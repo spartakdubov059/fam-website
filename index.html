@@ -4,14 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FAM — свои рядом</title>
+
+<!-- Основной CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Резерв, если первый не загрузился -->
+<script>
+  if (!window.supabase) {
+    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+  }
+</script>
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#f6f7fb;color:#20212a;font-family:Arial,sans-serif}
 header{background:white;padding:18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee}
 .logo{font-size:29px;font-weight:900;letter-spacing:-2px}
 .logo span{color:#ff7055}
-button{border:0;padding:12px 16px;border-radius:12px;background:#20212a;color:white;font-weight:bold;cursor:pointer}
+button{border:0;padding:12px 16px;border-radius:12px;background:#20212a;color:white;font-weight:bold;cursor:pointer;font-size:15px}
+button:disabled{opacity:.5;cursor:not-allowed}
 .accent{background:#ff7055}
 main{max-width:850px;margin:22px auto;padding:0 15px}
 .hero{background:#d9f7e9;padding:25px;border-radius:22px}
@@ -28,15 +38,17 @@ label{font-size:13px;font-weight:bold}
 .pill{font-size:12px;background:#f0f1f5;padding:6px 10px;border-radius:20px}
 .price{font-weight:bold;margin-top:14px}
 .small{font-size:12px;color:#747987}
-.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:15px}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:15px;z-index:999}
 .box{background:white;border-radius:20px;padding:22px;width:100%;max-width:420px;max-height:90vh;overflow:auto}
 .hidden{display:none!important}
 .notice{padding:12px;background:#fff0df;border-radius:12px;margin:12px 0;overflow-wrap:anywhere}
+.notice.error{background:#ffe0e0}
 footer{padding:25px;color:#777;font-size:12px;line-height:1.6}
 @media(max-width:480px){h1{font-size:30px}.filters{flex-direction:column}}
 </style>
 </head>
 <body>
+
 <header>
   <div>
     <div class="logo">FAM<span>.</span></div>
@@ -68,7 +80,7 @@ footer{padding:25px;color:#777;font-size:12px;line-height:1.6}
       <option>Учёба</option>
     </select>
   </div>
-  <div id="listings" class="grid">Загрузка объявлений...</div>
+  <div id="listings" class="grid">Загрузка объявлений…</div>
 </main>
 
 <footer>
@@ -83,34 +95,31 @@ FAM — площадка для объявлений. Не публикуй па
 </div>
 
 <script>
-const URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-const KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
-const db = window.supabase.createClient(URL, KEY);
+/* =========================================================
+   1. НАСТРОЙКИ
+   ========================================================= */
+const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
 
-let user = null;
-let listings = [];
-let onlyMine = false;
-
+/* =========================================================
+   2. УТИЛИТЫ И ГЛОБАЛЬНАЯ ОБРАБОТКА ОШИБОК
+   ========================================================= */
 const $ = id => document.getElementById(id);
 
-function message(text) {
-  $("notice").textContent = text;
-  $("notice").classList.remove("hidden");
+function showNotice(text, isError) {
+  const n = $("notice");
+  if (!n) return;
+  n.textContent = text;
+  n.classList.toggle("error", !!isError);
+  n.classList.remove("hidden");
+  clearTimeout(showNotice._t);
+  showNotice._t = setTimeout(() => n.classList.add("hidden"), 6000);
 }
 
-function openModal(html) {
-  $("modalContent").innerHTML = html;
-  $("modal").classList.remove("hidden");
+function setListingsText(text) {
+  const el = $("listings");
+  if (el) el.textContent = text;
 }
-
-function closeModal() {
-  $("modal").classList.add("hidden");
-}
-
-$("close").onclick = closeModal;
-$("modal").onclick = e => {
-  if (e.target === $("modal")) closeModal();
-};
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
@@ -119,55 +128,126 @@ function escapeHTML(value) {
   })[c]);
 }
 
+// Ловим любые ошибки страницы и показываем их
+window.addEventListener("error", e => {
+  setListingsText("ОШИБКА: " + (e.message || "неизвестная") +
+    (e.lineno ? " (строка " + e.lineno + ")" : ""));
+  showNotice("Ошибка: " + (e.message || "неизвестная"), true);
+});
+
+/* =========================================================
+   3. ПРОВЕРКА ЗАГРУЗКИ БИБЛИОТЕКИ
+   ========================================================= */
+if (!window.supabase) {
+  setListingsText("ОШИБКА: библиотека Supabase не загрузилась. Проверь интернет или блокировщик рекламы.");
+  $("authButton").disabled = true;
+  $("addButton").disabled = true;
+  showNotice("Библиотека Supabase не загрузилась", true);
+  throw new Error("Supabase SDK not loaded");
+}
+
+/* =========================================================
+   4. СОЗДАНИЕ КЛИЕНТА
+   ========================================================= */
+let db;
+try {
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+  setListingsText("ОШИБКА создания клиента: " + e.message);
+  showNotice("Ошибка клиента: " + e.message, true);
+  throw e;
+}
+
+/* =========================================================
+   5. СОСТОЯНИЕ
+   ========================================================= */
+let user = null;
+let listings = [];
+let onlyMine = false;
+
+/* =========================================================
+   6. МОДАЛЬНОЕ ОКНО
+   ========================================================= */
+function openModal(html) {
+  $("modalContent").innerHTML = html;
+  $("modal").classList.remove("hidden");
+}
+function closeModal() {
+  $("modal").classList.add("hidden");
+  $("modalContent").innerHTML = "";
+}
+$("close").onclick = closeModal;
+$("modal").onclick = e => { if (e.target === $("modal")) closeModal(); };
+
+/* =========================================================
+   7. АВТОРИЗАЦИЯ
+   ========================================================= */
 async function updateUser() {
-  const result = await db.auth.getUser();
-  user = result.data.user;
+  try {
+    const { data } = await db.auth.getUser();
+    user = data.user || null;
+  } catch {
+    user = null;
+  }
   $("authButton").textContent = user ? "Выйти" : "Войти";
   $("myButton").classList.toggle("hidden", !user);
 }
 
-function showAuth() {
+function showAuth(mode) {
+  // mode: 'in' | 'up'
+  const isIn = mode === "in";
   openModal(`
-    <h2>Вход и регистрация</h2>
+    <h2>${isIn ? "Вход" : "Регистрация"}</h2>
     <form id="authForm">
       <label>Электронная почта</label>
       <input id="email" type="email" required autocomplete="email">
-      <label>Пароль — минимум 6 символов</label>
+      <label>Пароль (минимум 6 символов)</label>
       <input id="password" type="password" minlength="6" required autocomplete="current-password">
-      <button class="accent" style="width:100%">Войти / создать аккаунт</button>
+      <button class="accent" style="width:100%" type="submit">
+        ${isIn ? "Войти" : "Создать аккаунт"}
+      </button>
     </form>
-    <p class="small">При регистрации может потребоваться подтверждение почты.</p>
-    <div id="authError" class="small"></div>
+    <p class="small" id="switchMode" style="cursor:pointer;text-decoration:underline;margin-top:12px">
+      ${isIn ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
+    </p>
+    <div id="authError" class="small" style="color:#c33"></div>
   `);
+
+  $("switchMode").onclick = () => showAuth(isIn ? "up" : "in");
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
     const email = $("email").value.trim();
     const password = $("password").value;
+    const errBox = $("authError");
+    errBox.textContent = "Подожди…";
 
-    let result = await db.auth.signInWithPassword({email, password});
+    try {
+      let result;
+      if (isIn) {
+        result = await db.auth.signInWithPassword({ email, password });
+      } else {
+        result = await db.auth.signUp({ email, password });
+      }
 
-    if (result.error &&
-        /invalid login credentials/i.test(result.error.message)) {
-      result = await db.auth.signUp({email, password});
+      if (result.error) {
+        errBox.textContent = "Ошибка: " + result.error.message;
+        return;
+      }
+
+      // Если регистрация и нет сессии — значит нужно подтвердить email
+      if (!isIn && !result.data.session) {
+        errBox.textContent = "Проверь почту и подтверди регистрацию, затем войди.";
+        return;
+      }
+
+      await updateUser();
+      closeModal();
+      await loadListings();
+      showNotice(isIn ? "Ты вошёл в FAM!" : "Аккаунт создан!");
+    } catch (err) {
+      errBox.textContent = "Ошибка: " + err.message;
     }
-
-    if (result.error) {
-      $("authError").textContent =
-        "Ошибка: " + result.error.message;
-      return;
-    }
-
-    if (!result.data.session) {
-      $("authError").textContent =
-        "Проверь почту для подтверждения регистрации, затем войди.";
-      return;
-    }
-
-    await updateUser();
-    closeModal();
-    await loadListings();
-    message("Ты вошёл в FAM!");
   };
 }
 
@@ -179,17 +259,17 @@ $("authButton").onclick = async () => {
     $("heading").textContent = "Свежие объявления";
     await updateUser();
     await loadListings();
-    message("Ты вышел из аккаунта.");
+    showNotice("Ты вышел из аккаунта.");
   } else {
-    showAuth();
+    showAuth("in");
   }
 };
 
+/* =========================================================
+   8. СОЗДАНИЕ ОБЪЯВЛЕНИЯ
+   ========================================================= */
 $("addButton").onclick = () => {
-  if (!user) {
-    showAuth();
-    return;
-  }
+  if (!user) { showAuth("in"); return; }
 
   openModal(`
     <h2>Новое объявление</h2>
@@ -207,13 +287,15 @@ $("addButton").onclick = () => {
       <textarea id="description" maxlength="1000" rows="4" required></textarea>
       <label>Цена или обмен</label>
       <input id="price" maxlength="60" placeholder="Например: бесплатно" required>
-      <button class="accent" style="width:100%">Опубликовать</button>
+      <button class="accent" style="width:100%" type="submit">Опубликовать</button>
     </form>
-    <div id="postError" class="small"></div>
+    <div id="postError" class="small" style="color:#c33"></div>
   `);
 
   $("postForm").onsubmit = async e => {
     e.preventDefault();
+    const errBox = $("postError");
+    errBox.textContent = "Публикуем…";
 
     const item = {
       user_id: user.id,
@@ -223,11 +305,9 @@ $("addButton").onclick = () => {
       price_text: $("price").value.trim()
     };
 
-    const result = await db.from("listings").insert(item);
-
-    if (result.error) {
-      $("postError").textContent =
-        "Не удалось опубликовать: " + result.error.message;
+    const { error } = await db.from("listings").insert(item);
+    if (error) {
+      errBox.textContent = "Не удалось: " + error.message;
       return;
     }
 
@@ -235,22 +315,27 @@ $("addButton").onclick = () => {
     onlyMine = false;
     $("heading").textContent = "Свежие объявления";
     await loadListings();
-    message("Объявление опубликовано!");
+    showNotice("Объявление опубликовано!");
   };
 };
 
+/* =========================================================
+   9. МОИ ОБЪЯВЛЕНИЯ
+   ========================================================= */
 $("myButton").onclick = async () => {
   onlyMine = !onlyMine;
-  $("heading").textContent =
-    onlyMine ? "Мои объявления" : "Свежие объявления";
+  $("heading").textContent = onlyMine ? "Мои объявления" : "Свежие объявления";
   await loadListings();
 };
 
 $("search").oninput = renderListings;
 $("category").onchange = renderListings;
 
+/* =========================================================
+   10. ЗАГРУЗКА И РЕНДЕР
+   ========================================================= */
 async function loadListings() {
-  $("listings").textContent = "Загрузка объявлений...";
+  setListingsText("Загрузка объявлений…");
 
   try {
     let query = db
@@ -258,7 +343,7 @@ async function loadListings() {
       .select("id,user_id,title,category,description,price_text,created_at,status")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
 
     if (onlyMine && user) {
       query = query.eq("user_id", user.id);
@@ -266,15 +351,17 @@ async function loadListings() {
 
     const { data, error } = await query;
 
-   if (error) {
-  $("listings").textContent = "Ошибка: " + error.message;
-  return;
-} 
+    if (error) {
+      setListingsText("Ошибка загрузки: " + error.message);
+      showNotice("Ошибка загрузки: " + error.message, true);
+      return;
+    }
+
     listings = data || [];
     renderListings();
-  } catch (error) {
-    $("listings").textContent =
-      "Ошибка загрузки: " + error.message;
+  } catch (err) {
+    setListingsText("Ошибка: " + err.message);
+    showNotice("Ошибка: " + err.message, true);
   }
 }
 
@@ -284,13 +371,11 @@ function renderListings() {
 
   const filtered = listings.filter(x =>
     (!category || x.category === category) &&
-    (!term || (x.title + " " + x.description)
-      .toLowerCase().includes(term))
+    (!term || (x.title + " " + x.description).toLowerCase().includes(term))
   );
 
   if (!filtered.length) {
-    $("listings").innerHTML =
-      '<div class="card">Объявлений пока нет. Будь первым!</div>';
+    $("listings").innerHTML = '<div class="card">Объявлений пока нет. Будь первым!</div>';
     return;
   }
 
@@ -301,33 +386,58 @@ function renderListings() {
       <p>${escapeHTML(x.description)}</p>
       <div class="price">${escapeHTML(x.price_text)}</div>
       <div class="small">${new Date(x.created_at).toLocaleDateString("ru-RU")}</div>
-      ${user && user.id === x.user_id ?
-        `<button style="margin-top:12px" onclick="hideListing('${x.id}')">Скрыть объявление</button>` : ""}
+      ${user && user.id === x.user_id
+        ? `<button style="margin-top:12px" data-hide="${x.id}">Скрыть объявление</button>`
+        : ""}
     </article>
   `).join("");
+
+  // Делегирование событий — вместо inline onclick
+  $("listings").querySelectorAll("[data-hide]").forEach(btn => {
+    btn.onclick = () => hideListing(btn.getAttribute("data-hide"));
+  });
 }
 
-window.hideListing = async id => {
-  const {error} = await db.from("listings")
-    .update({status:"hidden"})
-    .eq("id", id);
+async function hideListing(id) {
+  if (!user) return;
+  const { error } = await db
+    .from("listings")
+    .update({ status: "hidden" })
+    .eq("id", id)
+    .eq("user_id", user.id); // защита от чужого id
 
   if (error) {
-    message("Не удалось скрыть объявление: " + error.message);
+    showNotice("Не удалось скрыть: " + error.message, true);
     return;
   }
-
   await loadListings();
-  message("Объявление скрыто.");
-};
+  showNotice("Объявление скрыто.");
+}
 
-db.auth.onAuthStateChange(() => {
-  updateUser().then(loadListings);
+/* =========================================================
+   11. СЛУШАТЕЛЬ АВТОРИЗАЦИИ
+   ========================================================= */
+db.auth.onAuthStateChange((event, session) => {
+  user = session?.user ?? null;
+  $("authButton").textContent = user ? "Выйти" : "Войти";
+  $("myButton").classList.toggle("hidden", !user);
+  if (!user) {
+    onlyMine = false;
+    $("heading").textContent = "Свежие объявления";
+  }
 });
 
+/* =========================================================
+   12. СТАРТ
+   ========================================================= */
 (async () => {
-  await updateUser();
-  await loadListings();
+  try {
+    await updateUser();
+    await loadListings();
+  } catch (err) {
+    setListingsText("Ошибка старта: " + err.message);
+    showNotice("Ошибка старта: " + err.message, true);
+  }
 })();
 </script>
 </body>
