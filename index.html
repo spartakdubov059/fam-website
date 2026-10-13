@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAM — свои рядом</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f6f7fb;color:#20212a;font-family:Arial,sans-serif}
+header{background:white;padding:18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee}
+.logo{font-size:29px;font-weight:900;letter-spacing:-2px}
+.logo span{color:#ff7055}
+button{border:0;padding:12px 16px;border-radius:12px;background:#20212a;color:white;font-weight:bold;cursor:pointer}
+.accent{background:#ff7055}
+main{max-width:850px;margin:22px auto;padding:0 15px}
+.hero{background:#d9f7e9;padding:25px;border-radius:22px}
+h1{font-size:36px;margin:0 0 10px}
+p{line-height:1.5}
+input,textarea,select{width:100%;padding:13px;margin:6px 0 12px;border:1px solid #ddd;border-radius:11px;font-size:16px;background:white}
+label{font-size:13px;font-weight:bold}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.filters{display:flex;gap:8px;margin:18px 0}
+.filters>*{flex:1;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+.card{background:white;padding:17px;border-radius:17px;border:1px solid #eee;overflow-wrap:anywhere}
+.card h3{margin-bottom:8px}
+.pill{font-size:12px;background:#f0f1f5;padding:6px 10px;border-radius:20px}
+.price{font-weight:bold;margin-top:14px}
+.small{font-size:12px;color:#747987}
+.modal{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:15px}
+.box{background:white;border-radius:20px;padding:22px;width:100%;max-width:420px;max-height:90vh;overflow:auto}
+.hidden{display:none!important}
+.notice{padding:12px;background:#fff0df;border-radius:12px;margin:12px 0;overflow-wrap:anywhere}
+footer{padding:25px;color:#777;font-size:12px;line-height:1.6}
+@media(max-width:480px){h1{font-size:30px}.filters{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">FAM<span>.</span></div>
+    <div class="small">Свои рядом</div>
+  </div>
+  <button id="authButton" class="accent">Войти</button>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Нашёл своих.<br>Нашёл нужное.</h1>
+    <p>Объявления, идеи и помощь от ребят рядом.</p>
+    <div class="actions">
+      <button class="accent" id="addButton">＋ Разместить объявление</button>
+      <button id="myButton" class="hidden">Мои объявления</button>
+    </div>
+  </section>
+
+  <div id="notice" class="notice hidden"></div>
+
+  <h2 id="heading">Свежие объявления</h2>
+  <div class="filters">
+    <input id="search" placeholder="Поиск объявлений">
+    <select id="category">
+      <option value="">Все категории</option>
+      <option>Вещи</option>
+      <option>Услуги</option>
+      <option>Творчество</option>
+      <option>Учёба</option>
+    </select>
+  </div>
+  <div id="listings" class="grid">Загрузка объявлений...</div>
+</main>
+
+<footer>
+FAM — площадка для объявлений. Не публикуй пароли, домашний адрес и другие личные данные. Не отправляй незнакомцам деньги. Несовершеннолетним следует обсуждать встречи с незнакомыми людьми с родителями.
+</footer>
+
+<div id="modal" class="modal hidden">
+  <div class="box">
+    <button id="close" style="float:right">✕</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+const URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+const KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+const db = window.supabase.createClient(URL, KEY);
+
+let user = null;
+let listings = [];
+let onlyMine = false;
+
+const $ = id => document.getElementById(id);
+
+function message(text) {
+  $("notice").textContent = text;
+  $("notice").classList.remove("hidden");
+}
+
+function openModal(html) {
+  $("modalContent").innerHTML = html;
+  $("modal").classList.remove("hidden");
+}
+
+function closeModal() {
+  $("modal").classList.add("hidden");
+}
+
+$("close").onclick = closeModal;
+$("modal").onclick = e => {
+  if (e.target === $("modal")) closeModal();
+};
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#39;"
+  })[c]);
+}
+
+async function updateUser() {
+  const result = await db.auth.getUser();
+  user = result.data.user;
+  $("authButton").textContent = user ? "Выйти" : "Войти";
+  $("myButton").classList.toggle("hidden", !user);
+}
+
+function showAuth() {
+  openModal(`
+    <h2>Вход и регистрация</h2>
+    <form id="authForm">
+      <label>Электронная почта</label>
+      <input id="email" type="email" required autocomplete="email">
+      <label>Пароль — минимум 6 символов</label>
+      <input id="password" type="password" minlength="6" required autocomplete="current-password">
+      <button class="accent" style="width:100%">Войти / создать аккаунт</button>
+    </form>
+    <p class="small">При регистрации может потребоваться подтверждение почты.</p>
+    <div id="authError" class="small"></div>
+  `);
+
+  $("authForm").onsubmit = async e => {
+    e.preventDefault();
+    const email = $("email").value.trim();
+    const password = $("password").value;
+
+    let result = await db.auth.signInWithPassword({email, password});
+
+    if (result.error &&
+        /invalid login credentials/i.test(result.error.message)) {
+      result = await db.auth.signUp({email, password});
+    }
+
+    if (result.error) {
+      $("authError").textContent =
+        "Ошибка: " + result.error.message;
+      return;
+    }
+
+    if (!result.data.session) {
+      $("authError").textContent =
+        "Проверь почту для подтверждения регистрации, затем войди.";
+      return;
+    }
+
+    await updateUser();
+    closeModal();
+    await loadListings();
+    message("Ты вошёл в FAM!");
+  };
+}
+
+$("authButton").onclick = async () => {
+  if (user) {
+    await db.auth.signOut();
+    user = null;
+    onlyMine = false;
+    $("heading").textContent = "Свежие объявления";
+    await updateUser();
+    await loadListings();
+    message("Ты вышел из аккаунта.");
+  } else {
+    showAuth();
+  }
+};
+
+$("addButton").onclick = () => {
+  if (!user) {
+    showAuth();
+    return;
+  }
+
+  openModal(`
+    <h2>Новое объявление</h2>
+    <form id="postForm">
+      <label>Название</label>
+      <input id="title" maxlength="80" required>
+      <label>Категория</label>
+      <select id="cat">
+        <option>Вещи</option>
+        <option>Услуги</option>
+        <option>Творчество</option>
+        <option>Учёба</option>
+      </select>
+      <label>Описание</label>
+      <textarea id="description" maxlength="1000" rows="4" required></textarea>
+      <label>Цена или обмен</label>
+      <input id="price" maxlength="60" placeholder="Например: бесплатно" required>
+      <button class="accent" style="width:100%">Опубликовать</button>
+    </form>
+    <div id="postError" class="small"></div>
+  `);
+
+  $("postForm").onsubmit = async e => {
+    e.preventDefault();
+
+    const item = {
+      user_id: user.id,
+      title: $("title").value.trim(),
+      category: $("cat").value,
+      description: $("description").value.trim(),
+      price_text: $("price").value.trim()
+    };
+
+    const result = await db.from("listings").insert(item);
+
+    if (result.error) {
+      $("postError").textContent =
+        "Не удалось опубликовать: " + result.error.message;
+      return;
+    }
+
+    closeModal();
+    onlyMine = false;
+    $("heading").textContent = "Свежие объявления";
+    await loadListings();
+    message("Объявление опубликовано!");
+  };
+};
+
+$("myButton").onclick = async () => {
+  onlyMine = !onlyMine;
+  $("heading").textContent =
+    onlyMine ? "Мои объявления" : "Свежие объявления";
+  await loadListings();
+};
+
+$("search").oninput = renderListings;
+$("category").onchange = renderListings;
+
+async function loadListings() {
+  let query = db.from("listings")
+    .select("id,user_id,title,category,description,price_text,created_at,status")
+    .eq("status", "active")
+    .order("created_at", {ascending:false})
+    .limit(100);
+
+  if (onlyMine && user) {
+    query = query.eq("user_id", user.id);
+  }
+
+  const {data, error} = await query;
+
+  if (error) {
+    $("listings").textContent =
+      "Ошибка загрузки объявлений: " + error.message;
+    return;
+  }
+
+  listings = data || [];
+  renderListings();
+}
+
+function renderListings() {
+  const term = $("search").value.trim().toLowerCase();
+  const category = $("category").value;
+
+  const filtered = listings.filter(x =>
+    (!category || x.category === category) &&
+    (!term || (x.title + " " + x.description)
+      .toLowerCase().includes(term))
+  );
+
+  if (!filtered.length) {
+    $("listings").innerHTML =
+      '<div class="card">Объявлений пока нет. Будь первым!</div>';
+    return;
+  }
+
+  $("listings").innerHTML = filtered.map(x => `
+    <article class="card">
+      <span class="pill">${escapeHTML(x.category)}</span>
+      <h3>${escapeHTML(x.title)}</h3>
+      <p>${escapeHTML(x.description)}</p>
+      <div class="price">${escapeHTML(x.price_text)}</div>
+      <div class="small">${new Date(x.created_at).toLocaleDateString("ru-RU")}</div>
+      ${user && user.id === x.user_id ?
+        `<button style="margin-top:12px" onclick="hideListing('${x.id}')">Скрыть объявление</button>` : ""}
+    </article>
+  `).join("");
+}
+
+window.hideListing = async id => {
+  const {error} = await db.from("listings")
+    .update({status:"hidden"})
+    .eq("id", id);
+
+  if (error) {
+    message("Не удалось скрыть объявление: " + error.message);
+    return;
+  }
+
+  await loadListings();
+  message("Объявление скрыто.");
+};
+
+db.auth.onAuthStateChange(() => {
+  updateUser().then(loadListings);
+});
+
+(async () => {
+  await updateUser();
+  await loadListings();
+})();
+</script>
+</body>
+</html>
