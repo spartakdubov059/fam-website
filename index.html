@@ -254,7 +254,7 @@ async function loadListings() {
     .select("id,user_id,title,category,description,price_text,created_at,status")
     .eq("status", "active")
     .order("created_at", {ascending:false})
-    .limit(100);
+    .limit(20);
 
   if (onlyMine && user) {
     query = query.eq("user_id", user.id);
