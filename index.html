@@ -266,8 +266,10 @@ async function loadListings() {
 
     const { data, error } = await query;
 
-    if (error) throw error;
-
+   if (error) {
+  $("listings").textContent = "Ошибка: " + error.message;
+  return;
+} 
     listings = data || [];
     renderListings();
   } catch (error) {
