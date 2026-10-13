@@ -250,6 +250,25 @@ $("search").oninput = renderListings;
 $("category").onchange = renderListings;
 
 async function loadListings() {
+  $("listings").textContent = "Загрузка объявлений...";
+
+  try {
+    const { data, error } = await db
+      .from("listings")
+      .select("id,user_id,title,category,description,price_text,created_at,status")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+
+    listings = data || [];
+    renderListings();
+  } catch (error) {
+    $("listings").textContent =
+      "Ошибка загрузки: " + (error.message || "Нет соединения с сервером");
+  }
+}
   let query = db.from("listings")
     .select("id,user_id,title,category,description,price_text,created_at,status")
     .eq("status", "active")
