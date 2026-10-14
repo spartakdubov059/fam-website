@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#17181C">
 <title>FAM — Свои рядом</title>
-<meta name="description" content="FAM — площадка объявлений для своих. Вещи, услуги, творчество и учёба.">
+<meta name="description" content="FAM — площадка объявлений для своих.">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -20,13 +20,10 @@
   --muted: #A5A7B0;
   --border: #363840;
   --danger: #FF7777;
-  --success: #B9D8B6;
   --radius: 18px;
 }
-
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-
 body {
   margin: 0;
   background: var(--bg);
@@ -37,24 +34,17 @@ body {
   display: flex;
   flex-direction: column;
 }
-
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; transition: background .2s, transform .2s, opacity .2s; }
 button:active { transform: scale(.98); }
 button:disabled { opacity: .55; cursor: not-allowed; }
-
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-
 .hidden { display: none !important; }
 .small { font-size: 13px; color: var(--muted); }
 
-/* Шапка */
 header {
   position: sticky;
   top: 0;
@@ -68,7 +58,6 @@ header {
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(16px);
 }
-
 .logo { font-weight: 800; font-size: 22px; letter-spacing: -.5px; }
 .logo span { color: var(--accent); }
 
@@ -79,7 +68,6 @@ main {
   margin: 0 auto;
   padding: 24px 20px 60px;
 }
-
 .hero {
   background: linear-gradient(135deg, #292C33, #202126);
   border: 1px solid var(--border);
@@ -97,7 +85,6 @@ main {
 .hero p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
 .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
-/* Кнопки */
 button.primary, .primary, .accent {
   background: var(--accent);
   color: #17181C;
@@ -107,7 +94,6 @@ button.primary, .primary, .accent {
   font-weight: 700;
 }
 button.primary:hover, .primary:hover, .accent:hover { background: var(--accent-hover); }
-
 button.secondary, .secondary {
   background: var(--surface);
   color: var(--text);
@@ -117,7 +103,6 @@ button.secondary, .secondary {
 }
 button.secondary:hover, .secondary:hover { background: var(--surface-hover); }
 
-/* Поля */
 input, textarea, select {
   width: 100%;
   background: var(--surface);
@@ -135,7 +120,6 @@ input:focus, textarea:focus, select:focus {
 }
 label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 4px; }
 
-/* Фильтры */
 .filters {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -144,14 +128,11 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 4px;
 }
 @media (max-width: 600px) { .filters { grid-template-columns: 1fr; } }
 
-/* Сетка */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
-
-/* Карточки */
 .card, article {
   background: var(--surface);
   color: var(--text);
@@ -167,7 +148,6 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 4px;
 }
 .card h3 { margin: 10px 0 8px; }
 .card p { margin: 0 0 12px; color: var(--muted); }
-
 .pill {
   display: inline-block;
   background: rgba(212,215,222,.1);
@@ -177,18 +157,12 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 4px;
   font-size: 12px;
   font-weight: 600;
 }
-
 .price { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
-
 h1, h2, h3, h4 { color: var(--text); letter-spacing: -.4px; }
 h2 { margin: 24px 0 12px; }
-
 a { color: var(--text); text-decoration: none; }
 a:hover { color: var(--accent); }
 
-hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
-
-/* Notice */
 .notice {
   padding: 14px 16px;
   border-radius: 14px;
@@ -202,7 +176,6 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
   color: #ffb4b4;
 }
 
-/* Модалка */
 .modal {
   position: fixed;
   inset: 0;
@@ -227,7 +200,6 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 24px 0; }
   overflow-y: auto;
 }
 .modal h2 { margin: 0 0 16px; }
-
 #close {
   background: transparent;
   border: none;
@@ -246,7 +218,6 @@ footer {
   text-align: center;
   line-height: 1.6;
 }
-
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: #41434B; border-radius: 10px; }
@@ -312,17 +283,9 @@ FAM — площадка для объявлений. Не публикуй па
 (function () {
   "use strict";
 
-  /* =========================================================
-     1. НАСТРОЙКИ
-     ========================================================= */
   var SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-  // Если увидишь "Invalid API key" — замени на anon public key
-  // из Supabase → Settings → API
   var SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
 
-  /* =========================================================
-     2. УТИЛИТЫ
-     ========================================================= */
   function $(id) { return document.getElementById(id); }
 
   function showNotice(text, isError) {
@@ -343,9 +306,6 @@ FAM — площадка для объявлений. Не публикуй па
     });
   }
 
-  /* =========================================================
-     3. ПРОВЕРКА SDK
-     ========================================================= */
   if (!window.supabase || !window.supabase.createClient) {
     $("listings").textContent = "Ошибка: библиотека Supabase не загрузилась. Проверь интернет.";
     $("authButton").disabled = true;
@@ -354,9 +314,6 @@ FAM — площадка для объявлений. Не публикуй па
     return;
   }
 
-  /* =========================================================
-     4. КЛИЕНТ
-     ========================================================= */
   var db;
   try {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -365,16 +322,10 @@ FAM — площадка для объявлений. Не публикуй па
     return;
   }
 
-  /* =========================================================
-     5. СОСТОЯНИЕ
-     ========================================================= */
   var user = null;
   var listings = [];
   var onlyMine = false;
 
-  /* =========================================================
-     6. МОДАЛКА
-     ========================================================= */
   function openModal(html) {
     $("modalContent").innerHTML = html;
     $("modal").classList.remove("hidden");
@@ -388,9 +339,6 @@ FAM — площадка для объявлений. Не публикуй па
     if (e.target === $("modal")) closeModal();
   };
 
-  /* =========================================================
-     7. АВТОРИЗАЦИЯ
-     ========================================================= */
   function updateUser() {
     return db.auth.getUser().then(function (res) {
       user = (res && res.data && res.data.user) || null;
@@ -470,9 +418,6 @@ FAM — площадка для объявлений. Не публикуй па
     }
   };
 
-  /* =========================================================
-     8. СОЗДАНИЕ ОБЪЯВЛЕНИЯ
-     ========================================================= */
   $("addButton").onclick = function () {
     if (!user) { showAuth("in"); return; }
 
@@ -527,9 +472,6 @@ FAM — площадка для объявлений. Не публикуй па
     };
   };
 
-  /* =========================================================
-     9. ФИЛЬТРЫ И "МОИ"
-     ========================================================= */
   $("myButton").onclick = function () {
     onlyMine = !onlyMine;
     $("heading").textContent = onlyMine ? "Мои объявления" : "Свежие объявления";
@@ -539,9 +481,6 @@ FAM — площадка для объявлений. Не публикуй па
   $("search").oninput = renderListings;
   $("category").onchange = renderListings;
 
-  /* =========================================================
-     10. ЗАГРУЗКА И РЕНДЕР
-     ========================================================= */
   function loadListings() {
     var container = $("listings");
     container.textContent = "Загрузка объявлений…";
@@ -626,9 +565,6 @@ FAM — площадка для объявлений. Не публикуй па
       });
   }
 
-  /* =========================================================
-     11. АВТОСЛУШАТЕЛЬ
-     ========================================================= */
   db.auth.onAuthStateChange(function (event, session) {
     user = (session && session.user) || null;
     $("authButton").textContent = user ? "Выйти" : "Войти";
@@ -639,9 +575,6 @@ FAM — площадка для объявлений. Не публикуй па
     }
   });
 
-  /* =========================================================
-     12. СТАРТ
-     ========================================================= */
   updateUser().then(loadListings).catch(function (err) {
     showNotice("Ошибка старта: " + err.message, true);
   });
