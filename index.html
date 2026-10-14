@@ -1,584 +1,1565 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#17181C">
-<title>FAM — Свои рядом</title>
-<meta name="description" content="FAM — площадка объявлений для своих.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#17181C">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title>FAM — Свои рядом</title>
+  <meta name="description" content="FAM — современная площадка объявлений для своих. Вещи, услуги, творчество и учёба.">
 
-<style>
-:root {
-  --bg: #17181C;
-  --surface: #25272D;
-  --surface-hover: #2D3037;
-  --accent: #D4D7DE;
-  --accent-hover: #FFFFFF;
-  --text: #F5F5F5;
-  --muted: #A5A7B0;
-  --border: #363840;
-  --danger: #FF7777;
-  --radius: 18px;
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-button, input, textarea, select { font: inherit; }
-button { cursor: pointer; transition: background .2s, transform .2s, opacity .2s; }
-button:active { transform: scale(.98); }
-button:disabled { opacity: .55; cursor: not-allowed; }
-button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-.hidden { display: none !important; }
-.small { font-size: 13px; color: var(--muted); }
+  <style>
+    :root {
+      --bg: #17181C;
+      --surface: #25272D;
+      --surface-hover: #2D3037;
+      --accent: #D4D7DE;
+      --text: #F5F5F5;
+      --muted: #A5A7B0;
+      --border: #363840;
+      --danger: #FF7777;
+      --radius: 18px;
+    }
 
-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 24px;
-  background: rgba(23, 24, 28, .92);
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-}
-.logo { font-weight: 800; font-size: 22px; letter-spacing: -.5px; }
-.logo span { color: var(--accent); }
+    * {
+      box-sizing: border-box;
+    }
 
-main {
-  flex: 1;
-  width: 100%;
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 24px 20px 60px;
-}
-.hero {
-  background: linear-gradient(135deg, #292C33, #202126);
-  border: 1px solid var(--border);
-  border-radius: 26px;
-  padding: 32px;
-  margin-bottom: 24px;
-}
-.hero h1 {
-  margin: 0 0 12px;
-  font-size: clamp(30px, 5vw, 48px);
-  line-height: 1.08;
-  letter-spacing: -1.5px;
-  font-weight: 800;
-}
-.hero p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
-.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    html {
+      scroll-behavior: smooth;
+    }
 
-button.primary, .primary, .accent {
-  background: var(--accent);
-  color: #17181C;
-  border: none;
-  border-radius: 14px;
-  padding: 12px 18px;
-  font-weight: 700;
-}
-button.primary:hover, .primary:hover, .accent:hover { background: var(--accent-hover); }
-button.secondary, .secondary {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 18px;
-}
-button.secondary:hover, .secondary:hover { background: var(--surface-hover); }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Arial, sans-serif;
+      min-height: 100vh;
+    }
 
-input, textarea, select {
-  width: 100%;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: 13px 15px;
-  outline: none;
-  margin-bottom: 10px;
-}
-input::placeholder, textarea::placeholder { color: #777A85; }
-input:focus, textarea:focus, select:focus {
-  border-color: #777C88;
-  box-shadow: 0 0 0 3px rgba(212,215,222,.08);
-}
-label { display: block; font-size: 13px; color: var(--muted); margin: 6px 0 4px; }
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
 
-.filters {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-@media (max-width: 600px) { .filters { grid-template-columns: 1fr; } }
+    button {
+      cursor: pointer;
+    }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
-}
-.card, article {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  transition: background .2s, border-color .2s, transform .2s;
-}
-.card:hover, article:hover {
-  background: var(--surface-hover);
-  border-color: #50535D;
-  transform: translateY(-2px);
-}
-.card h3 { margin: 10px 0 8px; }
-.card p { margin: 0 0 12px; color: var(--muted); }
-.pill {
-  display: inline-block;
-  background: rgba(212,215,222,.1);
-  color: var(--accent);
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.price { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
-h1, h2, h3, h4 { color: var(--text); letter-spacing: -.4px; }
-h2 { margin: 24px 0 12px; }
-a { color: var(--text); text-decoration: none; }
-a:hover { color: var(--accent); }
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
 
-.notice {
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: rgba(212,215,222,.08);
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-.notice.error {
-  background: rgba(220,80,80,.12);
-  border-color: rgba(220,80,80,.35);
-  color: #ffb4b4;
-}
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(23, 24, 28, .92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
 
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 100;
-}
-.modal.hidden { display: none !important; }
-.modal .box {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  box-shadow: 0 24px 80px rgba(0,0,0,.4);
-  width: 100%;
-  max-width: 420px;
-  padding: 24px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-.modal h2 { margin: 0 0 16px; }
-#close {
-  background: transparent;
-  border: none;
-  color: var(--muted);
-  font-size: 18px;
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-#close:hover { background: var(--surface-hover); color: var(--text); }
+    .header-inner {
+      width: min(1100px, calc(100% - 32px));
+      min-height: 76px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
 
-footer {
-  color: var(--muted);
-  border-top: 1px solid var(--border);
-  padding: 24px;
-  font-size: 13px;
-  text-align: center;
-  line-height: 1.6;
-}
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: #41434B; border-radius: 10px; }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      color: var(--text);
+      text-decoration: none;
+    }
 
-@media (max-width: 600px) {
-  .hero { padding: 24px 20px; border-radius: 22px; }
-  .hero h1 { font-size: 34px; }
-  button { min-height: 42px; }
-  header { padding: 12px 16px; }
-  main { padding: 16px 14px 40px; }
-}
-</style>
+    .logo-mark {
+      display: grid;
+      place-items: center;
+      width: 43px;
+      height: 43px;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #17181C;
+      font-size: 19px;
+      font-weight: 950;
+      letter-spacing: -1.5px;
+    }
+
+    .logo-name {
+      font-size: 19px;
+      font-weight: 850;
+      letter-spacing: 1px;
+    }
+
+    .logo-caption {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .button {
+      min-height: 43px;
+      padding: 0 17px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      font-size: 13px;
+      font-weight: 750;
+      transition: .2s ease;
+    }
+
+    .button-primary {
+      background: var(--accent);
+      color: #17181C;
+    }
+
+    .button-primary:hover {
+      background: #FFFFFF;
+      transform: translateY(-1px);
+    }
+
+    .button-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .button-secondary:hover {
+      background: var(--surface-hover);
+    }
+
+    .button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    main {
+      width: min(1000px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      padding: 55px 0 30px;
+    }
+
+    .hero-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .hero-dot {
+      width: 7px;
+      height: 7px;
+      background: #B9D8B6;
+      border-radius: 50%;
+    }
+
+    h1 {
+      max-width: 700px;
+      margin: 20px 0 14px;
+      font-size: clamp(37px, 7vw, 66px);
+      line-height: 1.02;
+      letter-spacing: -2.5px;
+      font-weight: 900;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .hero-description {
+      max-width: 500px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 25px;
+    }
+
+    .search-box {
+      margin-top: 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 17px;
+      min-height: 57px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 17px;
+      transition: border-color .2s;
+    }
+
+    .search-box:focus-within {
+      border-color: #777B86;
+    }
+
+    .search-icon {
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .search-box input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .search-box input::placeholder {
+      color: #858792;
+    }
+
+    .section {
+      padding: 24px 0 55px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 23px;
+      font-weight: 850;
+      letter-spacing: -.6px;
+    }
+
+    .results-count {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .categories {
+      display: flex;
+      gap: 9px;
+      overflow-x: auto;
+      padding: 2px 1px 12px;
+      scrollbar-width: none;
+    }
+
+    .categories::-webkit-scrollbar {
+      display: none;
+    }
+
+    .category-button {
+      flex: 0 0 auto;
+      min-height: 40px;
+      padding: 0 15px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+      transition: .2s;
+    }
+
+    .category-button:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .category-button.active {
+      background: var(--accent);
+      color: #17181C;
+      border-color: var(--accent);
+    }
+
+    .listings {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .listing-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 205px;
+      padding: 19px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: transform .2s, border-color .2s, background .2s;
+    }
+
+    .listing-card:hover {
+      transform: translateY(-3px);
+      background: var(--surface-hover);
+      border-color: #4A4D57;
+    }
+
+    .listing-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .listing-category {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 9px;
+      border: 1px solid #41434C;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .listing-date {
+      color: #858792;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .listing-title {
+      margin: 0 0 9px;
+      font-size: 17px;
+      font-weight: 800;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .listing-description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .listing-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 20px;
+    }
+
+    .listing-price {
+      font-size: 17px;
+      font-weight: 850;
+      overflow-wrap: anywhere;
+    }
+
+    .listing-owner {
+      max-width: 45%;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .listing-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    .small-button {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .small-button:hover {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      padding: 48px 20px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px dashed #41434C;
+      border-radius: var(--radius);
+    }
+
+    .empty-icon {
+      margin-bottom: 12px;
+      font-size: 30px;
+    }
+
+    .empty-state h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+    }
+
+    .empty-state p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .notice {
+      margin-top: 15px;
+      padding: 13px 15px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .notice.error {
+      color: #FFAAAA;
+      border-color: #704040;
+    }
+
+    .notice.success {
+      color: #B9D8B6;
+      border-color: #405C42;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Модальные окна */
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0, 0, 0, .72);
+      backdrop-filter: blur(8px);
+      overflow-y: auto;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      width: min(100%, 440px);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      padding: 25px;
+      background: #202126;
+      border: 1px solid #41434C;
+      border-radius: 22px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, .4);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 15px;
+      margin-bottom: 22px;
+    }
+
+    .modal-header h2 {
+      margin: 0 0 7px;
+      font-size: 23px;
+      font-weight: 850;
+    }
+
+    .modal-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .close-button {
+      flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #D7D8DE;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      min-height: 46px;
+      padding: 12px 13px;
+      border: 1px solid #41434C;
+      border-radius: 12px;
+      outline: none;
+      background: #292B31;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .form-group textarea {
+      min-height: 100px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: #888B95;
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: #858792;
+    }
+
+    .form-submit {
+      width: 100%;
+      margin-top: 5px;
+    }
+
+    .modal-switch {
+      margin: 17px 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .text-button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font-weight: 750;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .form-message {
+      margin-top: 13px;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    /* Подвал SPR STUDIO */
+
+    footer {
+      width: min(100% - 40px, 1000px);
+      margin: 0 auto;
+      padding: 32px 0;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .footer-line {
+      width: 28px;
+      height: 1px;
+      background: #555862;
+    }
+
+    .footer-created {
+      color: #858792;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+    }
+
+    .footer-studio {
+      color: #F5F5F5;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    .footer-studio span {
+      color: #A5A7B0;
+    }
+
+    .footer-note {
+      max-width: 600px;
+      margin: 13px auto 0;
+      color: #777A85;
+      font-size: 12px;
+      line-height: 1.8;
+      letter-spacing: .3px;
+    }
+
+    /* Полоса прокрутки */
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #41434C;
+      border-radius: 10px;
+    }
+
+    @media (max-width: 760px) {
+      .listings {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero {
+        padding-top: 40px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .header-inner {
+        width: calc(100% - 24px);
+        min-height: 68px;
+      }
+
+      .logo-mark {
+        width: 38px;
+        height: 38px;
+      }
+
+      .logo-name {
+        font-size: 16px;
+      }
+
+      .logo-caption {
+        font-size: 10px;
+      }
+
+      .header-actions {
+        gap: 6px;
+      }
+
+      .header-actions .button {
+        min-height: 38px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+
+      main {
+        width: calc(100% - 28px);
+      }
+
+      .hero {
+        padding-top: 35px;
+      }
+
+      h1 {
+        letter-spacing: -1.7px;
+      }
+
+      .hero-description {
+        font-size: 14px;
+      }
+
+      .listings {
+        grid-template-columns: 1fr;
+      }
+
+      .listing-card {
+        min-height: 185px;
+      }
+
+      .section-heading h2 {
+        font-size: 20px;
+      }
+
+      .modal-content {
+        padding: 20px;
+      }
+
+      footer {
+        width: calc(100% - 28px);
+      }
+
+      .footer-brand {
+        gap: 8px;
+      }
+
+      .footer-line {
+        width: 18px;
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="#" class="logo" aria-label="FAM — главная">
+        <div class="logo-mark">F</div>
+        <div>
+          <div class="logo-name">FAM</div>
+          <div class="logo-caption">Свои рядом</div>
+        </div>
+      </a>
 
-<header>
-  <div>
-    <div class="logo">FAM<span>.</span></div>
-    <div class="small">Свои рядом</div>
-  </div>
-  <button id="authButton" class="accent">Войти</button>
-</header>
-
-<main>
-  <section class="hero">
-    <h1>Нашёл своих.<br>Нашёл нужное.</h1>
-    <p>Объявления, идеи и помощь от ребят рядом.</p>
-    <div class="actions">
-      <button class="accent" id="addButton">＋ Разместить объявление</button>
-      <button id="myButton" class="hidden secondary">Мои объявления</button>
+      <div class="header-actions">
+        <button class="button button-secondary" id="myListingsButton">
+          Мои объявления
+        </button>
+        <button class="button button-primary" id="authButton">
+          Войти
+        </button>
+      </div>
     </div>
-  </section>
+  </header>
 
-  <div id="notice" class="notice hidden"></div>
+  <main>
+    <section class="hero">
+      <div class="hero-label">
+        <span class="hero-dot"></span>
+        Место для своих
+      </div>
 
-  <h2 id="heading">Свежие объявления</h2>
-  <div class="filters">
-    <input id="search" placeholder="Поиск объявлений">
-    <select id="category">
-      <option value="">Все категории</option>
-      <option>Вещи</option>
-      <option>Услуги</option>
-      <option>Творчество</option>
-      <option>Учёба</option>
-    </select>
+      <h1>Находи своё.<br><span>Создавай своё.</span></h1>
+
+      <p class="hero-description">
+        Вещи, услуги, творчество и учёба — всё, чем хочется поделиться
+        с другими. Просто, быстро и рядом.
+      </p>
+
+      <div class="hero-actions">
+        <button class="button button-primary" id="createListingButton">
+          + Разместить объявление
+        </button>
+        <button class="button button-secondary" id="showAllButton">
+          Смотреть объявления
+        </button>
+      </div>
+
+      <label class="search-box">
+        <span class="search-icon">⌕</span>
+        <input
+          id="searchInput"
+          type="search"
+          placeholder="Что ищем сегодня?"
+          autocomplete="off"
+          aria-label="Поиск объявлений"
+        >
+      </label>
+    </section>
+
+    <section class="section" id="listingsSection">
+      <div class="section-heading">
+        <h2 id="listingsHeading">Объявления</h2>
+        <span class="results-count" id="resultsCount"></span>
+      </div>
+
+      <div class="categories" id="categories">
+        <button class="category-button active" data-category="Все">Все</button>
+        <button class="category-button" data-category="Вещи">Вещи</button>
+        <button class="category-button" data-category="Услуги">Услуги</button>
+        <button class="category-button" data-category="Творчество">Творчество</button>
+        <button class="category-button" data-category="Учёба">Учёба</button>
+      </div>
+
+      <div id="notice" class="notice hidden" role="status"></div>
+
+      <div class="listings" id="listings">
+        <div class="empty-state">
+          <div class="empty-icon">✳</div>
+          <h3>Загружаем объявления</h3>
+          <p>Секунду, скоро всё появится.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-brand">
+      <span class="footer-line"></span>
+      <span class="footer-created">CREATED BY</span>
+      <span class="footer-studio">SPR <span>STUDIO</span></span>
+      <span class="footer-line"></span>
+    </div>
+
+    <p class="footer-note">
+      FAM — свои рядом.<br>
+      Не публикуй пароли, домашний адрес и другие личные данные.
+      Не отправляй незнакомцам деньги. Несовершеннолетним следует
+      обсуждать встречи с незнакомыми людьми с родителями.
+    </p>
+  </footer>
+
+  <!-- Окно входа и регистрации -->
+  <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 id="authTitle">С возвращением!</h2>
+          <p id="authDescription">Войди, чтобы быть среди своих.</p>
+        </div>
+        <button class="close-button" data-close="authModal" aria-label="Закрыть">×</button>
+      </div>
+
+      <form id="authForm">
+        <div class="form-group">
+          <label for="authEmail">Электронная почта</label>
+          <input
+            id="authEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="authPassword">Пароль</label>
+          <input
+            id="authPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Минимум 6 символов"
+            minlength="6"
+            required
+          >
+        </div>
+
+        <button class="button button-primary form-submit" id="authSubmit" type="submit">
+          Войти
+        </button>
+
+        <div class="form-message" id="authMessage" aria-live="polite"></div>
+      </form>
+
+      <p class="modal-switch">
+        <span id="authSwitchText">Впервые здесь?</span>
+        <button class="text-button" id="authSwitchButton" type="button">
+          Создать аккаунт
+        </button>
+      </p>
+    </div>
   </div>
-  <div id="listings" class="grid">Загрузка объявлений…</div>
-</main>
 
-<footer>
-FAM — площадка для объявлений. Не публикуй пароли, домашний адрес и другие личные данные. Не отправляй незнакомцам деньги. Несовершеннолетним следует обсуждать встречи с незнакомыми людьми с родителями.
-</footer>
+  <!-- Окно создания объявления -->
+  <div class="modal" id="listingModal" role="dialog" aria-modal="true" aria-labelledby="listingModalTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 id="listingModalTitle">Новое объявление</h2>
+          <p>Расскажи другим, что предлагаешь.</p>
+        </div>
+        <button class="close-button" data-close="listingModal" aria-label="Закрыть">×</button>
+      </div>
 
-<div id="modal" class="modal hidden">
-  <div class="box">
-    <button id="close" style="float:right">✕</button>
-    <div id="modalContent"></div>
+      <form id="listingForm">
+        <div class="form-group">
+          <label for="listingTitle">Название</label>
+          <input
+            id="listingTitle"
+            type="text"
+            maxlength="100"
+            placeholder="Например, продаю наушники"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="listingCategory">Категория</label>
+          <select id="listingCategory" required>
+            <option value="Вещи">Вещи</option>
+            <option value="Услуги">Услуги</option>
+            <option value="Творчество">Творчество</option>
+            <option value="Учёба">Учёба</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="listingDescription">Описание</label>
+          <textarea
+            id="listingDescription"
+            maxlength="1500"
+            placeholder="Расскажи подробнее..."
+            required
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="listingPrice">Цена</label>
+          <input
+            id="listingPrice"
+            type="text"
+            maxlength="50"
+            placeholder="Например, 500 ₽ или бесплатно"
+            required
+          >
+        </div>
+
+        <button class="button button-primary form-submit" id="listingSubmit" type="submit">
+          Опубликовать
+        </button>
+
+        <div class="form-message" id="listingMessage" aria-live="polite"></div>
+      </form>
+    </div>
   </div>
-</div>
 
-<script>
-(function () {
-  "use strict";
+  <script>
+    const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
 
-  var SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-  var SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+    let supabaseClient = null;
+    let currentUser = null;
+    let allListings = [];
+    let selectedCategory = "Все";
+    let showOnlyMine = false;
+    let authMode = "login";
 
-  function $(id) { return document.getElementById(id); }
+    const $ = (id) => document.getElementById(id);
 
-  function showNotice(text, isError) {
-    var n = $("notice");
-    if (!n) return;
-    n.textContent = text;
-    n.classList.toggle("error", !!isError);
-    n.classList.remove("hidden");
-    clearTimeout(showNotice._t);
-    showNotice._t = setTimeout(function () {
-      n.classList.add("hidden");
-    }, 6000);
-  }
-
-  function escapeHTML(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
-      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
-    });
-  }
-
-  if (!window.supabase || !window.supabase.createClient) {
-    $("listings").textContent = "Ошибка: библиотека Supabase не загрузилась. Проверь интернет.";
-    $("authButton").disabled = true;
-    $("addButton").disabled = true;
-    showNotice("Библиотека Supabase не загрузилась", true);
-    return;
-  }
-
-  var db;
-  try {
-    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } catch (e) {
-    showNotice("Ошибка клиента: " + e.message, true);
-    return;
-  }
-
-  var user = null;
-  var listings = [];
-  var onlyMine = false;
-
-  function openModal(html) {
-    $("modalContent").innerHTML = html;
-    $("modal").classList.remove("hidden");
-  }
-  function closeModal() {
-    $("modal").classList.add("hidden");
-    $("modalContent").innerHTML = "";
-  }
-  $("close").onclick = closeModal;
-  $("modal").onclick = function (e) {
-    if (e.target === $("modal")) closeModal();
-  };
-
-  function updateUser() {
-    return db.auth.getUser().then(function (res) {
-      user = (res && res.data && res.data.user) || null;
-    }).catch(function () {
-      user = null;
-    }).then(function () {
-      $("authButton").textContent = user ? "Выйти" : "Войти";
-      $("myButton").classList.toggle("hidden", !user);
-    });
-  }
-
-  function showAuth(mode) {
-    var isIn = mode === "in";
-    openModal(
-      '<h2>' + (isIn ? "Вход" : "Регистрация") + '</h2>' +
-      '<form id="authForm">' +
-        '<label>Электронная почта</label>' +
-        '<input id="email" type="email" required autocomplete="email">' +
-        '<label>Пароль (минимум 6 символов)</label>' +
-        '<input id="password" type="password" minlength="6" required>' +
-        '<button class="accent" style="width:100%;margin-top:8px" type="submit">' +
-          (isIn ? "Войти" : "Создать аккаунт") +
-        '</button>' +
-      '</form>' +
-      '<p class="small" id="switchMode" style="cursor:pointer;text-decoration:underline;margin-top:12px">' +
-        (isIn ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти") +
-      '</p>' +
-      '<div id="authError" class="small" style="color:#ff9a9a"></div>'
-    );
-
-    $("switchMode").onclick = function () { showAuth(isIn ? "up" : "in"); };
-
-    $("authForm").onsubmit = function (e) {
-      e.preventDefault();
-      var email = $("email").value.trim();
-      var password = $("password").value;
-      var errBox = $("authError");
-      errBox.textContent = "Подожди…";
-
-      var action = isIn
-        ? db.auth.signInWithPassword({ email: email, password: password })
-        : db.auth.signUp({ email: email, password: password });
-
-      action.then(function (result) {
-        if (result.error) {
-          errBox.textContent = "Ошибка: " + result.error.message;
-          return;
-        }
-        if (!isIn && !result.data.session) {
-          errBox.textContent = "Проверь почту и подтверди регистрацию.";
-          return;
-        }
-        return updateUser().then(function () {
-          closeModal();
-          return loadListings();
-        }).then(function () {
-          showNotice(isIn ? "Ты вошёл в FAM!" : "Аккаунт создан!");
-        });
-      }).catch(function (err) {
-        errBox.textContent = "Ошибка: " + err.message;
-      });
-    };
-  }
-
-  $("authButton").onclick = function () {
-    if (user) {
-      db.auth.signOut().then(function () {
-        user = null;
-        onlyMine = false;
-        $("heading").textContent = "Свежие объявления";
-        return updateUser();
-      }).then(loadListings).then(function () {
-        showNotice("Ты вышел из аккаунта.");
-      });
-    } else {
-      showAuth("in");
+    function showNotice(message, type = "") {
+      const notice = $("notice");
+      notice.textContent = message;
+      notice.className = "notice" + (type ? " " + type : "");
     }
-  };
 
-  $("addButton").onclick = function () {
-    if (!user) { showAuth("in"); return; }
+    function hideNotice() {
+      $("notice").classList.add("hidden");
+    }
 
-    openModal(
-      '<h2>Новое объявление</h2>' +
-      '<form id="postForm">' +
-        '<label>Название</label>' +
-        '<input id="title" maxlength="80" required>' +
-        '<label>Категория</label>' +
-        '<select id="cat">' +
-          '<option>Вещи</option>' +
-          '<option>Услуги</option>' +
-          '<option>Творчество</option>' +
-          '<option>Учёба</option>' +
-        '</select>' +
-        '<label>Описание</label>' +
-        '<textarea id="description" maxlength="1000" rows="4" required></textarea>' +
-        '<label>Цена или обмен</label>' +
-        '<input id="price" maxlength="60" placeholder="Например: бесплатно" required>' +
-        '<button class="accent" style="width:100%;margin-top:8px" type="submit">Опубликовать</button>' +
-      '</form>' +
-      '<div id="postError" class="small" style="color:#ff9a9a"></div>'
-    );
+    function setFormMessage(id, message, type = "") {
+      const element = $(id);
+      element.textContent = message;
+      element.style.color =
+        type === "error" ? "#FFAAAA" :
+        type === "success" ? "#B9D8B6" : "#A5A7B0";
+    }
 
-    $("postForm").onsubmit = function (e) {
-      e.preventDefault();
-      var errBox = $("postError");
-      errBox.textContent = "Публикуем…";
+    function openModal(id) {
+      $(id).classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
 
-      var item = {
-        user_id: user.id,
-        title: $("title").value.trim(),
-        category: $("cat").value,
-        description: $("description").value.trim(),
-        price_text: $("price").value.trim()
-      };
+    function closeModal(id) {
+      $(id).classList.remove("open");
 
-      db.from("listings").insert(item).then(function (res) {
-        if (res.error) {
-          errBox.textContent = "Не удалось: " + res.error.message;
-          return;
-        }
-        closeModal();
-        onlyMine = false;
-        $("heading").textContent = "Свежие объявления";
-        return loadListings().then(function () {
-          showNotice("Объявление опубликовано!");
-        });
-      }).catch(function (err) {
-        errBox.textContent = "Ошибка: " + err.message;
+      if (!document.querySelector(".modal.open")) {
+        document.body.style.overflow = "";
+      }
+    }
+
+    document.querySelectorAll("[data-close]").forEach((button) => {
+      button.addEventListener("click", () => {
+        closeModal(button.dataset.close);
       });
-    };
-  };
+    });
 
-  $("myButton").onclick = function () {
-    onlyMine = !onlyMine;
-    $("heading").textContent = onlyMine ? "Мои объявления" : "Свежие объявления";
-    loadListings();
-  };
+    document.querySelectorAll(".modal").forEach((modal) => {
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeModal(modal.id);
+        }
+      });
+    });
 
-  $("search").oninput = renderListings;
-  $("category").onchange = renderListings;
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        document.querySelectorAll(".modal.open").forEach((modal) => {
+          closeModal(modal.id);
+        });
+      }
+    });
 
-  function loadListings() {
-    var container = $("listings");
-    container.textContent = "Загрузка объявлений…";
+    function updateAuthButton() {
+      $("authButton").textContent = currentUser
+        ? "Мой аккаунт"
+        : "Войти";
+    }
 
-    var query = db
-      .from("listings")
-      .select("id,user_id,title,category,description,price_text,created_at,status")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(30);
+    function formatDate(dateString) {
+      if (!dateString) return "";
 
-    if (onlyMine && user) query = query.eq("user_id", user.id);
+      const date = new Date(dateString);
 
-    return query.then(function (res) {
-      if (res.error) {
-        container.textContent = "Ошибка загрузки: " + res.error.message;
-        showNotice("Ошибка загрузки: " + res.error.message, true);
+      if (Number.isNaN(date.getTime())) return "";
+
+      return date.toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short"
+      });
+    }
+
+    function makeElement(tag, className, text) {
+      const element = document.createElement(tag);
+
+      if (className) element.className = className;
+      if (text !== undefined) element.textContent = text;
+
+      return element;
+    }
+
+    function renderListings() {
+      const container = $("listings");
+      container.replaceChildren();
+
+      const search = $("searchInput").value.trim().toLowerCase();
+
+      const filtered = allListings.filter((listing) => {
+        const matchesCategory =
+          selectedCategory === "Все" ||
+          listing.category === selectedCategory;
+
+        const searchableText = [
+          listing.title,
+          listing.description,
+          listing.category,
+          listing.price_text
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        const matchesSearch = searchableText.includes(search);
+
+        const matchesMine =
+          !showOnlyMine ||
+          (currentUser && listing.user_id === currentUser.id);
+
+        return matchesCategory && matchesSearch && matchesMine;
+      });
+
+      $("resultsCount").textContent =
+        filtered.length + " " + pluralize(filtered.length);
+
+      $("listingsHeading").textContent =
+        showOnlyMine ? "Мои объявления" : "Объявления";
+
+      if (filtered.length === 0) {
+        const empty = makeElement("div", "empty-state");
+        empty.append(
+          makeElement("div", "empty-icon", "✳"),
+          makeElement(
+            "h3",
+            "",
+            showOnlyMine
+              ? "У тебя пока нет объявлений"
+              : "Пока ничего не найдено"
+          ),
+          makeElement(
+            "p",
+            "",
+            showOnlyMine
+              ? "Создай первое объявление — пусть свои его увидят."
+              : "Попробуй изменить запрос или выбрать другую категорию."
+          )
+        );
+
+        container.append(empty);
         return;
       }
-      listings = res.data || [];
-      renderListings();
-    }).catch(function (err) {
-      container.textContent = "Ошибка: " + err.message;
-      showNotice("Ошибка: " + err.message, true);
-    });
-  }
 
-  function renderListings() {
-    var term = $("search").value.trim().toLowerCase();
-    var category = $("category").value;
+      filtered.forEach((listing) => {
+        const card = makeElement("article", "listing-card");
+        const top = makeElement("div", "listing-top");
 
-    var filtered = listings.filter(function (x) {
-      var okCat = !category || x.category === category;
-      var hay = ((x.title || "") + " " + (x.description || "")).toLowerCase();
-      var okTerm = !term || hay.indexOf(term) !== -1;
-      return okCat && okTerm;
-    });
+        top.append(
+          makeElement("span", "listing-category", listing.category || "Другое"),
+          makeElement("span", "listing-date", formatDate(listing.created_at))
+        );
 
-    if (!filtered.length) {
-      $("listings").innerHTML = '<div class="card">Объявлений пока нет. Будь первым!</div>';
-      return;
-    }
+        const title = makeElement("h3", "listing-title", listing.title);
+        const description = makeElement(
+          "p",
+          "listing-description",
+          listing.description
+        );
 
-    $("listings").innerHTML = filtered.map(function (x) {
-      var canHide = user && user.id === x.user_id;
-      return (
-        '<article class="card">' +
-          '<span class="pill">' + escapeHTML(x.category) + '</span>' +
-          '<h3>' + escapeHTML(x.title) + '</h3>' +
-          '<p>' + escapeHTML(x.description) + '</p>' +
-          '<div class="price">' + escapeHTML(x.price_text) + '</div>' +
-          '<div class="small">' + new Date(x.created_at).toLocaleDateString("ru-RU") + '</div>' +
-          (canHide
-            ? '<button class="secondary" style="margin-top:12px" data-hide="' + x.id + '">Скрыть</button>'
-            : '') +
-        '</article>'
-      );
-    }).join("");
+        const bottom = makeElement("div", "listing-bottom");
+        bottom.append(
+          makeElement("div", "listing-price", listing.price_text || "Цена договорная"),
+          makeElement("div", "listing-owner", "Участник FAM")
+        );
 
-    var buttons = $("listings").querySelectorAll("[data-hide]");
-    for (var i = 0; i < buttons.length; i++) {
-      (function (btn) {
-        btn.onclick = function () { hideListing(btn.getAttribute("data-hide")); };
-      })(buttons[i]);
-    }
-  }
+        card.append(top, title, description, bottom);
 
-  function hideListing(id) {
-    if (!user) return;
-    db.from("listings")
-      .update({ status: "hidden" })
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .then(function (res) {
-        if (res.error) {
-          showNotice("Не удалось скрыть: " + res.error.message, true);
-          return;
+        if (currentUser && listing.user_id === currentUser.id) {
+          const actions = makeElement("div", "listing-actions");
+          const hideButton = makeElement("button", "small-button", "Снять с публикации");
+
+          hideButton.type = "button";
+          hideButton.addEventListener("click", () => {
+            hideListing(listing.id, hideButton);
+          });
+
+          actions.append(hideButton);
+          card.append(actions);
         }
-        return loadListings().then(function () {
-          showNotice("Объявление скрыто.");
-        });
+
+        container.append(card);
       });
-  }
-
-  db.auth.onAuthStateChange(function (event, session) {
-    user = (session && session.user) || null;
-    $("authButton").textContent = user ? "Выйти" : "Войти";
-    $("myButton").classList.toggle("hidden", !user);
-    if (!user) {
-      onlyMine = false;
-      $("heading").textContent = "Свежие объявления";
     }
-  });
 
-  updateUser().then(loadListings).catch(function (err) {
-    showNotice("Ошибка старта: " + err.message, true);
-  });
-})();
-</script>
+    function pluralize(number) {
+      const lastTwo = number % 100;
+      const last = number % 10;
+
+      if (lastTwo >= 11 && lastTwo <= 14) return "объявлений";
+      if (last === 1) return "объявление";
+      if (last >= 2 && last <= 4) return "объявления";
+
+      return "объявлений";
+    }
+
+    async function loadListings() {
+      if (!supabaseClient) return;
+
+      $("listings").innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">✳</div>
+          <h3>Загружаем объявления</h3>
+          <p>Секунду, скоро всё появится.</p>
+        </div>
+      `;
+
+      hideNotice();
+
+      try {
+        const { data, error } = await supabaseClient
+          .from("listings")
+          .select("id,user_id,title,category,description,price_text,created_at,status")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+
+        allListings = data || [];
+        renderListings();
+      } catch (error) {
+        console.error("Ошибка загрузки объявлений:", error);
+
+        allListings = [];
+        renderListings();
+
+        showNotice(
+          "Не удалось загрузить объявления. Проверь подключение к интернету и настройки базы данных Supabase.",
+          "error"
+        );
+      }
+    }
+
+    async function hideListing(id, button) {
+      if (!currentUser) {
+        openAuthModal();
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "Снять объявление с публикации? Оно перестанет отображаться в общем списке."
+      );
+
+      if (!confirmed) return;
+
+      button.disabled = true;
+
+      try {
+        const { error } = await supabaseClient
+          .from("listings")
+          .update({ status: "hidden" })
+          .eq("id", id)
+          .eq("user_id", currentUser.id);
+
+        if (error) throw error;
+
+        await loadListings();
+        showNotice("Объявление снято с публикации.", "success");
+      } catch (error) {
+        console.error("Ошибка снятия объявления:", error);
+        showNotice("Не удалось снять объявление. Попробуй ещё раз.", "error");
+        button.disabled = false;
+      }
+    }
+
+    function openAuthModal() {
+      authMode = "login";
+      updateAuthMode();
+      setFormMessage("authMessage", "");
+      openModal("authModal");
+    }
+
+    function updateAuthMode() {
+      const isLogin = authMode === "login";
+
+      $("authTitle").textContent = isLogin
+        ? "С возвращением!"
+        : "Добро пожаловать!";
+
+      $("authDescription").textContent = isLogin
+        ? "Войди, чтобы быть среди своих."
+        : "Создай аккаунт и присоединяйся к FAM.";
+
+      $("authSubmit").textContent = isLogin
+        ? "Войти"
+        : "Создать аккаунт";
+
+      $("authSwitchText").textContent = isLogin
+        ? "Впервые здесь?"
+        : "Уже есть аккаунт?";
+
+      $("authSwitchButton").textContent = isLogin
+        ? "Создать аккаунт"
+        : "Войти";
+
+      $("authPassword").autocomplete = isLogin
+        ? "current-password"
+        : "new-password";
+    }
+
+    $("authSwitchButton").addEventListener("click", () => {
+      authMode = authMode === "login" ? "signup" : "login";
+      updateAuthMode();
+      setFormMessage("authMessage", "");
+    });
+
+    $("authButton").addEventListener("click", async () => {
+      if (!supabaseClient) {
+        showNotice("Сервис авторизации пока недоступен.", "error");
+        return;
+      }
+
+      if (currentUser) {
+        const confirmed = window.confirm(
+          "Выйти из аккаунта?"
+        );
+
+        if (!confirmed) return;
+
+        const { error } = await supabaseClient.auth.signOut();
+
+        if (error) {
+          showNotice("Не удалось выйти из аккаунта.", "error");
+        }
+
+        return;
+      }
+
+      openAuthModal();
+    });
+
+    $("authForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      if (!supabaseClient) {
+        setFormMessage(
+          "authMessage",
+          "Сервис авторизации недоступен. Попробуй позже.",
+          "error"
+        );
+        return;
+      }
+
+      const email = $("authEmail").value.trim();
+      const password = $("authPassword").value;
+      const submitButton = $("authSubmit");
+
+      submitButton.disabled = true;
+      setFormMessage("authMessage", "Подожди немного...");
+
+      try {
+        if (authMode === "signup") {
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password
+          });
+
+          if (error) throw error;
+
+          if (data.session) {
+            setFormMessage("authMessage", "Аккаунт создан!", "success");
+            closeModal("authModal");
+          } else {
+            setFormMessage(
+              "authMessage",
+              "Проверь почту и подтверди регистрацию, если подтверждение включено в настройках Supabase.",
+              "success"
+            );
+          }
+        } else {
+          const { error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (error) throw error;
+
+          setFormMessage("authMessage", "Вход выполнен!", "success");
+          closeModal("authModal");
+        }
+      } catch (error) {
+        console.error("Ошибка авторизации:", error);
+
+        let message = error.message || "Не удалось выполнить действие.";
+
+        if (message.toLowerCase().includes("invalid login credentials")) {
+          message = "Неверная почта или пароль.";
+        } else if (message.toLowerCase().includes("user already registered")) {
+          message = "Этот адрес уже зарегистрирован. Попробуй войти.";
+        } else if (message.toLowerCase().includes("password")) {
+          message = "Проверь пароль. Он должен содержать минимум 6 символов.";
+        }
+
+        setFormMessage("authMessage", message, "error");
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    $("createListingButton").addEventListener("click", () => {
+      if (!currentUser) {
+        openAuthModal();
+        setFormMessage(
+          "authMessage",
+          "Войди или создай аккаунт, чтобы разместить объявление."
+        );
+        return;
+      }
+
+      $("listingForm").reset();
+      setFormMessage("listingMessage", "");
+      openModal("listingModal");
+    });
+
+    $("listingForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      if (!currentUser) {
+        closeModal("listingModal");
+        openAuthModal();
+        return;
+      }
+
+      const title = $("listingTitle").value.trim();
+      const category = $("listingCategory").value;
+      const description = $("listingDescription").value.trim();
+      const priceText = $("listingPrice").value.trim();
+
+      if (!title || !description || !priceText) {
+        setFormMessage("listingMessage", "Заполни все поля.", "error");
+        return;
+      }
+
+      const submitButton = $("listingSubmit");
+      submitButton.disabled = true;
+      submitButton.textContent = "Публикуем...";
+
+      try {
+        const { error } = await supabaseClient
+          .from("listings")
+          .insert({
+            user_id: currentUser.id,
+            title,
+            category,
+            description,
+            price_text: priceText,
+            status: "active"
+          });
+
+        if (error) throw error;
+
+        closeModal("listingModal");
+        $("listingForm").reset();
+
+        showOnlyMine = false;
+        $("myListingsButton").textContent = "Мои объявления";
+
+        await loadListings();
+
+        showNotice("Объявление опубликовано!", "success");
+        $("listingsSection").scrollIntoView({ behavior: "smooth" });
+      } catch (error) {
+        console.error("Ошибка публикации:", error);
+
+        setFormMessage(
+          "listingMessage",
+          "Не удалось опубликовать объявление. Проверь настройки таблицы listings в Supabase.",
+          "error"
+        );
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "Опубликовать";
+      }
+    });
+
+    $("myListingsButton").addEventListener("click", () => {
+      if (!currentUser) {
+        openAuthModal();
+        setFormMessage(
+          "authMessage",
+          "Войди, чтобы посмотреть свои объявления."
+        );
+        return;
+      }
+
+      showOnlyMine = !showOnlyMine;
+
+      $("myListingsButton").textContent = showOnlyMine
+        ? "Все объявления"
+        : "Мои объявления";
+
+      renderListings();
+      $("listingsSection").scrollIntoView({ behavior: "smooth" });
+    });
+
+    $("showAllButton").addEventListener("click", () => {
+      showOnlyMine = false;
+      selectedCategory = "Все";
+      $("searchInput").value = "";
+      $("myListingsButton").textContent = "Мои объявления";
+
+      document.querySelectorAll(".category-button").forEach((button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset.category === "Все"
+        );
+      });
+
+      renderListings();
+      $("listingsSection").scrollIntoView({ behavior: "smooth" });
+    });
+
+    $("searchInput").addEventListener("input", renderListings);
+
+    $("categories").addEventListener("click", (event) => {
+      const button = event.target.closest(".category-button");
+
+      if (!button) return;
+
+      selectedCategory = button.dataset.category;
+
+      document.querySelectorAll(".category-button").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+
+      renderListings();
+    });
+
+    async function initializeApp() {
+      if (!window.supabase || !window.supabase.createClient) {
+        $("listings").innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">!</div>
+            <h3>Не удалось подключиться</h3>
+            <p>Обнови страницу или проверь интернет-соединение.</p>
+          </div>
+        `;
+
+        showNotice(
+          "Не удалось загрузить библиотеку Supabase. Проверь интернет-соединение.",
+          "error"
+        );
+
+        return;
+      }
+
+      supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+      );
+
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        currentUser = data.session?.user || null;
+      } catch (error) {
+        console.error("Ошибка проверки сессии:", error);
+      }
+
+      updateAuthButton();
+      await loadListings();
+
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        currentUser = session?.user || null;
+        updateAuthButton();
+        loadListings();
+      });
+    }
+
+    // Загружаем Supabase SDK перед запуском приложения.
+    const supabaseScript = document.createElement("script");
+
+    supabaseScript.src =
+      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+
+    supabaseScript.onload = initializeApp;
+
+    supabaseScript.onerror = () => {
+      showNotice(
+        "Не удалось загрузить сервис. Проверь подключение к интернету.",
+        "error"
+      );
+    };
+
+    document.head.appendChild(supabaseScript);
+  </script>
 </body>
 </html>
