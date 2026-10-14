@@ -1,3 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#17181C">
+
+  <title>FAM — Свои рядом</title>
+  <meta name="description" content="FAM — современная площадка объявлений для своих. Вещи, услуги, творчество и учёба.">
+
+  <style>
+    :root {
+      --bg: #17181C;
+      --surface: #25272D;
+      --surface-hover: #2D3037;
+      --accent: #D4D7DE;
+      --text: #F5F5F5;
+      --muted: #A5A7B0;
+      --border: #363840;
+      --danger: #FF7777;
+      --success: #B9D8B6;
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(23, 24, 28, .92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      width: min(1100px, calc(100% - 32px));
+      min-height: 76px;
+      margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -88,9 +148,7 @@
       margin: 0 auto;
     }
 
-    .hero {
-      padding: 55px 0 30px;
-    }
+    .hero { padding: 55px 0 30px; }
 
     .hero-label {
       display: inline-flex;
@@ -108,7 +166,7 @@
     .hero-dot {
       width: 7px;
       height: 7px;
-      background: #B9D8B6;
+      background: var(--success);
       border-radius: 50%;
     }
 
@@ -121,9 +179,7 @@
       font-weight: 900;
     }
 
-    h1 span {
-      color: var(--accent);
-    }
+    h1 span { color: var(--accent); }
 
     .hero-description {
       max-width: 500px;
@@ -153,14 +209,9 @@
       transition: border-color .2s;
     }
 
-    .search-box:focus-within {
-      border-color: #777B86;
-    }
+    .search-box:focus-within { border-color: #777B86; }
 
-    .search-icon {
-      color: var(--muted);
-      font-size: 19px;
-    }
+    .search-icon { color: var(--muted); font-size: 19px; }
 
     .search-box input {
       width: 100%;
@@ -172,13 +223,9 @@
       font-size: 14px;
     }
 
-    .search-box input::placeholder {
-      color: #858792;
-    }
+    .search-box input::placeholder { color: #858792; }
 
-    .section {
-      padding: 24px 0 55px;
-    }
+    .section { padding: 24px 0 55px; }
 
     .section-heading {
       display: flex;
@@ -195,10 +242,7 @@
       letter-spacing: -.6px;
     }
 
-    .results-count {
-      color: var(--muted);
-      font-size: 12px;
-    }
+    .results-count { color: var(--muted); font-size: 12px; }
 
     .categories {
       display: flex;
@@ -208,9 +252,7 @@
       scrollbar-width: none;
     }
 
-    .categories::-webkit-scrollbar {
-      display: none;
-    }
+    .categories::-webkit-scrollbar { display: none; }
 
     .category-button {
       flex: 0 0 auto;
@@ -329,6 +371,7 @@
     .listing-actions {
       display: flex;
       justify-content: flex-end;
+      gap: 8px;
       margin-top: 12px;
     }
 
@@ -339,9 +382,15 @@
       background: transparent;
       color: var(--muted);
       font-size: 11px;
+      transition: .2s;
     }
 
     .small-button:hover {
+      color: var(--text);
+      border-color: #5A5D67;
+    }
+
+    .small-button.danger:hover {
       color: var(--danger);
       border-color: var(--danger);
     }
@@ -355,16 +404,8 @@
       border-radius: var(--radius);
     }
 
-    .empty-icon {
-      margin-bottom: 12px;
-      font-size: 30px;
-    }
-
-    .empty-state h3 {
-      margin: 0 0 8px;
-      font-size: 17px;
-    }
-
+    .empty-icon { margin-bottom: 12px; font-size: 30px; }
+    .empty-state h3 { margin: 0 0 8px; font-size: 17px; }
     .empty-state p {
       margin: 0;
       color: var(--muted);
@@ -383,22 +424,12 @@
       line-height: 1.6;
     }
 
-    .notice.error {
-      color: #FFAAAA;
-      border-color: #704040;
-    }
+    .notice.error { color: #FFAAAA; border-color: #704040; }
+    .notice.success { color: var(--success); border-color: #405C42; }
 
-    .notice.success {
-      color: #B9D8B6;
-      border-color: #405C42;
-    }
-
-    .hidden {
-      display: none !important;
-    }
+    .hidden { display: none !important; }
 
     /* Модальные окна */
-
     .modal {
       position: fixed;
       inset: 0;
@@ -412,9 +443,7 @@
       overflow-y: auto;
     }
 
-    .modal.open {
-      display: flex;
-    }
+    .modal.open { display: flex; }
 
     .modal-content {
       width: min(100%, 440px);
@@ -435,12 +464,7 @@
       margin-bottom: 22px;
     }
 
-    .modal-header h2 {
-      margin: 0 0 7px;
-      font-size: 23px;
-      font-weight: 850;
-    }
-
+    .modal-header h2 { margin: 0 0 7px; font-size: 23px; font-weight: 850; }
     .modal-header p {
       margin: 0;
       color: var(--muted);
@@ -459,9 +483,7 @@
       font-size: 20px;
     }
 
-    .form-group {
-      margin-bottom: 16px;
-    }
+    .form-group { margin-bottom: 16px; }
 
     .form-group label {
       display: block;
@@ -493,19 +515,12 @@
 
     .form-group input:focus,
     .form-group textarea:focus,
-    .form-group select:focus {
-      border-color: #888B95;
-    }
+    .form-group select:focus { border-color: #888B95; }
 
     .form-group input::placeholder,
-    .form-group textarea::placeholder {
-      color: #858792;
-    }
+    .form-group textarea::placeholder { color: #858792; }
 
-    .form-submit {
-      width: 100%;
-      margin-top: 5px;
-    }
+    .form-submit { width: 100%; margin-top: 5px; }
 
     .modal-switch {
       margin: 17px 0 0;
@@ -532,7 +547,6 @@
     }
 
     /* Подвал SPR STUDIO */
-
     footer {
       width: min(100% - 40px, 1000px);
       margin: 0 auto;
@@ -549,11 +563,7 @@
       flex-wrap: wrap;
     }
 
-    .footer-line {
-      width: 28px;
-      height: 1px;
-      background: #555862;
-    }
+    .footer-line { width: 28px; height: 1px; background: #555862; }
 
     .footer-created {
       color: #858792;
@@ -569,9 +579,7 @@
       letter-spacing: 2px;
     }
 
-    .footer-studio span {
-      color: #A5A7B0;
-    }
+    .footer-studio span { color: #A5A7B0; }
 
     .footer-note {
       max-width: 600px;
@@ -582,29 +590,13 @@
       letter-spacing: .3px;
     }
 
-    /* Полоса прокрутки */
-
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: var(--bg);
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #41434C;
-      border-radius: 10px;
-    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
 
     @media (max-width: 760px) {
-      .listings {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .hero {
-        padding-top: 40px;
-      }
+      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero { padding-top: 40px; }
     }
 
     @media (max-width: 520px) {
@@ -612,73 +604,26 @@
         width: calc(100% - 24px);
         min-height: 68px;
       }
-
-      .logo-mark {
-        width: 38px;
-        height: 38px;
-      }
-
-      .logo-name {
-        font-size: 16px;
-      }
-
-      .logo-caption {
-        font-size: 10px;
-      }
-
-      .header-actions {
-        gap: 6px;
-      }
-
+      .logo-mark { width: 38px; height: 38px; }
+      .logo-name { font-size: 16px; }
+      .logo-caption { font-size: 10px; }
+      .header-actions { gap: 6px; }
       .header-actions .button {
         min-height: 38px;
         padding: 0 10px;
         font-size: 11px;
       }
-
-      main {
-        width: calc(100% - 28px);
-      }
-
-      .hero {
-        padding-top: 35px;
-      }
-
-      h1 {
-        letter-spacing: -1.7px;
-      }
-
-      .hero-description {
-        font-size: 14px;
-      }
-
-      .listings {
-        grid-template-columns: 1fr;
-      }
-
-      .listing-card {
-        min-height: 185px;
-      }
-
-      .section-heading h2 {
-        font-size: 20px;
-      }
-
-      .modal-content {
-        padding: 20px;
-      }
-
-      footer {
-        width: calc(100% - 28px);
-      }
-
-      .footer-brand {
-        gap: 8px;
-      }
-
-      .footer-line {
-        width: 18px;
-      }
+      main { width: calc(100% - 28px); }
+      .hero { padding-top: 35px; }
+      h1 { letter-spacing: -1.7px; }
+      .hero-description { font-size: 14px; }
+      .listings { grid-template-columns: 1fr; }
+      .listing-card { min-height: 185px; }
+      .section-heading h2 { font-size: 20px; }
+      .modal-content { padding: 20px; }
+      footer { width: calc(100% - 28px); }
+      .footer-brand { gap: 8px; }
+      .footer-line { width: 18px; }
     }
   </style>
 </head>
@@ -793,7 +738,7 @@
         <button class="close-button" data-close="authModal" aria-label="Закрыть">×</button>
       </div>
 
-      <form id="authForm">
+      <form id="authForm" novalidate>
         <div class="form-group">
           <label for="authEmail">Электронная почта</label>
           <input
@@ -844,7 +789,7 @@
         <button class="close-button" data-close="listingModal" aria-label="Закрыть">×</button>
       </div>
 
-      <form id="listingForm">
+      <form id="listingForm" novalidate>
         <div class="form-group">
           <label for="listingTitle">Название</label>
           <input
@@ -897,6 +842,7 @@
   </div>
 
   <script>
+    // ⚠️ ЗАМЕНИ на anon public key из Supabase → Settings → API
     const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
     const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
 
@@ -911,12 +857,12 @@
 
     function showNotice(message, type = "") {
       const notice = $("notice");
+      if (!message) {
+        notice.classList.add("hidden");
+        return;
+      }
       notice.textContent = message;
       notice.className = "notice" + (type ? " " + type : "");
-    }
-
-    function hideNotice() {
-      $("notice").classList.add("hidden");
     }
 
     function setFormMessage(id, message, type = "") {
@@ -934,23 +880,18 @@
 
     function closeModal(id) {
       $(id).classList.remove("open");
-
       if (!document.querySelector(".modal.open")) {
         document.body.style.overflow = "";
       }
     }
 
     document.querySelectorAll("[data-close]").forEach((button) => {
-      button.addEventListener("click", () => {
-        closeModal(button.dataset.close);
-      });
+      button.addEventListener("click", () => closeModal(button.dataset.close));
     });
 
     document.querySelectorAll(".modal").forEach((modal) => {
       modal.addEventListener("click", (event) => {
-        if (event.target === modal) {
-          closeModal(modal.id);
-        }
+        if (event.target === modal) closeModal(modal.id);
       });
     });
 
@@ -963,18 +904,13 @@
     });
 
     function updateAuthButton() {
-      $("authButton").textContent = currentUser
-        ? "Мой аккаунт"
-        : "Войти";
+      $("authButton").textContent = currentUser ? "Выйти" : "Войти";
     }
 
     function formatDate(dateString) {
       if (!dateString) return "";
-
       const date = new Date(dateString);
-
       if (Number.isNaN(date.getTime())) return "";
-
       return date.toLocaleDateString("ru-RU", {
         day: "numeric",
         month: "short"
@@ -983,11 +919,18 @@
 
     function makeElement(tag, className, text) {
       const element = document.createElement(tag);
-
       if (className) element.className = className;
       if (text !== undefined) element.textContent = text;
-
       return element;
+    }
+
+    function pluralize(number) {
+      const lastTwo = number % 100;
+      const last = number % 10;
+      if (lastTwo >= 11 && lastTwo <= 14) return "объявлений";
+      if (last === 1) return "объявление";
+      if (last >= 2 && last <= 4) return "объявления";
+      return "объявлений";
     }
 
     function renderListings() {
@@ -1028,21 +971,18 @@
         empty.append(
           makeElement("div", "empty-icon", "✳"),
           makeElement(
-            "h3",
-            "",
+            "h3", "",
             showOnlyMine
               ? "У тебя пока нет объявлений"
               : "Пока ничего не найдено"
           ),
           makeElement(
-            "p",
-            "",
+            "p", "",
             showOnlyMine
               ? "Создай первое объявление — пусть свои его увидят."
               : "Попробуй изменить запрос или выбрать другую категорию."
           )
         );
-
         container.append(empty);
         return;
       }
@@ -1057,11 +997,7 @@
         );
 
         const title = makeElement("h3", "listing-title", listing.title);
-        const description = makeElement(
-          "p",
-          "listing-description",
-          listing.description
-        );
+        const description = makeElement("p", "listing-description", listing.description);
 
         const bottom = makeElement("div", "listing-bottom");
         bottom.append(
@@ -1073,12 +1009,10 @@
 
         if (currentUser && listing.user_id === currentUser.id) {
           const actions = makeElement("div", "listing-actions");
-          const hideButton = makeElement("button", "small-button", "Снять с публикации");
+          const hideButton = makeElement("button", "small-button danger", "Снять");
 
           hideButton.type = "button";
-          hideButton.addEventListener("click", () => {
-            hideListing(listing.id, hideButton);
-          });
+          hideButton.addEventListener("click", () => hideListing(listing.id, hideButton));
 
           actions.append(hideButton);
           card.append(actions);
@@ -1086,17 +1020,6 @@
 
         container.append(card);
       });
-    }
-
-    function pluralize(number) {
-      const lastTwo = number % 100;
-      const last = number % 10;
-
-      if (lastTwo >= 11 && lastTwo <= 14) return "объявлений";
-      if (last === 1) return "объявление";
-      if (last >= 2 && last <= 4) return "объявления";
-
-      return "объявлений";
     }
 
     async function loadListings() {
@@ -1110,7 +1033,7 @@
         </div>
       `;
 
-      hideNotice();
+      showNotice("");
 
       try {
         const { data, error } = await supabaseClient
@@ -1126,368 +1049,9 @@
         renderListings();
       } catch (error) {
         console.error("Ошибка загрузки объявлений:", error);
-
         allListings = [];
         renderListings();
-
         showNotice(
-          "Не удалось загрузить объявления. Проверь подключение к интернету и настройки базы данных Supabase.",
+          "Не удалось загрузить объявления. Проверь интернет и настройки Supabase.",
           "error"
-        );
-      }
-    }
-
-    async function hideListing(id, button) {
-      if (!currentUser) {
-        openAuthModal();
-        return;
-      }
-
-      const confirmed = window.confirm(
-        "Снять объявление с публикации? Оно перестанет отображаться в общем списке."
-      );
-
-      if (!confirmed) return;
-
-      button.disabled = true;
-
-      try {
-        const { error } = await supabaseClient
-          .from("listings")
-          .update({ status: "hidden" })
-          .eq("id", id)
-          .eq("user_id", currentUser.id);
-
-        if (error) throw error;
-
-        await loadListings();
-        showNotice("Объявление снято с публикации.", "success");
-      } catch (error) {
-        console.error("Ошибка снятия объявления:", error);
-        showNotice("Не удалось снять объявление. Попробуй ещё раз.", "error");
-        button.disabled = false;
-      }
-    }
-
-    function openAuthModal() {
-      authMode = "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
-      openModal("authModal");
-    }
-
-    function updateAuthMode() {
-      const isLogin = authMode === "login";
-
-      $("authTitle").textContent = isLogin
-        ? "С возвращением!"
-        : "Добро пожаловать!";
-
-      $("authDescription").textContent = isLogin
-        ? "Войди, чтобы быть среди своих."
-        : "Создай аккаунт и присоединяйся к FAM.";
-
-      $("authSubmit").textContent = isLogin
-        ? "Войти"
-        : "Создать аккаунт";
-
-      $("authSwitchText").textContent = isLogin
-        ? "Впервые здесь?"
-        : "Уже есть аккаунт?";
-
-      $("authSwitchButton").textContent = isLogin
-        ? "Создать аккаунт"
-        : "Войти";
-
-      $("authPassword").autocomplete = isLogin
-        ? "current-password"
-        : "new-password";
-    }
-
-    $("authSwitchButton").addEventListener("click", () => {
-      authMode = authMode === "login" ? "signup" : "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
-    });
-
-    $("authButton").addEventListener("click", async () => {
-      if (!supabaseClient) {
-        showNotice("Сервис авторизации пока недоступен.", "error");
-        return;
-      }
-
-      if (currentUser) {
-        const confirmed = window.confirm(
-          "Выйти из аккаунта?"
-        );
-
-        if (!confirmed) return;
-
-        const { error } = await supabaseClient.auth.signOut();
-
-        if (error) {
-          showNotice("Не удалось выйти из аккаунта.", "error");
-        }
-
-        return;
-      }
-
-      openAuthModal();
-    });
-
-    $("authForm").addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      if (!supabaseClient) {
-        setFormMessage(
-          "authMessage",
-          "Сервис авторизации недоступен. Попробуй позже.",
-          "error"
-        );
-        return;
-      }
-
-      const email = $("authEmail").value.trim();
-      const password = $("authPassword").value;
-      const submitButton = $("authSubmit");
-
-      submitButton.disabled = true;
-      setFormMessage("authMessage", "Подожди немного...");
-
-      try {
-        if (authMode === "signup") {
-          const { data, error } = await supabaseClient.auth.signUp({
-            email,
-            password
-          });
-
-          if (error) throw error;
-
-          if (data.session) {
-            setFormMessage("authMessage", "Аккаунт создан!", "success");
-            closeModal("authModal");
-          } else {
-            setFormMessage(
-              "authMessage",
-              "Проверь почту и подтверди регистрацию, если подтверждение включено в настройках Supabase.",
-              "success"
-            );
-          }
-        } else {
-          const { error } = await supabaseClient.auth.signInWithPassword({
-            email,
-            password
-          });
-
-          if (error) throw error;
-
-          setFormMessage("authMessage", "Вход выполнен!", "success");
-          closeModal("authModal");
-        }
-      } catch (error) {
-        console.error("Ошибка авторизации:", error);
-
-        let message = error.message || "Не удалось выполнить действие.";
-
-        if (message.toLowerCase().includes("invalid login credentials")) {
-          message = "Неверная почта или пароль.";
-        } else if (message.toLowerCase().includes("user already registered")) {
-          message = "Этот адрес уже зарегистрирован. Попробуй войти.";
-        } else if (message.toLowerCase().includes("password")) {
-          message = "Проверь пароль. Он должен содержать минимум 6 символов.";
-        }
-
-        setFormMessage("authMessage", message, "error");
-      } finally {
-        submitButton.disabled = false;
-      }
-    });
-
-    $("createListingButton").addEventListener("click", () => {
-      if (!currentUser) {
-        openAuthModal();
-        setFormMessage(
-          "authMessage",
-          "Войди или создай аккаунт, чтобы разместить объявление."
-        );
-        return;
-      }
-
-      $("listingForm").reset();
-      setFormMessage("listingMessage", "");
-      openModal("listingModal");
-    });
-
-    $("listingForm").addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      if (!currentUser) {
-        closeModal("listingModal");
-        openAuthModal();
-        return;
-      }
-
-      const title = $("listingTitle").value.trim();
-      const category = $("listingCategory").value;
-      const description = $("listingDescription").value.trim();
-      const priceText = $("listingPrice").value.trim();
-
-      if (!title || !description || !priceText) {
-        setFormMessage("listingMessage", "Заполни все поля.", "error");
-        return;
-      }
-
-      const submitButton = $("listingSubmit");
-      submitButton.disabled = true;
-      submitButton.textContent = "Публикуем...";
-
-      try {
-        const { error } = await supabaseClient
-          .from("listings")
-          .insert({
-            user_id: currentUser.id,
-            title,
-            category,
-            description,
-            price_text: priceText,
-            status: "active"
-          });
-
-        if (error) throw error;
-
-        closeModal("listingModal");
-        $("listingForm").reset();
-
-        showOnlyMine = false;
-        $("myListingsButton").textContent = "Мои объявления";
-
-        await loadListings();
-
-        showNotice("Объявление опубликовано!", "success");
-        $("listingsSection").scrollIntoView({ behavior: "smooth" });
-      } catch (error) {
-        console.error("Ошибка публикации:", error);
-
-        setFormMessage(
-          "listingMessage",
-          "Не удалось опубликовать объявление. Проверь настройки таблицы listings в Supabase.",
-          "error"
-        );
-      } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = "Опубликовать";
-      }
-    });
-
-    $("myListingsButton").addEventListener("click", () => {
-      if (!currentUser) {
-        openAuthModal();
-        setFormMessage(
-          "authMessage",
-          "Войди, чтобы посмотреть свои объявления."
-        );
-        return;
-      }
-
-      showOnlyMine = !showOnlyMine;
-
-      $("myListingsButton").textContent = showOnlyMine
-        ? "Все объявления"
-        : "Мои объявления";
-
-      renderListings();
-      $("listingsSection").scrollIntoView({ behavior: "smooth" });
-    });
-
-    $("showAllButton").addEventListener("click", () => {
-      showOnlyMine = false;
-      selectedCategory = "Все";
-      $("searchInput").value = "";
-      $("myListingsButton").textContent = "Мои объявления";
-
-      document.querySelectorAll(".category-button").forEach((button) => {
-        button.classList.toggle(
-          "active",
-          button.dataset.category === "Все"
-        );
-      });
-
-      renderListings();
-      $("listingsSection").scrollIntoView({ behavior: "smooth" });
-    });
-
-    $("searchInput").addEventListener("input", renderListings);
-
-    $("categories").addEventListener("click", (event) => {
-      const button = event.target.closest(".category-button");
-
-      if (!button) return;
-
-      selectedCategory = button.dataset.category;
-
-      document.querySelectorAll(".category-button").forEach((item) => {
-        item.classList.toggle("active", item === button);
-      });
-
-      renderListings();
-    });
-
-    async function initializeApp() {
-      if (!window.supabase || !window.supabase.createClient) {
-        $("listings").innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">!</div>
-            <h3>Не удалось подключиться</h3>
-            <p>Обнови страницу или проверь интернет-соединение.</p>
-          </div>
-        `;
-
-        showNotice(
-          "Не удалось загрузить библиотеку Supabase. Проверь интернет-соединение.",
-          "error"
-        );
-
-        return;
-      }
-
-      supabaseClient = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY
-      );
-
-      try {
-        const { data } = await supabaseClient.auth.getSession();
-        currentUser = data.session?.user || null;
-      } catch (error) {
-        console.error("Ошибка проверки сессии:", error);
-      }
-
-      updateAuthButton();
-      await loadListings();
-
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
-        currentUser = session?.user || null;
-        updateAuthButton();
-        loadListings();
-      });
-    }
-
-    // Загружаем Supabase SDK перед запуском приложения.
-    const supabaseScript = document.createElement("script");
-
-    supabaseScript.src =
-      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-
-    supabaseScript.onload = initializeApp;
-
-    supabaseScript.onerror = () => {
-      showNotice(
-        "Не удалось загрузить сервис. Проверь подключение к интернету.",
-        "error"
-      );
-    };
-
-    document.head.appendChild(supabaseScript);
-  </script>
-</body>
-</html>
+        );      
