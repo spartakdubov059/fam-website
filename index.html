@@ -6,7 +6,12 @@
   <meta name="theme-color" content="#17181C">
 
   <title>FAM — Свои рядом</title>
-  <meta name="description" content="FAM — площадка объявлений для своих. Вещи, услуги, творчество и учёба.">
+  <meta
+    name="description"
+    content="FAM — доска объявлений для школьников. Находи нужное, предлагай своё."
+  >
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
@@ -22,20 +27,44 @@
       --radius: 18px;
     }
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
 
     body {
-      margin: 0;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
         Roboto, Arial, sans-serif;
       min-height: 100vh;
+      line-height: 1.5;
     }
 
-    button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; }
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
 
     button:focus-visible,
     input:focus-visible,
@@ -45,198 +74,270 @@
       outline-offset: 3px;
     }
 
-    /* Шапка */
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .container {
+      width: min(1120px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
     .header {
       position: sticky;
       top: 0;
-      z-index: 10;
-      background: rgba(23, 24, 28, .92);
+      z-index: 20;
+      background: rgba(23, 24, 28, 0.92);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
     }
 
     .header-inner {
-      width: min(1100px, calc(100% - 32px));
       min-height: 76px;
-      margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 20px;
     }
 
     .logo {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 11px;
-      color: var(--text);
-      text-decoration: none;
+      gap: 12px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
     }
 
     .logo-mark {
+      width: 42px;
+      height: 42px;
       display: grid;
       place-items: center;
-      width: 43px;
-      height: 43px;
-      border-radius: 14px;
       background: var(--accent);
-      color: #17181C;
-      font-size: 19px;
+      color: var(--bg);
+      border-radius: 12px;
+      font-size: 23px;
       font-weight: 950;
-      letter-spacing: -1.5px;
+      letter-spacing: -2px;
     }
 
-    .logo-name { font-size: 19px; font-weight: 850; letter-spacing: 1px; }
-    .logo-caption { margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .logo-subtitle {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      margin-top: -3px;
+    }
 
-    .header-actions { display: flex; align-items: center; gap: 9px; }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
     .button {
-      min-height: 43px;
-      padding: 0 17px;
+      min-height: 44px;
+      padding: 11px 17px;
+      border: 1px solid transparent;
+      border-radius: 13px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      border: 1px solid transparent;
-      border-radius: 13px;
-      font-size: 13px;
-      font-weight: 750;
-      transition: .2s ease;
+      font-weight: 700;
+      font-size: 14px;
+      transition: 0.2s ease;
     }
 
-    .button-primary { background: var(--accent); color: #17181C; }
-    .button-primary:hover { background: #FFFFFF; transform: translateY(-1px); }
+    .button-primary {
+      background: var(--accent);
+      color: #17181C;
+    }
+
+    .button-primary:hover {
+      background: #FFFFFF;
+      transform: translateY(-1px);
+    }
 
     .button-secondary {
       background: var(--surface);
       color: var(--text);
       border-color: var(--border);
     }
-    .button-secondary:hover { background: var(--surface-hover); }
 
-    .button:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-      transform: none;
+    .button-secondary:hover {
+      background: var(--surface-hover);
     }
 
-    main { width: min(1000px, calc(100% - 32px)); margin: 0 auto; }
+    .button-ghost {
+      background: transparent;
+      color: var(--text);
+      border-color: var(--border);
+    }
 
-    /* Hero */
-    .hero { padding: 55px 0 30px; }
+    .button-ghost:hover {
+      background: var(--surface);
+    }
 
-    .hero-label {
+    .button-danger {
+      color: var(--danger);
+      background: transparent;
+      border-color: var(--border);
+    }
+
+    .hero {
+      padding: 70px 0 54px;
+    }
+
+    .hero-content {
+      max-width: 760px;
+    }
+
+    .eyebrow {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 7px 12px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 100px;
+      border-radius: 999px;
       color: var(--muted);
       font-size: 12px;
-      font-weight: 650;
+      margin-bottom: 22px;
     }
 
-    .hero-dot {
-      width: 7px; height: 7px;
-      background: var(--success);
+    .eyebrow-dot {
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
+      background: var(--success);
     }
 
-    h1 {
-      max-width: 700px;
-      margin: 20px 0 14px;
-      font-size: clamp(37px, 7vw, 66px);
-      line-height: 1.02;
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 72px);
+      line-height: 1.04;
       letter-spacing: -2.5px;
-      font-weight: 900;
+      margin-bottom: 22px;
+      font-weight: 850;
     }
 
-    h1 span { color: var(--accent); }
+    .hero h1 span {
+      color: var(--accent);
+    }
 
     .hero-description {
-      max-width: 500px;
-      margin: 0;
+      max-width: 540px;
       color: var(--muted);
-      font-size: 15px;
-      line-height: 1.7;
+      font-size: 17px;
+      margin-bottom: 28px;
     }
 
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 25px;
+      gap: 12px;
     }
 
-    .search-box {
-      margin-top: 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 17px;
-      min-height: 57px;
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 44px;
+    }
+
+    .feature {
+      padding: 18px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 17px;
-      transition: border-color .2s;
+      border-radius: var(--radius);
     }
 
-    .search-box:focus-within { border-color: #777B86; }
-    .search-icon { color: var(--muted); font-size: 19px; }
+    .feature-icon {
+      font-size: 23px;
+      margin-bottom: 10px;
+    }
 
-    .search-box input {
-      width: 100%; min-width: 0;
-      border: 0; outline: none;
-      background: transparent;
-      color: var(--text);
+    .feature h3 {
       font-size: 14px;
+      margin-bottom: 5px;
     }
 
-    .search-box input::placeholder { color: #858792; }
+    .feature p {
+      color: var(--muted);
+      font-size: 12px;
+    }
 
-    /* Секция объявлений */
-    .section { padding: 24px 0 55px; }
+    .section {
+      padding: 28px 0 70px;
+      scroll-margin-top: 90px;
+    }
 
     .section-heading {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 20px;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 24px;
     }
 
     .section-heading h2 {
-      margin: 0;
-      font-size: 23px;
-      font-weight: 850;
-      letter-spacing: -.6px;
+      font-size: clamp(26px, 4vw, 34px);
+      letter-spacing: -0.8px;
     }
 
-    .results-count { color: var(--muted); font-size: 12px; }
+    .section-heading p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 5px;
+    }
+
+    .search-box {
+      width: min(100%, 330px);
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      min-height: 46px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      color: var(--text);
+      padding: 12px 15px 12px 42px;
+    }
+
+    .search-box input::placeholder {
+      color: var(--muted);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
 
     .categories {
       display: flex;
+      flex-wrap: wrap;
       gap: 9px;
-      overflow-x: auto;
-      padding: 2px 1px 12px;
-      scrollbar-width: none;
+      margin-bottom: 25px;
     }
-    .categories::-webkit-scrollbar { display: none; }
 
     .category-button {
-      flex: 0 0 auto;
-      min-height: 40px;
-      padding: 0 15px;
+      padding: 10px 16px;
+      border-radius: 999px;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
       color: var(--muted);
+      background: var(--surface);
       font-size: 13px;
       font-weight: 650;
-      transition: .2s;
+      transition: 0.2s ease;
     }
 
     .category-button:hover {
@@ -245,167 +346,224 @@
     }
 
     .category-button.active {
-      background: var(--accent);
       color: #17181C;
+      background: var(--accent);
       border-color: var(--accent);
     }
 
-    .listings {
+    .listings-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 12px;
+      gap: 16px;
     }
 
     .listing-card {
       display: flex;
       flex-direction: column;
       min-width: 0;
-      min-height: 205px;
-      padding: 19px;
+      padding: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      transition: transform .2s, border-color .2s, background .2s;
+      transition: border-color 0.2s, transform 0.2s;
     }
 
     .listing-card:hover {
-      transform: translateY(-3px);
-      background: var(--surface-hover);
-      border-color: #4A4D57;
+      border-color: #626570;
+      transform: translateY(-2px);
     }
 
     .listing-top {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 10px;
       margin-bottom: 16px;
     }
 
     .listing-category {
-      display: inline-flex;
-      align-items: center;
+      display: inline-block;
       padding: 6px 9px;
-      border: 1px solid #41434C;
+      background: #33353D;
+      color: var(--accent);
       border-radius: 8px;
-      color: var(--muted);
       font-size: 11px;
-      font-weight: 650;
+      font-weight: 700;
     }
 
-    .listing-date { color: #858792; font-size: 11px; white-space: nowrap; }
+    .listing-date {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
 
-    .listing-title {
-      margin: 0 0 9px;
-      font-size: 17px;
-      font-weight: 800;
+    .listing-card h3 {
+      font-size: 18px;
       line-height: 1.35;
+      margin-bottom: 10px;
       overflow-wrap: anywhere;
     }
 
     .listing-description {
-      margin: 0;
       color: var(--muted);
       font-size: 13px;
-      line-height: 1.65;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
+      margin-bottom: 20px;
+      flex: 1;
     }
 
     .listing-bottom {
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: flex-end;
-      gap: 10px;
-      margin-top: auto;
-      padding-top: 20px;
+      gap: 12px;
     }
 
-    .listing-price { font-size: 17px; font-weight: 850; overflow-wrap: anywhere; }
-
-    .listing-owner {
-      max-width: 45%;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: right;
+    .listing-price {
+      font-weight: 800;
+      font-size: 15px;
       overflow-wrap: anywhere;
     }
 
-    .listing-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .small-button {
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: transparent;
+    .listing-owner {
       color: var(--muted);
       font-size: 11px;
-      transition: .2s;
+      text-align: right;
     }
 
-    .small-button:hover { color: var(--text); border-color: #5A5D67; }
-    .small-button.danger:hover { color: var(--danger); border-color: var(--danger); }
+    .listing-card .hide-listing {
+      margin-top: 12px;
+      width: 100%;
+      min-height: 37px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--danger);
+      background: transparent;
+      font-size: 12px;
+    }
+
+    .listing-card .hide-listing:hover {
+      background: rgba(255, 119, 119, 0.08);
+    }
 
     .empty-state {
       grid-column: 1 / -1;
-      padding: 48px 20px;
+      padding: 45px 20px;
       text-align: center;
-      background: var(--surface);
-      border: 1px dashed #41434C;
+      border: 1px dashed var(--border);
       border-radius: var(--radius);
+      color: var(--muted);
     }
 
-    .empty-icon { margin-bottom: 12px; font-size: 30px; }
-    .empty-state h3 { margin: 0 0 8px; font-size: 17px; }
-    .empty-state p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .empty-icon {
+      font-size: 34px;
+      margin-bottom: 12px;
+    }
+
+    .empty-state h3 {
+      color: var(--text);
+      font-size: 18px;
+      margin-bottom: 7px;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+      margin-bottom: 17px;
+    }
+
+    .loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: var(--muted);
+      padding: 35px 15px;
+    }
 
     .notice {
-      margin-top: 15px;
-      padding: 13px 15px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 20px);
+      z-index: 100;
+      width: min(440px, calc(100% - 32px));
+      padding: 15px 18px;
+      border-radius: 14px;
+      background: #30323A;
+      border: 1px solid #4B4E59;
+      color: var(--text);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.25s;
+      font-size: 14px;
+    }
+
+    .notice.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .notice.error {
+      border-color: #9D4B4B;
+    }
+
+    .notice.success {
+      border-color: #63835F;
+    }
+
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 25px 0;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
       color: var(--muted);
       font-size: 12px;
-      line-height: 1.6;
     }
 
-    .notice.error { color: #FFAAAA; border-color: #704040; }
-    .notice.success { color: var(--success); border-color: #405C42; }
+    .footer-brand {
+      color: var(--text);
+      font-weight: 850;
+      letter-spacing: 1px;
+    }
 
-    .hidden { display: none !important; }
+    .footer-note {
+      max-width: 500px;
+      text-align: right;
+    }
 
-    /* Модальные окна */
     .modal {
+      display: none;
       position: fixed;
       inset: 0;
-      z-index: 100;
-      display: none;
+      z-index: 50;
+      padding: 18px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.72);
       align-items: center;
       justify-content: center;
-      padding: 16px;
-      background: rgba(0, 0, 0, .72);
-      backdrop-filter: blur(8px);
-      overflow-y: auto;
     }
 
-    .modal.open { display: flex; }
+    .modal.open {
+      display: flex;
+    }
 
-    .modal-content {
-      width: min(100%, 440px);
-      max-height: calc(100dvh - 32px);
-      overflow-y: auto;
-      padding: 25px;
+    .modal-panel {
+      width: min(100%, 470px);
+      position: relative;
       background: #202126;
-      border: 1px solid #41434C;
+      border: 1px solid var(--border);
       border-radius: 22px;
-      box-shadow: 0 25px 80px rgba(0, 0, 0, .4);
+      padding: 28px;
+      margin: auto;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
     }
 
     .modal-header {
@@ -413,171 +571,303 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 15px;
-      margin-bottom: 22px;
+      margin-bottom: 23px;
     }
 
-    .modal-header h2 { margin: 0 0 7px; font-size: 23px; font-weight: 850; }
-    .modal-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+    .modal-header h2 {
+      font-size: 25px;
+      letter-spacing: -0.5px;
+    }
 
-    .close-button {
-      flex: 0 0 auto;
-      width: 34px; height: 34px;
+    .modal-header p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 5px;
+    }
+
+    .close-modal {
+      width: 35px;
+      height: 35px;
+      flex-shrink: 0;
       border: 1px solid var(--border);
       border-radius: 10px;
-      background: var(--surface);
       color: var(--text);
+      background: var(--surface);
       font-size: 20px;
     }
 
-    .form-group { margin-bottom: 16px; }
+    .form-group {
+      margin-bottom: 16px;
+    }
 
     .form-group label {
       display: block;
-      margin-bottom: 8px;
-      color: #D7D8DE;
-      font-size: 12px;
-      font-weight: 700;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 650;
     }
 
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
+    .form-control {
       width: 100%;
       min-height: 46px;
       padding: 12px 13px;
-      border: 1px solid #41434C;
+      border: 1px solid var(--border);
       border-radius: 12px;
-      outline: none;
-      background: #292B31;
+      background: #17181C;
       color: var(--text);
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: #8E929E;
+    }
+
+    textarea.form-control {
+      min-height: 115px;
+      resize: vertical;
+    }
+
+    .form-control::placeholder {
+      color: #747782;
+    }
+
+    select.form-control {
+      cursor: pointer;
+    }
+
+    .form-hint {
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 7px;
+    }
+
+    .form-message {
+      display: none;
+      padding: 11px 12px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .form-message.show {
+      display: block;
+    }
+
+    .form-message.error {
+      color: var(--danger);
+    }
+
+    .form-message.success {
+      color: var(--success);
+    }
+
+    .form-submit {
+      width: 100%;
+      margin-top: 5px;
+    }
+
+    .auth-switch {
+      color: var(--muted);
+      text-align: center;
+      margin-top: 18px;
       font-size: 13px;
     }
 
-    .form-group textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
-
-    .form-group input:focus,
-    .form-group textarea:focus,
-    .form-group select:focus { border-color: #888B95; }
-
-    .form-group input::placeholder,
-    .form-group textarea::placeholder { color: #858792; }
-
-    .form-submit { width: 100%; margin-top: 5px; }
-
-    .modal-switch {
-      margin: 17px 0 0;
-      text-align: center;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
     .text-button {
-      padding: 0;
-      border: 0;
-      background: transparent;
-      color: var(--text);
+      border: none;
+      background: none;
+      color: var(--accent);
       font-weight: 750;
       text-decoration: underline;
       text-underline-offset: 3px;
     }
 
-    .form-message {
-      margin-top: 13px;
-      font-size: 12px;
-      line-height: 1.6;
+    .profile-box {
+      padding: 17px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 18px;
+    }
+
+    .profile-label {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+
+    .profile-email {
       overflow-wrap: anywhere;
+      font-weight: 650;
     }
 
-    /* Футер */
-    footer {
-      width: min(100% - 40px, 1000px);
-      margin: 0 auto;
-      padding: 32px 0;
-      text-align: center;
-      border-top: 1px solid var(--border);
-    }
-
-    .footer-brand {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .footer-line { width: 28px; height: 1px; background: #555862; }
-
-    .footer-created {
-      color: #858792;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 3px;
-    }
-
-    .footer-studio {
-      color: #F5F5F5;
-      font-size: 14px;
-      font-weight: 900;
-      letter-spacing: 2px;
-    }
-
-    .footer-studio span { color: #A5A7B0; }
-
-    .footer-note {
-      max-width: 600px;
-      margin: 13px auto 0;
-      color: #777A85;
+    .safety-note {
+      color: var(--muted);
       font-size: 12px;
-      line-height: 1.8;
-      letter-spacing: .3px;
+      margin-top: 17px;
+      line-height: 1.6;
     }
 
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
+    @media (max-width: 850px) {
+      .listings-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
 
-    @media (max-width: 760px) {
-      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .hero { padding-top: 40px; }
+      .hero {
+        padding-top: 55px;
+      }
     }
 
-    @media (max-width: 520px) {
-      .header-inner { width: calc(100% - 24px); min-height: 68px; }
-      .logo-mark { width: 38px; height: 38px; }
-      .logo-name { font-size: 16px; }
-      .logo-caption { font-size: 10px; }
-      .header-actions { gap: 6px; }
-      .header-actions .button { min-height: 38px; padding: 0 10px; font-size: 11px; }
-      main { width: calc(100% - 28px); }
-      .hero { padding-top: 35px; }
-      h1 { letter-spacing: -1.7px; }
-      .hero-description { font-size: 14px; }
-      .listings { grid-template-columns: 1fr; }
-      .listing-card { min-height: 185px; }
-      .section-heading h2 { font-size: 20px; }
-      .modal-content { padding: 20px; }
-      footer { width: calc(100% - 28px); }
-      .footer-brand { gap: 8px; }
-      .footer-line { width: 18px; }
+    @media (max-width: 600px) {
+      .container {
+        width: calc(100% - 28px);
+      }
+
+      .header-inner {
+        min-height: 66px;
+        gap: 10px;
+      }
+
+      .logo {
+        gap: 9px;
+        font-size: 21px;
+      }
+
+      .logo-mark {
+        width: 37px;
+        height: 37px;
+        font-size: 21px;
+      }
+
+      .logo-subtitle {
+        font-size: 9px;
+      }
+
+      .header-actions {
+        gap: 7px;
+      }
+
+      .header-actions .button {
+        padding: 9px 11px;
+        min-height: 39px;
+        font-size: 12px;
+      }
+
+      .hero {
+        padding: 45px 0 35px;
+      }
+
+      .hero h1 {
+        font-size: clamp(39px, 11vw, 58px);
+        letter-spacing: -1.8px;
+      }
+
+      .hero-description {
+        font-size: 15px;
+      }
+
+      .features {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-top: 30px;
+      }
+
+      .feature {
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+
+      .feature-icon {
+        margin: 0;
+        font-size: 25px;
+      }
+
+      .feature p {
+        margin-top: 3px;
+      }
+
+      .section {
+        padding: 25px 0 50px;
+      }
+
+      .section-heading {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .search-box {
+        width: 100%;
+      }
+
+      .categories {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 2px 2px 8px;
+        margin-right: -4px;
+        scrollbar-width: thin;
+      }
+
+      .category-button {
+        white-space: nowrap;
+      }
+
+      .listings-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .listing-card {
+        padding: 17px;
+      }
+
+      .footer-inner {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .footer-note {
+        text-align: left;
+      }
+
+      .modal {
+        padding: 10px;
+        align-items: flex-end;
+      }
+
+      .modal-panel {
+        padding: 22px 18px;
+        border-radius: 20px;
+        max-height: 92vh;
+        overflow-y: auto;
+      }
     }
   </style>
 </head>
 
 <body>
+
   <header class="header">
-    <div class="header-inner">
-      <a href="#" class="logo" aria-label="FAM — главная">
-        <div class="logo-mark">F</div>
-        <div>
-          <div class="logo-name">FAM</div>
-          <div class="logo-caption">Свои рядом</div>
-        </div>
+    <div class="container header-inner">
+      <a class="logo" href="#" aria-label="FAM — главная">
+        <span class="logo-mark">F.</span>
+        <span>
+          FAM
+          <span class="logo-subtitle">Свои рядом</span>
+        </span>
       </a>
 
       <div class="header-actions">
         <button class="button button-secondary" id="myListingsButton">
           Мои объявления
         </button>
+
         <button class="button button-primary" id="authButton">
           Войти
         </button>
@@ -587,135 +877,205 @@
 
   <main>
     <section class="hero">
-      <div class="hero-label">
-        <span class="hero-dot"></span>
-        Место для своих
+      <div class="container">
+        <div class="hero-content">
+          <div class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            Твоя школьная доска объявлений
+          </div>
+
+          <h1>
+            Находи своё.<br>
+            <span>Создавай своё.</span>
+          </h1>
+
+          <p class="hero-description">
+            Нужные вещи, полезные услуги, творчество и учёба —
+            всё в одном месте. Размещай объявления и находи то,
+            что тебе нужно.
+          </p>
+
+          <div class="hero-actions">
+            <button class="button button-primary" id="createListingButton">
+              ＋ Разместить объявление
+            </button>
+
+            <button class="button button-secondary" id="showListingsButton">
+              Смотреть объявления →
+            </button>
+          </div>
+        </div>
+
+        <div class="features">
+          <div class="feature">
+            <div class="feature-icon">✦</div>
+            <div>
+              <h3>Всё в одном месте</h3>
+              <p>Ищи и предлагай то, что может пригодиться другим.</p>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature-icon">↗</div>
+            <div>
+              <h3>Просто и понятно</h3>
+              <p>Удобная доска объявлений без лишних функций.</p>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature-icon">◈</div>
+            <div>
+              <h3>Твоё сообщество</h3>
+              <p>Делись полезными предложениями и идеями.</p>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <h1>Находи своё.<br><span>Создавай своё.</span></h1>
-
-      <p class="hero-description">
-        Вещи, услуги, творчество и учёба — всё, чем хочется поделиться
-        с другими. Просто, быстро и рядом.
-      </p>
-
-      <div class="hero-actions">
-        <button class="button button-primary" id="createListingButton">
-          + Разместить объявление
-        </button>
-        <button class="button button-secondary" id="showAllButton">
-          Смотреть объявления
-        </button>
-      </div>
-
-      <label class="search-box">
-        <span class="search-icon">⌕</span>
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="Что ищем сегодня?"
-          autocomplete="off"
-          aria-label="Поиск объявлений"
-        >
-      </label>
     </section>
 
     <section class="section" id="listingsSection">
-      <div class="section-heading">
-        <h2 id="listingsHeading">Объявления</h2>
-        <span class="results-count" id="resultsCount"></span>
-      </div>
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <h2 id="listingsTitle">Доска объявлений</h2>
+            <p id="listingsSubtitle">Находи интересное и предлагай своё</p>
+          </div>
 
-      <div class="categories" id="categories">
-        <button class="category-button active" data-category="Все">Все</button>
-        <button class="category-button" data-category="Вещи">Вещи</button>
-        <button class="category-button" data-category="Услуги">Услуги</button>
-        <button class="category-button" data-category="Творчество">Творчество</button>
-        <button class="category-button" data-category="Учёба">Учёба</button>
-      </div>
+          <div class="search-box">
+            <span class="search-icon">⌕</span>
+            <input
+              type="search"
+              id="searchInput"
+              placeholder="Поиск объявлений..."
+              autocomplete="off"
+              aria-label="Поиск объявлений"
+            >
+          </div>
+        </div>
 
-      <div id="notice" class="notice hidden" role="status"></div>
+        <div class="categories" id="categories">
+          <button class="category-button active" data-category="Все">Все</button>
+          <button class="category-button" data-category="Вещи">Вещи</button>
+          <button class="category-button" data-category="Услуги">Услуги</button>
+          <button class="category-button" data-category="Творчество">Творчество</button>
+          <button class="category-button" data-category="Учёба">Учёба</button>
+        </div>
 
-      <div class="listings" id="listings">
-        <div class="empty-state">
-          <div class="empty-icon">✳</div>
-          <h3>Загружаем объявления</h3>
-          <p>Секунду, скоро всё появится.</p>
+        <div class="listings-grid" id="listings">
+          <div class="loading">Загружаем объявления...</div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="footer-brand">
-      <span class="footer-line"></span>
-      <span class="footer-created">CREATED BY</span>
-      <span class="footer-studio">SPR <span>STUDIO</span></span>
-      <span class="footer-line"></span>
-    </div>
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <span class="footer-brand">FAM</span>
+        <span> · CREATED BY SPR STUDIO</span>
+      </div>
 
-    <p class="footer-note">
-      FAM — свои рядом.<br>
-      Не публикуй пароли, домашний адрес и другие личные данные.
-      Не отправляй незнакомцам деньги. Несовершеннолетним следует
-      обсуждать встречи с незнакомыми людьми с родителями.
-    </p>
+      <p class="footer-note">
+        Береги свои данные: не публикуй домашний адрес,
+        номер телефона и другую личную информацию.
+      </p>
+    </div>
   </footer>
 
   <!-- Окно входа и регистрации -->
-  <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <div class="modal-content">
+  <div class="modal" id="authModal" role="dialog" aria-modal="true"
+       aria-labelledby="authTitle">
+    <div class="modal-panel">
       <div class="modal-header">
         <div>
-          <h2 id="authTitle">С возвращением!</h2>
-          <p id="authDescription">Войди, чтобы быть среди своих.</p>
+          <h2 id="authTitle">С возвращением</h2>
+          <p id="authSubtitle">Войди, чтобы пользоваться возможностями FAM.</p>
         </div>
-        <button class="close-button" data-close="authModal" aria-label="Закрыть">×</button>
+
+        <button class="close-modal" data-close="authModal"
+                aria-label="Закрыть">×</button>
       </div>
 
-      <form id="authForm" novalidate>
+      <form id="authForm">
         <div class="form-group">
           <label for="authEmail">Электронная почта</label>
-          <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <input
+            class="form-control"
+            type="email"
+            id="authEmail"
+            placeholder="name@example.com"
+            autocomplete="email"
+            maxlength="254"
+            required
+          >
         </div>
 
         <div class="form-group">
           <label for="authPassword">Пароль</label>
-          <input id="authPassword" type="password" autocomplete="current-password" placeholder="Минимум 6 символов" minlength="6" required>
+          <input
+            class="form-control"
+            type="password"
+            id="authPassword"
+            placeholder="Не менее 6 символов"
+            autocomplete="current-password"
+            minlength="6"
+            maxlength="128"
+            required
+          >
         </div>
 
-        <button class="button button-primary form-submit" id="authSubmit" type="submit">Войти</button>
+        <div class="form-message" id="authMessage" role="status"></div>
 
-        <div class="form-message" id="authMessage" aria-live="polite"></div>
+        <button class="button button-primary form-submit" id="authSubmit"
+                type="submit">
+          Войти
+        </button>
       </form>
 
-      <p class="modal-switch">
-        <span id="authSwitchText">Впервые здесь?</span>
-        <button class="text-button" id="authSwitchButton" type="button">Создать аккаунт</button>
+      <div class="auth-switch">
+        <span id="authSwitchText">Ещё нет аккаунта?</span>
+        <button class="text-button" id="authSwitchButton" type="button">
+          Зарегистрироваться
+        </button>
+      </div>
+
+      <p class="safety-note">
+        Используй надёжный пароль и не сообщай его другим людям.
       </p>
     </div>
   </div>
 
   <!-- Окно создания объявления -->
-  <div class="modal" id="listingModal" role="dialog" aria-modal="true" aria-labelledby="listingModalTitle">
-    <div class="modal-content">
+  <div class="modal" id="listingModal" role="dialog" aria-modal="true"
+       aria-labelledby="listingModalTitle">
+    <div class="modal-panel">
       <div class="modal-header">
         <div>
           <h2 id="listingModalTitle">Новое объявление</h2>
-          <p>Расскажи другим, что предлагаешь.</p>
+          <p>Расскажи, что ты предлагаешь.</p>
         </div>
-        <button class="close-button" data-close="listingModal" aria-label="Закрыть">×</button>
+
+        <button class="close-modal" data-close="listingModal"
+                aria-label="Закрыть">×</button>
       </div>
 
-      <form id="listingForm" novalidate>
+      <form id="listingForm">
         <div class="form-group">
           <label for="listingTitle">Название</label>
-          <input id="listingTitle" type="text" maxlength="100" placeholder="Например, продаю наушники" required>
+          <input
+            class="form-control"
+            type="text"
+            id="listingTitle"
+            placeholder="Например, продаю учебник"
+            maxlength="100"
+            required
+          >
         </div>
 
         <div class="form-group">
           <label for="listingCategory">Категория</label>
-          <select id="listingCategory" required>
+          <select class="form-control" id="listingCategory" required>
             <option value="Вещи">Вещи</option>
             <option value="Услуги">Услуги</option>
             <option value="Творчество">Творчество</option>
@@ -725,25 +1085,88 @@
 
         <div class="form-group">
           <label for="listingDescription">Описание</label>
-          <textarea id="listingDescription" maxlength="1500" placeholder="Расскажи подробнее..." required></textarea>
+          <textarea
+            class="form-control"
+            id="listingDescription"
+            placeholder="Опиши своё предложение подробнее..."
+            maxlength="2000"
+            required
+          ></textarea>
         </div>
 
         <div class="form-group">
           <label for="listingPrice">Цена</label>
-          <input id="listingPrice" type="text" maxlength="50" placeholder="Например, 500 ₽ или бесплатно" required>
+          <input
+            class="form-control"
+            type="text"
+            id="listingPrice"
+            placeholder="Например, 500 ₽ или бесплатно"
+            maxlength="50"
+            required
+          >
+          <p class="form-hint">
+            Если предложение бесплатное, так и напиши.
+          </p>
         </div>
 
-        <button class="button button-primary form-submit" id="listingSubmit" type="submit">Опубликовать</button>
+        <div class="form-message" id="listingMessage" role="status"></div>
 
-        <div class="form-message" id="listingMessage" aria-live="polite"></div>
+        <button class="button button-primary form-submit"
+                id="listingSubmit" type="submit">
+          Опубликовать объявление
+        </button>
+
+        <p class="safety-note">
+          Не указывай в объявлении телефон, домашний адрес,
+          пароли или другие личные данные.
+        </p>
       </form>
     </div>
   </div>
 
+  <!-- Профиль -->
+  <div class="modal" id="profileModal" role="dialog" aria-modal="true"
+       aria-labelledby="profileTitle">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <div>
+          <h2 id="profileTitle">Мой профиль</h2>
+          <p>Информация о твоём аккаунте FAM.</p>
+        </div>
+
+        <button class="close-modal" data-close="profileModal"
+                aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="profile-box">
+        <div class="profile-label">Твой аккаунт</div>
+        <div class="profile-email" id="profileEmail"></div>
+      </div>
+
+      <button class="button button-secondary form-submit"
+              id="profileMyListingsButton">
+        Мои объявления
+      </button>
+
+      <button class="button button-ghost form-submit"
+              id="signOutButton" style="margin-top: 10px;">
+        Выйти из аккаунта
+      </button>
+    </div>
+  </div>
+
+  <div class="notice" id="notice" role="status" aria-live="polite"></div>
+
   <script>
-    // ⚠️ Замени на anon public key из Supabase → Settings → API, если будут ошибки
-    const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+    "use strict";
+
+    const SUPABASE_URL =
+      "https://tfacqpljrvfpcrhdovbu.supabase.co";
+
+    const SUPABASE_KEY =
+      "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+
+    const $ = (id) => document.getElementById(id);
 
     let supabaseClient = null;
     let currentUser = null;
@@ -751,165 +1174,489 @@
     let selectedCategory = "Все";
     let showOnlyMine = false;
     let authMode = "login";
-
-    const $ = (id) => document.getElementById(id);
+    let noticeTimer = null;
 
     function showNotice(message, type = "") {
       const notice = $("notice");
-      if (!message) { notice.classList.add("hidden"); return; }
+
       notice.textContent = message;
-      notice.className = "notice" + (type ? " " + type : "");
+      notice.className = "notice show";
+
+      if (type) {
+        notice.classList.add(type);
+      }
+
+      clearTimeout(noticeTimer);
+
+      noticeTimer = setTimeout(() => {
+        notice.classList.remove("show");
+      }, 3500);
     }
 
     function setFormMessage(id, message, type = "") {
       const element = $(id);
+
       element.textContent = message;
-      element.style.color =
-        type === "error" ? "#FFAAAA" :
-        type === "success" ? "#B9D8B6" : "#A5A7B0";
+      element.className = "form-message";
+
+      if (message) {
+        element.classList.add("show");
+      }
+
+      if (type) {
+        element.classList.add(type);
+      }
     }
 
     function openModal(id) {
-      $(id).classList.add("open");
-      document.body.style.overflow = "hidden";
+      const modal = $(id);
+
+      if (!modal) return;
+
+      modal.classList.add("open");
+      document.body.classList.add("modal-open");
+
+      const focusable = modal.querySelector(
+        "input:not([type=hidden]), textarea, select, button"
+      );
+
+      if (focusable) {
+        setTimeout(() => focusable.focus(), 50);
+      }
     }
 
     function closeModal(id) {
-      $(id).classList.remove("open");
+      const modal = $(id);
+
+      if (!modal) return;
+
+      modal.classList.remove("open");
+
       if (!document.querySelector(".modal.open")) {
-        document.body.style.overflow = "";
+        document.body.classList.remove("modal-open");
       }
     }
 
     document.querySelectorAll("[data-close]").forEach((button) => {
-      button.addEventListener("click", () => closeModal(button.dataset.close));
+      button.addEventListener("click", () => {
+        closeModal(button.dataset.close);
+      });
     });
 
     document.querySelectorAll(".modal").forEach((modal) => {
       modal.addEventListener("click", (event) => {
-        if (event.target === modal) closeModal(modal.id);
+        if (event.target === modal) {
+          closeModal(modal.id);
+        }
       });
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        document.querySelectorAll(".modal.open").forEach((modal) => {
+        const modal = document.querySelector(".modal.open");
+
+        if (modal) {
           closeModal(modal.id);
-        });
+        }
       }
     });
 
     function updateAuthButton() {
-      $("authButton").textContent = currentUser ? "Выйти" : "Войти";
+      const button = $("authButton");
+
+      if (currentUser) {
+        button.textContent = "Профиль";
+        button.classList.remove("button-primary");
+        button.classList.add("button-secondary");
+      } else {
+        button.textContent = "Войти";
+        button.classList.remove("button-secondary");
+        button.classList.add("button-primary");
+      }
     }
 
-    function formatDate(dateString) {
-      if (!dateString) return "";
-      const date = new Date(dateString);
+    function openAuthModal() {
+      if (currentUser) {
+        $("profileEmail").textContent = currentUser.email || "Аккаунт FAM";
+        openModal("profileModal");
+        return;
+      }
+
+      updateAuthMode("login");
+      setFormMessage("authMessage", "");
+      openModal("authModal");
+    }
+
+    function updateAuthMode(mode) {
+      authMode = mode;
+
+      const isSignup = mode === "signup";
+
+      $("authTitle").textContent = isSignup
+        ? "Создать аккаунт"
+        : "С возвращением";
+
+      $("authSubtitle").textContent = isSignup
+        ? "Зарегистрируйся, чтобы размещать объявления."
+        : "Войди, чтобы пользоваться возможностями FAM.";
+
+      $("authSubmit").textContent = isSignup
+        ? "Зарегистрироваться"
+        : "Войти";
+
+      $("authSwitchText").textContent = isSignup
+        ? "Уже есть аккаунт?"
+        : "Ещё нет аккаунта?";
+
+      $("authSwitchButton").textContent = isSignup
+        ? "Войти"
+        : "Зарегистрироваться";
+
+      $("authPassword").autocomplete = isSignup
+        ? "new-password"
+        : "current-password";
+
+      setFormMessage("authMessage", "");
+    }
+
+    $("authSwitchButton").addEventListener("click", () => {
+      updateAuthMode(authMode === "login" ? "signup" : "login");
+    });
+
+    $("authButton").addEventListener("click", openAuthModal);
+
+    $("createListingButton").addEventListener("click", () => {
+      if (!currentUser) {
+        showNotice("Сначала войди или зарегистрируйся.");
+        openAuthModal();
+        return;
+      }
+
+      $("listingForm").reset();
+      setFormMessage("listingMessage", "");
+      openModal("listingModal");
+    });
+
+    $("showListingsButton").addEventListener("click", () => {
+      $("listingsSection").scrollIntoView({ behavior: "smooth" });
+    });
+
+    $("myListingsButton").addEventListener("click", () => {
+      if (!currentUser) {
+        showNotice("Войди, чтобы посмотреть свои объявления.");
+        openAuthModal();
+        return;
+      }
+
+      showOnlyMine = true;
+      selectedCategory = "Все";
+
+      document.querySelectorAll(".category-button").forEach((button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset.category === "Все"
+        );
+      });
+
+      $("listingsTitle").textContent = "Мои объявления";
+      $("listingsSubtitle").textContent =
+        "Здесь находятся опубликованные тобой объявления.";
+
+      renderListings();
+
+      $("listingsSection").scrollIntoView({ behavior: "smooth" });
+    });
+
+    $("profileMyListingsButton").addEventListener("click", () => {
+      closeModal("profileModal");
+
+      showOnlyMine = true;
+      selectedCategory = "Все";
+
+      document.querySelectorAll(".category-button").forEach((button) => {
+        button.classList.toggle(
+          "active",
+          button.dataset.category === "Все"
+        );
+      });
+
+      $("listingsTitle").textContent = "Мои объявления";
+      $("listingsSubtitle").textContent =
+        "Здесь находятся опубликованные тобой объявления.";
+
+      renderListings();
+
+      $("listingsSection").scrollIntoView({ behavior: "smooth" });
+    });
+
+    $("signOutButton").addEventListener("click", async () => {
+      if (!supabaseClient) return;
+
+      const button = $("signOutButton");
+      button.disabled = true;
+
+      try {
+        const { error } = await supabaseClient.auth.signOut();
+
+        if (error) throw error;
+
+        currentUser = null;
+        showOnlyMine = false;
+
+        closeModal("profileModal");
+        updateAuthButton();
+        await loadListings();
+
+        showNotice("Ты вышел из аккаунта.", "success");
+      } catch (error) {
+        console.error("Ошибка выхода:", error);
+        showNotice("Не удалось выйти. Попробуй ещё раз.", "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    function formatDate(value) {
+      if (!value) return "";
+
+      const date = new Date(value);
+
       if (Number.isNaN(date.getTime())) return "";
-      return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short"
+      }).format(date);
     }
 
     function makeElement(tag, className, text) {
       const element = document.createElement(tag);
-      if (className) element.className = className;
-      if (text !== undefined) element.textContent = text;
+
+      if (className) {
+        element.className = className;
+      }
+
+      if (text !== undefined) {
+        element.textContent = text;
+      }
+
       return element;
     }
 
-    function pluralize(number) {
-      const lastTwo = number % 100;
-      const last = number % 10;
-      if (lastTwo >= 11 && lastTwo <= 14) return "объявлений";
-      if (last === 1) return "объявление";
-      if (last >= 2 && last <= 4) return "объявления";
-      return "объявлений";
+    function pluralize(count, forms) {
+      const mod10 = count % 10;
+      const mod100 = count % 100;
+
+      if (mod10 === 1 && mod100 !== 11) return forms[0];
+
+      if (
+        mod10 >= 2 &&
+        mod10 <= 4 &&
+        (mod100 < 12 || mod100 > 14)
+      ) {
+        return forms[1];
+      }
+
+      return forms[2];
     }
 
     function renderListings() {
       const container = $("listings");
+      const query = $("searchInput").value.trim().toLowerCase();
+
       container.replaceChildren();
 
-      const search = $("searchInput").value.trim().toLowerCase();
+      let filtered = allListings.filter((listing) => {
+        const categoryMatches =
+          selectedCategory === "Все" ||
+          listing.category === selectedCategory;
 
-      const filtered = allListings.filter((listing) => {
-        const matchesCategory =
-          selectedCategory === "Все" || listing.category === selectedCategory;
+        const mineMatches =
+          !showOnlyMine ||
+          (currentUser && listing.user_id === currentUser.id);
 
         const searchableText = [
           listing.title,
           listing.description,
           listing.category,
           listing.price_text
-        ].filter(Boolean).join(" ").toLowerCase();
+        ].join(" ").toLowerCase();
 
-        const matchesSearch = searchableText.includes(search);
+        const searchMatches =
+          !query || searchableText.includes(query);
 
-        const matchesMine =
-          !showOnlyMine || (currentUser && listing.user_id === currentUser.id);
-
-        return matchesCategory && matchesSearch && matchesMine;
+        return categoryMatches && mineMatches && searchMatches;
       });
 
-      $("resultsCount").textContent = filtered.length + " " + pluralize(filtered.length);
-      $("listingsHeading").textContent = showOnlyMine ? "Мои объявления" : "Объявления";
+      if (showOnlyMine && !currentUser) {
+        filtered = [];
+      }
 
       if (filtered.length === 0) {
         const empty = makeElement("div", "empty-state");
+        empty.append(makeElement("div", "empty-icon", "◈"));
+
         empty.append(
-          makeElement("div", "empty-icon", "✳"),
-          makeElement("h3", "", showOnlyMine ? "У тебя пока нет объявлений" : "Пока ничего не найдено"),
-          makeElement("p", "", showOnlyMine ? "Создай первое объявление — пусть свои его увидят." : "Попробуй изменить запрос или выбрать другую категорию.")
+          makeElement(
+            "h3",
+            "",
+            showOnlyMine
+              ? "У тебя пока нет объявлений"
+              : query
+                ? "Ничего не найдено"
+                : "Пока здесь пусто"
+          )
         );
+
+        empty.append(
+          makeElement(
+            "p",
+            "",
+            showOnlyMine
+              ? "Создай первое объявление — это займёт всего пару минут."
+              : query
+                ? "Попробуй изменить запрос или выбрать другую категорию."
+                : "Стань первым, кто разместит здесь объявление."
+          )
+        );
+
+        if (currentUser) {
+          const createButton = makeElement(
+            "button",
+            "button button-primary",
+            "＋ Создать объявление"
+          );
+
+          createButton.addEventListener("click", () => {
+            $("listingForm").reset();
+            setFormMessage("listingMessage", "");
+            openModal("listingModal");
+          });
+
+          empty.append(createButton);
+        } else if (!showOnlyMine) {
+          const authButton = makeElement(
+            "button",
+            "button button-primary",
+            "Войти и разместить"
+          );
+
+          authButton.addEventListener("click", openAuthModal);
+          empty.append(authButton);
+        }
+
         container.append(empty);
         return;
       }
 
       filtered.forEach((listing) => {
         const card = makeElement("article", "listing-card");
+
         const top = makeElement("div", "listing-top");
 
         top.append(
-          makeElement("span", "listing-category", listing.category || "Другое"),
-          makeElement("span", "listing-date", formatDate(listing.created_at))
+          makeElement(
+            "span",
+            "listing-category",
+            listing.category || "Другое"
+          )
         );
 
-        const title = makeElement("h3", "listing-title", listing.title);
-        const description = makeElement("p", "listing-description", listing.description);
+        top.append(
+          makeElement(
+            "span",
+            "listing-date",
+            formatDate(listing.created_at)
+          )
+        );
+
+        card.append(top);
+
+        card.append(
+          makeElement("h3", "", listing.title || "Без названия")
+        );
+
+        card.append(
+          makeElement(
+            "p",
+            "listing-description",
+            listing.description || "Описание отсутствует."
+          )
+        );
 
         const bottom = makeElement("div", "listing-bottom");
+
         bottom.append(
-          makeElement("div", "listing-price", listing.price_text || "Цена договорная"),
-          makeElement("div", "listing-owner", "Участник FAM")
+          makeElement(
+            "div",
+            "listing-price",
+            listing.price_text || "Цена не указана"
+          )
         );
 
-        card.append(top, title, description, bottom);
+        bottom.append(
+          makeElement(
+            "div",
+            "listing-owner",
+            currentUser && listing.user_id === currentUser.id
+              ? "Твоё объявление"
+              : "FAM · Свои рядом"
+          )
+        );
+
+        card.append(bottom);
 
         if (currentUser && listing.user_id === currentUser.id) {
-          const actions = makeElement("div", "listing-actions");
-          const hideButton = makeElement("button", "small-button danger", "Снять");
-          hideButton.type = "button";
-          hideButton.addEventListener("click", () => hideListing(listing.id, hideButton));
-          actions.append(hideButton);
-          card.append(actions);
+          const hideButton = makeElement(
+            "button",
+            "hide-listing",
+            "Скрыть объявление"
+          );
+
+          hideButton.addEventListener("click", () => {
+            hideListing(listing.id, hideButton);
+          });
+
+          card.append(hideButton);
         }
 
         container.append(card);
       });
+
+      $("listingsSubtitle").textContent =
+        `Найдено ${filtered.length} ` +
+        pluralize(filtered.length, [
+          "объявление",
+          "объявления",
+          "объявлений"
+        ]);
     }
 
     async function loadListings() {
-      if (!supabaseClient) return;
+      const container = $("listings");
 
-      $("listings").innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">✳</div>
-          <h3>Загружаем объявления</h3>
-          <p>Секунду, скоро всё появится.</p>
-        </div>
-      `;
+      container.replaceChildren(
+        makeElement("div", "loading", "Загружаем объявления...")
+      );
 
-      showNotice("");
+      if (!supabaseClient) {
+        container.replaceChildren();
+
+        const errorState = makeElement("div", "empty-state");
+        errorState.append(
+          makeElement("h3", "", "Сервис временно недоступен")
+        );
+        errorState.append(
+          makeElement(
+            "p",
+            "",
+            "Обнови страницу немного позже."
+          )
+        );
+
+        container.append(errorState);
+        return;
+      }
 
       try {
         const { data, error } = await supabaseClient
@@ -925,14 +1672,44 @@
         renderListings();
       } catch (error) {
         console.error("Ошибка загрузки объявлений:", error);
-        allListings = [];
-        renderListings();
-        showNotice("Не удалось загрузить объявления. Проверь интернет и настройки Supabase.", "error");
+
+        container.replaceChildren();
+
+        const errorState = makeElement("div", "empty-state");
+        errorState.append(
+          makeElement("h3", "", "Не удалось загрузить объявления")
+        );
+        errorState.append(
+          makeElement(
+            "p",
+            "",
+            "Проверь подключение к интернету и настройки базы данных."
+          )
+        );
+
+        const retryButton = makeElement(
+          "button",
+          "button button-secondary",
+          "Попробовать ещё раз"
+        );
+
+        retryButton.addEventListener("click", loadListings);
+        errorState.append(retryButton);
+        container.append(errorState);
       }
     }
 
     async function hideListing(id, button) {
-      if (!currentUser) { openAuthModal(); return; }
+      if (!currentUser || !supabaseClient) {
+        showNotice("Войди в аккаунт, чтобы управлять объявлениями.");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "Скрыть это объявление? Оно исчезнет с общей доски."
+      );
+
+      if (!confirmed) return;
 
       button.disabled = true;
 
@@ -945,56 +1722,45 @@
 
         if (error) throw error;
 
+        showNotice("Объявление скрыто.", "success");
         await loadListings();
-        showNotice("Объявление снято с публикации.", "success");
       } catch (error) {
-        console.error("Ошибка снятия объявления:", error);
-        showNotice("Не удалось снять объявление. Попробуй ещё раз.", "error");
+        console.error("Ошибка скрытия объявления:", error);
+        showNotice(
+          "Не удалось скрыть объявление. Проверь настройки базы данных.",
+          "error"
+        );
         button.disabled = false;
       }
     }
 
-    function openAuthModal() {
-      authMode = "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
-      openModal("authModal");
-    }
+    $("categories").addEventListener("click", (event) => {
+      const button = event.target.closest(".category-button");
 
-    function updateAuthMode() {
-      const isLogin = authMode === "login";
+      if (!button) return;
 
-      $("authTitle").textContent = isLogin ? "С возвращением!" : "Добро пожаловать!";
-      $("authDescription").textContent = isLogin ? "Войди, чтобы быть среди своих." : "Создай аккаунт и присоединяйся к FAM.";
-      $("authSubmit").textContent = isLogin ? "Войти" : "Создать аккаунт";
-      $("authSwitchText").textContent = isLogin ? "Впервые здесь?" : "Уже есть аккаунт?";
-      $("authSwitchButton").textContent = isLogin ? "Создать аккаунт" : "Войти";
-      $("authPassword").autocomplete = isLogin ? "current-password" : "new-password";
-    }
+      selectedCategory = button.dataset.category;
+      showOnlyMine = false;
 
-    $("authSwitchButton").addEventListener("click", () => {
-      authMode = authMode === "login" ? "signup" : "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
+      document.querySelectorAll(".category-button").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+
+      $("listingsTitle").textContent = "Доска объявлений";
+      renderListings();
     });
 
-    $("authButton").addEventListener("click", async () => {
-      if (!supabaseClient) { showNotice("Сервис авторизации пока недоступен.", "error"); return; }
-
-      if (currentUser) {
-        const { error } = await supabaseClient.auth.signOut();
-        if (error) showNotice("Не удалось выйти из аккаунта.", "error");
-        return;
-      }
-
-      openAuthModal();
-    });
+    $("searchInput").addEventListener("input", renderListings);
 
     $("authForm").addEventListener("submit", async (event) => {
       event.preventDefault();
 
       if (!supabaseClient) {
-        setFormMessage("authMessage", "Сервис авторизации недоступен. Попробуй позже.", "error");
+        setFormMessage(
+          "authMessage",
+          "Сервис авторизации недоступен. Попробуй позже.",
+          "error"
+        );
         return;
       }
 
@@ -1003,12 +1769,20 @@
       const submitButton = $("authSubmit");
 
       if (!email || !email.includes("@")) {
-        setFormMessage("authMessage", "Введи корректный email.", "error");
+        setFormMessage(
+          "authMessage",
+          "Введи корректный email.",
+          "error"
+        );
         return;
       }
 
       if (password.length < 6) {
-        setFormMessage("authMessage", "Пароль должен быть минимум 6 символов.", "error");
+        setFormMessage(
+          "authMessage",
+          "Пароль должен содержать минимум 6 символов.",
+          "error"
+        );
         return;
       }
 
@@ -1016,4 +1790,230 @@
       setFormMessage("authMessage", "Подожди немного...");
 
       try {
-        if (authMode === "signup
+        if (authMode === "signup") {
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password
+          });
+
+          if (error) throw error;
+
+          if (data.session) {
+            currentUser = data.user;
+            updateAuthButton();
+            closeModal("authModal");
+            await loadListings();
+
+            showNotice("Аккаунт создан! Добро пожаловать в FAM.", "success");
+          } else {
+            setFormMessage(
+              "authMessage",
+              "Регистрация почти завершена. Проверь почту и подтверди адрес, если Supabase запросил подтверждение.",
+              "success"
+            );
+          }
+        } else {
+          const { data, error } =
+            await supabaseClient.auth.signInWithPassword({
+              email,
+              password
+            });
+
+          if (error) throw error;
+
+          currentUser = data.user;
+          updateAuthButton();
+          closeModal("authModal");
+          await loadListings();
+
+          showNotice("Ты успешно вошёл в FAM!", "success");
+        }
+      } catch (error) {
+        console.error("Ошибка авторизации:", error);
+
+        let message = "Не удалось выполнить действие. Попробуй ещё раз.";
+
+        if (error.message) {
+          const rawMessage = error.message.toLowerCase();
+
+          if (
+            rawMessage.includes("invalid login credentials") ||
+            rawMessage.includes("invalid_credentials")
+          ) {
+            message = "Неверная почта или пароль.";
+          } else if (
+            rawMessage.includes("user already registered")
+          ) {
+            message = "Этот email уже зарегистрирован. Попробуй войти.";
+          } else if (
+            rawMessage.includes("password should be")
+          ) {
+            message = "Пароль не соответствует требованиям.";
+          } else if (
+            rawMessage.includes("rate limit")
+          ) {
+            message = "Слишком много попыток. Попробуй немного позже.";
+          } else if (
+            rawMessage.includes("email not confirmed")
+          ) {
+            message = "Сначала подтверди email через письмо.";
+          } else if (
+            rawMessage.includes("fetch")
+          ) {
+            message = "Не удалось подключиться к серверу. Проверь интернет.";
+          }
+        }
+
+        setFormMessage("authMessage", message, "error");
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    $("listingForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      if (!currentUser || !supabaseClient) {
+        closeModal("listingModal");
+        openAuthModal();
+        showNotice("Для публикации нужно войти в аккаунт.");
+        return;
+      }
+
+      const title = $("listingTitle").value.trim();
+      const category = $("listingCategory").value;
+      const description = $("listingDescription").value.trim();
+      const priceText = $("listingPrice").value.trim();
+      const submitButton = $("listingSubmit");
+
+      if (title.length < 3) {
+        setFormMessage(
+          "listingMessage",
+          "Название должно содержать хотя бы 3 символа.",
+          "error"
+        );
+        return;
+      }
+
+      if (description.length < 5) {
+        setFormMessage(
+          "listingMessage",
+          "Добавь немного больше информации в описание.",
+          "error"
+        );
+        return;
+      }
+
+      if (!priceText) {
+        setFormMessage(
+          "listingMessage",
+          "Укажи цену или напиши «Бесплатно».",
+          "error"
+        );
+        return;
+      }
+
+      submitButton.disabled = true;
+
+      setFormMessage(
+        "listingMessage",
+        "Публикуем объявление..."
+      );
+
+      try {
+        const { error } = await supabaseClient
+          .from("listings")
+          .insert({
+            user_id: currentUser.id,
+            title,
+            category,
+            description,
+            price_text: priceText,
+            status: "active"
+          });
+
+        if (error) throw error;
+
+        closeModal("listingModal");
+        $("listingForm").reset();
+
+        selectedCategory = "Все";
+        showOnlyMine = false;
+
+        document.querySelectorAll(".category-button").forEach((button) => {
+          button.classList.toggle(
+            "active",
+            button.dataset.category === "Все"
+          );
+        });
+
+        $("listingsTitle").textContent = "Доска объявлений";
+        $("searchInput").value = "";
+
+        await loadListings();
+
+        showNotice("Объявление опубликовано!", "success");
+
+        $("listingsSection").scrollIntoView({ behavior: "smooth" });
+      } catch (error) {
+        console.error("Ошибка публикации:", error);
+
+        let message =
+          "Не удалось опубликовать объявление. Попробуй ещё раз.";
+
+        if (
+          error.message &&
+          error.message.toLowerCase().includes("row-level security")
+        ) {
+          message =
+            "База данных запретила публикацию. Нужно проверить политики доступа Supabase.";
+        }
+
+        setFormMessage("listingMessage", message, "error");
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    async function initializeApp() {
+      if (!window.supabase) {
+        console.error("Библиотека Supabase не загрузилась.");
+        await loadListings();
+        return;
+      }
+
+      try {
+        supabaseClient = window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_KEY
+        );
+
+        const { data, error } =
+          await supabaseClient.auth.getSession();
+
+        if (error) throw error;
+
+        currentUser = data.session
+          ? data.session.user
+          : null;
+
+        updateAuthButton();
+
+        supabaseClient.auth.onAuthStateChange((_event, session) => {
+          currentUser = session ? session.user : null;
+          updateAuthButton();
+
+          loadListings();
+        });
+
+        await loadListings();
+      } catch (error) {
+        console.error("Ошибка запуска приложения:", error);
+        await loadListings();
+      }
+    }
+
+    initializeApp();
+  </script>
+</body>
+</html>
