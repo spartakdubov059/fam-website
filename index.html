@@ -1998,7 +1998,6 @@
           : null;
 
         updateAuthButton();
-
         supabaseClient.auth.onAuthStateChange((_event, session) => {
           currentUser = session ? session.user : null;
           updateAuthButton();
