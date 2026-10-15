@@ -1097,7 +1097,33 @@
 
     const $ = (id) => document.getElementById(id);
 
-    function showNotice(message, type = "") {
+    
+        function escapeHTML(value) {
+      return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[c]);
+    }
+
+    function makeElement(tag, className, text) {
+      const el = document.createElement(tag);
+      if (className) el.className = className;
+      if (text !== undefined) el.textContent = text;
+      return el;
+    }
+
+    function pluralize(n) {
+      const a = n % 100;
+      const b = n % 10;
+      if (a >= 11 && a <= 14) return "объявлений";
+      if (b === 1) return "объявление";
+      if (b >= 2 && b <= 4) return "объявления";
+      return "объявлений";
+    }
+function showNotice(message, type = "") {
       const notice = $("notice");
       notice.textContent = message;
       notice.className = "notice" + (type ? " " + type : "");
