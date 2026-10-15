@@ -1311,7 +1311,37 @@
         button.disabled = false;
       }
     }
+    // Навигация FAM
+    document.querySelectorAll(".nav-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const section = tab.dataset.tab;
 
+        if (section !== "board") {
+          const names = {
+            favorites: "Избранное",
+            messages: "Сообщения",
+            profile: "Профиль"
+          };
+          showNotice(
+            "Раздел «" + names[section] + "» пока разрабатывается. Добавим его следующим этапом.",
+            "success"
+          );
+          return;
+        }
+
+        document.querySelectorAll(".nav-tab").forEach((item) => {
+          item.classList.remove("active");
+        });
+        tab.classList.add("active");
+
+        showOnlyMine = false;
+        $("myListingsButton").textContent = "Мои объявления";
+        renderListings();
+        hideNotice();
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
     function openAuthModal() {
       authMode = "login";
       updateAuthMode();
