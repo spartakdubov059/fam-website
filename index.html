@@ -654,7 +654,46 @@
       letter-spacing: .3px;
     }
 
-    
+        /* Кнопка избранного на карточке */
+    .favorite-btn {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: .2s;
+      width: 100%;
+    }
+    .favorite-btn:hover {
+      border-color: #C8C9D0;
+      color: var(--text);
+    }
+    .favorite-btn.active {
+      background: rgba(255, 119, 119, .12);
+      border-color: #9D4B4B;
+      color: #FFAAAA;
+    }
+    .favorites-empty {
+      grid-column: 1 / -1;
+      padding: 48px 20px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px dashed #41434C;
+      border-radius: var(--radius);
+    }
+    .favorites-empty h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+    }
+    .favorites-empty p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
         /* Навигация FAM */
     .main-nav {
       position: sticky;
@@ -882,7 +921,13 @@
       </label>
     </section>
      
-
+    <section class="section hidden" id="favoritesSection">
+      <div class="section-heading">
+        <h2>Избранное</h2>
+        <span class="results-count" id="favoritesCount"></span>
+      </div>
+      <div class="listings" id="favoritesList"></div>
+    </section>
     <section class="section" id="listingsSection">
       <div class="section-heading">
         <h2 id="listingsHeading">Объявления</h2>
@@ -1213,6 +1258,20 @@
         );
 
         card.append(top, title, description, bottom);
+        // Кнопка избранного
+        if (currentUser) {
+          const isFav = favorites.includes(listing.id);
+          const favBtn = makeElement(
+            "button",
+            "favorite-btn" + (isFav ? " active" : ""),
+            isFav ? "❤ В избранном" : "♡ В избранное"
+          );
+          favBtn.type = "button";
+          favBtn.addEventListener("click", () => {
+            toggleFavorite(listing.id, favBtn);
+          });
+          card.append(favBtn);
+        }
 
         if (currentUser && listing.user_id === currentUser.id) {
           const actions = makeElement("div", "listing-actions");
@@ -1310,24 +1369,153 @@
         showNotice("Не удалось снять объявление. Попробуй ещё раз.", "error");
         button.disabled = false;
       }
+    }    // ===== ИЗБРАННОЕ =====
+    let favorites = [];
+
+    async function loadFavorites() {
+      if (!currentUser || !supabaseClient) {
+        favorites = [];
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient
+          .from("favorites")
+          .select("listing_id")
+          .eq("user_id", currentUser.id);
+        if (error) throw error;
+        favorites = (data || []).map((f) => f.listing_id);
+      } catch (e) {
+        console.error("Ошибка загрузки избранного:", e);
+        favorites = [];
+      }
+    }
+
+    async function toggleFavorite(listingId, button) {
+      if (!currentUser) {
+        openAuthModal();
+        setFormMessage("authMessage", "Войди, чтобы сохранять в избранное.");
+        return;
+      }
+      const isFav = favorites.includes(listingId);
+
+      try {
+        if (isFav) {
+          const { error } = await supabaseClient
+            .from("favorites")
+            .delete()
+            .eq("user_id", currentUser.id)
+            .eq("listing_id", listingId);
+          if (error) throw error;
+          favorites = favorites.filter((id) => id !== listingId);
+          button.classList.remove("active");
+          button.textContent = "♡ В избранное";
+          showNotice("Убрано из избранного.", "success");
+        } else {
+          const { error } = await supabaseClient
+            .from("favorites")
+            .insert({ user_id: currentUser.id, listing_id: listingId });
+          if (error) throw error;
+          favorites.push(listingId);
+          button.classList.add("active");
+          button.textContent = "❤ В избранном";
+          showNotice("Сохранено в избранное!", "success");
+        }
+      } catch (e) {
+        console.error("Ошибка избранного:", e);
+        showNotice("Не удалось сохранить. Попробуй ещё раз.", "error");
+      }
+    }
+
+    function renderFavorites() {
+      const container = $("favoritesList");
+      container.replaceChildren();
+
+      const favListings = allListings.filter((l) =>
+        favorites.includes(l.id)
+      );
+
+      $("favoritesCount").textContent =
+        favListings.length + " " + pluralize(favListings.length);
+
+      if (!favListings.length) {
+        const empty = document.createElement("div");
+        empty.className = "favorites-empty";
+        empty.innerHTML =
+          '<h3>Здесь пока пусто</h3>' +
+          '<p>Нажми ♡ на объявлении, чтобы сохранить его.</p>';
+        container.append(empty);
+        return;
+      }
+
+      favListings.forEach((listing) => {
+        const card = document.createElement("article");
+        card.className = "listing-card";
+        card.innerHTML =
+          '<div class="listing-top">' +
+            '<span class="listing-category">' +
+              escapeHTML(listing.category || "Другое") +
+            '</span>' +
+            '<span class="listing-date">' +
+              formatDate(listing.created_at) +
+            '</span>' +
+          '</div>' +
+          '<h3 class="listing-title">' +
+            escapeHTML(listing.title) +
+          '</h3>' +
+          '<p class="listing-description">' +
+            escapeHTML(listing.description) +
+          '</p>' +
+          '<div class="listing-bottom">' +
+            '<div class="listing-price">' +
+              escapeHTML(listing.price_text || "Цена договорная") +
+            '</div>' +
+            '<div class="listing-owner">Участник FAM</div>' +
+          '</div>';
+
+        const favBtn = document.createElement("button");
+        favBtn.type = "button";
+        favBtn.className = "favorite-btn active";
+        favBtn.textContent = "❤ В избранном";
+        favBtn.addEventListener("click", async () => {
+          await toggleFavorite(listing.id, favBtn);
+          renderFavorites();
+        });
+
+        card.append(favBtn);
+        container.append(card);
+      });
     }
     // Навигация FAM
     document.querySelectorAll(".nav-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         const section = tab.dataset.tab;
 
-        if (section !== "board") {
-          const names = {
-            favorites: "Избранное",
-            messages: "Сообщения",
-            profile: "Профиль"
-          };
-          showNotice(
-            "Раздел «" + names[section] + "» пока разрабатывается. Добавим его следующим этапом.",
-            "success"
-          );
-          return;
-        }
+             if (section === "favorites") {
+        document.querySelectorAll(".nav-tab").forEach((item) => {
+          item.classList.remove("active");
+        });
+        tab.classList.add("active");
+
+        $("listingsSection").classList.add("hidden");
+        $("favoritesSection").classList.remove("hidden");
+
+        renderFavorites();
+        hideNotice();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (section !== "board") {
+        const names = {
+          messages: "Сообщения",
+          profile: "Профиль"
+        };
+        showNotice(
+          "Раздел «" + names[section] + "» пока разрабатывается.",
+          "success"
+        );
+        return;
+      }
 
         document.querySelectorAll(".nav-tab").forEach((item) => {
           item.classList.remove("active");
@@ -1336,6 +1524,8 @@
 
         showOnlyMine = false;
         $("myListingsButton").textContent = "Мои объявления";
+        $("favoritesSection").classList.add("hidden");
+        $("listingsSection").classList.remove("hidden");
         renderListings();
         hideNotice();
 
@@ -1636,14 +1826,14 @@
       }
 
       updateAuthButton();
+      await loadFavorites();
       await loadListings();
-
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
+            supabaseClient.auth.onAuthStateChange(async (_event, session) => {
         currentUser = session?.user || null;
         updateAuthButton();
-        loadListings();
+        await loadFavorites();
+        await loadListings();
       });
-    }
 
     // Загружаем Supabase SDK перед запуском приложения.
     const supabaseScript = document.createElement("script");
