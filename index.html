@@ -654,7 +654,62 @@
       letter-spacing: .3px;
     }
 
-    /* Полоса прокрутки */
+    
+        /* Навигация FAM */
+    .main-nav {
+      position: sticky;
+      top: 76px;
+      z-index: 9;
+      background: rgba(23, 24, 28, .96);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+    }
+    .main-nav-inner {
+      width: min(1000px, calc(100% - 32px));
+      margin: 0 auto;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 0;
+      scrollbar-width: none;
+    }
+    .main-nav-inner::-webkit-scrollbar {
+      display: none;
+    }
+    .nav-tab {
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 0 17px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+      transition: .2s;
+    }
+    .nav-tab:hover {
+      background: var(--surface);
+      color: var(--text);
+    }
+    .nav-tab.active {
+      background: var(--accent);
+      color: #17181C;
+    }
+    @media (max-width: 520px) {
+      .main-nav {
+        top: 68px;
+      }
+      .main-nav-inner {
+        width: calc(100% - 24px);
+        gap: 5px;
+      }
+      .nav-tab {
+        min-height: 39px;
+        padding: 0 13px;
+        font-size: 12px;
+      }
+    }/* Полоса прокрутки */
 
     ::-webkit-scrollbar {
       width: 8px;
@@ -776,7 +831,22 @@
       </div>
     </div>
   </header>
-
+  <nav class="main-nav" aria-label="Главная навигация">
+    <div class="main-nav-inner">
+      <button class="nav-tab active" data-tab="board">
+        ▦ Доска
+      </button>
+      <button class="nav-tab" data-tab="favorites">
+        ♡ Избранное
+      </button>
+      <button class="nav-tab" data-tab="messages">
+        ✉ Сообщения
+      </button>
+      <button class="nav-tab" data-tab="profile">
+        ◉ Профиль
+      </button>
+    </div>
+  </nav>
   <main>
     <section class="hero">
       <div class="hero-label">
@@ -811,6 +881,7 @@
         >
       </label>
     </section>
+     
 
     <section class="section" id="listingsSection">
       <div class="section-heading">
