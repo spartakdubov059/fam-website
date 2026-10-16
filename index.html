@@ -39,7 +39,7 @@
       outline-offset: 3px;
     }
 
-    /* Шапка */
+    /* ===== Шапка ===== */
     .header {
       position: sticky;
       top: 0;
@@ -69,7 +69,7 @@
     .logo-caption { margin-top: 2px; color: var(--muted); font-size: 11px; }
     .header-actions { display: flex; align-items: center; gap: 9px; }
 
-    /* Кнопки */
+    /* ===== Кнопки ===== */
     .button {
       min-height: 43px;
       padding: 0 17px;
@@ -90,7 +90,7 @@
     .button-secondary:hover { background: var(--surface-hover); }
     .button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-    /* Навигация */
+    /* ===== Навигация ===== */
     .main-nav {
       position: sticky;
       top: 76px;
@@ -125,7 +125,7 @@
     .nav-tab:hover { background: var(--surface); color: var(--text); }
     .nav-tab.active { background: var(--accent); color: #17181C; }
 
-    /* Основное */
+    /* ===== Основное ===== */
     main { width: min(1000px, calc(100% - 32px)); margin: 0 auto; }
     .hero { padding: 55px 0 30px; }
     .hero-label {
@@ -304,14 +304,22 @@
 
     .hidden { display: none !important; }
 
-    /* Профиль */
+    /* ===== Профиль ===== */
     .profile-card {
-      display: flex; align-items: center; gap: 18px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
       padding: 22px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       margin-bottom: 16px;
+    }
+    .profile-avatar-wrap {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      flex-shrink: 0;
     }
     .profile-avatar {
       width: 64px; height: 64px;
@@ -319,11 +327,33 @@
       background: var(--accent); color: #17181C;
       display: grid; place-items: center;
       font-size: 26px; font-weight: 900;
-      flex-shrink: 0;
     }
-    .profile-info { min-width: 0; }
+    .profile-avatar-img {
+      position: absolute;
+      inset: 0;
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+    }
+    .profile-info { min-width: 0; flex: 1; }
     .profile-email { font-size: 17px; font-weight: 800; overflow-wrap: anywhere; margin-bottom: 5px; }
     .profile-meta { color: var(--muted); font-size: 13px; }
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .profile-actions .small-button {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    .profile-actions .small-button:hover {
+      color: var(--text);
+      border-color: #5A5D67;
+    }
     .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
     .profile-stat {
       padding: 18px;
@@ -337,7 +367,7 @@
     .profile-subheading { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
     .profile-signout { margin-top: 22px; width: 100%; }
 
-    /* Сообщения */
+    /* ===== Сообщения ===== */
     .dialogs { display: flex; flex-direction: column; gap: 10px; }
     .dialog-item {
       padding: 16px 18px;
@@ -405,7 +435,7 @@
     .chat-form input { flex: 1; margin-bottom: 0; }
     .chat-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 
-    /* Модальные окна */
+    /* ===== Модальные окна ===== */
     .modal {
       position: fixed; inset: 0;
       z-index: 100;
@@ -473,7 +503,7 @@
     }
     .form-message { margin-top: 13px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 
-    /* Футер */
+    /* ===== Футер ===== */
     footer {
       width: min(100% - 40px, 1000px);
       margin: 0 auto;
@@ -488,12 +518,12 @@
     .footer-studio span { color: #A5A7B0; }
     .footer-note { max-width: 600px; margin: 13px auto 0; color: #777A85; font-size: 12px; line-height: 1.8; letter-spacing: .3px; }
 
-    /* Скроллбар */
+    /* ===== Скроллбар ===== */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
 
-    /* Адаптив */
+    /* ===== Адаптив ===== */
     @media (max-width: 760px) {
       .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .hero { padding-top: 40px; }
@@ -570,10 +600,20 @@
     <section class="section hidden" id="profileSection">
       <div class="section-heading"><h2>Профиль</h2></div>
       <div class="profile-card">
-        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="profileAvatar">?</div>
+          <img class="profile-avatar-img hidden" id="profileAvatarImg" alt="">
+        </div>
         <div class="profile-info">
           <div class="profile-email" id="profileEmail">—</div>
           <div class="profile-meta" id="profileMeta">—</div>
+          <div class="profile-actions">
+            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block">
+              📷 Загрузить фото
+            </label>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none">
+            <button class="small-button hidden" id="avatarRemove" type="button">Удалить</button>
+          </div>
         </div>
       </div>
       <div class="profile-stats">
@@ -740,6 +780,7 @@
     var currentChatUserId = null;
     var currentChatEmail = null;
     var messagesPollTimer = null;
+    var currentAvatarUrl = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -970,11 +1011,40 @@
         });
     }
 
-    /* ========== ПРОФИЛЬ ========== */
+    /* ========== ПРОФИЛЬ + АВАТАРКИ ========== */
+    function ensureProfileRow() {
+      if (!currentUser || !supabaseClient) return Promise.resolve();
+      return supabaseClient
+        .from("profiles")
+        .upsert({ id: currentUser.id, email: currentUser.email }, { onConflict: "id" })
+        .then(function (res) {
+          if (res.error) console.error("Ошибка upsert профиля:", res.error);
+        });
+    }
+
+    function loadProfileData() {
+      if (!currentUser || !supabaseClient) { currentAvatarUrl = null; return Promise.resolve(); }
+      return supabaseClient
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", currentUser.id)
+        .maybeSingle()
+        .then(function (res) {
+          if (res.error) throw res.error;
+          currentAvatarUrl = (res.data && res.data.avatar_url) ? res.data.avatar_url : null;
+        })
+        .catch(function (e) {
+          console.error("Ошибка загрузки профиля:", e);
+          currentAvatarUrl = null;
+        });
+    }
+
     function renderProfile() {
       var emailEl = $("profileEmail");
       var metaEl = $("profileMeta");
       var avatarEl = $("profileAvatar");
+      var imgEl = $("profileAvatarImg");
+      var removeBtn = $("avatarRemove");
       var listingsCountEl = $("profileListingsCount");
       var favoritesCountEl = $("profileFavoritesCount");
       var container = $("profileListings");
@@ -982,7 +1052,9 @@
       if (!currentUser) {
         if (emailEl) emailEl.textContent = "Не войден";
         if (metaEl) metaEl.textContent = "Войди, чтобы увидеть профиль";
-        if (avatarEl) avatarEl.textContent = "?";
+        if (avatarEl) { avatarEl.textContent = "?"; avatarEl.classList.remove("hidden"); }
+        if (imgEl) { imgEl.classList.add("hidden"); imgEl.removeAttribute("src"); }
+        if (removeBtn) removeBtn.classList.add("hidden");
         if (listingsCountEl) listingsCountEl.textContent = "0";
         if (favoritesCountEl) favoritesCountEl.textContent = "0";
         if (container) container.replaceChildren();
@@ -991,7 +1063,16 @@
 
       var email = currentUser.email || "—";
       if (emailEl) emailEl.textContent = email;
-      if (avatarEl) avatarEl.textContent = email.charAt(0).toUpperCase();
+
+      if (currentAvatarUrl) {
+        if (imgEl) { imgEl.src = currentAvatarUrl; imgEl.classList.remove("hidden"); }
+        if (avatarEl) avatarEl.classList.add("hidden");
+        if (removeBtn) removeBtn.classList.remove("hidden");
+      } else {
+        if (imgEl) { imgEl.classList.add("hidden"); imgEl.removeAttribute("src"); }
+        if (avatarEl) { avatarEl.textContent = email.charAt(0).toUpperCase(); avatarEl.classList.remove("hidden"); }
+        if (removeBtn) removeBtn.classList.add("hidden");
+      }
 
       var created = currentUser.created_at
         ? new Date(currentUser.created_at).toLocaleDateString("ru-RU", {
@@ -1059,6 +1140,80 @@
         container.append(card);
       });
     }
+
+    function uploadAvatar(file) {
+      if (!currentUser || !supabaseClient) return;
+      if (!file) return;
+      if (file.size > 3 * 1024 * 1024) {
+        showNotice("Файл больше 3 МБ. Выбери поменьше.", "error");
+        return;
+      }
+
+      var ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      var path = currentUser.id + "/avatar." + ext;
+
+      showNotice("Загружаем фото...");
+
+      supabaseClient.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, cacheControl: "3600" })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
+          var url = pub.data.publicUrl + "?t=" + Date.now();
+          return supabaseClient
+            .from("profiles")
+            .upsert({ id: currentUser.id, email: currentUser.email, avatar_url: url }, { onConflict: "id" })
+            .then(function (r2) {
+              if (r2.error) throw r2.error;
+              currentAvatarUrl = url;
+              renderProfile();
+              showNotice("Фото загружено!", "success");
+            });
+        })
+        .catch(function (e) {
+          console.error("Ошибка загрузки фото:", e);
+          showNotice("Не удалось загрузить: " + (e.message || "ошибка"), "error");
+        });
+    }
+
+    function removeAvatar() {
+      if (!currentUser || !supabaseClient) return;
+      if (!window.confirm("Удалить фото профиля?")) return;
+
+      supabaseClient.storage
+        .from("avatars")
+        .list(currentUser.id)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          var files = res.data || [];
+          if (!files.length) return;
+          var paths = files.map(function (f) { return currentUser.id + "/" + f.name; });
+          return supabaseClient.storage.from("avatars").remove(paths);
+        })
+        .then(function () {
+          return supabaseClient
+            .from("profiles")
+            .upsert({ id: currentUser.id, email: currentUser.email, avatar_url: null }, { onConflict: "id" });
+        })
+        .then(function () {
+          currentAvatarUrl = null;
+          renderProfile();
+          showNotice("Фото удалено.", "success");
+        })
+        .catch(function (e) {
+          console.error("Ошибка удаления фото:", e);
+          showNotice("Не удалось удалить.", "error");
+        });
+    }
+
+    $("avatarInput").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (file) uploadAvatar(file);
+      e.target.value = "";
+    });
+
+    $("avatarRemove").addEventListener("click", removeAvatar);
 
     /* ========== ИЗБРАННОЕ ========== */
     function loadFavorites() {
@@ -1412,7 +1567,6 @@
           return;
         }
 
-        // board
         $("listingsSection").classList.remove("hidden");
         showOnlyMine = false;
         $("myListingsButton").textContent = "Мои объявления";
@@ -1632,14 +1786,20 @@
         .catch(function (e) { console.error("Ошибка сессии:", e); currentUser = null; })
         .then(function () {
           updateAuthButton();
-          return loadFavorites();
+          return ensureProfileRow();
         })
+        .then(function () { return loadProfileData(); })
+        .then(function () { return loadFavorites(); })
         .then(function () { return loadListings(); })
         .then(function () {
           supabaseClient.auth.onAuthStateChange(function (_event, session) {
             currentUser = session ? session.user : null;
             updateAuthButton();
-            loadFavorites().then(function () { loadListings(); });
+            currentAvatarUrl = null;
+            ensureProfileRow()
+              .then(function () { return loadProfileData(); })
+              .then(function () { return loadFavorites(); })
+              .then(function () { loadListings(); });
           });
         });
     }
