@@ -653,7 +653,73 @@
       line-height: 1.8;
       letter-spacing: .3px;
     }
-
+    /* Профиль */
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+    .profile-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: var(--accent);
+      color: #17181C;
+      display: grid;
+      place-items: center;
+      font-size: 26px;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+    .profile-info {
+      min-width: 0;
+    }
+    .profile-email {
+      font-size: 17px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+      margin-bottom: 5px;
+    }
+    .profile-meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .profile-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .profile-stat {
+      padding: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-align: center;
+    }
+    .profile-stat-value {
+      font-size: 26px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+    .profile-stat-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .profile-subheading {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .profile-signout {
+      margin-top: 22px;
+      width: 100%;
+    }
         /* Кнопка избранного на карточке */
     .favorite-btn {
       margin-top: 10px;
@@ -920,7 +986,37 @@
         >
       </label>
     </section>
-     
+         <section class="section hidden" id="profileSection">
+      <div class="section-heading">
+        <h2>Профиль</h2>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-info">
+          <div class="profile-email" id="profileEmail">—</div>
+          <div class="profile-meta" id="profileMeta">—</div>
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <div class="profile-stat-value" id="profileListingsCount">0</div>
+          <div class="profile-stat-label">Моих объявлений</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-value" id="profileFavoritesCount">0</div>
+          <div class="profile-stat-label">В избранном</div>
+        </div>
+      </div>
+
+      <h3 class="profile-subheading">Мои объявления</h3>
+      <div class="listings" id="profileListings"></div>
+
+      <button class="button button-secondary profile-signout" id="profileSignOut">
+        Выйти из аккаунта
+      </button>
+    </section>
     <section class="section hidden" id="favoritesSection">
       <div class="section-heading">
         <h2>Избранное</h2>
@@ -1395,6 +1491,117 @@ function showNotice(message, type = "") {
         showNotice("Не удалось снять объявление. Попробуй ещё раз.", "error");
         button.disabled = false;
       }
+          // ===== ПРОФИЛЬ =====
+    function renderProfile() {
+      const emailEl = $("profileEmail");
+      const metaEl = $("profileMeta");
+      const avatarEl = $("profileAvatar");
+      const listingsCountEl = $("profileListingsCount");
+      const favoritesCountEl = $("profileFavoritesCount");
+      const container = $("profileListings");
+
+      if (!currentUser) {
+        emailEl.textContent = "Не войден";
+        metaEl.textContent = "Войди, чтобы увидеть профиль";
+        avatarEl.textContent = "?";
+        listingsCountEl.textContent = "0";
+        favoritesCountEl.textContent = "0";
+        container.replaceChildren();
+        return;
+      }
+
+      // Email и аватар
+      emailEl.textContent = currentUser.email || "—";
+      avatarEl.textContent = (currentUser.email || "?").charAt(0).toUpperCase();
+
+      // Дата регистрации
+      const created = currentUser.created_at
+        ? new Date(currentUser.created_at).toLocaleDateString("ru-RU", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+          })
+        : "—";
+      metaEl.textContent = "В FAM с " + created;
+
+      // Мои объявления
+      const myListings = allListings.filter(
+        (l) => l.user_id === currentUser.id
+      );
+      listingsCountEl.textContent = myListings.length;
+      favoritesCountEl.textContent = favorites.length;
+
+      // Список объявлений
+      container.replaceChildren();
+
+      if (!myListings.length) {
+        const empty = document.createElement("div");
+        empty.className = "favorites-empty";
+        empty.innerHTML =
+          "<h3>У тебя пока нет объявлений</h3>" +
+          "<p>Нажми «Разместить объявление», чтобы создать первое.</p>";
+        container.append(empty);
+        return;
+      }
+
+      myListings.forEach((listing) => {
+        const card = document.createElement("article");
+        card.className = "listing-card";
+
+        card.innerHTML =
+          '<div class="listing-top">' +
+            '<span class="listing-category">' +
+              escapeHTML(listing.category || "Другое") +
+            "</span>" +
+            '<span class="listing-date">' +
+              formatDate(listing.created_at) +
+            "</span>" +
+          "</div>" +
+          '<h3 class="listing-title">' +
+            escapeHTML(listing.title) +
+          "</h3>" +
+          '<p class="listing-description">' +
+            escapeHTML(listing.description) +
+          "</p>" +
+          '<div class="listing-bottom">' +
+            '<div class="listing-price">' +
+              escapeHTML(listing.price_text || "Цена договорная") +
+            "</div>" +
+            '<div class="listing-owner">Твоё</div>' +
+          "</div>";
+
+        const hideBtn = document.createElement("button");
+        hideBtn.type = "button";
+        hideBtn.className = "small-button";
+        hideBtn.textContent = "Снять с публикации";
+        hideBtn.style.marginTop = "10px";
+        hideBtn.style.width = "100%";
+
+        hideBtn.addEventListener("click", async () => {
+          const ok = window.confirm("Снять объявление с публикации?");
+          if (!ok) return;
+          hideBtn.disabled = true;
+          try {
+            const { error } = await supabaseClient
+              .from("listings")
+              .update({ status: "hidden" })
+              .eq("id", listing.id)
+              .eq("user_id", currentUser.id);
+            if (error) throw error;
+            showNotice("Объявление снято.", "success");
+            await loadListings();
+            renderProfile();
+          } catch (e) {
+            console.error(e);
+            showNotice("Не удалось снять объявление.", "error");
+            hideBtn.disabled = false;
+          }
+        });
+
+        card.append(hideBtn);
+        container.append(card);
+      });
+    }
     }    // ===== ИЗБРАННОЕ =====
     let favorites = [];
 
@@ -1515,6 +1722,21 @@ function showNotice(message, type = "") {
     document.querySelectorAll(".nav-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
         const section = tab.dataset.tab;
+      if (section === "profile") {
+        document.querySelectorAll(".nav-tab").forEach((item) => {
+          item.classList.remove("active");
+        });
+        tab.classList.add("active");
+
+        $("listingsSection").classList.add("hidden");
+        $("favoritesSection").classList.add("hidden");
+        $("profileSection").classList.remove("hidden");
+
+        renderProfile();
+        hideNotice();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
 
              if (section === "favorites") {
         document.querySelectorAll(".nav-tab").forEach((item) => {
@@ -1524,17 +1746,15 @@ function showNotice(message, type = "") {
 
         $("listingsSection").classList.add("hidden");
         $("favoritesSection").classList.remove("hidden");
-
+        $("profileSection").classList.add("hidden");
         renderFavorites();
         hideNotice();
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
-
-      if (section !== "board") {
+if (section !== "board") {
         const names = {
-          messages: "Сообщения",
-          profile: "Профиль"
+          messages: "Сообщения"
         };
         showNotice(
           "Раздел «" + names[section] + "» пока разрабатывается.",
@@ -1551,6 +1771,7 @@ function showNotice(message, type = "") {
         showOnlyMine = false;
         $("myListingsButton").textContent = "Мои объявления";
         $("favoritesSection").classList.add("hidden");
+        $("profileSection").classList.add("hidden");
         $("listingsSection").classList.remove("hidden");
         renderListings();
         hideNotice();
@@ -1597,6 +1818,24 @@ function showNotice(message, type = "") {
       authMode = authMode === "login" ? "signup" : "login";
       updateAuthMode();
       setFormMessage("authMessage", "");
+    });
+    $("profileSignOut").addEventListener("click", async () => {
+      if (!supabaseClient || !currentUser) return;
+      const ok = window.confirm("Выйти из аккаунта?");
+      if (!ok) return;
+
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) {
+        showNotice("Не удалось выйти.", "error");
+        return;
+      }
+      showNotice("Ты вышел из аккаунта.", "success");
+      $("profileSection").classList.add("hidden");
+      $("listingsSection").classList.remove("hidden");
+      document.querySelectorAll(".nav-tab").forEach((item) => {
+        item.classList.remove("active");
+      });
+      document.querySelector('.nav-tab[data-tab="board"]').classList.add("active");
     });
 
     $("authButton").addEventListener("click", async () => {
