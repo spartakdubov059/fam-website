@@ -39,7 +39,7 @@
       outline-offset: 3px;
     }
 
-    /* ===== Шапка ===== */
+    /* Шапка */
     .header {
       position: sticky;
       top: 0;
@@ -57,30 +57,19 @@
       justify-content: space-between;
       gap: 16px;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      color: var(--text);
-      text-decoration: none;
-    }
+    .logo { display: flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
     .logo-mark {
-      display: grid;
-      place-items: center;
-      width: 43px;
-      height: 43px;
+      display: grid; place-items: center;
+      width: 43px; height: 43px;
       border-radius: 14px;
-      background: var(--accent);
-      color: #17181C;
-      font-size: 19px;
-      font-weight: 950;
-      letter-spacing: -1.5px;
+      background: var(--accent); color: #17181C;
+      font-size: 19px; font-weight: 950; letter-spacing: -1.5px;
     }
     .logo-name { font-size: 19px; font-weight: 850; letter-spacing: 1px; }
     .logo-caption { margin-top: 2px; color: var(--muted); font-size: 11px; }
     .header-actions { display: flex; align-items: center; gap: 9px; }
 
-    /* ===== Кнопки ===== */
+    /* Кнопки */
     .button {
       min-height: 43px;
       padding: 0 17px;
@@ -97,15 +86,11 @@
     }
     .button-primary { background: var(--accent); color: #17181C; }
     .button-primary:hover { background: #FFFFFF; transform: translateY(-1px); }
-    .button-secondary {
-      background: var(--surface);
-      color: var(--text);
-      border-color: var(--border);
-    }
+    .button-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
     .button-secondary:hover { background: var(--surface-hover); }
     .button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-    /* ===== Навигация ===== */
+    /* Навигация */
     .main-nav {
       position: sticky;
       top: 76px;
@@ -140,21 +125,17 @@
     .nav-tab:hover { background: var(--surface); color: var(--text); }
     .nav-tab.active { background: var(--accent); color: #17181C; }
 
-    /* ===== Основное ===== */
+    /* Основное */
     main { width: min(1000px, calc(100% - 32px)); margin: 0 auto; }
-
     .hero { padding: 55px 0 30px; }
     .hero-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
+      display: inline-flex; align-items: center; gap: 8px;
       padding: 8px 12px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 100px;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 650;
+      font-size: 12px; font-weight: 650;
     }
     .hero-dot { width: 7px; height: 7px; background: #B9D8B6; border-radius: 50%; }
     h1 {
@@ -166,20 +147,12 @@
       font-weight: 900;
     }
     h1 span { color: var(--accent); }
-    .hero-description {
-      max-width: 500px;
-      margin: 0;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.7;
-    }
+    .hero-description { max-width: 500px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
     .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 25px; }
 
     .search-box {
       margin-top: 28px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      display: flex; align-items: center; gap: 12px;
       padding: 0 17px;
       min-height: 57px;
       background: var(--surface);
@@ -190,10 +163,8 @@
     .search-box:focus-within { border-color: #777B86; }
     .search-icon { color: var(--muted); font-size: 19px; }
     .search-box input {
-      width: 100%;
-      min-width: 0;
-      border: 0;
-      outline: none;
+      width: 100%; min-width: 0;
+      border: 0; outline: none;
       background: transparent;
       color: var(--text);
       font-size: 14px;
@@ -208,26 +179,19 @@
       gap: 15px;
       margin-bottom: 20px;
     }
-    .section-heading h2 {
-      margin: 0;
-      font-size: 23px;
-      font-weight: 850;
-      letter-spacing: -.6px;
-    }
+    .section-heading h2 { margin: 0; font-size: 23px; font-weight: 850; letter-spacing: -.6px; }
     .results-count { color: var(--muted); font-size: 12px; }
 
     .categories { display: flex; gap: 9px; overflow-x: auto; padding: 2px 1px 12px; scrollbar-width: none; }
     .categories::-webkit-scrollbar { display: none; }
     .category-button {
       flex: 0 0 auto;
-      min-height: 40px;
-      padding: 0 15px;
+      min-height: 40px; padding: 0 15px;
       border: 1px solid var(--border);
       border-radius: 12px;
       background: var(--surface);
       color: var(--muted);
-      font-size: 13px;
-      font-weight: 650;
+      font-size: 13px; font-weight: 650;
       transition: .2s;
       cursor: pointer;
     }
@@ -241,8 +205,7 @@
       margin-top: 12px;
     }
     .listing-card {
-      display: flex;
-      flex-direction: column;
+      display: flex; flex-direction: column;
       min-width: 0;
       min-height: 205px;
       padding: 19px;
@@ -256,31 +219,17 @@
       background: var(--surface-hover);
       border-color: #4A4D57;
     }
-    .listing-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
+    .listing-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; }
     .listing-category {
-      display: inline-flex;
-      align-items: center;
+      display: inline-flex; align-items: center;
       padding: 6px 9px;
       border: 1px solid #41434C;
       border-radius: 8px;
       color: var(--muted);
-      font-size: 11px;
-      font-weight: 650;
+      font-size: 11px; font-weight: 650;
     }
     .listing-date { color: #858792; font-size: 11px; white-space: nowrap; }
-    .listing-title {
-      margin: 0 0 9px;
-      font-size: 17px;
-      font-weight: 800;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
+    .listing-title { margin: 0 0 9px; font-size: 17px; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
     .listing-description {
       margin: 0;
       color: var(--muted);
@@ -298,14 +247,7 @@
       padding-top: 20px;
     }
     .listing-price { font-size: 17px; font-weight: 850; overflow-wrap: anywhere; }
-    .listing-owner {
-      max-width: 45%;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: right;
-      overflow-wrap: anywhere;
-    }
-    .listing-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .listing-owner { max-width: 45%; color: var(--muted); font-size: 11px; text-align: right; overflow-wrap: anywhere; }
     .small-button {
       padding: 7px 10px;
       border: 1px solid var(--border);
@@ -317,7 +259,6 @@
     }
     .small-button:hover { color: var(--danger); border-color: var(--danger); }
 
-    /* ===== Кнопка избранного ===== */
     .favorite-btn {
       margin-top: 10px;
       padding: 8px 12px;
@@ -325,8 +266,7 @@
       border-radius: 10px;
       background: transparent;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 650;
+      font-size: 12px; font-weight: 650;
       cursor: pointer;
       transition: .2s;
       width: 100%;
@@ -338,7 +278,6 @@
       color: #FFAAAA;
     }
 
-    /* ===== Пустые состояния ===== */
     .empty-state, .favorites-empty {
       grid-column: 1 / -1;
       padding: 48px 20px;
@@ -349,14 +288,8 @@
     }
     .empty-icon { margin-bottom: 12px; font-size: 30px; }
     .empty-state h3, .favorites-empty h3 { margin: 0 0 8px; font-size: 17px; }
-    .empty-state p, .favorites-empty p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-    }
+    .empty-state p, .favorites-empty p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
-    /* ===== Notice ===== */
     .notice {
       margin-top: 15px;
       padding: 13px 15px;
@@ -364,19 +297,16 @@
       border-radius: 12px;
       background: var(--surface);
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 12px; line-height: 1.6;
     }
     .notice.error { color: #FFAAAA; border-color: #704040; }
     .notice.success { color: #B9D8B6; border-color: #405C42; }
 
     .hidden { display: none !important; }
 
-    /* ===== Профиль ===== */
+    /* Профиль */
     .profile-card {
-      display: flex;
-      align-items: center;
-      gap: 18px;
+      display: flex; align-items: center; gap: 18px;
       padding: 22px;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -384,31 +314,17 @@
       margin-bottom: 16px;
     }
     .profile-avatar {
-      width: 64px;
-      height: 64px;
+      width: 64px; height: 64px;
       border-radius: 20px;
-      background: var(--accent);
-      color: #17181C;
-      display: grid;
-      place-items: center;
-      font-size: 26px;
-      font-weight: 900;
+      background: var(--accent); color: #17181C;
+      display: grid; place-items: center;
+      font-size: 26px; font-weight: 900;
       flex-shrink: 0;
     }
     .profile-info { min-width: 0; }
-    .profile-email {
-      font-size: 17px;
-      font-weight: 800;
-      overflow-wrap: anywhere;
-      margin-bottom: 5px;
-    }
+    .profile-email { font-size: 17px; font-weight: 800; overflow-wrap: anywhere; margin-bottom: 5px; }
     .profile-meta { color: var(--muted); font-size: 13px; }
-    .profile-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
+    .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
     .profile-stat {
       padding: 18px;
       background: var(--surface);
@@ -421,14 +337,80 @@
     .profile-subheading { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
     .profile-signout { margin-top: 22px; width: 100%; }
 
-    /* ===== Модальные окна ===== */
+    /* Сообщения */
+    .dialogs { display: flex; flex-direction: column; gap: 10px; }
+    .dialog-item {
+      padding: 16px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: .2s;
+    }
+    .dialog-item:hover { background: var(--surface-hover); border-color: #4A4D57; }
+    .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .dialog-name { font-weight: 800; font-size: 14px; overflow-wrap: anywhere; }
+    .dialog-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .dialog-preview { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dialog-unread {
+      display: inline-block;
+      background: var(--accent); color: #17181C;
+      font-size: 10px; font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+    }
+
+    .chat {
+      display: flex; flex-direction: column;
+      min-height: 60vh;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .chat-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .chat-with { font-weight: 800; overflow-wrap: anywhere; }
+    .chat-messages {
+      flex: 1;
+      padding: 18px;
+      display: flex; flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      max-height: 55vh;
+    }
+    .msg {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .msg.mine { align-self: flex-end; background: var(--accent); color: #17181C; border-bottom-right-radius: 4px; }
+    .msg.theirs { align-self: flex-start; background: #33353D; color: var(--text); border-bottom-left-radius: 4px; }
+    .msg-time { display: block; font-size: 10px; opacity: .7; margin-top: 4px; }
+    .chat-form {
+      display: flex; gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .chat-form input { flex: 1; margin-bottom: 0; }
+    .chat-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+
+    /* Модальные окна */
     .modal {
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       z-index: 100;
       display: none;
-      align-items: center;
-      justify-content: center;
+      align-items: center; justify-content: center;
       padding: 16px;
       background: rgba(0, 0, 0, .72);
       backdrop-filter: blur(8px);
@@ -446,9 +428,7 @@
       box-shadow: 0 25px 80px rgba(0, 0, 0, .4);
     }
     .modal-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
+      display: flex; align-items: flex-start; justify-content: space-between;
       gap: 15px;
       margin-bottom: 22px;
     }
@@ -456,8 +436,7 @@
     .modal-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
     .close-button {
       flex: 0 0 auto;
-      width: 34px;
-      height: 34px;
+      width: 34px; height: 34px;
       border: 1px solid var(--border);
       border-radius: 10px;
       background: var(--surface);
@@ -466,13 +445,7 @@
       cursor: pointer;
     }
     .form-group { margin-bottom: 16px; }
-    .form-group label {
-      display: block;
-      margin-bottom: 8px;
-      color: #D7D8DE;
-      font-size: 12px;
-      font-weight: 700;
-    }
+    .form-group label { display: block; margin-bottom: 8px; color: #D7D8DE; font-size: 12px; font-weight: 700; }
     .form-group input, .form-group textarea, .form-group select {
       width: 100%;
       min-height: 46px;
@@ -485,15 +458,12 @@
       font-size: 13px;
     }
     .form-group textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-      border-color: #888B95;
-    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #888B95; }
     .form-group input::placeholder, .form-group textarea::placeholder { color: #858792; }
     .form-submit { width: 100%; margin-top: 5px; }
     .modal-switch { margin: 17px 0 0; text-align: center; color: var(--muted); font-size: 12px; }
     .text-button {
-      padding: 0;
-      border: 0;
+      padding: 0; border: 0;
       background: transparent;
       color: var(--text);
       font-weight: 750;
@@ -501,14 +471,9 @@
       text-underline-offset: 3px;
       cursor: pointer;
     }
-    .form-message {
-      margin-top: 13px;
-      font-size: 12px;
-      line-height: 1.6;
-      overflow-wrap: anywhere;
-    }
+    .form-message { margin-top: 13px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 
-    /* ===== Футер ===== */
+    /* Футер */
     footer {
       width: min(100% - 40px, 1000px);
       margin: 0 auto;
@@ -516,32 +481,19 @@
       text-align: center;
       border-top: 1px solid var(--border);
     }
-    .footer-brand {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+    .footer-brand { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
     .footer-line { width: 28px; height: 1px; background: #555862; }
     .footer-created { color: #858792; font-size: 10px; font-weight: 700; letter-spacing: 3px; }
     .footer-studio { color: #F5F5F5; font-size: 14px; font-weight: 900; letter-spacing: 2px; }
     .footer-studio span { color: #A5A7B0; }
-    .footer-note {
-      max-width: 600px;
-      margin: 13px auto 0;
-      color: #777A85;
-      font-size: 12px;
-      line-height: 1.8;
-      letter-spacing: .3px;
-    }
+    .footer-note { max-width: 600px; margin: 13px auto 0; color: #777A85; font-size: 12px; line-height: 1.8; letter-spacing: .3px; }
 
-    /* ===== Скроллбар ===== */
+    /* Скроллбар */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
 
-    /* ===== Адаптив ===== */
+    /* Адаптив */
     @media (max-width: 760px) {
       .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .hero { padding-top: 40px; }
@@ -599,10 +551,7 @@
 
   <main>
     <section class="hero">
-      <div class="hero-label">
-        <span class="hero-dot"></span>
-        Место для своих
-      </div>
+      <div class="hero-label"><span class="hero-dot"></span> Место для своих</div>
       <h1>Находи своё.<br><span>Создавай своё.</span></h1>
       <p class="hero-description">
         Вещи, услуги, творчество и учёба — всё, чем хочется поделиться с другими. Просто, быстро и рядом.
@@ -649,6 +598,24 @@
         <span class="results-count" id="favoritesCount"></span>
       </div>
       <div class="listings" id="favoritesList"></div>
+    </section>
+
+    <!-- Сообщения -->
+    <section class="section hidden" id="messagesSection">
+      <div class="section-heading"><h2>Сообщения</h2></div>
+      <div id="dialogsList" class="dialogs"></div>
+
+      <div id="chatView" class="chat hidden">
+        <div class="chat-header">
+          <button class="button button-secondary" id="chatBack">← Назад</button>
+          <div class="chat-with" id="chatWith">—</div>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" type="text" placeholder="Написать сообщение..." maxlength="1000" autocomplete="off">
+          <button class="button button-primary" type="submit">Отправить</button>
+        </form>
+      </div>
     </section>
 
     <!-- Доска -->
@@ -770,6 +737,9 @@
     var selectedCategory = "Все";
     var showOnlyMine = false;
     var authMode = "login";
+    var currentChatUserId = null;
+    var currentChatEmail = null;
+    var messagesPollTimer = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -787,8 +757,7 @@
     }
 
     function pluralize(n) {
-      var a = n % 100;
-      var b = n % 10;
+      var a = n % 100, b = n % 10;
       if (a >= 11 && a <= 14) return "объявлений";
       if (b === 1) return "объявление";
       if (b >= 2 && b <= 4) return "объявления";
@@ -808,9 +777,7 @@
       notice.textContent = message;
       notice.className = "notice" + (type ? " " + type : "");
       clearTimeout(showNotice._t);
-      showNotice._t = setTimeout(function () {
-        notice.classList.add("hidden");
-      }, 6000);
+      showNotice._t = setTimeout(function () { notice.classList.add("hidden"); }, 6000);
     }
 
     function hideNotice() {
@@ -838,27 +805,18 @@
       var m = $(id);
       if (!m) return;
       m.classList.remove("open");
-      if (!document.querySelector(".modal.open")) {
-        document.body.style.overflow = "";
-      }
+      if (!document.querySelector(".modal.open")) document.body.style.overflow = "";
     }
 
-    // Закрытие модалок
     document.querySelectorAll("[data-close]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        closeModal(btn.dataset.close);
-      });
+      btn.addEventListener("click", function () { closeModal(btn.dataset.close); });
     });
     document.querySelectorAll(".modal").forEach(function (modal) {
-      modal.addEventListener("click", function (e) {
-        if (e.target === modal) closeModal(modal.id);
-      });
+      modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(modal.id); });
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        document.querySelectorAll(".modal.open").forEach(function (m) {
-          closeModal(m.id);
-        });
+        document.querySelectorAll(".modal.open").forEach(function (m) { closeModal(m.id); });
       }
     });
 
@@ -867,7 +825,7 @@
       if (btn) btn.textContent = currentUser ? "Мой аккаунт" : "Войти";
     }
 
-    // ===== ЗАГРУЗКА ОБЪЯВЛЕНИЙ =====
+    /* ========== ЗАГРУЗКА ОБЪЯВЛЕНИЙ ========== */
     function loadListings() {
       if (!supabaseClient) return Promise.resolve();
       var container = $("listings");
@@ -962,7 +920,19 @@
           card.append(favBtn);
         }
 
-        // Кнопка скрыть (для своих)
+        // Кнопка «Написать» — для чужих объявлений
+        if (currentUser && listing.user_id !== currentUser.id) {
+          var writeBtn = makeElement("button", "button button-secondary", "✉ Написать продавцу");
+          writeBtn.type = "button";
+          writeBtn.style.marginTop = "8px";
+          writeBtn.style.width = "100%";
+          writeBtn.addEventListener("click", function () {
+            startDialogWith(listing.user_id, "Участник " + listing.user_id.slice(0, 6), listing.title);
+          });
+          card.append(writeBtn);
+        }
+
+        // Кнопка скрыть — для своих
         if (currentUser && listing.user_id === currentUser.id) {
           var hideBtn = makeElement("button", "small-button", "Снять с публикации");
           hideBtn.type = "button";
@@ -992,9 +962,7 @@
           if (res.error) throw res.error;
           return loadListings();
         })
-        .then(function () {
-          showNotice("Объявление снято.", "success");
-        })
+        .then(function () { showNotice("Объявление снято.", "success"); })
         .catch(function (error) {
           console.error("Ошибка снятия:", error);
           showNotice("Не удалось снять объявление.", "error");
@@ -1002,7 +970,7 @@
         });
     }
 
-    // ===== ПРОФИЛЬ =====
+    /* ========== ПРОФИЛЬ ========== */
     function renderProfile() {
       var emailEl = $("profileEmail");
       var metaEl = $("profileMeta");
@@ -1032,9 +1000,7 @@
         : "—";
       if (metaEl) metaEl.textContent = "В FAM с " + created;
 
-      var myListings = allListings.filter(function (l) {
-        return l.user_id === currentUser.id;
-      });
+      var myListings = allListings.filter(function (l) { return l.user_id === currentUser.id; });
       if (listingsCountEl) listingsCountEl.textContent = myListings.length;
       if (favoritesCountEl) favoritesCountEl.textContent = favorites.length;
 
@@ -1094,7 +1060,7 @@
       });
     }
 
-    // ===== ИЗБРАННОЕ =====
+    /* ========== ИЗБРАННОЕ ========== */
     function loadFavorites() {
       if (!currentUser || !supabaseClient) {
         favorites = [];
@@ -1162,9 +1128,7 @@
       if (!container) return;
       container.replaceChildren();
 
-      var favListings = allListings.filter(function (l) {
-        return favorites.indexOf(l.id) !== -1;
-      });
+      var favListings = allListings.filter(function (l) { return favorites.indexOf(l.id) !== -1; });
 
       var countEl = $("favoritesCount");
       if (countEl) countEl.textContent = favListings.length + " " + pluralize(favListings.length);
@@ -1204,20 +1168,217 @@
       });
     }
 
-    // ===== НАВИГАЦИЯ =====
+    /* ========== СООБЩЕНИЯ ========== */
+    function startDialogWith(userId, email, listingTitle) {
+      if (!currentUser) {
+        openAuthModal();
+        setFormMessage("authMessage", "Войди, чтобы написать сообщение.");
+        return;
+      }
+      if (userId === currentUser.id) {
+        showNotice("Это твоё собственное объявление.", "error");
+        return;
+      }
+      currentChatUserId = userId;
+      currentChatEmail = email || "Участник FAM";
+
+      document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
+      var msgTab = document.querySelector('.nav-tab[data-tab="messages"]');
+      if (msgTab) msgTab.classList.add("active");
+
+      $("listingsSection").classList.add("hidden");
+      $("favoritesSection").classList.add("hidden");
+      $("profileSection").classList.add("hidden");
+      $("messagesSection").classList.remove("hidden");
+
+      $("dialogsList").classList.add("hidden");
+      $("chatView").classList.remove("hidden");
+      $("chatWith").textContent = currentChatEmail;
+
+      if (listingTitle) $("chatInput").placeholder = "Про «" + listingTitle + "»...";
+
+      loadChatMessages();
+      startMessagesPolling();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function startMessagesPolling() {
+      stopMessagesPolling();
+      messagesPollTimer = setInterval(loadChatMessages, 4000);
+    }
+
+    function stopMessagesPolling() {
+      if (messagesPollTimer) {
+        clearInterval(messagesPollTimer);
+        messagesPollTimer = null;
+      }
+    }
+
+    function loadChatMessages() {
+      if (!currentUser || !currentChatUserId || !supabaseClient) return;
+
+      supabaseClient
+        .from("messages")
+        .select("id,sender_id,receiver_id,body,created_at,is_read")
+        .or(
+          "and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + ")," +
+          "and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")"
+        )
+        .order("created_at", { ascending: true })
+        .limit(200)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          renderChatMessages(res.data || []);
+          markChatAsRead();
+        })
+        .catch(function (e) { console.error("Ошибка загрузки сообщений:", e); });
+    }
+
+    function renderChatMessages(msgs) {
+      var container = $("chatMessages");
+      if (!container) return;
+      container.replaceChildren();
+
+      if (!msgs.length) {
+        container.append(makeElement("div", "chat-empty", "Напиши первое сообщение."));
+        return;
+      }
+
+      msgs.forEach(function (m) {
+        var isMine = m.sender_id === currentUser.id;
+        var el = makeElement("div", "msg " + (isMine ? "mine" : "theirs"));
+        el.append(document.createTextNode(m.body));
+        el.append(makeElement("span", "msg-time", new Date(m.created_at).toLocaleString("ru-RU", {
+          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
+        })));
+        container.append(el);
+      });
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function markChatAsRead() {
+      if (!currentUser || !currentChatUserId || !supabaseClient) return;
+      supabaseClient
+        .from("messages")
+        .update({ is_read: true })
+        .eq("sender_id", currentChatUserId)
+        .eq("receiver_id", currentUser.id)
+        .eq("is_read", false)
+        .then(function () {})
+        .catch(function () {});
+    }
+
+    function sendChatMessage(body) {
+      if (!currentUser || !currentChatUserId || !supabaseClient) return;
+      body = body.trim();
+      if (!body) return;
+
+      supabaseClient
+        .from("messages")
+        .insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          $("chatInput").value = "";
+          loadChatMessages();
+        })
+        .catch(function (e) {
+          console.error("Ошибка отправки:", e);
+          showNotice("Не удалось отправить сообщение.", "error");
+        });
+    }
+
+    function loadDialogs() {
+      if (!currentUser || !supabaseClient) return Promise.resolve();
+
+      return supabaseClient
+        .from("messages")
+        .select("id,sender_id,receiver_id,body,created_at,is_read")
+        .or("sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(300)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          renderDialogs(res.data || []);
+        })
+        .catch(function (e) { console.error("Ошибка загрузки диалогов:", e); });
+    }
+
+    function renderDialogs(msgs) {
+      var container = $("dialogsList");
+      if (!container) return;
+      container.replaceChildren();
+
+      var dialogs = {};
+      msgs.forEach(function (m) {
+        var other = m.sender_id === currentUser.id ? m.receiver_id : m.sender_id;
+        if (!dialogs[other]) dialogs[other] = { userId: other, last: m, unread: 0 };
+        if (m.receiver_id === currentUser.id && !m.is_read) dialogs[other].unread++;
+      });
+
+      var list = Object.values(dialogs);
+      if (!list.length) {
+        var empty = makeElement("div", "favorites-empty");
+        empty.innerHTML =
+          "<h3>Пока нет сообщений</h3>" +
+          "<p>Напиши продавцу на карточке объявления — переписка появится здесь.</p>";
+        container.append(empty);
+        return;
+      }
+
+      list.forEach(function (d) {
+        var item = makeElement("div", "dialog-item");
+        var top = makeElement("div", "dialog-top");
+        top.append(makeElement("div", "dialog-name", "Участник " + d.userId.slice(0, 6)));
+        top.append(makeElement("div", "dialog-date", new Date(d.last.created_at).toLocaleString("ru-RU", {
+          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
+        })));
+        item.append(top);
+
+        var prev = makeElement("div", "dialog-preview", d.last.body);
+        if (d.unread > 0) prev.append(makeElement("span", "dialog-unread", String(d.unread)));
+        item.append(prev);
+
+        item.addEventListener("click", function () {
+          currentChatUserId = d.userId;
+          currentChatEmail = "Участник " + d.userId.slice(0, 6);
+          $("dialogsList").classList.add("hidden");
+          $("chatView").classList.remove("hidden");
+          $("chatWith").textContent = currentChatEmail;
+          $("chatInput").placeholder = "Написать сообщение...";
+          loadChatMessages();
+          startMessagesPolling();
+        });
+
+        container.append(item);
+      });
+    }
+
+    $("chatBack").addEventListener("click", function () {
+      stopMessagesPolling();
+      $("chatView").classList.add("hidden");
+      $("dialogsList").classList.remove("hidden");
+      loadDialogs();
+    });
+
+    $("chatForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      sendChatMessage($("chatInput").value);
+    });
+
+    /* ========== НАВИГАЦИЯ ========== */
     document.querySelectorAll(".nav-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         var section = tab.dataset.tab;
 
-        document.querySelectorAll(".nav-tab").forEach(function (item) {
-          item.classList.remove("active");
-        });
+        document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
         tab.classList.add("active");
 
-        // Скрываем все секции
         $("listingsSection").classList.add("hidden");
         $("favoritesSection").classList.add("hidden");
         $("profileSection").classList.add("hidden");
+        $("messagesSection").classList.add("hidden");
+        stopMessagesPolling();
 
         if (section === "profile") {
           $("profileSection").classList.remove("hidden");
@@ -1236,12 +1397,22 @@
         }
 
         if (section === "messages") {
-          $("listingsSection").classList.remove("hidden");
-          showNotice("Раздел «Сообщения» пока разрабатывается.", "success");
+          if (!currentUser) {
+            $("listingsSection").classList.remove("hidden");
+            openAuthModal();
+            setFormMessage("authMessage", "Войди, чтобы видеть сообщения.");
+            return;
+          }
+          $("messagesSection").classList.remove("hidden");
+          $("dialogsList").classList.remove("hidden");
+          $("chatView").classList.add("hidden");
+          loadDialogs();
+          hideNotice();
+          window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
 
-        // board (по умолчанию)
+        // board
         $("listingsSection").classList.remove("hidden");
         showOnlyMine = false;
         $("myListingsButton").textContent = "Мои объявления";
@@ -1251,7 +1422,7 @@
       });
     });
 
-    // ===== АВТОРИЗАЦИЯ =====
+    /* ========== АВТОРИЗАЦИЯ ========== */
     function openAuthModal() {
       authMode = "login";
       updateAuthMode();
@@ -1276,10 +1447,7 @@
     });
 
     $("authButton").addEventListener("click", function () {
-      if (!supabaseClient) {
-        showNotice("Сервис авторизации недоступен.", "error");
-        return;
-      }
+      if (!supabaseClient) { showNotice("Сервис авторизации недоступен.", "error"); return; }
       if (currentUser) {
         if (!window.confirm("Выйти из аккаунта?")) return;
         supabaseClient.auth.signOut().then(function (res) {
@@ -1292,10 +1460,7 @@
 
     $("authForm").addEventListener("submit", function (event) {
       event.preventDefault();
-      if (!supabaseClient) {
-        setFormMessage("authMessage", "Сервис недоступен.", "error");
-        return;
-      }
+      if (!supabaseClient) { setFormMessage("authMessage", "Сервис недоступен.", "error"); return; }
 
       var email = $("authEmail").value.trim();
       var password = $("authPassword").value;
@@ -1326,12 +1491,10 @@
           else if (message.toLowerCase().indexOf("password") !== -1) message = "Пароль минимум 6 символов.";
           setFormMessage("authMessage", message, "error");
         })
-        .then(function () {
-          submitButton.disabled = false;
-        });
+        .then(function () { submitButton.disabled = false; });
     });
 
-    // ===== СОЗДАНИЕ ОБЪЯВЛЕНИЯ =====
+    /* ========== СОЗДАНИЕ ОБЪЯВЛЕНИЯ ========== */
     $("createListingButton").addEventListener("click", function () {
       if (!currentUser) {
         openAuthModal();
@@ -1345,11 +1508,7 @@
 
     $("listingForm").addEventListener("submit", function (event) {
       event.preventDefault();
-      if (!currentUser) {
-        closeModal("listingModal");
-        openAuthModal();
-        return;
-      }
+      if (!currentUser) { closeModal("listingModal"); openAuthModal(); return; }
 
       var title = $("listingTitle").value.trim();
       var category = $("listingCategory").value;
@@ -1397,7 +1556,7 @@
         });
     });
 
-    // ===== КНОПКА «МОИ ОБЪЯВЛЕНИЯ» =====
+    /* ========== ПРОЧИЕ КНОПКИ ========== */
     $("myListingsButton").addEventListener("click", function () {
       if (!currentUser) {
         openAuthModal();
@@ -1410,7 +1569,6 @@
       $("listingsSection").scrollIntoView({ behavior: "smooth" });
     });
 
-    // ===== КНОПКА «СМОТРЕТЬ ОБЪЯВЛЕНИЯ» =====
     $("showAllButton").addEventListener("click", function () {
       showOnlyMine = false;
       selectedCategory = "Все";
@@ -1435,27 +1593,21 @@
       renderListings();
     });
 
-    // ===== КНОПКА ВЫХОДА В ПРОФИЛЕ =====
     $("profileSignOut").addEventListener("click", function () {
       if (!supabaseClient || !currentUser) return;
       if (!window.confirm("Выйти из аккаунта?")) return;
 
       supabaseClient.auth.signOut().then(function (res) {
-        if (res.error) {
-          showNotice("Не удалось выйти.", "error");
-          return;
-        }
+        if (res.error) { showNotice("Не удалось выйти.", "error"); return; }
         showNotice("Ты вышел из аккаунта.", "success");
         $("profileSection").classList.add("hidden");
         $("listingsSection").classList.remove("hidden");
-        document.querySelectorAll(".nav-tab").forEach(function (item) {
-          item.classList.remove("active");
-        });
+        document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
         document.querySelector('.nav-tab[data-tab="board"]').classList.add("active");
       });
     });
 
-    // ===== СТАРТ =====
+    /* ========== СТАРТ ========== */
     function initializeApp() {
       if (!window.supabase || !window.supabase.createClient) {
         var c = $("listings");
@@ -1477,35 +1629,25 @@
         .then(function (res) {
           currentUser = (res.data && res.data.session) ? res.data.session.user : null;
         })
-        .catch(function (e) {
-          console.error("Ошибка сессии:", e);
-          currentUser = null;
-        })
+        .catch(function (e) { console.error("Ошибка сессии:", e); currentUser = null; })
         .then(function () {
           updateAuthButton();
           return loadFavorites();
         })
-        .then(function () {
-          return loadListings();
-        })
+        .then(function () { return loadListings(); })
         .then(function () {
           supabaseClient.auth.onAuthStateChange(function (_event, session) {
             currentUser = session ? session.user : null;
             updateAuthButton();
-            loadFavorites().then(function () {
-              loadListings();
-            });
+            loadFavorites().then(function () { loadListings(); });
           });
         });
     }
 
-    // Загружаем SDK
     var script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
     script.onload = initializeApp;
-    script.onerror = function () {
-      showNotice("Не удалось загрузить сервис.", "error");
-    };
+    script.onerror = function () { showNotice("Не удалось загрузить сервис.", "error"); };
     document.head.appendChild(script);
   })();
   </script>
