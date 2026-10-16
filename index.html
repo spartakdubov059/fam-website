@@ -1602,6 +1602,121 @@ function showNotice(message, type = "") {
         container.append(card);
       });
     }
+        // ===== ПРОФИЛЬ =====
+    function renderProfile() {
+      const emailEl = $("profileEmail");
+      const metaEl = $("profileMeta");
+      const avatarEl = $("profileAvatar");
+      const listingsCountEl = $("profileListingsCount");
+      const favoritesCountEl = $("profileFavoritesCount");
+      const container = $("profileListings");
+
+      if (!currentUser) {
+        if (emailEl) emailEl.textContent = "Не войден";
+        if (metaEl) metaEl.textContent = "Войди, чтобы увидеть профиль";
+        if (avatarEl) avatarEl.textContent = "?";
+        if (listingsCountEl) listingsCountEl.textContent = "0";
+        if (favoritesCountEl) favoritesCountEl.textContent = "0";
+        if (container) container.replaceChildren();
+        return;
+      }
+
+      // Email и аватар
+      if (emailEl) emailEl.textContent = currentUser.email || "—";
+      if (avatarEl) {
+        avatarEl.textContent = (currentUser.email || "?").charAt(0).toUpperCase();
+      }
+
+      // Дата регистрации
+      const created = currentUser.created_at
+        ? new Date(currentUser.created_at).toLocaleDateString("ru-RU", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+          })
+        : "—";
+      if (metaEl) metaEl.textContent = "В FAM с " + created;
+
+      // Мои объявления
+      const myListings = allListings.filter(
+        (l) => l.user_id === currentUser.id
+      );
+      if (listingsCountEl) listingsCountEl.textContent = myListings.length;
+      if (favoritesCountEl) favoritesCountEl.textContent = favorites.length;
+
+      // Список объявлений
+      if (!container) return;
+      container.replaceChildren();
+
+      if (!myListings.length) {
+        const empty = document.createElement("div");
+        empty.className = "favorites-empty";
+        empty.innerHTML =
+          "<h3>У тебя пока нет объявлений</h3>" +
+          "<p>Нажми «Разместить объявление», чтобы создать первое.</p>";
+        container.append(empty);
+        return;
+      }
+
+      myListings.forEach((listing) => {
+        const card = document.createElement("article");
+        card.className = "listing-card";
+
+        card.innerHTML =
+          '<div class="listing-top">' +
+            '<span class="listing-category">' +
+              escapeHTML(listing.category || "Другое") +
+            "</span>" +
+            '<span class="listing-date">' +
+              formatDate(listing.created_at) +
+            "</span>" +
+          "</div>" +
+          '<h3 class="listing-title">' +
+            escapeHTML(listing.title) +
+          "</h3>" +
+          '<p class="listing-description">' +
+            escapeHTML(listing.description) +
+          "</p>" +
+          '<div class="listing-bottom">' +
+            '<div class="listing-price">' +
+              escapeHTML(listing.price_text || "Цена договорная") +
+            "</div>" +
+            '<div class="listing-owner">Твоё</div>' +
+          "</div>";
+
+        const hideBtn = document.createElement("button");
+        hideBtn.type = "button";
+        hideBtn.className = "small-button";
+        hideBtn.textContent = "Снять с публикации";
+        hideBtn.style.marginTop = "10px";
+        hideBtn.style.width = "100%";
+
+        hideBtn.addEventListener("click", async () => {
+          const ok = window.confirm("Снять объявление с публикации?");
+          if (!ok) return;
+          hideBtn.disabled = true;
+          try {
+            const { error } = await supabaseClient
+              .from("listings")
+              .update({ status: "hidden" })
+              .eq("id", listing.id)
+              .eq("user_id", currentUser.id);
+            if (error) throw error;
+            showNotice("Объявление снято.", "success");
+            await loadListings();
+            renderProfile();
+          } catch (e) {
+            console.error(e);
+            showNotice("Не удалось снять объявление.", "error");
+            hideBtn.disabled = false;
+          }
+        });
+
+        card.append(hideBtn);
+        container.append(card);
+      });
+    }
+
     }    // ===== ИЗБРАННОЕ =====
     let favorites = [];
 
