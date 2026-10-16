@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#17181C">
-
   <title>FAM — Свои рядом</title>
   <meta name="description" content="FAM — современная площадка объявлений для своих.">
 
@@ -20,10 +19,8 @@
       --danger: #FF7777;
       --radius: 18px;
     }
-
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-
     body {
       margin: 0;
       background: var(--bg);
@@ -31,7 +28,6 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       min-height: 100vh;
     }
-
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; }
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
@@ -39,11 +35,9 @@
       outline-offset: 3px;
     }
 
-    /* ===== Шапка ===== */
+    /* Шапка */
     .header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      position: sticky; top: 0; z-index: 10;
       background: rgba(23, 24, 28, .92);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
@@ -52,16 +46,13 @@
       width: min(1100px, calc(100% - 32px));
       min-height: 76px;
       margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       gap: 16px;
     }
     .logo { display: flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
     .logo-mark {
       display: grid; place-items: center;
-      width: 43px; height: 43px;
-      border-radius: 14px;
+      width: 43px; height: 43px; border-radius: 14px;
       background: var(--accent); color: #17181C;
       font-size: 19px; font-weight: 950; letter-spacing: -1.5px;
     }
@@ -69,20 +60,13 @@
     .logo-caption { margin-top: 2px; color: var(--muted); font-size: 11px; }
     .header-actions { display: flex; align-items: center; gap: 9px; }
 
-    /* ===== Кнопки ===== */
+    /* Кнопки */
     .button {
-      min-height: 43px;
-      padding: 0 17px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      border: 1px solid transparent;
-      border-radius: 13px;
-      font-size: 13px;
-      font-weight: 750;
-      transition: .2s ease;
-      cursor: pointer;
+      min-height: 43px; padding: 0 17px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border: 1px solid transparent; border-radius: 13px;
+      font-size: 13px; font-weight: 750;
+      transition: .2s ease; cursor: pointer;
     }
     .button-primary { background: var(--accent); color: #17181C; }
     .button-primary:hover { background: #FFFFFF; transform: translateY(-1px); }
@@ -90,11 +74,9 @@
     .button-secondary:hover { background: var(--surface-hover); }
     .button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-    /* ===== Навигация ===== */
+    /* Навигация */
     .main-nav {
-      position: sticky;
-      top: 76px;
-      z-index: 9;
+      position: sticky; top: 76px; z-index: 9;
       background: rgba(23, 24, 28, .96);
       border-bottom: 1px solid var(--border);
       backdrop-filter: blur(16px);
@@ -102,30 +84,23 @@
     .main-nav-inner {
       width: min(1000px, calc(100% - 32px));
       margin: 0 auto;
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding: 12px 0;
+      display: flex; gap: 8px;
+      overflow-x: auto; padding: 12px 0;
       scrollbar-width: none;
     }
     .main-nav-inner::-webkit-scrollbar { display: none; }
     .nav-tab {
       flex: 0 0 auto;
-      min-height: 42px;
-      padding: 0 17px;
-      border: 1px solid transparent;
-      border-radius: 12px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 750;
-      transition: .2s;
-      cursor: pointer;
+      min-height: 42px; padding: 0 17px;
+      border: 1px solid transparent; border-radius: 12px;
+      background: transparent; color: var(--muted);
+      font-size: 13px; font-weight: 750;
+      transition: .2s; cursor: pointer;
     }
     .nav-tab:hover { background: var(--surface); color: var(--text); }
     .nav-tab.active { background: var(--accent); color: #17181C; }
 
-    /* ===== Основное ===== */
+    /* Основное */
     main { width: min(1000px, calc(100% - 32px)); margin: 0 auto; }
     .hero { padding: 55px 0 30px; }
     .hero-label {
@@ -134,17 +109,13 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 100px;
-      color: var(--muted);
-      font-size: 12px; font-weight: 650;
+      color: var(--muted); font-size: 12px; font-weight: 650;
     }
     .hero-dot { width: 7px; height: 7px; background: #B9D8B6; border-radius: 50%; }
     h1 {
-      max-width: 700px;
-      margin: 20px 0 14px;
+      max-width: 700px; margin: 20px 0 14px;
       font-size: clamp(37px, 7vw, 66px);
-      line-height: 1.02;
-      letter-spacing: -2.5px;
-      font-weight: 900;
+      line-height: 1.02; letter-spacing: -2.5px; font-weight: 900;
     }
     h1 span { color: var(--accent); }
     .hero-description { max-width: 500px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
@@ -153,31 +124,24 @@
     .search-box {
       margin-top: 28px;
       display: flex; align-items: center; gap: 12px;
-      padding: 0 17px;
-      min-height: 57px;
+      padding: 0 17px; min-height: 57px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 17px;
-      transition: border-color .2s;
+      border-radius: 17px; transition: border-color .2s;
     }
     .search-box:focus-within { border-color: #777B86; }
     .search-icon { color: var(--muted); font-size: 19px; }
     .search-box input {
       width: 100%; min-width: 0;
-      border: 0; outline: none;
-      background: transparent;
-      color: var(--text);
-      font-size: 14px;
+      border: 0; outline: none; background: transparent;
+      color: var(--text); font-size: 14px;
     }
     .search-box input::placeholder { color: #858792; }
 
     .section { padding: 24px 0 55px; }
     .section-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 15px; margin-bottom: 20px;
     }
     .section-heading h2 { margin: 0; font-size: 23px; font-weight: 850; letter-spacing: -.6px; }
     .results-count { color: var(--muted); font-size: 12px; }
@@ -185,30 +149,22 @@
     .categories { display: flex; gap: 9px; overflow-x: auto; padding: 2px 1px 12px; scrollbar-width: none; }
     .categories::-webkit-scrollbar { display: none; }
     .category-button {
-      flex: 0 0 auto;
-      min-height: 40px; padding: 0 15px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
-      color: var(--muted);
+      flex: 0 0 auto; min-height: 40px; padding: 0 15px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); color: var(--muted);
       font-size: 13px; font-weight: 650;
-      transition: .2s;
-      cursor: pointer;
+      transition: .2s; cursor: pointer;
     }
     .category-button:hover { background: var(--surface-hover); color: var(--text); }
     .category-button.active { background: var(--accent); color: #17181C; border-color: var(--accent); }
 
     .listings {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 12px;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px; margin-top: 12px;
     }
     .listing-card {
       display: flex; flex-direction: column;
-      min-width: 0;
-      min-height: 205px;
-      padding: 19px;
+      min-width: 0; min-height: 205px; padding: 19px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -223,104 +179,70 @@
     .listing-category {
       display: inline-flex; align-items: center;
       padding: 6px 9px;
-      border: 1px solid #41434C;
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 11px; font-weight: 650;
+      border: 1px solid #41434C; border-radius: 8px;
+      color: var(--muted); font-size: 11px; font-weight: 650;
     }
     .listing-date { color: #858792; font-size: 11px; white-space: nowrap; }
     .listing-title { margin: 0 0 9px; font-size: 17px; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
     .listing-description {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.65;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+      margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65;
+      white-space: pre-wrap; overflow-wrap: anywhere;
     }
     .listing-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 10px;
-      margin-top: auto;
-      padding-top: 20px;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      gap: 10px; margin-top: auto; padding-top: 20px;
     }
     .listing-price { font-size: 17px; font-weight: 850; overflow-wrap: anywhere; }
     .listing-owner { max-width: 45%; color: var(--muted); font-size: 11px; text-align: right; overflow-wrap: anywhere; }
     .small-button {
       padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 11px;
-      cursor: pointer;
+      border: 1px solid var(--border); border-radius: 9px;
+      background: transparent; color: var(--muted);
+      font-size: 11px; cursor: pointer;
     }
     .small-button:hover { color: var(--danger); border-color: var(--danger); }
 
     .favorite-btn {
-      margin-top: 10px;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: transparent;
-      color: var(--muted);
+      margin-top: 10px; padding: 8px 12px;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: transparent; color: var(--muted);
       font-size: 12px; font-weight: 650;
-      cursor: pointer;
-      transition: .2s;
-      width: 100%;
+      cursor: pointer; transition: .2s; width: 100%;
     }
     .favorite-btn:hover { border-color: #C8C9D0; color: var(--text); }
     .favorite-btn.active {
       background: rgba(255, 119, 119, .12);
-      border-color: #9D4B4B;
-      color: #FFAAAA;
+      border-color: #9D4B4B; color: #FFAAAA;
     }
 
     .empty-state, .favorites-empty {
-      grid-column: 1 / -1;
-      padding: 48px 20px;
-      text-align: center;
+      grid-column: 1 / -1; padding: 48px 20px; text-align: center;
       background: var(--surface);
-      border: 1px dashed #41434C;
-      border-radius: var(--radius);
+      border: 1px dashed #41434C; border-radius: var(--radius);
     }
     .empty-icon { margin-bottom: 12px; font-size: 30px; }
     .empty-state h3, .favorites-empty h3 { margin: 0 0 8px; font-size: 17px; }
     .empty-state p, .favorites-empty p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
     .notice {
-      margin-top: 15px;
-      padding: 13px 15px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
-      color: var(--muted);
+      margin-top: 15px; padding: 13px 15px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); color: var(--muted);
       font-size: 12px; line-height: 1.6;
     }
     .notice.error { color: #FFAAAA; border-color: #704040; }
     .notice.success { color: #B9D8B6; border-color: #405C42; }
-
     .hidden { display: none !important; }
 
-    /* ===== Профиль ===== */
+    /* Профиль */
     .profile-card {
-      display: flex;
-      align-items: center;
-      gap: 18px;
+      display: flex; align-items: center; gap: 18px;
       padding: 22px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border: 1px solid var(--border); border-radius: var(--radius);
       margin-bottom: 16px;
     }
-    .profile-avatar-wrap {
-      position: relative;
-      width: 64px;
-      height: 64px;
-      flex-shrink: 0;
-    }
+    .profile-avatar-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
     .profile-avatar {
       width: 64px; height: 64px;
       border-radius: 20px;
@@ -329,37 +251,23 @@
       font-size: 26px; font-weight: 900;
     }
     .profile-avatar-img {
-      position: absolute;
-      inset: 0;
-      width: 64px;
-      height: 64px;
-      border-radius: 20px;
-      object-fit: cover;
+      position: absolute; inset: 0;
+      width: 64px; height: 64px;
+      border-radius: 20px; object-fit: cover;
       border: 1px solid var(--border);
     }
     .profile-info { min-width: 0; flex: 1; }
     .profile-email { font-size: 17px; font-weight: 800; overflow-wrap: anywhere; margin-bottom: 5px; }
     .profile-meta { color: var(--muted); font-size: 13px; }
-    .profile-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .profile-actions .small-button {
-      padding: 6px 10px;
-      font-size: 11px;
-    }
-    .profile-actions .small-button:hover {
-      color: var(--text);
-      border-color: #5A5D67;
-    }
+    .profile-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .profile-actions .small-button { padding: 6px 10px; font-size: 11px; }
+    .profile-actions .small-button:hover { color: var(--text); border-color: #5A5D67; }
+
     .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
     .profile-stat {
       padding: 18px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border: 1px solid var(--border); border-radius: var(--radius);
       text-align: center;
     }
     .profile-stat-value { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
@@ -367,15 +275,13 @@
     .profile-subheading { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
     .profile-signout { margin-top: 22px; width: 100%; }
 
-    /* ===== Сообщения ===== */
+    /* Сообщения */
     .dialogs { display: flex; flex-direction: column; gap: 10px; }
     .dialog-item {
       padding: 16px 18px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      cursor: pointer;
-      transition: .2s;
+      border: 1px solid var(--border); border-radius: 14px;
+      cursor: pointer; transition: .2s;
     }
     .dialog-item:hover { background: var(--surface-hover); border-color: #4A4D57; }
     .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
@@ -386,17 +292,14 @@
       display: inline-block;
       background: var(--accent); color: #17181C;
       font-size: 10px; font-weight: 800;
-      padding: 3px 8px;
-      border-radius: 999px;
-      margin-left: 6px;
+      padding: 3px 8px; border-radius: 999px; margin-left: 6px;
     }
 
     .chat {
       display: flex; flex-direction: column;
       min-height: 60vh;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border: 1px solid var(--border); border-radius: var(--radius);
       overflow: hidden;
     }
     .chat-header {
@@ -407,40 +310,30 @@
     }
     .chat-with { font-weight: 800; overflow-wrap: anywhere; }
     .chat-messages {
-      flex: 1;
-      padding: 18px;
-      display: flex; flex-direction: column;
-      gap: 10px;
-      overflow-y: auto;
-      max-height: 55vh;
+      flex: 1; padding: 18px;
+      display: flex; flex-direction: column; gap: 10px;
+      overflow-y: auto; max-height: 55vh;
     }
     .msg {
-      max-width: 75%;
-      padding: 10px 14px;
-      border-radius: 16px;
-      font-size: 14px;
-      line-height: 1.4;
-      overflow-wrap: anywhere;
-      white-space: pre-wrap;
+      max-width: 75%; padding: 10px 14px;
+      border-radius: 16px; font-size: 14px; line-height: 1.4;
+      overflow-wrap: anywhere; white-space: pre-wrap;
     }
     .msg.mine { align-self: flex-end; background: var(--accent); color: #17181C; border-bottom-right-radius: 4px; }
     .msg.theirs { align-self: flex-start; background: #33353D; color: var(--text); border-bottom-left-radius: 4px; }
     .msg-time { display: block; font-size: 10px; opacity: .7; margin-top: 4px; }
     .chat-form {
-      display: flex; gap: 8px;
-      padding: 12px;
+      display: flex; gap: 8px; padding: 12px;
       border-top: 1px solid var(--border);
       background: var(--bg);
     }
     .chat-form input { flex: 1; margin-bottom: 0; }
     .chat-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 
-    /* ===== Модальные окна ===== */
+    /* Модалки */
     .modal {
-      position: fixed; inset: 0;
-      z-index: 100;
-      display: none;
-      align-items: center; justify-content: center;
+      position: fixed; inset: 0; z-index: 100;
+      display: none; align-items: center; justify-content: center;
       padding: 16px;
       background: rgba(0, 0, 0, .72);
       backdrop-filter: blur(8px);
@@ -449,43 +342,33 @@
     .modal.open { display: flex; }
     .modal-content {
       width: min(100%, 440px);
-      max-height: calc(100dvh - 32px);
-      overflow-y: auto;
+      max-height: calc(100dvh - 32px); overflow-y: auto;
       padding: 25px;
       background: #202126;
-      border: 1px solid #41434C;
-      border-radius: 22px;
+      border: 1px solid #41434C; border-radius: 22px;
       box-shadow: 0 25px 80px rgba(0, 0, 0, .4);
     }
     .modal-header {
       display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 22px;
+      gap: 15px; margin-bottom: 22px;
     }
     .modal-header h2 { margin: 0 0 7px; font-size: 23px; font-weight: 850; }
     .modal-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
     .close-button {
       flex: 0 0 auto;
       width: 34px; height: 34px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 20px;
-      cursor: pointer;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); color: var(--text);
+      font-size: 20px; cursor: pointer;
     }
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; margin-bottom: 8px; color: #D7D8DE; font-size: 12px; font-weight: 700; }
     .form-group input, .form-group textarea, .form-group select {
-      width: 100%;
-      min-height: 46px;
+      width: 100%; min-height: 46px;
       padding: 12px 13px;
-      border: 1px solid #41434C;
-      border-radius: 12px;
+      border: 1px solid #41434C; border-radius: 12px;
       outline: none;
-      background: #292B31;
-      color: var(--text);
-      font-size: 13px;
+      background: #292B31; color: var(--text); font-size: 13px;
     }
     .form-group textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
     .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #888B95; }
@@ -493,22 +376,16 @@
     .form-submit { width: 100%; margin-top: 5px; }
     .modal-switch { margin: 17px 0 0; text-align: center; color: var(--muted); font-size: 12px; }
     .text-button {
-      padding: 0; border: 0;
-      background: transparent;
-      color: var(--text);
-      font-weight: 750;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      cursor: pointer;
+      padding: 0; border: 0; background: transparent;
+      color: var(--text); font-weight: 750;
+      text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
     }
     .form-message { margin-top: 13px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 
-    /* ===== Футер ===== */
+    /* Футер */
     footer {
-      width: min(100% - 40px, 1000px);
-      margin: 0 auto;
-      padding: 32px 0;
-      text-align: center;
+      width: min(100% - 40px, 1000px); margin: 0 auto;
+      padding: 32px 0; text-align: center;
       border-top: 1px solid var(--border);
     }
     .footer-brand { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
@@ -518,12 +395,10 @@
     .footer-studio span { color: #A5A7B0; }
     .footer-note { max-width: 600px; margin: 13px auto 0; color: #777A85; font-size: 12px; line-height: 1.8; letter-spacing: .3px; }
 
-    /* ===== Скроллбар ===== */
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
 
-    /* ===== Адаптив ===== */
     @media (max-width: 760px) {
       .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .hero { padding-top: 40px; }
@@ -596,7 +471,6 @@
       </label>
     </section>
 
-    <!-- Профиль -->
     <section class="section hidden" id="profileSection">
       <div class="section-heading"><h2>Профиль</h2></div>
       <div class="profile-card">
@@ -608,9 +482,7 @@
           <div class="profile-email" id="profileEmail">—</div>
           <div class="profile-meta" id="profileMeta">—</div>
           <div class="profile-actions">
-            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block">
-              📷 Загрузить фото
-            </label>
+            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block">📷 Загрузить фото</label>
             <input type="file" id="avatarInput" accept="image/*" style="display:none">
             <button class="small-button hidden" id="avatarRemove" type="button">Удалить</button>
           </div>
@@ -631,7 +503,6 @@
       <button class="button button-secondary profile-signout" id="profileSignOut">Выйти из аккаунта</button>
     </section>
 
-    <!-- Избранное -->
     <section class="section hidden" id="favoritesSection">
       <div class="section-heading">
         <h2>Избранное</h2>
@@ -640,11 +511,9 @@
       <div class="listings" id="favoritesList"></div>
     </section>
 
-    <!-- Сообщения -->
     <section class="section hidden" id="messagesSection">
       <div class="section-heading"><h2>Сообщения</h2></div>
       <div id="dialogsList" class="dialogs"></div>
-
       <div id="chatView" class="chat hidden">
         <div class="chat-header">
           <button class="button button-secondary" id="chatBack">← Назад</button>
@@ -658,7 +527,6 @@
       </div>
     </section>
 
-    <!-- Доска -->
     <section class="section" id="listingsSection">
       <div class="section-heading">
         <h2 id="listingsHeading">Объявления</h2>
@@ -696,7 +564,6 @@
     </p>
   </footer>
 
-  <!-- Модалка авторизации -->
   <div class="modal" id="authModal" role="dialog" aria-modal="true">
     <div class="modal-content">
       <div class="modal-header">
@@ -725,7 +592,6 @@
     </div>
   </div>
 
-  <!-- Модалка создания объявления -->
   <div class="modal" id="listingModal" role="dialog" aria-modal="true">
     <div class="modal-content">
       <div class="modal-header">
@@ -789,14 +655,12 @@
         return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
       });
     }
-
     function makeElement(tag, className, text) {
       var el = document.createElement(tag);
       if (className) el.className = className;
       if (text !== undefined) el.textContent = text;
       return el;
     }
-
     function pluralize(n) {
       var a = n % 100, b = n % 10;
       if (a >= 11 && a <= 14) return "объявлений";
@@ -804,14 +668,12 @@
       if (b >= 2 && b <= 4) return "объявления";
       return "объявлений";
     }
-
     function formatDate(dateString) {
       if (!dateString) return "";
       var date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
       return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
     }
-
     function showNotice(message, type) {
       var notice = $("notice");
       if (!notice) return;
@@ -820,31 +682,23 @@
       clearTimeout(showNotice._t);
       showNotice._t = setTimeout(function () { notice.classList.add("hidden"); }, 6000);
     }
-
     function hideNotice() {
       var notice = $("notice");
       if (notice) notice.classList.add("hidden");
     }
-
     function setFormMessage(id, message, type) {
       var el = $(id);
       if (!el) return;
       el.textContent = message;
-      el.style.color =
-        type === "error" ? "#FFAAAA" :
-        type === "success" ? "#B9D8B6" : "#A5A7B0";
+      el.style.color = type === "error" ? "#FFAAAA" : type === "success" ? "#B9D8B6" : "#A5A7B0";
     }
-
     function openModal(id) {
-      var m = $(id);
-      if (!m) return;
+      var m = $(id); if (!m) return;
       m.classList.add("open");
       document.body.style.overflow = "hidden";
     }
-
     function closeModal(id) {
-      var m = $(id);
-      if (!m) return;
+      var m = $(id); if (!m) return;
       m.classList.remove("open");
       if (!document.querySelector(".modal.open")) document.body.style.overflow = "";
     }
@@ -866,19 +720,22 @@
       if (btn) btn.textContent = currentUser ? "Мой аккаунт" : "Войти";
     }
 
-    /* ========== ЗАГРУЗКА ОБЪЯВЛЕНИЙ ========== */
+    function updateProfileCounters() {
+      var cnt = $("profileFavoritesCount");
+      if (cnt) cnt.textContent = favorites.length;
+      var lc = $("profileListingsCount");
+      if (lc && currentUser) {
+        lc.textContent = allListings.filter(function (l) { return l.user_id === currentUser.id; }).length;
+      }
+    }
+
+    /* ===== Объявления ===== */
     function loadListings() {
       if (!supabaseClient) return Promise.resolve();
       var container = $("listings");
       if (container) {
-        container.innerHTML =
-          '<div class="empty-state">' +
-            '<div class="empty-icon">✳</div>' +
-            '<h3>Загружаем объявления</h3>' +
-            '<p>Секунду, скоро всё появится.</p>' +
-          '</div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">✳</div><h3>Загружаем объявления</h3><p>Секунду, скоро всё появится.</p></div>';
       }
-
       return supabaseClient
         .from("listings")
         .select("id,user_id,title,category,description,price_text,created_at,status")
@@ -889,12 +746,13 @@
           if (res.error) throw res.error;
           allListings = res.data || [];
           renderListings();
+          updateProfileCounters();
         })
         .catch(function (error) {
           console.error("Ошибка загрузки объявлений:", error);
           allListings = [];
           renderListings();
-          showNotice("Не удалось загрузить объявления. Проверь интернет.", "error");
+          showNotice("Не удалось загрузить объявления: " + error.message, "error");
         });
     }
 
@@ -946,22 +804,14 @@
         );
         card.append(bottom);
 
-        // Кнопка избранного
         if (currentUser) {
           var isFav = favorites.indexOf(listing.id) !== -1;
-          var favBtn = makeElement(
-            "button",
-            "favorite-btn" + (isFav ? " active" : ""),
-            isFav ? "❤ В избранном" : "♡ В избранное"
-          );
+          var favBtn = makeElement("button", "favorite-btn" + (isFav ? " active" : ""), isFav ? "❤ В избранном" : "♡ В избранное");
           favBtn.type = "button";
-          favBtn.addEventListener("click", function () {
-            toggleFavorite(listing.id, favBtn);
-          });
+          favBtn.addEventListener("click", function () { toggleFavorite(listing.id, favBtn); });
           card.append(favBtn);
         }
 
-        // Кнопка «Написать» — для чужих объявлений
         if (currentUser && listing.user_id !== currentUser.id) {
           var writeBtn = makeElement("button", "button button-secondary", "✉ Написать продавцу");
           writeBtn.type = "button";
@@ -973,15 +823,12 @@
           card.append(writeBtn);
         }
 
-        // Кнопка скрыть — для своих
         if (currentUser && listing.user_id === currentUser.id) {
           var hideBtn = makeElement("button", "small-button", "Снять с публикации");
           hideBtn.type = "button";
           hideBtn.style.marginTop = "8px";
           hideBtn.style.width = "100%";
-          hideBtn.addEventListener("click", function () {
-            hideListing(listing.id, hideBtn);
-          });
+          hideBtn.addEventListener("click", function () { hideListing(listing.id, hideBtn); });
           card.append(hideBtn);
         }
 
@@ -993,25 +840,21 @@
       if (!currentUser) { openAuthModal(); return; }
       if (!window.confirm("Снять объявление с публикации?")) return;
       button.disabled = true;
-
       supabaseClient
         .from("listings")
         .update({ status: "hidden" })
         .eq("id", id)
         .eq("user_id", currentUser.id)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          return loadListings();
-        })
+        .then(function (res) { if (res.error) throw res.error; return loadListings(); })
         .then(function () { showNotice("Объявление снято.", "success"); })
         .catch(function (error) {
           console.error("Ошибка снятия:", error);
-          showNotice("Не удалось снять объявление.", "error");
+          showNotice("Не удалось снять: " + error.message, "error");
           button.disabled = false;
         });
     }
 
-    /* ========== ПРОФИЛЬ + АВАТАРКИ ========== */
+    /* ===== Профиль ===== */
     function ensureProfileRow() {
       if (!currentUser || !supabaseClient) return Promise.resolve();
       return supabaseClient
@@ -1040,13 +883,9 @@
     }
 
     function renderProfile() {
-      var emailEl = $("profileEmail");
-      var metaEl = $("profileMeta");
-      var avatarEl = $("profileAvatar");
-      var imgEl = $("profileAvatarImg");
-      var removeBtn = $("avatarRemove");
-      var listingsCountEl = $("profileListingsCount");
-      var favoritesCountEl = $("profileFavoritesCount");
+      var emailEl = $("profileEmail"), metaEl = $("profileMeta"), avatarEl = $("profileAvatar");
+      var imgEl = $("profileAvatarImg"), removeBtn = $("avatarRemove");
+      var listingsCountEl = $("profileListingsCount"), favoritesCountEl = $("profileFavoritesCount");
       var container = $("profileListings");
 
       if (!currentUser) {
@@ -1075,9 +914,7 @@
       }
 
       var created = currentUser.created_at
-        ? new Date(currentUser.created_at).toLocaleDateString("ru-RU", {
-            day: "numeric", month: "long", year: "numeric"
-          })
+        ? new Date(currentUser.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })
         : "—";
       if (metaEl) metaEl.textContent = "В FAM с " + created;
 
@@ -1090,9 +927,7 @@
 
       if (!myListings.length) {
         var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML =
-          "<h3>У тебя пока нет объявлений</h3>" +
-          "<p>Нажми «Разместить объявление», чтобы создать первое.</p>";
+        empty.innerHTML = "<h3>У тебя пока нет объявлений</h3><p>Нажми «Разместить объявление», чтобы создать первое.</p>";
         container.append(empty);
         return;
       }
@@ -1100,16 +935,10 @@
       myListings.forEach(function (listing) {
         var card = makeElement("article", "listing-card");
         card.innerHTML =
-          '<div class="listing-top">' +
-            '<span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span>' +
-            '<span class="listing-date">' + formatDate(listing.created_at) + '</span>' +
-          '</div>' +
+          '<div class="listing-top"><span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span><span class="listing-date">' + formatDate(listing.created_at) + '</span></div>' +
           '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
           '<p class="listing-description">' + escapeHTML(listing.description) + '</p>' +
-          '<div class="listing-bottom">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div>' +
-            '<div class="listing-owner">Твоё</div>' +
-          '</div>';
+          '<div class="listing-bottom"><div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div><div class="listing-owner">Твоё</div></div>';
 
         var hideBtn = makeElement("button", "small-button", "Снять с публикации");
         hideBtn.type = "button";
@@ -1118,24 +947,12 @@
         hideBtn.addEventListener("click", function () {
           if (!window.confirm("Снять объявление с публикации?")) return;
           hideBtn.disabled = true;
-          supabaseClient
-            .from("listings")
-            .update({ status: "hidden" })
-            .eq("id", listing.id)
-            .eq("user_id", currentUser.id)
-            .then(function (res) {
-              if (res.error) throw res.error;
-              showNotice("Объявление снято.", "success");
-              return loadListings();
-            })
+          supabaseClient.from("listings").update({ status: "hidden" })
+            .eq("id", listing.id).eq("user_id", currentUser.id)
+            .then(function (res) { if (res.error) throw res.error; showNotice("Объявление снято.", "success"); return loadListings(); })
             .then(function () { renderProfile(); })
-            .catch(function (e) {
-              console.error(e);
-              showNotice("Не удалось снять объявление.", "error");
-              hideBtn.disabled = false;
-            });
+            .catch(function (e) { console.error(e); showNotice("Не удалось снять: " + e.message, "error"); hideBtn.disabled = false; });
         });
-
         card.append(hideBtn);
         container.append(card);
       });
@@ -1148,24 +965,25 @@
         showNotice("Файл больше 3 МБ. Выбери поменьше.", "error");
         return;
       }
-
       var ext = (file.name.split(".").pop() || "jpg").toLowerCase();
       var path = currentUser.id + "/avatar." + ext;
-
       showNotice("Загружаем фото...");
-
-      supabaseClient.storage
-        .from("avatars")
+      supabaseClient.storage.from("avatars")
         .upload(path, file, { upsert: true, cacheControl: "3600" })
         .then(function (res) {
-          if (res.error) throw res.error;
+          if (res.error) {
+            console.error("Storage ошибка:", res.error);
+            throw new Error(res.error.message || "Ошибка Storage");
+          }
           var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
           var url = pub.data.publicUrl + "?t=" + Date.now();
-          return supabaseClient
-            .from("profiles")
+          return supabaseClient.from("profiles")
             .upsert({ id: currentUser.id, email: currentUser.email, avatar_url: url }, { onConflict: "id" })
             .then(function (r2) {
-              if (r2.error) throw r2.error;
+              if (r2.error) {
+                console.error("Profiles ошибка:", r2.error);
+                throw new Error(r2.error.message || "Ошибка profiles");
+              }
               currentAvatarUrl = url;
               renderProfile();
               showNotice("Фото загружено!", "success");
@@ -1180,10 +998,7 @@
     function removeAvatar() {
       if (!currentUser || !supabaseClient) return;
       if (!window.confirm("Удалить фото профиля?")) return;
-
-      supabaseClient.storage
-        .from("avatars")
-        .list(currentUser.id)
+      supabaseClient.storage.from("avatars").list(currentUser.id)
         .then(function (res) {
           if (res.error) throw res.error;
           var files = res.data || [];
@@ -1192,8 +1007,7 @@
           return supabaseClient.storage.from("avatars").remove(paths);
         })
         .then(function () {
-          return supabaseClient
-            .from("profiles")
+          return supabaseClient.from("profiles")
             .upsert({ id: currentUser.id, email: currentUser.email, avatar_url: null }, { onConflict: "id" });
         })
         .then(function () {
@@ -1203,7 +1017,7 @@
         })
         .catch(function (e) {
           console.error("Ошибка удаления фото:", e);
-          showNotice("Не удалось удалить.", "error");
+          showNotice("Не удалось удалить: " + (e.message || "ошибка"), "error");
         });
     }
 
@@ -1212,27 +1026,17 @@
       if (file) uploadAvatar(file);
       e.target.value = "";
     });
-
     $("avatarRemove").addEventListener("click", removeAvatar);
 
-    /* ========== ИЗБРАННОЕ ========== */
+    /* ===== Избранное ===== */
     function loadFavorites() {
-      if (!currentUser || !supabaseClient) {
-        favorites = [];
-        return Promise.resolve();
-      }
-      return supabaseClient
-        .from("favorites")
-        .select("listing_id")
-        .eq("user_id", currentUser.id)
+      if (!currentUser || !supabaseClient) { favorites = []; return Promise.resolve(); }
+      return supabaseClient.from("favorites").select("listing_id").eq("user_id", currentUser.id)
         .then(function (res) {
           if (res.error) throw res.error;
           favorites = (res.data || []).map(function (f) { return f.listing_id; });
         })
-        .catch(function (e) {
-          console.error("Ошибка загрузки избранного:", e);
-          favorites = [];
-        });
+        .catch(function (e) { console.error("Ошибка загрузки избранного:", e); favorites = []; });
     }
 
     function toggleFavorite(listingId, button) {
@@ -1244,37 +1048,28 @@
       var isFav = favorites.indexOf(listingId) !== -1;
 
       if (isFav) {
-        supabaseClient
-          .from("favorites")
-          .delete()
-          .eq("user_id", currentUser.id)
-          .eq("listing_id", listingId)
+        supabaseClient.from("favorites").delete()
+          .eq("user_id", currentUser.id).eq("listing_id", listingId)
           .then(function (res) {
             if (res.error) throw res.error;
             favorites = favorites.filter(function (id) { return id !== listingId; });
             button.classList.remove("active");
             button.textContent = "♡ В избранное";
+            updateProfileCounters();
             showNotice("Убрано из избранного.", "success");
           })
-          .catch(function (e) {
-            console.error(e);
-            showNotice("Не удалось убрать.", "error");
-          });
+          .catch(function (e) { console.error(e); showNotice("Не удалось убрать: " + e.message, "error"); });
       } else {
-        supabaseClient
-          .from("favorites")
-          .insert({ user_id: currentUser.id, listing_id: listingId })
+        supabaseClient.from("favorites").insert({ user_id: currentUser.id, listing_id: listingId })
           .then(function (res) {
             if (res.error) throw res.error;
             favorites.push(listingId);
             button.classList.add("active");
             button.textContent = "❤ В избранном";
+            updateProfileCounters();
             showNotice("Сохранено!", "success");
           })
-          .catch(function (e) {
-            console.error(e);
-            showNotice("Не удалось сохранить.", "error");
-          });
+          .catch(function (e) { console.error(e); showNotice("Не удалось сохранить: " + e.message, "error"); });
       }
     }
 
@@ -1282,34 +1077,23 @@
       var container = $("favoritesList");
       if (!container) return;
       container.replaceChildren();
-
       var favListings = allListings.filter(function (l) { return favorites.indexOf(l.id) !== -1; });
-
       var countEl = $("favoritesCount");
       if (countEl) countEl.textContent = favListings.length + " " + pluralize(favListings.length);
 
       if (!favListings.length) {
         var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML =
-          "<h3>Здесь пока пусто</h3>" +
-          "<p>Нажми ♡ на объявлении, чтобы сохранить его.</p>";
+        empty.innerHTML = "<h3>Здесь пока пусто</h3><p>Нажми ♡ на объявлении, чтобы сохранить его.</p>";
         container.append(empty);
         return;
       }
-
       favListings.forEach(function (listing) {
         var card = makeElement("article", "listing-card");
         card.innerHTML =
-          '<div class="listing-top">' +
-            '<span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span>' +
-            '<span class="listing-date">' + formatDate(listing.created_at) + '</span>' +
-          '</div>' +
+          '<div class="listing-top"><span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span><span class="listing-date">' + formatDate(listing.created_at) + '</span></div>' +
           '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
           '<p class="listing-description">' + escapeHTML(listing.description) + '</p>' +
-          '<div class="listing-bottom">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div>' +
-            '<div class="listing-owner">Участник FAM</div>' +
-          '</div>';
+          '<div class="listing-bottom"><div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div><div class="listing-owner">Участник FAM</div></div>';
 
         var favBtn = makeElement("button", "favorite-btn active", "❤ В избранном");
         favBtn.type = "button";
@@ -1317,23 +1101,15 @@
           toggleFavorite(listing.id, favBtn);
           setTimeout(renderFavorites, 300);
         });
-
         card.append(favBtn);
         container.append(card);
       });
     }
 
-    /* ========== СООБЩЕНИЯ ========== */
+    /* ===== Сообщения ===== */
     function startDialogWith(userId, email, listingTitle) {
-      if (!currentUser) {
-        openAuthModal();
-        setFormMessage("authMessage", "Войди, чтобы написать сообщение.");
-        return;
-      }
-      if (userId === currentUser.id) {
-        showNotice("Это твоё собственное объявление.", "error");
-        return;
-      }
+      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы написать сообщение."); return; }
+      if (userId === currentUser.id) { showNotice("Это твоё собственное объявление.", "error"); return; }
       currentChatUserId = userId;
       currentChatEmail = email || "Участник FAM";
 
@@ -1345,11 +1121,9 @@
       $("favoritesSection").classList.add("hidden");
       $("profileSection").classList.add("hidden");
       $("messagesSection").classList.remove("hidden");
-
       $("dialogsList").classList.add("hidden");
       $("chatView").classList.remove("hidden");
       $("chatWith").textContent = currentChatEmail;
-
       if (listingTitle) $("chatInput").placeholder = "Про «" + listingTitle + "»...";
 
       loadChatMessages();
@@ -1361,26 +1135,16 @@
       stopMessagesPolling();
       messagesPollTimer = setInterval(loadChatMessages, 4000);
     }
-
     function stopMessagesPolling() {
-      if (messagesPollTimer) {
-        clearInterval(messagesPollTimer);
-        messagesPollTimer = null;
-      }
+      if (messagesPollTimer) { clearInterval(messagesPollTimer); messagesPollTimer = null; }
     }
 
     function loadChatMessages() {
       if (!currentUser || !currentChatUserId || !supabaseClient) return;
-
-      supabaseClient
-        .from("messages")
+      supabaseClient.from("messages")
         .select("id,sender_id,receiver_id,body,created_at,is_read")
-        .or(
-          "and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + ")," +
-          "and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")"
-        )
-        .order("created_at", { ascending: true })
-        .limit(200)
+        .or("and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + "),and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")")
+        .order("created_at", { ascending: true }).limit(200)
         .then(function (res) {
           if (res.error) throw res.error;
           renderChatMessages(res.data || []);
@@ -1393,69 +1157,43 @@
       var container = $("chatMessages");
       if (!container) return;
       container.replaceChildren();
-
-      if (!msgs.length) {
-        container.append(makeElement("div", "chat-empty", "Напиши первое сообщение."));
-        return;
-      }
-
+      if (!msgs.length) { container.append(makeElement("div", "chat-empty", "Напиши первое сообщение.")); return; }
       msgs.forEach(function (m) {
         var isMine = m.sender_id === currentUser.id;
         var el = makeElement("div", "msg " + (isMine ? "mine" : "theirs"));
         el.append(document.createTextNode(m.body));
-        el.append(makeElement("span", "msg-time", new Date(m.created_at).toLocaleString("ru-RU", {
-          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-        })));
+        el.append(makeElement("span", "msg-time", new Date(m.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })));
         container.append(el);
       });
-
       container.scrollTop = container.scrollHeight;
     }
 
     function markChatAsRead() {
       if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      supabaseClient
-        .from("messages")
-        .update({ is_read: true })
-        .eq("sender_id", currentChatUserId)
-        .eq("receiver_id", currentUser.id)
-        .eq("is_read", false)
-        .then(function () {})
-        .catch(function () {});
+      supabaseClient.from("messages").update({ is_read: true })
+        .eq("sender_id", currentChatUserId).eq("receiver_id", currentUser.id).eq("is_read", false)
+        .then(function () {}).catch(function () {});
     }
 
     function sendChatMessage(body) {
       if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      body = body.trim();
-      if (!body) return;
-
-      supabaseClient
-        .from("messages")
-        .insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body })
+      body = body.trim(); if (!body) return;
+      supabaseClient.from("messages").insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body })
         .then(function (res) {
           if (res.error) throw res.error;
           $("chatInput").value = "";
           loadChatMessages();
         })
-        .catch(function (e) {
-          console.error("Ошибка отправки:", e);
-          showNotice("Не удалось отправить сообщение.", "error");
-        });
+        .catch(function (e) { console.error("Ошибка отправки:", e); showNotice("Не удалось отправить: " + e.message, "error"); });
     }
 
     function loadDialogs() {
       if (!currentUser || !supabaseClient) return Promise.resolve();
-
-      return supabaseClient
-        .from("messages")
+      return supabaseClient.from("messages")
         .select("id,sender_id,receiver_id,body,created_at,is_read")
         .or("sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentUser.id)
-        .order("created_at", { ascending: false })
-        .limit(300)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          renderDialogs(res.data || []);
-        })
+        .order("created_at", { ascending: false }).limit(300)
+        .then(function (res) { if (res.error) throw res.error; renderDialogs(res.data || []); })
         .catch(function (e) { console.error("Ошибка загрузки диалогов:", e); });
     }
 
@@ -1463,37 +1201,28 @@
       var container = $("dialogsList");
       if (!container) return;
       container.replaceChildren();
-
       var dialogs = {};
       msgs.forEach(function (m) {
         var other = m.sender_id === currentUser.id ? m.receiver_id : m.sender_id;
         if (!dialogs[other]) dialogs[other] = { userId: other, last: m, unread: 0 };
         if (m.receiver_id === currentUser.id && !m.is_read) dialogs[other].unread++;
       });
-
       var list = Object.values(dialogs);
       if (!list.length) {
         var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML =
-          "<h3>Пока нет сообщений</h3>" +
-          "<p>Напиши продавцу на карточке объявления — переписка появится здесь.</p>";
+        empty.innerHTML = "<h3>Пока нет сообщений</h3><p>Напиши продавцу на карточке объявления — переписка появится здесь.</p>";
         container.append(empty);
         return;
       }
-
       list.forEach(function (d) {
         var item = makeElement("div", "dialog-item");
         var top = makeElement("div", "dialog-top");
         top.append(makeElement("div", "dialog-name", "Участник " + d.userId.slice(0, 6)));
-        top.append(makeElement("div", "dialog-date", new Date(d.last.created_at).toLocaleString("ru-RU", {
-          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-        })));
+        top.append(makeElement("div", "dialog-date", new Date(d.last.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })));
         item.append(top);
-
         var prev = makeElement("div", "dialog-preview", d.last.body);
         if (d.unread > 0) prev.append(makeElement("span", "dialog-unread", String(d.unread)));
         item.append(prev);
-
         item.addEventListener("click", function () {
           currentChatUserId = d.userId;
           currentChatEmail = "Участник " + d.userId.slice(0, 6);
@@ -1504,7 +1233,6 @@
           loadChatMessages();
           startMessagesPolling();
         });
-
         container.append(item);
       });
     }
@@ -1515,20 +1243,17 @@
       $("dialogsList").classList.remove("hidden");
       loadDialogs();
     });
-
     $("chatForm").addEventListener("submit", function (e) {
       e.preventDefault();
       sendChatMessage($("chatInput").value);
     });
 
-    /* ========== НАВИГАЦИЯ ========== */
+    /* ===== Навигация ===== */
     document.querySelectorAll(".nav-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         var section = tab.dataset.tab;
-
         document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
         tab.classList.add("active");
-
         $("listingsSection").classList.add("hidden");
         $("favoritesSection").classList.add("hidden");
         $("profileSection").classList.add("hidden");
@@ -1542,7 +1267,6 @@
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
-
         if (section === "favorites") {
           $("favoritesSection").classList.remove("hidden");
           renderFavorites();
@@ -1550,7 +1274,6 @@
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
-
         if (section === "messages") {
           if (!currentUser) {
             $("listingsSection").classList.remove("hidden");
@@ -1566,7 +1289,6 @@
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
-
         $("listingsSection").classList.remove("hidden");
         showOnlyMine = false;
         $("myListingsButton").textContent = "Мои объявления";
@@ -1576,14 +1298,13 @@
       });
     });
 
-    /* ========== АВТОРИЗАЦИЯ ========== */
+    /* ===== Авторизация ===== */
     function openAuthModal() {
       authMode = "login";
       updateAuthMode();
       setFormMessage("authMessage", "");
       openModal("authModal");
     }
-
     function updateAuthMode() {
       var isLogin = authMode === "login";
       $("authTitle").textContent = isLogin ? "С возвращением!" : "Добро пожаловать!";
@@ -1615,18 +1336,14 @@
     $("authForm").addEventListener("submit", function (event) {
       event.preventDefault();
       if (!supabaseClient) { setFormMessage("authMessage", "Сервис недоступен.", "error"); return; }
-
       var email = $("authEmail").value.trim();
       var password = $("authPassword").value;
       var submitButton = $("authSubmit");
-
       submitButton.disabled = true;
       setFormMessage("authMessage", "Подожди...");
-
       var promise = authMode === "signup"
         ? supabaseClient.auth.signUp({ email: email, password: password })
         : supabaseClient.auth.signInWithPassword({ email: email, password: password });
-
       promise
         .then(function (result) {
           if (result.error) throw result.error;
@@ -1648,13 +1365,9 @@
         .then(function () { submitButton.disabled = false; });
     });
 
-    /* ========== СОЗДАНИЕ ОБЪЯВЛЕНИЯ ========== */
+    /* ===== Создание объявления ===== */
     $("createListingButton").addEventListener("click", function () {
-      if (!currentUser) {
-        openAuthModal();
-        setFormMessage("authMessage", "Войди, чтобы разместить объявление.");
-        return;
-      }
+      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы разместить объявление."); return; }
       $("listingForm").reset();
       setFormMessage("listingMessage", "");
       openModal("listingModal");
@@ -1663,31 +1376,21 @@
     $("listingForm").addEventListener("submit", function (event) {
       event.preventDefault();
       if (!currentUser) { closeModal("listingModal"); openAuthModal(); return; }
-
       var title = $("listingTitle").value.trim();
       var category = $("listingCategory").value;
       var description = $("listingDescription").value.trim();
       var priceText = $("listingPrice").value.trim();
-
       if (!title || !description || !priceText) {
         setFormMessage("listingMessage", "Заполни все поля.", "error");
         return;
       }
-
       var submitButton = $("listingSubmit");
       submitButton.disabled = true;
       submitButton.textContent = "Публикуем...";
-
-      supabaseClient
-        .from("listings")
-        .insert({
-          user_id: currentUser.id,
-          title: title,
-          category: category,
-          description: description,
-          price_text: priceText,
-          status: "active"
-        })
+      supabaseClient.from("listings").insert({
+        user_id: currentUser.id, title: title, category: category,
+        description: description, price_text: priceText, status: "active"
+      })
         .then(function (res) {
           if (res.error) throw res.error;
           closeModal("listingModal");
@@ -1702,21 +1405,14 @@
         })
         .catch(function (error) {
           console.error("Ошибка публикации:", error);
-          setFormMessage("listingMessage", "Не удалось опубликовать: " + (error.message || "ошибка"), "error");
+          setFormMessage("listingMessage", "Не удалось: " + (error.message || "ошибка"), "error");
         })
-        .then(function () {
-          submitButton.disabled = false;
-          submitButton.textContent = "Опубликовать";
-        });
+        .then(function () { submitButton.disabled = false; submitButton.textContent = "Опубликовать"; });
     });
 
-    /* ========== ПРОЧИЕ КНОПКИ ========== */
+    /* ===== Прочие кнопки ===== */
     $("myListingsButton").addEventListener("click", function () {
-      if (!currentUser) {
-        openAuthModal();
-        setFormMessage("authMessage", "Войди, чтобы посмотреть свои объявления.");
-        return;
-      }
+      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы посмотреть свои объявления."); return; }
       showOnlyMine = !showOnlyMine;
       $("myListingsButton").textContent = showOnlyMine ? "Все объявления" : "Мои объявления";
       renderListings();
@@ -1736,7 +1432,6 @@
     });
 
     $("searchInput").addEventListener("input", renderListings);
-
     $("categories").addEventListener("click", function (event) {
       var button = event.target.closest(".category-button");
       if (!button) return;
@@ -1750,7 +1445,6 @@
     $("profileSignOut").addEventListener("click", function () {
       if (!supabaseClient || !currentUser) return;
       if (!window.confirm("Выйти из аккаунта?")) return;
-
       supabaseClient.auth.signOut().then(function (res) {
         if (res.error) { showNotice("Не удалось выйти.", "error"); return; }
         showNotice("Ты вышел из аккаунта.", "success");
@@ -1761,33 +1455,19 @@
       });
     });
 
-    /* ========== СТАРТ ========== */
+    /* ===== Старт ===== */
     function initializeApp() {
       if (!window.supabase || !window.supabase.createClient) {
         var c = $("listings");
-        if (c) {
-          c.innerHTML =
-            '<div class="empty-state">' +
-              '<div class="empty-icon">!</div>' +
-              '<h3>Не удалось подключиться</h3>' +
-              '<p>Обнови страницу или проверь интернет.</p>' +
-            '</div>';
-        }
+        if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><h3>Не удалось подключиться</h3><p>Обнови страницу.</p></div>';
         showNotice("Библиотека Supabase не загрузилась.", "error");
         return;
       }
-
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
       supabaseClient.auth.getSession()
-        .then(function (res) {
-          currentUser = (res.data && res.data.session) ? res.data.session.user : null;
-        })
+        .then(function (res) { currentUser = (res.data && res.data.session) ? res.data.session.user : null; })
         .catch(function (e) { console.error("Ошибка сессии:", e); currentUser = null; })
-        .then(function () {
-          updateAuthButton();
-          return ensureProfileRow();
-        })
+        .then(function () { updateAuthButton(); return ensureProfileRow(); })
         .then(function () { return loadProfileData(); })
         .then(function () { return loadFavorites(); })
         .then(function () { return loadListings(); })
