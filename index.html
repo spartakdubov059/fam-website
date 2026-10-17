@@ -13,6 +13,7 @@
       --surface: #25272D;
       --surface-hover: #2D3037;
       --accent: #D4D7DE;
+      --accent-hover: #FFFFFF;
       --text: #F5F5F5;
       --muted: #A5A7B0;
       --border: #363840;
@@ -32,7 +33,7 @@
     }
 
     button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; }
+    button { cursor: pointer; transition: .2s; }
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 3px;
@@ -84,7 +85,7 @@
       cursor: pointer;
     }
     .button-primary { background: var(--accent); color: #17181C; }
-    .button-primary:hover { background: #FFFFFF; transform: translateY(-1px); }
+    .button-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
     .button-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
     .button-secondary:hover { background: var(--surface-hover); }
     .button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
@@ -125,335 +126,239 @@
     .nav-tab.active { background: var(--accent); color: #17181C; }
 
     /* Основное */
-    main { width: min(1000px, calc(100% - 32px)); margin: 0 auto; }
-    .hero { padding: 55px 0 30px; }
-    .hero-label {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 8px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      color: var(--muted);
-      font-size: 12px; font-weight: 650;
-    }
-    .hero-dot { width: 7px; height: 7px; background: #B9D8B6; border-radius: 50%; }
-    h1 {
-      max-width: 700px;
-      margin: 20px 0 14px;
-      font-size: clamp(37px, 7vw, 66px);
-      line-height: 1.02;
-      letter-spacing: -2.5px;
-      font-weight: 900;
-    }
-    h1 span { color: var(--accent); }
-    .hero-description { max-width: 500px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 25px; }
-
+    main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; }
+    
+    /* Hero */
+    .hero { padding: 45px 0 30px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
+    .hero-content { flex: 1; }
+    .hero h1 { margin: 0 0 12px; font-size: clamp(32px, 5vw, 54px); line-height: 1.1; font-weight: 850; letter-spacing: -1.5px; }
+    .hero p { margin: 0 0 20px; color: var(--muted); font-size: 16px; line-height: 1.5; max-width: 500px; }
     .search-box {
-      margin-top: 28px;
       display: flex; align-items: center; gap: 12px;
-      padding: 0 17px;
-      min-height: 57px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 17px;
-      transition: border-color .2s;
+      padding: 0 17px; min-height: 54px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 17px; transition: border-color .2s; max-width: 500px;
     }
     .search-box:focus-within { border-color: #777B86; }
-    .search-icon { color: var(--muted); font-size: 19px; }
     .search-box input {
-      width: 100%; min-width: 0;
-      border: 0; outline: none;
-      background: transparent;
-      color: var(--text);
-      font-size: 14px;
+      width: 100%; min-width: 0; border: 0; outline: none;
+      background: transparent; color: var(--text); font-size: 14px;
     }
-    .search-box input::placeholder { color: #858792; }
+    
+    /* Карусель (Carousel) */
+    .carousel-wrap { flex: 1; max-width: 600px; position: relative; }
+    .carousel {
+      display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px;
+      scroll-snap-type: x mandatory; scrollbar-width: none;
+    }
+    .carousel::-webkit-scrollbar { display: none; }
+    .carousel-card {
+      flex: 0 0 85%; scroll-snap-align: start;
+      position: relative; height: 240px; border-radius: 20px;
+      overflow: hidden; border: 1px solid var(--border);
+    }
+    .carousel-card img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .carousel-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 20px; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+    }
+    .carousel-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .carousel-desc { font-size: 13px; color: #ccc; }
 
-    .section { padding: 24px 0 55px; }
-    .section-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 15px;
-      margin-bottom: 20px;
+    /* Категории и Фильтры */
+    .board-header { display: flex; align-items: center; justify-content: space-between; margin: 30px 0 20px; }
+    .board-title { font-size: 24px; font-weight: 850; letter-spacing: -.5px; margin: 0; }
+    .filters-row { display: flex; align-items: center; gap: 10px; }
+    .school-filter {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 12px; padding: 8px 12px;
+      font-size: 13px; font-weight: 600; outline: none; cursor: pointer;
     }
-    .section-heading h2 { margin: 0; font-size: 23px; font-weight: 850; letter-spacing: -.6px; }
-    .results-count { color: var(--muted); font-size: 12px; }
 
     .categories { display: flex; gap: 9px; overflow-x: auto; padding: 2px 1px 12px; scrollbar-width: none; }
     .categories::-webkit-scrollbar { display: none; }
     .category-button {
-      flex: 0 0 auto;
-      min-height: 40px; padding: 0 15px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
-      color: var(--muted);
-      font-size: 13px; font-weight: 650;
-      transition: .2s;
-      cursor: pointer;
+      flex: 0 0 auto; min-height: 40px; padding: 0 16px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); color: var(--muted);
+      font-size: 13px; font-weight: 650; cursor: pointer; transition: .2s;
     }
     .category-button:hover { background: var(--surface-hover); color: var(--text); }
     .category-button.active { background: var(--accent); color: #17181C; border-color: var(--accent); }
 
+    /* Сетка карточек */
     .listings {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
       margin-top: 12px;
     }
     .listing-card {
       display: flex; flex-direction: column;
-      min-width: 0;
-      min-height: 205px;
-      padding: 19px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      transition: transform .2s, border-color .2s, background .2s;
-      overflow: hidden;
+      min-width: 0; background: transparent;
+      border-radius: var(--radius); overflow: hidden;
+      transition: transform .2s;
     }
-    .listing-card:hover {
-      transform: translateY(-3px);
-      background: var(--surface-hover);
-      border-color: #4A4D57;
+    .listing-card:hover { transform: translateY(-4px); }
+    
+    .listing-image-wrap {
+      position: relative; width: 100%; padding-top: 100%; /* Квадратная картинка */
+      border-radius: 18px; overflow: hidden; border: 1px solid var(--border);
+      background: var(--surface);
     }
     .listing-img {
-      width: calc(100% + 38px);
-      margin: -19px -19px 15px -19px;
-      height: 160px;
-      object-fit: cover;
-      border-bottom: 1px solid var(--border);
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
     }
-    .listing-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; }
-    .listing-category {
-      display: inline-flex; align-items: center;
-      padding: 6px 9px;
-      border: 1px solid #41434C;
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 11px; font-weight: 650;
+    .listing-img-placeholder {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: grid; place-items: center; color: var(--muted); font-size: 30px;
     }
-    .listing-date { color: #858792; font-size: 11px; white-space: nowrap; }
-    .listing-title { margin: 0 0 9px; font-size: 17px; font-weight: 800; line-height: 1.35; overflow-wrap: anywhere; }
-    .listing-description {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.65;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-      flex-grow: 1;
+    
+    .listing-fav-btn {
+      position: absolute; top: 12px; right: 12px;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      border: none; color: #fff; font-size: 18px;
+      display: grid; place-items: center; cursor: pointer; transition: .2s;
     }
-    .listing-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 10px;
-      margin-top: auto;
-      padding-top: 20px;
-    }
-    .listing-price { font-size: 17px; font-weight: 850; overflow-wrap: anywhere; }
-    .listing-owner { max-width: 45%; color: var(--muted); font-size: 11px; text-align: right; overflow-wrap: anywhere; }
-    .small-button {
-      padding: 7px 10px;
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .small-button:hover { color: var(--danger); border-color: var(--danger); }
+    .listing-fav-btn.active { color: #FF7777; }
+    
+    .listing-info { padding: 14px 4px 0; display: flex; flex-direction: column; flex-grow: 1; }
+    .listing-price { font-size: 18px; font-weight: 850; margin-bottom: 4px; }
+    .listing-title { font-size: 14px; font-weight: 600; margin: 0 0 6px; line-height: 1.4; overflow-wrap: anywhere; }
+    .listing-category { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .listing-school { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: auto; }
 
-    .favorite-btn {
-      margin-top: 10px;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 12px; font-weight: 650;
-      cursor: pointer;
-      transition: .2s;
-      width: 100%;
-    }
-    .favorite-btn:hover { border-color: #C8C9D0; color: var(--text); }
-    .favorite-btn.active { background: rgba(255, 119, 119, .12); border-color: #9D4B4B; color: #FFAAAA; }
+    /* Кнопки внутри карточки (для мероприятий или "написать") */
+    .listing-actions { margin-top: 12px; }
+    .listing-actions .button { width: 100%; min-height: 36px; font-size: 12px; border-radius: 10px; }
+    .listing-card .small-button { width: 100%; margin-top: 8px; padding: 8px; }
 
-    .empty-state, .favorites-empty {
-      grid-column: 1 / -1;
-      padding: 48px 20px;
-      text-align: center;
-      background: var(--surface);
-      border: 1px dashed #41434C;
+    /* Пустые состояния */
+    .empty-state {
+      grid-column: 1 / -1; padding: 48px 20px; text-align: center;
+      background: var(--surface); border: 1px dashed #41434C;
       border-radius: var(--radius);
     }
     .empty-icon { margin-bottom: 12px; font-size: 30px; }
-    .empty-state h3, .favorites-empty h3 { margin: 0 0 8px; font-size: 17px; }
-    .empty-state p, .favorites-empty p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-
-    .notice {
-      margin-top: 15px;
-      padding: 13px 15px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--surface);
-      color: var(--muted);
-      font-size: 12px; line-height: 1.6;
-    }
-    .notice.error { color: #FFAAAA; border-color: #704040; }
-    .notice.success { color: #B9D8B6; border-color: #405C42; }
-
-    .hidden { display: none !important; }
+    .empty-state h3 { margin: 0 0 8px; font-size: 17px; }
+    .empty-state p { margin: 0; color: var(--muted); font-size: 13px; }
 
     /* Профиль */
     .profile-card {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      padding: 22px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 18px;
+      padding: 22px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 24px;
     }
-    .profile-avatar-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+    .profile-avatar-wrap { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
     .profile-avatar {
-      width: 64px; height: 64px;
-      border-radius: 20px;
+      width: 80px; height: 80px; border-radius: 50%;
       background: var(--accent); color: #17181C;
-      display: grid; place-items: center;
-      font-size: 26px; font-weight: 900;
+      display: grid; place-items: center; font-size: 32px; font-weight: 900;
     }
     .profile-avatar-img {
-      position: absolute; inset: 0;
-      width: 64px; height: 64px;
-      border-radius: 20px;
-      object-fit: cover;
-      border: 1px solid var(--border);
+      position: absolute; inset: 0; width: 80px; height: 80px;
+      border-radius: 50%; object-fit: cover; border: 2px solid var(--bg);
     }
-    .profile-info { min-width: 0; flex: 1; }
-    .profile-email { font-size: 17px; font-weight: 800; overflow-wrap: anywhere; margin-bottom: 5px; }
-    .profile-meta { color: var(--muted); font-size: 13px; }
-    .profile-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-    .profile-actions .small-button { padding: 6px 10px; font-size: 11px; }
-    .profile-actions .small-button:hover { color: var(--text); border-color: #5A5D67; }
-
-    .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-    .profile-stat {
-      padding: 18px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: var(--radius); text-align: center;
-    }
-    .profile-stat-value { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
+    .profile-info { flex: 1; }
+    .profile-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .profile-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 30px; }
+    .profile-stat { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-align: center; }
+    .profile-stat-value { font-size: 24px; font-weight: 850; margin-bottom: 4px; }
     .profile-stat-label { color: var(--muted); font-size: 12px; }
-    .profile-subheading { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
-    .profile-signout { margin-top: 22px; width: 100%; }
-
+    
     /* Сообщения */
     .dialogs { display: flex; flex-direction: column; gap: 10px; }
     .dialog-item {
       padding: 16px 18px; background: var(--surface);
       border: 1px solid var(--border); border-radius: 14px;
-      cursor: pointer; transition: .2s;
+      cursor: pointer; transition: .2s; display: flex; gap: 14px; align-items: center;
     }
     .dialog-item:hover { background: var(--surface-hover); border-color: #4A4D57; }
-    .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
-    .dialog-name { font-weight: 800; font-size: 14px; overflow-wrap: anywhere; }
+    .dialog-avatar { width: 46px; height: 46px; border-radius: 50%; background: #33353D; display: grid; place-items: center; font-size: 18px; font-weight: 800; flex-shrink: 0; }
+    .dialog-content { flex: 1; min-width: 0; }
+    .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .dialog-name { font-weight: 800; font-size: 14px; }
     .dialog-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
     .dialog-preview { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dialog-unread { display: inline-block; background: var(--accent); color: #17181C; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; margin-left: 6px; }
 
     .chat {
       display: flex; flex-direction: column; min-height: 60vh;
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
     }
     .chat-header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--bg); }
-    .chat-with { font-weight: 800; overflow-wrap: anywhere; }
+    .chat-with { font-weight: 800; }
     .chat-messages { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 55vh; }
-    .msg { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .msg { max-width: 75%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
     .msg.mine { align-self: flex-end; background: var(--accent); color: #17181C; border-bottom-right-radius: 4px; }
     .msg.theirs { align-self: flex-start; background: #33353D; color: var(--text); border-bottom-left-radius: 4px; }
-    .msg-time { display: block; font-size: 10px; opacity: .7; margin-top: 4px; }
+    .msg-time { display: block; font-size: 10px; opacity: .7; margin-top: 6px; }
     .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg); }
-    .chat-form input { flex: 1; margin-bottom: 0; }
-    .chat-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+    .chat-form input { flex: 1; margin-bottom: 0; border-radius: 14px; }
 
-    /* Модальные окна */
+    /* Модалки */
     .modal {
       position: fixed; inset: 0; z-index: 100;
       display: none; align-items: center; justify-content: center;
-      padding: 16px; background: rgba(0, 0, 0, .72);
-      backdrop-filter: blur(8px); overflow-y: auto;
+      padding: 16px; background: rgba(0, 0, 0, .8); backdrop-filter: blur(8px);
     }
     .modal.open { display: flex; }
     .modal-content {
       width: min(100%, 440px); max-height: calc(100dvh - 32px); overflow-y: auto;
-      padding: 25px; background: #202126; border: 1px solid #41434C;
-      border-radius: 22px; box-shadow: 0 25px 80px rgba(0, 0, 0, .4);
+      padding: 28px; background: #202126; border: 1px solid #41434C;
+      border-radius: 24px; box-shadow: 0 25px 80px rgba(0, 0, 0, .5); position: relative;
     }
-    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 22px; }
-    .modal-header h2 { margin: 0 0 7px; font-size: 23px; font-weight: 850; }
-    .modal-header p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    .close-button { flex: 0 0 auto; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 20px; cursor: pointer; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; margin-bottom: 8px; color: #D7D8DE; font-size: 12px; font-weight: 700; }
-    .form-group input, .form-group textarea, .form-group select {
-      width: 100%; min-height: 46px; padding: 12px 13px; border: 1px solid #41434C;
-      border-radius: 12px; outline: none; background: #292B31; color: var(--text); font-size: 13px;
-    }
-    .form-group textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
-    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #888B95; }
-    .form-group input::placeholder, .form-group textarea::placeholder { color: #858792; }
-    .form-submit { width: 100%; margin-top: 5px; }
-    .modal-switch { margin: 17px 0 0; text-align: center; color: var(--muted); font-size: 12px; }
-    .text-button { padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 750; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-    .form-message { margin-top: 13px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+    .modal-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 50%; background: var(--surface); border: none; color: var(--text); font-size: 18px; }
+    .modal-header h2 { margin: 0 0 8px; font-size: 24px; font-weight: 850; }
+    .modal-header p { margin: 0 0 24px; color: var(--muted); font-size: 13px; }
     
-    .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-    .checkbox-group input { width: auto; min-height: auto; margin: 0; }
-
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+    .form-control {
+      width: 100%; min-height: 48px; padding: 12px 16px;
+      border: 1px solid #41434C; border-radius: 14px;
+      background: #17181C; color: var(--text); font-size: 14px; outline: none;
+    }
+    .form-control:focus { border-color: #888B95; }
+    textarea.form-control { min-height: 100px; resize: vertical; }
+    
+    .text-button { background: none; border: none; color: var(--accent); font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0; font-size: 13px; }
+    
     /* Футер */
-    footer { width: min(100% - 40px, 1000px); margin: 0 auto; padding: 32px 0; text-align: center; border-top: 1px solid var(--border); }
-    .footer-brand { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
-    .footer-line { width: 28px; height: 1px; background: #555862; }
-    .footer-created { color: #858792; font-size: 10px; font-weight: 700; letter-spacing: 3px; }
+    footer { width: min(100% - 40px, 1100px); margin: 40px auto 0; padding: 32px 0; text-align: center; border-top: 1px solid var(--border); }
+    .footer-brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
     .footer-studio { color: #F5F5F5; font-size: 14px; font-weight: 900; letter-spacing: 2px; }
-    .footer-studio span { color: #A5A7B0; }
-    .footer-note { max-width: 600px; margin: 13px auto 0; color: #777A85; font-size: 12px; line-height: 1.8; letter-spacing: .3px; }
-
-    /* Скроллбар */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: #41434C; border-radius: 10px; }
+    .footer-studio span { color: var(--muted); }
+    .footer-note { color: #777A85; font-size: 12px; line-height: 1.8; }
 
     /* Адаптив */
-    @media (max-width: 760px) {
-      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .hero { padding-top: 40px; }
+    @media (max-width: 800px) {
+      .hero { flex-direction: column; padding-top: 30px; }
+      .hero-content { width: 100%; }
+      .carousel-wrap { width: 100%; max-width: 100%; margin-top: 20px; }
+      .board-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+      .filters-row { width: 100%; justify-content: space-between; }
+      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     }
     @media (max-width: 520px) {
-      .header-inner { width: calc(100% - 24px); min-height: 68px; }
-      .logo-mark { width: 38px; height: 38px; }
+      .header-inner { min-height: 64px; }
+      .logo-mark { width: 36px; height: 36px; font-size: 16px; }
       .logo-name { font-size: 16px; }
-      .logo-caption { font-size: 10px; }
-      .header-actions { gap: 6px; }
-      .header-actions .button { min-height: 38px; padding: 0 10px; font-size: 11px; }
-      .main-nav { top: 68px; }
-      .main-nav-inner { width: calc(100% - 24px); gap: 5px; }
-      .nav-tab { min-height: 39px; padding: 0 13px; font-size: 12px; }
-      main { width: calc(100% - 28px); }
-      .hero { padding-top: 35px; }
-      h1 { letter-spacing: -1.7px; }
-      .hero-description { font-size: 14px; }
-      .listings { grid-template-columns: 1fr; }
-      .listing-card { min-height: 185px; }
-      .section-heading h2 { font-size: 20px; }
-      .modal-content { padding: 20px; }
-      footer { width: calc(100% - 28px); }
-      .footer-brand { gap: 8px; }
-      .footer-line { width: 18px; }
+      .main-nav { top: 64px; }
+      main { width: calc(100% - 24px); }
+      .carousel-card { flex: 0 0 95%; height: 200px; }
+      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .listing-price { font-size: 15px; }
+      .listing-title { font-size: 13px; }
+      .listing-info { padding: 10px 2px 0; }
+      .profile-card { flex-direction: column; text-align: center; }
+      .profile-actions { justify-content: center; }
     }
   </style>
 </head>
@@ -477,47 +382,45 @@
 
   <nav class="main-nav" aria-label="Главная навигация">
     <div class="main-nav-inner">
-      <button class="nav-tab active" data-tab="board">▦ Доска</button>
-      <button class="nav-tab" data-tab="favorites">♡ Избранное</button>
-      <button class="nav-tab" data-tab="messages">✉ Сообщения</button>
-      <button class="nav-tab" data-tab="profile">◉ Профиль</button>
+      <button class="nav-tab active" data-tab="board">Доска</button>
+      <button class="nav-tab" data-tab="favorites">Избранное</button>
+      <button class="nav-tab" data-tab="messages">Сообщения</button>
+      <button class="nav-tab" data-tab="profile">Профиль</button>
     </div>
   </nav>
 
   <main>
     <section class="hero">
-      <div class="hero-label"><span class="hero-dot"></span> Место для своих</div>
-      <h1>Находи своё.<br><span>Создавай своё.</span></h1>
-      <p class="hero-description">
-        Вещи, услуги, творчество и учёба — всё, чем хочется поделиться с другими. Просто, быстро и рядом.
-      </p>
-      <div class="hero-actions">
-        <button class="button button-primary" id="createListingButton">+ Разместить объявление</button>
-        <button class="button button-secondary" id="showAllButton">Смотреть объявления</button>
+      <div class="hero-content">
+        <h1>Свои рядом</h1>
+        <p>Объявления, мероприятия и возможности от учеников твоей школы. Находи нужное и делись своим.</p>
+        <label class="search-box">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" placeholder="Поиск объявлений..." autocomplete="off">
+        </label>
       </div>
-      <label class="search-box">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" type="search" placeholder="Что ищем сегодня?" autocomplete="off" aria-label="Поиск объявлений">
-      </label>
+      
+      <div class="carousel-wrap">
+        <div class="carousel" id="bannerCarousel">
+          <!-- Баннеры будут добавлены здесь -->
+        </div>
+      </div>
     </section>
 
     <!-- Профиль -->
-    <section class="section hidden" id="profileSection">
-      <div class="section-heading"><h2>Профиль</h2></div>
+    <section class="section hidden" id="profileSection" style="margin-top: 30px;">
       <div class="profile-card">
         <div class="profile-avatar-wrap">
           <div class="profile-avatar" id="profileAvatar">?</div>
           <img class="profile-avatar-img hidden" id="profileAvatarImg" alt="">
         </div>
         <div class="profile-info">
-          <div class="profile-email" id="profileEmail">—</div>
+          <div class="profile-name" id="profileEmail">—</div>
           <div class="profile-meta" id="profileMeta">—</div>
           <div class="profile-actions">
-            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block">
-              📷 Загрузить фото
-            </label>
+            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block; padding:8px 12px; border-radius:10px; border:1px solid var(--border); font-size:12px;">📷 Загрузить фото</label>
             <input type="file" id="avatarInput" accept="image/jpeg, image/png, image/webp" style="display:none">
-            <button class="small-button hidden" id="avatarRemove" type="button">Удалить</button>
+            <button class="small-button hidden" id="avatarRemove" type="button" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); font-size:12px; background:transparent; color:var(--muted);">Удалить</button>
           </div>
         </div>
       </div>
@@ -531,33 +434,33 @@
           <div class="profile-stat-label">В избранном</div>
         </div>
       </div>
-      <h3 class="profile-subheading">Мои объявления</h3>
+      <h3 style="margin-bottom:16px;">Мои объявления</h3>
       <div class="listings" id="profileListings"></div>
-      <button class="button button-secondary profile-signout" id="profileSignOut">Выйти из аккаунта</button>
+      <button class="button button-secondary" id="profileSignOut" style="margin-top:30px; width:100%;">Выйти из аккаунта</button>
     </section>
 
     <!-- Избранное -->
-    <section class="section hidden" id="favoritesSection">
-      <div class="section-heading">
-        <h2>Избранное</h2>
+    <section class="section hidden" id="favoritesSection" style="margin-top: 30px;">
+      <div class="board-header">
+        <h2 class="board-title">Избранное</h2>
         <span class="results-count" id="favoritesCount"></span>
       </div>
       <div class="listings" id="favoritesList"></div>
     </section>
 
     <!-- Сообщения -->
-    <section class="section hidden" id="messagesSection">
-      <div class="section-heading"><h2>Сообщения</h2></div>
+    <section class="section hidden" id="messagesSection" style="margin-top: 30px;">
+      <div class="board-header"><h2 class="board-title">Сообщения</h2></div>
       <div id="dialogsList" class="dialogs"></div>
 
       <div id="chatView" class="chat hidden">
         <div class="chat-header">
-          <button class="button button-secondary" id="chatBack">← Назад</button>
+          <button class="button button-secondary" id="chatBack" style="padding: 0 12px; min-height:36px;">← Назад</button>
           <div class="chat-with" id="chatWith">—</div>
         </div>
         <div class="chat-messages" id="chatMessages"></div>
         <form id="chatForm" class="chat-form">
-          <input id="chatInput" type="text" placeholder="Написать сообщение..." maxlength="1000" autocomplete="off">
+          <input id="chatInput" type="text" class="form-control" placeholder="Написать сообщение..." maxlength="1000" autocomplete="off">
           <button class="button button-primary" type="submit">Отправить</button>
         </form>
       </div>
@@ -565,77 +468,77 @@
 
     <!-- Доска -->
     <section class="section" id="listingsSection">
-      <div class="section-heading">
-        <h2 id="listingsHeading">Объявления</h2>
-        <div>
-          <select id="schoolFilter" style="min-height: 36px; padding: 0 10px; font-size: 12px; width: auto; display: none;">
+      <div class="board-header">
+        <h2 class="board-title">Свежие объявления</h2>
+        <div class="filters-row">
+          <select id="schoolFilter" class="school-filter" style="display:none;">
             <option value="all">Все школы</option>
             <option value="my">Моя школа</option>
           </select>
-          <span class="results-count" id="resultsCount"></span>
         </div>
       </div>
+      
       <div class="categories" id="categories">
         <button class="category-button active" data-category="Все">Все</button>
         <button class="category-button" data-category="Вещи">Вещи</button>
         <button class="category-button" data-category="Услуги">Услуги</button>
         <button class="category-button" data-category="Творчество">Творчество</button>
         <button class="category-button" data-category="Учёба">Учёба</button>
-        <button class="category-button" data-category="Мероприятия">📢 Мероприятия</button>
+        <button class="category-button" data-category="Мероприятия">Мероприятия</button>
       </div>
-      <div id="notice" class="notice hidden" role="status"></div>
+      
+      <div id="notice" class="notice hidden" style="margin-bottom:20px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface); text-align:center;"></div>
+      
       <div class="listings" id="listings">
         <div class="empty-state">
           <div class="empty-icon">✳</div>
           <h3>Загружаем объявления</h3>
-          <p>Секунду, скоро всё появится.</p>
         </div>
+      </div>
+      
+      <div style="margin-top:30px; text-align:center;">
+         <button class="button button-primary" id="createListingButton" style="padding: 0 30px;">+ Создать объявление</button>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="footer-brand">
-      <span class="footer-line"></span>
-      <span class="footer-created">CREATED BY</span>
       <span class="footer-studio">SPR <span>STUDIO</span></span>
-      <span class="footer-line"></span>
     </div>
     <p class="footer-note">
-      FAM — свои рядом.<br>
-      Не публикуй пароли, домашний адрес и другие личные данные. Не отправляй незнакомцам деньги.
+      FAM — свои рядом. Не публикуй пароли, домашний адрес и другие личные данные.<br>
+      Не отправляй незнакомцам деньги.
     </p>
   </footer>
 
   <!-- Модалка авторизации -->
-  <div class="modal" id="authModal" role="dialog" aria-modal="true">
+  <div class="modal" id="authModal" role="dialog">
     <div class="modal-content">
+      <button class="modal-close" data-close="authModal">×</button>
       <div class="modal-header">
-        <div>
-          <h2 id="authTitle">С возвращением!</h2>
-          <p id="authDescription">Войди, чтобы быть среди своих.</p>
-        </div>
-        <button class="close-button" data-close="authModal">×</button>
+        <h2 id="authTitle">С возвращением</h2>
+        <p id="authDescription">Войди, чтобы быть среди своих.</p>
       </div>
       <form id="authForm">
         <div class="form-group" id="schoolGroup" style="display:none;">
           <label for="authSchool">Твоя школа</label>
-          <select id="authSchool" required>
+          <select id="authSchool" class="form-control" required>
             <option value="">Загрузка школ...</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="authEmail">Электронная почта</label>
-          <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <label for="authEmail">Почта</label>
+          <input id="authEmail" type="email" class="form-control" autocomplete="email" placeholder="example@mail.ru" required>
         </div>
         <div class="form-group">
           <label for="authPassword">Пароль</label>
-          <input id="authPassword" type="password" autocomplete="current-password" placeholder="Минимум 6 символов" minlength="6" required>
+          <input id="authPassword" type="password" class="form-control" autocomplete="current-password" placeholder="Минимум 6 символов" minlength="6" required>
         </div>
-        <button class="button button-primary form-submit" id="authSubmit" type="submit">Войти</button>
-        <div class="form-message" id="authMessage"></div>
+        <button class="button button-primary form-submit" id="authSubmit" type="submit" style="width:100%; margin-top:10px;">Войти</button>
+        <div class="form-message" id="authMessage" style="margin-top:12px; font-size:12px; text-align:center;"></div>
       </form>
-      <p class="modal-switch">
+      <p style="text-align: center; margin-top: 20px; font-size: 13px; color:var(--muted);">
         <span id="authSwitchText">Впервые здесь?</span>
         <button class="text-button" id="authSwitchButton" type="button">Создать аккаунт</button>
       </p>
@@ -643,23 +546,24 @@
   </div>
 
   <!-- Модалка создания объявления -->
-  <div class="modal" id="listingModal" role="dialog" aria-modal="true">
+  <div class="modal" id="listingModal" role="dialog">
     <div class="modal-content">
+      <button class="modal-close" data-close="listingModal">×</button>
       <div class="modal-header">
-        <div>
-          <h2>Новое объявление</h2>
-          <p>Расскажи другим, что предлагаешь.</p>
-        </div>
-        <button class="close-button" data-close="listingModal">×</button>
+        <h2>Создание объявления</h2>
       </div>
       <form id="listingForm">
         <div class="form-group">
-          <label for="listingTitle">Название</label>
-          <input id="listingTitle" type="text" maxlength="100" placeholder="Например, продаю наушники" required>
+          <label for="listingTitle">Заголовок</label>
+          <input id="listingTitle" type="text" class="form-control" maxlength="100" placeholder="Например, iPhone 13" required>
+        </div>
+        <div class="form-group">
+          <label for="listingDescription">Описание</label>
+          <textarea id="listingDescription" class="form-control" maxlength="1500" placeholder="Расскажите подробнее..." required></textarea>
         </div>
         <div class="form-group">
           <label for="listingCategory">Категория</label>
-          <select id="listingCategory" required>
+          <select id="listingCategory" class="form-control" required>
             <option value="Вещи">Вещи</option>
             <option value="Услуги">Услуги</option>
             <option value="Творчество">Творчество</option>
@@ -669,18 +573,14 @@
         </div>
         <div class="form-group" id="imageGroup" style="display:none;">
           <label for="listingImage">Обложка (картинка)</label>
-          <input id="listingImage" type="file" accept="image/jpeg, image/png, image/webp">
+          <input id="listingImage" type="file" class="form-control" accept="image/jpeg, image/png, image/webp" style="padding:10px;">
         </div>
         <div class="form-group">
-          <label for="listingDescription">Описание</label>
-          <textarea id="listingDescription" maxlength="1500" placeholder="Расскажи подробнее..." required></textarea>
+          <label for="listingPrice">Цена (необязательно)</label>
+          <input id="listingPrice" type="text" class="form-control" maxlength="50" placeholder="Например: 5 000 ₽">
         </div>
-        <div class="form-group">
-          <label for="listingPrice">Цена / Количество мест</label>
-          <input id="listingPrice" type="text" maxlength="50" placeholder="Например, 500 ₽ или нужно 5 человек" required>
-        </div>
-        <button class="button button-primary form-submit" id="listingSubmit" type="submit">Опубликовать</button>
-        <div class="form-message" id="listingMessage"></div>
+        <button class="button button-primary form-submit" id="listingSubmit" type="submit" style="width:100%; margin-top:10px;">Опубликовать</button>
+        <div class="form-message" id="listingMessage" style="margin-top:12px; font-size:12px; text-align:center;"></div>
       </form>
     </div>
   </div>
@@ -714,13 +614,6 @@
       });
     }
 
-    function makeElement(tag, className, text) {
-      var el = document.createElement(tag);
-      if (className) el.className = className;
-      if (text !== undefined) el.textContent = text;
-      return el;
-    }
-
     function pluralize(n) {
       var a = n % 100, b = n % 10;
       if (a >= 11 && a <= 14) return "объявлений";
@@ -741,13 +634,14 @@
       if (!notice) return;
       notice.textContent = message;
       notice.className = "notice" + (type ? " " + type : "");
+      notice.style.display = "block";
       clearTimeout(showNotice._t);
-      showNotice._t = setTimeout(function () { notice.classList.add("hidden"); }, 6000);
+      showNotice._t = setTimeout(function () { notice.style.display = "none"; }, 6000);
     }
 
     function hideNotice() {
       var notice = $("notice");
-      if (notice) notice.classList.add("hidden");
+      if (notice) notice.style.display = "none";
     }
 
     function setFormMessage(id, message, type) {
@@ -788,12 +682,7 @@
     function updateAuthButton() {
       var btn = $("authButton");
       if (btn) btn.textContent = currentUser ? "Мой аккаунт" : "Войти";
-      
-      if (currentUser) {
-        $("schoolFilter").style.display = "inline-block";
-      } else {
-        $("schoolFilter").style.display = "none";
-      }
+      $("schoolFilter").style.display = currentUser ? "inline-block" : "none";
     }
 
     /* ========== ЗАГРУЗКА ШКОЛ ========== */
@@ -802,42 +691,55 @@
         if (res.error) throw res.error;
         schoolsList = res.data || [];
         var selectAuth = $("authSchool");
-        var selectFilter = $("schoolFilter");
         
         selectAuth.innerHTML = '<option value="">Выбери школу</option>';
         schoolsList.forEach(function(s) {
           selectAuth.innerHTML += '<option value="'+s.id+'">'+s.name+' ('+s.city+')</option>';
         });
-
-        // Восстанавливаем фильтр
-        selectFilter.innerHTML = '<option value="all">Все школы</option><option value="my">Моя школа</option>';
       }).catch(function(e) {
         console.error("Ошибка загрузки школ:", e);
       });
     }
 
+    /* ========== БАННЕРЫ (КАРУСЕЛЬ) ========== */
+    function renderBanners() {
+      var container = $("bannerCarousel");
+      if (!container) return;
+      
+      var eventListings = allListings.filter(function(l) { return l.is_event; }).slice(0, 3);
+      
+      if (eventListings.length === 0) {
+         container.innerHTML = 
+           '<div class="carousel-card" style="background:var(--surface); display:grid; place-items:center;">' +
+             '<div style="text-align:center; color:var(--muted);">' +
+               '<h3 style="color:var(--text); margin-bottom:8px;">FAM</h3>' +
+               '<p>Ближе, чем кажется</p>' +
+             '</div>' +
+           '</div>';
+         return;
+      }
+
+      container.innerHTML = eventListings.map(function(l) {
+        return '<div class="carousel-card">' +
+          (l.image_url ? '<img src="'+escapeHTML(l.image_url)+'" alt="">' : '<div style="width:100%;height:100%;background:#333;"></div>') +
+          '<div class="carousel-overlay">' +
+            '<div class="carousel-title">'+escapeHTML(l.title)+'</div>' +
+            '<div class="carousel-desc">'+escapeHTML(l.price_text || "Мероприятие")+'</div>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    }
+
     /* ========== ЗАГРУЗКА ОБЪЯВЛЕНИЙ ========== */
     function loadListings() {
       if (!supabaseClient) return Promise.resolve();
-      var container = $("listings");
-      if (container) {
-        container.innerHTML =
-          '<div class="empty-state">' +
-            '<div class="empty-icon">✳</div>' +
-            '<h3>Загружаем объявления</h3>' +
-            '<p>Секунду, скоро всё появится.</p>' +
-          '</div>';
-      }
-
-      return supabaseClient
-        .from("listings")
-        .select("id,user_id,title,category,description,price_text,created_at,status,school_id,image_url,is_event")
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(100)
+      
+      return supabaseClient.from("listings").select("id,user_id,title,category,description,price_text,created_at,status,school_id,image_url,is_event")
+        .eq("status", "active").order("created_at", { ascending: false }).limit(100)
         .then(function (res) {
           if (res.error) throw res.error;
           allListings = res.data || [];
+          renderBanners();
           renderListings();
         })
         .catch(function (error) {
@@ -858,8 +760,7 @@
 
       var filtered = allListings.filter(function (listing) {
         var okCat = selectedCategory === "Все" || listing.category === selectedCategory;
-        var hay = [listing.title, listing.description, listing.category, listing.price_text]
-          .filter(Boolean).join(" ").toLowerCase();
+        var hay = [listing.title, listing.description, listing.category, listing.price_text].filter(Boolean).join(" ").toLowerCase();
         var okSearch = hay.indexOf(search) !== -1;
         var okMine = !showOnlyMine || (currentUser && listing.user_id === currentUser.id);
         
@@ -867,113 +768,65 @@
         if (filterSchool === "my" && currentProfile && currentProfile.school_id) {
           okSchool = listing.school_id === currentProfile.school_id;
         }
-
         return okCat && okSearch && okMine && okSchool;
       });
 
-      $("resultsCount").textContent = filtered.length + " " + pluralize(filtered.length);
-      $("listingsHeading").textContent = showOnlyMine ? "Мои объявления" : "Объявления";
-
       if (!filtered.length) {
-        var empty = makeElement("div", "empty-state");
-        empty.append(
-          makeElement("div", "empty-icon", "✳"),
-          makeElement("h3", "", showOnlyMine ? "У тебя пока нет объявлений" : "Пока ничего не найдено"),
-          makeElement("p", "", showOnlyMine ? "Создай первое объявление." : "Попробуй другой запрос.")
-        );
-        container.append(empty);
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">✳</div><h3>Здесь пока пусто</h3><p>Стань первым, кто опубликует объявление.</p></div>';
         return;
       }
 
       filtered.forEach(function (listing) {
-        var card = makeElement("article", "listing-card");
+        var card = document.createElement("article");
+        card.className = "listing-card";
         
-        if (listing.image_url) {
-           var img = document.createElement("img");
-           img.src = listing.image_url;
-           img.className = "listing-img";
-           card.append(img);
-        }
+        var imgBlock = listing.image_url 
+          ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img" alt="">' 
+          : '<div class="listing-img-placeholder">📦</div>';
 
-        var top = makeElement("div", "listing-top");
-        top.append(
-          makeElement("span", "listing-category", listing.category || "Другое"),
-          makeElement("span", "listing-date", formatDate(listing.created_at))
-        );
-        card.append(top);
-        card.append(makeElement("h3", "listing-title", listing.title));
-        card.append(makeElement("p", "listing-description", listing.description));
-
-        var bottom = makeElement("div", "listing-bottom");
-        bottom.append(
-          makeElement("div", "listing-price", listing.price_text || "Цена договорная"),
-          makeElement("div", "listing-owner", "Участник FAM")
-        );
-        card.append(bottom);
-
-        // Кнопка избранного (только для не-мероприятий)
+        var favBtn = '';
         if (currentUser && !listing.is_event) {
           var isFav = favorites.indexOf(listing.id) !== -1;
-          var favBtn = makeElement("button", "favorite-btn" + (isFav ? " active" : ""), isFav ? "❤ В избранном" : "♡ В избранное");
-          favBtn.type = "button";
-          favBtn.addEventListener("click", function () { toggleFavorite(listing.id, favBtn); });
-          card.append(favBtn);
+          favBtn = '<button class="listing-fav-btn '+(isFav ? 'active' : '')+'" data-fav="'+listing.id+'">'+(isFav ? '❤' : '♡')+'</button>';
         }
 
-        // Кнопка «Написать / Записаться»
+        var actionBtn = '';
         if (currentUser && listing.user_id !== currentUser.id) {
-          var isEvent = listing.is_event;
-          var writeBtn = makeElement("button", "button button-secondary", isEvent ? "🙋‍♂️ Записаться" : "✉ Написать продавцу");
-          writeBtn.type = "button";
-          writeBtn.style.marginTop = "8px";
-          writeBtn.style.width = "100%";
-          writeBtn.addEventListener("click", function () {
-            startDialogWith(listing.user_id, "Участник " + listing.user_id.slice(0, 6), listing.title, isEvent);
-          });
-          card.append(writeBtn);
+          var isEv = listing.is_event;
+          actionBtn = '<div class="listing-actions"><button class="button button-secondary" data-write="'+listing.user_id+'" data-title="'+escapeHTML(listing.title)+'" data-event="'+isEv+'">'+(isEv ? 'Записаться' : 'Написать')+'</button></div>';
         }
 
-        // Кнопка скрыть
-        if (currentUser && listing.user_id === currentUser.id) {
-          var hideBtn = makeElement("button", "small-button", "Снять с публикации");
-          hideBtn.type = "button";
-          hideBtn.style.marginTop = "8px";
-          hideBtn.style.width = "100%";
-          hideBtn.addEventListener("click", function () { hideListing(listing.id, hideBtn); });
-          card.append(hideBtn);
-        }
+        card.innerHTML = 
+          '<div class="listing-image-wrap">' +
+            imgBlock +
+            favBtn +
+          '</div>' +
+          '<div class="listing-info">' +
+            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
+            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
+            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
+            actionBtn +
+          '</div>';
 
-        container.append(card);
+        container.appendChild(card);
       });
-    }
 
-    function hideListing(id, button) {
-      if (!currentUser) { openAuthModal(); return; }
-      if (!window.confirm("Снять объявление с публикации?")) return;
-      button.disabled = true;
-
-      supabaseClient.from("listings").update({ status: "hidden" }).eq("id", id).eq("user_id", currentUser.id)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          return loadListings();
-        })
-        .then(function () { showNotice("Объявление снято.", "success"); })
-        .catch(function (error) {
-          console.error("Ошибка снятия:", error);
-          showNotice("Не удалось снять объявление.", "error");
-          button.disabled = false;
-        });
+      // Обработчики для кнопок внутри карточек
+      container.querySelectorAll("[data-fav]").forEach(function(btn) {
+        btn.onclick = function(e) { e.preventDefault(); toggleFavorite(btn.dataset.fav, btn); };
+      });
+      container.querySelectorAll("[data-write]").forEach(function(btn) {
+        btn.onclick = function(e) { 
+           e.preventDefault(); 
+           startDialogWith(btn.dataset.write, "Участник", btn.dataset.title, btn.dataset.event === "true"); 
+        };
+      });
     }
 
     /* ========== ПРОФИЛЬ ========== */
     function ensureProfileRow() {
       if (!currentUser || !supabaseClient) return Promise.resolve();
-      return supabaseClient.from("profiles").upsert(
-        { id: currentUser.id, email: currentUser.email }, 
-        { onConflict: "id", ignoreDuplicates: true }
-      ).then(function (res) {
-          if (res.error) console.error("Ошибка upsert профиля:", res.error);
-      });
+      return supabaseClient.from("profiles").upsert({ id: currentUser.id, email: currentUser.email }, { onConflict: "id", ignoreDuplicates: true });
     }
 
     function loadProfileData() {
@@ -983,415 +836,106 @@
           if (res.error) throw res.error;
           currentProfile = res.data;
           currentAvatarUrl = (res.data && res.data.avatar_url) ? res.data.avatar_url : null;
-        })
-        .catch(function (e) {
-          console.error("Ошибка загрузки профиля:", e);
-          currentProfile = null;
-          currentAvatarUrl = null;
         });
     }
 
     function renderProfile() {
-      var emailEl = $("profileEmail");
-      var metaEl = $("profileMeta");
-      var avatarEl = $("profileAvatar");
-      var imgEl = $("profileAvatarImg");
-      var removeBtn = $("avatarRemove");
-      var listingsCountEl = $("profileListingsCount");
-      var favoritesCountEl = $("profileFavoritesCount");
-      var container = $("profileListings");
-
-      if (!currentUser) {
-        if (emailEl) emailEl.textContent = "Не войден";
-        if (metaEl) metaEl.textContent = "Войди, чтобы увидеть профиль";
-        if (avatarEl) { avatarEl.textContent = "?"; avatarEl.classList.remove("hidden"); }
-        if (imgEl) { imgEl.classList.add("hidden"); imgEl.removeAttribute("src"); }
-        if (removeBtn) removeBtn.classList.add("hidden");
-        if (listingsCountEl) listingsCountEl.textContent = "0";
-        if (favoritesCountEl) favoritesCountEl.textContent = "0";
-        if (container) container.replaceChildren();
-        return;
-      }
-
-      var email = currentUser.email || "—";
-      if (emailEl) emailEl.textContent = email;
-
+      if (!currentUser) return;
+      
+      $("profileEmail").textContent = currentUser.email || "—";
+      
       var schoolName = "Не указана";
       if (currentProfile && currentProfile.school_id && schoolsList.length) {
          var sch = schoolsList.find(function(s) { return s.id === currentProfile.school_id; });
          if (sch) schoolName = sch.name + " (" + sch.city + ")";
       }
+      
+      var roleText = (currentProfile && currentProfile.role === "school_admin") ? " | Медиацентр" : "";
+      $("profileMeta").textContent = schoolName + roleText;
 
       if (currentAvatarUrl) {
-        if (imgEl) { imgEl.src = currentAvatarUrl; imgEl.classList.remove("hidden"); }
-        if (avatarEl) avatarEl.classList.add("hidden");
-        if (removeBtn) removeBtn.classList.remove("hidden");
+        $("profileAvatarImg").src = currentAvatarUrl; $("profileAvatarImg").classList.remove("hidden");
+        $("profileAvatar").classList.add("hidden"); $("avatarRemove").classList.remove("hidden");
       } else {
-        if (imgEl) { imgEl.classList.add("hidden"); imgEl.removeAttribute("src"); }
-        if (avatarEl) { avatarEl.textContent = email.charAt(0).toUpperCase(); avatarEl.classList.remove("hidden"); }
-        if (removeBtn) removeBtn.classList.add("hidden");
+        $("profileAvatarImg").classList.add("hidden"); $("profileAvatar").textContent = (currentUser.email||"?")[0].toUpperCase(); $("profileAvatar").classList.remove("hidden"); $("avatarRemove").classList.add("hidden");
       }
 
-      var roleText = (currentProfile && currentProfile.role === "school_admin") ? " | Медиацентр" : "";
-      if (metaEl) metaEl.textContent = schoolName + roleText;
-
       var myListings = allListings.filter(function (l) { return l.user_id === currentUser.id; });
-      if (listingsCountEl) listingsCountEl.textContent = myListings.length;
-      if (favoritesCountEl) favoritesCountEl.textContent = favorites.length;
+      $("profileListingsCount").textContent = myListings.length;
+      $("profileFavoritesCount").textContent = favorites.length;
 
-      if (!container) return;
+      var container = $("profileListings");
       container.replaceChildren();
-
       if (!myListings.length) {
-        var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML = "<h3>У тебя пока нет объявлений</h3><p>Нажми «Разместить объявление», чтобы создать первое.</p>";
-        container.append(empty);
-        return;
+        container.innerHTML = '<div class="empty-state"><h3>У тебя пока нет объявлений</h3></div>'; return;
       }
 
       myListings.forEach(function (listing) {
-        var card = makeElement("article", "listing-card");
-        if (listing.image_url) {
-           var img = document.createElement("img");
-           img.src = listing.image_url;
-           img.className = "listing-img";
-           card.append(img);
-        }
-        card.innerHTML +=
-          '<div class="listing-top">' +
-            '<span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span>' +
-            '<span class="listing-date">' + formatDate(listing.created_at) + '</span>' +
+        var card = document.createElement("article");
+        card.className = "listing-card";
+        card.innerHTML = 
+          '<div class="listing-image-wrap">' +
+             (listing.image_url ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img">' : '<div class="listing-img-placeholder">📦</div>') +
           '</div>' +
-          '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
-          '<p class="listing-description">' + escapeHTML(listing.description) + '</p>' +
-          '<div class="listing-bottom">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div>' +
-            '<div class="listing-owner">Твоё</div>' +
+          '<div class="listing-info">' +
+            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
+            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
+            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
+            '<button class="small-button" data-hide="'+listing.id+'">Снять с публикации</button>' +
           '</div>';
+        container.appendChild(card);
+      });
 
-        var hideBtn = makeElement("button", "small-button", "Снять с публикации");
-        hideBtn.type = "button";
-        hideBtn.style.marginTop = "10px";
-        hideBtn.style.width = "100%";
-        hideBtn.addEventListener("click", function () {
-          if (!window.confirm("Снять объявление с публикации?")) return;
-          hideBtn.disabled = true;
-          supabaseClient.from("listings").update({ status: "hidden" }).eq("id", listing.id).eq("user_id", currentUser.id)
-            .then(function (res) {
-              if (res.error) throw res.error;
-              showNotice("Объявление снято.", "success");
-              return loadListings();
-            })
-            .then(function () { renderProfile(); })
-            .catch(function (e) {
-              console.error(e);
-              showNotice("Не удалось снять объявление.", "error");
-              hideBtn.disabled = false;
-            });
-        });
-        card.append(hideBtn);
-        container.append(card);
+      container.querySelectorAll("[data-hide]").forEach(function(btn) {
+        btn.onclick = function() {
+          if (!window.confirm("Снять объявление?")) return;
+          supabaseClient.from("listings").update({ status: "hidden" }).eq("id", btn.dataset.hide).eq("user_id", currentUser.id)
+            .then(function(res) { if (res.error) throw res.error; loadListings().then(renderProfile); });
+        };
       });
     }
-
-    function uploadAvatar(file) {
-      if (!currentUser || !supabaseClient) return;
-      if (!file) return;
-      if (file.size > 3 * 1024 * 1024) { showNotice("Файл больше 3 МБ.", "error"); return; }
-      if (["image/jpeg", "image/png", "image/webp"].indexOf(file.type) === -1) { showNotice("Только JPG, PNG, WebP.", "error"); return; }
-
-      var ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      var path = currentUser.id + "/avatar." + ext;
-      showNotice("Загружаем фото...");
-
-      supabaseClient.storage.from("avatars").upload(path, file, { upsert: true, cacheControl: "3600" })
-        .then(function (res) {
-          if (res.error) throw res.error;
-          var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
-          var url = pub.data.publicUrl + "?t=" + Date.now();
-          return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url }, { onConflict: "id" })
-            .then(function (r2) {
-              if (r2.error) throw r2.error;
-              currentAvatarUrl = url;
-              renderProfile();
-              showNotice("Фото загружено!", "success");
-            });
-        })
-        .catch(function (e) {
-          console.error("Ошибка загрузки фото:", e);
-          showNotice("Не удалось загрузить: " + (e.message || "ошибка"), "error");
-        });
-    }
-
-    function removeAvatar() {
-      if (!currentUser || !supabaseClient) return;
-      if (!window.confirm("Удалить фото профиля?")) return;
-
-      supabaseClient.storage.from("avatars").list(currentUser.id)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          var files = res.data || [];
-          if (!files.length) return;
-          var paths = files.map(function (f) { return currentUser.id + "/" + f.name; });
-          return supabaseClient.storage.from("avatars").remove(paths);
-        })
-        .then(function () {
-          return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: null }, { onConflict: "id" });
-        })
-        .then(function () {
-          currentAvatarUrl = null;
-          renderProfile();
-          showNotice("Фото удалено.", "success");
-        })
-        .catch(function (e) {
-          console.error("Ошибка удаления фото:", e);
-          showNotice("Не удалось удалить.", "error");
-        });
-    }
-
-    $("avatarInput").addEventListener("change", function (e) {
-      var file = e.target.files && e.target.files[0];
-      if (file) uploadAvatar(file);
-      e.target.value = "";
-    });
-    $("avatarRemove").addEventListener("click", removeAvatar);
 
     /* ========== ИЗБРАННОЕ ========== */
     function loadFavorites() {
       if (!currentUser || !supabaseClient) { favorites = []; return Promise.resolve(); }
       return supabaseClient.from("favorites").select("listing_id").eq("user_id", currentUser.id)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          favorites = (res.data || []).map(function (f) { return f.listing_id; });
-        })
-        .catch(function (e) {
-          console.error("Ошибка загрузки избранного:", e);
-          favorites = [];
-        });
+        .then(function (res) { favorites = (res.data || []).map(function (f) { return f.listing_id; }); });
     }
 
     function toggleFavorite(listingId, button) {
-      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы сохранять в избранное."); return; }
+      if (!currentUser) { openAuthModal(); return; }
       var isFav = favorites.indexOf(listingId) !== -1;
-
       if (isFav) {
         supabaseClient.from("favorites").delete().eq("user_id", currentUser.id).eq("listing_id", listingId)
-          .then(function (res) {
-            if (res.error) throw res.error;
-            favorites = favorites.filter(function (id) { return id !== listingId; });
-            button.classList.remove("active");
-            button.textContent = "♡ В избранное";
-            showNotice("Убрано из избранного.", "success");
-            renderFavorites(); renderProfile();
-          })
-          .catch(function (e) { console.error(e); showNotice("Не удалось убрать.", "error"); });
+          .then(function (res) { if (res.error) throw res.error; favorites = favorites.filter(function (id) { return id !== listingId; }); renderListings(); renderProfile(); });
       } else {
         supabaseClient.from("favorites").insert({ user_id: currentUser.id, listing_id: listingId })
-          .then(function (res) {
-            if (res.error) throw res.error;
-            favorites.push(listingId);
-            button.classList.add("active");
-            button.textContent = "❤ В избранном";
-            showNotice("Сохранено!", "success");
-            renderFavorites(); renderProfile();
-          })
-          .catch(function (e) { console.error(e); showNotice("Не удалось сохранить.", "error"); });
+          .then(function (res) { if (res.error) throw res.error; favorites.push(listingId); renderListings(); renderProfile(); });
       }
     }
 
     function renderFavorites() {
       var container = $("favoritesList");
-      if (!container) return;
       container.replaceChildren();
-
       var favListings = allListings.filter(function (l) { return favorites.indexOf(l.id) !== -1; });
-      var countEl = $("favoritesCount");
-      if (countEl) countEl.textContent = favListings.length + " " + pluralize(favListings.length);
-
-      if (!favListings.length) {
-        var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML = "<h3>Здесь пока пусто</h3><p>Нажми ♡ на объявлении, чтобы сохранить его.</p>";
-        container.append(empty);
-        return;
-      }
+      $("favoritesCount").textContent = favListings.length + " " + pluralize(favListings.length);
+      if (!favListings.length) { container.innerHTML = '<div class="empty-state"><h3>Здесь пока пусто</h3></div>'; return; }
 
       favListings.forEach(function (listing) {
-        var card = makeElement("article", "listing-card");
-        if (listing.image_url) {
-           var img = document.createElement("img");
-           img.src = listing.image_url; img.className = "listing-img"; card.append(img);
-        }
-        card.innerHTML +=
-          '<div class="listing-top">' +
-            '<span class="listing-category">' + escapeHTML(listing.category || "Другое") + '</span>' +
-            '<span class="listing-date">' + formatDate(listing.created_at) + '</span>' +
+        var card = document.createElement("article");
+        card.className = "listing-card";
+        card.innerHTML = 
+          '<div class="listing-image-wrap">' +
+             (listing.image_url ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img">' : '<div class="listing-img-placeholder">📦</div>') +
           '</div>' +
-          '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
-          '<p class="listing-description">' + escapeHTML(listing.description) + '</p>' +
-          '<div class="listing-bottom">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Цена договорная") + '</div>' +
-            '<div class="listing-owner">Участник FAM</div>' +
+          '<div class="listing-info">' +
+            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
+            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
+            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
           '</div>';
-
-        var favBtn = makeElement("button", "favorite-btn active", "❤ В избранном");
-        favBtn.type = "button";
-        favBtn.addEventListener("click", function () { toggleFavorite(listing.id, favBtn); });
-        card.append(favBtn);
-        container.append(card);
+        container.appendChild(card);
       });
     }
-
-    /* ========== СООБЩЕНИЯ ========== */
-    function startDialogWith(userId, email, listingTitle, isEvent) {
-      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы написать сообщение."); return; }
-      if (userId === currentUser.id) { showNotice("Это твоё собственное объявление.", "error"); return; }
-      
-      currentChatUserId = userId;
-      currentChatEmail = email || "Участник FAM";
-
-      document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
-      var msgTab = document.querySelector('.nav-tab[data-tab="messages"]');
-      if (msgTab) msgTab.classList.add("active");
-
-      $("listingsSection").classList.add("hidden");
-      $("favoritesSection").classList.add("hidden");
-      $("profileSection").classList.add("hidden");
-      $("messagesSection").classList.remove("hidden");
-
-      $("dialogsList").classList.add("hidden");
-      $("chatView").classList.remove("hidden");
-      $("chatWith").textContent = currentChatEmail;
-
-      if (listingTitle) {
-         $("chatInput").placeholder = (isEvent ? "Хочу записаться: " : "Про «") + listingTitle + (isEvent ? "" : "»...");
-         if (isEvent) {
-             $("chatInput").value = "Здравствуйте! Хочу записаться на мероприятие «" + listingTitle + "». Подскажите детали.";
-         }
-      } else {
-         $("chatInput").placeholder = "Написать сообщение...";
-      }
-
-      loadChatMessages();
-      startMessagesPolling();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    function startMessagesPolling() { stopMessagesPolling(); messagesPollTimer = setInterval(loadChatMessages, 4000); }
-    function stopMessagesPolling() { if (messagesPollTimer) { clearInterval(messagesPollTimer); messagesPollTimer = null; } }
-
-    function loadChatMessages() {
-      if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      supabaseClient.from("messages").select("id,sender_id,receiver_id,body,created_at,is_read")
-        .or("and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + "),and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")")
-        .order("created_at", { ascending: true }).limit(200)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          renderChatMessages(res.data || []);
-          markChatAsRead();
-        })
-        .catch(function (e) { console.error("Ошибка загрузки сообщений:", e); });
-    }
-
-    function renderChatMessages(msgs) {
-      var container = $("chatMessages");
-      if (!container) return;
-      container.replaceChildren();
-
-      if (!msgs.length) { container.append(makeElement("div", "chat-empty", "Напиши первое сообщение.")); return; }
-
-      msgs.forEach(function (m) {
-        var isMine = m.sender_id === currentUser.id;
-        var el = makeElement("div", "msg " + (isMine ? "mine" : "theirs"));
-        el.append(document.createTextNode(m.body));
-        el.append(makeElement("span", "msg-time", new Date(m.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })));
-        container.append(el);
-      });
-      container.scrollTop = container.scrollHeight;
-    }
-
-    function markChatAsRead() {
-      if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      supabaseClient.from("messages").update({ is_read: true }).eq("sender_id", currentChatUserId).eq("receiver_id", currentUser.id).eq("is_read", false).then(function () {}).catch(function () {});
-    }
-
-    function sendChatMessage(body) {
-      if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      body = body.trim();
-      if (!body) return;
-
-      supabaseClient.from("messages").insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body })
-        .then(function (res) {
-          if (res.error) throw res.error;
-          $("chatInput").value = "";
-          loadChatMessages();
-        })
-        .catch(function (e) { console.error("Ошибка отправки:", e); showNotice("Не удалось отправить.", "error"); });
-    }
-
-    function loadDialogs() {
-      if (!currentUser || !supabaseClient) return Promise.resolve();
-      return supabaseClient.from("messages").select("id,sender_id,receiver_id,body,created_at,is_read")
-        .or("sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentUser.id)
-        .order("created_at", { ascending: false }).limit(300)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          renderDialogs(res.data || []);
-        })
-        .catch(function (e) { console.error("Ошибка загрузки диалогов:", e); });
-    }
-
-    function renderDialogs(msgs) {
-      var container = $("dialogsList");
-      if (!container) return;
-      container.replaceChildren();
-
-      var dialogs = {};
-      msgs.forEach(function (m) {
-        var other = m.sender_id === currentUser.id ? m.receiver_id : m.sender_id;
-        if (!dialogs[other]) dialogs[other] = { userId: other, last: m, unread: 0 };
-        if (m.receiver_id === currentUser.id && !m.is_read) dialogs[other].unread++;
-      });
-
-      var list = Object.values(dialogs);
-      if (!list.length) {
-        var empty = makeElement("div", "favorites-empty");
-        empty.innerHTML = "<h3>Пока нет сообщений</h3><p>Напиши кому-нибудь на карточке объявления — переписка появится здесь.</p>";
-        container.append(empty);
-        return;
-      }
-
-      list.forEach(function (d) {
-        var item = makeElement("div", "dialog-item");
-        var top = makeElement("div", "dialog-top");
-        top.append(makeElement("div", "dialog-name", "Участник " + d.userId.slice(0, 6)));
-        top.append(makeElement("div", "dialog-date", new Date(d.last.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })));
-        item.append(top);
-
-        var prev = makeElement("div", "dialog-preview", d.last.body);
-        if (d.unread > 0) prev.append(makeElement("span", "dialog-unread", String(d.unread)));
-        item.append(prev);
-
-        item.addEventListener("click", function () {
-          currentChatUserId = d.userId;
-          currentChatEmail = "Участник " + d.userId.slice(0, 6);
-          $("dialogsList").classList.add("hidden");
-          $("chatView").classList.remove("hidden");
-          $("chatWith").textContent = currentChatEmail;
-          $("chatInput").placeholder = "Написать сообщение...";
-          loadChatMessages();
-          startMessagesPolling();
-        });
-        container.append(item);
-      });
-    }
-
-    $("chatBack").addEventListener("click", function () {
-      stopMessagesPolling();
-      $("chatView").classList.add("hidden");
-      $("dialogsList").classList.remove("hidden");
-      loadDialogs();
-    });
-    $("chatForm").addEventListener("submit", function (e) { e.preventDefault(); sendChatMessage($("chatInput").value); });
 
     /* ========== НАВИГАЦИЯ ========== */
     document.querySelectorAll(".nav-tab").forEach(function (tab) {
@@ -1404,299 +948,167 @@
         $("favoritesSection").classList.add("hidden");
         $("profileSection").classList.add("hidden");
         $("messagesSection").classList.add("hidden");
-        stopMessagesPolling();
 
-        if (section === "profile") { $("profileSection").classList.remove("hidden"); renderProfile(); hideNotice(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-        if (section === "favorites") { $("favoritesSection").classList.remove("hidden"); renderFavorites(); hideNotice(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+        if (section === "profile") { $("profileSection").classList.remove("hidden"); renderProfile(); return; }
+        if (section === "favorites") { $("favoritesSection").classList.remove("hidden"); renderFavorites(); return; }
         if (section === "messages") {
-          if (!currentUser) { $("listingsSection").classList.remove("hidden"); openAuthModal(); setFormMessage("authMessage", "Войди, чтобы видеть сообщения."); return; }
-          $("messagesSection").classList.remove("hidden"); $("dialogsList").classList.remove("hidden"); $("chatView").classList.add("hidden"); loadDialogs(); hideNotice(); window.scrollTo({ top: 0, behavior: "smooth" }); return;
+          if (!currentUser) { $("listingsSection").classList.remove("hidden"); openAuthModal(); return; }
+          $("messagesSection").classList.remove("hidden"); $("dialogsList").classList.remove("hidden"); $("chatView").classList.add("hidden"); loadDialogs(); return;
         }
-
         $("listingsSection").classList.remove("hidden");
-        showOnlyMine = false; $("myListingsButton").textContent = "Мои объявления";
-        renderListings(); hideNotice(); window.scrollTo({ top: 0, behavior: "smooth" });
+        renderListings();
       });
     });
 
-    /* ========== АВТОРИЗАЦИЯ (ИСПРАВЛЕНА) ========== */
-    function openAuthModal() {
-      authMode = "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
-      openModal("authModal");
-    }
+    /* ========== АВТОРИЗАЦИЯ И МОДАЛКИ ========== */
+    function openAuthModal() { authMode = "login"; updateAuthMode(); openModal("authModal"); }
 
     function updateAuthMode() {
       var isLogin = authMode === "login";
-      $("authTitle").textContent = isLogin ? "С возвращением!" : "Добро пожаловать!";
-      $("authDescription").textContent = isLogin ? "Войди, чтобы быть среди своих." : "Создай аккаунт и присоединяйся к FAM.";
-      $("authSubmit").textContent = isLogin ? "Войти" : "Создать аккаунт";
+      $("authTitle").textContent = isLogin ? "С возвращением" : "Регистрация";
+      $("authSubmit").textContent = isLogin ? "Войти" : "Зарегистрироваться";
       $("authSwitchText").textContent = isLogin ? "Впервые здесь?" : "Уже есть аккаунт?";
       $("authSwitchButton").textContent = isLogin ? "Создать аккаунт" : "Войти";
-      $("authPassword").autocomplete = isLogin ? "current-password" : "new-password";
       $("schoolGroup").style.display = isLogin ? "none" : "block";
     }
 
-    $("authSwitchButton").addEventListener("click", function () {
-      authMode = authMode === "login" ? "signup" : "login";
-      updateAuthMode();
-      setFormMessage("authMessage", "");
-    });
-
+    $("authSwitchButton").addEventListener("click", function () { authMode = authMode === "login" ? "signup" : "login"; updateAuthMode(); });
     $("authButton").addEventListener("click", function () {
-      if (!supabaseClient) { showNotice("Сервис авторизации недоступен.", "error"); return; }
       if (currentUser) {
-        if (!window.confirm("Выйти из аккаунта?")) return;
-        supabaseClient.auth.signOut().then(function (res) {
-          if (res.error) showNotice("Не удалось выйти.", "error");
-          showOnlyMine = false;
-          $("myListingsButton").textContent = "Мои объявления";
-        });
-        return;
-      }
-      openAuthModal();
+        if (confirm("Выйти из аккаунта?")) supabaseClient.auth.signOut();
+      } else { openAuthModal(); }
     });
 
     $("authForm").addEventListener("submit", function (event) {
       event.preventDefault();
-      if (!supabaseClient) { setFormMessage("authMessage", "Сервис недоступен.", "error"); return; }
-
       var email = $("authEmail").value.trim();
       var password = $("authPassword").value;
       var schoolId = $("authSchool").value;
-      var submitButton = $("authSubmit");
+      var btn = $("authSubmit");
+      
+      if (authMode === "signup" && !schoolId) { setFormMessage("authMessage", "Выбери школу", "error"); return; }
+      
+      btn.disabled = true;
+      var promise = authMode === "signup" ? supabaseClient.auth.signUp({ email: email, password: password }) : supabaseClient.auth.signInWithPassword({ email: email, password: password });
 
-      if (authMode === "signup" && !schoolId) {
-        setFormMessage("authMessage", "Пожалуйста, выбери свою школу.", "error");
-        return;
-      }
-
-      submitButton.disabled = true;
-      setFormMessage("authMessage", "Подожди...");
-
-      var promise = authMode === "signup"
-        ? supabaseClient.auth.signUp({ email: email, password: password })
-        : supabaseClient.auth.signInWithPassword({ email: email, password: password });
-
-      promise
-        .then(function (result) {
-          if (result.error) throw result.error;
-          if (authMode === "signup") {
-            if (!result.data.session) {
-              setFormMessage("authMessage", "Проверь почту для подтверждения.", "success");
-              return;
-            }
-            return supabaseClient.from("profiles").upsert({
-              id: result.data.user.id,
-              email: email,
-              school_id: schoolId
-            }, { onConflict: "id" }).then(function (res) {
-                if (res.error) throw res.error;
-            });
-          }
-        })
-        .then(function () {
-          setFormMessage("authMessage", authMode === "signup" ? "Аккаунт создан!" : "Вход выполнен!", "success");
-          closeModal("authModal");
-        })
-        .catch(function (error) {
-          console.error("Ошибка авторизации:", error);
-          var message = error.message || "Ошибка";
-          if (message.toLowerCase().indexOf("invalid login") !== -1) message = "Неверная почта или пароль.";
-          else if (message.toLowerCase().indexOf("already registered") !== -1) message = "Этот email уже зарегистрирован.";
-          else if (message.toLowerCase().indexOf("password") !== -1) message = "Пароль минимум 6 символов.";
-          setFormMessage("authMessage", message, "error");
-        })
-        .then(function () { submitButton.disabled = false; });
+      promise.then(function (result) {
+        if (result.error) throw result.error;
+        if (authMode === "signup") {
+          if (!result.data.session) { setFormMessage("authMessage", "Проверь почту", "success"); return; }
+          return supabaseClient.from("profiles").upsert({ id: result.data.user.id, email: email, school_id: schoolId }, { onConflict: "id" });
+        }
+      }).then(function () { closeModal("authModal"); })
+      .catch(function (err) { setFormMessage("authMessage", err.message, "error"); })
+      .then(function () { btn.disabled = false; });
     });
 
-    /* ========== СОЗДАНИЕ ОБЪЯВЛЕНИЯ (ИСПРАВЛЕНО) ========== */
     $("listingCategory").addEventListener("change", function() {
-       var isEvent = this.value === "Мероприятия";
-       $("imageGroup").style.display = isEvent ? "block" : "none";
-       $("listingPrice").placeholder = isEvent ? "Сколько человек нужно?" : "Например, 500 ₽ или бесплатно";
+       var isEv = this.value === "Мероприятия";
+       $("imageGroup").style.display = isEv ? "block" : "none";
+       $("listingPrice").placeholder = isEv ? "Кол-во мест" : "Цена (необязательно)";
     });
 
     $("createListingButton").addEventListener("click", function () {
-      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы разместить объявление."); return; }
-      
+      if (!currentUser) { openAuthModal(); return; }
       var isAdmin = currentProfile && currentProfile.role === "school_admin";
       $("eventOption").style.display = isAdmin ? "block" : "none";
-      
       $("listingForm").reset();
       $("imageGroup").style.display = "none";
-      $("listingPrice").placeholder = "Например, 500 ₽ или бесплатно";
-      setFormMessage("listingMessage", "");
       openModal("listingModal");
     });
 
     $("listingForm").addEventListener("submit", function (event) {
       event.preventDefault();
-      if (!currentUser) { closeModal("listingModal"); openAuthModal(); return; }
-
       var title = $("listingTitle").value.trim();
-      var category = $("listingCategory").value;
-      var description = $("listingDescription").value.trim();
-      var priceText = $("listingPrice").value.trim();
-      var isEvent = category === "Мероприятия";
-      var imageFile = $("listingImage").files[0];
-      var submitButton = $("listingSubmit");
-
-      if (!title || !description || !priceText) {
-        setFormMessage("listingMessage", "Заполни все поля.", "error");
-        return;
+      var desc = $("listingDescription").value.trim();
+      var cat = $("listingCategory").value;
+      var price = $("listingPrice").value.trim();
+      var isEv = cat === "Мероприятия";
+      var file = $("listingImage").files[0];
+      var btn = $("listingSubmit");
+      
+      btn.disabled = true;
+      var imgUrl = null;
+      var upload = Promise.resolve();
+      
+      if (file) {
+        var path = currentUser.id + "/" + Date.now() + ".jpg";
+        var bucket = isEv ? "event-images" : "listing-images";
+        upload = supabaseClient.storage.from(bucket).upload(path, file).then(function(res) {
+          if (res.error) throw res.error;
+          imgUrl = supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        });
       }
 
-      if (imageFile) {
-        if (imageFile.size > 5 * 1024 * 1024) { setFormMessage("listingMessage", "Файл больше 5 МБ.", "error"); return; }
-        if (["image/jpeg", "image/png", "image/webp"].indexOf(imageFile.type) === -1) { setFormMessage("listingMessage", "Только JPG, PNG, WebP.", "error"); return; }
-      }
-
-      submitButton.disabled = true;
-      submitButton.textContent = "Публикуем...";
-      setFormMessage("listingMessage", "");
-
-      var imageUrl = null;
-      var uploadPromise = Promise.resolve();
-
-      if (imageFile) {
-         var ext = (imageFile.name.split(".").pop() || "jpg").toLowerCase();
-         var path = currentUser.id + "/" + Date.now() + "." + ext;
-         var bucket = isEvent ? "event-images" : "listing-images";
-         
-         uploadPromise = supabaseClient.storage.from(bucket).upload(path, imageFile)
-            .then(function(res) {
-                if (res.error) throw res.error;
-                var pub = supabaseClient.storage.from(bucket).getPublicUrl(path);
-                imageUrl = pub.data.publicUrl;
-            });
-      }
-
-      uploadPromise.then(function() {
-         return supabaseClient.from("listings").insert({
-            user_id: currentUser.id,
-            title: title,
-            category: category,
-            description: description,
-            price_text: priceText,
-            status: "active",
-            is_event: isEvent,
-            school_id: currentProfile ? currentProfile.school_id : null,
-            image_url: imageUrl
-         });
-      })
-      .then(function (res) {
+      upload.then(function() {
+        return supabaseClient.from("listings").insert({
+          user_id: currentUser.id, title: title, description: desc, category: cat, price_text: price || "Договорная",
+          status: "active", is_event: isEv, school_id: currentProfile ? currentProfile.school_id : null, image_url: imgUrl
+        });
+      }).then(function (res) {
         if (res.error) throw res.error;
         closeModal("listingModal");
-        $("listingForm").reset();
-        showOnlyMine = false;
-        $("myListingsButton").textContent = "Мои объявления";
-        return loadListings();
-      })
-      .then(function () {
-        showNotice(isEvent ? "Мероприятие опубликовано!" : "Объявление опубликовано!", "success");
-        $("listingsSection").scrollIntoView({ behavior: "smooth" });
-      })
-      .catch(function (error) {
-        console.error("Ошибка публикации:", error);
-        setFormMessage("listingMessage", "Не удалось опубликовать: " + (error.message || "ошибка"), "error");
-      })
-      .then(function () {
-        submitButton.disabled = false;
-        submitButton.textContent = "Опубликовать";
-      });
+        loadListings();
+      }).catch(function (err) {
+        setFormMessage("listingMessage", err.message, "error");
+      }).then(function () { btn.disabled = false; });
     });
 
-    /* ========== ПРОЧИЕ КНОПКИ ========== */
-    $("myListingsButton").addEventListener("click", function () {
-      if (!currentUser) { openAuthModal(); setFormMessage("authMessage", "Войди, чтобы посмотреть свои объявления."); return; }
-      showOnlyMine = !showOnlyMine;
-      $("myListingsButton").textContent = showOnlyMine ? "Все объявления" : "Мои объявления";
-      renderListings();
-      $("listingsSection").scrollIntoView({ behavior: "smooth" });
-    });
+    /* ========== ЧАТ (УПРОЩЕННО) ========== */
+    function startDialogWith(userId, email, title, isEv) {
+      currentChatUserId = userId;
+      document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
+      document.querySelector('.nav-tab[data-tab="messages"]').classList.add("active");
+      $("listingsSection").classList.add("hidden"); $("messagesSection").classList.remove("hidden"); $("chatView").classList.remove("hidden"); $("dialogsList").classList.add("hidden");
+      $("chatWith").textContent = "Участник";
+      if (isEv) { $("chatInput").value = "Хочу записаться: " + title; } else { $("chatInput").value = "По поводу: " + title; }
+      loadChatMessages();
+    }
 
-    $("showAllButton").addEventListener("click", function () {
-      showOnlyMine = false;
-      selectedCategory = "Все";
-      $("searchInput").value = "";
-      $("myListingsButton").textContent = "Мои объявления";
-      document.querySelectorAll(".category-button").forEach(function (b) { b.classList.toggle("active", b.dataset.category === "Все"); });
-      renderListings();
-      $("listingsSection").scrollIntoView({ behavior: "smooth" });
-    });
+    function loadChatMessages() {
+      if (!currentUser || !currentChatUserId) return;
+      supabaseClient.from("messages").select("*")
+        .or("and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + "),and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")")
+        .order("created_at").limit(50).then(function(res) {
+          var c = $("chatMessages"); c.innerHTML = "";
+          (res.data||[]).forEach(function(m) {
+             c.innerHTML += '<div class="msg '+(m.sender_id===currentUser.id?'mine':'theirs')+'">'+escapeHTML(m.body)+'</div>';
+          });
+          c.scrollTop = c.scrollHeight;
+        });
+    }
 
-    $("searchInput").addEventListener("input", renderListings);
-    $("schoolFilter").addEventListener("change", renderListings);
-
-    $("categories").addEventListener("click", function (event) {
-      var button = event.target.closest(".category-button");
-      if (!button) return;
-      selectedCategory = button.dataset.category;
-      document.querySelectorAll(".category-button").forEach(function (item) { item.classList.toggle("active", item === button); });
-      renderListings();
-    });
-
-    $("profileSignOut").addEventListener("click", function () {
-      if (!supabaseClient || !currentUser) return;
-      if (!window.confirm("Выйти из аккаунта?")) return;
-
-      supabaseClient.auth.signOut().then(function (res) {
-        if (res.error) { showNotice("Не удалось выйти.", "error"); return; }
-        showNotice("Ты вышел из аккаунта.", "success");
-        showOnlyMine = false;
-        $("myListingsButton").textContent = "Мои объявления";
-        $("profileSection").classList.add("hidden");
-        $("listingsSection").classList.remove("hidden");
-        document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
-        document.querySelector('.nav-tab[data-tab="board"]').classList.add("active");
+    $("chatForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      var body = $("chatInput").value.trim();
+      if (!body) return;
+      supabaseClient.from("messages").insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body }).then(function() {
+        $("chatInput").value = ""; loadChatMessages();
       });
     });
 
     /* ========== СТАРТ ========== */
-    function initializeApp() {
-      if (!window.supabase || !window.supabase.createClient) {
-        var c = $("listings");
-        if (c) c.innerHTML = '<div class="empty-state"><div class="empty-icon">!</div><h3>Не удалось подключиться</h3><p>Обнови страницу.</p></div>';
-        showNotice("Библиотека Supabase не загрузилась.", "error");
-        return;
-      }
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient.auth.getSession().then(function(res) {
+      currentUser = (res.data && res.data.session) ? res.data.session.user : null;
+      return loadSchools();
+    }).then(function() {
+      updateAuthButton();
+      return ensureProfileRow();
+    }).then(function() {
+      return loadProfileData();
+    }).then(function() {
+      return loadFavorites();
+    }).then(function() {
+      return loadListings();
+    }).then(function() {
+      supabaseClient.auth.onAuthStateChange(function(_e, session) {
+        currentUser = session ? session.user : null;
+        updateAuthButton();
+        loadProfileData().then(loadFavorites).then(loadListings);
+      });
+    });
 
-      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-      supabaseClient.auth.getSession()
-        .then(function (res) {
-          currentUser = (res.data && res.data.session) ? res.data.session.user : null;
-        })
-        .catch(function (e) { console.error("Ошибка сессии:", e); currentUser = null; })
-        .then(function () { return loadSchools(); })
-        .then(function () {
-          updateAuthButton();
-          return ensureProfileRow();
-        })
-        .then(function () { return loadProfileData(); })
-        .then(function () { return loadFavorites(); })
-        .then(function () { return loadListings(); })
-        .then(function () {
-          supabaseClient.auth.onAuthStateChange(function (_event, session) {
-            currentUser = session ? session.user : null;
-            updateAuthButton();
-            currentProfile = null;
-            currentAvatarUrl = null;
-            ensureProfileRow()
-              .then(function () { return loadProfileData(); })
-              .then(function () { return loadFavorites(); })
-              .then(function () { loadListings(); });
-          });
-        });
-    }
-
-    var script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-    script.onload = initializeApp;
-    script.onerror = function () { showNotice("Не удалось загрузить сервис.", "error"); };
-    document.head.appendChild(script);
   })();
   </script>
 </body>
