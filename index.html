@@ -354,10 +354,9 @@
         <div><h2 id="authTitle">С возвращением!</h2><p id="authDescription">Войди, чтобы быть среди своих.</p></div>
         <button class="close-button" data-close="authModal">×</button>
       </div>
-      <form id="authForm">
+      <form id="authForm" novalidate>
         <div class="form-group" id="regSchoolGroup" style="display:none">
           <label for="authSchool">Твоя школа</label>
-          <!-- Убрали required, чтобы скрытое поле не блокировало форму -->
           <select id="authSchool"></select>
         </div>
         <div class="form-group">
@@ -789,12 +788,29 @@
 
     $("authForm").onsubmit = function (e) {
       e.preventDefault();
-      var btn = $("authSubmit"); btn.disabled = true; setFormMessage("authMessage", "Подожди...");
+      
+      var btn = $("authSubmit"); 
+      btn.disabled = true; 
+      btn.textContent = "Подожди...";
+      setFormMessage("authMessage", "Подожди...");
+      
       var email = $("authEmail").value.trim();
       var pass = $("authPassword").value;
       var schoolId = $("authSchool").value;
 
-      if (authMode === "signup" && !schoolId) { setFormMessage("authMessage", "Выбери школу", "error"); btn.disabled = false; return; }
+      if (authMode === "signup" && !schoolId) { 
+        setFormMessage("authMessage", "Пожалуйста, выбери школу из списка", "error"); 
+        btn.disabled = false; 
+        btn.textContent = "Создать аккаунт";
+        return; 
+      }
+
+      if (!email || !pass) {
+        setFormMessage("authMessage", "Заполни почту и пароль", "error");
+        btn.disabled = false;
+        btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
+        return;
+      }
 
       var promise = authMode === "signup" 
         ? supabaseClient.auth.signUp({ email: email, password: pass, options: { data: { school_id: schoolId } } }) 
@@ -802,12 +818,14 @@
 
       promise.then(function(res) {
         if (res.error) throw res.error;
+        
         if (authMode === "signup" && !res.data.session) {
-          setFormMessage("authMessage", "Проверь почту для подтверждения.", "success");
+          setFormMessage("authMessage", "Аккаунт создан. Проверь почту для подтверждения.", "success");
           btn.disabled = false;
           btn.textContent = "Создать аккаунт";
           return;
         }
+        
         closeModal("authModal");
         showNotice("Успешно!", "success");
       }).catch(function(e) {
