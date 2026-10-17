@@ -231,7 +231,7 @@
     .listing-category { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
     .listing-school { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: auto; }
 
-    /* Кнопки внутри карточки (для мероприятий или "написать") */
+    /* Кнопки внутри карточки */
     .listing-actions { margin-top: 12px; }
     .listing-actions .button { width: 100%; min-height: 36px; font-size: 12px; border-radius: 10px; }
     .listing-card .small-button { width: 100%; margin-top: 8px; padding: 8px; }
@@ -702,7 +702,7 @@
     }
 
     /* ========== БАННЕРЫ (КАРУСЕЛЬ) ========== */
-        function renderBanners() {
+    function renderBanners() {
       var container = $("bannerCarousel");
       if (!container) return;
       
@@ -743,32 +743,6 @@
       );
 
       container.innerHTML = html.join("");
-    } {
-      var container = $("bannerCarousel");
-      if (!container) return;
-      
-      var eventListings = allListings.filter(function(l) { return l.is_event; }).slice(0, 3);
-      
-      if (eventListings.length === 0) {
-         container.innerHTML = 
-           '<div class="carousel-card" style="background:var(--surface); display:grid; place-items:center;">' +
-             '<div style="text-align:center; color:var(--muted);">' +
-               '<h3 style="color:var(--text); margin-bottom:8px;">FAM</h3>' +
-               '<p>Ближе, чем кажется</p>' +
-             '</div>' +
-           '</div>';
-         return;
-      }
-
-      container.innerHTML = eventListings.map(function(l) {
-        return '<div class="carousel-card">' +
-          (l.image_url ? '<img src="'+escapeHTML(l.image_url)+'" alt="">' : '<div style="width:100%;height:100%;background:#333;"></div>') +
-          '<div class="carousel-overlay">' +
-            '<div class="carousel-title">'+escapeHTML(l.title)+'</div>' +
-            '<div class="carousel-desc">'+escapeHTML(l.price_text || "Мероприятие")+'</div>' +
-          '</div>' +
-        '</div>';
-      }).join("");
     }
 
     /* ========== ЗАГРУЗКА ОБЪЯВЛЕНИЙ ========== */
