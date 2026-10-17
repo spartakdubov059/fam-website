@@ -357,7 +357,8 @@
       <form id="authForm">
         <div class="form-group" id="regSchoolGroup" style="display:none">
           <label for="authSchool">Твоя школа</label>
-          <select id="authSchool" required></select>
+          <!-- Убрали required, чтобы скрытое поле не блокировало форму -->
+          <select id="authSchool"></select>
         </div>
         <div class="form-group">
           <label for="authEmail">Электронная почта</label>
@@ -435,7 +436,7 @@
     var currentProfile = null;
     var allListings = [];
     var favorites = [];
-        var schoolsList = [
+    var schoolsList = [
       { id: "gymnasium_4", name: "Гимназия 4", city: "Пермь" },
       { id: "lyceum_3", name: "3 лицей", city: "Сочи" }
     ];
@@ -704,9 +705,10 @@
       supabaseClient.storage.from("avatars").upload(path, file).then(function(res) {
         if(res.error) throw res.error;
         var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
-        return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: pub.data.publicUrl });
+        var url = pub.data.publicUrl;
+        return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url });
       }).then(function() {
-        currentAvatarUrl = pub.data.publicUrl; renderProfile(); showNotice("Фото обновлено!", "success");
+        currentAvatarUrl = url; renderProfile(); showNotice("Фото обновлено!", "success");
       }).catch(function(e) { showNotice("Ошибка фото: " + e.message, "error"); });
     }
     $("avatarInput").onchange = function(e) { if(e.target.files[0]) uploadAvatar(e.target.files[0]); };
