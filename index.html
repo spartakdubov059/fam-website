@@ -994,27 +994,55 @@
       } else { openAuthModal(); }
     });
 
-    $("authForm").addEventListener("submit", function (event) {
+    $("authForm").addEventListener("submit", async function (event) {
       event.preventDefault();
       var email = $("authEmail").value.trim();
       var password = $("authPassword").value;
       var schoolId = $("authSchool").value;
+      var mode = authMode;
       var btn = $("authSubmit");
       
-      if (authMode === "signup" && !schoolId) { setFormMessage("authMessage", "Выбери школу", "error"); return; }
+      if (mode === "signup" && !schoolId) {
+        setFormMessage("authMessage", "Выбери школу", "error");
+        return;
+      }
       
       btn.disabled = true;
-      var promise = authMode === "signup" ? supabaseClient.auth.signUp({ email: email, password: password }) : supabaseClient.auth.signInWithPassword({ email: email, password: password });
+      setFormMessage("authMessage", "Подожди...", "");
 
-      promise.then(function (result) {
-        if (result.error) throw result.error;
-        if (authMode === "signup") {
-          if (!result.data.session) { setFormMessage("authMessage", "Проверь почту", "success"); return; }
-          return supabaseClient.from("profiles").upsert({ id: result.data.user.id, email: email, school_id: schoolId }, { onConflict: "id" });
+      try {
+        if (mode === "signup") {
+          var result = await supabaseClient.auth.signUp({ 
+            email: email, 
+            password: password,
+            options: { data: { school_id: schoolId } }
+          });
+          if (result.error) throw result.error;
+          
+          if (!result.data.session) {
+            setFormMessage("authMessage", "Регистрация почти завершена. Проверь почту и подтверди адрес.", "success");
+            return; // Не закрываем окно, чтобы человек прочитал
+          }
+          
+          var profileResult = await supabaseClient.from("profiles").upsert({ 
+            id: result.data.user.id, 
+            email: email, 
+            school_id: schoolId 
+          }, { onConflict: "id" });
+          
+          if (profileResult.error) throw profileResult.error;
+          closeModal("authModal");
+          
+        } else {
+          var loginResult = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+          if (loginResult.error) throw loginResult.error;
+          closeModal("authModal");
         }
-      }).then(function () { closeModal("authModal"); })
-      .catch(function (err) { setFormMessage("authMessage", err.message, "error"); })
-      .then(function () { btn.disabled = false; });
+      } catch (err) {
+        setFormMessage("authMessage", err.message || "Ошибка", "error");
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     $("listingCategory").addEventListener("change", function() {
@@ -1097,8 +1125,18 @@
       e.preventDefault();
       var body = $("chatInput").value.trim();
       if (!body) return;
-      supabaseClient.from("messages").insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body }).then(function() {
-        $("chatInput").value = ""; loadChatMessages();
+      
+      supabaseClient.from("messages").insert({ 
+        sender_id: currentUser.id, 
+        receiver_id: currentChatUserId, 
+        body: body 
+      }).then(function(res) {
+        if (res.error) throw res.error;
+        $("chatInput").value = ""; 
+        loadChatMessages();
+      }).catch(function(err) {
+        console.error("Ошибка отправки:", err);
+        alert("Не удалось отправить сообщение. Проверь интернет.");
       });
     });
 
