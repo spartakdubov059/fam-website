@@ -801,13 +801,18 @@
       promise.then(function(res) {
         if (res.error) throw res.error;
         if (authMode === "signup" && !res.data.session) {
-          setFormMessage("authMessage", "Проверь почту.", "success"); return;
+          setFormMessage("authMessage", "Проверь почту для подтверждения.", "success");
+          btn.disabled = false;
+          btn.textContent = "Создать аккаунт";
+          return;
         }
         closeModal("authModal");
         showNotice("Успешно!", "success");
       }).catch(function(e) {
-        setFormMessage("authMessage", e.message, "error");
-      }).then(function() { btn.disabled = false; });
+        setFormMessage("authMessage", "Ошибка: " + e.message, "error");
+        btn.disabled = false;
+        btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
+      });
     };
 
     /* ========== СООБЩЕНИЯ ========== */
