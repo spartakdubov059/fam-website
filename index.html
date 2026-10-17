@@ -956,20 +956,46 @@
     document.querySelectorAll(".nav-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         var section = tab.dataset.tab;
-        document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
+        
+        // 1. Подсвечиваем активную кнопку меню
+        document.querySelectorAll(".nav-tab").forEach(function (item) { 
+          item.classList.remove("active"); 
+        });
         tab.classList.add("active");
 
+        // 2. СКРЫВАЕМ ВСЕ СЕКЦИИ (это то, чего не хватало)
         $("listingsSection").classList.add("hidden");
         $("favoritesSection").classList.add("hidden");
         $("profileSection").classList.add("hidden");
         $("messagesSection").classList.add("hidden");
 
-        if (section === "profile") { $("profileSection").classList.remove("hidden"); renderProfile(); return; }
-        if (section === "favorites") { $("favoritesSection").classList.remove("hidden"); renderFavorites(); return; }
-        if (section === "messages") {
-          if (!currentUser) { $("listingsSection").classList.remove("hidden"); openAuthModal(); return; }
-          $("messagesSection").classList.remove("hidden"); $("dialogsList").classList.remove("hidden"); $("chatView").classList.add("hidden"); loadDialogs(); return;
+        // 3. ПОКАЗЫВАЕМ ТОЛЬКО НУЖНУЮ СЕКЦИЮ
+        if (section === "profile") { 
+           $("profileSection").classList.remove("hidden"); 
+           renderProfile(); 
+           return; 
         }
+        
+        if (section === "favorites") { 
+           $("favoritesSection").classList.remove("hidden"); 
+           renderFavorites(); 
+           return; 
+        }
+        
+        if (section === "messages") {
+          if (!currentUser) { 
+             $("listingsSection").classList.remove("hidden"); 
+             openAuthModal(); 
+             return; 
+          }
+          $("messagesSection").classList.remove("hidden"); 
+          $("dialogsList").classList.remove("hidden"); 
+          $("chatView").classList.add("hidden"); 
+          loadDialogs(); 
+          return;
+        }
+
+        // 4. По умолчанию (Доска)
         $("listingsSection").classList.remove("hidden");
         renderListings();
       });
