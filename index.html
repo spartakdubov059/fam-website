@@ -137,10 +137,6 @@
     .dialogs { display: flex; flex-direction: column; gap: 10px; }
     .dialog-item { padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; transition: .2s; }
     .dialog-item:hover { background: var(--surface-hover); border-color: #4A4D57; }
-    .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
-    .dialog-name { font-weight: 800; font-size: 14px; overflow-wrap: anywhere; }
-    .dialog-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
-    .dialog-preview { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .chat { display: flex; flex-direction: column; min-height: 60vh; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .chat-header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--bg); }
     .chat-with { font-weight: 800; overflow-wrap: anywhere; }
@@ -148,10 +144,8 @@
     .msg { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
     .msg.mine { align-self: flex-end; background: var(--accent); color: #17181C; border-bottom-right-radius: 4px; }
     .msg.theirs { align-self: flex-start; background: #33353D; color: var(--text); border-bottom-left-radius: 4px; }
-    .msg-time { display: block; font-size: 10px; opacity: .7; margin-top: 4px; }
     .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg); }
     .chat-form input { flex: 1; margin-bottom: 0; }
-    .chat-empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 
     /* Модалки */
     .modal { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .72); backdrop-filter: blur(8px); overflow-y: auto; }
@@ -263,10 +257,7 @@
       </div>
     </section>
 
-    <!-- БАННЕРЫ (Мероприятия) -->
-    <div class="banners-scroll hidden" id="bannersContainer">
-      <!-- Сюда рендерятся баннеры -->
-    </div>
+    <div class="banners-scroll hidden" id="bannersContainer"></div>
 
     <!-- Профиль -->
     <section class="section hidden" id="profileSection">
@@ -298,7 +289,7 @@
       </div>
       <h3 class="profile-subheading">Мои объявления</h3>
       <div class="listings" id="profileListings"></div>
-      <button class="button button-secondary profile-signout" id="profileSignOut" style="width:100%;margin-top:22px">Выйти из аккаунта</button>
+      <button class="button button-secondary hidden" id="profileSignOut" style="width:100%;margin-top:22px">Выйти из аккаунта</button>
     </section>
 
     <!-- Избранное -->
@@ -330,7 +321,7 @@
     <!-- Доска -->
     <section class="section" id="listingsSection">
       <div class="section-heading">
-        <h2 id="listingsHeading">Объявления</h2>
+        <h2 id="listingsHeading">Доска объявлений</h2>
         <span class="results-count" id="resultsCount"></span>
       </div>
       <div class="categories" id="categories">
@@ -657,15 +648,25 @@
       return supabaseClient.from("profiles").select("*").eq("id", currentUser.id).maybeSingle().then(function (res) {
         currentProfile = res.data || {};
         currentAvatarUrl = currentProfile.avatar_url || null;
-        if(currentAvatarUrl) $("profileAvatarImg").src = currentAvatarUrl;
       });
     }
 
     function renderProfile() {
-      if (!currentUser) return;
+      if (!currentUser) {
+        $("profileEmail").textContent = "Не войден";
+        $("profileAvatar").textContent = "?";
+        $("profileSignOut").classList.add("hidden");
+        $("profileListings").innerHTML = "";
+        $("profileListingsCount").textContent = "0";
+        $("profileFavoritesCount").textContent = "0";
+        return;
+      }
+      
       $("profileEmail").textContent = currentUser.email;
+      $("profileSignOut").classList.remove("hidden");
       
       if (currentAvatarUrl) {
+        $("profileAvatarImg").src = currentAvatarUrl;
         $("profileAvatarImg").classList.remove("hidden");
         $("profileAvatar").classList.add("hidden");
         $("avatarRemove").classList.remove("hidden");
@@ -683,22 +684,22 @@
       var container = $("profileListings"); container.innerHTML = '';
       myListings.forEach(function(l) {
         var c = makeElement("div", "listing-card");
-        c.innerHTML = '<h3>' + escapeHTML(l.title) + '</h3>';
+        c.innerHTML = '<h3 class="listing-title">' + escapeHTML(l.title) + '</h3>';
         container.append(c);
       });
     }
 
     function uploadAvatar(file) {
+      if (!currentUser) return;
       var ext = file.name.split(".").pop();
       var path = currentUser.id + "/avatar_" + Date.now() + "." + ext;
       showNotice("Загрузка фото...");
       supabaseClient.storage.from("avatars").upload(path, file).then(function(res) {
         if(res.error) throw res.error;
         var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
-        var url = pub.data.publicUrl;
-        return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url });
+        return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: pub.data.publicUrl });
       }).then(function() {
-        currentAvatarUrl = url; renderProfile(); showNotice("Фото обновлено!", "success");
+        currentAvatarUrl = pub.data.publicUrl; renderProfile(); showNotice("Фото обновлено!", "success");
       }).catch(function(e) { showNotice("Ошибка фото: " + e.message, "error"); });
     }
     $("avatarInput").onchange = function(e) { if(e.target.files[0]) uploadAvatar(e.target.files[0]); };
@@ -866,33 +867,60 @@
       btn.classList.add("active"); selectedCategory = btn.dataset.category; renderListings();
     };
 
+    $("authButton").onclick = openAuthModal;
     $("profileSignOut").onclick = function() { supabaseClient.auth.signOut(); };
+    $("avatarRemove").onclick = function() {
+      if(!currentUser) return;
+      supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: null }).then(function() {
+        currentAvatarUrl = null; renderProfile();
+      });
+    };
 
     /* ========== СТАРТ ========== */
     function init() {
       if (!window.supabase) return showNotice("Ошибка сети", "error");
-      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       
-      supabaseClient.auth.onAuthStateChange(function(e, session) {
-        currentUser = session ? session.user : null;
-        updateAuthButton();
-        if(currentUser) {
-          loadProfileData().then(function() { loadFavorites(); loadListings(); });
-        } else {
-          loadListings();
-        }
-      });
-      
+      try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch (e) {
+        return showNotice("Ошибка подключения: " + e.message, "error");
+      }
+
       loadSchools().then(function() {
         return supabaseClient.auth.getSession();
       }).then(function(res) {
-        currentUser = res.data.session ? res.data.session.user : null;
+        currentUser = (res && res.data && res.data.session) ? res.data.session.user : null;
         updateAuthButton();
-        if(currentUser) return loadProfileData();
+        
+        if (currentUser) {
+          return loadProfileData().then(function() {
+            return loadFavorites();
+          });
+        }
       }).then(function() {
-        return loadFavorites();
-      }).then(function() {
-        loadListings();
+        return loadListings();
+      }).catch(function(err) {
+        console.error("Ошибка при запуске сайта:", err);
+      });
+
+      supabaseClient.auth.onAuthStateChange(function(e, session) {
+        currentUser = session ? session.user : null;
+        updateAuthButton();
+        
+        if(currentUser) {
+          loadProfileData().then(function() { 
+            loadFavorites(); 
+            loadListings(); 
+          });
+        } else {
+          if ($("profileSection")) {
+             $("profileSection").classList.add("hidden");
+             $("listingsSection").classList.remove("hidden");
+             document.querySelector('.nav-tab[data-tab="board"]').classList.add("active");
+             document.querySelector('.nav-tab[data-tab="profile"]').classList.remove("active");
+          }
+          loadListings();
+        }
       });
     }
 
