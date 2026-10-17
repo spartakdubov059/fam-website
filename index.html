@@ -702,7 +702,48 @@
     }
 
     /* ========== БАННЕРЫ (КАРУСЕЛЬ) ========== */
-    function renderBanners() {
+        function renderBanners() {
+      var container = $("bannerCarousel");
+      if (!container) return;
+      
+      var eventListings = allListings.filter(function(l) { return l.is_event; }).slice(0, 3);
+      var html = [];
+
+      // 1. Добавляем мероприятия (если они есть)
+      eventListings.forEach(function(l) {
+        html.push(
+          '<div class="carousel-card">' +
+            (l.image_url ? '<img src="'+escapeHTML(l.image_url)+'" alt="">' : '<div style="width:100%;height:100%;background:#333;display:grid;place-items:center;color:#666;">📢</div>') +
+            '<div class="carousel-overlay">' +
+              '<div class="carousel-title">'+escapeHTML(l.title)+'</div>' +
+              '<div class="carousel-desc">'+escapeHTML(l.price_text || "Мероприятие")+'</div>' +
+            '</div>' +
+          '</div>'
+        );
+      });
+
+      // 2. Добавляем промо-баннер «Ближе, чем кажется»
+      html.push(
+        '<div class="carousel-card" style="background: linear-gradient(135deg, #2b2d35, #17181c); display: flex; align-items: center; justify-content: center;">' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 32px; font-weight: 900; letter-spacing: -1px; margin-bottom: 8px;">FAM.</div>' +
+            '<div style="color: var(--muted); font-size: 14px;">Ближе, чем кажется</div>' +
+          '</div>' +
+        '</div>'
+      );
+
+      // 3. Добавляем промо-баннер «Свои рядом»
+      html.push(
+        '<div class="carousel-card" style="background: linear-gradient(135deg, #1e2026, #25272D); display: flex; align-items: center; justify-content: center; border-color: #41434C;">' +
+          '<div style="text-align: center;">' +
+            '<div style="font-size: 24px; font-weight: 800; margin-bottom: 8px;">Свои рядом</div>' +
+            '<div style="color: var(--muted); font-size: 13px;">Объявления твоей школы</div>' +
+          '</div>' +
+        '</div>'
+      );
+
+      container.innerHTML = html.join("");
+    } {
       var container = $("bannerCarousel");
       if (!container) return;
       
