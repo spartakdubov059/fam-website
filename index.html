@@ -477,15 +477,19 @@
         
         var filterSel = $("schoolFilter");
         var authSel = $("authSchool");
-        filterSel.innerHTML = '<option value="all">🏫 Все школы</option>';
-        authSel.innerHTML = '<option value="">Выбери школу</option>';
+        
+        if (filterSel) filterSel.innerHTML = '<option value="all">🏫 Все школы</option>';
+        if (authSel) authSel.innerHTML = '<option value="">Выбери школу</option>';
         
         schoolsList.forEach(function (s) {
-          filterSel.innerHTML += '<option value="' + s.id + '">' + escapeHTML(s.name) + ' (' + escapeHTML(s.city) + ')</option>';
-          authSel.innerHTML += '<option value="' + s.id + '">' + escapeHTML(s.name) + ' (' + escapeHTML(s.city) + ')</option>';
+          var opt1 = '<option value="' + s.id + '">' + escapeHTML(s.name) + ' (' + escapeHTML(s.city) + ')</option>';
+          var opt2 = '<option value="' + s.id + '">' + escapeHTML(s.name) + ' (' + escapeHTML(s.city) + ')</option>';
+          if (filterSel) filterSel.innerHTML += opt1;
+          if (authSel) authSel.innerHTML += opt2;
         });
-        filterSel.value = selectedSchoolFilter;
-      }).catch(function (e) { console.error("Ошибка школ:", e); });
+        
+        if (filterSel) filterSel.value = selectedSchoolFilter;
+      }).catch(function (e) { console.error("Ошибка загрузки школ:", e); });
     }
 
     /* ========== ОБЪЯВЛЕНИЯ ========== */
