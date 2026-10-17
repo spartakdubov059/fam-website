@@ -698,17 +698,49 @@
 
     function uploadAvatar(file) {
       if (!currentUser) return;
-      var ext = file.name.split(".").pop();
+      if (file.size > 5 * 1024 * 1024) {
+        showNotice("Файл больше 5 МБ. Выбери фото поменьше.", "error");
+        return;
+      }
+
+      showNotice("Обработка фото...");
+      var ext = file.name.split(".").pop() || "jpg";
       var path = currentUser.id + "/avatar_" + Date.now() + "." + ext;
-      showNotice("Загрузка фото...");
-      supabaseClient.storage.from("avatars").upload(path, file).then(function(res) {
-        if(res.error) throw res.error;
-        var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
-        var url = pub.data.publicUrl;
-        return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url });
-      }).then(function() {
-        currentAvatarUrl = url; renderProfile(); showNotice("Фото обновлено!", "success");
-      }).catch(function(e) { showNotice("Ошибка фото: " + e.message, "error"); });
+
+      // Сжимаем фото перед загрузкой, чтобы было быстрее
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement("canvas");
+          var MAX_WIDTH = 400; // Уменьшаем размер аватарки
+          var width = img.width;
+          var height = img.height;
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_WIDTH) { width *= MAX_WIDTH / height; height = MAX_WIDTH; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob(function(blob) {
+            showNotice("Загрузка фото...");
+            supabaseClient.storage.from("avatars").upload(path, blob, { contentType: 'image/jpeg' }).then(function(res) {
+              if(res.error) throw res.error;
+              var pub = supabaseClient.storage.from("avatars").getPublicUrl(path);
+              var url = pub.data.publicUrl;
+              return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url });
+            }).then(function() {
+              currentAvatarUrl = url; renderProfile(); showNotice("Фото обновлено!", "success");
+            }).catch(function(err) { showNotice("Ошибка фото: " + err.message, "error"); });
+          }, 'image/jpeg', 0.8); // Сжимаем с качеством 80%
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     }
     $("avatarInput").onchange = function(e) { if(e.target.files[0]) uploadAvatar(e.target.files[0]); };
 
@@ -799,39 +831,43 @@
       var schoolId = $("authSchool").value;
 
       if (authMode === "signup" && !schoolId) { 
-        setFormMessage("authMessage", "Пожалуйста, выбери школу из списка", "error"); 
-        btn.disabled = false; 
-        btn.textContent = "Создать аккаунт";
-        return; 
+        setFormMessage("authMessage", "Выбери школу из списка", "error"); 
+        btn.disabled = false; btn.textContent = "Создать аккаунт"; return; 
       }
-
       if (!email || !pass) {
         setFormMessage("authMessage", "Заполни почту и пароль", "error");
-        btn.disabled = false;
-        btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
-        return;
+        btn.disabled = false; btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт"; return;
       }
+
+      // Защита от вечного зависания (таймаут 10 секунд)
+      var timeoutId = setTimeout(function() {
+        if (btn.disabled) {
+          setFormMessage("authMessage", "Сервер не отвечает. Проверь интернет.", "error");
+          btn.disabled = false; 
+          btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
+        }
+      }, 10000);
 
       var promise = authMode === "signup" 
         ? supabaseClient.auth.signUp({ email: email, password: pass, options: { data: { school_id: schoolId } } }) 
         : supabaseClient.auth.signInWithPassword({ email: email, password: pass });
 
       promise.then(function(res) {
+        clearTimeout(timeoutId);
         if (res.error) throw res.error;
         
         if (authMode === "signup" && !res.data.session) {
-          setFormMessage("authMessage", "Аккаунт создан. Проверь почту для подтверждения.", "success");
-          btn.disabled = false;
-          btn.textContent = "Создать аккаунт";
+          setFormMessage("authMessage", "Аккаунт создан. Проверь почту.", "success");
+          btn.disabled = false; btn.textContent = "Создать аккаунт";
           return;
         }
         
         closeModal("authModal");
         showNotice("Успешно!", "success");
       }).catch(function(e) {
+        clearTimeout(timeoutId);
         setFormMessage("authMessage", "Ошибка: " + e.message, "error");
-        btn.disabled = false;
-        btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
+        btn.disabled = false; btn.textContent = authMode === "login" ? "Войти" : "Создать аккаунт";
       });
     };
 
@@ -913,7 +949,9 @@
       if (!window.supabase) return showNotice("Ошибка сети", "error");
       
       try {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
       } catch (e) {
         return showNotice("Ошибка подключения: " + e.message, "error");
       }
@@ -925,9 +963,7 @@
         updateAuthButton();
         
         if (currentUser) {
-          return loadProfileData().then(function() {
-            return loadFavorites();
-          });
+          return loadProfileData().then(function() { return loadFavorites(); });
         }
       }).then(function() {
         return loadListings();
