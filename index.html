@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#17181C">
   <title>FAM — Свои рядом</title>
   <meta name="description" content="FAM — современная площадка объявлений для своих.">
+  
+  <!-- Библиотека Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
@@ -391,20 +394,55 @@
   </nav>
 
   <main>
-    <section class="hero">
-      <div class="hero-content">
-        <h1>Свои рядом</h1>
-        <p>Объявления, мероприятия и возможности от учеников твоей школы. Находи нужное и делись своим.</p>
-        <label class="search-box">
-          <span class="search-icon">⌕</span>
-          <input id="searchInput" type="search" placeholder="Поиск объявлений..." autocomplete="off">
-        </label>
+    <!-- Доска (Главная) -->
+    <section class="section" id="listingsSection">
+      <div class="hero">
+        <div class="hero-content">
+          <h1>Свои рядом</h1>
+          <p>Объявления, мероприятия и возможности от учеников твоей школы. Находи нужное и делись своим.</p>
+          <label class="search-box">
+            <span class="search-icon">⌕</span>
+            <input id="searchInput" type="search" placeholder="Поиск объявлений..." autocomplete="off">
+          </label>
+        </div>
+        
+        <div class="carousel-wrap">
+          <div class="carousel" id="bannerCarousel">
+            <!-- Баннеры добавляются скриптом -->
+          </div>
+        </div>
+      </div>
+
+      <div class="board-header">
+        <h2 class="board-title">Свежие объявления</h2>
+        <div class="filters-row">
+          <select id="schoolFilter" class="school-filter hidden">
+            <option value="all">Все школы</option>
+            <option value="my">Моя школа</option>
+          </select>
+        </div>
       </div>
       
-      <div class="carousel-wrap">
-        <div class="carousel" id="bannerCarousel">
-          <!-- Баннеры будут добавлены здесь -->
+      <div class="categories" id="categories">
+        <button class="category-button active" data-category="Все">Все</button>
+        <button class="category-button" data-category="Вещи">Вещи</button>
+        <button class="category-button" data-category="Услуги">Услуги</button>
+        <button class="category-button" data-category="Творчество">Творчество</button>
+        <button class="category-button" data-category="Учёба">Учёба</button>
+        <button class="category-button" data-category="Мероприятия">Мероприятия</button>
+      </div>
+      
+      <div id="notice" class="notice hidden" style="margin-bottom:20px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface); text-align:center;"></div>
+      
+      <div class="listings" id="listings">
+        <div class="empty-state">
+          <div class="empty-icon">✳</div>
+          <h3>Загружаем объявления</h3>
         </div>
+      </div>
+      
+      <div style="margin-top:30px; text-align:center;">
+         <button class="button button-primary" id="createListingButton" style="padding: 0 30px;">+ Создать объявление</button>
       </div>
     </section>
 
@@ -464,41 +502,6 @@
           <input id="chatInput" type="text" class="form-control" placeholder="Написать сообщение..." maxlength="1000" autocomplete="off">
           <button class="button button-primary" type="submit">Отправить</button>
         </form>
-      </div>
-    </section>
-
-    <!-- Доска -->
-    <section class="section" id="listingsSection">
-      <div class="board-header">
-        <h2 class="board-title">Свежие объявления</h2>
-        <div class="filters-row">
-          <select id="schoolFilter" class="school-filter" style="display:none;">
-            <option value="all">Все школы</option>
-            <option value="my">Моя школа</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="categories" id="categories">
-        <button class="category-button active" data-category="Все">Все</button>
-        <button class="category-button" data-category="Вещи">Вещи</button>
-        <button class="category-button" data-category="Услуги">Услуги</button>
-        <button class="category-button" data-category="Творчество">Творчество</button>
-        <button class="category-button" data-category="Учёба">Учёба</button>
-        <button class="category-button" data-category="Мероприятия">Мероприятия</button>
-      </div>
-      
-      <div id="notice" class="notice hidden" style="margin-bottom:20px; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface); text-align:center;"></div>
-      
-      <div class="listings" id="listings">
-        <div class="empty-state">
-          <div class="empty-icon">✳</div>
-          <h3>Загружаем объявления</h3>
-        </div>
-      </div>
-      
-      <div style="margin-top:30px; text-align:center;">
-         <button class="button button-primary" id="createListingButton" style="padding: 0 30px;">+ Создать объявление</button>
       </div>
     </section>
   </main>
@@ -640,11 +643,6 @@
       showNotice._t = setTimeout(function () { notice.style.display = "none"; }, 6000);
     }
 
-    function hideNotice() {
-      var notice = $("notice");
-      if (notice) notice.style.display = "none";
-    }
-
     function setFormMessage(id, message, type) {
       var el = $(id);
       if (!el) return;
@@ -683,7 +681,13 @@
     function updateAuthButton() {
       var btn = $("authButton");
       if (btn) btn.textContent = currentUser ? "Мой аккаунт" : "Войти";
-      $("schoolFilter").style.display = currentUser ? "inline-block" : "none";
+      
+      var filter = $("schoolFilter");
+      if (currentUser) {
+         filter.classList.remove("hidden");
+      } else {
+         filter.classList.add("hidden");
+      }
     }
 
     /* ========== ЗАГРУЗКА ШКОЛ ========== */
@@ -964,7 +968,7 @@
         });
         tab.classList.add("active");
 
-        // 2. СКРЫВАЕМ ВСЕ СЕКЦИИ (это то, чего не хватало)
+        // 2. СКРЫВАЕМ ВСЕ СЕКЦИИ
         $("listingsSection").classList.add("hidden");
         $("favoritesSection").classList.add("hidden");
         $("profileSection").classList.add("hidden");
