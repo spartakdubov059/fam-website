@@ -134,11 +134,14 @@
       border: 1px solid var(--border); box-shadow: var(--shadow-sm);
       background-size: cover; background-position: center;
     }
-    .carousel-card img { width: 100%; height: 100%; object-fit: cover; }
-    .carousel-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 22px 20px; background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.4) 60%, transparent 100%); }
-    .carousel-title { font-size: 19px; font-weight: 750; margin-bottom: 4px; letter-spacing: -0.3px; color: white; line-height: 1.15; }
-    .carousel-desc { font-size: 13px; color: #C0C4CE; margin-bottom: 12px; }
-    .carousel-icons { font-size: 16px; letter-spacing: 4px; opacity: 0.9; }
+    
+    /* НОВЫЕ СТИЛИ ДЛЯ КАРТИНОК БАННЕРОВ */
+    .carousel-card img { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
+      display: block;
+    }
 
     .board-header { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 18px; gap: 16px; }
     .board-title { font-size: 22px; font-weight: 800; letter-spacing: -0.6px; margin: 0; }
@@ -675,27 +678,24 @@
       }).catch(function(e) { console.error("Ошибка загрузки школ:", e); });
     }
 
+    // ИЗМЕНЕННАЯ ФУНКЦИЯ ДЛЯ ОТОБРАЖЕНИЯ ТВОИХ КАРТИНОК
     function renderBanners() {
       var container = $("bannerCarousel");
       if (!container) return;
 
       var banners = [
-        { title: "ФАМ ближе<br>к природе", desc: "Походы, новые маршруты, лучшие компании.", gradient: "linear-gradient(135deg, #1a2e1a 0%, #0f1f12 100%)", icons: "🏔 🌲 🔥" },
-        { title: "ФАМ ближе<br>к media", desc: "Школьный медиацентр. Снимаем, пишем, создаём.", gradient: "linear-gradient(135deg, #1e1b2e 0%, #12101c 100%)", icons: "📷 🎬 ✏" },
-        { title: "ФАМ ближе<br>к знаниям", desc: "Учёба, проекты, развитие, которое вдохновляет.", gradient: "linear-gradient(135deg, #1c2433 0%, #111827 100%)", icons: "🎓 💡 👥" },
-        { title: "ФАМ ближе<br>к творчеству", desc: "Идеи, проекты, люди, которые вдохновляют.", gradient: "linear-gradient(135deg, #2a1f2e 0%, #1a121c 100%)", icons: "🎨 🎵 ✦" },
-        { title: "ФАМ ближе,<br>чем кажется", desc: "Это не просто сообщество. Это — мы.", gradient: "linear-gradient(135deg, #2a2118 0%, #1a150f 100%)", icons: "❤ 👥 ★" },
-        { title: "ФАМ ближе<br>к событиям", desc: "Концерты, квизы, встречи, мероприятия. Всегда рядом.", gradient: "linear-gradient(135deg, #1a2333 0%, #0f172a 100%)", icons: "📅 ★ 👥" }
+        "banner-1.png", // ФАМ ближе, чем кажется
+        "banner-2.png", // ФАМ ближе к событиям
+        "banner-3.png", // ФАМ ближе к творчеству
+        "banner-4.png", // ФАМ ближе к знаниям
+        "banner-5.png", // ФАМ ближе к медиа
+        "banner-6.png"  // ФАМ ближе к природе
       ];
 
-      var html = banners.map(function(b) {
+      var html = banners.map(function(src) {
         return (
-          '<div class="carousel-card" style="background: ' + b.gradient + ';">' +
-            '<div class="carousel-overlay" style="background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 70%); height: 100%; display: flex; flex-direction: column; justify-content: flex-end;">' +
-              '<div class="carousel-title" style="color: white; font-size: 22px; line-height: 1.15; margin-bottom: 8px;">' + b.title + '</div>' +
-              '<div class="carousel-desc" style="color: #d1d5db; font-size: 13px; margin-bottom: 12px;">' + b.desc + '</div>' +
-              '<div style="font-size: 16px; letter-spacing: 4px; opacity: 0.9;">' + b.icons + '</div>' +
-            '</div>' +
+          '<div class="carousel-card">' +
+            '<img src="' + src + '" alt="FAM Баннер">' +
           '</div>'
         );
       }).join("");
