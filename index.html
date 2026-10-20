@@ -126,7 +126,7 @@
     .search-icon { color: var(--muted); font-size: 16px; }
 
     .carousel-wrap { flex: 1; max-width: 560px; position: relative; }
-    .carousel { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    .carousel { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .carousel::-webkit-scrollbar { display: none; }
     .carousel-card {
       flex: 0 0 82%; scroll-snap-align: start; position: relative;
@@ -135,7 +135,6 @@
       background-size: cover; background-position: center;
     }
     
-    /* НОВЫЕ СТИЛИ ДЛЯ КАРТИНОК БАННЕРОВ */
     .carousel-card img { 
       width: 100%; 
       height: 100%; 
@@ -678,18 +677,17 @@
       }).catch(function(e) { console.error("Ошибка загрузки школ:", e); });
     }
 
-    // ИЗМЕНЕННАЯ ФУНКЦИЯ ДЛЯ ОТОБРАЖЕНИЯ ТВОИХ КАРТИНОК
     function renderBanners() {
       var container = $("bannerCarousel");
       if (!container) return;
 
       var banners = [
-        "banner-1.png", // ФАМ ближе, чем кажется
-        "banner-2.png", // ФАМ ближе к событиям
-        "banner-3.png", // ФАМ ближе к творчеству
-        "banner-4.png", // ФАМ ближе к знаниям
-        "banner-5.png", // ФАМ ближе к медиа
-        "banner-6.png"  // ФАМ ближе к природе
+        "banner-1.png", 
+        "banner-2.png", 
+        "banner-3.png", 
+        "banner-4.png", 
+        "banner-5.png", 
+        "banner-6.png"  
       ];
 
       var html = banners.map(function(src) {
@@ -709,16 +707,18 @@
       if (!carousel) return;
       if (carouselTimer) clearInterval(carouselTimer);
 
+      // ИЗМЕНЕНИЕ: Увеличили интервал с 4000 (4 сек) до 6500 (6.5 сек)
       carouselTimer = setInterval(function() {
         if (carousel.matches(":hover")) return;
         var cardWidth = carousel.querySelector(".carousel-card") ? carousel.querySelector(".carousel-card").offsetWidth : 300;
         var maxScroll = carousel.scrollWidth - carousel.clientWidth;
+        
         if (carousel.scrollLeft >= maxScroll - 10) {
           carousel.scrollTo({ left: 0, behavior: "smooth" });
         } else {
           carousel.scrollBy({ left: cardWidth + 14, behavior: "smooth" });
         }
-      }, 4000);
+      }, 6500);
     }
 
     function loadListings() {
