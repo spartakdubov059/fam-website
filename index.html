@@ -610,7 +610,8 @@
     var currentProfile = null;
     var allListings = [];
     var favorites = [];
-    var eventRegistrations = [];
+    var eventRegistrations = []; // Приватные заявки (мои + для админа)
+    var eventOccupancy = [];     // Публичный счетчик (безопасный)
     var selectedCategory = "Все";
     var showOnlyMine = false;
     var authMode = "login";
@@ -720,12 +721,27 @@
       }).catch(function(e) { console.error("Ошибка загрузки школ:", e); });
     }
 
+    // ЗАГРУЗКА СЧЕТЧИКОВ (Безопасно)
     function loadEventRegistrations() {
       if (!supabaseClient) return Promise.resolve();
-      return supabaseClient.from("event_registrations").select("*").then(function(res) {
-        if (res.error) { console.error("Не удалось загрузить заявки. Возможно, таблица не создана."); return; }
-        eventRegistrations = res.data || [];
-      }).catch(function() {});
+      
+      // 1. Грузим СВОИ заявки (и заявки на наши мероприятия, если мы админ)
+      var fetchPrivate = supabaseClient.from("event_registrations").select("*").then(function(res) {
+        if (!res.error) eventRegistrations = res.data || [];
+      }).catch(function(e){ console.error("Ошибка приватных заявок:", e); });
+
+      // 2. Грузим БЕЗОПАСНЫЙ СЧЕТЧИК (View)
+      var fetchPublic = supabaseClient.from("event_occupancy").select("*").then(function(res) {
+        if (!res.error) eventOccupancy = res.data || [];
+      }).catch(function(e){ console.error("Ошибка публичного счетчика:", e); });
+
+      return Promise.all([fetchPrivate, fetchPublic]);
+    }
+
+    // Функция для получения количества занятых мест из безопасного View
+    function getTakenSeats(eventId) {
+      var oc = eventOccupancy.find(function(o) { return o.event_id === eventId; });
+      return oc ? parseInt(oc.taken) : 0;
     }
 
     function renderBanners() {
@@ -755,9 +771,7 @@
         });
         
         if (schoolEvent) {
-          var taken = eventRegistrations.filter(function(r) { 
-            return r.event_id === schoolEvent.id && (r.status === 'pending' || r.status === 'confirmed'); 
-          }).length;
+          var taken = getTakenSeats(schoolEvent.id);
           var max = schoolEvent.max_seats || 0;
           var seatsText = max > 0 ? 'Свободно: ' + Math.max(0, max - taken) + ' из ' + max : 'Без ограничений';
           var isFull = max > 0 && taken >= max;
@@ -778,7 +792,6 @@
 
       container.innerHTML = html.join("");
       
-      // Навешиваем обработчики на кнопки в баннерах
       container.querySelectorAll(".carousel-event-btn").forEach(function(btn) {
         if (!btn.disabled) {
            btn.onclick = function() {
@@ -870,9 +883,7 @@
         var isEv = listing.is_event;
         
         if (isEv) {
-          var taken = eventRegistrations.filter(function(r) { 
-            return r.event_id === listing.id && (r.status === 'pending' || r.status === 'confirmed'); 
-          }).length;
+          var taken = getTakenSeats(listing.id); // <--- БЕЗОПАСНЫЙ СЧЕТЧИК
           var max = listing.max_seats || 0;
           var left = max > 0 ? Math.max(0, max - taken) : "∞";
           var fullClass = (max > 0 && left === 0) ? " full" : "";
@@ -884,9 +895,7 @@
           var btnText = isEv ? 'Записаться' : 'Написать';
           var disabled = '';
           if (isEv) {
-             var takenCheck = eventRegistrations.filter(function(r) { 
-               return r.event_id === listing.id && (r.status === 'pending' || r.status === 'confirmed'); 
-             }).length;
+             var takenCheck = getTakenSeats(listing.id); // <--- БЕЗОПАСНЫЙ СЧЕТЧИК
              if (listing.max_seats > 0 && takenCheck >= listing.max_seats) {
                 btnText = 'Мест нет';
                 disabled = 'disabled style="opacity:0.5; cursor:not-allowed;"';
@@ -1278,11 +1287,14 @@
          if (already) {
              showNotice("Вы уже оставили заявку на это мероприятие", "error");
          } else {
-             // Создаем заявку
+             // Создаем заявку (RLS проверит auth.uid() = user_id)
              supabaseClient.from("event_registrations").insert({ event_id: eventId, user_id: currentUser.id, status: 'pending' })
                 .then(function(res) {
                     if (res.error) { console.error(res.error); return; }
-                    loadEventRegistrations();
+                    loadEventRegistrations().then(function() {
+                        renderListings();
+                        renderBanners();
+                    });
                 });
          }
       }
