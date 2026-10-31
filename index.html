@@ -346,7 +346,8 @@
       let img = l.image_url ? `<img src="${l.image_url}" class="card-img" loading="lazy">` : `<div class="card-img" style="display:grid; place-items:center; font-size:30px; background:var(--surface);">📦</div>`;
       let btn = '';
       
-      if (user && l.user_id !== user.id) {
+      // ИСПРАВЛЕНО: добавлена проверка l.user_id
+      if (user && l.user_id && l.user_id !== user.id) {
         if (l.is_event) {
           let isPast = l.event_date && new Date(l.event_date) < new Date(new Date().toDateString());
           if (isPast) btn = `<button class="button button-secondary card-btn" onclick="openFeedback('${l.id}')">Отзыв</button>`;
@@ -377,8 +378,12 @@
     }).join("") : `<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:40px;">Ничего не найдено</p>`;
   }
 
+  // ИСПРАВЛЕНО: защита от невалидного ID
   window.startChat = (userId, title) => {
     if (!user) return openModal('authModal');
+    if (!userId || userId === 'null' || userId === 'undefined' || userId.length < 30) {
+        return notice('Ошибка: у этого объявления нет автора (неверный ID).');
+    }
     curChat = userId;
     $("chatWith").textContent = "Чат: " + title;
     $("dialogsList").classList.add("hidden");
@@ -396,22 +401,37 @@
     curChat = null;
   };
 
+  // ИСПРАВЛЕНО: try/catch и логирование ошибок
   async function loadChatMessages(otherId) {
+    if (!user || !otherId) return;
+    
     let c = $("chatMessages");
     if (!c.innerHTML || c.innerHTML.includes('Загрузка')) c.innerHTML = '<p style="color:var(--muted); font-size:12px; text-align:center;">Загрузка...</p>';
     
-    let res = await sb.from("messages").select("*").or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`).order("created_at", { ascending: false }).limit(50);
-    
-    if (res.error) { c.innerHTML = '<p style="color:var(--danger);">Ошибка загрузки</p>'; return; }
-    
-    let msgs = res.data.reverse();
-
-    c.innerHTML = msgs.length ? msgs.map(m => {
-      let isMine = m.sender_id === user.id;
-      return `<div style="align-self:${isMine?'flex-end':'flex-start'}; background:${isMine?'var(--accent)':'var(--surface)'}; color:${isMine?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px;">${esc(m.text)}</div>`;
-    }).join("") : '<p style="color:var(--muted); text-align:center; font-size:13px; padding:20px;">Нет сообщений. Напишите первым!</p>';
-    
-    c.scrollTop = c.scrollHeight;
+    try {
+        let res = await sb.from("messages")
+            .select("*")
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        
+        if (res.error) {
+            console.error("Ошибка Supabase:", res.error);
+            c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка загрузки чата (${res.error.message})</p>`;
+            return;
+        }
+        
+        let msgs = res.data.reverse();
+        c.innerHTML = msgs.length ? msgs.map(m => {
+            let isMine = m.sender_id === user.id;
+            return `<div style="align-self:${isMine?'flex-end':'flex-start'}; background:${isMine?'var(--accent)':'var(--surface)'}; color:${isMine?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px;">${esc(m.text)}</div>`;
+        }).join("") : '<p style="color:var(--muted); text-align:center; font-size:13px; padding:20px;">Нет сообщений. Напишите первым!</p>';
+        
+        c.scrollTop = c.scrollHeight;
+    } catch (e) {
+        console.error("Сетевая ошибка:", e);
+        c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка сети. Проверьте подключение.</p>';
+    }
   }
 
   $("chatForm").onsubmit = async (e) => {
@@ -422,7 +442,6 @@
     $("chatInput").value = "";
     let c = $("chatMessages");
     
-    // ИСПРАВЛЕНО: очищаем и "Загрузку", и "Нет сообщений"
     if (c.innerHTML.includes('Нет сообщений') || c.innerHTML.includes('Загрузка')) {
       c.innerHTML = '';
     }
@@ -646,7 +665,6 @@
     const file = $("lImage").files[0];
     if (file) {
       const compressedFile = await compressImage(file);
-      // ИСПРАВЛЕНО: принудительно ставим .jpg
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`; 
       
       const { error: uploadError } = await sb.storage.from('listings-images').upload(fileName, compressedFile);
