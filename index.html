@@ -11,27 +11,31 @@
       --accent: #D4D8E3; --accent-hover: #F0F3FA; --text: #F5F6F8;
       --muted: #7A7E8A; --border: #2A2D36; --danger: #FF6B6B; --success: #6BCB9B;
       --gradient: linear-gradient(135deg, #C8CDD8 0%, #8B8F9A 50%, #C8CDD8 100%);
+      --gradient-brand: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
     .hidden { display: none !important; }
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     
-    /* HEADER ANIMATIONS */
-    .header { position: sticky; top: 0; z-index: 10; background: rgba(15,16,20,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); animation: slideDown 0.5s ease; }
+    .header { position: sticky; top: 0; z-index: 10; background: rgba(15,16,20,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); animation: slideDown 0.5s ease; }
     @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .header-inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
     .logo { display: flex; gap: 10px; align-items: center; color: var(--text); text-decoration: none; }
-    .logo-mark { width: 36px; height: 36px; background: var(--gradient); color: var(--bg); border-radius: 10px; display: grid; place-items: center; font-weight: 900; font-size: 16px; animation: pulse 3s infinite; }
-    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(200,205,216,0.4); } 50% { box-shadow: 0 0 0 10px rgba(200,205,216,0); } }
+    .logo-mark { width: 40px; height: 40px; background: var(--gradient); color: var(--bg); border-radius: 12px; display: grid; place-items: center; font-weight: 900; font-size: 18px; animation: logoPulse 3s infinite; }
+    @keyframes logoPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(200,205,216,0.4); } 50% { box-shadow: 0 0 0 12px rgba(200,205,216,0); } }
+    .logo-text { display: flex; flex-direction: column; line-height: 1.2; }
+    .logo-title { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; }
+    .logo-slogan { font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; background: linear-gradient(90deg, var(--muted), var(--accent), var(--muted)); background-size: 200% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: sloganShimmer 3s infinite; }
+    @keyframes sloganShimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    
     .header-actions { display: flex; gap: 8px; align-items: center; }
-    .header-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: white; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; transition: all 0.3s; }
+    .header-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--gradient-brand); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: white; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; transition: all 0.3s; }
     .header-avatar:hover { transform: scale(1.1) rotate(5deg); border-color: rgba(255,255,255,0.3); }
     .header-avatar img { width: 100%; height: 100%; object-fit: cover; }
     
-    /* NAV ANIMATIONS */
-    .main-nav { position: sticky; top: 60px; z-index: 9; background: rgba(15,16,20,0.85); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.04); animation: slideDown 0.5s ease 0.1s backwards; }
+    .main-nav { position: sticky; top: 64px; z-index: 9; background: rgba(15,16,20,0.85); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.04); animation: slideDown 0.5s ease 0.1s backwards; }
     .nav-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
     .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 4px; border-radius: 8px; font-weight: 600; font-size: 12px; text-align: center; white-space: nowrap; position: relative; overflow: hidden; transition: all 0.3s; }
     .nav-tab::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); transition: left 0.5s; }
@@ -41,7 +45,6 @@
     .nav-tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 20px; height: 2px; background: var(--gradient); border-radius: 2px; animation: expandWidth 0.3s ease; }
     @keyframes expandWidth { from { width: 0; } to { width: 20px; } }
     
-    /* BUTTON ANIMATIONS */
     .button { padding: 10px 16px; border-radius: 10px; border: none; font-weight: 700; font-size: 13px; position: relative; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     .button::before { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(255,255,255,0.3); transform: translate(-50%, -50%); transition: width 0.6s, height 0.6s; }
     .button:active::before { width: 300px; height: 300px; }
@@ -56,9 +59,8 @@
     .button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
     .button-small { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
     
-    main { max-width: 1100px; margin: 0 auto; padding: 16px 12px 80px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px 12px 80px; flex: 1; width: 100%; }
     
-    /* CAROUSEL ANIMATIONS */
     .carousel-container { position: relative; margin: 10px 0 20px; animation: fadeIn 0.6s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .carousel { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; padding-bottom: 8px; }
@@ -69,15 +71,12 @@
     .carousel-card:hover img { transform: scale(1.05); }
     .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 100%); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
     
-    /* LISTINGS ANIMATIONS */
     .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
     .card { display: flex; flex-direction: column; position: relative; animation: fadeInUp 0.5s ease backwards; }
     .card:nth-child(1) { animation-delay: 0.05s; }
     .card:nth-child(2) { animation-delay: 0.1s; }
     .card:nth-child(3) { animation-delay: 0.15s; }
     .card:nth-child(4) { animation-delay: 0.2s; }
-    .card:nth-child(5) { animation-delay: 0.25s; }
-    .card:nth-child(6) { animation-delay: 0.3s; }
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
     .card-img-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
     .card:hover .card-img-wrap { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
@@ -97,10 +96,23 @@
     .favorite-btn.active { color: #FF6B6B; animation: heartBeat 0.5s; }
     @keyframes heartBeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.3); } 50% { transform: scale(1); } 75% { transform: scale(1.3); } }
     
-    /* PROFILE ANIMATIONS */
     .profile-box { background: var(--surface); padding: 16px; border-radius: 16px; margin-bottom: 16px; border: 1px solid var(--border); animation: fadeIn 0.5s ease; transition: all 0.3s; }
     .profile-box:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
     .profile-email { word-break: break-all; font-size: 13px; margin: 0 0 4px; }
+    
+    /* ПАПКИ ИДЕЙ С АНИМАЦИЕЙ */
+    .idea-folders { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; animation: slideInFolders 0.6s ease; }
+    .idea-folders::-webkit-scrollbar { display: none; }
+    @keyframes slideInFolders { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .idea-folder { flex: 0 0 auto; padding: 8px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; position: relative; overflow: hidden; }
+    .idea-folder::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); transition: left 0.5s; }
+    .idea-folder:hover::before { left: 100%; }
+    .idea-folder:hover { border-color: rgba(255,255,255,0.2); color: var(--text); transform: translateY(-2px); }
+    .idea-folder.active { background: var(--gradient-brand); color: white; border-color: transparent; box-shadow: 0 4px 12px rgba(102,126,234,0.3); animation: folderActive 0.4s ease; }
+    @keyframes folderActive { 0% { transform: scale(0.95); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    .idea-folder .folder-count { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 8px; background: rgba(255,255,255,0.15); font-size: 10px; font-weight: 700; transition: all 0.3s; }
+    .idea-folder.active .folder-count { background: rgba(255,255,255,0.25); animation: countPulse 2s infinite; }
+    @keyframes countPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
     
     .idea-card { background: var(--bg); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.3s; animation: slideInLeft 0.4s ease; }
     @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
@@ -109,9 +121,8 @@
     .status-done { background: rgba(107,203,155,0.15); color: var(--success); }
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
     .status-work { background: rgba(240,193,75,0.15); color: #F0C14B; }
-    .status-new { background: rgba(200,205,216,0.15); color: var(--accent); }
+    .status-new { background: rgba(79,172,254,0.15); color: #4facfe; }
     
-    /* MODAL ANIMATIONS */
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; animation: fadeIn 0.3s; }
     .modal.open { display: flex; }
     .modal-content { background: var(--surface); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
@@ -126,30 +137,25 @@
     .form-control { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; transition: all 0.3s; }
     .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,205,216,0.1); transform: translateY(-1px); }
     
-    /* STARS ANIMATION */
     .stars { display: flex; gap: 6px; font-size: 24px; cursor: pointer; }
     .star { color: var(--muted); transition: all 0.3s; }
     .star:hover { transform: scale(1.3) rotate(15deg); color: #F0C14B; }
     .star.active { color: #F0C14B; animation: starPop 0.4s; }
     @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
     
-    /* AI HINTS ANIMATION */
     .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 8px; border: 1px solid rgba(102,126,234,0.2); background: rgba(102,126,234,0.05); line-height: 1.4; animation: fadeIn 0.5s; }
     .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: underline; transition: all 0.2s; }
     .ai-hint a:hover { color: var(--accent-hover); text-decoration: none; }
     
-    /* AVATAR ANIMATION */
     .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; animation: fadeIn 0.5s; }
-    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; transition: all 0.3s; animation: pulse 3s infinite; }
+    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-brand); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; transition: all 0.3s; animation: logoPulse 3s infinite; }
     .avatar-preview:hover { transform: scale(1.1); }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
     
-    /* EMPTY STATE ANIMATION */
     .empty-state { text-align: center; padding: 40px 16px; color: var(--muted); animation: fadeIn 0.6s; }
     .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); display: grid; place-items: center; position: relative; }
-    .empty-icon::before { content: ''; position: absolute; inset: 30%; background: var(--gradient); border-radius: 50%; opacity: 0.4; filter: blur(10px); animation: pulse 3s infinite; }
+    .empty-icon::before { content: ''; position: absolute; inset: 30%; background: var(--gradient); border-radius: 50%; opacity: 0.4; filter: blur(10px); animation: logoPulse 3s infinite; }
     
-    /* AI THINKING ANIMATION */
     .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(240,147,251,0.1)); border-radius: 10px; border: 1px solid rgba(102,126,234,0.3); font-size: 12px; font-weight: 600; position: relative; overflow: hidden; margin-bottom: 10px; animation: fadeIn 0.3s; }
     .ai-thinking::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); animation: shimmer 2s infinite; }
     @keyframes shimmer { to { left: 100%; } }
@@ -161,23 +167,28 @@
     .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
     
-    /* ADMIN SECTIONS */
     .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
     .admin-section-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
     
-    /* FAB ANIMATION */
-    .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(200,205,216,0.4); border: none; z-index: 20; font-weight: 900; animation: fabPulse 2s infinite; cursor: pointer; transition: all 0.3s; }
-    @keyframes fabPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(200,205,216,0.4); } 50% { box-shadow: 0 8px 32px rgba(200,205,216,0.6); } }
-    .fab:hover { transform: scale(1.15) rotate(90deg); box-shadow: 0 12px 32px rgba(200,205,216,0.5); }
+    .fab { position: fixed; bottom: 80px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-brand); color: white; font-size: 28px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(102,126,234,0.4); border: none; z-index: 20; font-weight: 900; animation: fabPulse 2s infinite; cursor: pointer; transition: all 0.3s; }
+    @keyframes fabPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(102,126,234,0.4); } 50% { box-shadow: 0 8px 32px rgba(102,126,234,0.7); } }
+    .fab:hover { transform: scale(1.15) rotate(90deg); box-shadow: 0 12px 32px rgba(102,126,234,0.6); }
     @media(min-width: 800px) { .fab { display: none; } }
     
-    /* SCROLLBAR */
+    .footer { background: var(--surface); border-top: 1px solid var(--border); padding: 20px 16px; text-align: center; margin-top: auto; animation: fadeIn 0.8s ease; }
+    .footer-text { font-size: 12px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; font-weight: 600; position: relative; display: inline-block; }
+    .footer-text::before, .footer-text::after { content: ''; position: absolute; top: 50%; width: 40px; height: 1px; background: var(--gradient-brand); }
+    .footer-text::before { right: 100%; margin-right: 12px; }
+    .footer-text::after { left: 100%; margin-left: 12px; }
+    .footer-brand { background: var(--gradient-brand); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; background-size: 200% 100%; animation: brandShimmer 3s infinite; }
+    @keyframes brandShimmer { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .footer-sub { font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 1px; opacity: 0.7; }
+    
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; transition: background 0.3s; }
     ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     
-    /* SECTION TRANSITIONS */
     main > section { animation: fadeIn 0.5s ease; }
   </style>
 </head>
@@ -185,7 +196,13 @@
 
 <header class="header">
   <div class="header-inner">
-    <a href="#" class="logo" onclick="document.querySelector('[data-tab=board]').click(); return false;"><div class="logo-mark">F</div><div><b style="font-size:14px;">FAM</b></div></a>
+    <a href="#" class="logo" onclick="document.querySelector('[data-tab=board]').click(); return false;">
+      <div class="logo-mark">F</div>
+      <div class="logo-text">
+        <span class="logo-title">FAM</span>
+        <span class="logo-slogan">Свои рядом</span>
+      </div>
+    </a>
     <div class="header-actions">
       <button class="button button-secondary button-small hidden" id="myListingsBtn">Мои</button>
       <button class="button button-primary button-small" id="authBtn">Войти</button>
@@ -279,25 +296,22 @@
         <div id="adminIdeasDash" class="hidden" style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
           <h4 style="margin:0 0 12px; font-size:13px; color:var(--accent); font-weight:800;">Панель Ученического Совета</h4>
           
-          <div class="admin-section">
-            <div class="admin-section-title">Новые идеи</div>
-            <div id="adminIdeasNew"></div>
+          <div class="idea-folders">
+            <div class="idea-folder active" data-folder="new" onclick="switchIdeaFolder('new')">
+              Новые <span class="folder-count" id="countNew">0</span>
+            </div>
+            <div class="idea-folder" data-folder="work" onclick="switchIdeaFolder('work')">
+              В работе <span class="folder-count" id="countWork">0</span>
+            </div>
+            <div class="idea-folder" data-folder="done" onclick="switchIdeaFolder('done')">
+              Выполнено <span class="folder-count" id="countDone">0</span>
+            </div>
+            <div class="idea-folder" data-folder="rejected" onclick="switchIdeaFolder('rejected')">
+              Отклонено <span class="folder-count" id="countRejected">0</span>
+            </div>
           </div>
           
-          <div class="admin-section">
-            <div class="admin-section-title">В работе</div>
-            <div id="adminIdeasWork"></div>
-          </div>
-          
-          <div class="admin-section">
-            <div class="admin-section-title">Выполнено</div>
-            <div id="adminIdeasDone"></div>
-          </div>
-          
-          <div class="admin-section">
-            <div class="admin-section-title">Отклонено</div>
-            <div id="adminIdeasRejected"></div>
-          </div>
+          <div id="ideaFolderContent"></div>
         </div>
       </div>
 
@@ -327,6 +341,13 @@
 </main>
 
 <button class="fab" id="fabBtn" onclick="user ? openModal('listingModal') : openModal('authModal')">+</button>
+
+<footer class="footer">
+  <div class="footer-text">
+    Developed by <span class="footer-brand">SPR Studio</span>
+  </div>
+  <div class="footer-sub">© 2026 · All rights reserved</div>
+</footer>
 
 <div class="modal" id="authModal">
   <div class="modal-content">
@@ -416,6 +437,7 @@
   let user = null, profile = null;
   let listings = [], regs = [], occupancy = [], ideas = [], favorites = [];
   let curCat = "Все", curChat = null, carTimer = null, chatInterval = null, selectedStars = 0;
+  let currentIdeaFolder = 'new';
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -765,7 +787,7 @@
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
-      let st = i.ai_status === 'rejected' ? 'Отклонено' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'Рассматривается'));
+      let st = i.ai_status === 'rejected' ? 'Отклонено' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'На рассмотрении'));
       let cls = i.ai_status === 'rejected' ? 'status-rejected' : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : 'status-new'));
       return `<div class="idea-card">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; align-items:center;">
@@ -780,6 +802,54 @@
     await sb.from("ideas").update({ admin_status: status }).eq("id", id);
     loadAll();
   };
+
+  // ПЕРЕКЛЮЧЕНИЕ ПАПКИ ИДЕЙ
+  window.switchIdeaFolder = (folder) => {
+    currentIdeaFolder = folder;
+    document.querySelectorAll('.idea-folder').forEach(f => f.classList.remove('active'));
+    document.querySelector(`.idea-folder[data-folder="${folder}"]`).classList.add('active');
+    renderIdeaFolderContent();
+  };
+
+  function renderIdeaFolderContent() {
+    const content = $("ideaFolderContent");
+    let filtered = [];
+    
+    if (currentIdeaFolder === 'new') {
+      filtered = ideas.filter(i => i.ai_status === 'approved' && (i.admin_status === 'new' || !i.admin_status));
+    } else if (currentIdeaFolder === 'work') {
+      filtered = ideas.filter(i => i.admin_status === 'in_progress');
+    } else if (currentIdeaFolder === 'done') {
+      filtered = ideas.filter(i => i.admin_status === 'done');
+    } else if (currentIdeaFolder === 'rejected') {
+      filtered = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected');
+    }
+    
+    if (filtered.length === 0) {
+      content.innerHTML = `<p style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">В этой папке пока пусто</p>`;
+      return;
+    }
+    
+    content.innerHTML = filtered.map(i => {
+      let buttons = '';
+      if (currentIdeaFolder === 'new') {
+        buttons = `<div style="display:flex; gap:6px; margin-top:8px;">
+          <button class="button button-secondary button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
+          <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
+        </div>`;
+      } else if (currentIdeaFolder === 'work') {
+        buttons = `<div style="display:flex; gap:6px; margin-top:8px;">
+          <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'done')">Готово</button>
+          <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
+        </div>`;
+      }
+      
+      return `<div class="idea-card">
+        <div style="font-size:12px; margin-bottom:4px;">${esc(i.text)}</div>
+        ${buttons}
+      </div>`;
+    }).join("");
+  }
 
   $("ideaForm").onsubmit = async e => {
     e.preventDefault();
@@ -836,42 +906,18 @@
     if (profile && profile.role === 'school_admin') {
       $("adminIdeasDash").classList.remove("hidden");
       
-      let newIdeas = ideas.filter(i => i.ai_status === 'approved' && i.admin_status === 'new');
-      let workIdeas = ideas.filter(i => i.admin_status === 'in_progress');
-      let doneIdeas = ideas.filter(i => i.admin_status === 'done');
-      let rejectedIdeas = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected');
+      // Обновляем счётчики папок
+      const newCount = ideas.filter(i => i.ai_status === 'approved' && (i.admin_status === 'new' || !i.admin_status)).length;
+      const workCount = ideas.filter(i => i.admin_status === 'in_progress').length;
+      const doneCount = ideas.filter(i => i.admin_status === 'done').length;
+      const rejectedCount = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected').length;
       
-      $("adminIdeasNew").innerHTML = newIdeas.length ? newIdeas.map(i => `
-        <div class="idea-card">
-          <div style="margin-bottom:6px; font-size:12px;">${esc(i.text)}</div>
-          <div style="display:flex; gap:6px;">
-            <button class="button button-secondary button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
-            <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
-          </div>
-        </div>
-      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет новых идей.</p>`;
+      $("countNew").textContent = newCount;
+      $("countWork").textContent = workCount;
+      $("countDone").textContent = doneCount;
+      $("countRejected").textContent = rejectedCount;
       
-      $("adminIdeasWork").innerHTML = workIdeas.length ? workIdeas.map(i => `
-        <div class="idea-card">
-          <div style="margin-bottom:6px; font-size:12px;">${esc(i.text)}</div>
-          <div style="display:flex; gap:6px;">
-            <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'done')">Готово</button>
-            <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
-          </div>
-        </div>
-      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет идей в работе.</p>`;
-      
-      $("adminIdeasDone").innerHTML = doneIdeas.length ? doneIdeas.map(i => `
-        <div class="idea-card">
-          <div style="font-size:12px;">${esc(i.text)}</div>
-        </div>
-      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет выполненных идей.</p>`;
-      
-      $("adminIdeasRejected").innerHTML = rejectedIdeas.length ? rejectedIdeas.map(i => `
-        <div class="idea-card">
-          <div style="font-size:12px;">${esc(i.text)}</div>
-        </div>
-      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет отклонённых идей.</p>`;
+      renderIdeaFolderContent();
       
       $("adminRequests").classList.remove("hidden");
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
