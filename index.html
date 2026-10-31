@@ -13,107 +13,144 @@
       --gradient: linear-gradient(135deg, #C8CDD8 0%, #8B8F9A 50%, #C8CDD8 100%);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     .hidden { display: none !important; }
     button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+    button { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     
-    .header { position: sticky; top: 0; z-index: 10; background: rgba(15,16,20,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    /* HEADER ANIMATIONS */
+    .header { position: sticky; top: 0; z-index: 10; background: rgba(15,16,20,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06); animation: slideDown 0.5s ease; }
+    @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .header-inner { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
     .logo { display: flex; gap: 10px; align-items: center; color: var(--text); text-decoration: none; }
-    .logo-mark { width: 36px; height: 36px; background: var(--gradient); color: var(--bg); border-radius: 10px; display: grid; place-items: center; font-weight: 900; font-size: 16px; }
+    .logo-mark { width: 36px; height: 36px; background: var(--gradient); color: var(--bg); border-radius: 10px; display: grid; place-items: center; font-weight: 900; font-size: 16px; animation: pulse 3s infinite; }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(200,205,216,0.4); } 50% { box-shadow: 0 0 0 10px rgba(200,205,216,0); } }
     .header-actions { display: flex; gap: 8px; align-items: center; }
-    .header-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: white; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; }
-    .header-avatar:hover { transform: scale(1.05); }
+    .header-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: white; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; transition: all 0.3s; }
+    .header-avatar:hover { transform: scale(1.1) rotate(5deg); border-color: rgba(255,255,255,0.3); }
     .header-avatar img { width: 100%; height: 100%; object-fit: cover; }
     
-    .main-nav { position: sticky; top: 60px; z-index: 9; background: rgba(15,16,20,0.85); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.04); }
+    /* NAV ANIMATIONS */
+    .main-nav { position: sticky; top: 60px; z-index: 9; background: rgba(15,16,20,0.85); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.04); animation: slideDown 0.5s ease 0.1s backwards; }
     .nav-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px; }
-    .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 4px; border-radius: 8px; font-weight: 600; font-size: 12px; text-align: center; white-space: nowrap; }
-    .nav-tab:hover { color: var(--text); }
+    .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 4px; border-radius: 8px; font-weight: 600; font-size: 12px; text-align: center; white-space: nowrap; position: relative; overflow: hidden; transition: all 0.3s; }
+    .nav-tab::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); transition: left 0.5s; }
+    .nav-tab:hover::before { left: 100%; }
+    .nav-tab:hover { color: var(--text); transform: translateY(-2px); }
     .nav-tab.active { background: rgba(200,205,216,0.12); color: var(--text); }
+    .nav-tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 20px; height: 2px; background: var(--gradient); border-radius: 2px; animation: expandWidth 0.3s ease; }
+    @keyframes expandWidth { from { width: 0; } to { width: 20px; } }
     
-    .button { padding: 10px 16px; border-radius: 10px; border: none; font-weight: 700; font-size: 13px; }
+    /* BUTTON ANIMATIONS */
+    .button { padding: 10px 16px; border-radius: 10px; border: none; font-weight: 700; font-size: 13px; position: relative; overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .button::before { content: ''; position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; background: rgba(255,255,255,0.3); transform: translate(-50%, -50%); transition: width 0.6s, height 0.6s; }
+    .button:active::before { width: 300px; height: 300px; }
     .button-primary { background: var(--accent); color: var(--bg); }
-    .button-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .button-primary:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(200,205,216,0.3); }
     .button-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-    .button-secondary:hover { background: var(--surface-hover); }
+    .button-secondary:hover { background: var(--surface-hover); transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
     .button-danger { background: var(--danger); color: white; }
+    .button-danger:hover { background: #ff5252; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(255,107,107,0.3); }
+    .button-success { background: var(--success); color: white; }
+    .button-success:hover { background: #5cb87a; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(107,203,155,0.3); }
     .button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
     .button-small { padding: 6px 10px; font-size: 11px; border-radius: 6px; }
     
     main { max-width: 1100px; margin: 0 auto; padding: 16px 12px 80px; }
     
-    .carousel-container { margin: 10px 0 20px; }
-    .carousel { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+    /* CAROUSEL ANIMATIONS */
+    .carousel-container { position: relative; margin: 10px 0 20px; animation: fadeIn 0.6s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .carousel { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; padding-bottom: 8px; }
     .carousel::-webkit-scrollbar { display: none; }
-    .carousel-card { flex: 0 0 100%; scroll-snap-align: start; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; position: relative; background: var(--surface); border: 1px solid var(--border); }
-    .carousel-card img { width: 100%; height: 100%; object-fit: cover; }
-    .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95), transparent); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
+    .carousel-card { flex: 0 0 100%; scroll-snap-align: start; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; position: relative; background: var(--surface); border: 1px solid var(--border); animation: scaleIn 0.5s ease; }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    .carousel-card img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+    .carousel-card:hover img { transform: scale(1.05); }
+    .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 100%); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
     
+    /* LISTINGS ANIMATIONS */
     .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
-    .card { display: flex; flex-direction: column; position: relative; animation: fadeInUp 0.4s ease backwards; }
+    .card { display: flex; flex-direction: column; position: relative; animation: fadeInUp 0.5s ease backwards; }
     .card:nth-child(1) { animation-delay: 0.05s; }
     .card:nth-child(2) { animation-delay: 0.1s; }
     .card:nth-child(3) { animation-delay: 0.15s; }
     .card:nth-child(4) { animation-delay: 0.2s; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-    .card-img-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); transition: all 0.3s; }
-    .card:hover .card-img-wrap { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
-    .card-img { width: 100%; height: 100%; object-fit: cover; }
-    .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #2A2D36, #1A1C22); position: relative; }
-    .card-placeholder::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40%; height: 40%; background: var(--gradient); border-radius: 10px; opacity: 0.3; filter: blur(15px); }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+    .card:nth-child(6) { animation-delay: 0.3s; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    .card-img-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card:hover .card-img-wrap { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
+    .card-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+    .card:hover .card-img { transform: scale(1.1); }
+    .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #2A2D36, #1A1C22); position: relative; overflow: hidden; }
+    .card-placeholder::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40%; height: 40%; background: var(--gradient); border-radius: 10px; opacity: 0.3; filter: blur(15px); animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translate(-50%, -50%) translateY(0); } 50% { transform: translate(-50%, -50%) translateY(-10px); } }
     .card-info { padding: 8px 2px 0; display: flex; flex-direction: column; flex-grow: 1; }
     .card-price { font-weight: 800; font-size: 14px; margin-bottom: 2px; }
     .card-title { font-size: 12px; margin: 0 0 4px; line-height: 1.3; }
     .card-cat { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px; }
     .card-btn { width: 100%; padding: 6px; font-size: 11px; margin-top: auto; }
     
-    .favorite-btn { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: none; color: white; font-size: 14px; display: grid; place-items: center; z-index: 2; cursor: pointer; transition: all 0.2s; }
-    .favorite-btn:hover { transform: scale(1.15); background: rgba(0,0,0,0.8); }
-    .favorite-btn.active { color: #FF6B6B; }
+    .favorite-btn { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: none; color: white; font-size: 14px; display: grid; place-items: center; z-index: 2; cursor: pointer; transition: all 0.3s; }
+    .favorite-btn:hover { transform: scale(1.2) rotate(15deg); background: rgba(0,0,0,0.8); }
+    .favorite-btn.active { color: #FF6B6B; animation: heartBeat 0.5s; }
+    @keyframes heartBeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.3); } 50% { transform: scale(1); } 75% { transform: scale(1.3); } }
     
-    .profile-box { background: var(--surface); padding: 16px; border-radius: 16px; margin-bottom: 16px; border: 1px solid var(--border); }
+    /* PROFILE ANIMATIONS */
+    .profile-box { background: var(--surface); padding: 16px; border-radius: 16px; margin-bottom: 16px; border: 1px solid var(--border); animation: fadeIn 0.5s ease; transition: all 0.3s; }
+    .profile-box:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
     .profile-email { word-break: break-all; font-size: 13px; margin: 0 0 4px; }
     
-    .idea-card { background: var(--bg); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.2s; }
-    .idea-card:hover { border-color: rgba(255,255,255,0.1); }
-    .idea-status { font-size: 10px; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+    .idea-card { background: var(--bg); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.3s; animation: slideInLeft 0.4s ease; }
+    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    .idea-card:hover { border-color: rgba(255,255,255,0.2); transform: translateX(5px); }
+    .idea-status { font-size: 10px; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; animation: fadeIn 0.3s; }
     .status-done { background: rgba(107,203,155,0.15); color: var(--success); }
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
     .status-work { background: rgba(240,193,75,0.15); color: #F0C14B; }
+    .status-new { background: rgba(200,205,216,0.15); color: var(--accent); }
     
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+    /* MODAL ANIMATIONS */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; animation: fadeIn 0.3s; }
     .modal.open { display: flex; }
-    .modal-content { background: var(--surface); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); animation: slideUp 0.25s ease; }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    .form-group { margin-bottom: 12px; }
+    .modal-content { background: var(--surface); padding: 20px; border-radius: 16px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); animation: modalSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    @keyframes modalSlideUp { from { opacity: 0; transform: translateY(50px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .form-group { margin-bottom: 12px; animation: fadeIn 0.4s ease backwards; }
+    .form-group:nth-child(1) { animation-delay: 0.1s; }
+    .form-group:nth-child(2) { animation-delay: 0.15s; }
+    .form-group:nth-child(3) { animation-delay: 0.2s; }
+    .form-group:nth-child(4) { animation-delay: 0.25s; }
+    .form-group:nth-child(5) { animation-delay: 0.3s; }
     .form-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .form-control { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; transition: border-color 0.2s; }
-    .form-control:focus { outline: none; border-color: var(--accent); }
+    .form-control { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; transition: all 0.3s; }
+    .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,205,216,0.1); transform: translateY(-1px); }
     
+    /* STARS ANIMATION */
     .stars { display: flex; gap: 6px; font-size: 24px; cursor: pointer; }
-    .star { color: var(--muted); transition: all 0.2s; }
-    .star:hover { transform: scale(1.15); }
-    .star.active { color: #F0C14B; }
+    .star { color: var(--muted); transition: all 0.3s; }
+    .star:hover { transform: scale(1.3) rotate(15deg); color: #F0C14B; }
+    .star.active { color: #F0C14B; animation: starPop 0.4s; }
+    @keyframes starPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
     
-    .fab { position: fixed; bottom: 16px; right: 16px; width: 52px; height: 52px; border-radius: 50%; background: var(--gradient); color: var(--bg); font-size: 22px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(200,205,216,0.3); border: none; z-index: 20; font-weight: 900; }
-    .fab:hover { transform: scale(1.1) rotate(90deg); }
-    @media(min-width: 800px) { .fab { display: none; } }
+    /* AI HINTS ANIMATION */
+    .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 8px; border: 1px solid rgba(102,126,234,0.2); background: rgba(102,126,234,0.05); line-height: 1.4; animation: fadeIn 0.5s; }
+    .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: underline; transition: all 0.2s; }
+    .ai-hint a:hover { color: var(--accent-hover); text-decoration: none; }
     
-    .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 8px; border: 1px solid rgba(102,126,234,0.2); background: rgba(102,126,234,0.05); line-height: 1.4; }
-    .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: underline; }
-    
-    .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; }
+    /* AVATAR ANIMATION */
+    .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; animation: fadeIn 0.5s; }
+    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; transition: all 0.3s; animation: pulse 3s infinite; }
+    .avatar-preview:hover { transform: scale(1.1); }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
     
-    .empty-state { text-align: center; padding: 40px 16px; color: var(--muted); }
+    /* EMPTY STATE ANIMATION */
+    .empty-state { text-align: center; padding: 40px 16px; color: var(--muted); animation: fadeIn 0.6s; }
     .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1)); display: grid; place-items: center; position: relative; }
     .empty-icon::before { content: ''; position: absolute; inset: 30%; background: var(--gradient); border-radius: 50%; opacity: 0.4; filter: blur(10px); animation: pulse 3s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
     
-    .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(240,147,251,0.1)); border-radius: 10px; border: 1px solid rgba(102,126,234,0.3); font-size: 12px; font-weight: 600; position: relative; overflow: hidden; margin-bottom: 10px; }
+    /* AI THINKING ANIMATION */
+    .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(240,147,251,0.1)); border-radius: 10px; border: 1px solid rgba(102,126,234,0.3); font-size: 12px; font-weight: 600; position: relative; overflow: hidden; margin-bottom: 10px; animation: fadeIn 0.3s; }
     .ai-thinking::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); animation: shimmer 2s infinite; }
     @keyframes shimmer { to { left: 100%; } }
     .ai-thinking-text { background: linear-gradient(90deg, #667eea, #f093fb, #4facfe, #667eea); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientMove 3s linear infinite; }
@@ -124,9 +161,24 @@
     .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
     
+    /* ADMIN SECTIONS */
+    .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
+    .admin-section-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    /* FAB ANIMATION */
+    .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(200,205,216,0.4); border: none; z-index: 20; font-weight: 900; animation: fabPulse 2s infinite; cursor: pointer; transition: all 0.3s; }
+    @keyframes fabPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(200,205,216,0.4); } 50% { box-shadow: 0 8px 32px rgba(200,205,216,0.6); } }
+    .fab:hover { transform: scale(1.15) rotate(90deg); box-shadow: 0 12px 32px rgba(200,205,216,0.5); }
+    @media(min-width: 800px) { .fab { display: none; } }
+    
+    /* SCROLLBAR */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; transition: background 0.3s; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    
+    /* SECTION TRANSITIONS */
+    main > section { animation: fadeIn 0.5s ease; }
   </style>
 </head>
 <body>
@@ -153,7 +205,10 @@
 
 <main>
   <section id="boardSection">
-    <div class="carousel-container"><div class="carousel" id="bannerCarousel"></div></div>
+    <div class="carousel-container" id="carouselContainer">
+      <div class="carousel" id="bannerCarousel"></div>
+    </div>
+    
     <div style="display:flex; justify-content:space-between; align-items:center; margin: 16px 0 8px;">
       <h2 style="margin:0; font-size:18px; font-weight:800;">Объявления</h2>
       <input type="search" id="searchInput" placeholder="Поиск..." class="form-control" style="width:140px; padding:6px 10px; font-size:12px;">
@@ -166,7 +221,6 @@
       <button class="button button-secondary cat-btn" data-cat="Мероприятия" style="padding:5px 10px; font-size:11px;">События</button>
     </div>
     <div class="listings" id="listingsGrid"></div>
-    <button class="button button-primary hidden" id="createBtnDesktop" style="width:100%; margin-top:16px;">+ Создать</button>
   </section>
 
   <section id="favoritesSection" class="hidden">
@@ -207,7 +261,7 @@
         <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
       </div>
 
-      <div id="adminRequests" class="hidden" style="margin-bottom:16px;">
+      <div id="adminRequests" class="hidden admin-section">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
         <div id="adminReqList"></div>
       </div>
@@ -223,8 +277,27 @@
         <div id="myIdeasList" style="margin-top:12px;"></div>
         
         <div id="adminIdeasDash" class="hidden" style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
-          <h4 style="margin:0 0 8px; font-size:12px; color:var(--accent); font-weight:800;">Панель Ученического Совета</h4>
-          <div id="adminIdeasList"></div>
+          <h4 style="margin:0 0 12px; font-size:13px; color:var(--accent); font-weight:800;">Панель Ученического Совета</h4>
+          
+          <div class="admin-section">
+            <div class="admin-section-title">Новые идеи</div>
+            <div id="adminIdeasNew"></div>
+          </div>
+          
+          <div class="admin-section">
+            <div class="admin-section-title">В работе</div>
+            <div id="adminIdeasWork"></div>
+          </div>
+          
+          <div class="admin-section">
+            <div class="admin-section-title">Выполнено</div>
+            <div id="adminIdeasDone"></div>
+          </div>
+          
+          <div class="admin-section">
+            <div class="admin-section-title">Отклонено</div>
+            <div id="adminIdeasRejected"></div>
+          </div>
         </div>
       </div>
 
@@ -237,7 +310,7 @@
     <div id="dialogsList">
       <div class="empty-state">
         <div class="empty-icon"></div>
-        <p style="font-size: 12px; margin: 0;">Нажмите «Написать» на карточке,<br>чтобы начать диалог</p>
+        <p style="font-size: 12px; margin: 0;">Нажмите «Записаться» или «Написать» на карточке,<br>чтобы начать диалог</p>
       </div>
     </div>
     
@@ -253,7 +326,7 @@
   </section>
 </main>
 
-<button class="fab" id="fabBtn">+</button>
+<button class="fab" id="fabBtn" onclick="user ? openModal('listingModal') : openModal('authModal')">+</button>
 
 <div class="modal" id="authModal">
   <div class="modal-content">
@@ -428,25 +501,6 @@
   lTitle.addEventListener("input", updateHints);
   lDesc.addEventListener("input", updateHints);
 
-  function compressImage(file, maxWidth = 800) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const scale = Math.min(maxWidth / img.width, 1);
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => resolve(new File([blob], 'image.jpg', { type: 'image/jpeg' })), 'image/jpeg', 0.8);
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
   async function loadAll() {
     let promises = [
       sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50),
@@ -477,19 +531,42 @@
   function renderBanners() {
     let box = $("bannerCarousel");
     let html = [];
+    
+    const staticBanners = ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"];
+    staticBanners.forEach(src => {
+      html.push(`<div class="carousel-card"><img src="${src}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`);
+    });
+    
     if (user && profile && profile.school_id) {
       let evs = listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 3);
       evs.forEach(e => {
         html.push(`<div class="carousel-card">
           <div class="carousel-event">
-            <div style="font-size:16px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
-            <div style="font-size:11px; color:#ccc; margin-bottom:8px;">${e.event_date || ''}</div>
+            <span style="background:var(--accent); color:var(--bg); padding:4px 10px; border-radius:6px; font-size:10px; font-weight:800; align-self:flex-start; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Событие школы</span>
+            <div style="font-size:18px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
+            <div style="font-size:12px; color:#ccc; margin-bottom:10px;">${e.event_date || ''}</div>
             <button class="button button-primary button-small" style="align-self:flex-start;" onclick="handleEventBtn('${e.id}', '${e.event_type}', ${e.max_seats})">Записаться</button>
           </div>
         </div>`);
       });
     }
+    
     box.innerHTML = html.join("");
+    
+    let isHover = false;
+    $("carouselContainer").onmouseenter = () => isHover = true;
+    $("carouselContainer").onmouseleave = () => isHover = false;
+    
+    if(carTimer) clearInterval(carTimer);
+    carTimer = setInterval(() => {
+      if(isHover || !box.children.length) return;
+      let cardW = box.children[0].offsetWidth + 12;
+      if (box.scrollLeft >= box.scrollWidth - box.clientWidth - 10) {
+        box.scrollTo({left:0, behavior:"smooth"});
+      } else {
+        box.scrollBy({left:cardW, behavior:"smooth"});
+      }
+    }, 4000);
   }
 
   function renderListings() {
@@ -507,7 +584,11 @@
         if (l.is_event) {
           let already = regs.find(r => r.event_id===l.id && r.user_id===user.id && r.status!=='rejected');
           if (already) {
-            btn = `<button class="button button-danger card-btn" onclick="cancelReg('${already.id}')">Отменить</button>`;
+            if (already.status === 'pending') {
+              btn = `<button class="button button-secondary card-btn" disabled>Заявка отправлена</button>`;
+            } else {
+              btn = `<button class="button button-danger card-btn" onclick="cancelReg('${already.id}')">Отменить</button>`;
+            }
           } else {
             let taken = getTaken(l.id), max = l.max_seats||0, left = max>0?max-taken:"∞";
             if (l.event_type==='limited' && left<=0) btn = `<button class="button card-btn" disabled>Мест нет</button>`;
@@ -575,7 +656,7 @@
     loadAll();
   };
 
-  window.startChat = (userId, title) => {
+  window.startChat = (userId, title, autoMessage = null) => {
     if (!user) return openModal('authModal');
     document.querySelector('[data-tab="messages"]').click();
     if(chatInterval) clearInterval(chatInterval);
@@ -585,6 +666,13 @@
     $("chatView").classList.remove("hidden");
     loadChatMessages(userId);
     chatInterval = setInterval(() => loadChatMessages(userId), 5000);
+    
+    if (autoMessage) {
+      setTimeout(() => {
+        $("chatInput").value = autoMessage;
+        $("chatForm").dispatchEvent(new Event('submit'));
+      }, 500);
+    }
   };
 
   $("chatBackBtn").onclick = () => {
@@ -623,19 +711,33 @@
 
   window.handleEventBtn = async (id, type, max) => {
     if (!user) return openModal('authModal');
+    
+    let ev = listings.find(l => l.id === id);
+    if (!ev) return alert("Мероприятие не найдено");
+    
     let status = (type === 'open' || type === 'limited') ? 'confirmed' : 'pending';
     let res = await sb.from("event_registrations").insert({ event_id: id, user_id: user.id, status });
     if (res.error) return notice(res.error.message);
-    notice(status === 'confirmed' ? "Вы записаны!" : "Заявка отправлена");
+    
+    if (status === 'pending') {
+      let autoMsg = `Здравствуйте! Я хочу участвовать в мероприятии "${ev.title}". Моя заявка на рассмотрении.`;
+      startChat(ev.user_id, ev.title, autoMsg);
+      notice("Заявка отправлена! Напишите организатору в чат.");
+    } else {
+      notice("Вы записаны!");
+    }
     loadAll();
   };
 
-  window.confirmReg = async (regId, evId) => {
+  window.confirmReg = async (regId, evId, action) => {
     let ev = listings.find(l => l.id === evId);
     if (!ev) return alert("Мероприятие не найдено");
-    let res = await sb.from("event_registrations").update({ status: 'confirmed' }).eq("id", regId);
+    
+    let status = action === 'approve' ? 'confirmed' : 'rejected';
+    let res = await sb.from("event_registrations").update({ status: status }).eq("id", regId);
     if(res.error) return alert(res.error.message);
-    alert("Одобрено!"); 
+    
+    alert(action === 'approve' ? "Заявка одобрена!" : "Заявка отклонена");
     loadAll();
   };
 
@@ -664,7 +766,7 @@
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
       let st = i.ai_status === 'rejected' ? 'Отклонено' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'Рассматривается'));
-      let cls = i.ai_status === 'rejected' ? 'status-rejected' : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : ''));
+      let cls = i.ai_status === 'rejected' ? 'status-rejected' : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : 'status-new'));
       return `<div class="idea-card">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; align-items:center;">
           <b style="font-size:12px;">${esc(i.text.slice(0,30))}${i.text.length>30?'...':''}</b>
@@ -733,16 +835,43 @@
 
     if (profile && profile.role === 'school_admin') {
       $("adminIdeasDash").classList.remove("hidden");
-      let allIdeas = ideas.filter(i => i.ai_status === 'approved');
-      $("adminIdeasList").innerHTML = allIdeas.length ? allIdeas.map(i => `
+      
+      let newIdeas = ideas.filter(i => i.ai_status === 'approved' && i.admin_status === 'new');
+      let workIdeas = ideas.filter(i => i.admin_status === 'in_progress');
+      let doneIdeas = ideas.filter(i => i.admin_status === 'done');
+      let rejectedIdeas = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected');
+      
+      $("adminIdeasNew").innerHTML = newIdeas.length ? newIdeas.map(i => `
         <div class="idea-card">
           <div style="margin-bottom:6px; font-size:12px;">${esc(i.text)}</div>
           <div style="display:flex; gap:6px;">
             <button class="button button-secondary button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
-            <button class="button button-primary button-small" onclick="updateIdea('${i.id}', 'done')">Готово</button>
+            <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
           </div>
         </div>
       `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет новых идей.</p>`;
+      
+      $("adminIdeasWork").innerHTML = workIdeas.length ? workIdeas.map(i => `
+        <div class="idea-card">
+          <div style="margin-bottom:6px; font-size:12px;">${esc(i.text)}</div>
+          <div style="display:flex; gap:6px;">
+            <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'done')">Готово</button>
+            <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
+          </div>
+        </div>
+      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет идей в работе.</p>`;
+      
+      $("adminIdeasDone").innerHTML = doneIdeas.length ? doneIdeas.map(i => `
+        <div class="idea-card">
+          <div style="font-size:12px;">${esc(i.text)}</div>
+        </div>
+      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет выполненных идей.</p>`;
+      
+      $("adminIdeasRejected").innerHTML = rejectedIdeas.length ? rejectedIdeas.map(i => `
+        <div class="idea-card">
+          <div style="font-size:12px;">${esc(i.text)}</div>
+        </div>
+      `).join("") : `<p style="color:var(--muted); font-size:11px;">Нет отклонённых идей.</p>`;
       
       $("adminRequests").classList.remove("hidden");
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
@@ -754,7 +883,10 @@
           return `<div class="idea-card">
             <b style="font-size:12px;">${esc(ev?.title || 'Мероприятие')}</b>
             <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${r.user_id.slice(0,8)}...</div>
-            <button class="button button-primary button-small" onclick="confirmReg('${r.id}', '${r.event_id}')">Одобрить</button>
+            <div style="display:flex; gap:6px;">
+              <button class="button button-success button-small" onclick="confirmReg('${r.id}', '${r.event_id}', 'approve')">Одобрить</button>
+              <button class="button button-danger button-small" onclick="confirmReg('${r.id}', '${r.event_id}', 'reject')">Отклонить</button>
+            </div>
           </div>`;
         }).join("") : `<p style="color:var(--muted); font-size:11px;">Нет новых заявок.</p>`;
       } else {
@@ -769,9 +901,8 @@
   $("avatarInput").onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const compressed = await compressImage(file, 400); 
     const fileName = `avatar_${user.id}.jpg`;
-    const { error } = await sb.storage.from('listings-images').upload(fileName, compressed, { upsert: true });
+    const { error } = await sb.storage.from('listings-images').upload(fileName, file, { upsert: true });
     if (error) return alert("Ошибка: " + error.message);
     const { data } = sb.storage.from('listings-images').getPublicUrl(fileName);
     await sb.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", user.id);
@@ -829,8 +960,6 @@
 
   $("authBtn").onclick = () => openModal('authModal');
   $("myListingsBtn").onclick = () => document.querySelector('[data-tab="profile"]').click();
-  $("createBtnDesktop").onclick = () => user ? openModal('listingModal') : openModal('authModal');
-  $("fabBtn").onclick = () => user ? openModal('listingModal') : openModal('authModal');
   $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
 
   $("lCat").onchange = function() {
@@ -856,9 +985,8 @@
 
     const file = $("lImage").files[0];
     if (file) {
-      const compressed = await compressImage(file);
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`; 
-      const { error } = await sb.storage.from('listings-images').upload(fileName, compressed);
+      const { error } = await sb.storage.from('listings-images').upload(fileName, file);
       if (!error) imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
     }
 
@@ -889,7 +1017,6 @@
   }).then(() => {
     if(user && profile?.role === 'school_admin') {
       $("evOption").style.display = "block";
-      $("createBtnDesktop").classList.remove("hidden");
     }
   });
 })();
