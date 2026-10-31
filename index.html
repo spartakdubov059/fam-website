@@ -7,85 +7,160 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
-      --bg: #16171B; --surface: #22242A; --surface-hover: #2A2D35;
-      --accent: #C8CDD8; --accent-hover: #E8ECF4; --text: #F2F3F5;
-      --muted: #8B8F9A; --border: #32353E; --danger: #FF7B7B; --success: #7BC99A;
+      --bg: #0F1014; --surface: #1A1C22; --surface-hover: #23262E;
+      --accent: #D4D8E3; --accent-hover: #F0F3FA; --text: #F5F6F8;
+      --muted: #7A7E8A; --border: #2A2D36; --danger: #FF6B6B; --success: #6BCB9B;
+      --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      --gradient-premium: linear-gradient(135deg, #C8CDD8 0%, #8B8F9A 50%, #C8CDD8 100%);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; line-height: 1.5; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; }
     .hidden { display: none !important; }
     button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; transition: 0.2s; }
+    button { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     
-    .header { position: sticky; top: 0; z-index: 10; background: rgba(22, 23, 27, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    /* HEADER */
+    .header { position: sticky; top: 0; z-index: 10; background: rgba(15, 16, 20, 0.85); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid rgba(255,255,255,0.06); }
     .header-inner { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
     .logo { display: flex; gap: 12px; align-items: center; color: var(--text); text-decoration: none; }
-    .logo-mark { width: 40px; height: 40px; background: var(--accent); color: var(--bg); border-radius: 12px; display: grid; place-items: center; font-weight: 900; font-size: 18px; }
-    .main-nav { position: sticky; top: 73px; z-index: 9; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
-    .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; gap: 8px; padding: 10px 16px; }
-    .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 16px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
-    .nav-tab.active { background: var(--accent); color: var(--bg); }
+    .logo-mark { width: 40px; height: 40px; background: var(--gradient-premium); color: var(--bg); border-radius: 12px; display: grid; place-items: center; font-weight: 900; font-size: 18px; box-shadow: 0 4px 20px rgba(200, 205, 216, 0.15); transition: transform 0.3s; }
+    .logo:hover .logo-mark { transform: rotate(-8deg) scale(1.05); }
     
-    .button { padding: 10px 20px; border-radius: 12px; border: none; font-weight: 700; font-size: 14px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .header-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--gradient-1); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: white; cursor: pointer; border: 2px solid rgba(255,255,255,0.1); transition: all 0.3s; overflow: hidden; }
+    .header-avatar:hover { transform: scale(1.08); border-color: rgba(255,255,255,0.3); }
+    .header-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    
+    /* NAV */
+    .main-nav { position: sticky; top: 73px; z-index: 9; background: rgba(15, 16, 20, 0.7); backdrop-filter: blur(15px); border-bottom: 1px solid rgba(255,255,255,0.04); overflow-x: auto; }
+    .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; gap: 6px; padding: 10px 16px; }
+    .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 18px; border-radius: 10px; font-weight: 600; white-space: nowrap; font-size: 14px; position: relative; }
+    .nav-tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .nav-tab.active { background: rgba(200, 205, 216, 0.12); color: var(--text); }
+    .nav-tab.active::after { content: ''; position: absolute; bottom: -11px; left: 50%; transform: translateX(-50%); width: 20px; height: 2px; background: var(--gradient-premium); border-radius: 2px; }
+    
+    /* BUTTONS */
+    .button { padding: 10px 20px; border-radius: 12px; border: none; font-weight: 700; font-size: 14px; position: relative; overflow: hidden; }
     .button-primary { background: var(--accent); color: var(--bg); }
+    .button-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(200, 205, 216, 0.2); }
     .button-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-    .button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .button-secondary:hover { background: var(--surface-hover); border-color: rgba(255,255,255,0.1); }
+    .button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
     .button-small { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
     
     main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 80px; }
     
-    .carousel-container { position: relative; margin: 10px 0 20px; }
+    /* CAROUSEL */
+    .carousel-container { position: relative; margin: 10px 0 24px; }
     .carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; padding-bottom: 10px; }
     .carousel::-webkit-scrollbar { display: none; }
-    .carousel-card { flex: 0 0 100%; scroll-snap-align: start; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; position: relative; border: 1px solid var(--border); background: #000; }
+    .carousel-card { flex: 0 0 100%; scroll-snap-align: start; aspect-ratio: 16/9; border-radius: 20px; overflow: hidden; position: relative; border: 1px solid var(--border); background: var(--surface); }
     .carousel-card img { width: 100%; height: 100%; object-fit: cover; }
-    .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
+    .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 50%, transparent 100%); padding: 24px; display: flex; flex-direction: column; justify-content: flex-end; }
     
+    /* LISTINGS */
     .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-top: 15px; }
-    .card { display: flex; flex-direction: column; }
-    .card-img-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); position: relative; }
-    .card-img { width: 100%; height: 100%; object-fit: cover; }
+    .card { display: flex; flex-direction: column; animation: fadeInUp 0.5s ease backwards; }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.2s; }
+    .card:nth-child(5) { animation-delay: 0.25s; }
+    .card:nth-child(6) { animation-delay: 0.3s; }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card-img-wrap { width: 100%; aspect-ratio: 1/1; border-radius: 16px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); position: relative; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+    .card:hover .card-img-wrap { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.1); }
+    .card-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+    .card:hover .card-img { transform: scale(1.05); }
+    .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #2A2D36 0%, #1A1C22 100%); display: grid; place-items: center; }
+    .card-placeholder::before { content: ''; width: 40%; height: 40%; background: var(--gradient-premium); border-radius: 12px; opacity: 0.3; filter: blur(20px); }
     .card-info { padding: 10px 2px 0; display: flex; flex-direction: column; flex-grow: 1; }
-    .card-price { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
+    .card-price { font-weight: 800; font-size: 15px; margin-bottom: 2px; background: var(--gradient-premium); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
     .card-title { font-size: 13px; margin: 0 0 4px; line-height: 1.3; }
-    .card-cat { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .card-cat { font-size: 11px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
     .card-btn { width: 100%; padding: 8px; font-size: 12px; margin-top: auto; }
-
-    .profile-box { background: var(--surface); padding: 20px; border-radius: 16px; margin-bottom: 24px; border: 1px solid var(--border); }
-    .idea-card { background: var(--bg); padding: 14px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border); }
-    .idea-status { font-size: 10px; padding: 3px 6px; border-radius: 4px; font-weight: 700; }
-    .status-done { background: rgba(123, 201, 154, 0.2); color: var(--success); }
-    .status-rejected { background: rgba(255, 123, 123, 0.2); color: var(--danger); }
-    .status-work { background: rgba(240, 193, 75, 0.2); color: #F0C14B; }
     
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+    /* PROFILE */
+    .profile-box { background: var(--surface); padding: 24px; border-radius: 20px; margin-bottom: 24px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+    .profile-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(200,205,216,0.3), transparent); }
+    .idea-card { background: var(--bg); padding: 14px; border-radius: 14px; margin-bottom: 10px; border: 1px solid var(--border); transition: all 0.3s; }
+    .idea-card:hover { border-color: rgba(255,255,255,0.1); transform: translateX(2px); }
+    .idea-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .status-done { background: rgba(107, 203, 155, 0.15); color: var(--success); }
+    .status-rejected { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+    .status-work { background: rgba(240, 193, 75, 0.15); color: #F0C14B; }
+    
+    /* MODAL */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; animation: fadeIn 0.2s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal.open { display: flex; }
-    .modal-content { background: var(--surface); padding: 24px; border-radius: 20px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; }
+    .modal-content { background: var(--surface); padding: 28px; border-radius: 24px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
-    .form-control { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-control { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); transition: all 0.2s; }
+    .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200, 205, 216, 0.1); }
     
     .stars { display: flex; gap: 8px; font-size: 30px; cursor: pointer; }
-    .star { color: var(--muted); transition: 0.2s; }
-    .star.active { color: #F0C14B; }
+    .star { color: var(--muted); transition: all 0.2s; }
+    .star:hover { transform: scale(1.2); }
+    .star.active { color: #F0C14B; text-shadow: 0 0 20px rgba(240, 193, 75, 0.5); }
     
-    .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: none; z-index: 20; }
+    .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-premium); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(200, 205, 216, 0.3); border: none; z-index: 20; font-weight: 900; }
+    .fab:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 12px 32px rgba(200, 205, 216, 0.4); }
     @media(min-width: 800px) { .fab { display: none; } }
     
-    .ai-hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.4; background: var(--bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
-    .ai-hint a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+    /* AI HINTS */
+    .ai-hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08)); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(102, 126, 234, 0.2); }
+    .ai-hint a { color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 600; border-bottom: 1px dashed rgba(200, 205, 216, 0.3); transition: all 0.2s; }
+    .ai-hint a:hover { color: var(--accent-hover); border-bottom-color: var(--accent-hover); }
     
+    /* PREMIUM AI THINKING ANIMATION */
+    .ai-thinking { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(240, 147, 251, 0.1), rgba(79, 172, 254, 0.1)); border-radius: 12px; border: 1px solid rgba(102, 126, 234, 0.3); font-size: 13px; font-weight: 600; position: relative; overflow: hidden; }
+    .ai-thinking::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); animation: shimmer 2s infinite; }
+    @keyframes shimmer { to { left: 100%; } }
+    .ai-thinking-text { background: linear-gradient(90deg, #667eea, #f093fb, #4facfe, #667eea); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientMove 3s linear infinite; }
+    @keyframes gradientMove { to { background-position: 300% 0; } }
+    .ai-thinking-dots { display: inline-flex; gap: 3px; }
+    .ai-thinking-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.4s infinite ease-in-out; }
+    .ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
+    
+    /* AVATAR */
     .avatar-upload { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-    .avatar-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; background: var(--border); display: grid; place-items: center; font-size: 30px; overflow: hidden; }
+    .avatar-preview { width: 80px; height: 80px; border-radius: 50%; background: var(--gradient-1); display: grid; place-items: center; font-size: 30px; font-weight: 800; color: white; overflow: hidden; box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3); border: 3px solid rgba(255,255,255,0.1); transition: all 0.3s; }
+    .avatar-preview:hover { transform: scale(1.05); }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+    
+    /* EMPTY STATES */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state-icon { width: 80px; height: 80px; margin: 0 auto 20px; border-radius: 24px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1)); display: grid; place-items: center; position: relative; }
+    .empty-state-icon::before { content: ''; position: absolute; inset: 20%; background: var(--gradient-premium); border-radius: 50%; opacity: 0.4; filter: blur(15px); animation: pulse 3s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); } }
+    
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   </style>
 </head>
 <body>
 
 <header class="header">
   <div class="header-inner">
-    <a href="#" class="logo"><div class="logo-mark">F</div><div><b>FAM</b><br><small style="color:var(--muted)">Свои рядом</small></div></a>
-    <div><button class="button button-secondary" id="myListingsBtn">Мои</button> <button class="button button-primary" id="authBtn">Войти</button></div>
+    <a href="#" class="logo" onclick="document.querySelector('[data-tab=board]').click(); return false;"><div class="logo-mark">F</div><div><b>FAM</b><br><small style="color:var(--muted); font-size:11px;">Свои рядом</small></div></a>
+    <div class="header-actions">
+      <button class="button button-secondary hidden" id="myListingsBtn">Мои</button>
+      <button class="button button-primary" id="authBtn">Войти</button>
+      <div class="header-avatar hidden" id="headerAvatar" onclick="document.querySelector('[data-tab=profile]').click()"></div>
+    </div>
   </div>
 </header>
 
@@ -103,68 +178,88 @@
     <div class="carousel-container" id="carouselContainer">
       <div class="carousel" id="bannerCarousel"></div>
     </div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin: 20px 0 10px;">
-      <h2 style="margin:0; font-size:20px;">Объявления</h2>
-      <input type="search" id="searchInput" placeholder="Поиск..." class="form-control" style="width:180px; padding:8px 12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 24px 0 12px;">
+      <h2 style="margin:0; font-size:22px; font-weight:800;">Объявления</h2>
+      <input type="search" id="searchInput" placeholder="Поиск..." class="form-control" style="width:180px; padding:8px 14px;">
     </div>
     <div style="overflow-x:auto; display:flex; gap:8px; padding-bottom:10px; margin-bottom:10px;">
-      <button class="button button-secondary cat-btn active" data-cat="Все" style="padding:6px 12px; font-size:12px;">Все</button>
-      <button class="button button-secondary cat-btn" data-cat="Вещи" style="padding:6px 12px; font-size:12px;">Вещи</button>
-      <button class="button button-secondary cat-btn" data-cat="Услуги" style="padding:6px 12px; font-size:12px;">Услуги</button>
-      <button class="button button-secondary cat-btn" data-cat="Учёба" style="padding:6px 12px; font-size:12px;">Учёба</button>
-      <button class="button button-secondary cat-btn" data-cat="Мероприятия" style="padding:6px 12px; font-size:12px;">Мероприятия</button>
+      <button class="button button-secondary cat-btn active" data-cat="Все" style="padding:6px 14px; font-size:12px;">Все</button>
+      <button class="button button-secondary cat-btn" data-cat="Вещи" style="padding:6px 14px; font-size:12px;">Вещи</button>
+      <button class="button button-secondary cat-btn" data-cat="Услуги" style="padding:6px 14px; font-size:12px;">Услуги</button>
+      <button class="button button-secondary cat-btn" data-cat="Учёба" style="padding:6px 14px; font-size:12px;">Учёба</button>
+      <button class="button button-secondary cat-btn" data-cat="Мероприятия" style="padding:6px 14px; font-size:12px;">Мероприятия</button>
     </div>
     <div class="listings" id="listingsGrid"></div>
-    <button class="button button-primary hidden" id="createBtnDesktop" style="width:100%; margin-top:20px;">+ Создать</button>
+    <button class="button button-primary hidden" id="createBtnDesktop" style="width:100%; margin-top:24px;">+ Создать объявление</button>
+  </section>
+
+  <section id="favoritesSection" class="hidden">
+    <h2 style="font-size:22px; margin-bottom:16px; font-weight:800;">Избранное</h2>
+    <div class="empty-state">
+      <div class="empty-state-icon"></div>
+      <p style="font-size: 14px; margin: 0;">Скоро здесь появятся сохранённые объявления</p>
+    </div>
   </section>
 
   <section id="profileSection" class="hidden">
-    <h2 style="font-size:20px; margin-bottom:16px;">Профиль</h2>
+    <h2 style="font-size:22px; margin-bottom:16px; font-weight:800;">Профиль</h2>
     
-    <div class="profile-box">
-      <div class="avatar-upload">
-        <div class="avatar-preview" id="avatarPreview">?</div>
-        <div>
-          <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Загрузить фото</label>
+    <div id="profileLoggedOut" class="profile-box" style="text-align:center;">
+      <div class="empty-state-icon" style="margin-bottom:16px;"></div>
+      <h3 style="margin:0 0 8px; font-size:18px;">Войдите в аккаунт</h3>
+      <p style="color:var(--muted); font-size:13px; margin:0 0 16px;">Чтобы создавать объявления, писать идеи и общаться</p>
+      <button class="button button-primary" onclick="openModal('authModal')">Войти</button>
+    </div>
+    
+    <div id="profileLoggedIn" class="hidden">
+      <div class="profile-box">
+        <div class="avatar-upload">
+          <div class="avatar-preview" id="avatarPreview">?</div>
+          <div style="flex:1;">
+            <h3 id="profEmail" style="margin:0 0 4px; font-size:16px;"></h3>
+            <div id="profMeta" style="color:var(--muted); font-size:13px;"></div>
+          </div>
+          <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Изменить</label>
           <input type="file" id="avatarInput" accept="image/*" style="display:none;">
         </div>
       </div>
-      <h3 id="profEmail" style="margin:0 0 4px; font-size:16px;"></h3>
-      <div id="profMeta" style="color:var(--muted); font-size:13px;"></div>
-    </div>
-    
-    <div id="adminRequests" class="hidden" style="margin-bottom:24px;">
-      <h3 style="font-size:16px;">Заявки на мероприятия</h3>
-      <div id="adminReqList"></div>
-    </div>
-
-    <div class="profile-box">
-      <h3 style="font-size:16px; margin-top:0;">Почта идей</h3>
-      <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">ИИ проверит идею, а ученический совет решит, что с ней делать.</p>
-      <form id="ideaForm">
-        <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить в школе?" required style="margin-bottom:10px;"></textarea>
-        <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%;">Отправить идею</button>
-        <div id="ideaMsg" style="text-align:center; margin-top:8px; font-size:12px;"></div>
-      </form>
-      <div id="myIdeasList" style="margin-top:16px;"></div>
       
-      <div id="adminIdeasDash" class="hidden" style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
-        <h4 style="margin:0 0 10px; font-size:14px; color:var(--accent);">Идеи учеников (Панель Ученического Совета)</h4>
-        <div id="adminIdeasList"></div>
+      <div id="adminRequests" class="hidden" style="margin-bottom:24px;">
+        <h3 style="font-size:16px; margin-bottom:12px;">Заявки на мероприятия</h3>
+        <div id="adminReqList"></div>
       </div>
-    </div>
 
-    <button class="button button-secondary" id="logoutBtn" style="width:100%; margin-top:20px;">Выйти</button>
+      <div class="profile-box">
+        <h3 style="font-size:16px; margin-top:0;">Почта идей</h3>
+        <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">Локальный ИИ проверит идею. Ученический совет увидит только одобренные.</p>
+        <form id="ideaForm">
+          <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить в школе?" required style="margin-bottom:10px;"></textarea>
+          <div id="ideaThinkingArea"></div>
+          <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%;">Отправить идею</button>
+        </form>
+        <div id="myIdeasList" style="margin-top:16px;"></div>
+        
+        <div id="adminIdeasDash" class="hidden" style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
+          <h4 style="margin:0 0 10px; font-size:14px; background: var(--gradient-premium); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight:800;">Панель Ученического Совета</h4>
+          <div id="adminIdeasList"></div>
+        </div>
+      </div>
+
+      <button class="button button-secondary" id="logoutBtn" style="width:100%; margin-top:20px;">Выйти</button>
+    </div>
   </section>
 
   <section id="messagesSection" class="hidden">
-    <h2 style="font-size:20px;">Сообщения</h2>
+    <h2 style="font-size:22px; margin-bottom:16px; font-weight:800;">Сообщения</h2>
     <div id="dialogsList">
-      <p style="color:var(--muted); font-size:13px;">Чтобы начать диалог, нажмите «Написать» на карточке объявления.</p>
+      <div class="empty-state">
+        <div class="empty-state-icon"></div>
+        <p style="font-size: 14px; margin: 0;">Нажмите «Написать» на карточке объявления,<br>чтобы начать диалог</p>
+      </div>
     </div>
     
-    <div id="chatView" class="hidden" style="margin-top:20px; background:var(--surface); padding:16px; border-radius:16px; border:1px solid var(--border);">
-      <button class="button button-secondary" id="chatBackBtn" style="padding:6px 12px; font-size:12px; margin-bottom:12px;">← Назад</button>
+    <div id="chatView" class="hidden" style="margin-top:20px; background:var(--surface); padding:20px; border-radius:20px; border:1px solid var(--border);">
+      <button class="button button-secondary" id="chatBackBtn" style="padding:6px 14px; font-size:12px; margin-bottom:12px;">← Назад</button>
       <h3 id="chatWith" style="font-size:16px; margin-bottom:12px;"></h3>
       <div id="chatMessages" style="max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin-bottom:16px;"></div>
       <form id="chatForm" style="display:flex; gap:8px;">
@@ -180,10 +275,10 @@
 <!-- МОДАЛКИ -->
 <div class="modal" id="authModal">
   <div class="modal-content">
-    <button onclick="closeModal('authModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
-    <h2 id="authTitle" style="margin-top:0;">Вход</h2>
+    <button onclick="closeModal('authModal')" style="float:right; background:none; border:none; color:white; font-size:24px; line-height:1;">×</button>
+    <h2 id="authTitle" style="margin-top:0; font-size:22px; font-weight:800;">Вход</h2>
     <form id="authForm">
-      <div class="form-group hidden" id="schoolGroup"><label>Выберите школу</label>
+      <div class="form-group hidden" id="schoolGroup"><label>Школа</label>
         <select id="authSchool" class="form-control">
           <option value="Третий лицей">Третий лицей</option>
         </select>
@@ -191,7 +286,7 @@
       <div class="form-group"><label>Почта</label><input type="email" id="authEmail" class="form-control" required></div>
       <div class="form-group"><label>Пароль</label><input type="password" id="authPassword" class="form-control" required></div>
       <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
-      <div style="text-align:center; margin-top:12px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--accent); font-size:13px;">Создать аккаунт</button></div>
+      <div style="text-align:center; margin-top:12px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--accent); font-size:13px; font-weight:600;">Создать аккаунт</button></div>
       <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:10px; font-size:13px;"></div>
     </form>
   </div>
@@ -199,18 +294,18 @@
 
 <div class="modal" id="listingModal">
   <div class="modal-content">
-    <button onclick="closeModal('listingModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
-    <h2 style="margin-top:0;">Создать объявление</h2>
+    <button onclick="closeModal('listingModal')" style="float:right; background:none; border:none; color:white; font-size:24px; line-height:1;">×</button>
+    <h2 style="margin-top:0; font-size:22px; font-weight:800;">Новое объявление</h2>
     <form id="listingForm">
-      <div id="aiHints" class="ai-hint">💡 Начните вводить заголовок, и ИИ поможет с категорией.</div>
+      <div id="aiHints" class="ai-hint">💡 Начните вводить заголовок — ИИ подскажет категорию.</div>
       
       <div class="form-group">
-        <label>Заголовок <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lTitle')">✨ Авто-исправить</button></label>
+        <label>Заголовок <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lTitle')">Авто-исправить</button></label>
         <input type="text" id="lTitle" class="form-control" required>
       </div>
       
       <div class="form-group">
-        <label>Описание <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lDesc')">✨ Авто-исправить</button></label>
+        <label>Описание <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lDesc')">Авто-исправить</button></label>
         <textarea id="lDesc" class="form-control" rows="3" required></textarea>
       </div>
       
@@ -220,24 +315,24 @@
           <option value="Вещи">Вещи</option>
           <option value="Услуги">Услуги</option>
           <option value="Учёба">Учёба</option>
-          <option value="Мероприятия" id="evOption" style="display:none;">📢 Мероприятие</option>
+          <option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
         </select>
       </div>
       
-      <div id="eventFields" class="hidden" style="background:var(--bg); padding:12px; border-radius:10px; margin-bottom:16px;">
+      <div id="eventFields" class="hidden" style="background:var(--bg); padding:14px; border-radius:12px; margin-bottom:16px;">
         <div class="form-group"><label>Дата</label><input type="date" id="evDate" class="form-control"></div>
         <div class="form-group"><label>Время</label><input type="time" id="evTime" class="form-control"></div>
         <div class="form-group">
           <label>Тип участия</label>
           <label style="display:block; margin-bottom:5px; font-size:13px;"><input type="radio" name="evType" value="open" checked> Открытое (все)</label>
-          <label style="display:block; margin-bottom:5px; font-size:13px;"><input type="radio" name="evType" value="request"> По заявке (одобрение)</label>
+          <label style="display:block; margin-bottom:5px; font-size:13px;"><input type="radio" name="evType" value="request"> По заявке</label>
           <label style="display:block; font-size:13px;"><input type="radio" name="evType" value="limited"> Лимит мест</label>
         </div>
         <div class="form-group hidden" id="seatsGroup"><label>Кол-во мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
       </div>
 
-      <div class="form-group"><label>Фото (необязательно)</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
-      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Договорная или Бесплатно"></div>
+      <div class="form-group"><label>Фото</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
+      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
   </div>
@@ -245,8 +340,8 @@
 
 <div class="modal" id="feedbackModal">
   <div class="modal-content">
-    <button onclick="closeModal('feedbackModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
-    <h2 style="margin-top:0;">Отзыв о мероприятии</h2>
+    <button onclick="closeModal('feedbackModal')" style="float:right; background:none; border:none; color:white; font-size:24px; line-height:1;">×</button>
+    <h2 style="margin-top:0; font-size:22px; font-weight:800;">Отзыв</h2>
     <form id="feedbackForm">
       <input type="hidden" id="fbEventId">
       <div class="form-group">
@@ -275,43 +370,83 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   window.closeModal = id => $(id).classList.remove("open");
-  const openModal = id => $(id).classList.add("open");
+  window.openModal = id => $(id).classList.add("open");
   const notice = (msg) => alert(msg);
 
-  // --- 1. ЖЕСТКИЙ ИИ-ФИЛЬТР (ИСПРАВЛЕНА ПРОВЕРКА НА КАПС) ---
+  // --- ОБНОВЛЕНИЕ UI АВТОРИЗАЦИИ ---
+  function updateAuthUI() {
+    if (user) {
+      $("authBtn").classList.add("hidden");
+      $("headerAvatar").classList.remove("hidden");
+      $("myListingsBtn").classList.remove("hidden");
+      
+      // Аватарка в хедере
+      if (profile?.avatar_url) {
+        $("headerAvatar").innerHTML = `<img src="${profile.avatar_url}">`;
+      } else {
+        $("headerAvatar").textContent = user.email[0].toUpperCase();
+      }
+      
+      $("profileLoggedOut").classList.add("hidden");
+      $("profileLoggedIn").classList.remove("hidden");
+    } else {
+      $("authBtn").classList.remove("hidden");
+      $("headerAvatar").classList.add("hidden");
+      $("myListingsBtn").classList.add("hidden");
+      
+      $("profileLoggedOut").classList.remove("hidden");
+      $("profileLoggedIn").classList.add("hidden");
+    }
+  }
+
+  // --- ПРЕМИАЛЬНАЯ АНИМАЦИЯ "ИИ ДУМАЕТ" ---
+  function showAIThinking(containerId, text = "ИИ анализирует") {
+    const container = $(containerId);
+    if (!container) return;
+    container.innerHTML = `
+      <div class="ai-thinking">
+        <span class="ai-thinking-text">${text}</span>
+        <span class="ai-thinking-dots"><span></span><span></span><span></span></span>
+      </div>
+    `;
+    container.style.display = 'block';
+    container.style.marginBottom = '12px';
+  }
+  function hideAIThinking(containerId) {
+    const container = $(containerId);
+    if (container) { container.innerHTML = ''; container.style.display = 'none'; }
+  }
+
+  // --- ИИ-ФИЛЬТР ---
   function moderateText(text) {
     if (!text) return { status: "rejected", reason: "Текст пуст." };
     
-    // ПРОВЕРКА НА КАПС (до перевода в нижний регистр!)
     const lettersOnly = text.replace(/[^a-zA-Zа-яА-ЯёЁ]/g, '');
     if (lettersOnly.length > 10 && lettersOnly === lettersOnly.toUpperCase()) {
-      return { status: "rejected", reason: "Не пишите полностью ЗАГЛАВНЫМИ буквами." };
+      return { status: "rejected", reason: "Не пишите ЗАГЛАВНЫМИ буквами." };
     }
 
     let t = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,""); 
-    
     if (t.length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
     
     const badRoots = [
-      "хуй", "хуя", "хуе", "хуи", "хер", "пизд", "бля", "блят", "блядь", "еб", "еба", "ебу", "ебл", "заеб", "уеб", 
-      "сук", "сука", "суки", "мудак", "мудил", "говн", "дерьм", "залуп", "манда", "шлюх", "гандон", "долбоеб", 
-      "пидор", "пидар", "педик", "срат", "срал", "жоп", "вагин", "член", "сперм", "секс", "трах", "дроч", 
-      "идиот", "дурак", "тупой", "дебил", "мразь", "чмо", "урод", "лох", "дура", "дур", "козел", "козл", 
-      "сволоч", "падл", "гнид", "тварь", "крыса"
+      "хуй", "хуя", "хуе", "хуи", "хер", "пизд", "бля", "блят", "блядь", 
+      "ебат", "ебал", "ебать", "заеб", "уеб", "выеб", "наеб", "оеб", "проeб",
+      "сука", "суки", "мудак", "мудил", "говн", "дерьм", "залуп", "манда", "шлюх", 
+      "гандон", "долбоеб", "пидор", "пидар", "срат", "жоп", "член", "сперм", "трах", "дроч", 
+      "идиот", "дурак", "тупой", "дебил", "мразь", "чмо", "урод", "лох", "козел", 
+      "сволоч", "падл", "гнид", "тварь"
     ];
-    
     if (badRoots.some(root => t.includes(root))) {
-      return { status: "rejected", reason: "Обнаружена нецензурная лексика или оскорбления." };
+      return { status: "rejected", reason: "Обнаружена нецензурная лексика." };
     }
-
     if (/(.)\1{3,}/.test(t) || /[бвгджзйклмнпрстфхцчшщ]{5,}/.test(t)) {
-      return { status: "rejected", reason: "Текст похож на спам или бессмыслицу." };
+      return { status: "rejected", reason: "Текст похож на спам." };
     }
-
     return { status: "approved", summary: text.slice(0, 60) + (text.length > 60 ? "..." : "") };
   }
 
-  // --- 2. АВТО-ИСПРАВЛЕНИЕ ---
+  // --- АВТО-ИСПРАВЛЕНИЕ ---
   window.autoFixField = (fieldId) => {
     const el = $(fieldId);
     let text = el.value.replace(/\s+/g, ' ').trim();
@@ -323,20 +458,20 @@
     updateHints();
   };
 
-  // --- 3. ПОДСКАЗКИ КАТЕГОРИЙ ---
+  // --- ПОДСКАЗКИ ---
   const lTitle = $("lTitle"), lDesc = $("lDesc"), lCat = $("lCat"), hintsBox = $("aiHints");
   const categoryKeywords = {
-    "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "вещи", "куплю", "наушники", "велосипед"],
-    "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул", "фотограф", "услуги", "настройка", "доставка"],
+    "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "куплю", "наушники", "велосипед"],
+    "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул", "фотограф", "настройка", "доставка"],
     "Учёба": ["конспекты", "решебник", "помощь с дз", "учебник", "подготовка", "егэ", "огэ", "математика", "физика"],
-    "Мероприятия": ["встреча", "концерт", "квиз", "игра", "соревнования", "фестиваль", "собрание", "турнир", "матч"]
+    "Мероприятия": ["встреча", "концерт", "квиз", "игра", "соревнования", "фестиваль", "турнир", "матч"]
   };
 
   function updateHints() {
     const combined = (lTitle.value + " " + lDesc.value).toLowerCase();
     let hints = [];
-    if (lTitle.value.length > 0 && lTitle.value.length < 5) hints.push("💡 Добавьте более понятный заголовок.");
-    if (lDesc.value.length > 10 && !$("lPrice").value) hints.push("💰 Не забудьте указать цену или напишите «Бесплатно».");
+    if (lTitle.value.length > 0 && lTitle.value.length < 5) hints.push("Добавьте более понятный заголовок");
+    if (lDesc.value.length > 10 && !$("lPrice").value) hints.push("Укажите цену или «Бесплатно»");
     
     let bestCat = null, maxMatches = 0;
     for (const [cat, keywords] of Object.entries(categoryKeywords)) {
@@ -344,16 +479,16 @@
       if (matches > maxMatches) { maxMatches = matches; bestCat = cat; }
     }
     if (bestCat && maxMatches > 0) {
-      if (lCat.value !== bestCat) hints.push(`🤖 <a onclick="document.getElementById('lCat').value='${bestCat}'; updateHints();">ИИ советует: ${bestCat} (нажмите)</a>`);
-      else hints.push(`✅ ИИ: категория «${bestCat}» отлично подходит.`);
+      if (lCat.value !== bestCat) hints.push(`<a onclick="document.getElementById('lCat').value='${bestCat}'; updateHints();">ИИ советует: ${bestCat}</a>`);
+      else hints.push(`Категория «${bestCat}» подходит`);
     }
-    hintsBox.innerHTML = hints.length ? hints.map(h => `<div>• ${h}</div>`).join("") : "💡 Начните вводить заголовок, и ИИ поможет.";
+    hintsBox.innerHTML = hints.length ? hints.map(h => `<div style="margin-bottom:2px;">• ${h}</div>`).join("") : "Начните вводить заголовок — ИИ подскажет категорию";
   }
   lTitle.addEventListener("input", updateHints);
   lDesc.addEventListener("input", updateHints);
   $("lPrice").addEventListener("input", updateHints);
 
-  // --- 4. СЖАТИЕ ИЗОБРАЖЕНИЙ ---
+  // --- СЖАТИЕ ФОТО ---
   function compressImage(file, maxWidth = 800) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -365,7 +500,7 @@
           canvas.width = img.width * scale;
           canvas.height = img.height * scale;
           canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => resolve(new File([blob], file.name, { type: 'image/jpeg' })), 'image/jpeg', 0.8);
+          canvas.toBlob((blob) => resolve(new File([blob], 'image.jpg', { type: 'image/jpeg' })), 'image/jpeg', 0.8);
         };
         img.src = e.target.result;
       };
@@ -373,7 +508,7 @@
     });
   }
 
-  // --- 5. ЗАГРУЗКА ДАННЫХ ---
+  // --- ЗАГРУЗКА ДАННЫХ ---
   async function loadAll() {
     let promises = [
       sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50),
@@ -400,17 +535,17 @@
   function renderBanners() {
     let box = $("bannerCarousel");
     let html = ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"]
-      .map(src => `<div class="carousel-card"><img src="${src}" loading="lazy" onerror="this.style.display='none'"></div>`);
+      .map(src => `<div class="carousel-card"><img src="${src}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`);
     
     if (user && profile && profile.school_id) {
       let evs = listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 3);
       evs.forEach(e => {
         html.push(`<div class="carousel-card">
           <div class="carousel-event">
-            <span style="background:var(--accent); color:var(--bg); padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; align-self:flex-start; margin-bottom:8px;">СОБЫТИЕ</span>
-            <div style="font-size:18px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
-            <div style="font-size:12px; color:#ccc; margin-bottom:10px;">${e.event_date || ''}</div>
-            <button class="button button-primary" style="align-self:flex-start; padding:8px 16px; font-size:12px;" onclick="handleEventBtn('${e.id}', '${e.event_type}', ${e.max_seats})">Записаться</button>
+            <span style="background:var(--gradient-premium); color:var(--bg); padding:4px 10px; border-radius:6px; font-size:10px; font-weight:800; align-self:flex-start; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Событие школы</span>
+            <div style="font-size:20px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
+            <div style="font-size:12px; color:#ccc; margin-bottom:12px;">${e.event_date || ''}</div>
+            <button class="button button-primary" style="align-self:flex-start; padding:8px 18px; font-size:12px;" onclick="handleEventBtn('${e.id}', '${e.event_type}', ${e.max_seats})">Записаться</button>
           </div>
         </div>`);
       });
@@ -435,7 +570,7 @@
     let filtered = listings.filter(l => (curCat==="Все" || l.category===curCat) && l.title.toLowerCase().includes(search));
     
     grid.innerHTML = filtered.length ? filtered.map(l => {
-      let img = l.image_url ? `<img src="${l.image_url}" class="card-img" loading="lazy">` : `<div class="card-img" style="display:grid; place-items:center; font-size:30px; background:var(--surface);">📦</div>`;
+      let img = l.image_url ? `<img src="${l.image_url}" class="card-img" loading="lazy">` : `<div class="card-placeholder"></div>`;
       let btn = '';
       
       const isValidUUID = l.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(l.user_id);
@@ -470,19 +605,21 @@
           ${btn}
         </div>
       </div>`;
-    }).join("") : `<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:40px;">Ничего не найдено</p>`;
+    }).join("") : `<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:60px 20px;">Ничего не найдено</p>`;
   }
 
-  // --- 6. ЧАТ С МОДЕРАЦИЕЙ ---
+  // --- ЧАТ (с автопереключением вкладки) ---
   window.startChat = (userId, title) => {
     if (!user) return openModal('authModal');
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!userId || !uuidRegex.test(userId)) return notice('Ошибка: неверный ID пользователя.');
-    if (curChat === userId && !$("chatView").classList.contains("hidden")) return;
-
+    if (!userId || !uuidRegex.test(userId)) return notice('Ошибка: неверный ID.');
+    
+    // АВТОПЕРЕХОД на вкладку "Сообщения"
+    document.querySelector('[data-tab="messages"]').click();
+    
     if(chatInterval) clearInterval(chatInterval);
     curChat = userId;
-    $("chatWith").textContent = "Чат: " + title;
+    $("chatWith").textContent = title;
     $("dialogsList").classList.add("hidden");
     $("chatView").classList.remove("hidden");
     loadChatMessages(userId);
@@ -499,35 +636,32 @@
   async function loadChatMessages(otherId) {
     if (!user || !otherId) return;
     let c = $("chatMessages");
-    if (!c.innerHTML || c.innerHTML.includes('Загрузка')) c.innerHTML = '<p style="color:var(--muted); font-size:12px; text-align:center;">Загрузка...</p>';
     try {
         let res = await sb.from("messages").select("*").or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`).order("created_at", { ascending: false }).limit(50);
-        if (res.error) { c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка загрузки чата</p>`; return; }
+        if (res.error) { c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка загрузки</p>`; return; }
         let msgs = res.data.reverse();
-        c.innerHTML = msgs.length ? msgs.map(m => `<div style="align-self:${m.sender_id === user.id?'flex-end':'flex-start'}; background:${m.sender_id === user.id?'var(--accent)':'var(--surface)'}; color:${m.sender_id === user.id?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px; word-break:break-word;">${esc(m.text)}</div>`).join("") : '<p style="color:var(--muted); text-align:center; font-size:13px; padding:20px;">Нет сообщений. Напишите первым!</p>';
+        c.innerHTML = msgs.length ? msgs.map(m => `<div style="align-self:${m.sender_id === user.id?'flex-end':'flex-start'}; background:${m.sender_id === user.id?'var(--gradient-premium)':'var(--bg)'}; color:${m.sender_id === user.id?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:14px; max-width:80%; font-size:13px; word-break:break-word; ${m.sender_id === user.id?'background:var(--accent); color:var(--bg);':''}">${esc(m.text)}</div>`).join("") : '<p style="color:var(--muted); text-align:center; font-size:13px; padding:20px;">Нет сообщений. Напишите первым!</p>';
         c.scrollTop = c.scrollHeight;
-    } catch (e) { c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка сети.</p>'; }
+    } catch (e) { c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка сети</p>'; }
   }
 
   $("chatForm").onsubmit = async (e) => {
     e.preventDefault();
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
-    
-    // ИИ-МОДЕРАЦИЯ ЧАТА
     const mod = moderateText(text);
-    if (mod.status === "rejected") return alert("🤖 Сообщение не отправлено: " + mod.reason);
+    if (mod.status === "rejected") return alert("🤖 " + mod.reason);
     
     $("chatInput").value = "";
     let c = $("chatMessages");
-    if (c.innerHTML.includes('Нет сообщений') || c.innerHTML.includes('Загрузка')) c.innerHTML = '';
-    c.innerHTML += `<div style="align-self:flex-end; background:var(--accent); color:var(--bg); padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px; opacity:0.7;">${esc(text)}</div>`;
+    if (c.innerHTML.includes('Нет сообщений')) c.innerHTML = '';
+    c.innerHTML += `<div style="align-self:flex-end; background:var(--accent); color:var(--bg); padding:10px 14px; border-radius:14px; max-width:80%; font-size:13px; opacity:0.7;">${esc(text)}</div>`;
     c.scrollTop = c.scrollHeight;
     let res = await sb.from("messages").insert({ sender_id: user.id, receiver_id: curChat, text: text });
     if (!res.error) loadChatMessages(curChat);
   };
 
-  // --- 7. МЕРОПРИЯТИЯ И ОТЗЫВЫ ---
+  // --- МЕРОПРИЯТИЯ ---
   window.handleEventBtn = async (id, type, max) => {
     if (!user) return openModal('authModal');
     if (type === 'limited' && max > 0) {
@@ -551,6 +685,7 @@
     alert("Одобрено!"); loadAll();
   };
 
+  // --- ОТЗЫВЫ ---
   window.openFeedback = id => {
     $("fbEventId").value = id; selectedStars = 0; $("fbStars").value = 0; $("fbText").value = "";
     document.querySelectorAll("#starRating .star").forEach(s => s.classList.remove("active"));
@@ -569,18 +704,19 @@
     if (selectedStars < 1) return alert("Поставьте оценку");
     let res = await sb.from("feedbacks").insert({ event_id: $("fbEventId").value, user_id: user.id, stars: selectedStars, text: $("fbText").value });
     if (res.error) return alert("Вы уже оставляли отзыв!");
-    closeModal('feedbackModal'); notice("Спасибо за отзыв!");
+    closeModal('feedbackModal'); notice("Спасибо!");
   };
 
-  // --- 8. ИДЕИ С МОДЕРАЦИЕЙ ---
+  // --- ИДЕИ ---
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
-      let st = i.ai_status === 'rejected' ? 'Отклонено ИИ' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'На рассмотрении'));
+      let st = i.ai_status === 'rejected' ? 'Отклонено' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'Рассматривается'));
       let cls = i.ai_status === 'rejected' ? 'status-rejected' : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : ''));
       return `<div class="idea-card">
-        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-          <b style="font-size:13px;">${esc(i.text.slice(0,30))}...</b><span class="idea-status ${cls}">${st}</span>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px; align-items:center;">
+          <b style="font-size:13px;">${esc(i.text.slice(0,30))}${i.text.length>30?'...':''}</b>
+          <span class="idea-status ${cls}">${st}</span>
         </div>
         <div style="color:var(--muted); font-size:12px;">${esc(i.text)}</div>
       </div>`;
@@ -615,38 +751,40 @@
     if(!user) return openModal('authModal');
     let txt = $("ideaText").value.trim();
     let btn = $("ideaSubmitBtn");
-    btn.disabled = true; btn.textContent = "ИИ проверяет...";
+    btn.disabled = true; 
+    showAIThinking('ideaThinkingArea', 'ИИ анализирует идею');
     
     setTimeout(async () => {
-      // ИИ-МОДЕРАЦИЯ ИДЕИ
       const mod = moderateText(txt);
+      hideAIThinking('ideaThinkingArea');
       if (mod.status === "rejected") {
-        $("ideaText").value = ""; btn.disabled = false; btn.textContent = "Отправить идею";
-        return notice("🤖 ИИ отклонил: " + mod.reason);
+        $("ideaText").value = ""; btn.disabled = false;
+        return notice("ИИ отклонил: " + mod.reason);
       }
       await sb.from("ideas").insert({
         user_id: user.id, school_id: profile?.school_id, text: txt,
         ai_status: "approved", ai_summary: mod.summary, admin_status: 'new'
       });
-      $("ideaText").value = ""; btn.disabled = false; btn.textContent = "Отправить идею";
-      notice("Идея отправлена в Ученический совет!");
+      $("ideaText").value = ""; btn.disabled = false;
+      notice("Идея отправлена!");
       loadAll();
-    }, 800);
+    }, 1500);
   };
 
-  // --- 9. ПРОФИЛЬ ---
+  // --- ПРОФИЛЬ ---
   async function renderProfile() {
+    updateAuthUI();
     if(!user) return;
     $("profEmail").textContent = user.email;
     
     if (profile && profile.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${profile.avatar_url}">`;
     } else {
-      $("avatarPreview").innerHTML = user.email[0].toUpperCase();
+      $("avatarPreview").textContent = user.email[0].toUpperCase();
     }
 
     let school = profile?.school_id ? profile.school_id : "Школа не указана";
-    let role = profile?.role === 'school_admin' ? " | Ученический совет" : "";
+    let role = profile?.role === 'school_admin' ? " · Ученический совет" : "";
     $("profMeta").textContent = school + role;
 
     renderIdeas();
@@ -661,7 +799,7 @@
           let ev = listings.find(l => l.id === r.event_id);
           return `<div class="idea-card">
             <b style="font-size:13px;">${esc(ev.title)}</b>
-            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">Ученик: ${r.user_id.slice(0,8)}...</div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:6px;">${r.user_id.slice(0,8)}...</div>
             <button class="button button-primary" style="padding:4px 10px; font-size:11px;" onclick="confirmReg('${r.id}', '${r.event_id}')">Одобрить</button>
           </div>`;
         }).join("") : `<p style="color:var(--muted); font-size:12px;">Нет новых заявок.</p>`;
@@ -679,15 +817,16 @@
     const compressed = await compressImage(file, 400); 
     const fileName = `avatar_${user.id}.jpg`;
     const { error } = await sb.storage.from('listings-images').upload(fileName, compressed, { upsert: true });
-    if (error) return alert("Ошибка загрузки: " + error.message);
-    
+    if (error) return alert("Ошибка: " + error.message);
     const { data } = sb.storage.from('listings-images').getPublicUrl(fileName);
     await sb.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", user.id);
     alert("Аватарка обновлена!");
-    loadAll().then(renderProfile);
+    profile.avatar_url = data.publicUrl;
+    updateAuthUI();
+    renderProfile();
   };
 
-  // --- 10. РЕГИСТРАЦИЯ И ВХОД ---
+  // --- АВТОРИЗАЦИЯ ---
   $("switchAuthBtn").onclick = () => {
     if($("authTitle").textContent === "Вход") {
       $("authTitle").textContent = "Регистрация";
@@ -715,12 +854,11 @@
     } else {
       res = await sb.auth.signInWithPassword({ email, password: pass });
     }
-    
     if (res.error) return $("authMsg").textContent = res.error.message;
-    if(isReg) alert("Проверьте почту для подтверждения!"); else location.reload();
+    if(isReg) alert("Проверьте почту!"); else location.reload();
   };
 
-  // --- 11. ОБРАБОТЧИКИ ИНТЕРФЕЙСА ---
+  // --- НАВИГАЦИЯ ---
   document.querySelectorAll(".nav-tab").forEach(tab => {
     tab.onclick = () => {
       document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
@@ -739,7 +877,8 @@
   });
   $("searchInput").oninput = renderListings;
 
-  $("authBtn").onclick = () => user ? document.querySelector('[data-tab="profile"]').click() : openModal('authModal');
+  $("authBtn").onclick = () => openModal('authModal');
+  $("myListingsBtn").onclick = () => document.querySelector('[data-tab="profile"]').click();
   $("createBtnDesktop").onclick = () => user ? openModal('listingModal') : openModal('authModal');
   $("fabBtn").onclick = () => user ? openModal('listingModal') : openModal('authModal');
   $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
@@ -753,14 +892,12 @@
     $("seatsGroup").classList.toggle("hidden", this.value !== "limited");
   });
 
-  // --- 12. СОЗДАНИЕ ОБЪЯВЛЕНИЯ С МОДЕРАЦИЕЙ ---
+  // --- СОЗДАНИЕ ОБЪЯВЛЕНИЯ ---
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
-    
-    // ИИ-МОДЕРАЦИЯ ОБЪЯВЛЕНИЯ
     const mod = moderateText(combinedText);
-    if (mod.status === "rejected") return alert("🤖 ИИ-модератор: " + mod.reason);
+    if (mod.status === "rejected") return alert("ИИ: " + mod.reason);
 
     let btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = "Публикация...";
@@ -787,10 +924,9 @@
     
     btn.disabled = false; btn.textContent = "Опубликовать";
     if(res.error) return alert(res.error.message);
-    
     closeModal('listingModal'); 
     $("listingForm").reset();
-    hintsBox.innerHTML = "💡 Начните вводить заголовок, и ИИ поможет с категорией.";
+    hintsBox.innerHTML = "Начните вводить заголовок — ИИ подскажет категорию";
     loadAll();
   };
 
@@ -801,6 +937,7 @@
     return null;
   }).then(res => {
     if(res && res.data) profile = res.data;
+    updateAuthUI();
     return loadAll();
   }).then(() => {
     if(user && profile?.role === 'school_admin') {
