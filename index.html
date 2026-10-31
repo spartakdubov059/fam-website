@@ -3,1543 +3,621 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#16171B">
   <title>FAM — Свои рядом</title>
-  <meta name="description" content="FAM — современная площадка объявлений для своих.">
-  
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     :root {
-      --bg: #16171B;
-      --surface: #22242A;
-      --surface-hover: #2A2D35;
-      --surface-2: #1C1E24;
-      --accent: #C8CDD8;
-      --accent-hover: #E8ECF4;
-      --accent-soft: rgba(200, 205, 216, 0.12);
-      --text: #F2F3F5;
-      --muted: #8B8F9A;
-      --border: #32353E;
-      --border-light: #3A3E48;
-      --danger: #FF7B7B;
-      --success: #7BC99A;
-      --radius: 18px;
-      --radius-sm: 12px;
-      --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
-      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+      --bg: #16171B; --surface: #22242A; --surface-hover: #2A2D35; --surface-2: #1C1E24;
+      --accent: #C8CDD8; --accent-hover: #E8ECF4; --accent-soft: rgba(200, 205, 216, 0.12);
+      --text: #F2F3F5; --muted: #8B8F9A; --border: #32353E; --border-light: #3A3E48;
+      --danger: #FF7B7B; --success: #7BC99A; --radius: 18px;
     }
-
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; line-height: 1.5; }
     .hidden { display: none !important; }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      min-height: 100vh;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-
     button, input, textarea, select { font: inherit; }
-    button { cursor: pointer; transition: all 0.2s ease; }
-    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    .header {
-      position: sticky; top: 0; z-index: 10;
-      background: rgba(22, 23, 27, 0.85);
-      backdrop-filter: blur(20px) saturate(1.4);
-      -webkit-backdrop-filter: blur(20px) saturate(1.4);
-      border-bottom: 1px solid var(--border);
-    }
-    .header-inner {
-      width: min(1100px, calc(100% - 32px));
-      min-height: 72px; margin: 0 auto;
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    }
-    .logo { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
-    .logo-mark {
-      display: grid; place-items: center;
-      width: 42px; height: 42px; border-radius: 13px;
-      background: linear-gradient(135deg, #E4E7EE, #B8BECB);
-      color: #16171B; font-size: 18px; font-weight: 900; letter-spacing: -1.5px;
-      box-shadow: 0 4px 12px rgba(200, 205, 216, 0.15);
-    }
-    .logo-name { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; }
-    .logo-caption { margin-top: 1px; color: var(--muted); font-size: 11px; font-weight: 500; }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-
-    .button {
-      min-height: 42px; padding: 0 18px;
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      border: 1px solid transparent; border-radius: 13px;
-      font-size: 13px; font-weight: 700; letter-spacing: 0.2px;
-      transition: all 0.2s ease;
-    }
-    .button-primary { background: var(--accent); color: #16171B; box-shadow: 0 4px 14px rgba(200, 205, 216, 0.18); }
-    .button-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(200, 205, 216, 0.25); }
-    .button-primary:active { transform: translateY(0); }
-    .button-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
-    .button-secondary:hover { background: var(--surface-hover); border-color: var(--border-light); }
-    .button:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
-
-    .main-nav {
-      position: sticky; top: 72px; z-index: 9;
-      background: rgba(22, 23, 27, 0.92);
-      backdrop-filter: blur(16px); border-bottom: 1px solid var(--border);
-    }
-    .main-nav-inner {
-      width: min(1000px, calc(100% - 32px)); margin: 0 auto;
-      display: flex; gap: 6px; overflow-x: auto; padding: 10px 0; scrollbar-width: none;
-    }
-    .main-nav-inner::-webkit-scrollbar { display: none; }
-    .nav-tab {
-      flex: 0 0 auto; min-height: 40px; padding: 0 16px;
-      border: 1px solid transparent; border-radius: 11px;
-      background: transparent; color: var(--muted);
-      font-size: 13px; font-weight: 650; transition: all 0.2s ease;
-    }
-    .nav-tab:hover { background: var(--surface); color: var(--text); }
-    .nav-tab.active { background: var(--accent); color: #16171B; font-weight: 750; }
-
-    main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding-bottom: 40px; }
+    button { cursor: pointer; transition: 0.2s; }
     
-    .hero { padding: 40px 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 32px; }
-    .hero-content { flex: 1; }
-    .hero h1 { margin: 0 0 12px; font-size: clamp(30px, 5vw, 48px); line-height: 1.12; font-weight: 800; letter-spacing: -1.4px; }
-    .hero p { margin: 0 0 22px; color: var(--muted); font-size: 15px; line-height: 1.55; max-width: 460px; }
-    .search-box {
-      display: flex; align-items: center; gap: 12px;
-      padding: 0 16px; min-height: 52px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; transition: border-color 0.2s, box-shadow 0.2s; max-width: 440px;
-    }
-    .search-box:focus-within { border-color: #6B7080; box-shadow: 0 0 0 3px var(--accent-soft); }
-    .search-box input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: 14px; }
-    .search-icon { color: var(--muted); font-size: 16px; }
-
-    .carousel-wrap { flex: 1; max-width: 560px; position: relative; }
-    .carousel { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+    /* Хедер и навигация */
+    .header { position: sticky; top: 0; z-index: 10; background: rgba(22, 23, 27, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .logo { display: flex; gap: 12px; align-items: center; color: var(--text); text-decoration: none; }
+    .logo-mark { width: 40px; height: 40px; background: var(--accent); color: var(--bg); border-radius: 12px; display: grid; place-items: center; font-weight: 900; font-size: 18px; }
+    .main-nav { position: sticky; top: 73px; z-index: 9; background: var(--bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+    .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; gap: 8px; padding: 10px 16px; }
+    .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 16px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+    .nav-tab.active { background: var(--accent); color: var(--bg); }
+    
+    .button { padding: 10px 20px; border-radius: 12px; border: none; font-weight: 700; font-size: 14px; }
+    .button-primary { background: var(--accent); color: var(--bg); }
+    .button-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 80px; }
+    
+    /* Карусель */
+    .carousel-container { position: relative; margin: 20px 0; }
+    .carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; padding-bottom: 10px; }
     .carousel::-webkit-scrollbar { display: none; }
-    .carousel-card {
-      flex: 0 0 82%; scroll-snap-align: start; position: relative;
-      height: 230px; border-radius: 20px; overflow: hidden;
-      border: 1px solid var(--border); box-shadow: var(--shadow-sm);
-      background-size: cover; background-position: center;
-      background-color: var(--surface);
-    }
+    .carousel-card { flex: 0 0 85%; scroll-snap-align: start; height: 240px; border-radius: 20px; overflow: hidden; position: relative; border: 1px solid var(--border); }
+    .carousel-card img { width: 100%; height: 100%; object-fit: cover; }
+    .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
     
-    .carousel-card img { 
-      width: 100%; 
-      height: 100%; 
-      object-fit: cover; 
-      display: block;
-    }
+    .carousel-arrows { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; display: flex; justify-content: space-between; pointer-events: none; padding: 0 10px; }
+    .arrow { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; display: grid; place-items: center; pointer-events: auto; cursor: pointer; opacity: 0; transition: 0.2s; }
+    .carousel-container:hover .arrow { opacity: 1; }
+    .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; }
+    .dot.active { background: var(--accent); }
 
-    .carousel-event-content {
-      position: absolute; inset: 0;
-      padding: 20px;
-      display: flex; flex-direction: column; justify-content: flex-end;
-      background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 60%, transparent 100%);
-      color: white;
-    }
-    .carousel-event-tag {
-      align-self: flex-start;
-      font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-      padding: 4px 8px; border-radius: 6px;
-      background: var(--accent); color: #16171B;
-      margin-bottom: 8px;
-    }
-    .carousel-event-title { font-size: 18px; font-weight: 800; line-height: 1.2; margin-bottom: 4px; }
-    .carousel-event-date { font-size: 12px; color: #d1d5db; margin-bottom: 12px; }
-    .carousel-event-btn {
-      align-self: flex-start;
-      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
-      color: white; padding: 8px 16px; border-radius: 10px;
-      font-size: 12px; font-weight: 700; cursor: pointer; backdrop-filter: blur(4px);
-      transition: all 0.2s;
-    }
-    .carousel-event-btn:hover { background: rgba(255,255,255,0.25); }
-
-    .board-header { display: flex; align-items: center; justify-content: space-between; margin: 28px 0 18px; gap: 16px; }
-    .board-title { font-size: 22px; font-weight: 800; letter-spacing: -0.6px; margin: 0; }
-    .results-count { font-size: 13px; color: var(--muted); font-weight: 600; }
+    /* Карточки */
+    .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .card { background: var(--surface); border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }
+    .card-img { width: 100%; height: 160px; object-fit: cover; }
+    .card-info { padding: 14px; }
     
-    .filters-row { display: flex; align-items: center; gap: 10px; }
-    .school-filter {
-      background: var(--surface); border: 1px solid var(--border);
-      color: var(--text); border-radius: 11px; padding: 8px 14px;
-      font-size: 13px; font-weight: 600; outline: none; cursor: pointer; transition: border-color 0.2s;
-    }
-    .school-filter:hover, .school-filter:focus { border-color: var(--border-light); }
-
-    .categories { display: flex; gap: 8px; overflow-x: auto; padding: 2px 1px 14px; scrollbar-width: none; }
-    .categories::-webkit-scrollbar { display: none; }
-    .category-button {
-      flex: 0 0 auto; min-height: 38px; padding: 0 15px;
-      border: 1px solid var(--border); border-radius: 11px;
-      background: var(--surface); color: var(--muted);
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
-    }
-    .category-button:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
-    .category-button.active { background: var(--accent); color: #16171B; border-color: var(--accent); font-weight: 700; }
-
-    .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; margin-top: 8px; }
-    .listing-card { display: flex; flex-direction: column; min-width: 0; background: transparent; border-radius: var(--radius); overflow: hidden; transition: transform 0.22s ease; }
-    .listing-card:hover { transform: translateY(-5px); }
+    /* Идеи */
+    .idea-card { background: var(--surface); padding: 16px; border-radius: 14px; margin-bottom: 12px; border: 1px solid var(--border); }
+    .idea-status { font-size: 11px; padding: 4px 8px; border-radius: 6px; background: var(--bg); font-weight: 700; }
+    .idea-status.approved { color: var(--success); }
+    .idea-status.rejected { color: var(--danger); }
     
-    .listing-image-wrap {
-      position: relative; width: 100%; padding-top: 100%;
-      border-radius: 16px; overflow: hidden; border: 1px solid var(--border);
-      background: var(--surface); box-shadow: var(--shadow-sm);
-      transition: box-shadow 0.22s ease, border-color 0.22s ease;
-    }
-    .listing-card:hover .listing-image-wrap { box-shadow: var(--shadow-md); border-color: var(--border-light); }
-    .listing-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s ease; }
-    .listing-card:hover .listing-img { transform: scale(1.04); }
-    .listing-img-placeholder {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      display: grid; place-items: center; color: var(--muted); font-size: 28px;
-      background: linear-gradient(145deg, #252830, #1E2026);
-    }
-    
-    .listing-fav-btn {
-      position: absolute; top: 10px; right: 10px;
-      width: 34px; height: 34px; border-radius: 50%;
-      background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(8px);
-      border: none; color: #fff; font-size: 16px;
-      display: grid; place-items: center; cursor: pointer; transition: all 0.2s ease; z-index: 2;
-    }
-    .listing-fav-btn:hover { background: rgba(0, 0, 0, 0.75); transform: scale(1.08); }
-    .listing-fav-btn.active { color: #FF7B7B; }
-
-    .listing-info { padding: 12px 2px 0; display: flex; flex-direction: column; flex-grow: 1; }
-    .listing-price { font-size: 17px; font-weight: 800; margin-bottom: 3px; letter-spacing: -0.3px; }
-    .listing-title { font-size: 14px; font-weight: 600; margin: 0 0 5px; line-height: 1.35; overflow-wrap: anywhere; color: var(--text); }
-    .listing-category { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
-    .listing-school { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: auto; opacity: 0.85; }
-    .listing-seats { font-size: 12px; font-weight: 700; margin-top: 4px; color: var(--success); }
-    .listing-seats.full { color: var(--danger); }
-
-    .listing-actions { margin-top: 10px; }
-    .listing-actions .button { width: 100%; min-height: 36px; font-size: 12px; border-radius: 10px; }
-    .listing-card .small-button {
-      width: 100%; margin-top: 8px; padding: 8px; border-radius: 10px;
-      border: 1px solid var(--border); background: transparent; color: var(--muted);
-      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-    }
-    .listing-card .small-button:hover { background: var(--surface); color: var(--text); border-color: var(--border-light); }
-
-    .empty-state {
-      grid-column: 1 / -1; padding: 56px 24px; text-align: center;
-      background: var(--surface); border: 1px dashed #3A3E48; border-radius: var(--radius);
-    }
-    .empty-icon { margin-bottom: 14px; font-size: 32px; opacity: 0.7; }
-    .empty-state h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; }
-    .empty-state p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 280px; margin-left: auto; margin-right: auto; }
-
-    .profile-card {
-      display: flex; align-items: center; gap: 20px;
-      padding: 24px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 20px; margin-bottom: 24px; box-shadow: var(--shadow-sm);
-    }
-    .profile-avatar-wrap { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
-    .profile-avatar {
-      width: 84px; height: 84px; border-radius: 50%;
-      background: linear-gradient(135deg, #D4D8E2, #A8AEBB); color: #16171B;
-      display: grid; place-items: center; font-size: 30px; font-weight: 900;
-    }
-    .profile-avatar-img { position: absolute; inset: 0; width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid var(--bg); }
-    .profile-info { flex: 1; }
-    .profile-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.3px; }
-    .profile-meta { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
-    .profile-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    
-    .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
-    .profile-stat { padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; text-align: center; transition: border-color 0.2s; }
-    .profile-stat:hover { border-color: var(--border-light); }
-    .profile-stat-value { font-size: 26px; font-weight: 800; margin-bottom: 4px; letter-spacing: -0.5px; }
-    .profile-stat-label { color: var(--muted); font-size: 12px; font-weight: 500; }
-
-    .dialogs { display: flex; flex-direction: column; gap: 8px; }
-    .dialog-item {
-      padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; cursor: pointer; transition: all 0.2s ease;
-      display: flex; gap: 14px; align-items: center;
-    }
-    .dialog-item:hover { background: var(--surface-hover); border-color: var(--border-light); transform: translateX(2px); }
-    .dialog-avatar { width: 44px; height: 44px; border-radius: 50%; background: #2F323C; display: grid; place-items: center; font-size: 17px; font-weight: 800; flex-shrink: 0; }
-    .dialog-content { flex: 1; min-width: 0; }
-    .dialog-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 3px; }
-    .dialog-name { font-weight: 750; font-size: 14px; }
-    .dialog-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
-    .dialog-preview { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .chat { display: flex; flex-direction: column; min-height: 60vh; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-sm); }
-    .chat-header { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--bg); }
-    .chat-with { font-weight: 750; font-size: 15px; }
-    .chat-messages { flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 55vh; }
-    .msg { max-width: 75%; padding: 11px 15px; border-radius: 16px; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
-    .msg.mine { align-self: flex-end; background: var(--accent); color: #16171B; border-bottom-right-radius: 4px; }
-    .msg.theirs { align-self: flex-start; background: #2F323C; color: var(--text); border-bottom-left-radius: 4px; }
-    .msg-time { display: block; font-size: 10px; opacity: 0.65; margin-top: 5px; }
-    .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg); }
-    .chat-form input { flex: 1; margin-bottom: 0; border-radius: 13px; }
-
-    .modal { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(10px); }
+    /* Модалки */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
     .modal.open { display: flex; }
-    .modal-content { width: min(100%, 440px); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 28px; background: #1E2026; border: 1px solid #3A3E48; border-radius: 22px; box-shadow: var(--shadow-lg); position: relative; }
-    .modal-close { position: absolute; top: 18px; right: 18px; width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 18px; display: grid; place-items: center; transition: background 0.2s; }
-    .modal-close:hover { background: var(--surface-hover); }
-    .modal-header h2 { margin: 0 0 6px; font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
-    .modal-header p { margin: 0 0 22px; color: var(--muted); font-size: 13px; }
-    
+    .modal-content { background: var(--surface); padding: 24px; border-radius: 20px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; }
     .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.2px; }
-    .form-control { width: 100%; min-height: 48px; padding: 12px 15px; border: 1px solid #3A3E48; border-radius: 13px; background: #16171B; color: var(--text); font-size: 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
-    .form-control:focus { border-color: #6B7080; box-shadow: 0 0 0 3px var(--accent-soft); }
-    textarea.form-control { min-height: 110px; resize: vertical; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+    .form-control { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); }
     
-    .text-button { background: none; border: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 0; font-size: 13px; }
-    .form-message { margin-top: 12px; font-size: 13px; text-align: center; min-height: 18px; }
-
-    footer { width: min(100% - 40px, 1100px); margin: 48px auto 0; padding: 32px 0 40px; text-align: center; border-top: 1px solid var(--border); }
-    .footer-brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
-    .footer-studio { color: #F2F3F5; font-size: 13px; font-weight: 900; letter-spacing: 2.5px; }
-    .footer-studio span { color: var(--muted); }
-    .footer-note { color: #6B6F7A; font-size: 12px; line-height: 1.7; }
-
-    .fab {
-      display: none; position: fixed; right: 20px; bottom: 24px;
-      width: 56px; height: 56px; border-radius: 18px;
-      background: var(--accent); color: #16171B; border: none;
-      font-size: 28px; font-weight: 400;
-      box-shadow: 0 8px 24px rgba(200, 205, 216, 0.3);
-      z-index: 20; align-items: center; justify-content: center;
-      transition: all 0.2s ease;
-    }
-    .fab:hover { transform: scale(1.06); background: var(--accent-hover); }
-    .fab.hidden-by-tab { display: none !important; }
-
-    .notice { margin-bottom: 20px; padding: 13px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); text-align: center; font-size: 13px; font-weight: 500; }
-    .notice.error { border-color: rgba(255, 123, 123, 0.35); background: rgba(255, 123, 123, 0.08); color: #FFB0B0; }
-    .notice.success { border-color: rgba(123, 201, 154, 0.35); background: rgba(123, 201, 154, 0.08); color: #A8E0BC; }
-
-    @media (max-width: 800px) {
-      .hero { flex-direction: column; padding-top: 28px; gap: 24px; }
-      .hero-content { width: 100%; }
-      .carousel-wrap { width: 100%; max-width: 100%; }
-      .board-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-      .filters-row { width: 100%; justify-content: space-between; }
-      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-      .fab { display: flex; }
-      #createListingButton { display: none; }
-      .carousel-card { flex: 0 0 88%; height: 210px; }
-    }
-    @media (max-width: 520px) {
-      .header-inner { min-height: 62px; }
-      .logo-mark { width: 36px; height: 36px; font-size: 15px; }
-      .logo-name { font-size: 16px; }
-      .main-nav { top: 62px; }
-      main { width: calc(100% - 24px); }
-      .carousel-card { flex: 0 0 92%; height: 200px; }
-      .listings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-      .listing-price { font-size: 15px; }
-      .listing-title { font-size: 13px; }
-      .listing-info { padding: 10px 2px 0; }
-      .profile-card { flex-direction: column; text-align: center; }
-      .profile-actions { justify-content: center; }
-      .hero h1 { font-size: 28px; }
-    }
+    .stars { display: flex; gap: 8px; font-size: 30px; cursor: pointer; }
+    .star { color: var(--muted); transition: 0.2s; }
+    .star.active { color: #F0C14B; }
+    
+    .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: none; z-index: 20; }
+    @media(min-width: 800px) { .fab { display: none; } }
   </style>
 </head>
-
 <body>
-  <header class="header">
-    <div class="header-inner">
-      <a href="#" class="logo" aria-label="FAM — главная">
-        <div class="logo-mark">F</div>
-        <div>
-          <div class="logo-name">FAM</div>
-          <div class="logo-caption">Свои рядом</div>
-        </div>
-      </a>
-      <div class="header-actions">
-        <button class="button button-secondary" id="myListingsButton">Мои объявления</button>
-        <button class="button button-primary" id="authButton">Войти</button>
+
+<header class="header">
+  <div class="header-inner">
+    <a href="#" class="logo"><div class="logo-mark">F</div><div><b>FAM</b><br><small style="color:var(--muted)">Свои рядом</small></div></a>
+    <div><button class="button button-secondary" id="myListingsBtn">Мои</button> <button class="button button-primary" id="authBtn">Войти</button></div>
+  </div>
+</header>
+
+<nav class="main-nav">
+  <div class="nav-inner">
+    <button class="nav-tab active" data-tab="board">Доска</button>
+    <button class="nav-tab" data-tab="ideas">Идеи</button>
+    <button class="nav-tab" data-tab="favorites">Избранное</button>
+    <button class="nav-tab" data-tab="messages">Сообщения</button>
+    <button class="nav-tab" data-tab="profile">Профиль</button>
+  </div>
+</nav>
+
+<main>
+  <!-- ЛЕНТА -->
+  <section id="boardSection">
+    <div class="carousel-container" id="carouselContainer">
+      <div class="carousel" id="bannerCarousel"></div>
+      <div class="carousel-arrows">
+        <button class="arrow" id="arrLeft">‹</button>
+        <button class="arrow" id="arrRight">›</button>
       </div>
+      <div class="carousel-dots" id="carouselDots"></div>
     </div>
-  </header>
 
-  <nav class="main-nav" aria-label="Главная навигация">
-    <div class="main-nav-inner">
-      <button class="nav-tab active" data-tab="board">Доска</button>
-      <button class="nav-tab" data-tab="favorites">Избранное</button>
-      <button class="nav-tab" data-tab="messages">Сообщения</button>
-      <button class="nav-tab" data-tab="profile">Профиль</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin: 20px 0;">
+      <h2 style="margin:0;">Объявления</h2>
+      <input type="search" id="searchInput" placeholder="Поиск..." class="form-control" style="width:200px;">
     </div>
-  </nav>
+    
+    <div style="overflow-x:auto; display:flex; gap:8px; padding-bottom:10px; margin-bottom:20px;">
+      <button class="button button-secondary cat-btn active" data-cat="Все">Все</button>
+      <button class="button button-secondary cat-btn" data-cat="Вещи">Вещи</button>
+      <button class="button button-secondary cat-btn" data-cat="Услуги">Услуги</button>
+      <button class="button button-secondary cat-btn" data-cat="Учёба">Учёба</button>
+      <button class="button button-secondary cat-btn" data-cat="Мероприятия">Мероприятия</button>
+    </div>
 
-  <main>
-    <section class="section" id="listingsSection">
-      <div class="hero">
-        <div class="hero-content">
-          <h1>Свои рядом</h1>
-          <p>Объявления, мероприятия и возможности от учеников твоей школы. Находи нужное и делись своим.</p>
-          <label class="search-box">
-            <span class="search-icon">⌕</span>
-            <input id="searchInput" type="search" placeholder="Поиск объявлений..." autocomplete="off">
-          </label>
+    <div class="listings" id="listingsGrid"></div>
+    <button class="button button-primary hidden" id="createBtnDesktop" style="width:100%; margin-top:20px;">+ Создать</button>
+  </section>
+
+  <!-- ИДЕИ -->
+  <section id="ideasSection" class="hidden">
+    <h2>Почта идей</h2>
+    <p style="color:var(--muted); font-size:14px;">ИИ проверит идею, а медиацентр решит, что с ней делать.</p>
+    
+    <div style="background:var(--surface); padding:20px; border-radius:16px; margin-bottom:20px;">
+      <form id="ideaForm">
+        <div class="form-group">
+          <label>Твоя идея</label>
+          <textarea id="ideaText" class="form-control" rows="3" placeholder="Что можно улучшить в школе?" required></textarea>
         </div>
-        
-        <div class="carousel-wrap">
-          <div class="carousel" id="bannerCarousel"></div>
+        <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%;">Отправить</button>
+        <div id="ideaMsg" style="text-align:center; margin-top:10px; font-size:13px;"></div>
+      </form>
+    </div>
+
+    <h3>Мои идеи</h3>
+    <div id="myIdeasList"></div>
+
+    <div id="adminIdeasDash" class="hidden" style="margin-top:30px; border-top:1px solid var(--border); padding-top:20px;">
+      <h3>Идеи школы (Панель медиацентра)</h3>
+      <div id="adminIdeasList"></div>
+    </div>
+  </section>
+
+  <!-- ПРОФИЛЬ -->
+  <section id="profileSection" class="hidden">
+    <h2>Профиль</h2>
+    <div style="background:var(--surface); padding:20px; border-radius:16px; margin-bottom:20px;">
+      <h3 id="profEmail" style="margin:0 0 8px;"></h3>
+      <div id="profMeta" style="color:var(--muted);"></div>
+    </div>
+    
+    <div id="adminRequests" class="hidden">
+      <h3>Заявки на мероприятия</h3>
+      <div id="adminReqList"></div>
+    </div>
+
+    <h3>Мои объявления</h3>
+    <div class="listings" id="myListingsGrid"></div>
+    <button class="button button-secondary" id="logoutBtn" style="width:100%; margin-top:20px;">Выйти</button>
+  </section>
+
+  <!-- СООБЩЕНИЯ -->
+  <section id="messagesSection" class="hidden">
+    <h2>Сообщения</h2>
+    <div id="dialogsList"></div>
+    <div id="chatView" class="hidden" style="margin-top:20px; background:var(--surface); padding:20px; border-radius:16px;">
+      <button class="button button-secondary" id="chatBackBtn">← Назад</button>
+      <h3 id="chatWith"></h3>
+      <div id="chatMessages" style="max-height:40vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin-bottom:20px;"></div>
+      <form id="chatForm" style="display:flex; gap:8px;">
+        <input id="chatInput" class="form-control" style="flex:1;" placeholder="Написать...">
+        <button type="submit" class="button button-primary">→</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fabBtn">+</button>
+
+<!-- МОДАЛКИ -->
+<div class="modal" id="authModal">
+  <div class="modal-content">
+    <button onclick="closeModal('authModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
+    <h2 id="authTitle">Вход</h2>
+    <form id="authForm">
+      <div class="form-group"><label>Почта</label><input type="email" id="authEmail" class="form-control" required></div>
+      <div class="form-group"><label>Пароль</label><input type="password" id="authPassword" class="form-control" required></div>
+      <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
+      <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--accent);">Создать аккаунт</button></div>
+      <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:10px;"></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="listingModal">
+  <div class="modal-content">
+    <button onclick="closeModal('listingModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
+    <h2>Создать</h2>
+    <form id="listingForm">
+      <div class="form-group"><label>Заголовок</label><input type="text" id="lTitle" class="form-control" required></div>
+      <div class="form-group"><label>Описание</label><textarea id="lDesc" class="form-control" required></textarea></div>
+      <div class="form-group">
+        <label>Категория</label>
+        <select id="lCat" class="form-control" required>
+          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Учёба">Учёба</option>
+          <option value="Мероприятия" id="evOption" style="display:none;">📢 Мероприятие</option>
+        </select>
+      </div>
+      
+      <div id="eventFields" class="hidden" style="background:var(--bg); padding:12px; border-radius:10px; margin-bottom:16px;">
+        <div class="form-group"><label>Дата</label><input type="date" id="evDate" class="form-control"></div>
+        <div class="form-group"><label>Время</label><input type="time" id="evTime" class="form-control"></div>
+        <div class="form-group">
+          <label>Тип участия</label>
+          <label style="display:block; margin-bottom:5px;"><input type="radio" name="evType" value="open" checked> Открытое (все)</label>
+          <label style="display:block; margin-bottom:5px;"><input type="radio" name="evType" value="request"> По заявке (одобрение)</label>
+          <label style="display:block;"><input type="radio" name="evType" value="limited"> Лимит мест</label>
         </div>
+        <div class="form-group hidden" id="seatsGroup"><label>Кол-во мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
       </div>
 
-      <div class="board-header">
-        <h2 class="board-title">Свежие объявления</h2>
-        <div class="filters-row">
-          <select id="schoolFilter" class="school-filter hidden">
-            <option value="all">Все школы</option>
-            <option value="my">Моя школа</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="categories" id="categories">
-        <button class="category-button active" data-category="Все">Все</button>
-        <button class="category-button" data-category="Вещи">Вещи</button>
-        <button class="category-button" data-category="Услуги">Услуги</button>
-        <button class="category-button" data-category="Творчество">Творчество</button>
-        <button class="category-button" data-category="Учёба">Учёба</button>
-        <button class="category-button" data-category="Мероприятия">Мероприятия</button>
-      </div>
-      
-      <div id="notice" class="notice hidden"></div>
-      
-      <div class="listings" id="listings">
-        <div class="empty-state">
-          <div class="empty-icon">✳</div>
-          <h3>Загружаем объявления</h3>
-        </div>
-      </div>
-      
-      <div style="margin-top:30px; text-align:center;">
-         <button class="button button-primary" id="createListingButton" style="padding: 0 30px;">+ Создать объявление</button>
-      </div>
-    </section>
+      <div class="form-group"><label>Фото</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
+      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Договорная"></div>
+      <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
+    </form>
+  </div>
+</div>
 
-    <section class="section hidden" id="profileSection" style="margin-top: 30px;">
-      <div class="profile-card">
-        <div class="profile-avatar-wrap">
-          <div class="profile-avatar" id="profileAvatar">?</div>
-          <img class="profile-avatar-img hidden" id="profileAvatarImg" alt="">
+<div class="modal" id="feedbackModal">
+  <div class="modal-content">
+    <button onclick="closeModal('feedbackModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
+    <h2>Отзыв о мероприятии</h2>
+    <form id="feedbackForm">
+      <input type="hidden" id="fbEventId">
+      <div class="form-group">
+        <label>Оценка</label>
+        <div class="stars" id="starRating">
+          <span class="star" data-v="1">☆</span><span class="star" data-v="2">☆</span><span class="star" data-v="3">☆</span><span class="star" data-v="4">☆</span><span class="star" data-v="5">☆</span>
         </div>
-        <div class="profile-info">
-          <div class="profile-name" id="profileEmail">—</div>
-          <div class="profile-meta" id="profileMeta">—</div>
-          <div class="profile-actions">
-            <label class="small-button" for="avatarInput" style="cursor:pointer;display:inline-block; padding:8px 12px; border-radius:10px; border:1px solid var(--border); font-size:12px;">📷 Загрузить фото</label>
-            <input type="file" id="avatarInput" accept="image/jpeg, image/png, image/webp" style="display:none">
-            <button class="small-button hidden" id="avatarRemove" type="button" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); font-size:12px; background:transparent; color:var(--muted);">Удалить</button>
-            <button class="small-button" id="btnAdminCode" style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); font-size:12px; background:transparent; color:var(--muted);">🔑 Код медиацентра</button>
+        <input type="hidden" id="fbStars" value="0">
+      </div>
+      <div class="form-group"><label>Комментарий</label><textarea id="fbText" class="form-control" rows="3"></textarea></div>
+      <button type="submit" class="button button-primary" style="width:100%;">Отправить</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let user = null, profile = null;
+  let listings = [], regs = [], occupancy = [], ideas = [];
+  let curCat = "Все", curChat = null, carTimer = null, selectedStars = 0;
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  window.closeModal = id => $(id).classList.remove("open");
+  const openModal = id => $(id).classList.add("open");
+  const notice = (msg, type="success") => { alert(msg); };
+
+  // --- AI ФИЛЬТР ---
+  function aiFilter(text) {
+    let t = text.toLowerCase();
+    if (t.length < 10) return { status: "rejected", reason: "Слишком короткая идея" };
+    let bad = ["хуй", "бля", "пизд", "говно", "fuck", "shit"];
+    if (bad.some(b => t.includes(b))) return { status: "rejected", reason: "Неприемлемые слова" };
+    if (/(.)\1{5,}/.test(t)) return { status: "rejected", reason: "Похоже на спам" };
+    return { status: "approved", summary: text.slice(0, 50) + (text.length>50?"...":"") };
+  }
+
+  // --- ЗАГРУЗКА ---
+  async function loadAll() {
+    let r1 = await sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false });
+    if(!r1.error) listings = r1.data;
+
+    if (user) {
+      let r2 = await sb.from("event_registrations").select("*");
+      if(!r2.error) regs = r2.data;
+      
+      let r3 = await sb.from("ideas").select("*").order("created_at", { ascending: false });
+      if(!r3.error) ideas = r3.data;
+    }
+    
+    let r4 = await sb.from("event_occupancy").select("*");
+    if(!r4.error) occupancy = r4.data;
+
+    renderBanners();
+    renderListings();
+    if(!$("ideasSection").classList.contains("hidden")) renderIdeas();
+    if(!$("profileSection").classList.contains("hidden")) renderProfile();
+  }
+
+  const getTaken = id => { let o = occupancy.find(x=>x.event_id===id); return o?parseInt(o.taken):0; };
+
+  // --- БАННЕРЫ (КАРУСЕЛЬ) ---
+  function renderBanners() {
+    let box = $("bannerCarousel");
+    let dots = $("carouselDots");
+    let html = ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"]
+      .map(src => `<div class="carousel-card"><img src="${src}"></div>`);
+    
+    if (user && profile && profile.school_id) {
+      let evs = listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 3);
+      evs.forEach(e => {
+        html.push(`<div class="carousel-card">
+          <div class="carousel-event">
+            <span style="background:var(--accent); color:var(--bg); padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; align-self:flex-start; margin-bottom:8px;">СОБЫТИЕ</span>
+            <div style="font-size:18px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
+            <div style="font-size:12px; color:#ccc; margin-bottom:10px;">${e.event_date || ''}</div>
+            <button class="button button-primary" style="align-self:flex-start; padding:8px 16px; font-size:12px;" onclick="handleEventBtn('${e.id}', '${e.event_type}', ${e.max_seats})">Записаться</button>
           </div>
-        </div>
-      </div>
-      
-      <div class="profile-stats">
-        <div class="profile-stat">
-          <div class="profile-stat-value" id="profileListingsCount">0</div>
-          <div class="profile-stat-label">Моих объявлений</div>
-        </div>
-        <div class="profile-stat">
-          <div class="profile-stat-value" id="profileFavoritesCount">0</div>
-          <div class="profile-stat-label">В избранном</div>
-        </div>
-      </div>
-
-      <!-- Раздел заявок для медиацентра -->
-      <div id="adminRequests" class="hidden" style="margin-bottom: 30px;">
-        <h3 style="margin-bottom:16px;">Заявки на мероприятия</h3>
-        <div id="adminRequestsList" class="dialogs"></div>
-      </div>
-
-      <h3 style="margin-bottom:16px;">Мои объявления</h3>
-      <div class="listings" id="profileListings"></div>
-      
-      <button class="button button-secondary" id="profileSignOut" style="margin-top:30px; width:100%;">Выйти из аккаунта</button>
-    </section>
-
-    <section class="section hidden" id="favoritesSection" style="margin-top: 30px;">
-      <div class="board-header">
-        <h2 class="board-title">Избранное</h2>
-        <span class="results-count" id="favoritesCount"></span>
-      </div>
-      <div class="listings" id="favoritesList"></div>
-    </section>
-
-    <section class="section hidden" id="messagesSection" style="margin-top: 30px;">
-      <div class="board-header"><h2 class="board-title">Сообщения</h2></div>
-      <div id="dialogsList" class="dialogs"></div>
-
-      <div id="chatView" class="chat hidden">
-        <div class="chat-header">
-          <button class="button button-secondary" id="chatBack" style="padding: 0 12px; min-height:36px;">← Назад</button>
-          <div class="chat-with" id="chatWith">—</div>
-        </div>
-        <div class="chat-messages" id="chatMessages"></div>
-        <form id="chatForm" class="chat-form">
-          <input id="chatInput" type="text" class="form-control" placeholder="Написать сообщение..." maxlength="1000" autocomplete="off">
-          <button class="button button-primary" type="submit">Отправить</button>
-        </form>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="footer-brand">
-      <span class="footer-studio">SPR <span>STUDIO</span></span>
-    </div>
-    <p class="footer-note">
-      FAM — свои рядом. Не публикуй пароли, домашний адрес и другие личные данные.<br>
-      Не отправляй незнакомцам деньги.
-    </p>
-    <p class="footer-note" style="margin-top: 8px;">
-      Нашёл баг или есть идея? Напиши нам: 
-      <a href="https://t.me/Spartak_059" target="_blank" style="color: var(--accent); text-decoration: underline;">
-        @Spartak_059
-      </a>
-    </p>
-  </footer>
-
-  <button class="fab" id="fabCreate" aria-label="Создать объявление">+</button>
-
-  <div class="modal" id="authModal" role="dialog">
-    <div class="modal-content">
-      <button class="modal-close" data-close="authModal">×</button>
-      <div class="modal-header">
-        <h2 id="authTitle">С возвращением</h2>
-        <p id="authDescription">Войди, чтобы быть среди своих.</p>
-      </div>
-      <form id="authForm">
-        <div class="form-group" id="schoolGroup" style="display:none;">
-          <label for="authSchool">Твоя школа</label>
-          <select id="authSchool" class="form-control" required>
-            <option value="">Загрузка школ...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="authEmail">Почта</label>
-          <input id="authEmail" type="email" class="form-control" autocomplete="email" placeholder="example@mail.ru" required>
-        </div>
-        <div class="form-group">
-          <label for="authPassword">Пароль</label>
-          <input id="authPassword" type="password" class="form-control" autocomplete="current-password" placeholder="Минимум 6 символов" minlength="6" required>
-        </div>
-        <button class="button button-primary form-submit" id="authSubmit" type="submit" style="width:100%; margin-top:10px;">Войти</button>
-        <div class="form-message" id="authMessage"></div>
-      </form>
-      <p style="text-align: center; margin-top: 20px; font-size: 13px; color:var(--muted);">
-        <span id="authSwitchText">Впервые здесь?</span>
-        <button class="text-button" id="authSwitchButton" type="button">Создать аккаунт</button>
-      </p>
-    </div>
-  </div>
-
-  <div class="modal" id="listingModal" role="dialog">
-    <div class="modal-content">
-      <button class="modal-close" data-close="listingModal">×</button>
-      <div class="modal-header">
-        <h2>Создание объявления</h2>
-      </div>
-      <form id="listingForm">
-        <div class="form-group">
-          <label for="listingTitle">Заголовок</label>
-          <input id="listingTitle" type="text" class="form-control" maxlength="100" placeholder="Например, iPhone 13" required>
-        </div>
-        <div class="form-group">
-          <label for="listingDescription">Описание</label>
-          <textarea id="listingDescription" class="form-control" maxlength="1500" placeholder="Расскажите подробнее..." required></textarea>
-        </div>
-        <div class="form-group">
-          <label for="listingCategory">Категория</label>
-          <select id="listingCategory" class="form-control" required>
-            <option value="Вещи">Вещи</option>
-            <option value="Услуги">Услуги</option>
-            <option value="Творчество">Творчество</option>
-            <option value="Учёба">Учёба</option>
-            <option value="Мероприятия" id="eventOption" style="display:none;">📢 Мероприятие</option>
-          </select>
-        </div>
-        <!-- Поле для количества мест -->
-        <div class="form-group" id="seatsGroup" style="display:none;">
-          <label for="listingSeats">Количество мест</label>
-          <input id="listingSeats" type="number" class="form-control" min="1" placeholder="Например: 20">
-        </div>
-        <div class="form-group" id="imageGroup">
-          <label for="listingImage">Обложка (картинка)</label>
-          <input id="listingImage" type="file" class="form-control" accept="image/jpeg, image/png, image/webp" style="padding:10px;">
-        </div>
-        <div class="form-group">
-          <label for="listingPrice">Цена (необязательно)</label>
-          <input id="listingPrice" type="text" class="form-control" maxlength="50" placeholder="Например: 5 000 ₽">
-        </div>
-        <button class="button button-primary form-submit" id="listingSubmit" type="submit" style="width:100%; margin-top:10px;">Опубликовать</button>
-        <div class="form-message" id="listingMessage"></div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-  (function () {
-    "use strict";
-
-    var SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-    var SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
-
-    var supabaseClient = null;
-    var currentUser = null;
-    var currentProfile = null;
-    var allListings = [];
-    var favorites = [];
-    var eventRegistrations = []; // Приватные заявки (мои + для админа)
-    var eventOccupancy = [];     // Публичный счетчик (безопасный)
-    var selectedCategory = "Все";
-    var showOnlyMine = false;
-    var authMode = "login";
-    var currentChatUserId = null;
-    var messagesPollTimer = null;
-    var carouselTimer = null;
-    var currentAvatarUrl = null;
-    var schoolsList = [];
-    var profilesCache = {};
-
-    function $(id) { return document.getElementById(id); }
-
-    function escapeHTML(value) {
-      return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
-        return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+        </div>`);
       });
     }
 
-    function pluralize(n) {
-      var a = n % 100, b = n % 10;
-      if (a >= 11 && a <= 14) return "объявлений";
-      if (b === 1) return "объявление";
-      if (b >= 2 && b <= 4) return "объявления";
-      return "объявлений";
-    }
-
-    function formatDate(dateString) {
-      if (!dateString) return "";
-      var date = new Date(dateString);
-      if (isNaN(date.getTime())) return "";
-      return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-    }
-
-    function showNotice(message, type) {
-      var notice = $("notice");
-      if (!notice) return;
-      notice.textContent = message;
-      notice.className = "notice" + (type ? " " + type : "");
-      notice.classList.remove("hidden");
-      notice.style.display = "block";
-      clearTimeout(showNotice._t);
-      showNotice._t = setTimeout(function () { 
-        notice.style.display = "none"; 
-        notice.classList.add("hidden");
-      }, 6000);
-    }
-
-    function setFormMessage(id, message, type) {
-      var el = $(id);
-      if (!el) return;
-      el.textContent = message;
-      el.style.color =
-        type === "error" ? "#FFAAAA" :
-        type === "success" ? "#B9D8B6" : "#A5A7B0";
-    }
-
-    function openModal(id) {
-      var m = $(id);
-      if (!m) return;
-      m.classList.add("open");
-      document.body.style.overflow = "hidden";
-    }
-
-    function closeModal(id) {
-      var m = $(id);
-      if (!m) return;
-      m.classList.remove("open");
-      if (!document.querySelector(".modal.open")) document.body.style.overflow = "";
-    }
-
-    document.querySelectorAll("[data-close]").forEach(function (btn) {
-      btn.addEventListener("click", function () { closeModal(btn.dataset.close); });
-    });
-    document.querySelectorAll(".modal").forEach(function (modal) {
-      modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(modal.id); });
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") {
-        document.querySelectorAll(".modal.open").forEach(function (m) { closeModal(m.id); });
-      }
-    });
-
-    function updateAuthButton() {
-      var btn = $("authButton");
-      if (btn) btn.textContent = currentUser ? "Мой аккаунт" : "Войти";
-      
-      var filter = $("schoolFilter");
-      if (currentUser) filter.classList.remove("hidden");
-      else filter.classList.add("hidden");
-    }
-
-    function getSchoolName(schoolId) {
-      if (!schoolId || !schoolsList.length) return "";
-      var sch = schoolsList.find(function(s) { return s.id === schoolId; });
-      return sch ? sch.name + " (" + sch.city + ")" : "";
-    }
-
-    function loadSchools() {
-      return supabaseClient.from("schools").select("*").order("city").then(function(res) {
-        if (res.error) throw res.error;
-        schoolsList = res.data || [];
-        var selectAuth = $("authSchool");
-        selectAuth.innerHTML = '<option value="">Выбери школу</option>';
-        schoolsList.forEach(function(s) {
-          selectAuth.innerHTML += '<option value="'+s.id+'">'+s.name+' ('+s.city+')</option>';
-        });
-      }).catch(function(e) { console.error("Ошибка загрузки школ:", e); });
-    }
-
-    // ЗАГРУЗКА СЧЕТЧИКОВ (Безопасно)
-    function loadEventRegistrations() {
-      if (!supabaseClient) return Promise.resolve();
-      
-      // 1. Грузим СВОИ заявки (и заявки на наши мероприятия, если мы админ)
-      var fetchPrivate = supabaseClient.from("event_registrations").select("*").then(function(res) {
-        if (!res.error) eventRegistrations = res.data || [];
-      }).catch(function(e){ console.error("Ошибка приватных заявок:", e); });
-
-      // 2. Грузим БЕЗОПАСНЫЙ СЧЕТЧИК (View)
-      var fetchPublic = supabaseClient.from("event_occupancy").select("*").then(function(res) {
-        if (!res.error) eventOccupancy = res.data || [];
-      }).catch(function(e){ console.error("Ошибка публичного счетчика:", e); });
-
-      return Promise.all([fetchPrivate, fetchPublic]);
-    }
-
-    // Функция для получения количества занятых мест из безопасного View
-    function getTakenSeats(eventId) {
-      var oc = eventOccupancy.find(function(o) { return o.event_id === eventId; });
-      return oc ? parseInt(oc.taken) : 0;
-    }
-
-    function renderBanners() {
-      var container = $("bannerCarousel");
-      if (!container) return;
-
-      var banners = [
-        "banner-1.png", 
-        "banner-2.png", 
-        "banner-3.png", 
-        "banner-4.png", 
-        "banner-5.png", 
-        "banner-6.png"  
-      ];
-
-      var html = banners.map(function(src) {
-        return (
-          '<div class="carousel-card">' +
-            '<img src="' + src + '" alt="FAM Баннер">' +
-          '</div>'
-        );
-      });
-
-      if (currentUser && currentProfile && currentProfile.school_id) {
-        var schoolEvent = allListings.find(function(l) { 
-          return l.is_event && l.school_id === currentProfile.school_id; 
-        });
-        
-        if (schoolEvent) {
-          var taken = getTakenSeats(schoolEvent.id);
-          var max = schoolEvent.max_seats || 0;
-          var seatsText = max > 0 ? 'Свободно: ' + Math.max(0, max - taken) + ' из ' + max : 'Без ограничений';
-          var isFull = max > 0 && taken >= max;
-          var btnText = isFull ? 'Мест нет' : 'Записаться';
-          
-          var eventHtml = 
-            '<div class="carousel-card" style="background: linear-gradient(135deg, #1e293b, #0f172a);">' +
-              '<div class="carousel-event-content">' +
-                '<div class="carousel-event-tag">Мероприятие школы</div>' +
-                '<div class="carousel-event-title">' + escapeHTML(schoolEvent.title) + '</div>' +
-                '<div class="carousel-event-date">' + formatDate(schoolEvent.created_at) + ' • ' + seatsText + '</div>' +
-                '<button class="carousel-event-btn" ' + (isFull ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '') + ' data-write="' + schoolEvent.user_id + '" data-title="' + escapeHTML(schoolEvent.title) + '" data-event="true" data-id="' + schoolEvent.id + '">' + btnText + '</button>' +
-              '</div>' +
-            '</div>';
-          html.push(eventHtml);
-        }
-      }
-
-      container.innerHTML = html.join("");
-      
-      container.querySelectorAll(".carousel-event-btn").forEach(function(btn) {
-        if (!btn.disabled) {
-           btn.onclick = function() {
-              startDialogWith(btn.dataset.write, btn.dataset.title, btn.dataset.event === "true", btn.dataset.id);
-           };
-        }
-      });
-      
-      startCarouselAutoScroll();
-    }
-
-    function startCarouselAutoScroll() {
-      var carousel = $("bannerCarousel");
-      if (!carousel) return;
-      if (carouselTimer) clearInterval(carouselTimer);
-
-      carouselTimer = setInterval(function() {
-        if (carousel.matches(":hover")) return;
-        var cardWidth = carousel.querySelector(".carousel-card") ? carousel.querySelector(".carousel-card").offsetWidth : 300;
-        var maxScroll = carousel.scrollWidth - carousel.clientWidth;
-        
-        if (carousel.scrollLeft >= maxScroll - 10) {
-          carousel.scrollTo({ left: 0, behavior: "smooth" });
-        } else {
-          carousel.scrollBy({ left: cardWidth + 14, behavior: "smooth" });
-        }
-      }, 6500);
-    }
-
-    function loadListings() {
-      if (!supabaseClient) return Promise.resolve();
-      return supabaseClient.from("listings").select("id,user_id,title,category,description,price_text,created_at,status,school_id,image_url,is_event,max_seats")
-        .eq("status", "active")
-        .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        .order("created_at", { ascending: false }).limit(100)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          allListings = res.data || [];
-          renderBanners();
-          renderListings();
-        })
-        .catch(function (error) {
-          console.error("Ошибка загрузки объявлений:", error);
-          allListings = [];
-          renderListings();
-          showNotice("Не удалось загрузить объявления.", "error");
-        });
-    }
-
-    function renderListings() {
-      var container = $("listings");
-      if (!container) return;
-      container.replaceChildren();
-
-      var search = ($("searchInput").value || "").trim().toLowerCase();
-      var filterSchool = $("schoolFilter").value;
-
-      var filtered = allListings.filter(function (listing) {
-        var okCat = selectedCategory === "Все" || listing.category === selectedCategory;
-        var hay = [listing.title, listing.description, listing.category, listing.price_text].filter(Boolean).join(" ").toLowerCase();
-        var okSearch = hay.indexOf(search) !== -1;
-        var okMine = !showOnlyMine || (currentUser && listing.user_id === currentUser.id);
-        var okSchool = true;
-        if (filterSchool === "my" && currentProfile && currentProfile.school_id) {
-          okSchool = listing.school_id === currentProfile.school_id;
-        }
-        return okCat && okSearch && okMine && okSchool;
-      });
-
-      if (!filtered.length) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">✳</div><h3>Здесь пока пусто</h3><p>Стань первым, кто опубликует объявление.</p></div>';
-        return;
-      }
-
-      filtered.forEach(function (listing) {
-        var card = document.createElement("article");
-        card.className = "listing-card";
-        var imgBlock = listing.image_url 
-          ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img" alt="">' 
-          : '<div class="listing-img-placeholder">📦</div>';
-
-        var favBtn = '';
-        if (currentUser && !listing.is_event) {
-          var isFav = favorites.indexOf(listing.id) !== -1;
-          favBtn = '<button class="listing-fav-btn '+(isFav ? 'active' : '')+'" data-fav="'+listing.id+'">'+(isFav ? '❤' : '♡')+'</button>';
-        }
-
-        var seatsHtml = '';
-        var isEv = listing.is_event;
-        
-        if (isEv) {
-          var taken = getTakenSeats(listing.id); // <--- БЕЗОПАСНЫЙ СЧЕТЧИК
-          var max = listing.max_seats || 0;
-          var left = max > 0 ? Math.max(0, max - taken) : "∞";
-          var fullClass = (max > 0 && left === 0) ? " full" : "";
-          seatsHtml = '<div class="listing-seats' + fullClass + '">Свободно: ' + left + ' из ' + (max || "∞") + '</div>';
-        }
-
-        var actionBtn = '';
-        if (currentUser && listing.user_id !== currentUser.id) {
-          var btnText = isEv ? 'Записаться' : 'Написать';
-          var disabled = '';
-          if (isEv) {
-             var takenCheck = getTakenSeats(listing.id); // <--- БЕЗОПАСНЫЙ СЧЕТЧИК
-             if (listing.max_seats > 0 && takenCheck >= listing.max_seats) {
-                btnText = 'Мест нет';
-                disabled = 'disabled style="opacity:0.5; cursor:not-allowed;"';
-             }
-          }
-          actionBtn = '<div class="listing-actions"><button class="button button-secondary" ' + disabled + ' data-write="'+listing.user_id+'" data-title="'+escapeHTML(listing.title)+'" data-event="'+isEv+'" data-id="'+listing.id+'">'+btnText+'</button></div>';
-        }
-
-        var schoolName = getSchoolName(listing.school_id);
-        var schoolHtml = schoolName ? '<div class="listing-school">🏫 ' + escapeHTML(schoolName) + '</div>' : '';
-
-        card.innerHTML = 
-          '<div class="listing-image-wrap">' + imgBlock + favBtn + '</div>' +
-          '<div class="listing-info">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
-            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
-            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
-            seatsHtml +
-            schoolHtml + actionBtn +
-          '</div>';
-        container.appendChild(card);
-      });
-
-      container.querySelectorAll("[data-fav]").forEach(function(btn) {
-        btn.onclick = function(e) { e.preventDefault(); toggleFavorite(btn.dataset.fav, btn); };
-      });
-      container.querySelectorAll("[data-write]").forEach(function(btn) {
-        if (btn.disabled) return;
-        btn.onclick = function(e) { 
-           e.preventDefault(); 
-           startDialogWith(btn.dataset.write, btn.dataset.title, btn.dataset.event === "true", btn.dataset.id); 
-        };
-      });
-    }
-
-    function ensureProfileRow() {
-      if (!currentUser || !supabaseClient) return Promise.resolve();
-      return supabaseClient.from("profiles").upsert({ id: currentUser.id, email: currentUser.email }, { onConflict: "id", ignoreDuplicates: true });
-    }
-
-    function loadProfileData() {
-      if (!currentUser || !supabaseClient) { currentProfile = null; currentAvatarUrl = null; return Promise.resolve(); }
-      return supabaseClient.from("profiles").select("*").eq("id", currentUser.id).maybeSingle()
-        .then(function (res) {
-          if (res.error) throw res.error;
-          currentProfile = res.data;
-          currentAvatarUrl = (res.data && res.data.avatar_url) ? res.data.avatar_url : null;
-        });
-    }
-
-    window.confirmRegistration = function(regId, eventId) {
-        var ev = allListings.find(function(l) { return l.id === eventId; });
-        var confirmedCount = eventRegistrations.filter(function(r) { return r.event_id === eventId && r.status === 'confirmed'; }).length;
-        
-        if (ev && ev.max_seats > 0 && confirmedCount >= ev.max_seats) {
-            alert("Все места уже подтверждены, вы не можете подтвердить ещё одного!");
-            return;
-        }
-        
-        supabaseClient.from("event_registrations").update({status: 'confirmed'}).eq("id", regId)
-            .then(function(res) {
-                if (res.error) { alert("Ошибка: " + res.error.message); return; }
-                showNotice("Участник успешно подтвержден!", "success");
-                loadEventRegistrations().then(function() { 
-                    renderProfile(); 
-                    renderListings(); 
-                    renderBanners();
-                });
-            });
+    box.innerHTML = html.join("");
+    dots.innerHTML = html.map((_, i) => `<div class="dot ${i===0?'active':''}" data-i="${i}"></div>`).join("");
+    
+    // Логика скролла и точек
+    let isHover = false;
+    $("carouselContainer").onmouseenter = () => isHover = true;
+    $("carouselContainer").onmouseleave = () => isHover = false;
+    
+    const scrollToCard = (i) => {
+      let card = box.children[i];
+      if(card) box.scrollTo({ left: card.offsetLeft - box.offsetLeft, behavior: 'smooth' });
     };
 
-    function renderProfile() {
-      if (!currentUser) return;
-      $("profileEmail").textContent = currentUser.email || "—";
-      
-      var schoolName = "Не указана";
-      if (currentProfile && currentProfile.school_id && schoolsList.length) {
-         var sch = schoolsList.find(function(s) { return s.id === currentProfile.school_id; });
-         if (sch) schoolName = sch.name + " (" + sch.city + ")";
-      }
-      
-      var roleText = (currentProfile && currentProfile.role === "school_admin") ? " | Медиацентр" : "";
-      $("profileMeta").textContent = schoolName + roleText;
+    dots.querySelectorAll(".dot").forEach(d => d.onclick = () => scrollToCard(parseInt(d.dataset.i)));
+    $("arrLeft").onclick = () => box.scrollBy({ left: -box.children[0].offsetWidth - 14, behavior: 'smooth' });
+    $("arrRight").onclick = () => box.scrollBy({ left: box.children[0].offsetWidth + 14, behavior: 'smooth' });
 
-      if (currentAvatarUrl) {
-        $("profileAvatarImg").src = currentAvatarUrl; $("profileAvatarImg").classList.remove("hidden");
-        $("profileAvatar").classList.add("hidden"); $("avatarRemove").classList.remove("hidden");
-      } else {
-        $("profileAvatarImg").classList.add("hidden"); $("profileAvatar").textContent = (currentUser.email||"?")[0].toUpperCase(); $("profileAvatar").classList.remove("hidden"); $("avatarRemove").classList.add("hidden");
-      }
+    if(carTimer) clearInterval(carTimer);
+    carTimer = setInterval(() => {
+      if(isHover) return;
+      let idx = Math.round(box.scrollLeft / (box.children[0].offsetWidth + 14));
+      let next = (idx + 1) % box.children.length;
+      scrollToCard(next);
+      dots.querySelectorAll(".dot").forEach((d, i) => d.classList.toggle("active", i === next));
+    }, 4500);
+  }
 
-      var myListings = allListings.filter(function (l) { return l.user_id === currentUser.id; });
-      $("profileListingsCount").textContent = myListings.length;
-      $("profileFavoritesCount").textContent = favorites.length;
-
-      // РЕНДЕР ЗАЯВОК ДЛЯ МЕДИАЦЕНТРА
-      if (currentProfile && currentProfile.role === "school_admin") {
-        $("adminRequests").classList.remove("hidden");
-        var myEvents = allListings.filter(function(l) { return l.user_id === currentUser.id && l.is_event; }).map(function(l) { return l.id; });
-        var pendingReqs = eventRegistrations.filter(function(r) { return myEvents.indexOf(r.event_id) !== -1 && r.status === 'pending'; });
-        
-        var reqContainer = $("adminRequestsList");
-        reqContainer.innerHTML = "";
-        
-        if (!pendingReqs.length) {
-           reqContainer.innerHTML = "<p style='color:var(--muted);font-size:13px;'>Нет новых заявок на ваши мероприятия.</p>";
-        } else {
-           pendingReqs.forEach(function(r) {
-              var ev = allListings.find(function(l) { return l.id === r.event_id; });
-              var div = document.createElement("div");
-              div.className = "dialog-item";
-              div.style.cursor = "default";
-              div.innerHTML = 
-                '<div class="dialog-avatar">📝</div>' +
-                '<div class="dialog-content">' +
-                   '<div class="dialog-name">' + escapeHTML(ev.title) + '</div>' +
-                   '<div class="dialog-preview">Пользователь: ' + r.user_id.slice(0,8) + '...</div>' +
-                '</div>' +
-                '<button class="button button-primary" style="padding:0 12px; min-height:32px; font-size:11px;" onclick="confirmRegistration(\'' + r.id + '\', \'' + r.event_id + '\')">Подтвердить</button>';
-              reqContainer.appendChild(div);
-           });
-        }
-      } else {
-        $("adminRequests").classList.add("hidden");
-      }
-
-      var container = $("profileListings");
-      container.replaceChildren();
-      if (!myListings.length) {
-        container.innerHTML = '<div class="empty-state"><h3>У тебя пока нет объявлений</h3></div>'; return;
-      }
-
-      myListings.forEach(function (listing) {
-        var card = document.createElement("article");
-        card.className = "listing-card";
-        card.innerHTML = 
-          '<div class="listing-image-wrap">' +
-             (listing.image_url ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img">' : '<div class="listing-img-placeholder">📦</div>') +
-          '</div>' +
-          '<div class="listing-info">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
-            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
-            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
-            '<button class="small-button" data-hide="'+listing.id+'">Снять с публикации</button>' +
-          '</div>';
-        container.appendChild(card);
-      });
-
-      container.querySelectorAll("[data-hide]").forEach(function(btn) {
-        btn.onclick = function() {
-          if (!window.confirm("Снять объявление?")) return;
-          supabaseClient.from("listings").update({ status: "hidden" }).eq("id", btn.dataset.hide).eq("user_id", currentUser.id)
-            .then(function(res) { if (res.error) throw res.error; loadListings().then(renderProfile); });
-        };
-      });
-    }
-
-    function loadFavorites() {
-      if (!currentUser || !supabaseClient) { favorites = []; return Promise.resolve(); }
-      return supabaseClient.from("favorites").select("listing_id").eq("user_id", currentUser.id)
-        .then(function (res) { favorites = (res.data || []).map(function (f) { return f.listing_id; }); });
-    }
-
-    function toggleFavorite(listingId, button) {
-      if (!currentUser) { openAuthModal(); return; }
-      var isFav = favorites.indexOf(listingId) !== -1;
-      
-      if (isFav) {
-        supabaseClient.from("favorites").delete().eq("user_id", currentUser.id).eq("listing_id", listingId)
-          .then(function (res) { 
-            if (res.error) throw res.error; 
-            favorites = favorites.filter(function (id) { return id !== listingId; }); 
-            renderListings(); 
-            renderProfile(); 
-            if(!$("favoritesSection").classList.contains("hidden")) renderFavorites();
-          });
-      } else {
-        supabaseClient.from("favorites").insert({ user_id: currentUser.id, listing_id: listingId })
-          .then(function (res) { 
-            if (res.error) throw res.error; 
-            favorites.push(listingId); 
-            renderListings(); 
-            renderProfile(); 
-          });
-      }
-    }
-
-    function renderFavorites() {
-      var container = $("favoritesList");
-      container.replaceChildren();
-      var favListings = allListings.filter(function (l) { return favorites.indexOf(l.id) !== -1; });
-      $("favoritesCount").textContent = favListings.length + " " + pluralize(favListings.length);
-      if (!favListings.length) { 
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">♡</div><h3>Здесь пока пусто</h3><p>Нажимай сердечко на объявлениях, чтобы сохранить их здесь.</p></div>'; 
-        return; 
-      }
-
-      favListings.forEach(function (listing) {
-        var card = document.createElement("article");
-        card.className = "listing-card";
-        var imgBlock = listing.image_url 
-          ? '<img src="'+escapeHTML(listing.image_url)+'" class="listing-img" alt="">' 
-          : '<div class="listing-img-placeholder">📦</div>';
-        var schoolName = getSchoolName(listing.school_id);
-        var schoolHtml = schoolName ? '<div class="listing-school">🏫 ' + escapeHTML(schoolName) + '</div>' : '';
-
-        card.innerHTML = 
-          '<div class="listing-image-wrap">' + imgBlock + '<button class="listing-fav-btn active" data-fav="'+listing.id+'">❤</button></div>' +
-          '<div class="listing-info">' +
-            '<div class="listing-price">' + escapeHTML(listing.price_text || "Договорная") + '</div>' +
-            '<h3 class="listing-title">' + escapeHTML(listing.title) + '</h3>' +
-            '<div class="listing-category">' + escapeHTML(listing.category) + '</div>' +
-            schoolHtml +
-          '</div>';
-        container.appendChild(card);
-      });
-
-      container.querySelectorAll("[data-fav]").forEach(function(btn) {
-        btn.onclick = function(e) {
-          e.preventDefault();
-          toggleFavorite(btn.dataset.fav, btn);
-          setTimeout(renderFavorites, 100);
-        };
-      });
-    }
-
-    document.querySelectorAll(".nav-tab").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        var section = tab.dataset.tab;
-        document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
-        tab.classList.add("active");
-
-        $("listingsSection").classList.add("hidden");
-        $("favoritesSection").classList.add("hidden");
-        $("profileSection").classList.add("hidden");
-        $("messagesSection").classList.add("hidden");
-        stopMessagesPolling();
-
-        var fab = $("fabCreate");
-        if (fab) {
-          if (section === "board") fab.classList.remove("hidden-by-tab");
-          else fab.classList.add("hidden-by-tab");
-        }
-
-        if (section === "profile") { $("profileSection").classList.remove("hidden"); renderProfile(); return; }
-        if (section === "favorites") { $("favoritesSection").classList.remove("hidden"); renderFavorites(); return; }
-        if (section === "messages") {
-          if (!currentUser) { $("listingsSection").classList.remove("hidden"); openAuthModal(); return; }
-          $("messagesSection").classList.remove("hidden"); $("dialogsList").classList.remove("hidden"); $("chatView").classList.add("hidden"); loadDialogs(); return;
-        }
-        $("listingsSection").classList.remove("hidden");
-        renderListings();
-      });
-    });
-
-    function openAuthModal() { authMode = "login"; updateAuthMode(); openModal("authModal"); }
-
-    function updateAuthMode() {
-      var isLogin = authMode === "login";
-      $("authTitle").textContent = isLogin ? "С возвращением" : "Регистрация";
-      $("authSubmit").textContent = isLogin ? "Войти" : "Зарегистрироваться";
-      $("authSwitchText").textContent = isLogin ? "Впервые здесь?" : "Уже есть аккаунт?";
-      $("authSwitchButton").textContent = isLogin ? "Создать аккаунт" : "Войти";
-      $("schoolGroup").style.display = isLogin ? "none" : "block";
-    }
-
-    $("authSwitchButton").addEventListener("click", function () { authMode = authMode === "login" ? "signup" : "login"; updateAuthMode(); });
+  // --- ЛЕНТА ---
+  function renderListings() {
+    let grid = $("listingsGrid");
+    let search = $("searchInput").value.toLowerCase();
+    let filtered = listings.filter(l => (curCat==="Все" || l.category===curCat) && l.title.toLowerCase().includes(search));
     
-    $("authButton").addEventListener("click", function (e) {
-      if (currentUser) {
-        e.stopImmediatePropagation();
-        document.querySelector('.nav-tab[data-tab="profile"]').click();
-      } else { openAuthModal(); }
-    });
-
-    $("authForm").addEventListener("submit", async function (event) {
-      event.preventDefault();
-      var email = $("authEmail").value.trim();
-      var password = $("authPassword").value;
-      var schoolId = $("authSchool").value;
-      var mode = authMode;
-      var btn = $("authSubmit");
+    grid.innerHTML = filtered.length ? filtered.map(l => {
+      let img = l.image_url ? `<img src="${l.image_url}" class="card-img">` : `<div class="card-img" style="display:grid; place-items:center; font-size:30px;">📦</div>`;
+      let btn = '';
       
-      if (mode === "signup" && !schoolId) { setFormMessage("authMessage", "Выбери школу", "error"); return; }
-      
-      btn.disabled = true;
-      setFormMessage("authMessage", "Подожди...", "");
-
-      try {
-        if (mode === "signup") {
-          var result = await supabaseClient.auth.signUp({ email: email, password: password, options: { data: { school_id: schoolId } } });
-          if (result.error) throw result.error;
-          if (!result.data.session) { setFormMessage("authMessage", "Регистрация почти завершена. Проверь почту и подтверди адрес.", "success"); return; }
-          var profileResult = await supabaseClient.from("profiles").upsert({ id: result.data.user.id, email: email, school_id: schoolId }, { onConflict: "id" });
-          if (profileResult.error) throw profileResult.error;
-          closeModal("authModal");
+      if (user && l.user_id !== user.id) {
+        if (l.is_event) {
+          let isPast = l.event_date && new Date(l.event_date) < new Date(new Date().toDateString());
+          if (isPast) btn = `<button class="button button-secondary" style="width:100%; margin-top:10px;" onclick="openFeedback('${l.id}')">Оставить отзыв</button>`;
+          else {
+            let taken = getTaken(l.id), max = l.max_seats||0, left = max>0?max-taken:"∞";
+            let already = regs.find(r => r.event_id===l.id && r.user_id===user.id && r.status!=='rejected');
+            if (already) btn = `<button class="button" disabled style="width:100%; margin-top:10px; opacity:0.5;">Заявка отправлена</button>`;
+            else if (l.event_type==='limited' && left<=0) btn = `<button class="button" disabled style="width:100%; margin-top:10px; opacity:0.5;">Мест нет</button>`;
+            else {
+              let txt = l.event_type==='open'?'Записаться':(l.event_type==='request'?'Оставить заявку':`Мест: ${left}`);
+              btn = `<button class="button button-primary" style="width:100%; margin-top:10px;" onclick="handleEventBtn('${l.id}', '${l.event_type}', ${max})">${txt}</button>`;
+            }
+          }
         } else {
-          var loginResult = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
-          if (loginResult.error) throw loginResult.error;
-          closeModal("authModal");
+          btn = `<button class="button button-secondary" style="width:100%; margin-top:10px;" onclick="startChat('${l.user_id}', '${esc(l.title)}')">Написать</button>`;
         }
-      } catch (err) {
-        setFormMessage("authMessage", err.message || "Ошибка", "error");
-      } finally {
-        btn.disabled = false;
       }
-    });
-
-    $("listingCategory").addEventListener("change", function() {
-       var isEv = this.value === "Мероприятия";
-       $("listingPrice").placeholder = isEv ? "Стоимость (или Бесплатно)" : "Цена (необязательно)";
-       $("seatsGroup").style.display = isEv ? "block" : "none";
-       if (isEv) $("listingSeats").required = true;
-       else { $("listingSeats").required = false; $("listingSeats").value = ""; }
-    });
-
-    function openCreateModal() {
-      if (!currentUser) { openAuthModal(); return; }
-      var isAdmin = currentProfile && currentProfile.role === "school_admin";
-      $("eventOption").style.display = isAdmin ? "block" : "none";
-      $("listingForm").reset();
-      $("seatsGroup").style.display = "none";
-      openModal("listingModal");
-    }
-
-    $("createListingButton").addEventListener("click", openCreateModal);
-    $("fabCreate").addEventListener("click", openCreateModal);
-
-    $("listingForm").addEventListener("submit", function (event) {
-      event.preventDefault();
-      var title = $("listingTitle").value.trim();
-      var desc = $("listingDescription").value.trim();
-      var cat = $("listingCategory").value;
-      var price = $("listingPrice").value.trim();
-      var isEv = cat === "Мероприятия";
-      var maxSeats = isEv ? parseInt($("listingSeats").value) || 0 : 0;
-      var file = $("listingImage").files[0];
-      var btn = $("listingSubmit");
       
-      if (file && file.size > 5 * 1024 * 1024) { setFormMessage("listingMessage", "Файл больше 5 МБ", "error"); return; }
-      
-      btn.disabled = true;
-      setFormMessage("listingMessage", "Публикуем...", "");
-      var imgUrl = null;
-      var upload = Promise.resolve();
-      
-      if (file) {
-        var path = currentUser.id + "/" + Date.now() + ".jpg";
-        var bucket = isEv ? "event-images" : "listing-images";
-        upload = supabaseClient.storage.from(bucket).upload(path, file).then(function(res) {
-          if (res.error) throw res.error;
-          imgUrl = supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-        });
-      }
+      return `<div class="card">${img}<div class="card-info">
+        <div style="font-weight:800; font-size:16px; margin-bottom:4px;">${esc(l.price_text||"Бесплатно")}</div>
+        <h3 style="margin:0 0 8px; font-size:14px;">${esc(l.title)}</h3>
+        <div style="color:var(--muted); font-size:12px; margin-bottom:10px;">${esc(l.category)} ${l.event_date?'• '+l.event_date:''}</div>
+        ${btn}
+      </div></div>`;
+    }).join("") : `<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:40px;">Ничего не найдено</p>`;
+  }
 
-      upload.then(function() {
-        return supabaseClient.from("listings").insert({
-          user_id: currentUser.id, title: title, description: desc, category: cat, price_text: price || (isEv ? "Бесплатно" : "Договорная"),
-          status: "active", is_event: isEv, school_id: currentProfile ? currentProfile.school_id : null, image_url: imgUrl, max_seats: maxSeats
-        });
-      }).then(function (res) {
-        if (res.error) throw res.error;
-        closeModal("listingModal");
-        loadListings();
-        showNotice("Опубликовано!", "success");
-      }).catch(function (err) {
-        setFormMessage("listingMessage", err.message || "Ошибка", "error");
-      }).then(function () { btn.disabled = false; });
-    });
+  // --- МЕРОПРИЯТИЯ (ЗАПИСЬ) ---
+  window.handleEventBtn = async (id, type, max) => {
+    if (!user) return openModal('authModal');
+    let status = (type === 'open' || type === 'limited') ? 'confirmed' : 'pending';
+    let res = await sb.from("event_registrations").insert({ event_id: id, user_id: user.id, status });
+    if (res.error) return notice(res.error.message, "error");
+    notice(status === 'confirmed' ? "Вы записаны!" : "Заявка отправлена", "success");
+    loadAll();
+  };
 
-    function loadProfileById(userId) {
-      if (!userId || profilesCache[userId]) return Promise.resolve(profilesCache[userId]);
-      return supabaseClient.from("profiles").select("id, email, avatar_url").eq("id", userId).maybeSingle()
-        .then(function(res) { if (res.data) profilesCache[userId] = res.data; return res.data; });
-    }
+  // --- ОТЗЫВЫ ---
+  window.openFeedback = id => {
+    $("fbEventId").value = id;
+    selectedStars = 0;
+    $("fbStars").value = 0;
+    $("fbText").value = "";
+    document.querySelectorAll("#starRating .star").forEach(s => s.classList.remove("active"));
+    openModal('feedbackModal');
+  };
 
-    function getUserDisplayName(userId) {
-      if (!userId) return "Участник";
-      if (profilesCache[userId] && profilesCache[userId].email) return profilesCache[userId].email.split("@")[0];
-      return "Участник " + userId.slice(0, 6);
-    }
-
-    function startDialogWith(userId, title, isEv, eventId) {
-      currentChatUserId = userId;
-      
-      if (isEv && eventId) {
-         // Проверяем, не записан ли уже
-         var already = eventRegistrations.find(function(r) { return r.event_id === eventId && r.user_id === currentUser.id && r.status !== 'rejected'; });
-         if (already) {
-             showNotice("Вы уже оставили заявку на это мероприятие", "error");
-         } else {
-             // Создаем заявку (RLS проверит auth.uid() = user_id)
-             supabaseClient.from("event_registrations").insert({ event_id: eventId, user_id: currentUser.id, status: 'pending' })
-                .then(function(res) {
-                    if (res.error) { console.error(res.error); return; }
-                    loadEventRegistrations().then(function() {
-                        renderListings();
-                        renderBanners();
-                    });
-                });
-         }
-      }
-
-      document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
-      document.querySelector('.nav-tab[data-tab="messages"]').classList.add("active");
-      $("listingsSection").classList.add("hidden"); $("messagesSection").classList.remove("hidden"); $("chatView").classList.remove("hidden"); $("dialogsList").classList.add("hidden");
-      var fab = $("fabCreate"); if (fab) fab.classList.add("hidden-by-tab");
-      $("chatWith").textContent = "Загрузка...";
-      loadProfileById(userId).then(function() { $("chatWith").textContent = getUserDisplayName(userId); });
-      
-      if (isEv) { $("chatInput").value = "Я хочу записаться на мероприятие: " + title; } 
-      else { $("chatInput").value = "По поводу: " + title; }
-      
-      loadChatMessages();
-      startMessagesPolling();
-    }
-
-    function startMessagesPolling() {
-      stopMessagesPolling();
-      messagesPollTimer = setInterval(function () { loadChatMessages(); markMessagesRead(); }, 3000);
-    }
-
-    function stopMessagesPolling() {
-      if (messagesPollTimer) { clearInterval(messagesPollTimer); messagesPollTimer = null; }
-    }
-
-    function markMessagesRead() {
-      if (!currentUser || !currentChatUserId || !supabaseClient) return;
-      supabaseClient.from("messages").update({ is_read: true }).eq("sender_id", currentChatUserId).eq("receiver_id", currentUser.id).eq("is_read", false).then(function() {});
-    }
-
-    function loadDialogs() {
-      if (!currentUser || !supabaseClient) return Promise.resolve();
-      return supabaseClient.from("messages").select("id,sender_id,receiver_id,body,created_at,is_read")
-        .or("sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentUser.id)
-        .order("created_at", { ascending: false }).limit(300)
-        .then(function (res) { if (res.error) throw res.error; renderDialogs(res.data || []); })
-        .catch(function (e) { console.error("Ошибка загрузки диалогов:", e); });
-    }
-
-    function renderDialogs(msgs) {
-      var container = $("dialogsList");
-      if (!container) return;
-      container.replaceChildren();
-      var dialogs = {};
-      msgs.forEach(function (m) {
-        var other = m.sender_id === currentUser.id ? m.receiver_id : m.sender_id;
-        if (!dialogs[other]) dialogs[other] = { userId: other, last: m, unread: 0 };
-        if (m.receiver_id === currentUser.id && !m.is_read) dialogs[other].unread++;
+  document.querySelectorAll("#starRating .star").forEach(st => {
+    st.onclick = function() {
+      selectedStars = parseInt(this.dataset.v);
+      $("fbStars").value = selectedStars;
+      document.querySelectorAll("#starRating .star").forEach(s => {
+        s.classList.toggle("active", parseInt(s.dataset.v) <= selectedStars);
       });
+    };
+  });
 
-      var list = Object.values(dialogs);
-      if (!list.length) {
-        container.innerHTML = "<div class='empty-state'><h3>Пока нет сообщений</h3><p>Напиши кому-нибудь на карточке объявления — переписка появится здесь.</p></div>";
-        return;
-      }
+  $("feedbackForm").onsubmit = e => {
+    e.preventDefault();
+    if (selectedStars < 1) return alert("Поставьте оценку");
+    let fb = JSON.parse(localStorage.getItem("fam_fb")||"[]");
+    fb.push({ event_id: $("fbEventId").value, stars: selectedStars, text: $("fbText").value });
+    localStorage.setItem("fam_fb", JSON.stringify(fb));
+    closeModal('feedbackModal');
+    notice("Спасибо за отзыв!");
+  };
 
-      list.forEach(function (d) {
-        var item = document.createElement("div");
-        item.className = "dialog-item";
-        
-        var unreadBadge = d.unread > 0 
-          ? '<span style="background:#FF7B7B;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;">' + d.unread + '</span>' 
-          : '';
+  // --- ИДЕИ ---
+  function renderIdeas() {
+    let mine = ideas.filter(i => i.user_id === (user&&user.id));
+    $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
+      let st = i.ai_status === 'rejected' ? 'Отклонено ИИ' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'На рассмотрении'));
+      let cls = i.ai_status === 'rejected' ? 'rejected' : (i.admin_status === 'done' ? 'approved' : '');
+      return `<div class="idea-card">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <b>${esc(i.text.slice(0,30))}...</b><span class="idea-status ${cls}">${st}</span>
+        </div>
+        <div style="color:var(--muted); font-size:13px;">${esc(i.text)}</div>
+      </div>`;
+    }).join("") : `<p style="color:var(--muted);">Вы еще не предлагали идей.</p>`;
 
-        item.innerHTML = 
-          '<div class="dialog-avatar">👤</div>' +
-          '<div class="dialog-content">' +
-            '<div class="dialog-top">' +
-              '<div class="dialog-name">Загрузка...' + unreadBadge + '</div>' +
-              '<div class="dialog-date">' + new Date(d.last.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + '</div>' +
-            '</div>' +
-            '<div class="dialog-preview">' + escapeHTML(d.last.body) + '</div>' +
-          '</div>';
-          
-        loadProfileById(d.userId).then(function() {
-           var nameEl = item.querySelector(".dialog-name");
-           if (nameEl) nameEl.innerHTML = getUserDisplayName(d.userId) + unreadBadge;
-        });
+    let dash = $("adminIdeasDash");
+    if (profile && profile.role === 'school_admin') {
+      dash.classList.remove("hidden");
+      let all = ideas.filter(i => i.ai_status === 'approved');
+      $("adminIdeasList").innerHTML = all.length ? all.map(i => `
+        <div class="idea-card">
+          <div style="margin-bottom:8px;">${esc(i.text)}</div>
+          ${i.ai_summary?`<div style="font-size:11px; color:#F0C14B; margin-bottom:8px;">ИИ: ${esc(i.ai_summary)}</div>`:''}
+          <div style="display:flex; gap:8px;">
+            <button class="button button-secondary" style="padding:4px 10px; font-size:11px;" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
+            <button class="button button-primary" style="padding:4px 10px; font-size:11px;" onclick="updateIdea('${i.id}', 'done')">Готово</button>
+          </div>
+        </div>
+      `).join("") : `<p style="color:var(--muted);">Нет идей для проверки.</p>`;
+    } else {
+      dash.classList.add("hidden");
+    }
+  }
 
-        item.addEventListener("click", function () {
-          currentChatUserId = d.userId;
-          $("dialogsList").classList.add("hidden");
-          $("chatView").classList.remove("hidden");
-          var fab = $("fabCreate"); if (fab) fab.classList.add("hidden-by-tab");
-          loadProfileById(d.userId).then(function() { $("chatWith").textContent = getUserDisplayName(d.userId); });
-          $("chatInput").placeholder = "Написать сообщение...";
-          loadChatMessages();
-          startMessagesPolling();
-        });
-        container.appendChild(item);
+  window.updateIdea = async (id, status) => {
+    await sb.from("ideas").update({ admin_status: status }).eq("id", id);
+    loadAll();
+  };
+
+  $("ideaForm").onsubmit = async e => {
+    e.preventDefault();
+    if(!user) return openModal('authModal');
+    let txt = $("ideaText").value.trim();
+    let btn = $("ideaSubmitBtn");
+    btn.disabled = true; btn.textContent = "ИИ проверяет...";
+    
+    setTimeout(async () => {
+      let ai = aiFilter(txt);
+      await sb.from("ideas").insert({
+        user_id: user.id, school_id: profile?.school_id, text: txt,
+        ai_status: ai.status, ai_summary: ai.summary || null, admin_status: 'new'
       });
-    }
+      $("ideaText").value = "";
+      btn.disabled = false; btn.textContent = "Отправить";
+      notice(ai.status==='approved'?"Идея отправлена!":"ИИ отклонил: " + ai.reason, ai.status==='approved'?"success":"error");
+      loadAll();
+    }, 1000);
+  };
 
-    function loadChatMessages() {
-      if (!currentUser || !currentChatUserId) return;
-      supabaseClient.from("messages").select("*")
-        .or("and(sender_id.eq." + currentUser.id + ",receiver_id.eq." + currentChatUserId + "),and(sender_id.eq." + currentChatUserId + ",receiver_id.eq." + currentUser.id + ")")
-        .order("created_at").limit(50).then(function(res) {
-          var c = $("chatMessages"); 
-          c.innerHTML = "";
-          (res.data||[]).forEach(function(m) {
-             var time = new Date(m.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-             c.innerHTML += '<div class="msg '+(m.sender_id===currentUser.id?'mine':'theirs')+'">' + escapeHTML(m.body) + '<span class="msg-time">' + time + '</span></div>';
-          });
-          c.scrollTop = c.scrollHeight;
-        });
-    }
+  // --- ПРОФИЛЬ ---
+  function renderProfile() {
+    if(!user) return;
+    $("profEmail").textContent = user.email;
+    let school = profile?.school_id ? "Школа указана" : "Школа не указана";
+    let role = profile?.role === 'school_admin' ? " | Медиацентр" : "";
+    $("profMeta").textContent = school + role;
 
-    $("chatBack").addEventListener("click", function () {
-      stopMessagesPolling();
-      $("chatView").classList.add("hidden");
-      $("dialogsList").classList.remove("hidden");
-      loadDialogs();
-    });
+    let myL = listings.filter(l => l.user_id === user.id);
+    $("myListingsGrid").innerHTML = myL.map(l => `<div class="card"><div class="card-info"><h3>${esc(l.title)}</h3></div></div>`).join("");
 
-    $("chatForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      var body = $("chatInput").value.trim();
-      if (!body) return;
-      var btn = e.target.querySelector('button[type="submit"]');
-      if (btn) btn.disabled = true;
-      supabaseClient.from("messages").insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, body: body })
-        .then(function(res) {
-          if (res.error) throw res.error;
-          $("chatInput").value = ""; 
-          loadChatMessages();
-        }).catch(function(err) { 
-          console.error("Ошибка отправки:", err); 
-          var msg = (err.message || "").toLowerCase();
-          if (msg.includes("rate") || msg.includes("policy") || msg.includes("violates")) {
-            alert("Слишком много сообщений! Подожди минуту.");
-          } else {
-            alert("Не удалось отправить сообщение.");
-          }
-        }).then(function() { if (btn) btn.disabled = false; });
-    });
-
-    $("avatarInput").addEventListener("change", function (e) {
-      var file = e.target.files && e.target.files[0];
-      if (!file) return;
-      if (file.size > 3 * 1024 * 1024) { alert("Файл больше 3 МБ"); return; }
-      var path = currentUser.id + "/avatar.jpg";
-      showNotice("Загружаем фото...");
-      supabaseClient.storage.from("avatars").upload(path, file, { upsert: true })
-        .then(function (res) {
-          if (res.error) throw res.error;
-          var url = supabaseClient.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?t=" + Date.now();
-          return supabaseClient.from("profiles").upsert({ id: currentUser.id, avatar_url: url }, { onConflict: "id" });
-        })
-        .then(function () { showNotice("Фото загружено!", "success"); loadProfileData().then(renderProfile); })
-        .catch(function (err) { console.error(err); showNotice("Ошибка загрузки фото", "error"); });
-    });
-
-    $("avatarRemove").addEventListener("click", function () {
-      if (!confirm("Удалить фото?")) return;
-      supabaseClient.from("profiles").update({ avatar_url: null }).eq("id", currentUser.id)
-        .then(function () { loadProfileData().then(renderProfile); showNotice("Фото удалено", "success"); });
-    });
-
-    $("btnAdminCode").addEventListener("click", async function () {
-      if (!currentUser) return;
-      var code = prompt("Введи секретный код медиацентра:");
-      if (!code) return;
+    if (profile && profile.role === 'school_admin') {
+      $("adminRequests").classList.remove("hidden");
+      let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
+      let pending = regs.filter(r => myEvs.includes(r.event_id) && r.status === 'pending');
       
-      try {
-        var res = await supabaseClient.rpc("claim_admin_role", { secret_code: code.trim() });
-        
-        if (res.error || !res.data || !res.data.success) {
-          alert(res.data?.error || "Неверный код");
-          return;
-        }
-        
-        alert("Роль медиацентра получена!");
-        loadProfileData().then(renderProfile);
-      } catch (err) {
-        console.error(err);
-        alert("Ошибка при проверке кода");
-      }
-    });
+      $("adminReqList").innerHTML = pending.length ? pending.map(r => {
+        let ev = listings.find(l => l.id === r.event_id);
+        return `<div class="idea-card">
+          <b>${esc(ev.title)}</b>
+          <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">User: ${r.user_id.slice(0,6)}...</div>
+          <button class="button button-primary" style="padding:4px 10px; font-size:11px;" onclick="confirmReg('${r.id}', '${r.event_id}')">Одобрить</button>
+        </div>`;
+      }).join("") : `<p style="color:var(--muted);">Нет новых заявок.</p>`;
+    } else {
+      $("adminRequests").classList.add("hidden");
+    }
+  }
 
-    $("myListingsButton").addEventListener("click", function () {
-      if (!currentUser) { openAuthModal(); return; }
-      showOnlyMine = !showOnlyMine;
-      $("myListingsButton").textContent = showOnlyMine ? "Все объявления" : "Мои объявления";
-      var boardTab = document.querySelector('.nav-tab[data-tab="board"]');
-      if (boardTab && !boardTab.classList.contains("active")) boardTab.click();
-      renderListings();
-    });
+  window.confirmReg = async (regId, evId) => {
+    let ev = listings.find(l => l.id === evId);
+    let conf = regs.filter(r => r.event_id === evId && r.status === 'confirmed').length;
+    if (ev.max_seats > 0 && conf >= ev.max_seats) return alert("Мест нет!");
+    await sb.from("event_registrations").update({ status: 'confirmed' }).eq("id", regId);
+    alert("Одобрено!");
+    loadAll();
+  };
 
-    $("profileSignOut").addEventListener("click", function () {
-      if (confirm("Выйти из аккаунта?")) { stopMessagesPolling(); supabaseClient.auth.signOut(); }
-    });
+  // --- НАВИГАЦИЯ И БАЗА ---
+  document.querySelectorAll(".nav-tab").forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
+      let id = tab.dataset.tab + "Section";
+      if($(id)) $(id).classList.remove("hidden");
+      
+      if(tab.dataset.tab === 'profile') renderProfile();
+      if(tab.dataset.tab === 'ideas') renderIdeas();
+      if(tab.dataset.tab === 'board') loadAll();
+    };
+  });
 
-    $("searchInput").addEventListener("input", renderListings);
-    $("schoolFilter").addEventListener("change", renderListings);
+  document.querySelectorAll(".cat-btn").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".cat-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    curCat = b.dataset.cat;
+    renderListings();
+  });
+  $("searchInput").oninput = renderListings;
 
-    document.querySelectorAll(".category-button").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        document.querySelectorAll(".category-button").forEach(function (b) { b.classList.remove("active"); });
-        btn.classList.add("active");
-        selectedCategory = btn.dataset.category;
-        renderListings();
-      });
-    });
+  $("authBtn").onclick = () => user ? document.querySelector('[data-tab="profile"]').click() : openModal('authModal');
+  $("createBtnDesktop").onclick = () => user ? openModal('listingModal') : openModal('authModal');
+  $("fabBtn").onclick = () => user ? openModal('listingModal') : openModal('authModal');
+  $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
 
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    supabaseClient.auth.getSession().then(function(res) {
-      currentUser = (res.data && res.data.session) ? res.data.session.user : null;
-      return loadSchools();
-    }).then(function() {
-      updateAuthButton();
-      return ensureProfileRow();
-    }).then(function() { return loadProfileData(); })
-    .then(function() { return loadEventRegistrations(); })
-    .then(function() { return loadFavorites(); })
-    .then(function() { return loadListings(); })
-    .then(function() {
-      supabaseClient.auth.onAuthStateChange(function(event, session) {
-        currentUser = session ? session.user : null;
-        updateAuthButton();
-        if (event === "SIGNED_OUT") {
-          stopMessagesPolling();
-          showOnlyMine = false;
-          $("myListingsButton").textContent = "Мои объявления";
-          document.querySelectorAll(".nav-tab").forEach(function (item) { item.classList.remove("active"); });
-          document.querySelector('.nav-tab[data-tab="board"]').classList.add("active");
-          $("listingsSection").classList.remove("hidden");
-          $("favoritesSection").classList.add("hidden");
-          $("profileSection").classList.add("hidden");
-          $("messagesSection").classList.add("hidden");
-          var fab = $("fabCreate"); if (fab) fab.classList.remove("hidden-by-tab");
-          renderListings();
-        }
-        if (event === "SIGNED_IN" && session && session.user) {
-          var metaSchool = session.user.user_metadata.school_id;
-          if (metaSchool) {
-            supabaseClient.from("profiles").upsert({ id: session.user.id, email: session.user.email, school_id: metaSchool }, { onConflict: "id" }).then(function() { loadProfileData(); });
-          }
-        }
-        loadProfileData().then(loadEventRegistrations).then(loadFavorites).then(loadListings);
-      });
+  $("switchAuthBtn").onclick = () => {
+    if($("authTitle").textContent === "Вход") {
+      $("authTitle").textContent = "Регистрация";
+      $("switchAuthBtn").textContent = "У меня есть аккаунт";
+    } else {
+      $("authTitle").textContent = "Вход";
+      $("switchAuthBtn").textContent = "Создать аккаунт";
+    }
+  };
+
+  $("authForm").onsubmit = async e => {
+    e.preventDefault();
+    let email = $("authEmail").value, pass = $("authPassword").value;
+    let isReg = $("authTitle").textContent === "Регистрация";
+    let res = isReg ? await sb.auth.signUp({ email, password: pass }) : await sb.auth.signInWithPassword({ email, password: pass });
+    if (res.error) return $("authMsg").textContent = res.error.message;
+    if(isReg) alert("Проверьте почту для подтверждения!");
+    else location.reload();
+  };
+
+  $("lCat").onchange = function() {
+    let isEv = this.value === "Мероприятия";
+    $("eventFields").classList.toggle("hidden", !isEv);
+    $("evOption").style.display = "block";
+  };
+  document.querySelectorAll('input[name="evType"]').forEach(r => r.onchange = function() {
+    $("seatsGroup").classList.toggle("hidden", this.value !== "limited");
+  });
+
+  $("listingForm").onsubmit = async e => {
+    e.preventDefault();
+    let isEv = $("lCat").value === "Мероприятия";
+    let type = document.querySelector('input[name="evType"]:checked')?.value || 'open';
+    
+    let res = await sb.from("listings").insert({
+      user_id: user.id, title: $("lTitle").value, description: $("lDesc").value,
+      category: $("lCat").value, price_text: $("lPrice").value || "Бесплатно",
+      status: "active", is_event: isEv, school_id: profile?.school_id,
+      event_date: isEv ? $("evDate").value : null,
+      event_time: isEv ? $("evTime").value : null,
+      event_type: isEv ? type : null,
+      max_seats: (isEv && type === 'limited') ? parseInt($("evSeats").value) : 0
     });
-  })();
-  </script>
+    
+    if(res.error) return alert(res.error.message);
+    closeModal('listingModal');
+    loadAll();
+  };
+
+  // INIT
+  sb.auth.getSession().then(res => {
+    user = res.data?.session?.user || null;
+    if(user) return sb.from("profiles").select("*").eq("id", user.id).single();
+    return null;
+  }).then(res => {
+    if(res && res.data) profile = res.data;
+    return loadAll();
+  }).then(() => {
+    if(user && profile?.role === 'school_admin') {
+      $("evOption").style.display = "block";
+      $("createBtnDesktop").classList.remove("hidden");
+    }
+  });
+})();
+</script>
 </body>
 </html>
