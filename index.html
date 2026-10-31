@@ -17,7 +17,7 @@
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; transition: 0.2s; }
     
-    .header { position: sticky; top: 0; z-index: 10; background: rgba(22, 23, 27, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .header { position: sticky; top: 0; z-index: 10; background: rgba(22, 23, 27, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
     .header-inner { max-width: 1100px; margin: 0 auto; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
     .logo { display: flex; gap: 12px; align-items: center; color: var(--text); text-decoration: none; }
     .logo-mark { width: 40px; height: 40px; background: var(--accent); color: var(--bg); border-radius: 12px; display: grid; place-items: center; font-weight: 900; font-size: 18px; }
@@ -30,6 +30,7 @@
     .button-primary { background: var(--accent); color: var(--bg); }
     .button-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     .button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .button-small { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
     
     main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 80px; }
     
@@ -37,7 +38,7 @@
     .carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; padding-bottom: 10px; }
     .carousel::-webkit-scrollbar { display: none; }
     .carousel-card { flex: 0 0 100%; scroll-snap-align: start; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; position: relative; border: 1px solid var(--border); background: #000; }
-    .carousel-card img { width: 100%; height: 100%; object-fit: contain; }
+    .carousel-card img { width: 100%; height: 100%; object-fit: cover; }
     .carousel-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 20px; display: flex; flex-direction: column; justify-content: flex-end; }
     
     .listings { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-top: 15px; }
@@ -70,6 +71,9 @@
     
     .fab { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 24px; display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: none; z-index: 20; }
     @media(min-width: 800px) { .fab { display: none; } }
+    
+    .ai-hint { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.4; background: var(--bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+    .ai-hint a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -124,7 +128,7 @@
 
     <div class="profile-box">
       <h3 style="font-size:16px; margin-top:0;">Почта идей</h3>
-      <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">ИИ проверит идею, а медиацентр решит, что с ней делать.</p>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:12px;">ИИ проверит идею, а ученический совет решит, что с ней делать.</p>
       <form id="ideaForm">
         <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить в школе?" required style="margin-bottom:10px;"></textarea>
         <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%;">Отправить идею</button>
@@ -132,7 +136,7 @@
       </form>
       <div id="myIdeasList" style="margin-top:16px;"></div>
       <div id="adminIdeasDash" class="hidden" style="margin-top:20px; border-top:1px solid var(--border); padding-top:16px;">
-        <h4 style="margin:0 0 10px; font-size:14px; color:var(--accent);">Идеи учеников (Панель админа)</h4>
+        <h4 style="margin:0 0 10px; font-size:14px; color:var(--accent);">Идеи учеников (Панель Ученического Совета)</h4>
         <div id="adminIdeasList"></div>
       </div>
     </div>
@@ -180,14 +184,26 @@
 <div class="modal" id="listingModal">
   <div class="modal-content">
     <button onclick="closeModal('listingModal')" style="float:right; background:none; border:none; color:white; font-size:20px;">×</button>
-    <h2 style="margin-top:0;">Создать</h2>
+    <h2 style="margin-top:0;">Создать объявление</h2>
     <form id="listingForm">
-      <div class="form-group"><label>Заголовок</label><input type="text" id="lTitle" class="form-control" required></div>
-      <div class="form-group"><label>Описание</label><textarea id="lDesc" class="form-control" required></textarea></div>
+      <div id="aiHints" class="ai-hint">💡 Начните вводить заголовок, и ИИ поможет с категорией.</div>
+      
+      <div class="form-group">
+        <label>Заголовок <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lTitle')">✨ Авто-исправить</button></label>
+        <input type="text" id="lTitle" class="form-control" required>
+      </div>
+      
+      <div class="form-group">
+        <label>Описание <button type="button" class="button button-secondary button-small" style="float:right; padding:2px 8px; font-size:11px;" onclick="autoFixField('lDesc')">✨ Авто-исправить</button></label>
+        <textarea id="lDesc" class="form-control" rows="3" required></textarea>
+      </div>
+      
       <div class="form-group">
         <label>Категория</label>
         <select id="lCat" class="form-control" required>
-          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Учёба">Учёба</option>
+          <option value="Вещи">Вещи</option>
+          <option value="Услуги">Услуги</option>
+          <option value="Учёба">Учёба</option>
           <option value="Мероприятия" id="evOption" style="display:none;">📢 Мероприятие</option>
         </select>
       </div>
@@ -204,8 +220,8 @@
         <div class="form-group hidden" id="seatsGroup"><label>Кол-во мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
       </div>
 
-      <div class="form-group"><label>Фото</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
-      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Договорная"></div>
+      <div class="form-group"><label>Фото (необязательно)</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
+      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Договорная или Бесплатно"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
   </div>
@@ -246,6 +262,7 @@
   const openModal = id => $(id).classList.add("open");
   const notice = (msg) => alert(msg);
 
+  // --- 1. СЖАТИЕ ФОТО ---
   function compressImage(file, maxWidth = 800) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -266,15 +283,93 @@
     });
   }
 
-  function aiFilter(text) {
-    let t = text.toLowerCase();
-    if (t.length < 10) return { status: "rejected", reason: "Слишком короткая идея" };
-    let bad = ["хуй", "бля", "пизд", "говно", "fuck", "shit"];
-    if (bad.some(b => t.includes(b))) return { status: "rejected", reason: "Неприемлемые слова" };
-    if (/(.)\1{5,}/.test(t)) return { status: "rejected", reason: "Похоже на спам" };
-    return { status: "approved", summary: text.slice(0, 50) + (text.length>50?"...":"") };
+  // --- 2. УНИВЕРСАЛЬНЫЙ ОФЛАЙН МОДЕРАТОР ---
+  function moderateText(text, type = 'idea') {
+    if (!text) return { status: "rejected", reason: "Текст пуст." };
+    let t = text.toLowerCase().trim();
+    
+    if (type === 'idea' && t.length < 15) return { status: "rejected", reason: "Идея слишком короткая. Опишите подробнее (мин. 15 символов)." };
+    if (type === 'listing' && t.length < 10) return { status: "rejected", reason: "Слишком короткое описание." };
+    if (type === 'chat' && t.length < 2) return { status: "rejected", reason: "Сообщение слишком короткое." };
+    
+    if (!t.includes(" ") && t.length > 10) return { status: "rejected", reason: "Напишите связное предложение, а не одно слово." };
+    if (/(.)\1{4,}/.test(t) || /[бвгджзйклмнпрстфхцчшщ]{5,}/.test(t)) {
+      return { status: "rejected", reason: "Текст похож на спам или бессмыслицу." };
+    }
+    if (t === t.toUpperCase() && t.length > 10) return { status: "rejected", reason: "Не пишите полностью ЗАГЛАВНЫМИ буквами." };
+
+    const badWords = ["хуй", "бля", "пизд", "говно", "fuck", "shit", "иди к черту", "идиот", "дурак", "тупой", "дебил", "нахуй", "ебан", "сука", "мразь", "чмо", "урод", "пошел ты", "пошёл ты", "заткнись", "лох"];
+    if (badWords.some(b => t.includes(b))) {
+      return { status: "rejected", reason: "Обнаружена грубость или оскорбление. Пожалуйста, будьте вежливы." };
+    }
+
+    return { status: "approved", summary: text.slice(0, 60) + (text.length > 60 ? "..." : "") };
   }
 
+  // --- 3. АВТО-ИСПРАВЛЕНИЕ ТЕКСТА ---
+  window.autoFixField = (fieldId) => {
+    const el = $(fieldId);
+    let text = el.value;
+    // Убираем лишние пробелы
+    text = text.replace(/\s+/g, ' ').trim();
+    // Если больше 60% текста в верхнем регистре, делаем нормальный регистр
+    const letters = text.replace(/[^a-zA-Zа-яА-Я]/g, '');
+    if (letters.length > 5 && (letters.match(/[A-ZА-Я]/g) || []).length / letters.length > 0.6) {
+      text = text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+    }
+    el.value = text;
+    updateHints(); // Обновить подсказки
+  };
+
+  // --- 4. ЖИВЫЕ ПОДСКАЗКИ И АВТО-КАТЕГОРИЯ ---
+  const lTitle = $("lTitle");
+  const lDesc = $("lDesc");
+  const lCat = $("lCat");
+  const hintsBox = $("aiHints");
+
+  const categoryKeywords = {
+    "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "вещи", "куплю", "наушники", "велосипед"],
+    "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул", "фотограф", "услуги", "настройка", "доставка"],
+    "Учёба": ["конспекты", "решебник", "помощь с дз", "учебник", "подготовка", "егэ", "огэ", "математика", "физика"],
+    "Мероприятия": ["встреча", "концерт", "квиз", "игра", "соревнования", "фестиваль", "собрание", "турнир", "матч"]
+  };
+
+  function updateHints() {
+    const title = lTitle.value.toLowerCase();
+    const desc = lDesc.value.toLowerCase();
+    const combined = title + " " + desc;
+    let hints = [];
+
+    if (title.length > 0 && title.length < 5) hints.push("💡 Добавьте более понятный заголовок.");
+    if (title.length >= 5 && desc.length < 10) hints.push("📝 Опишите подробнее: состояние, детали или условия.");
+    if (desc.length > 10 && !$("lPrice").value) hints.push("💰 Не забудьте указать цену или напишите «Бесплатно».");
+
+    let bestCat = null;
+    let maxMatches = 0;
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      const matches = keywords.filter(k => combined.includes(k)).length;
+      if (matches > maxMatches) {
+        maxMatches = matches;
+        bestCat = cat;
+      }
+    }
+
+    if (bestCat && maxMatches > 0) {
+      if (lCat.value !== bestCat) {
+        hints.push(`🤖 <a onclick="document.getElementById('lCat').value='${bestCat}'; updateHints();">ИИ советует: ${bestCat} (нажмите, чтобы применить)</a>`);
+      } else {
+        hints.push(`✅ ИИ: категория «${bestCat}» отлично подходит.`);
+      }
+    }
+
+    hintsBox.innerHTML = hints.length ? hints.map(h => `<div>• ${h}</div>`).join("") : "💡 Начните вводить заголовок, и ИИ поможет с категорией.";
+  }
+
+  lTitle.addEventListener("input", updateHints);
+  lDesc.addEventListener("input", updateHints);
+  $("lPrice").addEventListener("input", updateHints);
+
+  // --- 5. ЗАГРУЗКА ДАННЫХ ---
   async function loadAll() {
     let promises = [
       sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50),
@@ -305,7 +400,7 @@
   function renderBanners() {
     let box = $("bannerCarousel");
     let html = ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"]
-      .map(src => `<div class="carousel-card"><img src="${src}" loading="lazy"></div>`);
+      .map(src => `<div class="carousel-card"><img src="${src}" loading="lazy" onerror="this.style.display='none'"></div>`);
     
     if (user && profile && profile.school_id) {
       let evs = listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 3);
@@ -322,7 +417,6 @@
     }
 
     box.innerHTML = html.join("");
-    
     let isHover = false;
     $("carouselContainer").onmouseenter = () => isHover = true;
     $("carouselContainer").onmouseleave = () => isHover = false;
@@ -346,10 +440,12 @@
       let img = l.image_url ? `<img src="${l.image_url}" class="card-img" loading="lazy">` : `<div class="card-img" style="display:grid; place-items:center; font-size:30px; background:var(--surface);">📦</div>`;
       let btn = '';
       
-      // ИСПРАВЛЕНО: добавлена проверка l.user_id
       if (user && l.user_id && l.user_id !== user.id) {
         if (l.is_event) {
-          let isPast = l.event_date && new Date(l.event_date) < new Date(new Date().toDateString());
+          let today = new Date(); today.setHours(0,0,0,0);
+          let evDate = new Date(l.event_date + 'T00:00:00');
+          let isPast = l.event_date && evDate < today;
+          
           if (isPast) btn = `<button class="button button-secondary card-btn" onclick="openFeedback('${l.id}')">Отзыв</button>`;
           else {
             let taken = getTaken(l.id), max = l.max_seats||0, left = max>0?max-taken:"∞";
@@ -378,19 +474,22 @@
     }).join("") : `<p style="grid-column:1/-1; text-align:center; color:var(--muted); padding:40px;">Ничего не найдено</p>`;
   }
 
-  // ИСПРАВЛЕНО: защита от невалидного ID
+  // --- 6. ЧАТ ---
   window.startChat = (userId, title) => {
     if (!user) return openModal('authModal');
     if (!userId || userId === 'null' || userId === 'undefined' || userId.length < 30) {
         return notice('Ошибка: у этого объявления нет автора (неверный ID).');
     }
+    if (curChat === userId && !$("chatView").classList.contains("hidden")) return;
+
+    if(chatInterval) clearInterval(chatInterval);
+    
     curChat = userId;
     $("chatWith").textContent = "Чат: " + title;
     $("dialogsList").classList.add("hidden");
     $("chatView").classList.remove("hidden");
     loadChatMessages(userId);
     
-    if(chatInterval) clearInterval(chatInterval);
     chatInterval = setInterval(() => loadChatMessages(userId), 5000);
   };
 
@@ -401,10 +500,8 @@
     curChat = null;
   };
 
-  // ИСПРАВЛЕНО: try/catch и логирование ошибок
   async function loadChatMessages(otherId) {
     if (!user || !otherId) return;
-    
     let c = $("chatMessages");
     if (!c.innerHTML || c.innerHTML.includes('Загрузка')) c.innerHTML = '<p style="color:var(--muted); font-size:12px; text-align:center;">Загрузка...</p>';
     
@@ -416,21 +513,19 @@
             .limit(50);
         
         if (res.error) {
-            console.error("Ошибка Supabase:", res.error);
-            c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка загрузки чата (${res.error.message})</p>`;
+            c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка загрузки чата</p>`;
             return;
         }
         
         let msgs = res.data.reverse();
         c.innerHTML = msgs.length ? msgs.map(m => {
             let isMine = m.sender_id === user.id;
-            return `<div style="align-self:${isMine?'flex-end':'flex-start'}; background:${isMine?'var(--accent)':'var(--surface)'}; color:${isMine?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px;">${esc(m.text)}</div>`;
+            return `<div style="align-self:${isMine?'flex-end':'flex-start'}; background:${isMine?'var(--accent)':'var(--surface)'}; color:${isMine?'var(--bg)':'var(--text)'}; padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px; word-break:break-word;">${esc(m.text)}</div>`;
         }).join("") : '<p style="color:var(--muted); text-align:center; font-size:13px; padding:20px;">Нет сообщений. Напишите первым!</p>';
         
         c.scrollTop = c.scrollHeight;
     } catch (e) {
-        console.error("Сетевая ошибка:", e);
-        c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка сети. Проверьте подключение.</p>';
+        c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:12px;">Ошибка сети.</p>';
     }
   }
 
@@ -439,37 +534,30 @@
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
     
+    const modResult = moderateText(text, 'chat');
+    if (modResult.status === "rejected") {
+      return alert("🤖 Сообщение не отправлено: " + modResult.reason);
+    }
+    
     $("chatInput").value = "";
     let c = $("chatMessages");
-    
-    if (c.innerHTML.includes('Нет сообщений') || c.innerHTML.includes('Загрузка')) {
-      c.innerHTML = '';
-    }
+    if (c.innerHTML.includes('Нет сообщений') || c.innerHTML.includes('Загрузка')) c.innerHTML = '';
     
     c.innerHTML += `<div style="align-self:flex-end; background:var(--accent); color:var(--bg); padding:10px 14px; border-radius:12px; max-width:80%; font-size:13px; opacity:0.7;">${esc(text)}</div>`;
     c.scrollTop = c.scrollHeight;
 
     let res = await sb.from("messages").insert({ sender_id: user.id, receiver_id: curChat, text: text });
-    if (res.error) {
-        notice("Ошибка отправки");
-        loadChatMessages(curChat); 
-    } else {
-        loadChatMessages(curChat); 
-    }
+    if (res.error) { notice("Ошибка отправки"); loadChatMessages(curChat); } 
+    else { loadChatMessages(curChat); }
   };
 
+  // --- 7. МЕРОПРИЯТИЯ И ОТЗЫВЫ ---
   window.handleEventBtn = async (id, type, max) => {
     if (!user) return openModal('authModal');
-    
     if (type === 'limited' && max > 0) {
-      const { count, error } = await sb.from("event_registrations")
-        .select("*", { count: "exact", head: true })
-        .eq("event_id", id)
-        .eq("status", "confirmed");
-        
+      const { count, error } = await sb.from("event_registrations").select("*", { count: "exact", head: true }).eq("event_id", id).eq("status", "confirmed");
       if (!error && count >= max) return notice("Извините, места только что закончились!");
     }
-
     let status = (type === 'open' || type === 'limited') ? 'confirmed' : 'pending';
     let res = await sb.from("event_registrations").insert({ event_id: id, user_id: user.id, status });
     if (res.error) return notice(res.error.message);
@@ -480,10 +568,8 @@
   window.confirmReg = async (regId, evId) => {
     let ev = listings.find(l => l.id === evId);
     if (!ev) return alert("Мероприятие не найдено");
-    
     let taken = getTaken(evId);
     if (ev.max_seats > 0 && taken >= ev.max_seats) return alert("Мест нет!");
-    
     let res = await sb.from("event_registrations").update({ status: 'confirmed' }).eq("id", regId);
     if(res.error) return alert(res.error.message);
     alert("Одобрено!"); loadAll();
@@ -505,12 +591,12 @@
   $("feedbackForm").onsubmit = async e => {
     e.preventDefault();
     if (selectedStars < 1) return alert("Поставьте оценку");
-    
     let res = await sb.from("feedbacks").insert({ event_id: $("fbEventId").value, user_id: user.id, stars: selectedStars, text: $("fbText").value });
     if (res.error) return alert("Вы уже оставляли отзыв на это мероприятие!");
     closeModal('feedbackModal'); notice("Спасибо за отзыв!");
   };
 
+  // --- 8. ИДЕИ ---
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
@@ -556,22 +642,28 @@
     btn.disabled = true; btn.textContent = "ИИ проверяет...";
     
     setTimeout(async () => {
-      let ai = aiFilter(txt);
+      const modResult = moderateText(txt, 'idea');
+      if (modResult.status === "rejected") {
+        $("ideaText").value = ""; btn.disabled = false; btn.textContent = "Отправить идею";
+        return notice("🤖 ИИ отклонил: " + modResult.reason);
+      }
+      
       await sb.from("ideas").insert({
         user_id: user.id, school_id: profile?.school_id, text: txt,
-        ai_status: ai.status, ai_summary: ai.summary || null, admin_status: 'new'
+        ai_status: "approved", ai_summary: modResult.summary, admin_status: 'new'
       });
       $("ideaText").value = ""; btn.disabled = false; btn.textContent = "Отправить идею";
-      notice(ai.status==='approved'?"Идея отправлена!":"ИИ отклонил: " + ai.reason);
+      notice("Идея успешно отправлена в Ученический совет!");
       loadAll();
-    }, 1000);
+    }, 800);
   };
 
+  // --- 9. ПРОФИЛЬ ---
   async function renderProfile() {
     if(!user) return;
     $("profEmail").textContent = user.email;
     let school = profile?.school_id ? "Школа указана" : "Школа не указана";
-    let role = profile?.role === 'school_admin' ? " | Медиацентр" : "";
+    let role = profile?.role === 'school_admin' ? " | Ученический совет" : "";
     $("profMeta").textContent = school + role;
 
     let myL = listings.filter(l => l.user_id === user.id);
@@ -585,11 +677,9 @@
     if (profile && profile.role === 'school_admin') {
       $("adminRequests").classList.remove("hidden");
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
-      
       if (myEvs.length > 0) {
         let res = await sb.from("event_registrations").select("*").in("event_id", myEvs).eq("status", "pending");
         let pending = res.error ? [] : res.data;
-        
         $("adminReqList").innerHTML = pending.length ? pending.map(r => {
           let ev = listings.find(l => l.id === r.event_id);
           return `<div class="idea-card">
@@ -606,6 +696,7 @@
     }
   }
 
+  // --- 10. НАВИГАЦИЯ И ФОРМЫ ---
   document.querySelectorAll(".nav-tab").forEach(tab => {
     tab.onclick = () => {
       document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
@@ -613,7 +704,6 @@
       document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
       let id = tab.dataset.tab + "Section";
       if($(id)) $(id).classList.remove("hidden");
-      
       if(tab.dataset.tab === 'profile') renderProfile();
       if(tab.dataset.tab === 'board') loadAll();
     };
@@ -655,6 +745,10 @@
 
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
+    const combinedText = $("lTitle").value + " " + $("lDesc").value;
+    const modResult = moderateText(combinedText, 'listing');
+    if (modResult.status === "rejected") return alert("🤖 ИИ-модератор: " + modResult.reason);
+
     let btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = "Публикация...";
 
@@ -666,7 +760,6 @@
     if (file) {
       const compressedFile = await compressImage(file);
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`; 
-      
       const { error: uploadError } = await sb.storage.from('listings-images').upload(fileName, compressedFile);
       if (!uploadError) {
         const { data: { publicUrl } } = sb.storage.from('listings-images').getPublicUrl(fileName);
@@ -686,12 +779,13 @@
     
     btn.disabled = false; btn.textContent = "Опубликовать";
     if(res.error) return alert(res.error.message);
-    
     closeModal('listingModal'); 
     $("listingForm").reset();
+    hintsBox.innerHTML = "💡 Начните вводить заголовок, и ИИ поможет с категорией.";
     loadAll();
   };
 
+  // --- INIT ---
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles").select("*").eq("id", user.id).single();
