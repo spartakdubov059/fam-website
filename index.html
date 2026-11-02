@@ -100,7 +100,6 @@
     .profile-box:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
     .profile-email { word-break: break-all; font-size: 13px; margin: 0 0 4px; }
     
-    /* ПАПКИ ИДЕЙ С АНИМАЦИЕЙ */
     .idea-folders { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; animation: slideInFolders 0.6s ease; }
     .idea-folders::-webkit-scrollbar { display: none; }
     @keyframes slideInFolders { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
@@ -340,7 +339,8 @@
   </section>
 </main>
 
-<button class="fab" id="fabBtn" onclick="user ? openModal('listingModal') : openModal('authModal')">+</button>
+<!-- ИСПРАВЛЕНО: Убран inline onclick, который не видел переменную user -->
+<button class="fab" id="fabBtn">+</button>
 
 <footer class="footer">
   <div class="footer-text">
@@ -481,14 +481,19 @@
     if (container) container.innerHTML = '';
   }
 
-  function moderateText(text) {
+  // ИСПРАВЛЕНО: Добавлен параметр isChat для смягчения модерации коротких сообщений в чате
+  function moderateText(text, isChat = false) {
     if (!text) return { status: "rejected", reason: "Текст пуст." };
     const lettersOnly = text.replace(/[^a-zA-Zа-яА-ЯёЁ]/g, '');
     if (lettersOnly.length > 10 && lettersOnly === lettersOnly.toUpperCase()) {
       return { status: "rejected", reason: "Не пишите ЗАГЛАВНЫМИ." };
     }
     let t = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,""); 
-    if (t.length < 5) return { status: "rejected", reason: "Слишком коротко." };
+    
+    // Для чата разрешаем сообщения от 2 символов (например, "Да", "Ок")
+    if (!isChat && t.length < 5) return { status: "rejected", reason: "Слишком коротко." };
+    if (isChat && t.length < 2) return { status: "rejected", reason: "Слишком короткое сообщение." };
+    
     const badRoots = ["хуй", "пизд", "бля", "ебат", "сука", "мудак", "говн", "дерьм", "залуп", "шлюх", "пидор", "долбоеб"];
     if (badRoots.some(root => t.includes(root))) {
       return { status: "rejected", reason: "Нецензурная лексика." };
@@ -687,6 +692,7 @@
     $("dialogsList").classList.add("hidden");
     $("chatView").classList.remove("hidden");
     loadChatMessages(userId);
+    // Обновляем чат каждые 5 секунд для получения новых сообщений
     chatInterval = setInterval(() => loadChatMessages(userId), 5000);
     
     if (autoMessage) {
@@ -704,31 +710,74 @@
     curChat = null;
   };
 
+  // ИСПРАВЛЕНО: Надежная загрузка истории чата с правильной сортировкой (старые сверху) и увеличенным лимитом
   async function loadChatMessages(otherId) {
     if (!user || !otherId) return;
     let c = $("chatMessages");
     try {
-        let res = await sb.from("messages").select("*").or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`).order("created_at", { ascending: false }).limit(50);
-        if (res.error) { c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:11px;">Ошибка</p>`; return; }
-        let msgs = res.data.reverse();
-        c.innerHTML = msgs.length ? msgs.map(m => `<div style="align-self:${m.sender_id === user.id?'flex-end':'flex-start'}; background:${m.sender_id === user.id?'var(--accent)':'var(--bg)'}; color:${m.sender_id === user.id?'var(--bg)':'var(--text)'}; padding:8px 12px; border-radius:10px; max-width:80%; font-size:12px; word-break:break-word;">${esc(m.text)}</div>`).join("") : '<p style="color:var(--muted); text-align:center; font-size:12px;">Нет сообщений</p>';
+        const res = await sb.from("messages")
+            .select("*")
+            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`)
+            .order("created_at", { ascending: true }) // Хронологический порядок
+            .limit(100); // Показываем больше истории
+            
+        if (res.error) { 
+            console.error("Ошибка загрузки чата:", res.error);
+            c.innerHTML = `<p style="color:var(--danger); text-align:center; font-size:11px;">Ошибка: ${res.error.message}. Проверьте RLS политики в Supabase.</p>`; 
+            return; 
+        }
+        
+        const msgs = res.data || [];
+        if (msgs.length === 0) {
+            c.innerHTML = '<p style="color:var(--muted); text-align:center; font-size:12px; margin-top: 20px;">История сообщений пуста. Напишите первое сообщение!</p>';
+        } else {
+            c.innerHTML = msgs.map(m => `
+                <div style="align-self:${m.sender_id === user.id ? 'flex-end' : 'flex-start'}; background:${m.sender_id === user.id ? 'var(--accent)' : 'var(--bg)'}; color:${m.sender_id === user.id ? 'var(--bg)' : 'var(--text)'}; padding:8px 12px; border-radius:10px; max-width:80%; font-size:12px; word-break:break-word; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    ${esc(m.text)}
+                </div>
+            `).join("");
+        }
         c.scrollTop = c.scrollHeight;
-    } catch (e) { c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:11px;">Ошибка сети</p>'; }
+    } catch (e) { 
+        console.error("Сетевая ошибка чата:", e);
+        c.innerHTML = '<p style="color:var(--danger); text-align:center; font-size:11px;">Ошибка сети</p>'; 
+    }
   }
 
+  // ИСПРАВЛЕНО: Корректная обработка отправки с удалением временного сообщения при ошибке
   $("chatForm").onsubmit = async (e) => {
     e.preventDefault();
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
-    const mod = moderateText(text);
-    if (mod.status === "rejected") return alert(mod.reason);
-    $("chatInput").value = "";
+    
+    const mod = moderateText(text, true); // true = это чат, применяем мягкие правила
+    if (mod.status === "rejected") return alert("ИИ модерация: " + mod.reason);
+    
     let c = $("chatMessages");
-    if (c.innerHTML.includes('Нет сообщений')) c.innerHTML = '';
-    c.innerHTML += `<div style="align-self:flex-end; background:var(--accent); color:var(--bg); padding:8px 12px; border-radius:10px; max-width:80%; font-size:12px; opacity:0.7;">${esc(text)}</div>`;
+    if (c.innerHTML.includes('История сообщений пуста')) c.innerHTML = '';
+    
+    // Временное добавление для мгновенного отклика UI
+    const tempId = 'temp-' + Date.now();
+    c.innerHTML += `<div id="${tempId}" style="align-self:flex-end; background:var(--accent); color:var(--bg); padding:8px 12px; border-radius:10px; max-width:80%; font-size:12px; word-break:break-word; opacity:0.7;">${esc(text)}</div>`;
     c.scrollTop = c.scrollHeight;
-    let res = await sb.from("messages").insert({ sender_id: user.id, receiver_id: curChat, text: text });
-    if (!res.error) loadChatMessages(curChat);
+    $("chatInput").value = "";
+
+    const res = await sb.from("messages").insert({ 
+        sender_id: user.id, 
+        receiver_id: curChat, 
+        text: text 
+    });
+    
+    if (res.error) {
+        console.error("Ошибка отправки сообщения:", res.error);
+        alert("Не удалось отправить сообщение: " + res.error.message);
+        // Удаляем временное сообщение, если оно не сохранилось в базе
+        const tempEl = document.getElementById(tempId);
+        if (tempEl) tempEl.remove();
+    } else {
+        // Перезагружаем чат для синхронизации (получаем реальный ID и created_at)
+        loadChatMessages(curChat);
+    }
   };
 
   window.handleEventBtn = async (id, type, max) => {
@@ -803,7 +852,6 @@
     loadAll();
   };
 
-  // ПЕРЕКЛЮЧЕНИЕ ПАПКИ ИДЕЙ
   window.switchIdeaFolder = (folder) => {
     currentIdeaFolder = folder;
     document.querySelectorAll('.idea-folder').forEach(f => f.classList.remove('active'));
@@ -906,7 +954,6 @@
     if (profile && profile.role === 'school_admin') {
       $("adminIdeasDash").classList.remove("hidden");
       
-      // Обновляем счётчики папок
       const newCount = ideas.filter(i => i.ai_status === 'approved' && (i.admin_status === 'new' || !i.admin_status)).length;
       const workCount = ideas.filter(i => i.admin_status === 'in_progress').length;
       const doneCount = ideas.filter(i => i.admin_status === 'done').length;
@@ -1007,6 +1054,15 @@
   $("authBtn").onclick = () => openModal('authModal');
   $("myListingsBtn").onclick = () => document.querySelector('[data-tab="profile"]').click();
   $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
+
+  // ИСПРАВЛЕНО: Обработчик кнопки "+" теперь внутри IIFE, где переменная user доступна
+  $("fabBtn").onclick = () => {
+    if (user) {
+      openModal('listingModal');
+    } else {
+      openModal('authModal');
+    }
+  };
 
   $("lCat").onchange = function() {
     let isEv = this.value === "Мероприятия";
