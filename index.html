@@ -462,15 +462,15 @@
   const notice = (msg) => alert(msg);
 
   // --- ИИ-ФИЛЬТР ЧЕРЕЗ CLOUDFLARE WORKER ---
-  async function moderateText(text, isChat = false) {
+  async function moderateText(text, context = "idea") {
     if (!text) return { status: "rejected", reason: "Текст пуст." };
-    if (!isChat && text.length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
+    if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
     
     try {
       const res = await fetch("https://fam-ai.spartakdubov.workers.dev/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text, type: isChat ? "chat" : "idea" })
+        body: JSON.stringify({ text: text, type: context })
       });
       const data = await res.json();
       if (data.approved === false) {
@@ -695,7 +695,7 @@
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
     
-    const mod = await moderateText(text, true);
+    const mod = await moderateText(text, "chat");
     if (mod.status === "rejected") return alert("ИИ модерация: " + mod.reason);
     
     let c = $("chatMessages");
@@ -819,7 +819,7 @@
     btn.disabled = true; 
     showAIThinking('ideaThinkingArea', 'ИИ проверяет');
     
-    const mod = await moderateText(txt, false); 
+    const mod = await moderateText(txt, "idea"); 
     hideAIThinking('ideaThinkingArea');
     
     if (mod.status === "rejected") {
@@ -1012,7 +1012,7 @@
     e.preventDefault();
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
     
-    const mod = await moderateText(combinedText, false);
+    const mod = await moderateText(combinedText, "listing");
     if (mod.status === "rejected") return alert("ИИ: " + mod.reason);
 
     let btn = e.target.querySelector('button[type="submit"]');
