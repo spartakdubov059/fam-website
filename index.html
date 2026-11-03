@@ -177,15 +177,8 @@
     .tabbar-badge.pop { animation: badgePop 0.45s var(--spring); }
     @keyframes badgePop { 0% { scale: 0.4; } 60% { scale: 1.3; } 100% { scale: 1; } }
 
-    .page-in-right  { animation: pageInRight  0.6s var(--ios-ease) both; }
-    .page-in-left   { animation: pageInLeft   0.6s var(--ios-ease) both; }
-    .page-out-left  { animation: pageOutLeft  0.4s var(--ios-ease) both; }
-    .page-out-right { animation: pageOutRight 0.4s var(--ios-ease) both; }
-    @keyframes pageInRight  { from { opacity: 0; transform: translateX(100px) scale(0.94); filter: blur(10px); } to { opacity: 1; transform: none; filter: blur(0); } }
-    @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-100px) scale(0.94); filter: blur(10px); } to { opacity: 1; transform: none; filter: blur(0); } }
-    @keyframes pageOutLeft  { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(-60px) scale(0.96); filter: blur(10px); } }
-    @keyframes pageOutRight { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(60px) scale(0.96); filter: blur(10px); } }
-    main > section { animation: fadeIn 0.5s ease; will-change: transform, opacity, filter; }
+    .page-anim { animation: pageAnim 0.35s var(--ios-ease) both; }
+    @keyframes pageAnim { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     .fab { position: fixed; bottom: 100px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-fab); color: white; font-size: 28px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(107,203,155,0.4); border: none; z-index: 40; font-weight: 900; animation: fabPulse 2s infinite, fabIn 0.6s var(--spring) 0.5s backwards, fabFloat 3s ease-in-out 1.1s infinite; cursor: pointer; transition: all 0.3s; }
     @keyframes fabPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(107,203,155,0.4); } 50% { box-shadow: 0 8px 32px rgba(79,172,254,0.7); } }
@@ -453,6 +446,12 @@
 
 <script>
 (function(){
+  // 1. Проверка на загрузку Supabase
+  if (!window.supabase) {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#FF6B6B;font-family:sans-serif;font-size:16px;">Ошибка загрузки Supabase. Проверьте интернет-соединение и обновите страницу.</div>';
+    return;
+  }
+
   const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
   const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -473,12 +472,7 @@
   
   window.openModal = id => {
     const modal = $(id);
-    if (modal) {
-      modal.classList.add("open");
-      console.log("Открыта модалка:", id);
-    } else {
-      console.error("Модалка не найдена:", id);
-    }
+    if (modal) modal.classList.add("open");
   };
   
   const notice = (msg) => alert(msg);
@@ -549,20 +543,28 @@
   lDesc.addEventListener("input", updateHints);
 
   async function loadAll() {
-    let promises = [sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50), sb.from("event_occupancy").select("*")];
-    if (user) {
+    let promises = [
+      sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50), 
+      sb.from("event_occupancy").select("*")
+    ];
+    
+    // ИСПРАВЛЕНО: Добавлена проверка user.id
+    if (user && user.id) {
       promises.push(sb.from("event_registrations").select("*").eq("user_id", user.id));
       promises.push(sb.from("ideas").select("*").order("created_at", { ascending: false }));
       promises.push(sb.from("favorites").select("*").eq("user_id", user.id));
     }
+    
     const results = await Promise.all(promises);
     if(!results[0].error) listings = results[0].data;
     if(!results[1].error) occupancy = results[1].data;
-    if (user) {
+    
+    if (user && user.id) {
       if(!results[2].error) regs = results[2].data;
       if(!results[3].error) ideas = results[3].data;
       if(!results[4].error) favorites = results[4].data;
     }
+    
     renderBanners(); renderListings(); renderFavorites();
     if(!$("profileSection").classList.contains("hidden")) renderProfile();
   }
@@ -574,14 +576,16 @@
     let box = $("bannerCarousel"); let html = [];
     const staticBanners = ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"];
     staticBanners.forEach(src => html.push(`<div class="carousel-card"><img src="${src}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`));
+    
     if (user && profile && profile.school_id) {
       let evs = listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 3);
       evs.forEach(e => {
+        // ИСПРАВЛЕНО: Экранирование ID и типа события
         html.push(`<div class="carousel-card"><div class="carousel-event">
           <span style="background:var(--accent); color:var(--bg); padding:4px 10px; border-radius:6px; font-size:10px; font-weight:800; align-self:flex-start; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Событие школы</span>
           <div style="font-size:18px; font-weight:800; margin-bottom:4px;">${esc(e.title)}</div>
-          <div style="font-size:12px; color:#ccc; margin-bottom:10px;">${e.event_date || ''}</div>
-          <button class="button button-primary button-small" style="align-self:flex-start;" onclick="handleEventBtn('${e.id}', '${e.event_type}', ${e.max_seats})">Записаться</button>
+          <div style="font-size:12px; color:#ccc; margin-bottom:10px;">${esc(e.event_date || '')}</div>
+          <button class="button button-primary button-small" style="align-self:flex-start;" onclick="handleEventBtn('${esc(e.id)}', '${esc(e.event_type)}', ${e.max_seats || 0})">Записаться</button>
         </div></div>`);
       });
     }
@@ -603,29 +607,33 @@
     let search = $("searchInput").value.toLowerCase();
     let filtered = listings.filter(l => (curCat==="Все" || l.category===curCat) && l.title.toLowerCase().includes(search));
     grid.innerHTML = filtered.length ? filtered.map(l => {
-      let img = l.image_url ? `<img src="${l.image_url}" class="card-img" loading="lazy">` : `<div class="card-placeholder"></div>`;
+      let img = l.image_url ? `<img src="${esc(l.image_url)}" class="card-img" loading="lazy">` : `<div class="card-placeholder"></div>`;
       let btn = ''; let favClass = isFavorite(l.id) ? 'active' : '';
       const isValidUUID = l.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(l.user_id);
+      
       if (user && isValidUUID && l.user_id !== user.id) {
         if (l.is_event) {
           let already = regs.find(r => r.event_id===l.id && r.user_id===user.id && r.status!=='rejected');
           if (already) {
             if (already.status === 'pending') btn = `<button class="button button-secondary card-btn" disabled>Заявка отправлена</button>`;
-            else btn = `<button class="button button-danger card-btn" onclick="cancelReg('${already.id}')">Отменить</button>`;
+            // ИСПРАВЛЕНО: Экранирование ID
+            else btn = `<button class="button button-danger card-btn" onclick="cancelReg('${esc(already.id)}')">Отменить</button>`;
           } else {
             let taken = getTaken(l.id), max = l.max_seats||0, left = max>0?max-taken:"∞";
             if (l.event_type==='limited' && left<=0) btn = `<button class="button card-btn" disabled>Мест нет</button>`;
             else {
               let txt = l.event_type==='open'?'Записаться':(l.event_type==='request'?'Заявка':`Мест: ${left}`);
-              btn = `<button class="button button-primary card-btn" onclick="handleEventBtn('${l.id}', '${l.event_type}', ${max})">${txt}</button>`;
+              // ИСПРАВЛЕНО: Экранирование
+              btn = `<button class="button button-primary card-btn" onclick="handleEventBtn('${esc(l.id)}', '${esc(l.event_type)}', ${max})">${txt}</button>`;
             }
           }
         } else {
-          btn = `<button class="button button-secondary card-btn" onclick="startChat('${l.user_id}', '${esc(l.title)}')">Написать</button>`;
+          // ИСПРАВЛЕНО: Экранирование ID и title
+          btn = `<button class="button button-secondary card-btn" onclick="startChat('${esc(l.user_id)}', '${esc(l.title)}')">Написать</button>`;
         }
       }
       return `<div class="card">
-        <button class="favorite-btn ${favClass}" onclick="toggleFavorite('${l.id}')">♥</button>
+        <button class="favorite-btn ${favClass}" onclick="toggleFavorite('${esc(l.id)}')">♥</button>
         <div class="card-img-wrap">${img}</div>
         <div class="card-info">
           <div class="card-price">${esc(l.price_text||"Бесплатно")}</div>
@@ -644,9 +652,9 @@
     else {
       $("favoritesEmpty").classList.add("hidden");
       grid.innerHTML = favListings.map(l => {
-        let img = l.image_url ? `<img src="${l.image_url}" class="card-img">` : `<div class="card-placeholder"></div>`;
+        let img = l.image_url ? `<img src="${esc(l.image_url)}" class="card-img">` : `<div class="card-placeholder"></div>`;
         return `<div class="card">
-          <button class="favorite-btn active" onclick="toggleFavorite('${l.id}')">♥</button>
+          <button class="favorite-btn active" onclick="toggleFavorite('${esc(l.id)}')">♥</button>
           <div class="card-img-wrap">${img}</div>
           <div class="card-info">
             <div class="card-price">${esc(l.price_text||"Бесплатно")}</div>
@@ -781,8 +789,8 @@
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
-      let st = i.ai_status === 'rejected' ? 'Отклонено' : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : 'На рассмотрении'));
-      let cls = i.ai_status === 'rejected' ? 'status-rejected' : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : 'status-new'));
+      let st = (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'На рассмотрении')));
+      let cls = (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
       return `<div class="idea-card">
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; align-items:center;">
           <b style="font-size:12px;">${esc(i.text.slice(0,30))}${i.text.length>30?'...':''}</b>
@@ -792,10 +800,19 @@
     }).join("") : `<p style="color:var(--muted); font-size:11px;">Вы еще не предлагали идей.</p>`;
   }
 
+  // ИСПРАВЛЕНО: Удален двойной вызов renderProfile()
   window.updateIdea = async (id, status) => {
-    await sb.from("ideas").update({ admin_status: status }).eq("id", id);
-    loadAll();
-    renderIdeaFolderContent();
+    try {
+      const { error } = await sb.from("ideas").update({ admin_status: status }).eq("id", id);
+      if (error) {
+        console.error("Ошибка БД:", error);
+        return alert("Ошибка при сохранении: " + error.message);
+      }
+      await loadAll(); 
+    } catch (e) {
+      console.error(e);
+      alert("Сетевая ошибка. Попробуйте еще раз.");
+    }
   };
 
   window.switchIdeaFolder = (folder) => {
@@ -808,10 +825,10 @@
   function renderIdeaFolderContent() {
     const content = $("ideaFolderContent");
     let filtered = [];
-    if (currentIdeaFolder === 'new') filtered = ideas.filter(i => i.ai_status === 'approved' && (i.admin_status === 'new' || !i.admin_status));
+    if (currentIdeaFolder === 'new') filtered = ideas.filter(i => i.admin_status === 'new');
     else if (currentIdeaFolder === 'work') filtered = ideas.filter(i => i.admin_status === 'in_progress');
     else if (currentIdeaFolder === 'done') filtered = ideas.filter(i => i.admin_status === 'done');
-    else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected');
+    else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.admin_status === 'rejected');
     
     if (filtered.length === 0) { 
       content.innerHTML = `<p style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">В этой папке пока пусто</p>`; 
@@ -821,13 +838,13 @@
       let buttons = '';
       if (currentIdeaFolder === 'new') {
         buttons = `<div style="display:flex; gap:6px; margin-top:8px;">
-          <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
-          <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
+          <button class="button button-success button-small" onclick="updateIdea('${esc(i.id)}', 'in_progress')">В работу</button>
+          <button class="button button-danger button-small" onclick="updateIdea('${esc(i.id)}', 'rejected')">Отклонить</button>
         </div>`;
       } else if (currentIdeaFolder === 'work') {
         buttons = `<div style="display:flex; gap:6px; margin-top:8px;">
-          <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'done')">Готово</button>
-          <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
+          <button class="button button-success button-small" onclick="updateIdea('${esc(i.id)}', 'done')">Готово</button>
+          <button class="button button-danger button-small" onclick="updateIdea('${esc(i.id)}', 'rejected')">Отклонить</button>
         </div>`;
       }
       return `<div class="idea-card"><div style="font-size:12px; margin-bottom:4px;">${esc(i.text)}</div>${buttons}</div>`;
@@ -847,7 +864,7 @@
     
     if (mod.status === "rejected") {
       $("ideaText").value = ""; btn.disabled = false;
-      return notice("ИИ отклонил: " + mod.reason);
+      return notice("🤖 ИИ заблокировал вашу идею: " + mod.reason + "\n\nОна не отправлена Ученическому совету.");
     }
     
     await sb.from("ideas").insert({ 
@@ -860,7 +877,7 @@
     });
     
     $("ideaText").value = ""; btn.disabled = false;
-    notice("Идея отправлена!");
+    notice("Идея успешно отправлена Ученическому совету!");
     loadAll();
   };
 
@@ -868,7 +885,7 @@
     updateAuthUI();
     if(!user) return;
     $("profEmail").textContent = user.email;
-    if (profile?.avatar_url) $("avatarPreview").innerHTML = `<img src="${profile.avatar_url}">`;
+    if (profile?.avatar_url) $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}">`;
     else $("avatarPreview").textContent = user.email[0].toUpperCase();
     let school = profile?.school_id || "Школа не указана";
     let role = profile?.role === 'school_admin' ? " · Ученический совет" : "";
@@ -878,7 +895,7 @@
     if (myL.length > 0) {
       $("myListingsEmpty").classList.add("hidden");
       $("myListingsGrid").innerHTML = myL.map(l => {
-        let img = l.image_url ? `<img src="${l.image_url}" class="card-img">` : `<div class="card-placeholder"></div>`;
+        let img = l.image_url ? `<img src="${esc(l.image_url)}" class="card-img">` : `<div class="card-placeholder"></div>`;
         return `<div class="card"><div class="card-img-wrap">${img}</div><div class="card-info"><h3 class="card-title">${esc(l.title)}</h3></div></div>`;
       }).join("");
     } else {
@@ -888,10 +905,10 @@
 
     if (profile && profile.role === 'school_admin') {
       $("adminIdeasDash").classList.remove("hidden");
-      $("countNew").textContent = ideas.filter(i => i.ai_status === 'approved' && (i.admin_status === 'new' || !i.admin_status)).length;
+      $("countNew").textContent = ideas.filter(i => i.admin_status === 'new').length;
       $("countWork").textContent = ideas.filter(i => i.admin_status === 'in_progress').length;
       $("countDone").textContent = ideas.filter(i => i.admin_status === 'done').length;
-      $("countRejected").textContent = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected').length;
+      $("countRejected").textContent = ideas.filter(i => i.admin_status === 'rejected').length;
       renderIdeaFolderContent();
       
       $("adminRequests").classList.remove("hidden");
@@ -901,12 +918,13 @@
         let pending = res.error ? [] : res.data;
         $("adminReqList").innerHTML = pending.length ? pending.map(r => {
           let ev = listings.find(l => l.id === r.event_id);
+          // ИСПРАВЛЕНО: Экранирование ID
           return `<div class="idea-card">
             <b style="font-size:12px;">${esc(ev?.title || 'Мероприятие')}</b>
-            <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${r.user_id.slice(0,8)}...</div>
+            <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${esc(r.user_id.slice(0,8))}...</div>
             <div style="display:flex; gap:6px;">
-              <button class="button button-success button-small" onclick="confirmReg('${r.id}', '${r.event_id}', 'approve')">Одобрить</button>
-              <button class="button button-danger button-small" onclick="confirmReg('${r.id}', '${r.event_id}', 'reject')">Отклонить</button>
+              <button class="button button-success button-small" onclick="confirmReg('${esc(r.id)}', '${esc(r.event_id)}', 'approve')">Одобрить</button>
+              <button class="button button-danger button-small" onclick="confirmReg('${esc(r.id)}', '${esc(r.event_id)}', 'reject')">Отклонить</button>
             </div>
           </div>`;
         }).join("") : `<p style="color:var(--muted); font-size:11px;">Нет новых заявок.</p>`;
@@ -941,12 +959,27 @@
     let email = $("authEmail").value, pass = $("authPassword").value;
     let isReg = $("authTitle").textContent === "Регистрация";
     let school = $("authSchool").value; let res;
+    
     if (isReg) {
       res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school } } });
       if (!res.error) await sb.from("profiles").upsert({ id: res.data.user.id, school_id: school, role: 'student' });
-    } else { res = await sb.auth.signInWithPassword({ email, password: pass }); }
-    if (res.error) return $("authMsg").textContent = res.error.message;
-    if(isReg) alert("Проверьте почту!"); else location.reload();
+    } else { 
+      res = await sb.auth.signInWithPassword({ email, password: pass }); 
+    }
+    
+    // ИСПРАВЛЕНО: Модалка закрывается при успешной регистрации
+    if (res.error) {
+      $("authMsg").textContent = res.error.message;
+      $("authPassword").value = ""; // Очистка пароля при ошибке
+      return;
+    }
+    
+    if (isReg) {
+      closeModal('authModal');
+      alert("✅ Регистрация прошла успешно!\nПроверьте почту для подтверждения аккаунта.");
+    } else {
+      location.reload();
+    }
   };
 
   function positionIndicator(squish) {
@@ -964,23 +997,22 @@
   const TAB_ORDER = ['board', 'favorites', 'messages', 'profile'];
   function showTab(name, forceNoAnim = false) {
     if (name === currentTab) { positionIndicator(true); return; }
-    const dir = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(currentTab) ? 1 : -1;
-    const oldSec = $(currentTab + 'Section');
-    const newSec = $(name + 'Section');
     currentTab = name;
 
     document.querySelectorAll('.tabbar-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     positionIndicator(true);
 
-    if (oldSec !== newSec && !forceNoAnim) {
-      oldSec.classList.add(dir > 0 ? 'page-out-left' : 'page-out-right');
-      setTimeout(() => { oldSec.classList.add('hidden'); oldSec.classList.remove('page-out-left', 'page-out-right'); }, 400);
-      newSec.classList.remove('hidden');
-      newSec.classList.add(dir > 0 ? 'page-in-right' : 'page-in-left');
-      setTimeout(() => newSec.classList.remove('page-in-right', 'page-in-left'), 600);
-    } else {
-      document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
-      newSec.classList.remove('hidden');
+    document.querySelectorAll("main > section").forEach(s => {
+      s.classList.add("hidden");
+      s.classList.remove('page-anim');
+    });
+
+    const newSec = $(name + 'Section');
+    newSec.classList.remove('hidden');
+    
+    if (!forceNoAnim) {
+      newSec.classList.add('page-anim');
+      setTimeout(() => newSec.classList.remove('page-anim'), 400);
     }
 
     if (name === 'profile') renderProfile();
@@ -1017,7 +1049,14 @@
     b.classList.add("active"); curCat = b.dataset.cat; renderListings();
   });
   $("searchInput").oninput = renderListings;
-  $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
+  
+  // ИСПРАВЛЕНО: Блокировка кнопки при выходе
+  $("logoutBtn").onclick = function() {
+    this.disabled = true;
+    this.textContent = "Выход...";
+    sb.auth.signOut().then(() => location.reload());
+  };
+  
   $("fabBtn").onclick = () => { if (user) openModal('listingModal'); else openModal('authModal'); };
 
   $("lCat").onchange = function() {
