@@ -14,7 +14,7 @@
       --gradient-brand: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       --gradient-fab: linear-gradient(135deg, #6BCB9B 0%, #4facfe 100%);
       --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-      --ios-ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --ios-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
@@ -177,14 +177,14 @@
     .tabbar-badge.pop { animation: badgePop 0.45s var(--spring); }
     @keyframes badgePop { 0% { scale: 0.4; } 60% { scale: 1.3; } 100% { scale: 1; } }
 
-    .page-in-right  { animation: pageInRight  0.5s var(--ios-ease) both; }
-    .page-in-left   { animation: pageInLeft   0.5s var(--ios-ease) both; }
-    .page-out-left  { animation: pageOutLeft  0.35s var(--ios-ease) both; }
-    .page-out-right { animation: pageOutRight 0.35s var(--ios-ease) both; }
-    @keyframes pageInRight  { from { opacity: 0; transform: translateX(80px) scale(0.96); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
-    @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-80px) scale(0.96); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
-    @keyframes pageOutLeft  { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(-50px) scale(0.97); filter: blur(8px); } }
-    @keyframes pageOutRight { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(50px) scale(0.97); filter: blur(8px); } }
+    .page-in-right  { animation: pageInRight  0.6s var(--ios-ease) both; }
+    .page-in-left   { animation: pageInLeft   0.6s var(--ios-ease) both; }
+    .page-out-left  { animation: pageOutLeft  0.4s var(--ios-ease) both; }
+    .page-out-right { animation: pageOutRight 0.4s var(--ios-ease) both; }
+    @keyframes pageInRight  { from { opacity: 0; transform: translateX(100px) scale(0.94); filter: blur(10px); } to { opacity: 1; transform: none; filter: blur(0); } }
+    @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-100px) scale(0.94); filter: blur(10px); } to { opacity: 1; transform: none; filter: blur(0); } }
+    @keyframes pageOutLeft  { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(-60px) scale(0.96); filter: blur(10px); } }
+    @keyframes pageOutRight { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateX(60px) scale(0.96); filter: blur(10px); } }
     main > section { animation: fadeIn 0.5s ease; will-change: transform, opacity, filter; }
 
     .fab { position: fixed; bottom: 100px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-fab); color: white; font-size: 28px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(107,203,155,0.4); border: none; z-index: 40; font-weight: 900; animation: fabPulse 2s infinite, fabIn 0.6s var(--spring) 0.5s backwards, fabFloat 3s ease-in-out 1.1s infinite; cursor: pointer; transition: all 0.3s; }
@@ -221,6 +221,10 @@
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; transition: background 0.3s; }
     ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+    
+    .upload-status { padding: 8px; border-radius: 6px; font-size: 11px; margin-top: 8px; animation: fadeIn 0.3s; }
+    .upload-status.success { background: rgba(107,203,155,0.15); color: var(--success); }
+    .upload-status.error { background: rgba(255,107,107,0.15); color: var(--danger); }
   </style>
 </head>
 <body>
@@ -236,7 +240,7 @@
     </a>
     <div class="header-actions">
       <button class="button button-secondary button-small hidden" id="myListingsBtn">Мои</button>
-      <button class="button button-primary button-small" id="authBtn">Войти</button>
+      <button class="button button-primary button-small" id="authBtn" onclick="openModal('authModal')">Войти</button>
       <div class="header-avatar hidden" id="headerAvatar" onclick="document.querySelector('[data-tab=profile]').click()"></div>
     </div>
   </div>
@@ -301,7 +305,7 @@
       </div>
       <div class="profile-box">
         <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">Настоящий ИИ проверит идею. Ученический совет увидит только одобренные.</p>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">ИИ проверит идею перед отправкой</p>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -417,7 +421,11 @@
         </div>
         <div class="form-group hidden" id="seatsGroup"><label>Мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
       </div>
-      <div class="form-group"><label>Фото</label><input type="file" id="lImage" class="form-control" accept="image/*"></div>
+      <div class="form-group">
+        <label>Фото</label>
+        <input type="file" id="lImage" class="form-control" accept="image/*">
+        <div id="uploadStatus"></div>
+      </div>
       <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
@@ -457,13 +465,26 @@
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  window.closeModal = id => $(id).classList.remove("open");
-  window.openModal = id => $(id).classList.add("open");
+  
+  window.closeModal = id => {
+    const modal = $(id);
+    if (modal) modal.classList.remove("open");
+  };
+  
+  window.openModal = id => {
+    const modal = $(id);
+    if (modal) {
+      modal.classList.add("open");
+      console.log("Открыта модалка:", id);
+    } else {
+      console.error("Модалка не найдена:", id);
+    }
+  };
+  
   const notice = (msg) => alert(msg);
 
-  // --- ИИ-ФИЛЬТР ЧЕРЕЗ CLOUDFLARE WORKER ---
   async function moderateText(text, context = "idea") {
-    if (!text) return { status: "rejected", reason: "Текст пуст." };
+    if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым." };
     if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
     
     try {
@@ -473,12 +494,10 @@
         body: JSON.stringify({ text: text, type: context })
       });
       const data = await res.json();
-      if (data.approved === false) {
-        return { status: "rejected", reason: data.reason || "Обнаружено нарушение правил." };
-      }
+      if (data.approved === false) return { status: "rejected", reason: data.reason || "Обнаружено нарушение правил." };
       return { status: "approved", summary: text.slice(0, 60) };
     } catch (e) {
-      console.error("Ошибка ИИ:", e);
+      console.error("Ошибка связи с ИИ:", e);
       return { status: "rejected", reason: "Сервер проверки временно недоступен. Попробуйте позже." };
     }
   }
@@ -776,6 +795,7 @@
   window.updateIdea = async (id, status) => {
     await sb.from("ideas").update({ admin_status: status }).eq("id", id);
     loadAll();
+    renderIdeaFolderContent();
   };
 
   window.switchIdeaFolder = (folder) => {
@@ -793,12 +813,15 @@
     else if (currentIdeaFolder === 'done') filtered = ideas.filter(i => i.admin_status === 'done');
     else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.ai_status === 'rejected' || i.admin_status === 'rejected');
     
-    if (filtered.length === 0) { content.innerHTML = `<p style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">В этой папке пока пусто</p>`; return; }
+    if (filtered.length === 0) { 
+      content.innerHTML = `<p style="color:var(--muted); font-size:11px; text-align:center; padding:20px;">В этой папке пока пусто</p>`; 
+      return; 
+    }
     content.innerHTML = filtered.map(i => {
       let buttons = '';
       if (currentIdeaFolder === 'new') {
         buttons = `<div style="display:flex; gap:6px; margin-top:8px;">
-          <button class="button button-secondary button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
+          <button class="button button-success button-small" onclick="updateIdea('${i.id}', 'in_progress')">В работу</button>
           <button class="button button-danger button-small" onclick="updateIdea('${i.id}', 'rejected')">Отклонить</button>
         </div>`;
       } else if (currentIdeaFolder === 'work') {
@@ -926,7 +949,6 @@
     if(isReg) alert("Проверьте почту!"); else location.reload();
   };
 
-  // ===== НАВИГАЦИЯ =====
   function positionIndicator(squish) {
     const ind = $("tabIndicator");
     const active = document.querySelector(".tabbar-btn[data-tab].active");
@@ -952,10 +974,10 @@
 
     if (oldSec !== newSec && !forceNoAnim) {
       oldSec.classList.add(dir > 0 ? 'page-out-left' : 'page-out-right');
-      setTimeout(() => { oldSec.classList.add('hidden'); oldSec.classList.remove('page-out-left', 'page-out-right'); }, 320);
+      setTimeout(() => { oldSec.classList.add('hidden'); oldSec.classList.remove('page-out-left', 'page-out-right'); }, 400);
       newSec.classList.remove('hidden');
       newSec.classList.add(dir > 0 ? 'page-in-right' : 'page-in-left');
-      setTimeout(() => newSec.classList.remove('page-in-right', 'page-in-left'), 550);
+      setTimeout(() => newSec.classList.remove('page-in-right', 'page-in-left'), 600);
     } else {
       document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
       newSec.classList.remove('hidden');
@@ -995,8 +1017,6 @@
     b.classList.add("active"); curCat = b.dataset.cat; renderListings();
   });
   $("searchInput").oninput = renderListings;
-  $("authBtn").onclick = () => openModal('authModal');
-  $("myListingsBtn").onclick = () => showTab('profile');
   $("logoutBtn").onclick = () => sb.auth.signOut().then(() => location.reload());
   $("fabBtn").onclick = () => { if (user) openModal('listingModal'); else openModal('authModal'); };
 
@@ -1011,6 +1031,7 @@
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
+    const uploadStatus = $("uploadStatus");
     
     const mod = await moderateText(combinedText, "listing");
     if (mod.status === "rejected") return alert("ИИ: " + mod.reason);
@@ -1024,9 +1045,23 @@
 
     const file = $("lImage").files[0];
     if (file) {
+      uploadStatus.innerHTML = '<div class="upload-status">Загрузка фото...</div>';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`; 
-      const { error } = await sb.storage.from('listings-images').upload(fileName, file);
-      if (!error) imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
+      const { data: uploadData, error } = await sb.storage.from('listings-images').upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+      
+      if (error) {
+        console.error("Ошибка загрузки файла:", error);
+        uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}. Убедитесь, что bucket 'listings-images' создан и публичен в Supabase.</div>`;
+        btn.disabled = false; btn.textContent = "Опубликовать";
+        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте настройки Supabase Storage:\n1. Создайте bucket 'listings-images'\n2. Сделайте его Public");
+      }
+      
+      const { data: urlData } = sb.storage.from('listings-images').getPublicUrl(fileName);
+      imageUrl = urlData.publicUrl;
+      uploadStatus.innerHTML = '<div class="upload-status success">✓ Фото загружено</div>';
     }
 
     let res = await sb.from("listings").insert({
@@ -1038,9 +1073,13 @@
     });
     
     btn.disabled = false; btn.textContent = "Опубликовать";
-    if(res.error) return alert(res.error.message);
+    if(res.error) {
+      uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${res.error.message}</div>`;
+      return alert(res.error.message);
+    }
     closeModal('listingModal'); 
     $("listingForm").reset();
+    uploadStatus.innerHTML = '';
     hintsBox.innerHTML = "Начните вводить — ИИ подскажет категорию";
     loadAll();
   };
