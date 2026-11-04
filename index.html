@@ -75,8 +75,12 @@
     .button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
     .button-small { padding: 6px 10px; font-size: 11px; border-radius: 8px; }
 
-    /* Уменьшили нижний отступ, так как таббар стал тоньше и ниже */
     main { max-width: 1100px; margin: 0 auto; padding: 14px 16px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; width: 100%; position: relative; z-index: 1; overflow: hidden; }
+
+    /* ПЛАШКА О НЕДОСТУПНОСТИ ИИ */
+    .ai-offline-banner { background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.4); color: #FF6B6B; padding: 12px 16px; border-radius: 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.4; animation: fadeIn 0.4s ease; }
+    .ai-offline-banner .icon { font-size: 18px; }
+    .ai-offline-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
 
     .hero-wrap { margin: 4px 0 6px; animation: fadeIn .6s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -85,9 +89,7 @@
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 270px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
     
-    /* ИСПРАВЛЕНИЕ БАННЕРА: убрали рамки, фон заменили на прозрачный */
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; min-height: auto; }
-    /* ИСПРАВЛЕНИЕ: object-fit: cover полностью заполняет контейнер, убирая черные полосы */
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: crownFloat 3.4s ease-in-out infinite; }
@@ -231,18 +233,17 @@
     @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
     .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
 
-    /* ============ ТАББАР — ПЛАВАЮЩАЯ КАПСУЛА, НИЖЕ И ТОНЬШЕ ============ */
     .tabbar {
       position: fixed;
       left: 50%;
       transform: translateX(-50%);
-      bottom: calc(6px + env(safe-area-inset-bottom, 0px)); /* Прижат к самому низу */
-      width: min(480px, calc(100% - 24px)); /* Чуть уже */
+      bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+      width: min(480px, calc(100% - 24px));
       display: flex;
       justify-content: space-around;
       align-items: center;
-      padding: 4px 12px; /* Тоньше */
-      border-radius: 999px; /* Круглая капсула */
+      padding: 4px 12px;
+      border-radius: 999px;
       background: rgba(16,16,24,0.72);
       backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
       -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
@@ -260,12 +261,11 @@
     .tabbar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.1), transparent); animation: glassShine 5.5s ease-in-out infinite; pointer-events: none; }
     @keyframes glassShine { 0%,55% { left: -40%; } 100% { left: 130%; } }
 
-    /* ============ ИНДИКАТОР ============ */
     .tabbar-indicator {
       position: absolute;
       top: 0;
       left: 0;
-      width: 42px; /* Уменьшен под размер иконок */
+      width: 42px;
       height: 42px;
       border-radius: 50%;
       background: linear-gradient(135deg, rgba(250,250,255,.97) 0%, rgba(205,210,225,.92) 100%);
@@ -293,10 +293,10 @@
     .tab-btn:not(.active):hover { color: var(--text); }
     .tab-plus {
       position: absolute;
-      top: -20px; /* Чуть меньше выступает */
+      top: -20px;
       left: 50%;
       transform: translateX(-50%);
-      width: 52px; /* Уменьшен */
+      width: 52px;
       height: 52px;
       border-radius: 50%;
       background: var(--gradient-violet);
@@ -317,7 +317,6 @@
     .tabbar-badge.pop { animation: badgePop 0.45s var(--spring); }
     @keyframes badgePop { 0% { scale: 0.4; } 60% { scale: 1.3; } 100% { scale: 1; } }
 
-    /* ============ ПЛАВНЫЙ ПЕРЕХОД СТРАНИЦ ============ */
     .page-out-left  { animation: pageOutLeft  0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
     .page-out-right { animation: pageOutRight 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
     .page-in-left   { animation: pageInLeft   0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
@@ -387,6 +386,16 @@
 </div>
 
 <main id="mainContent">
+  <!-- ПЛАШКА О ТОМ, ЧТО ИИ НЕ РАБОТАЕТ -->
+  <div id="aiOfflineBanner" class="ai-offline-banner hidden">
+    <div class="icon">⚠️</div>
+    <div>
+      <b>Ведутся технические работы!</b>
+      ИИ-модерация временно недоступна. Размещение объявлений и отправка идей приостановлены.<br>
+      <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Чат работает в обычном режиме — вы можете продолжать договариваться.</span>
+    </div>
+  </div>
+
   <section id="boardSection">
     <div class="hero-wrap">
       <div class="hero" id="bannerCarousel"></div>
@@ -604,6 +613,10 @@
   let notifOpen = false;
   let heroRendered = false;
   let seenMap = {};
+  
+  // Флаг доступности ИИ
+  let isAiDown = false;
+  let lastAiCheck = 0;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -614,11 +627,32 @@
 
   const debounce = (fn, ms) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; };
 
+  // Управление статусом ИИ
+  function updateAiStatus(down) {
+    isAiDown = down;
+    const banner = $("aiOfflineBanner");
+    if (down) {
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+    }
+  }
+
+  // Умная проверка ИИ с фолбэком
   async function moderateText(text, context = "idea") {
     if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым." };
     if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
+
+    // Если ИИ упал, не пытаемся его вызывать, если не прошло 2 минуты с последней попытки
+    if (isAiDown && (Date.now() - lastAiCheck < 120000)) {
+      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) }; // Чат работает без ИИ
+      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
+    lastAiCheck = Date.now();
+
     try {
       const res = await fetch("https://fam-ai.spartakdubov.workers.dev/", {
         method: "POST",
@@ -627,13 +661,28 @@
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+      
+      // Если сервер вернул 500 или другую ошибку сервера
+      if (!res.ok) throw new Error("Server error " + res.status);
+
       const data = await res.json();
       if (data.approved === false) return { status: "rejected", reason: data.reason || "Обнаружено нарушение правил." };
+      
+      // Если проверка прошла успешно, значит ИИ снова работает
+      if (isAiDown) updateAiStatus(false);
       return { status: "approved", summary: text.slice(0, 60) };
     } catch (e) {
       clearTimeout(timeoutId);
-      console.warn("AI moderation unavailable, failing open:", e);
-      return { status: "approved", summary: text.slice(0, 60), warning: "AI недоступен" };
+      console.warn("AI moderation unavailable:", e);
+      
+      // Пометка, что ИИ упал
+      if (!isAiDown) updateAiStatus(true);
+      
+      // Если это чат — разрешаем отправку без проверки
+      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) };
+      
+      // Для остальных — ошибка
+      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
     }
   }
 
@@ -673,6 +722,9 @@
   function buildNotifications() {
     const notes = [];
     notes.push({ icon: '🚀', title: 'Обновление приложения', text: 'Новый дизайн, Liquid Glass и ИИ-модерация уже здесь!', time: Date.now() - 45 * 60000 });
+    if (isAiDown) {
+      notes.unshift({ icon: '⚠️', title: 'Технические работы', text: 'ИИ-модерация временно недоступна. Почта идей и создание объявлений приостановлены.', time: Date.now() });
+    }
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 4).forEach(e => {
         const dateStr = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
@@ -1035,6 +1087,8 @@
     e.preventDefault();
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
+    
+    // Умная проверка: если ИИ упал, отправляем без промедления (context = "chat" пропускает ошибку)
     const mod = await moderateText(text, "chat");
     if (mod.status === "rejected") return alert("ИИ модерация: " + mod.reason);
 
@@ -1222,6 +1276,11 @@
   $("ideaForm").onsubmit = async e => {
     e.preventDefault();
     if(!user) return openModal('authModal');
+    
+    if (isAiDown) {
+      return alert("⚠️ Технические работы\n\nСервис проверки идей временно недоступен. Попробуйте позже.");
+    }
+
     let txt = $("ideaText").value.trim();
     let btn = $("ideaSubmitBtn");
     btn.disabled = true;
@@ -1232,7 +1291,7 @@
 
     if (mod.status === "rejected") {
       $("ideaText").value = ""; btn.disabled = false;
-      return notice("🤖 ИИ заблокировал вашу идею: " + mod.reason + "\n\nОна не отправлена Ученическому совету.");
+      return notice("🤖 " + mod.reason + "\n\nИдея не отправлена.");
     }
 
     const { data, error } = await sb.from("ideas").insert({ user_id: user.id, school_id: profile?.school_id, text: txt, ai_status: "approved", ai_summary: mod.summary, admin_status: 'new' }).select().single();
@@ -1466,7 +1525,11 @@
       $("listingsGrid").scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     else if (action === 'open-listing') {
-      if (user) openModal('listingModal'); else openModal('authModal');
+      if (isAiDown) {
+        alert("⚠️ Технические работы\n\nСоздание объявлений временно приостановлено, так как ИИ-модерация недоступна.");
+      } else {
+        if (user) openModal('listingModal'); else openModal('authModal');
+      }
     }
     else if (action === 'toggle-fav') { toggleFavoriteAction(btn.dataset.id); }
     else if (action === 'cancel-reg') { cancelRegAction(btn.dataset.id); }
@@ -1531,10 +1594,15 @@
 
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
+    
+    if (isAiDown) {
+      return alert("⚠️ Технические работы\n\nСоздание объявлений временно недоступно. Попробуйте позже.");
+    }
+
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
     const uploadStatus = $("uploadStatus");
     const mod = await moderateText(combinedText, "listing");
-    if (mod.status === "rejected") return alert("ИИ: " + mod.reason);
+    if (mod.status === "rejected") return alert("🤖 ИИ: " + mod.reason);
 
     let btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = "Публикация...";
@@ -1580,7 +1648,11 @@
 
   $("fabBtn").onclick = (e) => {
     e.stopPropagation();
-    if (user) openModal('listingModal'); else openModal('authModal');
+    if (isAiDown) {
+      alert("⚠️ Технические работы\n\nСоздание объявлений временно приостановлено, так как ИИ-модерация недоступна. Вы можете продолжить общение в чате.");
+    } else {
+      if (user) openModal('listingModal'); else openModal('authModal');
+    }
   };
 
   sb.auth.getSession().then(res => {
@@ -1602,6 +1674,10 @@
     return loadAll();
   }).then(() => {
     if(user && profile?.role === 'school_admin') $("evOption").style.display = "block";
+    // Проверка ИИ при запуске (невидимая)
+    moderateText("ping", "chat").then(mod => {
+        if (mod.status === 'approved' && !isAiDown) updateAiStatus(false);
+    });
   });
 })();
 </script>
