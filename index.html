@@ -77,7 +77,6 @@
 
     main { max-width: 1100px; margin: 0 auto; padding: 14px 16px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; width: 100%; position: relative; z-index: 1; overflow: hidden; }
 
-    /* ПЛАШКА О НЕДОСТУПНОСТИ ИИ */
     .ai-offline-banner { background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.4); color: #FF6B6B; padding: 12px 16px; border-radius: 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.4; animation: fadeIn 0.4s ease; }
     .ai-offline-banner .icon { font-size: 18px; }
     .ai-offline-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
@@ -198,7 +197,7 @@
     .idea-folder .folder-count { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,0.16); font-size: 10px; font-weight: 800; }
     .idea-card { background: var(--bg); padding: 12px; border-radius: 14px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.3s; animation: slideInLeft 0.4s ease; }
     .idea-card:hover { border-color: rgba(139,92,246,0.4); transform: translateX(4px); }
-    .idea-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; }
+    .idea-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
     .status-done { background: rgba(107,203,155,0.15); color: var(--success); }
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
     .status-work { background: rgba(240,193,75,0.15); color: #F0C14B; }
@@ -386,7 +385,6 @@
 </div>
 
 <main id="mainContent">
-  <!-- ПЛАШКА О ТОМ, ЧТО ИИ НЕ РАБОТАЕТ -->
   <div id="aiOfflineBanner" class="ai-offline-banner hidden">
     <div class="icon">⚠️</div>
     <div>
@@ -614,7 +612,6 @@
   let heroRendered = false;
   let seenMap = {};
   
-  // Флаг доступности ИИ
   let isAiDown = false;
   let lastAiCheck = 0;
 
@@ -627,7 +624,6 @@
 
   const debounce = (fn, ms) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; };
 
-  // Управление статусом ИИ
   function updateAiStatus(down) {
     isAiDown = down;
     const banner = $("aiOfflineBanner");
@@ -638,19 +634,18 @@
     }
   }
 
-  // Умная проверка ИИ с фолбэком
+  // ОБНОВЛЕННЫЙ ТАЙМАУТ (15000ms) И ОБРАБОТКА ОШИБОК
   async function moderateText(text, context = "idea") {
     if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым." };
     if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
 
-    // Если ИИ упал, не пытаемся его вызывать, если не прошло 2 минуты с последней попытки
     if (isAiDown && (Date.now() - lastAiCheck < 120000)) {
-      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) }; // Чат работает без ИИ
+      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) };
       return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 секунд на ответ ИИ
     lastAiCheck = Date.now();
 
     try {
@@ -662,26 +657,21 @@
       });
       clearTimeout(timeoutId);
       
-      // Если сервер вернул 500 или другую ошибку сервера
       if (!res.ok) throw new Error("Server error " + res.status);
 
       const data = await res.json();
       if (data.approved === false) return { status: "rejected", reason: data.reason || "Обнаружено нарушение правил." };
       
-      // Если проверка прошла успешно, значит ИИ снова работает
       if (isAiDown) updateAiStatus(false);
       return { status: "approved", summary: text.slice(0, 60) };
     } catch (e) {
       clearTimeout(timeoutId);
       console.warn("AI moderation unavailable:", e);
       
-      // Пометка, что ИИ упал
       if (!isAiDown) updateAiStatus(true);
       
-      // Если это чат — разрешаем отправку без проверки
       if (context === "chat") return { status: "approved", summary: text.slice(0, 60) };
       
-      // Для остальных — ошибка
       return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
     }
   }
@@ -1088,7 +1078,6 @@
     const text = $("chatInput").value.trim();
     if (!text || !curChat) return;
     
-    // Умная проверка: если ИИ упал, отправляем без промедления (context = "chat" пропускает ошибку)
     const mod = await moderateText(text, "chat");
     if (mod.status === "rejected") return alert("ИИ модерация: " + mod.reason);
 
@@ -1147,11 +1136,15 @@
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
       let st = (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'На рассмотрении')));
       let cls = (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
-      return `<div class="idea-card">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
-          <b style="font-size:12px;">${esc(i.text.slice(0,30))}${i.text.length>30?'...':''}</b>
+      
+      let waitMsg = cls === 'status-new' ? `<div style="font-size:10px; color:#F0C14B; margin-top:6px; font-weight:700;">⏳ Ожидает решения Ученического совета</div>` : '';
+
+      return `<div class="idea-card" style="${cls === 'status-new' ? 'border-color: rgba(240,193,75,0.3); background: rgba(240,193,75,0.03);' : ''}">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:flex-start;gap:10px;">
+          <b style="font-size:12px; line-height:1.3;">${esc(i.text)}</b>
           <span class="idea-status ${cls}">${st}</span>
         </div>
+        ${waitMsg}
       </div>`;
     }).join("") : '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Вы еще не предлагали идей.</p>';
   }
@@ -1619,7 +1612,7 @@
       if (error) {
         uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
         btn.disabled = false; btn.textContent = "Опубликовать";
-        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте bucket 'listings-images' в Supabase Storage (должен быть Public).");
+        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте bucket 'listings-images' в Supabase Storage (должен быть Public и разрешены policy на INSERT).");
       }
       imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
       uploadStatus.innerHTML = '<div class="upload-status success">✓ Фото загружено</div>';
@@ -1674,7 +1667,6 @@
     return loadAll();
   }).then(() => {
     if(user && profile?.role === 'school_admin') $("evOption").style.display = "block";
-    // Проверка ИИ при запуске (невидимая)
     moderateText("ping", "chat").then(mod => {
         if (mod.status === 'approved' && !isAiDown) updateAiStatus(false);
     });
