@@ -857,7 +857,16 @@
     await new Promise(resolve => setTimeout(resolve, animationDuration));
     
     try {
-      const idsToDelete = ideasToDelete.map(i => i.id);
+      // ФИЛЬТРУЕМ ID: оставляем только валидные строки длиной 36 символов (стандартный UUID)
+      const idsToDelete = ideasToDelete
+        .map(i => i.id)
+        .filter(id => typeof id === 'string' && id.length === 36);
+
+      if (idsToDelete.length === 0) {
+        alert("Ошибка: Не найдено валидных ID для удаления. Возможно, данные в базе повреждены.");
+        return;
+      }
+
       const { error } = await sb.from("ideas").delete().in("id", idsToDelete);
       
       if (error) {
