@@ -177,8 +177,12 @@
     .tabbar-badge.pop { animation: badgePop 0.45s var(--spring); }
     @keyframes badgePop { 0% { scale: 0.4; } 60% { scale: 1.3; } 100% { scale: 1; } }
 
+    /* ИСПРАВЛЕННАЯ АНИМАЦИЯ БЕЗ ДЕРГАНЬЯ */
     .page-anim { animation: pageAnim 0.35s var(--ios-ease) both; }
-    @keyframes pageAnim { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes pageAnim { 
+      from { opacity: 0; } 
+      to { opacity: 1; } 
+    }
 
     .fab { position: fixed; bottom: 100px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--gradient-fab); color: white; font-size: 28px; display: grid; place-items: center; box-shadow: 0 8px 24px rgba(107,203,155,0.4); border: none; z-index: 40; font-weight: 900; animation: fabPulse 2s infinite, fabIn 0.6s var(--spring) 0.5s backwards, fabFloat 3s ease-in-out 1.1s infinite; cursor: pointer; transition: all 0.3s; }
     @keyframes fabPulse { 0%, 100% { box-shadow: 0 8px 24px rgba(107,203,155,0.4); } 50% { box-shadow: 0 8px 32px rgba(79,172,254,0.7); } }
@@ -831,7 +835,6 @@
     }
   };
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ УДАЛЕНИЯ
   async function batchDeleteIdeas(ideasToDelete, successMessage, btnElement) {
     if (!user || !user.id || ideasToDelete.length === 0) return;
     
@@ -867,7 +870,6 @@
         return;
       }
 
-      // ЗАПРАШИВАЕМ COUNT, ЧТОБЫ УЗНАТЬ, РЕАЛЬНО ЛИ УДАЛИЛОСЬ
       const { error, count } = await sb.from("ideas").delete({ count: 'exact' }).in("id", idsToDelete);
       
       if (error) {
