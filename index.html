@@ -85,11 +85,28 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .hero { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .hero::-webkit-scrollbar { display: none; }
-    .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 270px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
+    
+    .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
     
-    .hero-slide.hero-img { padding: 0; background: transparent; border: none; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; min-height: auto; }
-    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .hero-slide.hero-img { 
+        padding: 0; 
+        background: transparent; 
+        border: none; 
+        aspect-ratio: auto; 
+        height: 240px;
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: auto; 
+    }
+    .hero-slide.hero-img img { 
+        width: 100%; 
+        height: 100%; 
+        object-fit: contain; 
+        display: block;
+        border-radius: 28px; 
+    }
 
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
@@ -634,7 +651,6 @@
     }
   }
 
-  // ОБНОВЛЕННЫЙ ТАЙМАУТ (15000ms) И ОБРАБОТКА ОШИБОК
   async function moderateText(text, context = "idea") {
     if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым." };
     if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
@@ -645,7 +661,7 @@
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 секунд на ответ ИИ
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     lastAiCheck = Date.now();
 
     try {
@@ -842,6 +858,10 @@
         regs = (!results[2].error && results[2].data) || [];
         ideas = (!results[3].error && results[3].data) || [];
         favorites = (!results[4].error && results[4].data) || [];
+        
+        if (results[3].error) {
+          console.error("❌ ОШИБКА ЗАГРУЗКИ ИДЕЙ:", results[3].error.message);
+        }
       }
 
       if (!heroRendered) { renderHero(); heroRendered = true; }
@@ -1472,7 +1492,22 @@
       newSec.classList.remove('hidden');
     }
 
-    if (name === 'profile') renderProfile();
+    if (name === 'profile') {
+      // ПРИНУДИТЕЛЬНАЯ ЗАГРУЗКА ИДЕЙ ПРИ ОТКРЫТИИ ПРОФИЛЯ
+      if (user) {
+        sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false }).then(res => {
+          if (!res.error) {
+            ideas = res.data || [];
+            renderIdeas();
+            renderIdeaFolderContent();
+            updateIdeaCounters();
+          } else {
+            console.error("❌ Ошибка загрузки идей в профиле:", res.error.message);
+          }
+        });
+      }
+      renderProfile();
+    }
     if (name === 'board') loadAll();
     if (name === 'favorites') renderFavorites();
     if (name === 'messages') {
