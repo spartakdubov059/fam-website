@@ -80,8 +80,8 @@
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 270px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-    .hero-slide.hero-img { padding: 0; background: var(--surface); }
-    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+    .hero-slide.hero-img { padding: 0; background: #101018; }
+    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
     .hero-script { font-family: 'Caveat', cursive; font-size: 52px; line-height: 1.0; font-weight: 700; color: #fff; transform: rotate(-2deg); }
@@ -165,6 +165,9 @@
     .l-go.mini { width: 30px; height: 30px; font-size: 12px; }
     .l-go.red { background: linear-gradient(135deg,#FF6B6B,#ff5252); box-shadow: 0 6px 16px rgba(255,107,107,.35); }
     .l-own { font-size: 10px; font-weight: 800; color: var(--lime); text-transform: uppercase; letter-spacing: .5px; }
+    
+    .event-counter { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .event-counter span { color: var(--violet2); }
 
     .promo-card { border-radius: 24px; background: linear-gradient(140deg, #2A1B4A, #171226 70%); border: 1px solid rgba(139,92,246,0.3); position: relative; overflow: hidden; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 190px; animation: cardAppear .6s var(--spring) .25s backwards; }
     .promo-gift { position: absolute; right: -8px; top: 12px; font-size: 70px; transform: rotate(12deg); filter: drop-shadow(0 10px 20px rgba(139,92,246,.5)); animation: giftFloat 3.2s ease-in-out infinite; }
@@ -220,7 +223,6 @@
     @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
     .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
 
-    /* ===== TABBAR ===== */
     .tabbar {
       position: fixed;
       left: 50%;
@@ -821,10 +823,13 @@
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
         const dateStr = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
         const metaStr = [dateStr, e.event_time || ''].filter(Boolean).join(' · ');
+        const taken = getTaken(e.id);
+        const max = e.max_seats || 0;
+        const seatsInfo = max > 0 ? `👥 Занято: ${taken} из ${max}` : `👥 Без ограничений`;
         html.push('<div class="hero-slide hero-img"><div class="hero-event">' +
           '<span class="school-badge">🎓 Событие школы</span>' +
           '<div class="event-title">' + esc(e.title) + '</div>' +
-          (metaStr ? '<div class="event-meta">📅 ' + esc(metaStr) + '</div>' : '') +
+          (metaStr ? '<div class="event-meta">📅 ' + esc(metaStr) + ' · ' + seatsInfo + '</div>' : '') +
           '<button class="button button-primary button-small" style="align-self:flex-start;" onclick="handleEventBtn(\'' + esc(e.id) + '\', \'' + esc(e.event_type) + '\', ' + (e.max_seats || 0) + ')">Записаться</button>' +
           '</div></div>');
       });
@@ -871,6 +876,13 @@
     const favClass = isFavorite(l.id) ? 'active' : '';
     let badge = l.is_event ? 'Событие 🎉' : (idx === 0 ? 'Популярное 🔥' : (catEmoji[l.category] || '📦') + ' ' + esc(l.category));
 
+    let capacityHTML = '';
+    if (l.is_event) {
+      const taken = getTaken(l.id);
+      const max = l.max_seats || 0;
+      capacityHTML = '<div class="event-counter">👥 ' + (max > 0 ? '<span>' + taken + '</span> / ' + max + ' мест' : 'Без ограничений') + '</div>';
+    }
+
     let action = '';
     const isValidUUID = l.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(l.user_id);
     if (user && isValidUUID && l.user_id !== user.id) {
@@ -904,6 +916,7 @@
       '<div class="l-body">' +
         '<h3 class="l-title">' + esc(l.title) + '</h3>' +
         '<div class="l-price">' + esc(l.price_text || "Бесплатно") + '</div>' +
+        capacityHTML +
         '<div class="l-foot">' +
           '<div class="l-seller"><span class="l-ava">' + (catEmoji[l.category] || '📦') + '</span><span class="l-time">' + timeAgo(l.created_at) + '</span></div>' +
           action +
