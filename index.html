@@ -1,3 +1,10 @@
+Я всё понял. На скриншоте видно, что баннеры сохраняют пропорции картинки, из-за чего сверху и снизу появляются чёрные полосы (изображение «влезает» в рамку). А таббар стал слишком высоким и широким.
+
+Вот полностью готовый код, где:
+1. **Баннеры** теперь будут заполнять блок целиком (без чёрных рамок сверху и снизу) благодаря `object-fit: cover`.
+2. **Таббар** снова стал «плавающей» закруглённой капсулой (как был раньше), но при этом прижат ниже к краю экрана и стал тоньше (уменьшены отступы и размер иконок). Кругляшок подстраивается автоматически.
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -75,8 +82,8 @@
     .button:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
     .button-small { padding: 6px 10px; font-size: 11px; border-radius: 8px; }
 
-    /* main: padding-bottom с запасом под фиксированный таббар + safe-area */
-    main { max-width: 1100px; margin: 0 auto; padding: 14px 16px calc(110px + env(safe-area-inset-bottom, 0px)); flex: 1; width: 100%; position: relative; z-index: 1; overflow: hidden; }
+    /* Уменьшили нижний отступ, так как таббар стал тоньше и ниже */
+    main { max-width: 1100px; margin: 0 auto; padding: 14px 16px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; width: 100%; position: relative; z-index: 1; overflow: hidden; }
 
     .hero-wrap { margin: 4px 0 6px; animation: fadeIn .6s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -84,8 +91,11 @@
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 270px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-    .hero-slide.hero-img { padding: 0; background: var(--bg); aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; min-height: auto; }
-    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    
+    /* ИСПРАВЛЕНИЕ БАННЕРА: убрали рамки, фон заменили на прозрачный */
+    .hero-slide.hero-img { padding: 0; background: transparent; border: none; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; min-height: auto; }
+    /* ИСПРАВЛЕНИЕ: object-fit: cover полностью заполняет контейнер, убирая черные полосы */
+    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
@@ -228,43 +238,42 @@
     @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
     .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
 
-    /* ============ ТАББАР — приклеен к самому низу, на всю ширину ============ */
+    /* ============ ТАББАР — ПЛАВАЮЩАЯ КАПСУЛА, НИЖЕ И ТОНЬШЕ ============ */
     .tabbar {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(6px + env(safe-area-inset-bottom, 0px)); /* Прижат к самому низу */
+      width: min(480px, calc(100% - 24px)); /* Чуть уже */
       display: flex;
       justify-content: space-around;
       align-items: center;
-      padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
-      border-radius: 24px 24px 0 0;
+      padding: 4px 12px; /* Тоньше */
+      border-radius: 999px; /* Круглая капсула */
       background: rgba(16,16,24,0.72);
       backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
       -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
       border: 1px solid rgba(255,255,255,0.16);
-      border-bottom: none;
-      box-shadow: 0 -8px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.22);
+      box-shadow: 0 10px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.22);
       z-index: 50;
       animation: tabbarIn 0.6s var(--spring) 0.3s backwards;
       overflow: visible;
     }
     @keyframes tabbarIn {
-      from { opacity: 0; transform: translateY(60px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateX(-50%) translateY(60px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
     .tabbar::before { content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); pointer-events: none; }
     .tabbar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.1), transparent); animation: glassShine 5.5s ease-in-out infinite; pointer-events: none; }
     @keyframes glassShine { 0%,55% { left: -40%; } 100% { left: 130%; } }
 
-    /* ============ ИНДИКАТОР — ровно по иконке ============ */
+    /* ============ ИНДИКАТОР ============ */
     .tabbar-indicator {
       position: absolute;
       top: 0;
       left: 0;
-      width: 46px;
-      height: 46px;
+      width: 42px; /* Уменьшен под размер иконок */
+      height: 42px;
       border-radius: 50%;
       background: linear-gradient(135deg, rgba(250,250,255,.97) 0%, rgba(205,210,225,.92) 100%);
       box-shadow: 0 8px 22px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 5px rgba(0,0,0,.15);
@@ -280,9 +289,9 @@
     .tabbar-indicator.moving { animation: indSquish 0.55s var(--spring); }
     @keyframes indSquish { 0% { scale: 1 1; } 35% { scale: 1.3 0.75; } 70% { scale: 0.95 1.05; } 100% { scale: 1 1; } }
 
-    .tab-btn { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: var(--muted); padding: 4px 8px; transition: color .3s ease, transform .3s var(--spring); flex: 1; }
-    .tab-ico { position: relative; width: 46px; height: 46px; display: grid; place-items: center; }
-    .tab-ico svg { width: 22px; height: 22px; transition: transform .3s var(--spring); }
+    .tab-btn { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: var(--muted); padding: 4px 8px; transition: color .3s ease, transform .3s var(--spring); flex: 1; }
+    .tab-ico { position: relative; width: 42px; height: 42px; display: grid; place-items: center; }
+    .tab-ico svg { width: 20px; height: 20px; transition: transform .3s var(--spring); }
     .tab-label { font-size: 10px; font-weight: 700; letter-spacing: .2px; }
     .tab-btn:active { transform: scale(0.86); }
     .tab-btn.active .tab-ico { color: #0B0B10; }
@@ -291,15 +300,15 @@
     .tab-btn:not(.active):hover { color: var(--text); }
     .tab-plus {
       position: absolute;
-      top: -22px;
+      top: -20px; /* Чуть меньше выступает */
       left: 50%;
       transform: translateX(-50%);
-      width: 58px;
-      height: 58px;
+      width: 52px; /* Уменьшен */
+      height: 52px;
       border-radius: 50%;
       background: var(--gradient-violet);
       color: #fff;
-      border: 5px solid var(--bg);
+      border: 4px solid var(--bg);
       display: grid;
       place-items: center;
       z-index: 3;
@@ -308,7 +317,7 @@
       animation: plusFloat 3s ease-in-out infinite;
     }
     @keyframes plusFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
-    .tab-plus svg { width: 24px; height: 24px; }
+    .tab-plus svg { width: 22px; height: 22px; }
     .tab-plus:hover { transform: translateX(-50%) rotate(90deg) scale(1.08); }
     .tab-plus:active { transform: translateX(-50%) scale(0.9); }
     .tabbar-badge { position: absolute; top: 2px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #4A8CFF; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid rgba(16,16,24,0.95); pointer-events: none; }
@@ -438,7 +447,7 @@
         <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
         <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
       </div>
-      <div id="adminRequests" class="hidden admin-section">
+      <div id="adminRequests" class="hidden profile-box admin-section">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
         <div id="adminReqList"></div>
       </div>
@@ -490,7 +499,6 @@
 <nav class="tabbar" id="tabbar">
   <span class="tabbar-indicator" id="tabIndicator"></span>
 
-  <!-- ДОСКА: школьная доска с полочкой -->
   <button class="tab-btn active" data-tab="board">
     <span class="tab-ico">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1355,7 +1363,6 @@
     location.reload();
   };
 
-  /* ============ ИНДИКАТОР: центрируем по иконке и по X, и по Y ============ */
   function positionIndicator(squish) {
     const ind = $("tabIndicator");
     const active = document.querySelector(".tab-btn.active .tab-ico");
@@ -1377,7 +1384,6 @@
 
   const TAB_ORDER = ['board', 'messages', 'favorites', 'profile'];
 
-  /* ============ ПЛАВНЫЙ ПЕРЕХОД + фиксация высоты main ============ */
   function showTab(name, forceNoAnim = false) {
     if (name === currentTab) { positionIndicator(true); return; }
     const dir = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(currentTab) ? 1 : -1;
@@ -1594,7 +1600,6 @@
       try { seenMap = JSON.parse(localStorage.getItem(`fam_chat_seen_map_${user.id}`) || '{}'); } catch(e) { seenMap = {}; }
     }
     updateAuthUI();
-    // несколько попыток поставить индикатор ровно, чтобы учесть загрузку шрифтов
     requestAnimationFrame(() => positionIndicator(false));
     setTimeout(() => positionIndicator(false), 100);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => positionIndicator(false));
@@ -1609,3 +1614,4 @@
 </script>
 </body>
 </html>
+```
