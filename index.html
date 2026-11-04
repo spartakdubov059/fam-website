@@ -831,6 +831,7 @@
     }
   };
 
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ УДАЛЕНИЯ
   async function batchDeleteIdeas(ideasToDelete, successMessage, btnElement) {
     if (!user || !user.id || ideasToDelete.length === 0) return;
     
@@ -857,7 +858,6 @@
     await new Promise(resolve => setTimeout(resolve, animationDuration));
     
     try {
-      // ФИЛЬТРУЕМ ID: оставляем только валидные строки длиной 36 символов (стандартный UUID)
       const idsToDelete = ideasToDelete
         .map(i => i.id)
         .filter(id => typeof id === 'string' && id.length === 36);
@@ -867,10 +867,13 @@
         return;
       }
 
-      const { error } = await sb.from("ideas").delete().in("id", idsToDelete);
+      // ЗАПРАШИВАЕМ COUNT, ЧТОБЫ УЗНАТЬ, РЕАЛЬНО ЛИ УДАЛИЛОСЬ
+      const { error, count } = await sb.from("ideas").delete({ count: 'exact' }).in("id", idsToDelete);
       
       if (error) {
         alert("Ошибка при удалении: " + error.message);
+      } else if (count === 0) {
+        alert("⚠️ Ошибка: Идеи не удалены. В Supabase запрещено удаление (проверьте RLS-политики для таблицы ideas).");
       } else {
         notice(`✅ ${successMessage}`);
       }
