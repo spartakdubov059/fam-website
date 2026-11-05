@@ -825,21 +825,22 @@
     const dialogsList = $("dialogsList");
     dialogsList.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:12px;">Загрузка чатов...</p>';
     try {
-      const { data, error } = await sb.from('messages')
-        .select('sender_id, receiver_id, text, created_at')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
+      // Делаем два запроса вместо сложного or(), чтобы избежать ошибки 400
+      const { data: sent, error: err1 } = await sb.from('messages').select('*').eq('sender_id', user.id).order('created_at', { ascending: false });
+      if (err1) throw err1;
+      const { data: received, error: err2 } = await sb.from('messages').select('*').eq('receiver_id', user.id).order('created_at', { ascending: false });
+      if (err2) throw err2;
+      
+      const allMsgs = [...(sent || []), ...(received || [])].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      
       const dialogs = {};
-      (data || []).forEach(m => {
+      allMsgs.forEach(m => {
         const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
         if (!dialogs[otherId]) {
           dialogs[otherId] = { otherId, text: m.text, created_at: m.created_at };
         }
       });
-
+      
       const list = Object.values(dialogs);
       if (list.length === 0) {
         dialogsList.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p style="font-size: 12px; margin: 0;">Нет активных диалогов<br>Нажмите «Написать» на карточке товара</p></div>';
@@ -853,6 +854,7 @@
         `).join('');
       }
     } catch (e) {
+      console.error("Ошибка загрузки чатов:", e);
       dialogsList.innerHTML = '<p style="text-align:center; color:var(--danger); font-size:12px;">Ошибка загрузки чатов</p>';
     }
   }
