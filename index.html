@@ -498,9 +498,7 @@
 
   <section id="messagesSection" class="hidden">
     <div class="foryou-row"><h2>Сообщения 💬</h2></div>
-    <div id="dialogsList">
-      <div class="empty-state"><div class="empty-icon">💬</div><p style="font-size: 12px; margin: 0;">Нажмите «Записаться» или «Написать» на карточке,<br>чтобы начать диалог</p></div>
-    </div>
+    <div id="dialogsList"></div>
     <div id="chatView" class="hidden" style="margin-top:16px; background:var(--surface); padding:16px; border-radius:24px; border:1px solid var(--border);">
       <button class="button button-secondary button-small" data-action="chat-back" style="margin-bottom:10px;">← Назад</button>
       <h3 id="chatWith" style="font-size:14px; margin-bottom:10px;"></h3>
@@ -763,7 +761,6 @@
   window.closeNotifPanel = () => {
     notifOpen = false;
     $("notifPanel").classList.add("hidden");
-    localStorage.setItem('fam_notif_seen', String(Date.now()));
   };
 
   function toggleNotif() {
@@ -771,6 +768,8 @@
     notifOpen = true;
     renderNotifPanel();
     $("notifPanel").classList.remove("hidden");
+    // СРАЗУ ОТМЕЧАЕМ КАК ПРОЧИТАННОЕ
+    localStorage.setItem('fam_notif_seen', String(Date.now()));
     updateBellBadge();
   }
 
@@ -809,6 +808,54 @@
     } catch (e) { /* тихо */ }
   }
   setInterval(updateChatBadge, 15000);
+
+  async function clearChatBadge() {
+    if (!user) return;
+    try {
+      const { data } = await sb.from('messages').select('sender_id').eq('receiver_id', user.id);
+      const now = new Date().toISOString();
+      (data || []).forEach(m => { seenMap[m.sender_id] = now; });
+      localStorage.setItem(`fam_chat_seen_map_${user.id}`, JSON.stringify(seenMap));
+      updateChatBadge();
+    } catch(e) {}
+  }
+
+  async function loadDialogsList() {
+    if (!user) return;
+    const dialogsList = $("dialogsList");
+    dialogsList.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:12px;">Загрузка чатов...</p>';
+    try {
+      const { data, error } = await sb.from('messages')
+        .select('sender_id, receiver_id, text, created_at')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const dialogs = {};
+      (data || []).forEach(m => {
+        const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
+        if (!dialogs[otherId]) {
+          dialogs[otherId] = { otherId, text: m.text, created_at: m.created_at };
+        }
+      });
+
+      const list = Object.values(dialogs);
+      if (list.length === 0) {
+        dialogsList.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p style="font-size: 12px; margin: 0;">Нет активных диалогов<br>Нажмите «Написать» на карточке товара</p></div>';
+      } else {
+        dialogsList.innerHTML = list.map(d => `
+          <div class="idea-card" data-action="open-dialog" data-user-id="${esc(d.otherId)}" style="cursor:pointer; margin-bottom:8px;">
+            <b style="font-size:12px;">Пользователь ${esc(d.otherId.slice(0,8))}...</b>
+            <div style="font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px;">${esc(d.text)}</div>
+            <div style="font-size:9px; color:var(--muted); margin-top:4px;">${timeAgo(d.created_at)}</div>
+          </div>
+        `).join('');
+      }
+    } catch (e) {
+      dialogsList.innerHTML = '<p style="text-align:center; color:var(--danger); font-size:12px;">Ошибка загрузки чатов</p>';
+    }
+  }
 
   function updateAuthUI() {
     if (user) {
@@ -1065,7 +1112,7 @@
     setTimeout(() => {
       if(chatInterval) clearInterval(chatInterval);
       curChat = userId;
-      $("chatWith").textContent = title;
+      $("chatWith").textContent = title || "Диалог";
       $("dialogsList").classList.add("hidden");
       $("chatView").classList.remove("hidden");
       loadChatMessages(userId);
@@ -1511,8 +1558,8 @@
     if (name === 'board') loadAll();
     if (name === 'favorites') renderFavorites();
     if (name === 'messages') {
-      if (curChat) markChatSeen(curChat);
-      updateChatBadge();
+      clearChatBadge();
+      loadDialogsList();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1562,12 +1609,14 @@
     else if (action === 'toggle-fav') { toggleFavoriteAction(btn.dataset.id); }
     else if (action === 'cancel-reg') { cancelRegAction(btn.dataset.id); }
     else if (action === 'start-chat') { window.startChat(btn.dataset.userId, btn.dataset.title); }
+    else if (action === 'open-dialog') { window.startChat(btn.dataset.userId, "Диалог"); }
     else if (action === 'handle-event') { window.handleEventBtn(btn.dataset.id, btn.dataset.type, parseInt(btn.dataset.max)); }
     else if (action === 'chat-back') {
       $("chatView").classList.add("hidden");
       $("dialogsList").classList.remove("hidden");
       if(chatInterval) clearInterval(chatInterval);
       curChat = null;
+      loadDialogsList();
     }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
