@@ -628,7 +628,6 @@
   let seenMap = {};
   
   let isAiDown = false;
-  let lastAiCheck = 0;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -649,44 +648,37 @@
     }
   }
 
+  // ЗАМЕНА CLOUDFLARE НА SUPABASE EDGE FUNCTION (GigaChat)
   async function moderateText(text, context = "idea") {
-    if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым." };
-    if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст." };
-
-    if (isAiDown && (Date.now() - lastAiCheck < 120000)) {
-      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) };
-      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    lastAiCheck = Date.now();
+    if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым.", action: "reject" };
+    if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст.", action: "reject" };
 
     try {
-      const res = await fetch("https://fam-ai.spartakdubov.workers.dev/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text, type: context }),
-        signal: controller.signal
+      const { data, error } = await sb.functions.invoke("moderate", {
+        body: { text: text }
       });
-      clearTimeout(timeoutId);
-      
-      if (!res.ok) throw new Error("Server error " + res.status);
 
-      const data = await res.json();
-      if (data.approved === false) return { status: "rejected", reason: data.reason || "Обнаружено нарушение правил." };
+      if (error) throw error;
+
+      // GigaChat возвращает { action: "ok" | "reject" | "pending", reason: "..." }
+      if (data.action === "reject") {
+        return { status: "rejected", reason: data.reason || "Нарушение правил", action: "reject" };
+      }
+      
+      // Если pending, возвращаем approved, чтобы формы не падали, но передаем action: pending для объявлений
+      if (data.action === "pending") {
+        if (context === "chat") return { status: "approved", action: "ok" };
+        return { status: "approved", action: "pending", reason: data.reason };
+      }
       
       if (isAiDown) updateAiStatus(false);
-      return { status: "approved", summary: text.slice(0, 60) };
+      return { status: "approved", action: "ok" };
+
     } catch (e) {
-      clearTimeout(timeoutId);
-      console.warn("AI moderation unavailable:", e);
-      
+      console.error("Ошибка вызова GigaChat:", e);
       if (!isAiDown) updateAiStatus(true);
-      
-      if (context === "chat") return { status: "approved", summary: text.slice(0, 60) };
-      
-      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы." };
+      if (context === "chat") return { status: "approved", action: "ok" };
+      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы.", action: "reject" };
     }
   }
 
@@ -768,7 +760,6 @@
     notifOpen = true;
     renderNotifPanel();
     $("notifPanel").classList.remove("hidden");
-    // СРАЗУ ОТМЕЧАЕМ КАК ПРОЧИТАННОЕ
     localStorage.setItem('fam_notif_seen', String(Date.now()));
     updateBellBadge();
   }
@@ -825,7 +816,6 @@
     const dialogsList = $("dialogsList");
     dialogsList.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:12px;">Загрузка чатов...</p>';
     try {
-      // Делаем два запроса вместо сложного or(), чтобы избежать ошибки 400
       const { data: sent, error: err1 } = await sb.from('messages').select('*').eq('sender_id', user.id).order('created_at', { ascending: false });
       if (err1) throw err1;
       const { data: received, error: err2 } = await sb.from('messages').select('*').eq('receiver_id', user.id).order('created_at', { ascending: false });
@@ -907,10 +897,6 @@
         regs = (!results[2].error && results[2].data) || [];
         ideas = (!results[3].error && results[3].data) || [];
         favorites = (!results[4].error && results[4].data) || [];
-        
-        if (results[3].error) {
-          console.error("❌ ОШИБКА ЗАГРУЗКИ ИДЕЙ:", results[3].error.message);
-        }
       }
 
       if (!heroRendered) { renderHero(); heroRendered = true; }
@@ -1356,7 +1342,7 @@
       return notice("🤖 " + mod.reason + "\n\nИдея не отправлена.");
     }
 
-    const { data, error } = await sb.from("ideas").insert({ user_id: user.id, school_id: profile?.school_id, text: txt, ai_status: "approved", ai_summary: mod.summary, admin_status: 'new' }).select().single();
+    const { data, error } = await sb.from("ideas").insert({ user_id: user.id, school_id: profile?.school_id, text: txt, ai_status: "approved", ai_summary: txt.slice(0,60), admin_status: 'new' }).select().single();
     if (error) { btn.disabled = false; return notice("Ошибка: " + error.message); }
     if (data) ideas.unshift(data);
 
@@ -1680,7 +1666,11 @@
 
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
     const uploadStatus = $("uploadStatus");
+    
+    // Запускаем проверку через GigaChat
     const mod = await moderateText(combinedText, "listing");
+    
+    // Если явный отказ
     if (mod.status === "rejected") return alert("🤖 ИИ: " + mod.reason);
 
     let btn = e.target.querySelector('button[type="submit"]');
@@ -1698,16 +1688,19 @@
       if (error) {
         uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
         btn.disabled = false; btn.textContent = "Опубликовать";
-        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте bucket 'listings-images' в Supabase Storage (должен быть Public и разрешены policy на INSERT).");
+        return alert("Не удалось загрузить фото: " + error.message);
       }
       imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
       uploadStatus.innerHTML = '<div class="upload-status success">✓ Фото загружено</div>';
     }
 
+    // Если ИИ ответил pending, ставим статус pending (на проверку), иначе active
+    let statusToSet = mod.action === "pending" ? "pending" : "active";
+
     const { data, error } = await sb.from("listings").insert({
       user_id: user.id, title: $("lTitle").value, description: $("lDesc").value,
       category: $("lCat").value, price_text: $("lPrice").value || "Бесплатно",
-      image_url: imageUrl, status: "active", is_event: isEv, school_id: profile?.school_id,
+      image_url: imageUrl, status: statusToSet, is_event: isEv, school_id: profile?.school_id,
       event_date: isEv ? $("evDate").value : null, event_time: isEv ? $("evTime").value : null,
       event_type: isEv ? type : null, max_seats: (isEv && type === 'limited') ? parseInt($("evSeats").value) : 0
     }).select().single();
@@ -1717,12 +1710,21 @@
       uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
       return alert(error.message);
     }
-    if (data) listings.unshift(data);
+    
+    if (data && statusToSet === "active") {
+      listings.unshift(data);
+    }
+    
     closeModal('listingModal');
     $("listingForm").reset();
     uploadStatus.innerHTML = '';
     $("aiHints").innerHTML = "Начните вводить — ИИ подскажет категорию";
-    renderListings();
+    
+    if (statusToSet === "pending") {
+      alert("✅ Объявление отправлено на проверку ИИ и администратору.");
+    } else {
+      renderListings();
+    }
   };
 
   $("fabBtn").onclick = (e) => {
@@ -1753,9 +1755,6 @@
     return loadAll();
   }).then(() => {
     if(user && profile?.role === 'school_admin') $("evOption").style.display = "block";
-    moderateText("ping", "chat").then(mod => {
-        if (mod.status === 'approved' && !isAiDown) updateAiStatus(false);
-    });
   });
 })();
 </script>
