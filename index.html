@@ -648,7 +648,7 @@
     }
   }
 
-  // ЗАМЕНА CLOUDFLARE НА SUPABASE EDGE FUNCTION (GigaChat)
+  // ЖЕСТКАЯ ФУНКЦИЯ ПРОВЕРКИ
   async function moderateText(text, context = "idea") {
     if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым.", action: "reject" };
     if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст.", action: "reject" };
@@ -660,23 +660,20 @@
 
       if (error) throw error;
 
-      // GigaChat возвращает { action: "ok" | "reject" | "pending", reason: "..." }
+      // Если ИИ сказал reject, блокируем
       if (data.action === "reject") {
         return { status: "rejected", reason: data.reason || "Нарушение правил", action: "reject" };
       }
       
-      // Если pending, возвращаем approved, чтобы формы не падали, но передаем action: pending для объявлений
-      if (data.action === "pending") {
-        if (context === "chat") return { status: "approved", action: "ok" };
-        return { status: "approved", action: "pending", reason: data.reason };
-      }
-      
+      // Если все ок
       if (isAiDown) updateAiStatus(false);
       return { status: "approved", action: "ok" };
 
     } catch (e) {
       console.error("Ошибка вызова GigaChat:", e);
       if (!isAiDown) updateAiStatus(true);
+      
+      // Если сервер упал, в чате разрешаем писать, а объявления/идеи блокируем
       if (context === "chat") return { status: "approved", action: "ok" };
       return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы.", action: "reject" };
     }
@@ -1667,10 +1664,8 @@
     const combinedText = $("lTitle").value + " " + $("lDesc").value;
     const uploadStatus = $("uploadStatus");
     
-    // Запускаем проверку через GigaChat
+    // ЖЕСТКАЯ БЛОКИРОВКА (Если ИИ сказал reject)
     const mod = await moderateText(combinedText, "listing");
-    
-    // Если явный отказ
     if (mod.status === "rejected") return alert("🤖 ИИ: " + mod.reason);
 
     let btn = e.target.querySelector('button[type="submit"]');
@@ -1688,13 +1683,13 @@
       if (error) {
         uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
         btn.disabled = false; btn.textContent = "Опубликовать";
-        return alert("Не удалось загрузить фото: " + error.message);
+        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте bucket 'listings-images' в Supabase Storage (должен быть Public и разрешены policy на INSERT).");
       }
       imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
       uploadStatus.innerHTML = '<div class="upload-status success">✓ Фото загружено</div>';
     }
 
-    // Если ИИ ответил pending, ставим статус pending (на проверку), иначе active
+    // Если ИИ вернул pending, сохраняем как pending, иначе active
     let statusToSet = mod.action === "pending" ? "pending" : "active";
 
     const { data, error } = await sb.from("listings").insert({
@@ -1710,10 +1705,7 @@
       uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
       return alert(error.message);
     }
-    
-    if (data && statusToSet === "active") {
-      listings.unshift(data);
-    }
+    if (data && statusToSet === "active") listings.unshift(data);
     
     closeModal('listingModal');
     $("listingForm").reset();
