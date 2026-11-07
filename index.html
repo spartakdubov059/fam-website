@@ -4,13 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FAM — Свои рядом</title>
+
+  <meta name="description" content="FAM — школьная доска объявлений. Найди своих: вещи, услуги, учёба и афиша рядом с тобой.">
+  <link rel="canonical" href="https://spartakdubov059.github.io/fam-website/">
+  <meta property="og:title" content="FAM — Свои рядом">
+  <meta property="og:description" content="Школьная доска объявлений. Вещи, услуги, учёба и афиша.">
+  <meta property="og:image" content="https://spartakdubov059.github.io/fam-website/banner-1.png">
+  <meta property="og:url" content="https://spartakdubov059.github.io/fam-website/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="FAM — Свои рядом">
+  <meta name="twitter:description" content="Школьная доска объявлений.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  
   <style>
     :root {
       --bg: #0F1014; --surface: #1A1C22; --surface-hover: #23262E;
       --accent: #D4D8E3; --accent-hover: #F0F3FA; --text: #F5F6F8;
-      --muted: #7A7E8A; --border: #2A2D36; --danger: #FF6B6B; --success: #6BCB9B;
+      --muted: #AEB3C0; --border: #2A2D36; --danger: #FF6B6B; --success: #6BCB9B;
       --violet: #8B5CF6; --violet2: #5B8CFF; --lime: #C8F542; --pink: #F472B6;
       --gradient-violet: linear-gradient(135deg, #8B5CF6 0%, #5B8CFF 100%);
       --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -18,7 +32,7 @@
       --smooth: cubic-bezier(0.4, 0, 0.2, 1);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100vh; display: flex; flex-direction: column; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; min-height: 100dvh; display: flex; flex-direction: column; }
     .hidden { display: none !important; }
     button, input, textarea, select { font: inherit; }
     button { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -46,7 +60,7 @@
     .icon-round:active { transform: scale(0.9); }
     .icon-round svg { width: 18px; height: 18px; }
     .icon-round .mini-badge { position: absolute; top: -3px; right: -3px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #FF4D6D; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid var(--bg); animation: badgePop .45s var(--spring); }
-    .header-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-weight: 800; font-size: 15px; color: white; cursor: pointer; border: 2px solid rgba(139,92,246,0.9); box-shadow: 0 0 0 3px rgba(139,92,246,0.25); overflow: hidden; transition: all 0.3s; }
+    .header-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-weight: 800; font-size: 15px; color: white; cursor: pointer; border: 2px solid rgba(139,92,246,0.9); box-shadow: 0 0 0 3px rgba(139,92,246,0.25); overflow: hidden; transition: all 0.3s; padding: 0; appearance: none; }
     .header-avatar:hover { transform: scale(1.1) rotate(5deg); }
     .header-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -54,10 +68,9 @@
     @keyframes panelIn { from { opacity: 0; transform: translateY(-14px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .notif-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 4px; }
     .notif-head b { font-size: 14px; }
-    .notif-item { display: flex; gap: 10px; padding: 10px 12px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; animation: slideInLeft .4s ease backwards; transition: all .25s ease; }
+    .notif-item { display: flex; gap: 10px; padding: 10px 12px; border-radius: 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 8px; transition: all .25s ease; }
     .notif-item:hover { background: rgba(255,255,255,0.09); transform: translateX(3px); }
-    @keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
-    .notif-ico { font-size: 22px; flex: 0 0 auto; filter: drop-shadow(0 3px 6px rgba(0,0,0,.4)); }
+    .notif-ico { font-size: 22px; flex: 0 0 auto; }
     .notif-title { font-size: 12px; font-weight: 800; }
     .notif-text { font-size: 11px; color: #c9c9d6; margin-top: 2px; }
     .notif-time { font-size: 10px; color: var(--muted); margin-top: 3px; }
@@ -77,76 +90,48 @@
 
     main { max-width: 1100px; margin: 0 auto; padding: 14px 16px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; width: 100%; position: relative; z-index: 1; overflow: hidden; }
 
-    .ai-offline-banner { background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.4); color: #FF6B6B; padding: 12px 16px; border-radius: 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.4; animation: fadeIn 0.4s ease; }
+    .ai-offline-banner { background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.4); color: #FF6B6B; padding: 12px 16px; border-radius: 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.4; }
     .ai-offline-banner .icon { font-size: 18px; }
     .ai-offline-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
 
-    .hero-wrap { margin: 4px 0 6px; animation: fadeIn .6s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .hero-wrap { margin: 4px 0 6px; }
     .hero { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .hero::-webkit-scrollbar { display: none; }
-    
-    .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; animation: scaleIn .5s ease; }
-    @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-    
-    .hero-slide.hero-img { 
-        padding: 0; 
-        background: transparent; 
-        border: none; 
-        aspect-ratio: auto; 
-        height: 240px;
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        min-height: auto; 
-    }
-    .hero-slide.hero-img img { 
-        width: 100%; 
-        height: 100%; 
-        object-fit: contain; 
-        display: block;
-        border-radius: 28px; 
-    }
-
-    .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); animation: crownFloat 3.4s ease-in-out infinite; }
+    .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
+    .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
+    .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
+    .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
-    .hero-script { font-family: 'Caveat', cursive; font-size: 52px; line-height: 1.0; font-weight: 700; color: #fff; transform: rotate(-2deg); }
+    .hero-script { font-family: 'Caveat', cursive, sans-serif; font-size: 52px; line-height: 1; font-weight: 700; color: #fff; transform: rotate(-2deg); }
     .hero-script span { color: var(--pink); text-decoration: underline; text-decoration-thickness: 4px; text-underline-offset: 8px; }
     .hero-sub { color: #cfcfda; font-size: 15px; margin: 12px 0 18px; max-width: 250px; }
-    .hero-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 11px 20px; font-weight: 800; font-size: 14px; align-self: flex-start; transition: all .3s var(--spring); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-    .hero-cta:hover { transform: translateY(-3px) scale(1.04); }
+    .hero-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 11px 20px; font-weight: 800; font-size: 14px; align-self: flex-start; }
     .hero-cta svg { width: 16px; height: 16px; }
-    .hero-spark { position: absolute; right: 42px; top: 50%; font-size: 34px; color: #fff; animation: sparkTwinkle 2.6s ease-in-out infinite; }
-    @keyframes sparkTwinkle { 0%,100% { transform: scale(1) rotate(0deg); opacity: .9; } 50% { transform: scale(1.25) rotate(20deg); opacity: .5; } }
-    .hero-graffiti { position: absolute; right: 22px; bottom: 14px; font-family: 'Caveat', cursive; font-size: 36px; font-weight: 700; color: #fff; transform: rotate(-6deg); }
+    .hero-spark { position: absolute; right: 42px; top: 50%; font-size: 34px; color: #fff; }
+    .hero-graffiti { position: absolute; right: 22px; bottom: 14px; font-family: 'Caveat', cursive, sans-serif; font-size: 36px; font-weight: 700; color: #fff; transform: rotate(-6deg); }
     .ai-live { position: absolute; left: 24px; bottom: 18px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.4); font-size: 11px; font-weight: 700; color: #cbb8ff; }
-    .ai-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); animation: livePulse 1.6s infinite; }
-    @keyframes livePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(200,245,66,.5); } 50% { box-shadow: 0 0 0 6px rgba(200,245,66,0); } }
+    .ai-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
     .hero-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 55%, transparent 100%); padding: 22px; display: flex; flex-direction: column; justify-content: flex-end; }
-    .school-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--gradient-violet); color: white; padding: 5px 12px; border-radius: 999px; font-size: 10px; font-weight: 800; align-self: flex-start; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; box-shadow: 0 4px 14px rgba(139,92,246,.45); animation: badgePulse 2.5s ease-in-out infinite; }
-    @keyframes badgePulse { 0%,100% { box-shadow: 0 4px 14px rgba(139,92,246,.45); } 50% { box-shadow: 0 4px 22px rgba(139,92,246,.75); } }
-    .event-title { font-size: 21px; font-weight: 900; margin-bottom: 4px; line-height: 1.2; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+    .school-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--gradient-violet); color: white; padding: 5px 12px; border-radius: 999px; font-size: 10px; font-weight: 800; align-self: flex-start; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
+    .event-title { font-size: 21px; font-weight: 900; margin-bottom: 4px; line-height: 1.2; }
     .event-meta { font-size: 12px; color: #d6d6e2; margin-bottom: 12px; }
-    .db-emoji { font-size: 62px; position: absolute; right: 22px; top: 22px; transform: rotate(10deg); filter: drop-shadow(0 10px 18px rgba(0,0,0,.55)); animation: giftFloat 3.5s ease-in-out infinite; }
+    .db-emoji { font-size: 62px; position: absolute; right: 22px; top: 22px; transform: rotate(10deg); animation: giftFloat 3.5s ease-in-out infinite; }
     @keyframes giftFloat { 0%,100% { transform: rotate(10deg) translateY(0); } 50% { transform: rotate(5deg) translateY(-8px); } }
-    .db-title { font-family: 'Caveat', cursive; font-size: 40px; font-weight: 700; color: #fff; line-height: 1; max-width: 70%; }
+    .db-title { font-family: 'Caveat', cursive, sans-serif; font-size: 40px; font-weight: 700; color: #fff; line-height: 1; max-width: 70%; }
     .db-sub { color: #cfcfda; font-size: 14px; margin: 8px 0 16px; max-width: 65%; }
     .hero-dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0 4px; }
     .hero-dot { width: 8px; height: 8px; border-radius: 999px; background: #33333e; border: none; padding: 0; transition: all .35s var(--spring); }
     .hero-dot.active { width: 24px; background: #fff; }
 
-    .search-pill { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 12px 18px; margin: 14px 0 14px; transition: all .3s var(--spring); }
+    .search-pill { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 12px 18px; margin: 14px 0; }
     .search-pill:focus-within { border-color: rgba(139,92,246,0.6); box-shadow: 0 0 0 4px rgba(139,92,246,0.15); }
     .search-pill svg { width: 17px; height: 17px; color: var(--muted); flex: 0 0 auto; }
     .search-pill input { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 14px; }
 
-    .cat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; perspective: 700px; }
-    .cat-tile { padding: 12px 6px 10px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 11px; color: #fff; border: 1px solid rgba(255,255,255,0.08); transition: all .3s var(--spring); position: relative; overflow: hidden; box-shadow: inset 0 2px 6px rgba(255,255,255,.16), inset 0 -8px 14px rgba(0,0,0,.5), 0 10px 22px rgba(0,0,0,.45); }
-    .cat-tile .tile-emoji { font-size: 30px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.55)) drop-shadow(0 2px 2px rgba(0,0,0,.45)); transition: transform .4s var(--spring); }
-    .cat-tile:hover { transform: translateY(-4px) rotateX(7deg); }
-    .cat-tile:hover .tile-emoji { transform: scale(1.2) rotate(-8deg) translateY(-2px); }
-    .cat-tile:active { transform: scale(0.92) rotateX(0deg); }
-    .cat-tile.active { outline: 2px solid var(--violet); box-shadow: inset 0 2px 6px rgba(255,255,255,.16), inset 0 -8px 14px rgba(0,0,0,.5), 0 10px 26px rgba(139,92,246,.45); transform: scale(1.04); }
+    .cat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+    .cat-tile { padding: 12px 6px 10px; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 11px; color: #fff; border: 1px solid rgba(255,255,255,0.08); position: relative; overflow: hidden; box-shadow: inset 0 2px 6px rgba(255,255,255,.16), inset 0 -8px 14px rgba(0,0,0,.5); }
+    .cat-tile .tile-emoji { font-size: 30px; }
+    .cat-tile.active { outline: 2px solid var(--violet); transform: scale(1.04); }
     .t-things { background: linear-gradient(160deg, #2A3768, #131A30); }
     .t-services { background: linear-gradient(160deg, #6B5A18, #26200C); }
     .t-study { background: linear-gradient(160deg, #1B5C3E, #0C2418); }
@@ -154,225 +139,123 @@
 
     .foryou-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
     .foryou-row h2 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
-    .foryou-row .spark { display: inline-block; animation: sparkTwinkle 2.2s ease-in-out infinite; }
-    .pill-all { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 13px; transition: all .3s var(--spring); flex: 0 0 auto; }
-    .pill-all:hover { background: var(--surface-hover); transform: translateY(-2px); }
+    .pill-all { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 13px; }
     .pill-all svg { width: 15px; height: 15px; }
 
     .l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 14px; }
-    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 24px; padding: 10px; position: relative; transition: all .35s var(--ios-ease); animation: cardAppear .6s var(--spring) backwards; display: flex; flex-direction: column; }
-    .l-card:nth-child(1){animation-delay:.05s}.l-card:nth-child(2){animation-delay:.1s}.l-card:nth-child(3){animation-delay:.15s}.l-card:nth-child(4){animation-delay:.2s}
-    @keyframes cardAppear { from { opacity: 0; transform: translateY(30px) scale(0.95); filter: blur(4px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
-    .l-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(0,0,0,0.5); border-color: rgba(139,92,246,0.35); }
+    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 24px; padding: 10px; display: flex; flex-direction: column; }
     .l-imgwrap { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 4/3; background: #101018; }
-    .l-imgwrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s; }
-    .l-card:hover .l-imgwrap img { transform: scale(1.08); }
-    .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #23232e, #14141c); position: relative; overflow: hidden; }
-    .card-placeholder::before { content: '✦'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 34px; color: rgba(139,92,246,0.5); animation: float 3s ease-in-out infinite; }
-    @keyframes float { 0%, 100% { transform: translate(-50%, -50%) translateY(0); } 50% { transform: translate(-50%, -50%) translateY(-10px); } }
-    .l-fav { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; background: rgba(10,10,15,0.55); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 14px; display: grid; place-items: center; z-index: 2; transition: all .3s var(--spring); }
-    .l-fav:hover { transform: scale(1.15) rotate(10deg); }
-    .l-fav.active { color: #FF6B6B; background: rgba(255,107,107,0.2); animation: heartBeat .5s; }
-    @keyframes heartBeat { 0%,100%{transform:scale(1)} 25%{transform:scale(1.3)} 50%{transform:scale(1)} 75%{transform:scale(1.3)} }
-    .l-badge { position: absolute; left: 8px; bottom: 8px; z-index: 2; background: var(--gradient-violet); color: #fff; font-size: 10px; font-weight: 800; padding: 5px 10px; border-radius: 999px; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+    .l-imgwrap img { width: 100%; height: 100%; object-fit: cover; }
+    .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #23232e, #14141c); position: relative; }
+    .card-placeholder::before { content: '✦'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 34px; color: rgba(139,92,246,0.5); }
+    .l-fav { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; background: rgba(10,10,15,0.55); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 14px; display: grid; place-items: center; z-index: 2; }
+    .l-fav.active { color: #FF6B6B; background: rgba(255,107,107,0.2); }
+    .l-badge { position: absolute; left: 8px; bottom: 8px; z-index: 2; background: var(--gradient-violet); color: #fff; font-size: 10px; font-weight: 800; padding: 5px 10px; border-radius: 999px; }
     .l-body { padding: 10px 4px 4px; display: flex; flex-direction: column; flex-grow: 1; gap: 4px; }
     .l-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .l-price { font-size: 15px; font-weight: 900; }
     .l-foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; gap: 6px; }
     .l-seller { display: flex; align-items: center; gap: 7px; min-width: 0; }
-    .l-ava { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,#2a2a36,#1c1c26); border: 1px solid rgba(255,255,255,0.1); display: grid; place-items: center; font-size: 12px; flex: 0 0 auto; }
-    .l-time { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .l-actions { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
-    .l-go { width: 34px; height: 34px; border-radius: 50%; background: var(--gradient-violet); color: #fff; border: none; display: grid; place-items: center; transition: all .3s var(--spring); box-shadow: 0 6px 16px rgba(139,92,246,0.4); flex: 0 0 auto; font-size: 14px; }
+    .l-ava { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,#2a2a36,#1c1c26); display: grid; place-items: center; font-size: 12px; }
+    .l-time { font-size: 11px; color: var(--muted); }
+    .l-go { width: 34px; height: 34px; border-radius: 50%; background: var(--gradient-violet); color: #fff; border: none; display: grid; place-items: center; font-size: 14px; }
     .l-go svg { width: 16px; height: 16px; }
-    .l-go:hover { transform: translateX(3px) scale(1.1); }
-    .l-go:disabled { opacity: .45; box-shadow: none; cursor: not-allowed; transform: none; }
-    .l-go.mini { width: 30px; height: 30px; font-size: 12px; }
-    .l-go.mini svg { width: 14px; height: 14px; }
-    .l-go.red { background: linear-gradient(135deg,#FF6B6B,#ff5252); box-shadow: 0 6px 16px rgba(255,107,107,.35); }
-    .l-own { font-size: 10px; font-weight: 800; color: var(--lime); text-transform: uppercase; letter-spacing: .5px; }
-
-    .event-counter { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .l-go:disabled { opacity: .45; }
+    .l-go.mini { width: 30px; height: 30px; }
+    .l-go.red { background: linear-gradient(135deg,#FF6B6B,#ff5252); }
+    .l-own { font-size: 10px; font-weight: 800; color: var(--lime); text-transform: uppercase; }
+    .event-counter { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 4px; }
     .event-counter span { color: var(--violet2); }
 
-    .promo-card { border-radius: 24px; background: linear-gradient(140deg, #2A1B4A, #171226 70%); border: 1px solid rgba(139,92,246,0.3); position: relative; overflow: hidden; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 190px; animation: cardAppear .6s var(--spring) .25s backwards; }
-    .promo-gift { position: absolute; right: -8px; top: 12px; font-size: 70px; transform: rotate(12deg); filter: drop-shadow(0 10px 20px rgba(139,92,246,.5)); animation: giftFloat 3.2s ease-in-out infinite; }
-    .promo-script { font-family: 'Caveat', cursive; font-size: 29px; font-weight: 700; line-height: 1.05; color: #fff; max-width: 72%; }
+    .promo-card { border-radius: 24px; background: linear-gradient(140deg, #2A1B4A, #171226 70%); border: 1px solid rgba(139,92,246,0.3); position: relative; overflow: hidden; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 190px; }
+    .promo-gift { position: absolute; right: -8px; top: 12px; font-size: 70px; transform: rotate(12deg); }
+    .promo-script { font-family: 'Caveat', cursive, sans-serif; font-size: 29px; font-weight: 700; line-height: 1.05; color: #fff; max-width: 72%; }
     .promo-script b { color: var(--lime); }
-    .promo-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; font-size: 13px; align-self: flex-start; transition: all .3s var(--spring); }
-    .promo-cta:hover { transform: translateY(-2px) scale(1.05); }
+    .promo-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; font-size: 13px; align-self: flex-start; }
     .promo-cta svg { width: 15px; height: 15px; }
 
-    .profile-box { background: var(--surface); padding: 18px; border-radius: 24px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); animation: fadeIn 0.5s ease; transition: all 0.3s; position: relative; overflow: hidden; }
-    .profile-box:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .profile-box { background: var(--surface); padding: 18px; border-radius: 24px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); }
     .profile-email { word-break: break-all; font-size: 14px; margin: 0 0 4px; font-weight: 700; }
     .idea-folders { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .idea-folders::-webkit-scrollbar { display: none; }
-    .idea-folder { flex: 0 0 auto; padding: 8px 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all 0.3s var(--spring); white-space: nowrap; }
-    .idea-folder:hover { border-color: rgba(255,255,255,0.2); color: var(--text); transform: translateY(-2px); }
-    .idea-folder.active { background: var(--gradient-violet); color: white; border-color: transparent; box-shadow: 0 4px 14px rgba(139,92,246,0.4); }
+    .idea-folder { flex: 0 0 auto; padding: 8px 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
+    .idea-folder.active { background: var(--gradient-violet); color: white; border-color: transparent; }
     .idea-folder .folder-count { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,0.16); font-size: 10px; font-weight: 800; }
-    .idea-card { background: var(--bg); padding: 12px; border-radius: 14px; margin-bottom: 8px; border: 1px solid var(--border); transition: all 0.3s; animation: slideInLeft 0.4s ease; }
-    .idea-card:hover { border-color: rgba(139,92,246,0.4); transform: translateX(4px); }
+    .idea-card { background: var(--bg); padding: 12px; border-radius: 14px; margin-bottom: 8px; border: 1px solid var(--border); }
     .idea-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
     .status-done { background: rgba(107,203,155,0.15); color: var(--success); }
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
     .status-work { background: rgba(240,193,75,0.15); color: #F0C14B; }
     .status-new { background: rgba(91,140,255,0.15); color: #7EA6FF; }
 
-    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
-    .modal.open { display: flex; animation: fadeIn 0.3s ease; }
-    .modal-content { background: var(--surface); padding: 22px; border-radius: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); animation: modalSlideUp 0.5s var(--spring); box-shadow: 0 24px 70px rgba(0,0,0,0.65); }
-    @keyframes modalSlideUp { from { opacity: 0; transform: translateY(60px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+    .modal.open { display: flex; }
+    .modal-content { background: var(--surface); padding: 22px; border-radius: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); }
     .form-group { margin-bottom: 12px; }
+    .event-type-group { border: 0; padding: 0; margin: 0 0 12px; min-width: 0; }
+    .event-type-group legend { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .ai-hint-suggest { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
     .form-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-    .form-control { width: 100%; padding: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 13px; transition: all 0.3s; }
+    .form-control { width: 100%; padding: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 13px; }
     .form-control:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); line-height: 1.4; }
     .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 700; text-decoration: underline; }
     .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; transition: all 0.3s; box-shadow: 0 0 0 3px rgba(139,92,246,0.25); }
-    .avatar-preview:hover { transform: scale(1.1); }
+    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
-    .empty-state { text-align: center; padding: 40px 16px; color: var(--muted); animation: fadeIn 0.6s; }
-    .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 20px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(91,140,255,0.1)); display: grid; place-items: center; font-size: 26px; position: relative; }
-    .empty-icon::before { content: ''; position: absolute; inset: 30%; background: var(--gradient-violet); border-radius: 50%; opacity: 0.35; filter: blur(12px); animation: logoGlow 3s ease-in-out infinite; }
-    @keyframes logoGlow { 0%,100% { opacity: .3; transform: scale(1); } 50% { opacity: .6; transform: scale(1.15); } }
-    .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(244,114,182,0.1)); border-radius: 12px; border: 1px solid rgba(139,92,246,0.35); font-size: 12px; font-weight: 700; position: relative; overflow: hidden; margin-bottom: 10px; }
-    .ai-thinking::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); animation: shimmer 2s infinite; }
-    @keyframes shimmer { to { left: 100%; } }
-    .ai-thinking-text { background: linear-gradient(90deg, #8B5CF6, #f093fb, #5B8CFF, #8B5CF6); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: gradientMove 3s linear infinite; }
-    @keyframes gradientMove { to { background-position: 300% 0; } }
-    .ai-thinking-dots { display: inline-flex; gap: 3px; }
-    .ai-thinking-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: dotPulse 1.4s infinite ease-in-out; }
-    .ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; } .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
-    .admin-section { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
+    .empty-state { text-align: center; padding: 40px 16px; color: var(--muted); }
+    .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 20px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(91,140,255,0.1)); display: grid; place-items: center; font-size: 26px; }
+    .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(244,114,182,0.1)); border-radius: 12px; border: 1px solid rgba(139,92,246,0.35); font-size: 12px; font-weight: 700; margin-bottom: 10px; }
 
-    .tabbar {
-      position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-      width: min(480px, calc(100% - 24px));
-      display: flex;
-      justify-content: space-around;
-      align-items: center;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(16,16,24,0.72);
-      backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
-      -webkit-backdrop-filter: blur(36px) saturate(220%) brightness(1.1);
-      border: 1px solid rgba(255,255,255,0.16);
-      box-shadow: 0 10px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.22);
-      z-index: 50;
-      animation: tabbarIn 0.6s var(--spring) 0.3s backwards;
-      overflow: visible;
-    }
-    @keyframes tabbarIn {
-      from { opacity: 0; transform: translateX(-50%) translateY(60px); }
-      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-    .tabbar::before { content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); pointer-events: none; }
-    .tabbar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.1), transparent); animation: glassShine 5.5s ease-in-out infinite; pointer-events: none; }
-    @keyframes glassShine { 0%,55% { left: -40%; } 100% { left: 130%; } }
-
-    .tabbar-indicator {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 42px;
-      height: 42px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, rgba(250,250,255,.97) 0%, rgba(205,210,225,.92) 100%);
-      box-shadow: 0 8px 22px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -2px 5px rgba(0,0,0,.15);
-      transition: transform 0.45s var(--spring), scale 0.4s var(--spring), opacity 0.3s ease;
-      scale: 1;
-      opacity: 1;
-      z-index: 0;
-      pointer-events: none;
-      transform: translate(0, 0);
-      will-change: transform;
-    }
+    .tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom, 0px)); width: min(480px, calc(100% - 24px)); display: flex; justify-content: space-around; align-items: center; padding: 4px 12px; border-radius: 999px; background: rgba(16,16,24,0.72); backdrop-filter: blur(36px) saturate(220%); border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 40px rgba(0,0,0,.6); z-index: 50; }
+    .tabbar-indicator { position: absolute; top: 0; left: 0; width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, rgba(250,250,255,.97), rgba(205,210,225,.92)); box-shadow: 0 8px 22px rgba(0,0,0,.5); transition: transform 0.45s var(--spring), scale 0.4s var(--spring), opacity 0.3s ease; scale: 1; opacity: 1; z-index: 0; pointer-events: none; transform: translate(0, 0); }
     .tabbar-indicator.idle { scale: 0; opacity: 0; }
-    .tabbar-indicator.moving { animation: indSquish 0.55s var(--spring); }
-    @keyframes indSquish { 0% { scale: 1 1; } 35% { scale: 1.3 0.75; } 70% { scale: 0.95 1.05; } 100% { scale: 1 1; } }
-
-    .tab-btn { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: var(--muted); padding: 4px 8px; transition: color .3s ease, transform .3s var(--spring); flex: 1; }
+    .tab-btn { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: var(--muted); padding: 4px 8px; flex: 1; }
     .tab-ico { position: relative; width: 42px; height: 42px; display: grid; place-items: center; }
-    .tab-ico svg { width: 20px; height: 20px; transition: transform .3s var(--spring); }
-    .tab-label { font-size: 10px; font-weight: 700; letter-spacing: .2px; }
-    .tab-btn:active { transform: scale(0.86); }
+    .tab-ico svg { width: 20px; height: 20px; }
+    .tab-label { font-size: 10px; font-weight: 700; }
     .tab-btn.active .tab-ico { color: #0B0B10; }
-    .tab-btn.active .tab-ico svg { transform: scale(1.1); }
     .tab-btn.active .tab-label { color: #fff; }
-    .tab-btn:not(.active):hover { color: var(--text); }
-    .tab-plus {
-      position: absolute;
-      top: -20px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      background: var(--gradient-violet);
-      color: #fff;
-      border: 4px solid var(--bg);
-      display: grid;
-      place-items: center;
-      z-index: 3;
-      box-shadow: 0 10px 28px rgba(139,92,246,0.6), inset 0 2px 4px rgba(255,255,255,.4);
-      transition: all .3s var(--spring);
-      animation: plusFloat 3s ease-in-out infinite;
-    }
-    @keyframes plusFloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-4px); } }
+    .tab-plus { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; border-radius: 50%; background: var(--gradient-violet); color: #fff; border: 4px solid var(--bg); display: grid; place-items: center; z-index: 3; box-shadow: 0 10px 28px rgba(139,92,246,0.6); }
     .tab-plus svg { width: 22px; height: 22px; }
-    .tab-plus:hover { transform: translateX(-50%) rotate(90deg) scale(1.08); }
-    .tab-plus:active { transform: translateX(-50%) scale(0.9); }
-    .tabbar-badge { position: absolute; top: 2px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #4A8CFF; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid rgba(16,16,24,0.95); pointer-events: none; }
-    .tabbar-badge.pop { animation: badgePop 0.45s var(--spring); }
-    @keyframes badgePop { 0% { scale: 0.4; } 60% { scale: 1.3; } 100% { scale: 1; } }
+    .tabbar-badge { position: absolute; top: 2px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #4A8CFF; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid rgba(16,16,24,0.95); }
 
-    .page-out-left  { animation: pageOutLeft  0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    .page-out-right { animation: pageOutRight 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    .page-in-left   { animation: pageInLeft   0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    .page-in-right  { animation: pageInRight  0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-    @keyframes pageOutLeft  { from { opacity: 1; transform: translateX(0);     } to { opacity: 0; transform: translateX(-60px); } }
-    @keyframes pageOutRight { from { opacity: 1; transform: translateX(0);     } to { opacity: 0; transform: translateX(60px);  } }
-    @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0);     } }
-    @keyframes pageInRight  { from { opacity: 0; transform: translateX(60px);  } to { opacity: 1; transform: translateX(0);     } }
+    .page-out-left  { animation: pageOutLeft  0.35s var(--ios-ease) forwards; }
+    .page-out-right { animation: pageOutRight 0.35s var(--ios-ease) forwards; }
+    .page-in-left   { animation: pageInLeft   0.35s var(--ios-ease) forwards; }
+    .page-in-right  { animation: pageInRight  0.35s var(--ios-ease) forwards; }
+    @keyframes pageOutLeft  { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-40px); } }
+    @keyframes pageOutRight { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
+    @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pageInRight  { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
 
-    .footer { background: var(--surface); border-top: 1px solid var(--border); padding: 22px 16px 22px; text-align: center; margin-top: auto; animation: fadeIn 0.8s ease; position: relative; overflow: hidden; }
-    .footer::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 200px; height: 1px; background: linear-gradient(90deg, transparent, var(--gradient-violet), transparent); animation: footerLine 3s ease-in-out infinite; }
-    @keyframes footerLine { 0%, 100% { width: 200px; opacity: 0.5; } 50% { width: 400px; opacity: 1; } }
-    .footer-brand { font-weight: 900; letter-spacing: 3px; font-size: 14px; display: inline-block; position: relative; background: linear-gradient(90deg, #6BCB9B 0%, #4facfe 25%, #F0C14B 50%, #4facfe 75%, #6BCB9B 100%); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: brandRainbow 4s linear infinite, brandFloat 3s ease-in-out infinite; filter: drop-shadow(0 0 8px rgba(107,203,155,0.5)); }
-    .footer-brand::before { content: 'SPR Studio'; position: absolute; inset: 0; background: linear-gradient(90deg, #6BCB9B, #4facfe, #F0C14B, #4facfe, #6BCB9B); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: brandRainbow 4s linear infinite; filter: blur(8px); opacity: 0.6; z-index: -1; }
-    @keyframes brandRainbow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
-    @keyframes brandFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+    .footer { background: var(--surface); border-top: 1px solid var(--border); padding: 22px 16px; text-align: center; margin-top: auto; }
+    .footer-brand { font-weight: 900; letter-spacing: 3px; font-size: 14px; background: linear-gradient(90deg, #6BCB9B, #4facfe, #F0C14B, #4facfe, #6BCB9B); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; transition: background 0.3s; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @supports not (backdrop-filter: blur(1px)) {
+      .header, .notif-panel, .tabbar { background: var(--surface) !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) { 
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } 
+    }
 
     .upload-status { padding: 8px; border-radius: 8px; font-size: 11px; margin-top: 8px; }
     .upload-status.success { background: rgba(107,203,155,0.15); color: var(--success); }
     .upload-status.error { background: rgba(255,107,107,0.15); color: var(--danger); }
-    .clear-btn-wrapper { display: flex; justify-content: flex-end; margin-bottom: 12px; animation: slideDown 0.4s var(--spring); }
-    .clear-folder-btn { padding: 6px 12px; font-size: 11px; border-radius: 10px; background: linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,107,107,0.05)); color: var(--danger); border: 1px solid rgba(255,107,107,0.3); font-weight: 700; cursor: pointer; transition: all 0.3s var(--spring); display: inline-flex; align-items: center; gap: 6px; position: relative; overflow: hidden; }
-    .clear-folder-btn:hover { background: var(--danger); color: white; transform: translateY(-2px) scale(1.05); }
-    .clear-folder-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
-    .clear-folder-btn .icon { font-size: 13px; transition: transform 0.4s var(--spring); }
-    .clear-folder-btn:hover .icon { transform: rotate(-15deg) scale(1.2); }
-    .idea-card.deleting { animation: cardDelete 0.5s var(--ios-ease) forwards; }
-    @keyframes cardDelete { 0% { opacity: 1; transform: translateX(0) scale(1); } 50% { opacity: 0.5; transform: translateX(30px) scale(0.95); } 100% { opacity: 0; transform: translateX(60px) scale(0.9); height: 0; padding: 0; margin: 0; border: 0; } }
-    .clear-folder-btn.loading { pointer-events: none; opacity: 0.7; }
-    .clear-folder-btn.loading::after { content: ''; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 4px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .clear-btn-wrapper { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+    .clear-folder-btn { padding: 6px 12px; font-size: 11px; border-radius: 10px; background: rgba(255,107,107,0.15); color: var(--danger); border: 1px solid rgba(255,107,107,0.3); font-weight: 700; }
   </style>
 </head>
 <body>
+  <noscript>
+    <div style="padding: 40px; text-align: center; color: #FF6B6B; font-family: sans-serif; font-size: 16px;">
+      Для работы приложения необходим JavaScript. Пожалуйста, включите его в настройках браузера.
+    </div>
+  </noscript>
 
 <div class="bg-decor"><span class="ring2"></span><span class="slash"></span></div>
 
@@ -387,27 +270,27 @@
     </a>
     <div class="header-actions">
       <button class="icon-round" id="bellBtn" aria-label="Уведомления">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="mini-badge hidden" id="bellBadge">0</span>
       </button>
       <button class="button button-primary button-small hidden" id="authBtn" data-action="open-auth">Войти</button>
-      <div class="header-avatar hidden" id="headerAvatar" data-action="go-profile"></div>
+      <button type="button" class="header-avatar hidden" id="headerAvatar" data-action="go-profile" aria-label="Открыть профиль"></button>
     </div>
   </div>
 </header>
 
-<div class="notif-panel hidden" id="notifPanel" role="dialog" aria-modal="true">
-  <div class="notif-head"><b>Уведомления 🔔</b><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div>
+<div class="notif-panel hidden" id="notifPanel" role="dialog" aria-labelledby="notifTitle">
+  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div>
   <div id="notifContent"></div>
 </div>
 
 <main id="mainContent">
-  <div id="aiOfflineBanner" class="ai-offline-banner hidden">
+  <div id="aiOfflineBanner" class="ai-offline-banner hidden" role="status" aria-live="polite">
     <div class="icon">⚠️</div>
     <div>
       <b>Ведутся технические работы!</b>
-      ИИ-модерация временно недоступна. Размещение объявлений и отправка идей приостановлены.<br>
-      <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Чат работает в обычном режиме — вы можете продолжать договариваться.</span>
+      Сервис проверки временно недоступен. Отправка сообщений, объявлений и идей приостановлена до восстановления.<br>
+      <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Мы работаем над восстановлением. Попробуйте позже.</span>
     </div>
   </div>
 
@@ -417,8 +300,8 @@
       <div class="hero-dots" id="heroDots"></div>
     </div>
     <div class="search-pill">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="search" id="searchInput" placeholder="Поиск по названию или описанию...">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="search" id="searchInput" placeholder="Поиск по названию или описанию..." aria-label="Поиск по объявлениям">
     </div>
     <div class="cat-tiles">
       <button class="cat-tile t-things" data-cat="Вещи"><span class="tile-emoji">🛍️</span>Вещи</button>
@@ -428,7 +311,7 @@
     </div>
     <div class="foryou-row">
       <h2>Для тебя <span class="spark">✨</span></h2>
-      <button class="pill-all" data-action="reset-search">Все объявления <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button class="pill-all" data-action="reset-search">Все объявления <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>
     <div class="l-grid" id="listingsGrid"></div>
   </section>
@@ -456,7 +339,7 @@
             <div id="profMeta" style="color:var(--muted); font-size:11px;"></div>
           </div>
           <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Фото</label>
-          <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+          <input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
         </div>
       </div>
       <div class="profile-box">
@@ -464,7 +347,7 @@
         <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
         <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
       </div>
-      <div id="adminRequests" class="hidden profile-box admin-section">
+      <div id="adminRequests" class="hidden profile-box">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
         <div id="adminReqList"></div>
       </div>
@@ -472,22 +355,22 @@
         <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
         <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">ИИ проверит идею перед отправкой</p>
         <form id="ideaForm">
-          <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required style="margin-bottom:8px; font-size:12px;"></textarea>
+          <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
           <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить</button>
         </form>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; margin-bottom:8px;">
-          <div style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px;">Мои идеи</div>
+          <div style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase;">Мои идеи</div>
           <button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="padding:4px 10px; font-size:10px; display:none;" data-action="clear-my-ideas">🗑 Очистить все</button>
         </div>
         <div id="myIdeasList"></div>
         <div id="adminIdeasDash" class="hidden" style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
           <h4 style="margin:0 0 12px; font-size:13px; color:var(--accent); font-weight:800;">Панель Ученического Совета</h4>
           <div class="idea-folders">
-            <div class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></div>
-            <div class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></div>
-            <div class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></div>
-            <div class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></div>
+            <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
+            <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
+            <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
+            <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
           </div>
           <div id="ideaFolderContent"></div>
         </div>
@@ -504,7 +387,7 @@
       <h3 id="chatWith" style="font-size:14px; margin-bottom:10px;"></h3>
       <div id="chatMessages" style="max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
       <form id="chatForm" style="display:flex; gap:6px;">
-        <input id="chatInput" class="form-control" style="flex:1; font-size:13px;" placeholder="Написать...">
+        <input id="chatInput" class="form-control" style="flex:1; font-size:13px;" placeholder="Написать..." maxlength="1000" aria-label="Текст сообщения">
         <button type="submit" class="button button-primary">→</button>
       </form>
     </div>
@@ -513,60 +396,25 @@
 
 <nav class="tabbar" id="tabbar">
   <span class="tabbar-indicator" id="tabIndicator"></span>
-
-  <button class="tab-btn active" data-tab="board">
-    <span class="tab-ico">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="1.5"/>
-        <line x1="6" y1="8" x2="14" y2="8"/>
-        <line x1="6" y1="11" x2="18" y2="11"/>
-        <line x1="4" y1="20" x2="20" y2="20"/>
-      </svg>
-    </span>
-    <span class="tab-label">Доска</span>
-  </button>
-
-  <button class="tab-btn" data-tab="messages">
-    <span class="tab-ico">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-      <span class="tabbar-badge hidden" id="chatBadge">0</span>
-    </span>
-    <span class="tab-label">Чат</span>
-  </button>
-
-  <button class="tab-btn" data-tab="favorites">
-    <span class="tab-ico">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-    </span>
-    <span class="tab-label">Избранное</span>
-  </button>
-
-  <button class="tab-btn" data-tab="profile">
-    <span class="tab-ico">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
-    </span>
-    <span class="tab-label">Профиль</span>
-  </button>
-
-  <button class="tab-plus" id="fabBtn" aria-label="Создать">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  </button>
+  <button class="tab-btn active" data-tab="board"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="1.5"/><line x1="6" y1="8" x2="14" y2="8"/><line x1="6" y1="11" x2="18" y2="11"/><line x1="4" y1="20" x2="20" y2="20"/></svg></span><span class="tab-label">Доска</span></button>
+  <button class="tab-btn" data-tab="messages"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="tabbar-badge hidden" id="chatBadge">0</span></span><span class="tab-label">Чат</span></button>
+  <button class="tab-btn" data-tab="favorites"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span><span class="tab-label">Избранное</span></button>
+  <button class="tab-btn" data-tab="profile"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg></span><span class="tab-label">Профиль</span></button>
+  <button class="tab-plus" id="fabBtn" aria-label="Создать объявление"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </nav>
 
-<footer class="footer">
-  <span class="footer-brand">SPR Studio</span>
-</footer>
+<footer class="footer"><span class="footer-brand">SPR Studio</span></footer>
 
-<div class="modal" id="authModal" role="dialog" aria-modal="true">
+<div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="modal-content">
     <button data-action="close-auth-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
     <h2 id="authTitle" style="margin-top:0; font-size:20px; font-weight:900;">Вход</h2>
     <form id="authForm">
-      <div class="form-group hidden" id="schoolGroup"><label>Школа</label>
+      <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
         <select id="authSchool" class="form-control"><option value="Третий лицей">Третий лицей</option></select>
       </div>
-      <div class="form-group"><label>Почта</label><input type="email" id="authEmail" class="form-control" required></div>
-      <div class="form-group"><label>Пароль</label><input type="password" id="authPassword" class="form-control" required></div>
+      <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
+      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
       <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
@@ -574,42 +422,50 @@
   </div>
 </div>
 
-<div class="modal" id="listingModal" role="dialog" aria-modal="true">
+<div class="modal" id="listingModal" role="dialog" aria-modal="true" aria-labelledby="listingTitle">
   <div class="modal-content">
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
-    <h2 style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
+    <h2 id="listingTitle" style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
     <form id="listingForm">
       <div id="aiHints" class="ai-hint">Начните вводить — ИИ подскажет категорию</div>
-      <div class="form-group"><label>Заголовок</label><input type="text" id="lTitle" class="form-control" required></div>
-      <div class="form-group"><label>Описание</label><textarea id="lDesc" class="form-control" rows="3" required></textarea></div>
+      <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="100"></div>
+      <div class="form-group"><label for="lDesc">Описание</label><textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea></div>
       <div class="form-group">
-        <label>Категория</label>
+        <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
           <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
         </select>
       </div>
       <div id="eventFields" class="hidden" style="background:var(--bg); padding:10px; border-radius:12px; margin-bottom:12px;">
-        <div class="form-group"><label>Дата</label><input type="date" id="evDate" class="form-control"></div>
-        <div class="form-group"><label>Время</label><input type="time" id="evTime" class="form-control"></div>
-        <div class="form-group">
-          <label>Тип</label>
+        <div class="form-group"><label for="evDate">Дата</label><input type="date" id="evDate" class="form-control"></div>
+        <div class="form-group"><label for="evTime">Время</label><input type="time" id="evTime" class="form-control"></div>
+        <fieldset class="form-group event-type-group">
+          <legend>Тип мероприятия</legend>
           <label style="display:block; margin-bottom:4px; font-size:12px;"><input type="radio" name="evType" value="open" checked> Открытое</label>
           <label style="display:block; margin-bottom:4px; font-size:12px;"><input type="radio" name="evType" value="request"> По заявке</label>
           <label style="display:block; font-size:12px;"><input type="radio" name="evType" value="limited"> Лимит мест</label>
-        </div>
-        <div class="form-group hidden" id="seatsGroup"><label>Мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
+        </fieldset>
+        <div class="form-group hidden" id="seatsGroup"><label for="evSeats">Мест</label><input type="number" id="evSeats" class="form-control" min="1"></div>
       </div>
-      <div class="form-group"><label>Фото</label><input type="file" id="lImage" class="form-control" accept="image/*"><div id="uploadStatus"></div></div>
-      <div class="form-group"><label>Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно"></div>
+      <div class="form-group"><label for="lImage">Фото</label><input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp"><div id="uploadStatus"></div></div>
+      <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
   </div>
 </div>
 
 <script>
+window.onerror = function(message, source, lineno) {
+  console.error("Ошибка:", message, "Строка:", lineno);
+  return false;
+};
+window.onunhandledrejection = function(event) {
+  console.error("Необработанный промис:", event.reason);
+};
+
 (function(){
-  if (!window.supabase) {
-    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#FF6B6B;font-family:sans-serif;font-size:16px;">Ошибка загрузки Supabase. Проверьте интернет-соединение и обновите страницу.</div>';
+  if (typeof supabase === 'undefined') {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#FF6B6B;font-family:sans-serif;font-size:16px;">Ошибка загрузки Supabase. Проверьте интернет-соединение.</div>';
     return;
   }
 
@@ -626,80 +482,103 @@
   let notifOpen = false;
   let heroRendered = false;
   let seenMap = {};
-  
   let isAiDown = false;
+  let isListingSubmitting = false;
+  let isChatSubmitting = false;
+  let chatOpenTimeout = null;
+  let autoMessageTimeout = null;
+  let chatLoadSeq = 0;
+  let tabTransitionTimer = null;
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   window.closeModal = id => { const m = $(id); if (m) m.classList.remove("open"); };
   window.openModal = id => { const m = $(id); if (m) m.classList.add("open"); };
   const notice = (msg) => alert(msg);
 
   const debounce = (fn, ms) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; };
 
+  function safeLocalStorageGet(key) { try { return localStorage.getItem(key); } catch(e) { return null; } }
+  function safeLocalStorageSet(key, val) { try { localStorage.setItem(key, val); } catch(e) {} }
+
+  const IMAGE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+  function getImageExtension(file) {
+    if (!file || !IMAGE_EXTENSIONS[file.type]) {
+      throw new Error("Поддерживаются только изображения JPG, PNG и WebP.");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Файл слишком большой (максимум 5 МБ).");
+    }
+    return IMAGE_EXTENSIONS[file.type];
+  }
+  function makeUniqueFileSuffix() {
+    return (window.crypto && typeof window.crypto.randomUUID === "function")
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   function updateAiStatus(down) {
-    isAiDown = down;
+    isAiDown = Boolean(down);
     const banner = $("aiOfflineBanner");
-    if (down) {
-      banner.classList.remove("hidden");
-    } else {
-      banner.classList.add("hidden");
-    }
+    if (isAiDown) banner.classList.remove("hidden");
+    else banner.classList.add("hidden");
+    const liveLabel = document.querySelector(".ai-live");
+    if (liveLabel) liveLabel.textContent = isAiDown ? "ИИ-модерация недоступна" : "ИИ-модерация активна";
   }
 
-  // ЖЕСТКАЯ ФУНКЦИЯ ПРОВЕРКИ
+  // Fail-Closed: разрешаем продолжение только при явном action === "ok".
   async function moderateText(text, context = "idea") {
-    if (!text || text.trim() === "") return { status: "rejected", reason: "Текст не может быть пустым.", action: "reject" };
-    if (context !== "chat" && text.trim().length < 5) return { status: "rejected", reason: "Слишком короткий текст.", action: "reject" };
+    const value = typeof text === "string" ? text.trim() : "";
+    if (!value) return { status: "rejected", reason: "Текст не может быть пустым.", action: "reject" };
+    if (value.length < 2) return { status: "rejected", reason: "Слишком короткий текст.", action: "reject" };
 
+    let data;
     try {
-      const { data, error } = await sb.functions.invoke("moderate", {
-        body: { text: text }
+      const { data: responseData, error } = await sb.functions.invoke("moderate", {
+        body: { text: value }
       });
-
       if (error) throw error;
-
-      // Если ИИ сказал reject, блокируем
-      if (data.action === "reject") {
-        return { status: "rejected", reason: data.reason || "Нарушение правил", action: "reject" };
-      }
-      
-      // Если все ок
-      if (isAiDown) updateAiStatus(false);
-      return { status: "approved", action: "ok" };
-
+      data = responseData;
     } catch (e) {
-      console.error("Ошибка вызова GigaChat:", e);
-      if (!isAiDown) updateAiStatus(true);
-      
-      // Если сервер упал, в чате разрешаем писать, а объявления/идеи блокируем
-      if (context === "chat") return { status: "approved", action: "ok" };
-      return { status: "rejected", reason: "Сервис проверки временно недоступен. Ведутся технические работы.", action: "reject" };
+      console.error(`Ошибка вызова ИИ-модерации (${context}):`, e);
+      updateAiStatus(true);
+      return { status: "rejected", reason: "Сервис проверки недоступен. Попробуйте позже.", action: "reject" };
     }
+
+    // Неизвестная/неполная схема ответа тоже считается ошибкой, а не одобрением.
+    if (!data || !["ok", "pending", "reject"].includes(data.action)) {
+      updateAiStatus(true);
+      return { status: "rejected", reason: "Сервис проверки вернул некорректный ответ. Попробуйте позже.", action: "reject" };
+    }
+
+    updateAiStatus(false);
+    if (data.action === "ok") return { status: "approved", reason: "Проверка пройдена.", action: "ok" };
+    if (data.action === "pending") return { status: "pending", reason: data.reason || "Требуется дополнительная проверка.", action: "pending" };
+    return { status: "rejected", reason: data.reason || "Нарушение правил.", action: "reject" };
   }
 
-  window.updateHints = function() {
+  function updateHints() {
     const combined = ($("lTitle").value + " " + $("lDesc").value).toLowerCase();
-    const categoryKeywords = {
-      "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "куплю", "наушники", "велосипед"],
-      "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул", "фотограф", "настройка", "доставка"],
-      "Учёба": ["конспекты", "решебник", "помощь с дз", "учебник", "подготовка", "егэ", "огэ", "математика", "физика"],
-      "Мероприятия": ["встреча", "концерт", "квиз", "игра", "соревнования", "фестиваль", "турнир", "матч"]
+    const kw = {
+      "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "куплю"],
+      "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул"],
+      "Учёба": ["конспекты", "решебник", "учебник", "подготовка", "егэ"],
+      "Мероприятия": ["встреча", "концерт", "квиз", "фестиваль", "матч"]
     };
-    let bestCat = null, maxMatches = 0;
-    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-      const matches = keywords.filter(k => combined.includes(k)).length;
-      if (matches > maxMatches) { maxMatches = matches; bestCat = cat; }
+    let bestCat = null, max = 0;
+    for (const [cat, words] of Object.entries(kw)) {
+      const m = words.filter(k => combined.includes(k)).length;
+      if (m > max) { max = m; bestCat = cat; }
     }
     if (bestCat && $("lCat").value !== bestCat) {
-      $("aiHints").innerHTML = `<a onclick="document.getElementById('lCat').value='${bestCat}'; window.updateHints();">ИИ советует: ${bestCat}</a>`;
+      $("aiHints").innerHTML = `<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="${bestCat}">ИИ советует: ${bestCat}</button>`;
     } else {
-      $("aiHints").innerHTML = "Начните вводить — ИИ подскажет категорию";
+      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
     }
-  };
-  $("lTitle").addEventListener("input", debounce(window.updateHints, 300));
-  $("lDesc").addEventListener("input", debounce(window.updateHints, 300));
+  }
+  $("lTitle").addEventListener("input", debounce(updateHints, 300));
+  $("lDesc").addEventListener("input", debounce(updateHints, 300));
 
   function timeAgo(isoOrMs) {
     if (!isoOrMs) return '';
@@ -713,22 +592,19 @@
   }
 
   function buildNotifications() {
-    const notes = [];
-    notes.push({ icon: '🚀', title: 'Обновление приложения', text: 'Новый дизайн, Liquid Glass и ИИ-модерация уже здесь!', time: Date.now() - 45 * 60000 });
-    if (isAiDown) {
-      notes.unshift({ icon: '⚠️', title: 'Технические работы', text: 'ИИ-модерация временно недоступна. Почта идей и создание объявлений приостановлены.', time: Date.now() });
-    }
+    const notes = [{ icon: '🚀', title: 'Обновление', text: 'Новый дизайн и ИИ-модерация.', time: Date.now() - 45 * 60000 }];
+    if (isAiDown) notes.unshift({ icon: '⚠️', title: 'Технические работы', text: 'ИИ временно недоступен.', time: Date.now() });
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 4).forEach(e => {
-        const dateStr = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        notes.push({ icon: '🎭', title: 'Новое событие школы', text: e.title + (dateStr ? ' · ' + dateStr : ''), time: new Date(e.created_at || Date.now()).getTime() });
+        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
+        notes.push({ icon: '🎭', title: 'Событие школы', text: e.title + (ds ? ' · ' + ds : ''), time: new Date(e.created_at || Date.now()).getTime() });
       });
     }
     return notes.sort((a, b) => b.time - a.time);
   }
 
   function updateBellBadge() {
-    const seen = parseInt(localStorage.getItem('fam_notif_seen') || '0', 10);
+    const seen = parseInt(safeLocalStorageGet('fam_notif_seen') || '0', 10);
     const n = buildNotifications().filter(x => x.time > seen).length;
     const b = $("bellBadge");
     if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove("hidden"); }
@@ -737,55 +613,42 @@
 
   function renderNotifPanel() {
     const notes = buildNotifications();
-    $("notifContent").innerHTML = notes.length ? notes.map((n, i) =>
-      `<div class="notif-item" style="animation-delay:${i * 0.06}s">
-        <span class="notif-ico">${n.icon}</span>
-        <div style="min-width:0;"><div class="notif-title">${esc(n.title)}</div>
-        <div class="notif-text">${esc(n.text)}</div>
-        <div class="notif-time">${timeAgo(n.time)}</div></div>
-      </div>`
+    $("notifContent").innerHTML = notes.length ? notes.map(n =>
+      `<div class="notif-item"><span class="notif-ico">${n.icon}</span><div style="min-width:0;"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${timeAgo(n.time)}</div></div></div>`
     ).join("") : '<p style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Пока нет уведомлений</p>';
   }
 
-  window.closeNotifPanel = () => {
-    notifOpen = false;
-    $("notifPanel").classList.add("hidden");
-  };
-
+  window.closeNotifPanel = () => { notifOpen = false; $("notifPanel").classList.add("hidden"); };
   function toggleNotif() {
-    if (notifOpen) { window.closeNotifPanel(); return; }
+    if (notifOpen) { closeNotifPanel(); return; }
     notifOpen = true;
     renderNotifPanel();
     $("notifPanel").classList.remove("hidden");
-    localStorage.setItem('fam_notif_seen', String(Date.now()));
+    safeLocalStorageSet('fam_notif_seen', String(Date.now()));
     updateBellBadge();
   }
-
   $("bellBtn").onclick = (e) => { e.stopPropagation(); toggleNotif(); };
   document.addEventListener('click', e => {
-    if (notifOpen && !e.target.closest('#notifPanel') && !e.target.closest('#bellBtn')) window.closeNotifPanel();
+    if (notifOpen && !e.target.closest('#notifPanel') && !e.target.closest('#bellBtn')) closeNotifPanel();
   });
 
   function markChatSeen(otherId) {
     if (!user || !otherId) return;
     seenMap[otherId] = new Date().toISOString();
-    try { localStorage.setItem(`fam_chat_seen_map_${user.id}`, JSON.stringify(seenMap)); } catch (e) {}
+    safeLocalStorageSet(`fam_chat_seen_map_${user.id}`, JSON.stringify(seenMap));
   }
 
   function setBadge(n) {
     const b = $('chatBadge');
-    if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove('hidden'); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+    if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove('hidden'); }
     else b.classList.add('hidden');
   }
 
   async function updateChatBadge() {
+    if (document.hidden) return;
     if (!user || !user.id) { setBadge(0); return; }
     try {
-      const { data, error } = await sb.from('messages')
-        .select('sender_id, created_at')
-        .eq('receiver_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const { data, error } = await sb.from('messages').select('sender_id, created_at').eq('receiver_id', user.id).order('created_at', { ascending: false }).limit(500);
       if (error) return;
       let unread = 0;
       (data || []).forEach(m => {
@@ -793,41 +656,29 @@
         if (new Date(m.created_at) > new Date(seenAt)) unread++;
       });
       setBadge(unread);
-    } catch (e) { /* тихо */ }
+    } catch (e) {}
   }
   setInterval(updateChatBadge, 15000);
-
-  async function clearChatBadge() {
-    if (!user) return;
-    try {
-      const { data } = await sb.from('messages').select('sender_id').eq('receiver_id', user.id);
-      const now = new Date().toISOString();
-      (data || []).forEach(m => { seenMap[m.sender_id] = now; });
-      localStorage.setItem(`fam_chat_seen_map_${user.id}`, JSON.stringify(seenMap));
-      updateChatBadge();
-    } catch(e) {}
-  }
 
   async function loadDialogsList() {
     if (!user) return;
     const dialogsList = $("dialogsList");
     dialogsList.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:12px;">Загрузка чатов...</p>';
     try {
-      const { data: sent, error: err1 } = await sb.from('messages').select('*').eq('sender_id', user.id).order('created_at', { ascending: false });
-      if (err1) throw err1;
-      const { data: received, error: err2 } = await sb.from('messages').select('*').eq('receiver_id', user.id).order('created_at', { ascending: false });
-      if (err2) throw err2;
-      
-      const allMsgs = [...(sent || []), ...(received || [])].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-      
+      const [sentResult, receivedResult] = await Promise.all([
+        sb.from('messages').select('*').eq('sender_id', user.id).order('created_at', { ascending: false }).limit(500),
+        sb.from('messages').select('*').eq('receiver_id', user.id).order('created_at', { ascending: false }).limit(500)
+      ]);
+      if (sentResult.error) throw sentResult.error;
+      if (receivedResult.error) throw receivedResult.error;
+      const allMsgs = [...(sentResult.data || []), ...(receivedResult.data || [])]
+        .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
       const dialogs = {};
       allMsgs.forEach(m => {
+        if (!m.sender_id || !m.receiver_id) return;
         const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
-        if (!dialogs[otherId]) {
-          dialogs[otherId] = { otherId, text: m.text, created_at: m.created_at };
-        }
+        if (!dialogs[otherId]) dialogs[otherId] = { otherId, text: m.text, created_at: m.created_at };
       });
-      
       const list = Object.values(dialogs);
       if (list.length === 0) {
         dialogsList.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p style="font-size: 12px; margin: 0;">Нет активных диалогов<br>Нажмите «Написать» на карточке товара</p></div>';
@@ -859,14 +710,10 @@
   }
 
   function showAIThinking(containerId, text = "ИИ анализирует") {
-    const container = $(containerId);
-    if (!container) return;
-    container.innerHTML = `<div class="ai-thinking"><span class="ai-thinking-text">${text}</span><span class="ai-thinking-dots"><span></span><span></span><span></span></span></div>`;
+    const c = $(containerId);
+    if (c) c.innerHTML = `<div class="ai-thinking"><span>${text}</span><span>...</span></div>`;
   }
-  function hideAIThinking(containerId) {
-    const container = $(containerId);
-    if (container) container.innerHTML = '';
-  }
+  function hideAIThinking(containerId) { const c = $(containerId); if (c) c.innerHTML = ''; }
 
   async function loadAll() {
     try {
@@ -883,29 +730,45 @@
         promises.push(sb.from("favorites").select("*").eq("user_id", user.id));
       }
       const results = await Promise.all(promises);
-
-      if(results[0].error) console.error("Ошибка загрузки объявлений:", results[0].error);
-      else listings = results[0].data || [];
-
-      if(results[1].error) console.error("Ошибка занятости мест:", results[1].error);
-      else occupancy = results[1].data || [];
-
+      if (!results[0].error) listings = results[0].data || [];
+      if (!results[1].error) occupancy = results[1].data || [];
       if (user && user.id) {
         regs = (!results[2].error && results[2].data) || [];
         ideas = (!results[3].error && results[3].data) || [];
         favorites = (!results[4].error && results[4].data) || [];
       }
-
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge();
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
-    } catch (e) {
-      console.error("Критическая ошибка в loadAll:", e);
-    }
+    } catch (e) { console.error("Ошибка loadAll:", e); }
   }
 
   const getTaken = id => { let o = occupancy.find(x=>x.event_id===id); return o?parseInt(o.taken):0; };
   const isFavorite = id => favorites.some(f => f.listing_id === id);
+
+  function stopHeroTimer() {
+    if (carTimer) clearInterval(carTimer);
+    carTimer = null;
+  }
+
+  function startHeroTimer() {
+    stopHeroTimer();
+    if (currentTab !== "board" || document.hidden) return;
+    const box = $("bannerCarousel");
+    if (!box || !box.children.length) return;
+    carTimer = setInterval(() => {
+      if (currentTab !== "board" || document.hidden || box.matches(":hover") || !box.children.length) return;
+      const cardW = box.children[0].offsetWidth + 14;
+      const idx = Math.round(box.scrollLeft / cardW);
+      if (idx >= box.children.length - 1) box.scrollTo({ left: 0, behavior: "smooth" });
+      else box.scrollBy({ left: cardW, behavior: "smooth" });
+    }, 4200);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopHeroTimer();
+    else if (currentTab === "board") startHeroTimer();
+  });
 
   function renderHero() {
     const box = $("bannerCarousel");
@@ -919,59 +782,37 @@
       <span class="hero-graffiti">FAM.</span>
       <span class="ai-live"><i></i>ИИ-модерация активна</span>
     </div>`);
-
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
       html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
     });
-
-    const designedBanners = [
-      { g: 'linear-gradient(140deg,#2A1B4A,#171226 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно и за одну минуту', action: 'open-listing' },
-      { g: 'linear-gradient(140deg,#123324,#0C2418 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом — у своих ребят', action: 'cat', cat: 'Вещи' },
-      { g: 'linear-gradient(140deg,#4A3F14,#26200C 70%)', e: '🤖', t: 'ИИ-модерация', s: 'защищает школу 24/7', action: null },
-      { g: 'linear-gradient(140deg,#1E2749,#131A30 70%)', e: '🎓', t: 'Учёба без стресса', s: 'конспекты, помощь, подготовка', action: 'cat', cat: 'Учёба' }
+    const designed = [
+      { g: 'linear-gradient(140deg,#2A1B4A,#171226 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
+      { g: 'linear-gradient(140deg,#123324,#0C2418 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
+      { g: 'linear-gradient(140deg,#4A3F14,#26200C 70%)', e: '🤖', t: 'ИИ-модерация', s: 'защита 24/7', action: null },
+      { g: 'linear-gradient(140deg,#1E2749,#131A30 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
     ];
-    designedBanners.forEach(b => {
-      const dataAttrs = b.action === 'cat'
-        ? `data-action="cat" data-cat="${b.cat}"`
-        : (b.action ? `data-action="${b.action}"` : '');
-      html.push(`<div class="hero-slide" style="background:${b.g}" ${dataAttrs}>
-        <span class="db-emoji">${b.e}</span>
-        <div class="db-title">${b.t}</div>
-        <div class="db-sub">${b.s}</div>
-      </div>`);
+    designed.forEach(b => {
+      const attrs = b.action === 'cat' ? `data-action="cat" data-cat="${b.cat}"` : (b.action ? `data-action="${b.action}"` : '');
+      html.push(`<div class="hero-slide" style="background:${b.g}" ${attrs}><span class="db-emoji">${b.e}</span><div class="db-title">${b.t}</div><div class="db-sub">${b.s}</div></div>`);
     });
-
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
-        const dateStr = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        const metaStr = [dateStr, e.event_time || ''].filter(Boolean).join(' · ');
-        const taken = getTaken(e.id);
-        const max = e.max_seats || 0;
-        const seatsInfo = max > 0 ? `👥 Занято: ${taken} из ${max}` : `👥 Без ограничений`;
+        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
+        const meta = [ds, e.event_time || ''].filter(Boolean).join(' · ');
+        const taken = getTaken(e.id), max = e.max_seats || 0;
+        const info = max > 0 ? `👥 ${taken} из ${max}` : '👥 Без ограничений';
         html.push(`<div class="hero-slide hero-img"><div class="hero-event">
           <span class="school-badge">🎭 Афиша</span>
           <div class="event-title">${esc(e.title)}</div>
-          ${metaStr ? `<div class="event-meta">📅 ${esc(metaStr)} · ${seatsInfo}</div>` : ''}
-          <button class="button button-primary button-small" style="align-self:flex-start;" data-action="handle-event" data-id="${esc(e.id)}" data-type="${esc(e.event_type || '')}" data-max="${e.max_seats || 0}">Записаться</button>
+          ${meta ? `<div class="event-meta">📅 ${esc(meta)} · ${info}</div>` : ''}
+          <button class="button button-primary button-small" style="align-self:flex-start;" data-action="handle-event" data-id="${esc(e.id)}">Записаться</button>
         </div></div>`);
       });
     }
-
     box.innerHTML = html.join("");
     syncHeroDots();
-
-    let isHover = false;
-    box.onmouseenter = () => isHover = true;
-    box.onmouseleave = () => isHover = false;
-    if (carTimer) clearInterval(carTimer);
-    carTimer = setInterval(() => {
-      if (isHover || !box.children.length) return;
-      const cardW = box.children[0].offsetWidth + 14;
-      const idx = Math.round(box.scrollLeft / cardW);
-      if (idx >= box.children.length - 1) box.scrollTo({ left: 0, behavior: "smooth" });
-      else box.scrollBy({ left: cardW, behavior: "smooth" });
-    }, 4200);
-
+    updateAiStatus(isAiDown);
+    startHeroTimer();
     box.onscroll = () => {
       const cardW = box.children[0] ? box.children[0].offsetWidth + 14 : 1;
       const idx = Math.round(box.scrollLeft / cardW);
@@ -979,52 +820,45 @@
     };
   }
 
-  window.syncHeroDots = function() {
+  function syncHeroDots() {
     const box = $("bannerCarousel");
     $("heroDots").innerHTML = Array.from(box.children).map((_, i) =>
-      `<button class="hero-dot${i === 0 ? ' active' : ''}" data-action="scroll-to-slide" data-idx="${i}"></button>`
+      `<button class="hero-dot${i === 0 ? ' active' : ''}" data-action="scroll-to-slide" data-idx="${i}" aria-label="Слайд ${i+1}"></button>`
     ).join("");
-  };
+  }
 
   function listingCard(l, idx) {
     const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
     const favClass = isFavorite(l.id) ? 'active' : '';
     let badge = l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || ''));
-
     let capacityHTML = '';
     if (l.is_event) {
-      const taken = getTaken(l.id);
-      const max = l.max_seats || 0;
+      const taken = getTaken(l.id), max = l.max_seats || 0;
       capacityHTML = `<div class="event-counter">👥 ${max > 0 ? `<span>${taken}</span> / ${max} мест` : 'Без ограничений'}</div>`;
     }
-
     let actionHTML = '';
     const isValidUUID = l.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(l.user_id);
     if (user && isValidUUID && l.user_id !== user.id) {
       if (l.is_event) {
         const already = regs.find(r => r.event_id===l.id && r.user_id===user.id && r.status!=='rejected');
         if (already) {
-          if (already.status === 'pending') actionHTML = `<button class="l-go" disabled title="Заявка отправлена">⏳</button>`;
-          else actionHTML = `<button class="l-go mini red" data-action="cancel-reg" data-id="${esc(already.id)}" title="Отменить заявку">✕</button>`;
+          if (already.status === 'pending') actionHTML = `<button class="l-go" disabled>⏳</button>`;
+          else actionHTML = `<button class="l-go mini red" data-action="cancel-reg" data-id="${esc(already.id)}" aria-label="Отменить заявку">✕</button>`;
         } else {
           const taken = getTaken(l.id), max = l.max_seats||0, left = max>0?max-taken:Infinity;
-          if (l.event_type==='limited' && left<=0) actionHTML = `<button class="l-go" disabled title="Мест нет">✕</button>`;
-          else actionHTML = `<button class="l-go" data-action="handle-event" data-id="${esc(l.id)}" data-type="${esc(l.event_type || 'open')}" data-max="${max}" title="Записаться">${ARROW}</button>`;
+          if (l.event_type==='limited' && left<=0) actionHTML = `<button class="l-go" disabled>✕</button>`;
+          else actionHTML = `<button class="l-go" data-action="handle-event" data-id="${esc(l.id)}" aria-label="Записаться">${ARROW}</button>`;
         }
       } else {
-        actionHTML = `<button class="l-go" data-action="start-chat" data-user-id="${esc(l.user_id)}" data-title="${esc(l.title)}" title="Написать">${ARROW}</button>`;
+        actionHTML = `<button class="l-go" data-action="start-chat" data-user-id="${esc(l.user_id)}" data-title="${esc(l.title)}" aria-label="Написать">${ARROW}</button>`;
       }
     } else if (user && l.user_id === user.id) {
       actionHTML = `<span class="l-own">Ваше</span>`;
     } else {
-      actionHTML = `<button class="l-go" data-action="open-auth" title="Войти">🔒</button>`;
+      actionHTML = `<button class="l-go" data-action="open-auth" aria-label="Войти">🔒</button>`;
     }
-
     return `<div class="l-card">
-      <div class="l-imgwrap">${img}
-        <button class="l-fav ${favClass}" data-action="toggle-fav" data-id="${esc(l.id)}">♥</button>
-        <span class="l-badge">${badge}</span>
-      </div>
+      <div class="l-imgwrap">${img}<button class="l-fav ${favClass}" data-action="toggle-fav" data-id="${esc(l.id)}" aria-label="В избранное">♥</button><span class="l-badge">${badge}</span></div>
       <div class="l-body">
         <h3 class="l-title">${esc(l.title)}</h3>
         <div class="l-price">${esc(l.price_text || "Бесплатно")}</div>
@@ -1045,159 +879,259 @@
       ((l.title || '').toLowerCase().includes(search) || (l.description && l.description.toLowerCase().includes(search)))
     );
     let html = filtered.map((l, i) => listingCard(l, i)).join("");
-    html += `<div class="promo-card" data-action="open-listing">
-      <span class="promo-gift">🎁</span>
-      <div class="promo-script">Размести объявление <b>бесплатно!</b></div>
-      <button class="promo-cta">Создать ${ARROW}</button>
-    </div>`;
+    html += `<div class="promo-card" data-action="open-listing"><span class="promo-gift">🎁</span><div class="promo-script">Размести объявление <b>бесплатно!</b></div><button class="promo-cta">Создать ${ARROW}</button></div>`;
     grid.innerHTML = filtered.length ? html : '<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">Ничего не найдено 🔍</p>';
   }
 
   function renderFavorites() {
     const grid = $("favoritesGrid");
     const favListings = listings.filter(l => isFavorite(l.id));
-    if (favListings.length === 0) {
-      grid.innerHTML = '';
-      $("favoritesEmpty").classList.remove("hidden");
-    } else {
-      $("favoritesEmpty").classList.add("hidden");
-      grid.innerHTML = favListings.map((l, i) => listingCard(l, i + 1)).join("");
-    }
+    if (favListings.length === 0) { grid.innerHTML = ''; $("favoritesEmpty").classList.remove("hidden"); }
+    else { $("favoritesEmpty").classList.add("hidden"); grid.innerHTML = favListings.map((l, i) => listingCard(l, i + 1)).join(""); }
   }
 
   async function toggleFavoriteAction(listingId) {
     if (!user) return openModal('authModal');
-    const favIdx = favorites.findIndex(f => f.listing_id === listingId);
-    if (favIdx !== -1) {
-      const { error } = await sb.from("favorites").delete().eq("id", favorites[favIdx].id);
-      if (error) return alert(error.message);
-      favorites.splice(favIdx, 1);
-    } else {
-      const { data, error } = await sb.from("favorites").insert({ user_id: user.id, listing_id: listingId }).select().single();
-      if (error) return alert(error.message);
-      if (data) favorites.push(data);
-    }
-    renderListings();
-    if (currentTab === 'favorites') renderFavorites();
-    if (!$("profileSection").classList.contains("hidden")) renderProfile();
+    try {
+      const favIdx = favorites.findIndex(f => f.listing_id === listingId);
+      if (favIdx !== -1) {
+        const { error } = await sb.from("favorites").delete().eq("id", favorites[favIdx].id);
+        if (error) throw error;
+        favorites.splice(favIdx, 1);
+      } else {
+        const { data, error } = await sb.from("favorites").insert({ user_id: user.id, listing_id: listingId }).select().single();
+        if (error) throw error;
+        if (data) favorites.push(data);
+      }
+      renderListings();
+      if (currentTab === 'favorites') renderFavorites();
+      if (!$("profileSection").classList.contains("hidden")) renderProfile();
+    } catch(e) { alert(e.message); }
   }
 
   async function cancelRegAction(regId) {
     if (!confirm("Отменить заявку?")) return;
-    const { error } = await sb.from("event_registrations").delete().eq("id", regId);
-    if (error) return alert(error.message);
-    regs = regs.filter(r => r.id !== regId);
-    renderListings();
-    notice("Заявка отменена");
+    try {
+      const { data, error } = await sb.from("event_registrations").delete().eq("id", regId).select("id");
+      if (error) throw error;
+      if (!data || data.length !== 1) throw new Error("Заявка не отменена: возможно, нет прав или она уже удалена.");
+      regs = regs.filter(r => r.id !== regId);
+      renderListings();
+      notice("Заявка отменена");
+    } catch(e) { alert(e.message); }
+  }
+
+  function stopChatSession(resetView = true) {
+    if (chatOpenTimeout) clearTimeout(chatOpenTimeout);
+    if (autoMessageTimeout) clearTimeout(autoMessageTimeout);
+    if (chatInterval) clearInterval(chatInterval);
+    chatOpenTimeout = null;
+    autoMessageTimeout = null;
+    chatInterval = null;
+    chatLoadSeq++;
+    curChat = null;
+    if (resetView) {
+      $("chatView").classList.add("hidden");
+      $("dialogsList").classList.remove("hidden");
+    }
   }
 
   window.startChat = function(userId, title, autoMessage = null) {
     if (!user) return openModal('authModal');
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(String(userId || "")) || userId === user.id) {
+      alert("Не удалось определить собеседника.");
+      return;
+    }
+
+    stopChatSession(true);
     showTab('messages');
-    setTimeout(() => {
-      if(chatInterval) clearInterval(chatInterval);
+    chatOpenTimeout = setTimeout(() => {
+      chatOpenTimeout = null;
+      if (currentTab !== 'messages' || !user || userId === user.id) return;
       curChat = userId;
       $("chatWith").textContent = title || "Диалог";
       $("dialogsList").classList.add("hidden");
       $("chatView").classList.remove("hidden");
       loadChatMessages(userId);
-      chatInterval = setInterval(() => loadChatMessages(userId), 5000);
-      if (autoMessage) setTimeout(() => { $("chatInput").value = autoMessage; $("chatForm").dispatchEvent(new Event('submit')); }, 500);
+      chatInterval = setInterval(() => {
+        if (currentTab === 'messages' && curChat === userId) loadChatMessages(userId);
+      }, 5000);
+      if (autoMessage) {
+        autoMessageTimeout = setTimeout(() => {
+          autoMessageTimeout = null;
+          if (currentTab !== 'messages' || curChat !== userId || $("chatView").classList.contains("hidden")) return;
+          $("chatInput").value = autoMessage;
+          $("chatForm").dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }, 500);
+      }
     }, 400);
   };
 
   async function loadChatMessages(otherId) {
-    if (!user || !otherId) return;
-    let c = $("chatMessages");
+    if (!user || !otherId || otherId === 'undefined' || curChat !== otherId) return;
+    const requestSeq = ++chatLoadSeq;
+    const c = $("chatMessages");
     try {
-      const res = await sb.from("messages").select("*")
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${user.id})`)
-        .order("created_at", { ascending: true }).limit(100);
-      if (res.error) { c.innerHTML = '<p style="color:var(--danger);text-align:center;font-size:11px;">Ошибка: ' + res.error.message + '</p>'; return; }
-      const msgs = res.data || [];
-      if (msgs.length === 0) c.innerHTML = '<p style="color:var(--muted);text-align:center;font-size:12px;margin-top:20px;">История сообщений пуста. Напишите первое сообщение!</p>';
-      else c.innerHTML = msgs.map(m => `<div style="align-self:${m.sender_id === user.id ? 'flex-end' : 'flex-start'};background:${m.sender_id === user.id ? 'var(--gradient-violet)' : 'var(--bg)'};color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;word-break:break-word;">${esc(m.text)}</div>`).join("");
+      // Each direction is fetched independently; merge and retain the newest 100 overall.
+      const [sentResult, receivedResult] = await Promise.all([
+        sb.from("messages").select("*").eq("sender_id", user.id).eq("receiver_id", otherId).order("created_at", { ascending: false }).limit(100),
+        sb.from("messages").select("*").eq("sender_id", otherId).eq("receiver_id", user.id).order("created_at", { ascending: false }).limit(100)
+      ]);
+      if (sentResult.error) throw sentResult.error;
+      if (receivedResult.error) throw receivedResult.error;
+      if (requestSeq !== chatLoadSeq || currentTab !== 'messages' || curChat !== otherId) return;
+
+      const msgs = [...(sentResult.data || []), ...(receivedResult.data || [])]
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .slice(-100);
+
+      if (msgs.length === 0) {
+        c.innerHTML = '<p style="color:var(--muted);text-align:center;font-size:12px;margin-top:20px;">История пуста. Напишите первое сообщение!</p>';
+      } else {
+        c.innerHTML = msgs.map(m => `<div style="align-self:${m.sender_id === user.id ? 'flex-end' : 'flex-start'};background:${m.sender_id === user.id ? 'var(--gradient-violet)' : 'var(--bg)'};color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;word-break:break-word;">${esc(m.text)}</div>`).join("");
+      }
       c.scrollTop = c.scrollHeight;
-      if (!$("chatView").classList.contains("hidden")) {
+
+      if (currentTab === 'messages' && !$("chatView").classList.contains("hidden") && curChat === otherId) {
         markChatSeen(otherId);
         updateChatBadge();
       }
-    } catch (e) { c.innerHTML = '<p style="color:var(--danger);text-align:center;font-size:11px;">Ошибка сети</p>'; }
+    } catch (e) {
+      if (requestSeq !== chatLoadSeq) return;
+      console.error("Ошибка загрузки сообщений:", e);
+      c.textContent = "Не удалось загрузить сообщения. Попробуйте ещё раз.";
+    }
   }
 
   $("chatForm").onsubmit = async (e) => {
     e.preventDefault();
+    if (isChatSubmitting) return;
     const text = $("chatInput").value.trim();
-    if (!text || !curChat) return;
-    
-    const mod = await moderateText(text, "chat");
-    if (mod.status === "rejected") return alert("ИИ модерация: " + mod.reason);
+    const recipientId = curChat;
+    if (!text || !recipientId || currentTab !== 'messages') return;
 
-    let c = $("chatMessages");
-    if (c.innerHTML.includes('История сообщений пуста')) c.innerHTML = '';
-    const tempId = 'temp-' + Date.now();
-    c.innerHTML += `<div id="${tempId}" style="align-self:flex-end;background:var(--gradient-violet);color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;word-break:break-word;opacity:0.7;">${esc(text)}</div>`;
-    c.scrollTop = c.scrollHeight;
-    $("chatInput").value = "";
+    isChatSubmitting = true;
+    const submitBtn = $("chatForm").querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    let tempId = null;
 
-    const res = await sb.from("messages").insert({ sender_id: user.id, receiver_id: curChat, text: text });
-    if (res.error) {
-      alert("Не удалось отправить: " + res.error.message);
-      const t = document.getElementById(tempId); if (t) t.remove();
-    } else {
-      loadChatMessages(curChat);
+    try {
+      const mod = await moderateText(text, "chat");
+      if (mod.status === "rejected") {
+        alert("ИИ-модерация: " + mod.reason);
+        return;
+      }
+      if (mod.status === "pending") {
+        alert("Сообщение требует дополнительной проверки и пока не отправлено.");
+        return;
+      }
+      if (currentTab !== 'messages' || curChat !== recipientId) return;
+
+      const c = $("chatMessages");
+      if (c.textContent.includes('История пуста')) c.textContent = '';
+      tempId = 'temp-' + makeUniqueFileSuffix();
+      const tempMessage = document.createElement('div');
+      tempMessage.id = tempId;
+      tempMessage.style.cssText = 'align-self:flex-end;background:var(--gradient-violet);color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;opacity:0.7;word-break:break-word;';
+      tempMessage.textContent = text;
+      c.appendChild(tempMessage);
+      c.scrollTop = c.scrollHeight;
+
+      const { error } = await sb.from("messages").insert({ sender_id: user.id, receiver_id: recipientId, text });
+      if (error) throw error;
+      $("chatInput").value = "";
+      if (curChat === recipientId && currentTab === 'messages') await loadChatMessages(recipientId);
+    } catch (err) {
+      const temp = tempId ? document.getElementById(tempId) : null;
+      if (temp) temp.remove();
+      if (!$("chatInput").value) $("chatInput").value = text;
+      alert("Не удалось отправить сообщение: " + err.message);
+    } finally {
+      isChatSubmitting = false;
+      if (submitBtn) submitBtn.disabled = false;
     }
   };
 
-  window.handleEventBtn = async function(id, type, max) {
+  window.handleEventBtn = async function(id) {
     if (!user) return openModal('authModal');
-    let ev = listings.find(l => l.id === id);
-    if (!ev) return alert("Мероприятие не найдено");
-    const already = regs.find(r => r.event_id===id && r.user_id===user.id && r.status!=='rejected');
+    const ev = listings.find(l => l.id === id);
+    if (!ev || !ev.is_event) return alert("Мероприятие не найдено.");
+    if (ev.user_id === user.id) return notice("Нельзя записаться на собственное мероприятие.");
+    const already = regs.find(r => r.event_id === id && r.user_id === user.id && r.status !== 'rejected');
     if (already) return notice("Вы уже подали заявку на это мероприятие.");
 
-    let status = (type === 'open' || type === 'limited') ? 'confirmed' : 'pending';
-    const { data, error } = await sb.from("event_registrations").insert({ event_id: id, user_id: user.id, status }).select().single();
-    if (error) return notice(error.message);
+    // Не доверяем type/max из DOM: берём настройки из записи мероприятия.
+    const eventType = ["open", "request", "limited"].includes(ev.event_type) ? ev.event_type : "request";
+    const maxSeats = Math.max(0, Number(ev.max_seats) || 0);
+    try {
+      if (eventType === "limited" && maxSeats > 0) {
+        // This refresh is a user-friendly precheck only. A database trigger/RPC must
+        // re-check capacity atomically to prevent two users taking the last seat.
+        const { data: occupancyRow, error: occupancyError } = await sb
+          .from("event_occupancy").select("taken").eq("event_id", id).maybeSingle();
+        if (occupancyError) throw occupancyError;
+        const taken = Math.max(0, Number(occupancyRow?.taken) || 0);
+        if (taken >= maxSeats) return alert("Свободных мест больше нет.");
+      }
 
-    regs.push(data);
-    if (status === 'pending') {
-      window.startChat(ev.user_id, ev.title, `Здравствуйте! Я хочу участвовать в мероприятии "${ev.title}". Моя заявка на рассмотрении.`);
-      notice("Заявка отправлена! Напишите организатору в чат.");
-    } else {
-      notice("Вы записаны! 🎉");
+      const status = eventType === 'request' ? 'pending' : 'confirmed';
+      const { data, error } = await sb.from("event_registrations")
+        .insert({ event_id: id, user_id: user.id, status }).select().single();
+      if (error) throw error;
+      if (data) regs.push(data);
+
+      if (status === 'pending') {
+        window.startChat(ev.user_id, ev.title, `Здравствуйте! Я хочу участвовать в мероприятии «${ev.title}». Заявка на рассмотрении.`);
+        notice("Заявка отправлена организатору на рассмотрение.");
+      } else {
+        notice("Вы записаны! 🎉");
+      }
+      await loadAll();
+    } catch (err) {
+      alert(err.message || "Не удалось записаться на мероприятие.");
     }
-    renderListings();
   };
 
   window.confirmReg = async function(regId, evId, action) {
-    let status = action === 'approve' ? 'confirmed' : 'rejected';
-    const { error } = await sb.from("event_registrations").update({ status: status }).eq("id", regId);
-    if(error) return alert(error.message);
-    const idx = regs.findIndex(r => r.id === regId);
-    if (idx !== -1) regs[idx].status = status;
-    alert(action === 'approve' ? "Заявка одобрена!" : "Заявка отклонена");
-    renderProfile();
+    if (!user || profile?.role !== 'school_admin') {
+      alert("Недостаточно прав для обработки заявок.");
+      return;
+    }
+    if (!["approve", "reject"].includes(action)) return;
+    const ownsEvent = listings.some(l => l.id === evId && l.user_id === user.id && l.is_event);
+    if (!ownsEvent) {
+      alert("Это мероприятие не принадлежит вашему аккаунту.");
+      return;
+    }
+    try {
+      const status = action === 'approve' ? 'confirmed' : 'rejected';
+      const { data, error } = await sb.from("event_registrations")
+        .update({ status }).eq("id", regId).eq("event_id", evId).select("id, status");
+      if (error) throw error;
+      if (!data || data.length !== 1) {
+        alert("Заявка не изменена: возможно, она уже обработана или нет прав.");
+        return;
+      }
+      const idx = regs.findIndex(r => r.id === regId);
+      if (idx !== -1) regs[idx].status = status;
+      alert(action === 'approve' ? "Заявка одобрена!" : "Заявка отклонена.");
+      await renderProfile();
+    } catch (err) { alert(err.message); }
   };
 
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     const clearBtn = $("clearMyIdeasBtn");
     if (clearBtn) clearBtn.style.display = mine.length > 0 ? 'inline-flex' : 'none';
-
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
       let st = (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'На рассмотрении')));
       let cls = (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
-      
-      let waitMsg = cls === 'status-new' ? `<div style="font-size:10px; color:#F0C14B; margin-top:6px; font-weight:700;">⏳ Ожидает решения Ученического совета</div>` : '';
-
-      return `<div class="idea-card" style="${cls === 'status-new' ? 'border-color: rgba(240,193,75,0.3); background: rgba(240,193,75,0.03);' : ''}">
+      let waitMsg = cls === 'status-new' ? `<div style="font-size:10px; color:#F0C14B; margin-top:6px; font-weight:700;">⏳ Ожидает решения Совета</div>` : '';
+      return `<div class="idea-card" style="${cls === 'status-new' ? 'border-color: rgba(240,193,75,0.3);' : ''}">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:flex-start;gap:10px;">
-          <b style="font-size:12px; line-height:1.3;">${esc(i.text)}</b>
-          <span class="idea-status ${cls}">${st}</span>
-        </div>
-        ${waitMsg}
-      </div>`;
+          <b style="font-size:12px;">${esc(i.text)}</b><span class="idea-status ${cls}">${st}</span>
+        </div>${waitMsg}</div>`;
     }).join("") : '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Вы еще не предлагали идей.</p>';
   }
 
@@ -1210,12 +1144,21 @@
   }
 
   window.updateIdea = async function(id, status) {
-    const { error } = await sb.from("ideas").update({ admin_status: status }).eq("id", id);
-    if (error) return alert("Ошибка при сохранении: " + error.message);
-    const idx = ideas.findIndex(i => i.id === id);
-    if (idx !== -1) ideas[idx].admin_status = status;
-    renderIdeaFolderContent();
-    updateIdeaCounters();
+    if (!user || profile?.role !== 'school_admin') {
+      alert("Недостаточно прав для изменения идей.");
+      return;
+    }
+    if (!["in_progress", "done", "rejected"].includes(status)) return;
+    try {
+      const { data, error } = await sb.from("ideas").update({ admin_status: status })
+        .eq("id", id).eq("school_id", profile.school_id).select();
+      if (error) throw error;
+      if (!data || data.length === 0) { alert("Нет прав для изменения этой идеи."); return; }
+      const idx = ideas.findIndex(i => i.id === id);
+      if (idx !== -1) ideas[idx].admin_status = status;
+      renderIdeaFolderContent();
+      updateIdeaCounters();
+    } catch(e) { alert(e.message); }
   };
 
   window.switchIdeaFolder = function(folder) {
@@ -1233,29 +1176,17 @@
     else if (currentIdeaFolder === 'work') filtered = ideas.filter(i => i.admin_status === 'in_progress');
     else if (currentIdeaFolder === 'done') filtered = ideas.filter(i => i.admin_status === 'done');
     else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.admin_status === 'rejected');
-
-    if (filtered.length === 0) {
-      content.innerHTML = '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">В этой папке пока пусто</p>';
-      return;
-    }
-
+    if (filtered.length === 0) { content.innerHTML = '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">В этой папке пока пусто</p>'; return; }
     const showClear = ['work','done','rejected'].includes(currentIdeaFolder);
     const names = { work: 'в работе', done: 'выполненные', rejected: 'отклонённые' };
     let html = '';
-    if (showClear) html += `<div class="clear-btn-wrapper"><button class="clear-folder-btn" data-action="clear-folder" data-folder="${currentIdeaFolder}"><span class="icon">🗑</span>Очистить ${names[currentIdeaFolder]} (${filtered.length})</button></div>`;
-
+    if (showClear) html += `<div class="clear-btn-wrapper"><button class="clear-folder-btn" data-action="clear-folder" data-folder="${currentIdeaFolder}">🗑 Очистить ${names[currentIdeaFolder]} (${filtered.length})</button></div>`;
     html += filtered.map(i => {
       let buttons = '';
       if (currentIdeaFolder === 'new') {
-        buttons = `<div style="display:flex;gap:6px;margin-top:8px;">
-          <button class="button button-success button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="in_progress">В работу</button>
-          <button class="button button-danger button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="rejected">Отклонить</button>
-        </div>`;
+        buttons = `<div style="display:flex;gap:6px;margin-top:8px;"><button class="button button-success button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="in_progress">В работу</button><button class="button button-danger button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="rejected">Отклонить</button></div>`;
       } else if (currentIdeaFolder === 'work') {
-        buttons = `<div style="display:flex;gap:6px;margin-top:8px;">
-          <button class="button button-success button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="done">Готово</button>
-          <button class="button button-danger button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="rejected">Отклонить</button>
-        </div>`;
+        buttons = `<div style="display:flex;gap:6px;margin-top:8px;"><button class="button button-success button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="done">Готово</button><button class="button button-danger button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="rejected">Отклонить</button></div>`;
       }
       return `<div class="idea-card"><div style="font-size:12px;margin-bottom:4px;">${esc(i.text)}</div>${buttons}</div>`;
     }).join("");
@@ -1264,42 +1195,18 @@
 
   async function batchDeleteIdeas(toDelete, successMessage, btnElement) {
     if (!user || !user.id || toDelete.length === 0) return;
-    if (!confirm('🗑 ' + successMessage + ' (' + toDelete.length + ' шт.)?\n\nЭто действие нельзя отменить.')) return;
-
-    if (btnElement) {
-      btnElement.disabled = true;
-      if (btnElement.classList.contains('clear-folder-btn')) btnElement.classList.add('loading');
-      else btnElement.textContent = "Удаление...";
-    }
-
-    const container = btnElement && btnElement.id === 'clearMyIdeasBtn'
-      ? document.querySelectorAll('#myIdeasList .idea-card')
-      : document.querySelectorAll('#ideaFolderContent .idea-card');
-    container.forEach((card, i) => setTimeout(() => card.classList.add('deleting'), i * 50));
-    await new Promise(r => setTimeout(r, Math.min(toDelete.length * 50 + 500, 1500)));
-
+    if (!confirm('🗑 ' + successMessage + ' (' + toDelete.length + ' шт.)?')) return;
+    if (btnElement) btnElement.disabled = true;
     try {
       const ids = toDelete.map(i => i.id);
       const { error } = await sb.from("ideas").delete().in("id", ids);
-      if (error) {
-        alert("Ошибка при удалении: " + error.message);
-      } else {
-        notice('✅ ' + successMessage);
-        const delSet = new Set(ids);
-        ideas = ideas.filter(i => !delSet.has(i.id));
-        renderIdeas();
-        renderIdeaFolderContent();
-        updateIdeaCounters();
-      }
-    } catch (e) {
-      alert("Ошибка при удалении: " + e.message);
-    } finally {
-      if (btnElement) {
-        btnElement.disabled = false;
-        if (btnElement.classList.contains('clear-folder-btn')) btnElement.classList.remove('loading');
-        else btnElement.textContent = "🗑 Очистить все";
-      }
-    }
+      if (error) throw error;
+      notice('✅ ' + successMessage);
+      const delSet = new Set(ids);
+      ideas = ideas.filter(i => !delSet.has(i.id));
+      renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
+    } catch(e) { alert(e.message); }
+    finally { if (btnElement) btnElement.disabled = false; }
   }
 
   window.clearMyIdeas = async () => {
@@ -1307,47 +1214,51 @@
     const mine = ideas.filter(i => i.user_id === user.id);
     await batchDeleteIdeas(mine, 'Удалено ' + mine.length + ' идей', $("clearMyIdeasBtn"));
   };
-
   window.clearFolderIdeas = async (folder) => {
+    if (!user || profile?.role !== 'school_admin') return alert("Недостаточно прав.");
     const names = { work: 'В работе', done: 'Выполненные', rejected: 'Отклонённые' };
-    const filtered = ideas.filter(i =>
-      folder === 'work' ? i.admin_status === 'in_progress' :
-      folder === 'done' ? i.admin_status === 'done' :
-      i.admin_status === 'rejected'
-    );
+    if (!Object.prototype.hasOwnProperty.call(names, folder)) return;
+    const filtered = ideas.filter(i => folder === 'work' ? i.admin_status === 'in_progress' : folder === 'done' ? i.admin_status === 'done' : i.admin_status === 'rejected');
     await batchDeleteIdeas(filtered, 'Удалено из "' + names[folder] + '"', document.querySelector('.clear-folder-btn'));
   };
 
   $("ideaForm").onsubmit = async e => {
     e.preventDefault();
     if(!user) return openModal('authModal');
-    
-    if (isAiDown) {
-      return alert("⚠️ Технические работы\n\nСервис проверки идей временно недоступен. Попробуйте позже.");
-    }
-
     let txt = $("ideaText").value.trim();
     let btn = $("ideaSubmitBtn");
+    if (btn.disabled) return;
     btn.disabled = true;
     showAIThinking('ideaThinkingArea', 'ИИ проверяет');
 
-    const mod = await moderateText(txt, "idea");
-    hideAIThinking('ideaThinkingArea');
+    try {
+      const mod = await moderateText(txt, "idea");
+      hideAIThinking('ideaThinkingArea');
 
-    if (mod.status === "rejected") {
-      $("ideaText").value = ""; btn.disabled = false;
-      return notice("🤖 " + mod.reason + "\n\nИдея не отправлена.");
+      if (mod.status === "rejected") {
+        $("ideaText").value = "";
+        return notice("🤖 " + mod.reason + "\n\nИдея не отправлена.");
+      }
+
+      // pending для идей — сохраняем со статусом new (всё равно идёт на проверку Совету)
+      const aiStatus = mod.status === "pending" ? "pending" : "approved";
+
+      const { data, error } = await sb.from("ideas").insert({
+        user_id: user.id, school_id: profile?.school_id, text: txt,
+        ai_status: aiStatus, ai_summary: txt.slice(0,60), admin_status: 'new'
+      }).select().single();
+      if (error) throw error;
+      if (data) ideas.unshift(data);
+
+      $("ideaText").value = "";
+      notice(mod.status === "pending" ? "Идея отправлена на дополнительную проверку." : "Идея отправлена Совету!");
+      renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
+    } catch(err) {
+      hideAIThinking('ideaThinkingArea');
+      notice("Ошибка: " + err.message);
+    } finally {
+      btn.disabled = false;
     }
-
-    const { data, error } = await sb.from("ideas").insert({ user_id: user.id, school_id: profile?.school_id, text: txt, ai_status: "approved", ai_summary: txt.slice(0,60), admin_status: 'new' }).select().single();
-    if (error) { btn.disabled = false; return notice("Ошибка: " + error.message); }
-    if (data) ideas.unshift(data);
-
-    $("ideaText").value = ""; btn.disabled = false;
-    notice("Идея успешно отправлена Ученическому совету!");
-    renderIdeas();
-    renderIdeaFolderContent();
-    updateIdeaCounters();
   };
 
   async function renderProfile() {
@@ -1370,25 +1281,19 @@
 
     if (profile && profile.role === 'school_admin') {
       $("adminIdeasDash").classList.remove("hidden");
-      updateIdeaCounters();
-      renderIdeaFolderContent();
-
+      updateIdeaCounters(); renderIdeaFolderContent();
       $("adminRequests").classList.remove("hidden");
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
       if (myEvs.length > 0) {
-        const res = await sb.from("event_registrations").select("*, profiles(email)").in("event_id", myEvs).eq("status", "pending");
-        let pending = res.error ? [] : (res.data || []);
-        $("adminReqList").innerHTML = pending.length ? pending.map(r => {
-          let ev = listings.find(l => l.id === r.event_id);
-          return `<div class="idea-card">
-            <b style="font-size:12px;">${esc(ev?.title || 'Мероприятие')}</b>
-            <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${esc(r.profiles?.email || (r.user_id || '').slice(0,8))}</div>
-            <div style="display:flex; gap:6px;">
-              <button class="button button-success button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="approve">Одобрить</button>
-              <button class="button button-danger button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="reject">Отклонить</button>
-            </div>
-          </div>`;
-        }).join("") : '<p style="color:var(--muted);font-size:11px;">Нет новых заявок.</p>';
+        try {
+          const res = await sb.from("event_registrations").select("*, profiles(email)").in("event_id", myEvs).eq("status", "pending");
+          if (res.error) throw res.error;
+          let pending = res.data || [];
+          $("adminReqList").innerHTML = pending.length ? pending.map(r => {
+            let ev = listings.find(l => l.id === r.event_id);
+            return `<div class="idea-card"><b style="font-size:12px;">${esc(ev?.title || 'Мероприятие')}</b><div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${esc(r.profiles?.email || (r.user_id || '').slice(0,8))}</div><div style="display:flex; gap:6px;"><button class="button button-success button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="approve">Одобрить</button><button class="button button-danger button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="reject">Отклонить</button></div></div>`;
+          }).join("") : '<p style="color:var(--muted);font-size:11px;">Нет новых заявок.</p>';
+        } catch(e) { $("adminReqList").innerHTML = '<p style="color:var(--danger);font-size:11px;">Ошибка загрузки</p>'; }
       } else {
         $("adminReqList").innerHTML = '<p style="color:var(--muted);font-size:11px;">Создайте мероприятие, чтобы получать заявки.</p>';
       }
@@ -1399,15 +1304,31 @@
   }
 
   $("avatarInput").onchange = async (e) => {
-    const file = e.target.files[0]; if (!file || !user) return;
-    const fileName = `avatar_${user.id}.jpg`;
-    const { error } = await sb.storage.from('listings-images').upload(fileName, file, { upsert: true });
-    if (error) return alert("Ошибка: " + error.message);
-    const { data } = sb.storage.from('listings-images').getPublicUrl(fileName);
-    await sb.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", user.id);
-    if (profile) profile.avatar_url = data.publicUrl;
-    updateAuthUI();
-    renderProfile();
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    try {
+      const extension = getImageExtension(file);
+      const fileName = `avatar_${user.id}.${extension}`;
+      const { error: uploadError } = await sb.storage.from('listings-images').upload(fileName, file, {
+        upsert: true,
+        contentType: file.type,
+        cacheControl: '3600'
+      });
+      if (uploadError) throw uploadError;
+
+      const { data } = sb.storage.from('listings-images').getPublicUrl(fileName);
+      const { data: updatedProfile, error: profileError } = await sb.from("profiles")
+        .update({ avatar_url: data.publicUrl }).eq("id", user.id).select("avatar_url").maybeSingle();
+      if (profileError) throw profileError;
+      if (!updatedProfile) throw new Error("Профиль не обновлён. Проверьте права доступа.");
+      if (profile) profile.avatar_url = updatedProfile.avatar_url;
+      updateAuthUI();
+      await renderProfile();
+    } catch (err) {
+      alert("Ошибка загрузки аватара: " + err.message);
+    } finally {
+      e.target.value = "";
+    }
   };
 
   $("switchAuthBtn").onclick = () => {
@@ -1427,37 +1348,34 @@
     let email = $("authEmail").value, pass = $("authPassword").value;
     let isReg = $("authTitle").textContent === "Регистрация";
     let school = $("authSchool").value;
-    let res;
-
-    if (isReg) {
-      res = await sb.auth.signUp({ email: email, password: pass, options: { data: { school_id: school } } });
-      if (res.error) {
-        $("authMsg").textContent = res.error.message;
-        return;
+    try {
+      let res;
+      if (isReg) {
+        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school } } });
+        if (res.error) throw res.error;
+        if (!res.data.session) {
+          closeModal('authModal');
+          alert("Регистрация успешна! Проверьте почту для подтверждения.");
+          return;
+        }
+        const { error: profileInsertError } = await sb.from("profiles").upsert({ id: res.data.user.id, school_id: school, role: 'student' });
+        if (profileInsertError) throw profileInsertError;
+      } else {
+        res = await sb.auth.signInWithPassword({ email, password: pass });
+        if (res.error) throw res.error;
+        const { data: pd } = await sb.from("profiles").select("*").eq("id", res.data.user.id).maybeSingle();
+        if (!pd) {
+          const { error: profileInsertError } = await sb.from("profiles").upsert({ id: res.data.user.id, school_id: 'Не указана', role: 'student' });
+          if (profileInsertError) throw profileInsertError;
+        }
       }
-      if (!res.data.session) {
-        closeModal('authModal');
-        alert("Регистрация успешна! Проверьте почту для подтверждения. После подтверждения войдите в аккаунт (профиль создастся автоматически).");
-        return;
-      }
-      const { error: pErr } = await sb.from("profiles").upsert({ id: res.data.user.id, school_id: school, role: 'student' });
-      if (pErr) console.error("Profile upsert error:", pErr);
-    } else {
-      res = await sb.auth.signInWithPassword({ email: email, password: pass });
-      if (res.error) {
-        $("authMsg").textContent = res.error.message;
-        $("authPassword").value = "";
-        return;
-      }
-      const { data: profileData } = await sb.from("profiles").select("*").eq("id", res.data.user.id).maybeSingle();
-      if (!profileData) {
-        await sb.from("profiles").upsert({ id: res.data.user.id, school_id: 'Не указана', role: 'student' });
-      }
+      closeModal('authModal');
+      if (isReg) alert("✅ Регистрация успешна!");
+      location.reload();
+    } catch(err) {
+      $("authMsg").textContent = err.message;
+      $("authPassword").value = "";
     }
-
-    closeModal('authModal');
-    if (isReg) alert("✅ Регистрация прошла успешно!");
-    location.reload();
   };
 
   function positionIndicator(squish) {
@@ -1468,13 +1386,11 @@
     ind.classList.remove("idle");
     const barRect = $("tabbar").getBoundingClientRect();
     const icoRect = active.getBoundingClientRect();
-    const x = icoRect.left - barRect.left + (icoRect.width  - ind.offsetWidth)  / 2;
-    const y = icoRect.top  - barRect.top  + (icoRect.height - ind.offsetHeight) / 2;
+    const x = icoRect.left - barRect.left + (icoRect.width - ind.offsetWidth) / 2;
+    const y = icoRect.top - barRect.top + (icoRect.height - ind.offsetHeight) / 2;
     ind.style.transform = `translate(${x}px, ${y}px)`;
     if (squish && !wasIdle) {
-      ind.classList.remove("moving");
-      void ind.offsetWidth;
-      ind.classList.add("moving");
+      ind.classList.remove("moving"); void ind.offsetWidth; ind.classList.add("moving");
     }
   }
   window.addEventListener("resize", () => positionIndicator(false));
@@ -1482,59 +1398,87 @@
   const TAB_ORDER = ['board', 'messages', 'favorites', 'profile'];
 
   function showTab(name, forceNoAnim = false) {
+    if (!TAB_ORDER.includes(name)) return;
     if (name === currentTab) { positionIndicator(true); return; }
-    const dir = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(currentTab) ? 1 : -1;
-    previousTab = currentTab;
-    currentTab = name;
 
+    if (tabTransitionTimer) {
+      clearTimeout(tabTransitionTimer);
+      tabTransitionTimer = null;
+    }
+
+    const fromName = currentTab;
+    const fromSection = $(fromName + 'Section');
+    const toSection = $(name + 'Section');
+    const mainEl = $("mainContent");
+    const dir = TAB_ORDER.indexOf(name) > TAB_ORDER.indexOf(fromName) ? 1 : -1;
+
+    // Normalize any interrupted transition before starting a new one.
+    document.querySelectorAll("main > section").forEach(section => {
+      section.classList.add("hidden");
+      section.classList.remove("page-out-left", "page-out-right", "page-in-left", "page-in-right");
+      section.style.position = "";
+      section.style.inset = "";
+      section.style.width = "";
+      section.style.pointerEvents = "";
+    });
+    mainEl.style.minHeight = "";
+    mainEl.style.overflow = "";
+
+    previousTab = fromName;
+    currentTab = name;
     document.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     positionIndicator(true);
 
-    const oldSec = $(previousTab + 'Section');
-    const newSec = $(name + 'Section');
-    const mainEl = $("mainContent");
-
-    if (!forceNoAnim && oldSec && newSec) {
-      const oldH = oldSec.offsetHeight;
-      mainEl.style.minHeight = oldH + 'px';
-      mainEl.style.overflow  = 'hidden';
-
-      oldSec.style.position = 'absolute';
-      oldSec.style.inset = '0';
-      oldSec.style.width = '100%';
-      oldSec.style.pointerEvents = 'none';
-
-      oldSec.classList.add(dir > 0 ? 'page-out-left' : 'page-out-right');
-      newSec.classList.remove('hidden');
-      newSec.classList.add(dir > 0 ? 'page-in-right' : 'page-in-left');
-
-      setTimeout(() => {
-        oldSec.classList.add('hidden');
-        oldSec.style.position = '';
-        oldSec.style.inset = '';
-        oldSec.style.width = '';
-        oldSec.style.pointerEvents = '';
-        oldSec.classList.remove('page-out-left', 'page-out-right');
-        newSec.classList.remove('page-in-right', 'page-in-left');
+    if (!forceNoAnim && fromSection && toSection) {
+      fromSection.classList.remove("hidden");
+      const oldHeight = fromSection.offsetHeight;
+      mainEl.style.minHeight = oldHeight + 'px';
+      mainEl.style.overflow = 'hidden';
+      fromSection.style.position = 'absolute';
+      fromSection.style.inset = '0';
+      fromSection.style.width = '100%';
+      fromSection.style.pointerEvents = 'none';
+      fromSection.classList.add(dir > 0 ? 'page-out-left' : 'page-out-right');
+      toSection.classList.remove('hidden');
+      toSection.classList.add(dir > 0 ? 'page-in-right' : 'page-in-left');
+      tabTransitionTimer = setTimeout(() => {
+        fromSection.classList.add('hidden');
+        fromSection.style.position = '';
+        fromSection.style.inset = '';
+        fromSection.style.width = '';
+        fromSection.style.pointerEvents = '';
+        fromSection.classList.remove('page-out-left', 'page-out-right');
+        toSection.classList.remove('page-in-right', 'page-in-left');
         mainEl.style.minHeight = '';
-        mainEl.style.overflow  = '';
+        mainEl.style.overflow = '';
+        tabTransitionTimer = null;
       }, 430);
     } else {
-      document.querySelectorAll("main > section").forEach(s => s.classList.add("hidden"));
-      newSec.classList.remove('hidden');
+      toSection.classList.remove('hidden');
     }
 
+    if (name !== 'messages') {
+      stopChatSession(true);
+    } else {
+      loadDialogsList();
+    }
+
+    if (name !== 'board') stopHeroTimer();
+    else startHeroTimer();
+
     if (name === 'profile') {
-      // ПРИНУДИТЕЛЬНАЯ ЗАГРУЗКА ИДЕЙ ПРИ ОТКРЫТИИ ПРОФИЛЯ
       if (user) {
-        sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false }).then(res => {
+        const ideasQuery = profile?.role === 'school_admin'
+          ? sb.from("ideas").select("*").eq('school_id', profile.school_id).order("created_at", { ascending: false })
+          : sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
+        ideasQuery.then(res => {
           if (!res.error) {
             ideas = res.data || [];
             renderIdeas();
             renderIdeaFolderContent();
             updateIdeaCounters();
           } else {
-            console.error("❌ Ошибка загрузки идей в профиле:", res.error.message);
+            console.error("Ошибка загрузки идей в профиле:", res.error);
           }
         });
       }
@@ -1542,10 +1486,6 @@
     }
     if (name === 'board') loadAll();
     if (name === 'favorites') renderFavorites();
-    if (name === 'messages') {
-      clearChatBadge();
-      loadDialogsList();
-    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1563,7 +1503,15 @@
     else if (action === 'open-auth') { e.preventDefault(); openModal('authModal'); }
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
-    else if (action === 'close-notif') { window.closeNotifPanel(); }
+    else if (action === 'close-notif') { closeNotifPanel(); }
+    else if (action === 'select-hint-category') {
+      const category = btn.dataset.category;
+      if (["Вещи", "Услуги", "Учёба", "Мероприятия"].includes(category)) {
+        $("lCat").value = category;
+        $("eventFields").classList.toggle("hidden", category !== "Мероприятия");
+        updateHints();
+      }
+    }
     else if (action === 'reset-search') {
       curCat = "Все";
       document.querySelectorAll(".cat-tile").forEach(x => x.classList.remove('active'));
@@ -1585,22 +1533,15 @@
       $("listingsGrid").scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     else if (action === 'open-listing') {
-      if (isAiDown) {
-        alert("⚠️ Технические работы\n\nСоздание объявлений временно приостановлено, так как ИИ-модерация недоступна.");
-      } else {
-        if (user) openModal('listingModal'); else openModal('authModal');
-      }
+      if (user) openModal('listingModal'); else openModal('authModal');
     }
     else if (action === 'toggle-fav') { toggleFavoriteAction(btn.dataset.id); }
     else if (action === 'cancel-reg') { cancelRegAction(btn.dataset.id); }
     else if (action === 'start-chat') { window.startChat(btn.dataset.userId, btn.dataset.title); }
     else if (action === 'open-dialog') { window.startChat(btn.dataset.userId, "Диалог"); }
-    else if (action === 'handle-event') { window.handleEventBtn(btn.dataset.id, btn.dataset.type, parseInt(btn.dataset.max)); }
+    else if (action === 'handle-event') { window.handleEventBtn(btn.dataset.id); }
     else if (action === 'chat-back') {
-      $("chatView").classList.add("hidden");
-      $("dialogsList").classList.remove("hidden");
-      if(chatInterval) clearInterval(chatInterval);
-      curChat = null;
+      stopChatSession(true);
       loadDialogsList();
     }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
@@ -1610,7 +1551,14 @@
     else if (action === 'logout') {
       btn.disabled = true;
       btn.textContent = "Выход...";
-      sb.auth.signOut().then(() => location.reload());
+      sb.auth.signOut().then(({ error }) => {
+        if (error) throw error;
+        location.reload();
+      }).catch(err => {
+        btn.disabled = false;
+        btn.textContent = "Выйти";
+        alert("Не удалось выйти: " + err.message);
+      });
     }
   });
 
@@ -1619,7 +1567,6 @@
     if (e.target.closest('.tabbar, .modal, input, textarea, select, .hero, .form-control, .notif-panel')) return;
     tX = e.touches[0].clientX; tY = e.touches[0].clientY;
   }, { passive: true });
-
   document.addEventListener('touchend', e => {
     if (tX === null) return;
     const dx = e.changedTouches[0].clientX - tX, dy = e.changedTouches[0].clientY - tY; tX = null;
@@ -1631,13 +1578,8 @@
 
   document.querySelectorAll(".cat-tile").forEach(t => t.onclick = () => {
     const cat = t.dataset.cat;
-    if (curCat === cat) {
-      curCat = "Все";
-      t.classList.remove('active');
-    } else {
-      curCat = cat;
-      document.querySelectorAll(".cat-tile").forEach(x => x.classList.toggle('active', x.dataset.cat === cat));
-    }
+    if (curCat === cat) { curCat = "Все"; t.classList.remove('active'); }
+    else { curCat = cat; document.querySelectorAll(".cat-tile").forEach(x => x.classList.toggle('active', x.dataset.cat === cat)); }
     renderListings();
   });
 
@@ -1647,85 +1589,111 @@
 
   $("searchInput").addEventListener('input', debounce(() => { renderListings(); }, 300));
 
-  $("lCat").onchange = function() {
-    $("eventFields").classList.toggle("hidden", this.value !== "Мероприятия");
-  };
+  $("lCat").onchange = function() { $("eventFields").classList.toggle("hidden", this.value !== "Мероприятия"); };
   document.querySelectorAll('input[name="evType"]').forEach(r => r.onchange = function() {
     $("seatsGroup").classList.toggle("hidden", this.value !== "limited");
   });
 
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
-    
-    if (isAiDown) {
-      return alert("⚠️ Технические работы\n\nСоздание объявлений временно недоступно. Попробуйте позже.");
-    }
-
-    const combinedText = $("lTitle").value + " " + $("lDesc").value;
-    const uploadStatus = $("uploadStatus");
-    
-    // ЖЕСТКАЯ БЛОКИРОВКА (Если ИИ сказал reject)
-    const mod = await moderateText(combinedText, "listing");
-    if (mod.status === "rejected") return alert("🤖 ИИ: " + mod.reason);
-
+    // ═══ ЗАЩИТА ОТ ДВОЙНОЙ ОТПРАВКИ ═══
+    if (isListingSubmitting) return;
+    isListingSubmitting = true;
+    let uploadedImagePath = null;
     let btn = e.target.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = "Публикация...";
+    btn.disabled = true; btn.textContent = "Проверка...";
 
-    let isEv = $("lCat").value === "Мероприятия";
-    let type = document.querySelector('input[name="evType"]:checked')?.value || 'open';
-    let imageUrl = null;
+    try {
+      const combinedText = $("lTitle").value + " " + $("lDesc").value;
+      const uploadStatus = $("uploadStatus");
 
-    const file = $("lImage").files[0];
-    if (file) {
-      uploadStatus.innerHTML = '<div class="upload-status">Загрузка фото...</div>';
-      const fileName = Date.now() + '-' + Math.random().toString(36).substring(7) + '.jpg';
-      const { error } = await sb.storage.from('listings-images').upload(fileName, file, { cacheControl: '3600', upsert: false });
-      if (error) {
-        uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
-        btn.disabled = false; btn.textContent = "Опубликовать";
-        return alert("Не удалось загрузить фото: " + error.message + "\n\nПроверьте bucket 'listings-images' в Supabase Storage (должен быть Public и разрешены policy на INSERT).");
+      const mod = await moderateText(combinedText, "listing");
+      if (mod.status === "rejected") {
+        alert("🤖 ИИ: " + mod.reason);
+        return;
       }
-      imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
-      uploadStatus.innerHTML = '<div class="upload-status success">✓ Фото загружено</div>';
-    }
 
-    // Если ИИ вернул pending, сохраняем как pending, иначе active
-    let statusToSet = mod.action === "pending" ? "pending" : "active";
+      btn.textContent = "Публикация...";
 
-    const { data, error } = await sb.from("listings").insert({
-      user_id: user.id, title: $("lTitle").value, description: $("lDesc").value,
-      category: $("lCat").value, price_text: $("lPrice").value || "Бесплатно",
-      image_url: imageUrl, status: statusToSet, is_event: isEv, school_id: profile?.school_id,
-      event_date: isEv ? $("evDate").value : null, event_time: isEv ? $("evTime").value : null,
-      event_type: isEv ? type : null, max_seats: (isEv && type === 'limited') ? parseInt($("evSeats").value) : 0
-    }).select().single();
+      let isEv = $("lCat").value === "Мероприятия";
+      let type = document.querySelector('input[name="evType"]:checked')?.value || 'open';
+      let imageUrl = null;
 
-    btn.disabled = false; btn.textContent = "Опубликовать";
-    if(error) {
-      uploadStatus.innerHTML = `<div class="upload-status error">Ошибка: ${error.message}</div>`;
-      return alert(error.message);
-    }
-    if (data && statusToSet === "active") listings.unshift(data);
-    
-    closeModal('listingModal');
-    $("listingForm").reset();
-    uploadStatus.innerHTML = '';
-    $("aiHints").innerHTML = "Начните вводить — ИИ подскажет категорию";
-    
-    if (statusToSet === "pending") {
-      alert("✅ Объявление отправлено на проверку ИИ и администратору.");
-    } else {
-      renderListings();
+      const file = $("lImage").files[0];
+      if (file) {
+        const extension = getImageExtension(file);
+        uploadStatus.textContent = '';
+        const st = document.createElement('div');
+        st.className = 'upload-status'; st.textContent = 'Загрузка фото...';
+        uploadStatus.appendChild(st);
+
+        const fileName = `listing_${user.id}_${makeUniqueFileSuffix()}.${extension}`;
+        const { error } = await sb.storage.from('listings-images').upload(fileName, file, {
+          cacheControl: '3600', upsert: false, contentType: file.type
+        });
+        if (error) throw new Error("Ошибка загрузки фото: " + error.message);
+        uploadedImagePath = fileName;
+        imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
+
+        uploadStatus.textContent = '';
+        const suc = document.createElement('div');
+        suc.className = 'upload-status success'; suc.textContent = '✓ Фото загружено';
+        uploadStatus.appendChild(suc);
+      }
+
+      // pending → объявление скрыто до проверки админом
+      let statusToSet = mod.status === "pending" ? "pending" : "active";
+
+      const { data, error } = await sb.from("listings").insert({
+        user_id: user.id, title: $("lTitle").value, description: $("lDesc").value,
+        category: $("lCat").value, price_text: $("lPrice").value || "Бесплатно",
+        image_url: imageUrl, status: statusToSet, is_event: isEv, school_id: profile?.school_id,
+        event_date: isEv ? $("evDate").value : null, event_time: isEv ? $("evTime").value : null,
+        event_type: isEv ? type : null, max_seats: (isEv && type === 'limited') ? parseInt($("evSeats").value) : 0
+      }).select().single();
+
+      if (error) throw error;
+      uploadedImagePath = null; // Storage object is now referenced by a saved listing.
+      if (data && statusToSet === "active") listings.unshift(data);
+
+      closeModal('listingModal');
+      $("listingForm").reset();
+      uploadStatus.innerHTML = '';
+      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
+
+      if (statusToSet === "pending") {
+        alert("✅ Объявление отправлено на дополнительную проверку.");
+      } else {
+        renderListings();
+      }
+    } catch (error) {
+      const uploadStatus = $("uploadStatus");
+      if (uploadStatus) {
+        uploadStatus.textContent = '';
+        const errDiv = document.createElement('div');
+        errDiv.className = 'upload-status error';
+        errDiv.textContent = 'Ошибка: ' + error.message;
+        uploadStatus.appendChild(errDiv);
+      }
+      if (uploadedImagePath) {
+        // Best-effort cleanup for a file uploaded before a failed database insert.
+        try {
+          const { error: removeError } = await sb.storage.from('listings-images').remove([uploadedImagePath]);
+          if (removeError) console.warn("Не удалось удалить неиспользуемое фото:", removeError.message);
+        } catch (cleanupError) {
+          console.warn("Не удалось удалить неиспользуемое фото:", cleanupError);
+        }
+      }
+      alert(error.message);
+    } finally {
+      isListingSubmitting = false;
+      btn.disabled = false; btn.textContent = "Опубликовать";
     }
   };
 
   $("fabBtn").onclick = (e) => {
     e.stopPropagation();
-    if (isAiDown) {
-      alert("⚠️ Технические работы\n\nСоздание объявлений временно приостановлено, так как ИИ-модерация недоступна. Вы можете продолжить общение в чате.");
-    } else {
-      if (user) openModal('listingModal'); else openModal('authModal');
-    }
+    if (user) openModal('listingModal'); else openModal('authModal');
   };
 
   sb.auth.getSession().then(res => {
@@ -1735,12 +1703,11 @@
   }).then(res => {
     if(res && res.data) profile = res.data;
     if (user) {
-      try { seenMap = JSON.parse(localStorage.getItem(`fam_chat_seen_map_${user.id}`) || '{}'); } catch(e) { seenMap = {}; }
+      try { seenMap = JSON.parse(safeLocalStorageGet(`fam_chat_seen_map_${user.id}`) || '{}'); } catch(e) { seenMap = {}; }
     }
     updateAuthUI();
     requestAnimationFrame(() => positionIndicator(false));
     setTimeout(() => positionIndicator(false), 100);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => positionIndicator(false));
     return loadAll();
   }).catch(err => {
     console.error("Auth error:", err);
