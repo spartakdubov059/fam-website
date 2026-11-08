@@ -142,8 +142,9 @@
     .pill-all { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 13px; }
     .pill-all svg { width: 15px; height: 15px; }
 
-    .l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; }
-    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 17px; padding: 8px; display: flex; flex-direction: column; min-width: 0; }
+    .l-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+    @media (min-width: 560px) { .l-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 15px; padding: 7px; display: flex; flex-direction: column; min-width: 0; }
     .l-imgwrap { position: relative; border-radius: 13px; overflow: hidden; aspect-ratio: 4/3; background: #101018; }
     .l-imgwrap img { width: 100%; height: 100%; object-fit: cover; }
     .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #23232e, #14141c); position: relative; }
@@ -341,18 +342,6 @@
       <button class="button button-primary" data-action="open-auth">Войти</button>
     </div>
     <div id="profileLoggedIn" class="hidden">
-      <div class="profile-box">
-        <div class="avatar-upload">
-          <div class="avatar-preview" id="avatarPreview">?</div>
-          <div style="flex:1; min-width:0;">
-            <h3 class="profile-email" id="profEmail"></h3>
-            <div id="profMeta" style="color:var(--muted); font-size:11px;"></div>
-          </div>
-          <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Фото</label>
-          <input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
-        </div>
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:8px 0 0;">Аватар доступен по публичной ссылке. Не используйте чужие фотографии, документы, пропуска или изображения с контактными данными.</p>
-      </div>
       <div id="schoolAdminAccess" class="profile-box hidden">
         <h3 style="font-size:14px; margin:0 0 8px;">Доступ к панели Ученического совета</h3>
         <p style="font-size:11px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
@@ -373,25 +362,34 @@
           Запросить доступ Совета
         </button>
       </div>
+      <div class="profile-box">
+        <div class="avatar-upload">
+          <div class="avatar-preview" id="avatarPreview">?</div>
+          <div style="flex:1; min-width:0;">
+            <h3 class="profile-email" id="profEmail"></h3>
+            <div id="profMeta" style="color:var(--muted); font-size:11px;"></div>
+          </div>
+          <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Фото</label>
+          <input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
+        </div>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:8px 0 0;">Аватар доступен по публичной ссылке. Не используйте чужие фотографии, документы, пропуска или изображения с контактными данными.</p>
+      </div>
+      
       <div id="userSafetyReports" class="profile-box hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <h3 style="font-size:14px;margin:0;">Безопасность участников</h3>
+          <h3 style="font-size:14px;margin:0;">Агент безопасности пользователей</h3>
           <button type="button" class="button button-secondary button-small" data-action="refresh-safety-reports">Обновить</button>
         </div>
         <p style="font-size:10px;line-height:1.5;color:var(--muted);margin:0 0 10px;">
-          Агент анализирует только сигналы из FAM: травлю, угрозы, личные негативные призывы и повторяющиеся нарушения. Отчёты не содержат текстов личных сообщений, имён и прямых ID участников. Серьёзные ситуации передавайте ответственному взрослому школы.
+          Проверяются тексты сообщений, идей и объявлений, а также загружаемые фото. Агент выявляет признаки травли, угроз, дискриминации, личных негативных призывов и повторяющихся нарушений. Он не отслеживает клики и просмотры страниц и не строит психологические профили. В отчёте — только категория, повторяемость и время сигнала, без текста переписок и имён. Сигнал не доказывает нарушение: серьёзный случай должен проверить ответственный взрослый школы.
         </p>
+        <div id="userSafetyReportsSummary" style="font-size:11px;color:var(--muted);margin:0 0 8px;" aria-live="polite">Загрузка сводки…</div>
         <div id="userSafetyReportsList" aria-live="polite"><p style="font-size:11px;color:var(--muted);">Загрузка отчётов…</p></div>
       </div>
       <div id="adminRequests" class="hidden profile-box">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
         <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Здесь отображаются заявки на ваши мероприятия.</p>
         <div id="adminReqList"></div>
-      </div>
-      <div class="profile-box">
-        <h3 style="font-size:14px; margin:0 0 8px;">Мои объявления</h3>
-        <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
-        <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
       </div>
       <div class="profile-box">
         <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
@@ -461,6 +459,12 @@
           <div id="ideaFolderContent"></div>
         </div>
       </div>
+      <div class="profile-box">
+        <h3 style="font-size:14px; margin:0 0 8px;">Мои объявления</h3>
+        <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
+        <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
+      </div>
+      
       <div class="profile-box" style="margin-top:12px;">
         <h3 style="font-size:13px;margin:0 0 6px;">Удаление аккаунта</h3>
         <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 9px;">Можно удалить свой аккаунт в любой момент. Будут удалены профиль, объявления и мероприятия, идеи, избранное, переписки, регистрации и все принадлежащие аккаунту фотографии и файлы. Восстановить их будет нельзя.</p>
@@ -495,6 +499,7 @@
         <input id="chatInput" class="form-control" style="flex:1; font-size:13px;" placeholder="Написать..." maxlength="1000" aria-label="Текст сообщения">
         <button type="submit" class="button button-primary">→</button>
       </form>
+      <p style="font-size:9px;color:var(--muted);line-height:1.4;margin:6px 2px 0;">Сообщения автоматически проверяются ИИ на нарушения правил FAM и безопасность участников.</p>
     </div>
   </section>
 </main>
@@ -1799,18 +1804,20 @@ window.onunhandledrejection = function(event) {
   }
 
   function safetySourceLabel(source) {
-    return source === "message" ? "сообщения" : source === "idea" ? "почта идей" : "фото";
+    return source === "message" ? "сообщения" : source === "idea" ? "почта идей" : source === "listing" ? "объявления" : "фото";
   }
 
   async function loadUserSafetyReports() {
     const box = $("userSafetyReports");
     const list = $("userSafetyReportsList");
+    const summary = $("userSafetyReportsSummary");
     if (!box || !list) return;
     if (!user || profile?.role !== "school_admin") {
       box.classList.add("hidden");
       return;
     }
     box.classList.remove("hidden");
+    if (summary) summary.textContent = "Загружаем сводку за последние 30 дней…";
     list.innerHTML = '<p style="font-size:11px;color:var(--muted);">Загружаем отчёты…</p>';
     try {
       const { data, error } = await sb.functions.invoke("council-management", {
@@ -1819,6 +1826,10 @@ window.onunhandledrejection = function(event) {
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Не удалось получить отчёты.");
       const reports = Array.isArray(data.reports) ? data.reports : [];
+      const highCount = reports.filter(report => report.severity === "high").length;
+      if (summary) summary.textContent = reports.length
+        ? `Новых групп сигналов: ${reports.length} · повышенное внимание: ${highCount} · период: ${Number(data.period_days) || 30} дней`
+        : `За последние ${Number(data.period_days) || 30} дней новых сигналов нет.`;
       list.innerHTML = reports.length ? reports.map(report => {
         const severity = report.severity === "high" ? "status-rejected" : "status-work";
         const repeatText = report.repeated ? " · повторяется" : "";
@@ -1836,6 +1847,7 @@ window.onunhandledrejection = function(event) {
         </div>`;
       }).join("") : '<p style="font-size:11px;color:var(--muted);margin:0;">Новых сигналов нет. Если появится подозрение на травлю или угрозу, отчёт появится здесь.</p>';
     } catch (error) {
+      if (summary) summary.textContent = "Сводка временно недоступна.";
       list.innerHTML = `<p style="font-size:11px;color:var(--danger);">${esc(error?.message || "Не удалось загрузить отчёты.")}</p>`;
     }
   }
