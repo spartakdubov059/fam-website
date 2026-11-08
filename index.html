@@ -411,7 +411,7 @@
     <h2 id="authTitle" style="margin-top:0; font-size:20px; font-weight:900;">Вход</h2>
     <form id="authForm">
       <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
-        <select id="authSchool" class="form-control"><option value="lyceum_3">3 лицей — Сочи</option></select>
+        <select id="authSchool" class="form-control"><option value="lyceum_3">Лицей № 3 — Сочи</option></select>
       </div>
       <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
       <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
@@ -491,7 +491,15 @@ window.onunhandledrejection = function(event) {
   let tabTransitionTimer = null;
 
   const $ = id => document.getElementById(id);
-  const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const SCHOOL_DISPLAY_NAMES = Object.freeze({
+    "lyceum_3": "Лицей № 3",
+    "gymnasium_4": "Гимназия № 4"
+  });
+  function getSchoolDisplayName(schoolId) {
+    const id = typeof schoolId === "string" ? schoolId.trim() : "";
+    return id ? (SCHOOL_DISPLAY_NAMES[id] || "Школа уточняется") : "Школа не указана";
+  }
+  const esc = s => String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'" :'&#39;'}[c]));
   const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   window.closeModal = id => { const m = $(id); if (m) m.classList.remove("open"); };
   window.openModal = id => { const m = $(id); if (m) m.classList.add("open"); };
@@ -1246,7 +1254,7 @@ window.onunhandledrejection = function(event) {
     $("profEmail").textContent = user.email;
     if (profile?.avatar_url) $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     else $("avatarPreview").textContent = user.email[0].toUpperCase();
-    $("profMeta").textContent = (profile?.school_id || "Школа не указана") + (profile?.role === 'school_admin' ? " · Ученический совет" : "");
+    $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + (profile?.role === 'school_admin' ? " · Ученический совет" : "");
 
     let myL = listings.filter(l => l.user_id === user.id);
     if (myL.length > 0) {
