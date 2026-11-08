@@ -292,12 +292,21 @@ Deno.serve(async (req: Request) => {
       }
 
       let imageCleanup = "no_image";
-      if (typeof listing.image_url === "string" && listing.image_url.includes("/storage/v1/object/public/listings-images/")) {
+      if (typeof listing.image_url === "string") {
         try {
-          const path = decodeURIComponent(listing.image_url.split("/storage/v1/object/public/listings-images/")[1].split("?")[0]);
-          if (path && path.startsWith("listing_" + listing.user_id + "_")) {
-            await storageRemove("listings-images", [path]);
-            imageCleanup = "removed";
+          const buckets = ["listings-images", "listing-images"];
+          for (const bucket of buckets) {
+            const marker = "/storage/v1/object/public/" + bucket + "/";
+            const markerAt = listing.image_url.indexOf(marker);
+            if (markerAt < 0) continue;
+            const path = decodeURIComponent(listing.image_url.slice(markerAt + marker.length).split("?")[0]);
+            const belongsToOwner = path.startsWith("listing_" + listing.user_id + "_")
+              || path.startsWith(listing.user_id + "/");
+            if (path && belongsToOwner) {
+              await storageRemove(bucket, [path]);
+              imageCleanup = "removed";
+            }
+            break;
           }
         } catch (error) {
           imageCleanup = "failed";
