@@ -2586,6 +2586,12 @@ window.onunhandledrejection = function(event) {
 
   function jumpToProfileSection(targetId) {
     let target = targetId ? $(targetId) : null;
+    if ((!target || target.classList.contains("hidden")) && targetId === "schoolAdminAccess") {
+      const councilPanel = $("adminIdeasDash");
+      target = councilPanel && !councilPanel.classList.contains("hidden")
+        ? councilPanel
+        : $("profileAccountPanel");
+    }
     if (!target || target.classList.contains("hidden")) target = $("profileAccountPanel");
     if (!target) return;
     const details = target.closest("details");
