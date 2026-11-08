@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-11-08",
+  "updated_at": "2026-11-09",
   "purpose": "Синтетический регрессионный набор для проверки локального детектора контактов и второго уровня ИИ-модерации. Не содержит реальных персональных данных.",
   "expected_actions": [
     "no_local_block",
@@ -215,6 +215,58 @@
       "expected_decision": "reject",
       "expected_reason_code": "spam_or_advertising",
       "note": "Бессмысленный повторяющийся текст."
+    }
+  ],
+  "user_safety_agent_cases": [
+    {
+      "id": "safety_message_targeted_harassment",
+      "kind": "message",
+      "text": "Давайте все будем высмеивать одного ученика в чате.",
+      "expected_signal": "targeted_harassment",
+      "severity": "medium"
+    },
+    {
+      "id": "safety_message_personal_call",
+      "kind": "message",
+      "text": "Напишите ему все неприятные сообщения, чтобы он ушёл из чата.",
+      "expected_signal": "negative_personal_call",
+      "severity": "medium"
+    },
+    {
+      "id": "safety_message_threat",
+      "kind": "message",
+      "text": "Я тебе угрожаю, не приходи завтра.",
+      "expected_signal": "threat_or_intimidation",
+      "severity": "high"
+    },
+    {
+      "id": "safety_idea_constructive_criticism",
+      "kind": "idea",
+      "text": "Предлагаю изменить расписание столовой, потому что сейчас очередь слишком длинная.",
+      "expected_signal": "no_safety_incident",
+      "severity": "none"
+    },
+    {
+      "id": "safety_idea_unclear_accusation",
+      "kind": "idea",
+      "text": "Нужно проверить серьёзную жалобу на конкретного сотрудника; подробности должен запросить ответственный взрослый.",
+      "expected_signal": "manual_review",
+      "severity": "medium"
+    },
+    {
+      "id": "safety_repeated_target_pair",
+      "kind": "message",
+      "text": "Повторяющиеся сигналы в одном направлении объединяются без сохранения текста сообщений и прямых ID.",
+      "expected_signal": "repeated_pair_fingerprint",
+      "severity": "high_after_three_signals"
+    },
+    {
+      "id": "safety_high_risk_category",
+      "kind": "message",
+      "text": "Синтетический тест категории повышенного риска без реального текста пользователя.",
+      "expected_signal": "unclear_safety_signal",
+      "severity": "high",
+      "synthetic_only": true
     }
   ]
 }
