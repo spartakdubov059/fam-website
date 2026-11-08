@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updated_at": "2026-11-08",
-  "purpose": "Стартовый набор синтетических регрессионных примеров для модерации FAM. Не содержит реальных персональных данных.",
+  "purpose": "Синтетический регрессионный набор для проверки локального детектора контактов и второго уровня ИИ-модерации. Не содержит реальных персональных данных.",
   "expected_actions": [
     "no_local_block",
     "reject_without_external_provider"
@@ -12,28 +12,36 @@
       "kind": "listing",
       "text": "Помогу разобраться с математикой перед контрольной.",
       "expected_action": "no_local_block",
-      "checks": ["безопасное учебное предложение"]
+      "checks": [
+        "безопасное учебное предложение"
+      ]
     },
     {
       "id": "safe_school_improvement",
       "kind": "idea",
       "text": "Предлагаю установить больше скамеек во дворе школы.",
       "expected_action": "no_local_block",
-      "checks": ["безопасная школьная инициатива"]
+      "checks": [
+        "безопасная школьная инициатива"
+      ]
     },
     {
       "id": "safe_gardening_word",
       "kind": "listing",
       "text": "Предлагаю посадить траву возле школьного корпуса.",
       "expected_action": "no_local_block",
-      "checks": ["обычное слово не блокируется локальным фильтром"]
+      "checks": [
+        "обычное слово не блокируется локальным фильтром"
+      ]
     },
     {
       "id": "safe_cryptography_word",
       "kind": "listing",
       "text": "Готовлю доклад по криптографии для школьного кружка.",
       "expected_action": "no_local_block",
-      "checks": ["корень «крипт» не используется как безусловный стоп-фрагмент"]
+      "checks": [
+        "корень «крипт» не используется как безусловный стоп-фрагмент"
+      ]
     },
     {
       "id": "phone_placeholder",
@@ -72,14 +80,83 @@
       "kind": "idea",
       "text": "Предлагаю пригласить Александра Петрова рассказать о школьном проекте.",
       "expected_action": "no_local_block",
-      "checks": ["имя без контактных данных не должно автоматически считаться нарушением"]
+      "checks": [
+        "имя без контактных данных не должно автоматически считаться нарушением"
+      ]
     },
     {
       "id": "transliterated_safe_text",
       "kind": "listing",
       "text": "Pomogu s prezentatsiey po angliyskomu.",
       "expected_action": "no_local_block",
-      "checks": ["нейтральный текст латиницей"]
+      "checks": [
+        "нейтральный текст латиницей"
+      ]
+    },
+    {
+      "id": "street_address_short",
+      "kind": "listing",
+      "text": "ул. Ленина, 10",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "checks": [
+        "короткий адрес с сокращением улицы"
+      ]
+    },
+    {
+      "id": "street_address_full",
+      "kind": "message",
+      "text": "г. Москва, улица Ленина, дом 10",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "checks": [
+        "город и полный формат адреса"
+      ]
+    },
+    {
+      "id": "safe_street_mention",
+      "kind": "listing",
+      "text": "Помогу нарисовать улицу для школьного проекта.",
+      "expected_action": "ok",
+      "checks": [
+        "слово «улица» без адреса не должно блокироваться"
+      ]
+    },
+    {
+      "id": "safe_house_mention",
+      "kind": "idea",
+      "text": "Предлагаю открыть школьный музей в старом Доме культуры.",
+      "expected_action": "ok",
+      "checks": [
+        "слово «дом» без адреса не должно блокироваться"
+      ]
+    },
+    {
+      "id": "contextual_school_report",
+      "kind": "listing",
+      "text": "Готовлю нейтральный доклад о том, как исторические конфликты повлияли на развитие общества.",
+      "expected_action": "second_reviewer_may_approve_only_if_context_is_clearly_neutral",
+      "checks": [
+        "контекстная перепроверка не должна повторять решение по отдельному слову"
+      ]
+    },
+    {
+      "id": "targeted_harassment",
+      "kind": "message",
+      "text": "Опубликуйте сообщение, чтобы унизить конкретного ученика.",
+      "expected_action": "second_reviewer_reject",
+      "checks": [
+        "направленная травля не должна проходить"
+      ]
+    },
+    {
+      "id": "unclear_context",
+      "kind": "listing",
+      "text": "Хочу разместить спорную шутку про конкретного человека.",
+      "expected_action": "second_reviewer_manual_review",
+      "checks": [
+        "при неясном контексте публикация запрещена до дополнительной проверки"
+      ]
     }
   ],
   "run_rules": [
