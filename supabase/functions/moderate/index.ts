@@ -2,8 +2,70 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 import { reviewDisputedContent } from "./dispute-reviewer.ts";
 
-const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
+const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+
+function readDefaultKey(variable: string): string {
+  const raw = Deno.env.get(variable) ?? "";
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.default === "string") return parsed.default;
+  } catch {
+    // Legacy service-role secrets are plain strings.
+  }
+  return raw;
+}
+
+const SUPABASE_INTERNAL_KEY =
+  readDefaultKey("SUPABASE_SECRET_KEYS") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_SECRET_KEY") ||
+  "";
+
+type CachedModerationDecision = {
+  expiresAt: number;
+  body: Record<string, unknown>;
+};
+
+const moderationCache = new Map<string, CachedModerationDecision>();
+const MODERATION_CACHE_TTL_MS = 5 * 60 * 1000;
+const MODERATION_CACHE_MAX_ENTRIES = 400;
+
+async function createModerationCacheKey(text: string, imageUrl: string): Promise<string> {
+  const source = JSON.stringify({
+    version: "fam-openai-moderation-v2",
+    text,
+    image_url: imageUrl,
+  });
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function getCachedDecision(key: string): Record<string, unknown> | null {
+  const now = Date.now();
+  for (const [entryKey, entry] of moderationCache) {
+    if (entry.expiresAt <= now) moderationCache.delete(entryKey);
+  }
+  const entry = moderationCache.get(key);
+  return entry && entry.expiresAt > now ? entry.body : null;
+}
+
+function cacheAndRespond(
+  key: string,
+  body: Record<string, unknown>,
+  headers: Record<string, string>,
+): Response {
+  if (!moderationCache.has(key) && moderationCache.size >= MODERATION_CACHE_MAX_ENTRIES) {
+    const oldestKey = moderationCache.keys().next().value;
+    if (oldestKey) moderationCache.delete(oldestKey);
+  }
+  moderationCache.set(key, {
+    expiresAt: Date.now() + MODERATION_CACHE_TTL_MS,
+    body,
+  });
+  return jsonResponse(body, 200, headers);
+}
 
 const ALLOWED_ORIGINS = new Set([
   "https://spartakdubov059.github.io",
@@ -85,9 +147,22 @@ serve(async (req: Request) => {
     return jsonResponse({ action: "reject", reason: "Метод запроса не поддерживается." }, 405, headers);
   }
 
+  // Only submit-content may call this endpoint; direct calls cannot bypass per-user send quotas.
+  const internalKey = req.headers.get("x-fam-internal-key") ?? "";
+  if (!SUPABASE_INTERNAL_KEY || internalKey !== SUPABASE_INTERNAL_KEY) {
+    return jsonResponse({
+      action: "pending",
+      degraded: true,
+      diagnostic_code: "internal_only",
+      reason: "Проверка доступна только через защищённую отправку FAM.",
+    }, 403, headers);
+  }
+
   try {
     const payload = await req.json().catch(() => null);
     const value = typeof payload?.text === "string" ? payload.text.trim() : "";
+    const imageUrl = typeof payload?.image_url === "string" ? payload.image_url.trim() : "";
+    const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/public/listings-images/listing_";
 
     if (value.length < 2 || value.length > 3000) {
       return jsonResponse({
@@ -96,8 +171,15 @@ serve(async (req: Request) => {
       }, 400, headers);
     }
 
-    // Detect personal contact data locally before any text is sent to an external provider.
-    // Rejected content is not stored in the FAM database or sent to OpenAI/OpenRouter.
+    if (imageUrl && (!SUPABASE_URL || !imageUrl.startsWith(allowedImagePrefix) || imageUrl.length > 1200)) {
+      return jsonResponse({
+        action: "reject",
+        reason_code: "invalid_listing_image",
+        reason: "Фото должно быть загружено в хранилище изображений FAM.",
+      }, 200, headers);
+    }
+
+    // Detect personal contact data locally before text or images are sent to OpenAI.
     if (containsContactData(value)) {
       return jsonResponse({
         action: "reject",
@@ -122,17 +204,34 @@ serve(async (req: Request) => {
       }, 200, headers);
     }
 
-    // OpenAI Moderation classifies general safety categories; enforce FAM-specific
-    // restricted-content rules locally as an additional layer for listings and chats.
-    if (policyFlag) {
-      return jsonResponse({
-        action: "reject",
-        reason_code: policyFlag.code,
-        reason: "FAM не разрешает публикации и сообщения на эту тему. Измените текст.",
-      }, 200, headers);
+    const cacheKey = await createModerationCacheKey(value, imageUrl);
+    const cached = getCachedDecision(cacheKey);
+    if (cached) {
+      console.info("moderation_cache_hit");
+      return jsonResponse(cached, 200, headers);
     }
 
-    // Prefer the dedicated OpenAI Moderation API when its server-side key is configured.
+    // For locally flagged text, ask the OpenAI contextual agent first. This avoids
+    // spending a /v1/moderations request on keyword-only false positives.
+    if (policyFlag && !imageUrl) {
+      if (!OPENAI_KEY) {
+        return jsonResponse({
+          action: "pending",
+          degraded: true,
+          diagnostic_code: "missing_api_key",
+          reason: "ИИ-модерация не настроена. Материал не опубликован и ожидает проверки.",
+        }, 200, headers);
+      }
+      const policyReview = await reviewDisputedContent(value, OPENAI_KEY);
+      return cacheAndRespond(cacheKey, {
+        action: policyReview.action,
+        reason_code: policyReview.reason_code,
+        reason: policyReview.reason,
+        provider: "openai_dispute_agent",
+      }, headers);
+    }
+
+    // OpenAI Moderation checks text and, when present, the listing image in one request.
     // It is a classifier endpoint, not a text-generation model. Never send the same text
     // to a second provider if this provider is unavailable.
     if (OPENAI_KEY) {
@@ -150,7 +249,12 @@ serve(async (req: Request) => {
           },
           body: JSON.stringify({
             model: "omni-moderation-latest",
-            input: value,
+            input: imageUrl
+              ? [
+                  { type: "text", text: value },
+                  { type: "image_url", image_url: { url: imageUrl } },
+                ]
+              : value,
           }),
           signal: controller.signal,
         });
@@ -230,112 +334,55 @@ serve(async (req: Request) => {
           nonOverridableCategories.has(category) || !contextualCategories.has(category)
         );
 
-        if (!flaggedCategories.length || requiresSeparateSafetyProcess || !OPENROUTER_KEY) {
+        if (!flaggedCategories.length || requiresSeparateSafetyProcess || imageUrl) {
+          const reasonCode = imageUrl
+            ? "image_requires_human_review"
+            : requiresSeparateSafetyProcess
+              ? "sensitive_category_requires_separate_process"
+              : "missing_category_details";
           console.info("moderation_second_review_skipped", JSON.stringify({
-            reason_code: !OPENROUTER_KEY
-              ? "second_reviewer_not_configured"
-              : requiresSeparateSafetyProcess
-                ? "sensitive_category_requires_separate_process"
-                : "missing_category_details",
+            reason_code: reasonCode,
             categories: flaggedCategories,
           }));
-          return jsonResponse({
+          return cacheAndRespond(cacheKey, {
             action: "pending",
-            reason_code: "additional_safety_review",
-            reason: "Автоматическая проверка обнаружила возможный риск. Материал не опубликован и требует дополнительной проверки.",
+            reason_code: reasonCode,
+            reason: imageUrl
+              ? "ИИ обнаружил возможный риск на изображении. Материал скрыт и требует проверки."
+              : "Автоматическая проверка обнаружила возможный риск. Материал скрыт и требует отдельной проверки.",
             provider: "openai",
-          }, 200, headers);
+          }, headers);
         }
 
-        // The second-level FAM reviewer only receives contact-free text and
-        // only context-sensitive categories. Its decision cannot override
-        // high-risk flags or the local contact/policy checks above.
-        const secondReview = await reviewDisputedContent(value, OPENROUTER_KEY);
+        // The OpenAI contextual agent sees text only and cannot override high-risk flags.
+        const secondReview = await reviewDisputedContent(value, OPENAI_KEY);
         console.info("moderation_second_review_completed", JSON.stringify({
           action: secondReview.action,
           reason_code: secondReview.reason_code,
           model: secondReview.model,
         }));
 
-        if (secondReview.action === "ok") {
-          return jsonResponse({
-            action: "ok",
-            provider: "openai+fam_expert",
-            reason_code: secondReview.reason_code,
-          }, 200, headers);
-        }
-
-        if (secondReview.action === "reject") {
-          return jsonResponse({
-            action: "reject",
-            reason_code: secondReview.reason_code,
-            reason: secondReview.reason,
-            provider: "openai+fam_expert",
-          }, 200, headers);
-        }
-
-        return jsonResponse({
-          action: "pending",
+        return cacheAndRespond(cacheKey, {
+          action: secondReview.action,
           reason_code: secondReview.reason_code,
           reason: secondReview.reason,
-          provider: "openai+fam_expert",
-        }, 200, headers);
+          provider: "openai+gpt-5-mini",
+        }, headers);
       }
 
-      return jsonResponse({ action: "ok", provider: "openai" }, 200, headers);
+      return cacheAndRespond(cacheKey, { action: "ok", provider: "openai" }, headers);
     }
 
-    if (!OPENROUTER_KEY) {
-      console.warn("moderation_provider_selected", "none");
-      console.error("moderation_config_error: no OPENAI_API_KEY or OPENROUTER_API_KEY configured");
-      return jsonResponse({
-        action: "pending",
-        degraded: true,
-        diagnostic_code: "missing_api_key",
-        reason: "ИИ-модерация не настроена. Материал не опубликован и ожидает ручной проверки.",
-      }, 200, headers);
-    }
+    return jsonResponse({
+      action: "pending",
+      degraded: true,
+      diagnostic_code: "missing_api_key",
+      reason: "ИИ-модерация не настроена. Материал не опубликован и ожидает проверки.",
+    }, 200, headers);
 
-    let chatRes: Response | null = null;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15_000);
-
-    try {
-      chatRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + OPENROUTER_KEY,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://spartakdubov059.github.io",
-          "X-Title": "FAM School",
-        },
-        body: JSON.stringify({
-          // Use only free models whose current OpenRouter pages confirm JSON output support.
-          // The provider filter also excludes endpoints that cannot honor these settings.
-          // The primary model is explicit; the models array is the cross-model fallback chain.
-          // Both free models support JSON output and remain behind the no-data-collection filter.
-          model: "google/gemma-4-26b-a4b-it:free",
-          models: [
-            "google/gemma-4-31b-it:free",
-          ],
-          provider: {
-            require_parameters: true,
-            data_collection: "deny",
-            allow_fallbacks: true,
-          },
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: JSON.stringify({ content_to_review: value }) },
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0,
-          max_tokens: 240,
-        }),
-        signal: controller.signal,
-      });
-    } catch (error) {
+  } catch (error) {
       chatRes = null;
-      console.warn("OpenRouter moderation request failed:", error instanceof Error ? error.name : "unknown");
+      console.warn("OpenAI moderation request failed:", error instanceof Error ? error.name : "unknown");
     } finally {
       clearTimeout(timeoutId);
     }
