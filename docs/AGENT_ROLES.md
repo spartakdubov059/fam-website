@@ -99,3 +99,9 @@
 - Модель доступа Supabase Storage (public/private buckets): https://supabase.com/docs/guides/storage/buckets/fundamentals
 - Подписанные ссылки Supabase Storage: https://supabase.com/docs/guides/storage/serving/downloads
 - Leaked Password Protection: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+
+
+### Проверка GitHub Actions на 08.11.2026
+- Workflow `Moderation regression tests` на commit `66705de77d758ffcac38e2fa3f24efd25f1221b9` завершился `success`. В workflow входят 5 Node.js тестов и проверка синтаксиса встроенного JavaScript в `index.html`.
+- Workflow `pages build and deployment` на том же commit завершился `success`.
+- Это подтверждает сборку и публикацию GitHub Pages на стороне GitHub. Отдельный deploy Netlify инструментально не подтверждён.
