@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
+import { reviewListingImage } from "./image-reviewer.ts";
+import { recordSafetySignal, type SafetyContext, type SafetyCategory } from "./user-safety-agent.ts";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -66,6 +68,60 @@ function cacheAndRespond(
     body,
   });
   return jsonResponse(body, 200, headers);
+}
+
+function parseSafetyContext(raw: unknown): SafetyContext | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  const kind = value.kind;
+  const senderId = typeof value.sender_id === "string" ? value.sender_id : "";
+  const receiverId = typeof value.receiver_id === "string" ? value.receiver_id : null;
+  const schoolId = typeof value.school_id === "string" ? value.school_id : "";
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!["message", "idea", "listing"].includes(String(kind))) return null;
+  if (!uuid.test(senderId) || !schoolId || schoolId.length > 120) return null;
+  if (kind === "message" && (!receiverId || !uuid.test(receiverId))) return null;
+  return { kind: kind as SafetyContext["kind"], sender_id: senderId, receiver_id: receiverId, school_id: schoolId };
+}
+
+function safetySignalFromCategories(categories: string[]): { category: SafetyCategory; severity: "medium" | "high" } | null {
+  if (categories.some(category => ["harassment/threatening", "hate/threatening", "violence", "violence/graphic"].includes(category))) {
+    return { category: "threat_or_intimidation", severity: "high" };
+  }
+  if (categories.includes("hate")) return { category: "hate_or_discrimination", severity: "high" };
+  if (categories.includes("harassment")) return { category: "targeted_harassment", severity: "medium" };
+  return null;
+}
+
+async function writeSafetySignal(
+  context: SafetyContext | null,
+  category: SafetyCategory,
+  severity: "medium" | "high",
+): Promise<void> {
+  if (!context) return;
+  await recordSafetySignal({
+    context,
+    category,
+    severity,
+    supabaseUrl: SUPABASE_URL,
+    serviceKey: SUPABASE_INTERNAL_KEY,
+  });
+}
+
+async function recordCachedSignal(context: SafetyContext | null, cached: Record<string, unknown>): Promise<void> {
+  if (!context || cached.action === "ok") return;
+  const code = typeof cached.reason_code === "string" ? cached.reason_code : "";
+  const map: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
+    targeted_harassment: { category: "targeted_harassment", severity: "medium" },
+    negative_personal_call: { category: "negative_personal_call", severity: "medium" },
+    spam_or_advertising: { category: "spam_or_repeated_abuse", severity: "medium" },
+    image_requires_review: { category: "unsafe_image", severity: "medium" },
+    personal_information: { category: "personal_data_in_image", severity: "medium" },
+    private_document: { category: "personal_data_in_image", severity: "medium" },
+    unsafe_content: { category: "unsafe_image", severity: "high" },
+  };
+  const signal = map[code];
+  if (signal) await writeSafetySignal(context, signal.category, signal.severity);
 }
 
 const ALLOWED_ORIGINS = new Set([
@@ -163,7 +219,11 @@ serve(async (req: Request) => {
     const payload = await req.json().catch(() => null);
     const value = typeof payload?.text === "string" ? payload.text.trim() : "";
     const imageUrl = typeof payload?.image_url === "string" ? payload.image_url.trim() : "";
-    const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/public/listings-images/listing_";
+    const safetyContext = parseSafetyContext(payload?.context);
+    const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/sign/listing-images-pending/";
+    const expectedImagePrefix = safetyContext?.sender_id
+      ? allowedImagePrefix + safetyContext.sender_id + "/listing_" + safetyContext.sender_id + "_"
+      : "";
 
     if (value.length < 2 || value.length > 3000) {
       return jsonResponse({
@@ -172,11 +232,11 @@ serve(async (req: Request) => {
       }, 400, headers);
     }
 
-    if (imageUrl && (!SUPABASE_URL || !imageUrl.startsWith(allowedImagePrefix) || imageUrl.length > 1200)) {
+    if (imageUrl && (!expectedImagePrefix || !imageUrl.startsWith(expectedImagePrefix) || imageUrl.length > 1600 || !imageUrl.includes("token="))) {
       return jsonResponse({
         action: "reject",
         reason_code: "invalid_listing_image",
-        reason: "Фото должно быть загружено в хранилище изображений FAM.",
+        reason: "Фото должно быть загружено в защищённое хранилище FAM.",
       }, 200, headers);
     }
 
@@ -196,6 +256,7 @@ serve(async (req: Request) => {
     const cached = getCachedDecision(cacheKey);
     if (cached) {
       console.info(isIdea ? "idea_moderation_cache_hit" : "moderation_cache_hit");
+      await recordCachedSignal(safetyContext, cached);
       return jsonResponse(cached, 200, headers);
     }
 
@@ -217,6 +278,16 @@ serve(async (req: Request) => {
         reason_code: ideaReview.reason_code,
         model: ideaReview.model ?? null,
       }));
+
+      if (ideaReview.reason_code === "targeted_harassment") {
+        await writeSafetySignal(safetyContext, "targeted_harassment", "medium");
+      } else if (ideaReview.reason_code === "negative_personal_call") {
+        await writeSafetySignal(safetyContext, "negative_personal_call", "medium");
+      } else if (ideaReview.reason_code === "spam_or_advertising") {
+        await writeSafetySignal(safetyContext, "spam_or_repeated_abuse", "medium");
+      } else if (ideaReview.reason_code === "unsafe_content") {
+        await writeSafetySignal(safetyContext, "unclear_safety_signal", "high");
+      }
 
       return cacheAndRespond(cacheKey, {
         action: ideaReview.action,
@@ -359,6 +430,12 @@ serve(async (req: Request) => {
             reason_code: reasonCode,
             categories: flaggedCategories,
           }));
+          if (imageUrl) {
+            await writeSafetySignal(safetyContext, "unsafe_image", "high");
+          } else {
+            const signal = safetySignalFromCategories(flaggedCategories);
+            if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
+          }
           return cacheAndRespond(cacheKey, {
             action: "pending",
             reason_code: reasonCode,
@@ -377,6 +454,11 @@ serve(async (req: Request) => {
           model: secondReview.model,
         }));
 
+        if (secondReview.action !== "ok") {
+          const signal = safetySignalFromCategories(flaggedCategories);
+          if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
+          else await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
+        }
         return cacheAndRespond(cacheKey, {
           action: secondReview.action,
           reason_code: secondReview.reason_code,
@@ -385,6 +467,32 @@ serve(async (req: Request) => {
         }, headers);
       }
 
+      if (imageUrl) {
+        const imageReview = await reviewListingImage(value, imageUrl, OPENAI_KEY);
+        console.info("fam_image_review_completed", JSON.stringify({
+          action: imageReview.action,
+          reason_code: imageReview.reason_code,
+          model: imageReview.model ?? null,
+        }));
+        if (imageReview.action !== "ok") {
+          if (["personal_information", "private_document"].includes(imageReview.reason_code)) {
+            await writeSafetySignal(safetyContext, "personal_data_in_image", "medium");
+          } else {
+            await writeSafetySignal(safetyContext, "unsafe_image", imageReview.action === "pending" ? "medium" : "high");
+          }
+          return cacheAndRespond(cacheKey, {
+            action: imageReview.action,
+            reason_code: imageReview.reason_code,
+            reason: imageReview.reason,
+            provider: "openai_image_agent",
+          }, headers);
+        }
+        return cacheAndRespond(cacheKey, {
+          action: "ok",
+          provider: "openai+image_agent",
+          image_review: "approved",
+        }, headers);
+      }
       return cacheAndRespond(cacheKey, { action: "ok", provider: "openai" }, headers);
     }
 
