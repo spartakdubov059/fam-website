@@ -527,37 +527,6 @@ window.onunhandledrejection = function(event) {
     if (liveLabel) liveLabel.textContent = isAiDown ? "ИИ-модерация недоступна" : "ИИ-модерация активна";
   }
 
-  // Fail-Closed: разрешаем продолжение только при явном action === "ok".
-  async function moderateText(text, context = "idea") {
-    const value = typeof text === "string" ? text.trim() : "";
-    if (!value) return { status: "rejected", reason: "Текст не может быть пустым.", action: "reject" };
-    if (value.length < 2) return { status: "rejected", reason: "Слишком короткий текст.", action: "reject" };
-
-    let data;
-    try {
-      const { data: responseData, error } = await sb.functions.invoke("moderate", {
-        body: { text: value }
-      });
-      if (error) throw error;
-      data = responseData;
-    } catch (e) {
-      console.error(`Ошибка вызова ИИ-модерации (${context}):`, e);
-      updateAiStatus(true);
-      return { status: "rejected", reason: "Сервис проверки недоступен. Попробуйте позже.", action: "reject" };
-    }
-
-    // Неизвестная/неполная схема ответа тоже считается ошибкой, а не одобрением.
-    if (!data || !["ok", "pending", "reject"].includes(data.action)) {
-      updateAiStatus(true);
-      return { status: "rejected", reason: "Сервис проверки вернул некорректный ответ. Попробуйте позже.", action: "reject" };
-    }
-
-    updateAiStatus(false);
-    if (data.action === "ok") return { status: "approved", reason: "Проверка пройдена.", action: "ok" };
-    if (data.action === "pending") return { status: "pending", reason: data.reason || "Требуется дополнительная проверка.", action: "pending" };
-    return { status: "rejected", reason: data.reason || "Нарушение правил.", action: "reject" };
-  }
-
   function updateHints() {
     const combined = ($("lTitle").value + " " + $("lDesc").value).toLowerCase();
     const kw = {
@@ -1032,7 +1001,8 @@ window.onunhandledrejection = function(event) {
       const { data: submission, error } = await sb.functions.invoke("submit-content", {
         body: { kind: "message", receiver_id: recipientId, body: text }
       });
-      if (error) throw error;
+      if (error) { updateAiStatus(true); throw error; }
+      updateAiStatus(false);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Сообщение не прошло модерацию.");
       $("chatInput").value = "";
       if (curChat === recipientId && currentTab === 'messages') await loadChatMessages(recipientId);
@@ -1230,7 +1200,8 @@ window.onunhandledrejection = function(event) {
         body: { kind: "idea", text: txt }
       });
       hideAIThinking('ideaThinkingArea');
-      if (error) throw error;
+      if (error) { updateAiStatus(true); throw error; }
+      updateAiStatus(false);
       if (!submission?.ok) {
         $("ideaText").value = "";
         return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку.") + "\n\nИдея не отправлена.");
@@ -1591,7 +1562,6 @@ window.onunhandledrejection = function(event) {
     btn.disabled = true; btn.textContent = "Проверка...";
 
     try {
-      const combinedText = $("lTitle").value + " " + $("lDesc").value;
       const uploadStatus = $("uploadStatus");
 
       btn.textContent = "Загрузка фото и серверная проверка...";
@@ -1636,7 +1606,8 @@ window.onunhandledrejection = function(event) {
           max_seats: (isEv && type === "limited") ? parseInt($("evSeats").value, 10) : 0
         }
       });
-      if (error) throw error;
+      if (error) { updateAiStatus(true); throw error; }
+      updateAiStatus(false);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
       const data = submission.listing;
