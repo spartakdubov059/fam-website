@@ -346,15 +346,17 @@
       <div id="schoolAdminAccess" class="profile-box hidden">
         <h3 style="font-size:14px; margin:0 0 8px;">Доступ к панели Ученического совета</h3>
         <p style="font-size:11px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
-          Если вы действительно состоите в Ученическом совете, укажите свою роль. Заявку проверит действующий администратор вашего лицея. Права не выдаются автоматически.
+          По умолчанию каждый аккаунт FAM — обычный пользователь. Членство в Ученическом совете и права администратора не назначаются автоматически.
         </p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете" style="font-size:12px; margin-bottom:8px;">
           <option value="">Выберите свою роль в Совете</option>
-          <option value="Председатель Ученического совета">Председатель</option>
-          <option value="Заместитель председателя Ученического совета">Заместитель председателя</option>
-          <option value="Секретарь Ученического совета">Секретарь</option>
-          <option value="Член Ученического совета">Член Совета</option>
+          <option value="Член Ученического совета">Член Совета — участвует в работе и школьных инициативах</option>
+          <option value="Заместитель председателя Ученического совета">Заместитель председателя — помогает председателю и заменяет его</option>
+          <option value="Председатель Ученического совета">Председатель — организует работу и координирует Совет</option>
         </select>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:0 0 10px;">
+          Эти варианты описывают обязанности. После одобрения все три роли получают одну и ту же панель Совета.
+        </p>
         <div id="schoolAdminAccessStatus" style="font-size:11px; color:var(--muted); margin-bottom:8px;" aria-live="polite"></div>
         <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">
           Запросить доступ Совета
@@ -1343,11 +1345,25 @@ window.onunhandledrejection = function(event) {
     }
   };
 
+  function showSchoolAdminAccessStatus(label, detail, tone = "new") {
+    const accessStatus = $("schoolAdminAccessStatus");
+    if (!accessStatus) return;
+    const safeTone = ["new", "work", "done", "rejected"].includes(tone) ? tone : "new";
+    accessStatus.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+        <span class="idea-status status-${safeTone}">${esc(label)}</span>
+      </div>
+      <div style="line-height:1.5;">${esc(detail)}</div>
+    `;
+  }
+
   async function loadSchoolAdminAccess() {
     const accessBox = $("schoolAdminAccess");
     const reviewBox = $("schoolAdminReview");
     const accessStatus = $("schoolAdminAccessStatus");
     const applyBtn = $("schoolAdminApplyBtn");
+    const roleSelect = $("schoolAdminRequestNote");
+
     if (!user || !profile) {
       if (accessBox) accessBox.classList.add("hidden");
       if (reviewBox) reviewBox.classList.add("hidden");
@@ -1358,9 +1374,8 @@ window.onunhandledrejection = function(event) {
       if (reviewBox) reviewBox.classList.add("hidden");
       if (accessBox) accessBox.classList.remove("hidden");
       if (applyBtn) applyBtn.disabled = !profile.school_id;
-      if (accessStatus) accessStatus.textContent = profile.school_id
-        ? "Доступ открывается только после проверки действующим Советом."
-        : "Сначала выберите школу в профиле.";
+      if (roleSelect) { roleSelect.disabled = !profile.school_id; roleSelect.classList.remove("hidden"); }
+      if (applyBtn) applyBtn.classList.remove("hidden");
 
       try {
         const { data, error } = await sb.functions.invoke("school-admin-access", {
@@ -1371,29 +1386,53 @@ window.onunhandledrejection = function(event) {
 
         if (data.role === "school_admin") {
           profile.role = "school_admin";
-          if (accessBox) accessBox.classList.add("hidden");
-          if (reviewBox) reviewBox.classList.remove("hidden");
-          const { data: schoolIdeas, error: ideasError } = await sb.from("ideas")
-            .select("*").eq("school_id", profile.school_id)
-            .order("created_at", { ascending: false });
-          if (!ideasError) ideas = schoolIdeas || [];
-          if (accessStatus) accessStatus.textContent = "Доступ Совета подтверждён. Обновите страницу, чтобы обновить все разделы профиля.";
+          await loadSchoolAdminAccess();
           return;
         }
 
         const request = data.request;
         if (request?.status === "pending") {
-          if (accessStatus) accessStatus.textContent = "Заявка отправлена и ожидает проверки действующим администратором.";
+          showSchoolAdminAccessStatus(
+            "Заявка отправлена",
+            "Она ожидает рассмотрения действующим Советом. Повторно отправлять заявку не нужно."
+          );
+          if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
+          if (applyBtn) applyBtn.classList.add("hidden");
+        } else if (request?.status === "reviewing") {
+          const when = request.review_started_at
+            ? new Date(request.review_started_at).toLocaleString("ru-RU")
+            : "";
+          showSchoolAdminAccessStatus(
+            "Заявка на рассмотрении",
+            "Действующий представитель Совета взял её в работу" + (when ? " " + when : "") + ". Повторную заявку создавать не нужно.",
+            "work"
+          );
+          if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
         } else if (request?.status === "rejected") {
-          if (accessStatus) accessStatus.textContent = "Предыдущая заявка отклонена. После уточнения с Советом можно отправить новую.";
+          showSchoolAdminAccessStatus(
+            "Заявка отклонена",
+            request.review_note || "Совет не подтвердил членство. Уточните причину у действующего представителя, затем при необходимости можно подать новую заявку.",
+            "rejected"
+          );
+          if (roleSelect) {
+            roleSelect.disabled = !profile.school_id;
+            roleSelect.classList.remove("hidden");
+            if (request.applicant_note) roleSelect.value = request.applicant_note;
+          }
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         } else {
-          if (accessStatus) accessStatus.textContent = "Заявки пока нет. Не указывайте здесь телефоны, адреса или другие личные данные.";
+          showSchoolAdminAccessStatus(
+            "Обычный пользователь",
+            profile.school_id
+              ? "Это стандартный статус каждого нового аккаунта FAM. Если вы состоите в Ученическом совете, выберите свою роль и отправьте одну заявку."
+              : "Это стандартный статус каждого нового аккаунта FAM. Сначала выберите школу в профиле."
+          );
+          if (roleSelect) { roleSelect.disabled = !profile.school_id; roleSelect.classList.remove("hidden"); }
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         }
       } catch (error) {
-        if (accessStatus) accessStatus.textContent = "Не удалось загрузить статус заявки. " + (error?.message || "");
+        showSchoolAdminAccessStatus("Не удалось проверить статус", error?.message || "Попробуйте обновить страницу.");
       }
       return;
     }
@@ -1415,17 +1454,32 @@ window.onunhandledrejection = function(event) {
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить заявки.");
       const requests = Array.isArray(data.requests) ? data.requests : [];
       if (!list) return;
-      list.innerHTML = requests.length ? requests.map(request => `
-        <div class="idea-card" style="margin-bottom:8px;">
-          <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("пользователя " + String(request.user_id || "").slice(0,8) + "…"))}</b>
-          <div style="font-size:10px; color:var(--muted); margin:5px 0;">${esc(request.applicant_note || "Роль в Совете не указана")}</div>
-          <div style="font-size:9px; color:var(--muted); margin-bottom:8px;">${esc(new Date(request.created_at).toLocaleString("ru-RU"))}</div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      list.innerHTML = requests.length ? requests.map(request => {
+        const statusText = request.status === "reviewing" ? "На рассмотрении" : "Ожидает рассмотрения";
+        let actions = "";
+        if (request.status === "pending") {
+          actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.id)}">Взять на рассмотрение</button>`;
+        } else if (request.status === "reviewing" && request.review_started_by === user.id) {
+          actions = `
             <button type="button" class="button button-success button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="approve">Подтвердить</button>
             <button type="button" class="button button-danger button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="reject">Отклонить</button>
+          `;
+        } else if (request.status === "reviewing") {
+          actions = '<span style="font-size:10px;color:var(--muted);">Заявку уже рассматривает другой администратор.</span>';
+        }
+        const reviewDate = request.review_started_at
+          ? new Date(request.review_started_at).toLocaleString("ru-RU")
+          : "";
+        return `
+          <div class="idea-card" style="margin-bottom:8px;">
+            <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("пользователя " + String(request.user_id || "").slice(0,8) + "…"))}</b>
+            <div style="font-size:10px; color:var(--muted); margin:5px 0;">${esc(request.applicant_note || "Роль в Совете не указана")}</div>
+            <div style="font-size:10px; margin:5px 0;">Статус: <b>${esc(statusText)}</b></div>
+            <div style="font-size:9px; color:var(--muted); margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>
           </div>
-        </div>
-      `).join("") : '<p style="font-size:11px; color:var(--muted); margin:0;">Новых заявок на доступ пока нет.</p>';
+        `;
+      }).join("") : '<p style="font-size:11px; color:var(--muted); margin:0;">Новых заявок пока нет.</p>';
     } catch (error) {
       if (list) list.textContent = "Не удалось загрузить заявки. " + (error?.message || "");
     }
@@ -1433,14 +1487,19 @@ window.onunhandledrejection = function(event) {
 
   async function submitSchoolAdminRequest() {
     if (!user || profile?.role !== "student" || !profile?.school_id) {
-      notice("Для заявки нужен ученический аккаунт с выбранным лицеем.");
+      notice("Для заявки нужен обычный аккаунт с выбранной школой.");
       return;
     }
     const noteEl = $("schoolAdminRequestNote");
     const button = $("schoolAdminApplyBtn");
     const applicantNote = noteEl?.value?.trim() || "";
-    if (applicantNote.length < 5 || applicantNote.length > 160) {
-      notice("Укажите свою роль в Ученическом совете (от 5 до 160 символов).");
+    const allowedRoles = [
+      "Председатель Ученического совета",
+      "Заместитель председателя Ученического совета",
+      "Член Ученического совета"
+    ];
+    if (!allowedRoles.includes(applicantNote)) {
+      notice("Выберите одну из трёх ролей Ученического совета.");
       return;
     }
     if (button) { button.disabled = true; button.textContent = "Отправляем..."; }
@@ -1451,14 +1510,32 @@ window.onunhandledrejection = function(event) {
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Не удалось отправить заявку.");
       if (noteEl) noteEl.value = "";
-      notice(data.already_pending
-        ? "Ваша заявка уже ожидает рассмотрения."
-        : "Заявка отправлена действующему администратору вашего лицея.");
       await loadSchoolAdminAccess();
+      notice(data.already_pending
+        ? "Заявка уже существует и ожидает рассмотрения."
+        : "Заявка отправлена. Теперь её статус виден в профиле.");
     } catch (error) {
       notice("Ошибка: " + (error?.message || "Не удалось отправить заявку."));
     } finally {
       if (button) { button.disabled = false; button.textContent = "Запросить доступ Совета"; }
+    }
+  }
+
+  async function startSchoolAdminReview(requestId) {
+    if (!user || profile?.role !== "school_admin" || !requestId) {
+      notice("Недостаточно прав для начала рассмотрения.");
+      return;
+    }
+    try {
+      const { data, error } = await sb.functions.invoke("school-admin-access", {
+        body: { action: "start_review", request_id: requestId }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось взять заявку на рассмотрение.");
+      notice("Заявка взята на рассмотрение. Теперь можно проверить членство и принять решение.");
+      await loadSchoolAdminAccess();
+    } catch (error) {
+      notice("Ошибка: " + (error?.message || "Не удалось начать рассмотрение."));
     }
   }
 
@@ -1767,6 +1844,7 @@ window.onunhandledrejection = function(event) {
     }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
+    else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
     else if (action === 'review-school-admin') { reviewSchoolAdminRequest(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
     else if (action === 'update-idea') { window.updateIdea(btn.dataset.id, btn.dataset.status); }
