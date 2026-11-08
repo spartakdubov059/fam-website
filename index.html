@@ -356,16 +356,14 @@
           По умолчанию каждый аккаунт FAM — обычный пользователь. Членство в Ученическом совете и права администратора не назначаются автоматически.
         </p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете" style="font-size:12px; margin-bottom:8px;">
-          <option value="">Выберите роль в Совете</option>
-          <option value="Член Ученического совета">Член Совета</option>
-          <option value="Заместитель председателя Ученического совета">Заместитель председателя</option>
-          <option value="Председатель Ученического совета">Председатель</option>
+          <option value="">Выберите должность</option>
+          <option value="Участник Ученического совета">Участник Ученического совета</option>
+          <option value="Администратор">Администратор</option>
         </select>
         <div style="font-size:10px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
-          <div><b style="color:var(--text);">Член Совета</b> — участвует в инициативах и работе Совета.</div>
-          <div><b style="color:var(--text);">Заместитель председателя</b> — помогает руководить работой и заменяет председателя.</div>
-          <div><b style="color:var(--text);">Председатель</b> — организует работу и координирует Совет.</div>
-          <div style="margin-top:6px;">В FAM все три должности пока получают одинаковый набор прав панели. Отличаются обязанности, а не технические разрешения.</div>
+          <div><b style="color:var(--text);">Участник совета</b> — публикует школьные мероприятия, работает с идеями и заявками на свои мероприятия.</div>
+          <div><b style="color:var(--text);">Администратор</b> — имеет все права участника, а также рассматривает заявки, назначает и снимает полномочия, управляет объявлениями и аккаунтами своей школы.</div>
+          <div style="margin-top:6px;">Новая роль назначается только после одобрения действующим администратором. Самостоятельно повысить свои права нельзя.</div>
         </div>
         <div id="schoolAdminAccessStatus" style="font-size:11px; color:var(--muted); margin-bottom:8px;" aria-live="polite"></div>
         <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">
@@ -379,6 +377,7 @@
       </div>
       <div id="adminRequests" class="hidden profile-box">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
+        <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Здесь отображаются заявки на ваши мероприятия.</p>
         <div id="adminReqList"></div>
       </div>
       <div class="profile-box">
@@ -400,6 +399,19 @@
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
+          </div>
+          <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+              <h5 style="font-size:12px;margin:0;">Управление школой</h5>
+              <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
+            </div>
+            <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
+            <h6 style="font-size:11px;margin:10px 0 6px;">Аккаунты школы</h6>
+            <div id="councilAdminUsers" aria-live="polite"></div>
+            <h6 style="font-size:11px;margin:12px 0 6px;">Объявления школы</h6>
+            <div id="councilAdminListings" aria-live="polite"></div>
+            <h6 style="font-size:11px;margin:12px 0 6px;">История действий</h6>
+            <div id="councilAdminAudit" aria-live="polite"></div>
           </div>
           <div class="idea-folders">
             <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
@@ -823,7 +835,7 @@ window.onunhandledrejection = function(event) {
       ];
       if (user && user.id) {
         promises.push(sb.from("event_registrations").select("*").eq("user_id", user.id));
-        const ideasQuery = profile?.role === 'school_admin'
+        const ideasQuery = ["school_admin", "council_member"].includes(profile?.role)
           ? sb.from("ideas").select("*").eq('school_id', profile.school_id).order("created_at", { ascending: false })
           : sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
         promises.push(ideasQuery);
@@ -1189,8 +1201,8 @@ window.onunhandledrejection = function(event) {
   };
 
   window.confirmReg = async function(regId, evId, action) {
-    if (!user || profile?.role !== 'school_admin') {
-      alert("Недостаточно прав для обработки заявок.");
+    if (!user || !["school_admin", "council_member"].includes(profile?.role)) {
+      alert("Обрабатывать заявки на свои мероприятия могут только участники совета и администраторы.");
       return;
     }
     if (!["approve", "reject"].includes(action)) return;
@@ -1231,7 +1243,7 @@ window.onunhandledrejection = function(event) {
   }
 
   function updateIdeaCounters() {
-    if (!profile || profile.role !== 'school_admin') return;
+    if (!profile || !["school_admin", "council_member"].includes(profile.role)) return;
     $("countNew").textContent = ideas.filter(i => i.admin_status === 'new').length;
     $("countWork").textContent = ideas.filter(i => i.admin_status === 'in_progress').length;
     $("countDone").textContent = ideas.filter(i => i.admin_status === 'done').length;
@@ -1239,8 +1251,8 @@ window.onunhandledrejection = function(event) {
   }
 
   window.updateIdea = async function(id, status) {
-    if (!user || profile?.role !== 'school_admin') {
-      alert("Недостаточно прав для изменения идей.");
+    if (!user || !["school_admin", "council_member"].includes(profile?.role)) {
+      alert("Изменять идеи могут только участники Ученического совета и администраторы.");
       return;
     }
     if (!["in_progress", "done", "rejected"].includes(status)) return;
@@ -1272,7 +1284,7 @@ window.onunhandledrejection = function(event) {
     else if (currentIdeaFolder === 'done') filtered = ideas.filter(i => i.admin_status === 'done');
     else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.admin_status === 'rejected');
     if (filtered.length === 0) { content.innerHTML = '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">В этой папке пока пусто</p>'; return; }
-    const showClear = ['work','done','rejected'].includes(currentIdeaFolder);
+    const showClear = profile?.role === "school_admin" && ['work','done','rejected'].includes(currentIdeaFolder);
     const names = { work: 'в работе', done: 'выполненные', rejected: 'отклонённые' };
     let html = '';
     if (showClear) html += `<div class="clear-btn-wrapper"><button class="clear-folder-btn" data-action="clear-folder" data-folder="${currentIdeaFolder}">🗑 Очистить ${names[currentIdeaFolder]} (${filtered.length})</button></div>`;
@@ -1421,8 +1433,8 @@ window.onunhandledrejection = function(event) {
         if (error) throw error;
         if (!data?.ok) throw new Error(data?.error || "Не удалось проверить заявку.");
 
-        if (data.role === "school_admin") {
-          profile.role = "school_admin";
+        if (["council_member", "school_admin"].includes(data.role)) {
+          profile.role = data.role;
           await loadSchoolAdminAccess();
           return;
         }
@@ -1547,12 +1559,11 @@ window.onunhandledrejection = function(event) {
     const button = $("schoolAdminApplyBtn");
     const applicantNote = noteEl?.value?.trim() || "";
     const allowedRoles = [
-      "Председатель Ученического совета",
-      "Заместитель председателя Ученического совета",
-      "Член Ученического совета"
+      "Участник Ученического совета",
+      "Администратор"
     ];
     if (!allowedRoles.includes(applicantNote)) {
-      notice("Выберите одну из трёх ролей Ученического совета.");
+      notice("Выберите одну из двух должностей.");
       return;
     }
     if (button) { button.disabled = true; button.textContent = "Отправляем..."; }
@@ -1612,13 +1623,140 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  function councilRoleName(role) {
+    if (role === "school_admin") return "Администратор";
+    if (role === "council_member") return "Участник совета";
+    return "Обычный пользователь";
+  }
+
+  function councilAuditLabel(action) {
+    const labels = {
+      role_granted: "Выданы полномочия",
+      role_revoked: "Полномочия сняты",
+      application_rejected: "Заявка отклонена",
+      listing_deleted: "Удалено объявление",
+      account_deleted: "Удалён аккаунт"
+    };
+    return labels[action] || "Действие администратора";
+  }
+
+  async function loadCouncilAdminTools() {
+    const box = $("councilAdminTools");
+    if (!box) return;
+    if (!user || profile?.role !== "school_admin") {
+      box.classList.add("hidden");
+      return;
+    }
+    box.classList.remove("hidden");
+    $("councilAdminUsers").textContent = "Загружаем аккаунты...";
+    $("councilAdminListings").textContent = "Загружаем объявления...";
+    $("councilAdminAudit").textContent = "Загружаем историю...";
+    try {
+      const { data, error } = await sb.functions.invoke("council-management", {
+        body: { action: "overview" }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить управление школой.");
+
+      const users = Array.isArray(data.users) ? data.users : [];
+      $("councilAdminUsers").innerHTML = users.length ? users.map(row => {
+        const isSelf = row.id === user.id;
+        const canRevoke = !isSelf && ["council_member", "school_admin"].includes(row.role);
+        const canDelete = !isSelf && row.role === "student";
+        const actions = [
+          canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
+          canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button>` : ""
+        ].filter(Boolean).join("");
+        return `<div class="idea-card" style="margin-bottom:7px;">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <b style="font-size:11px;">${esc(row.email || "Пользователь")}</b>
+            <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
+          </div>
+          ${isSelf ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;">Ваш аккаунт</div>' : ""}
+          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${actions}</div>` : ""}
+        </div>`;
+      }).join("") : '<p style="font-size:10px;color:var(--muted);">Аккаунты не найдены.</p>';
+
+      const listingsData = Array.isArray(data.listings) ? data.listings : [];
+      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => `
+        <div class="idea-card" style="margin-bottom:7px;">
+          <div style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
+          <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
+          <button type="button" class="button button-danger button-small" data-action="delete-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
+        </div>
+      `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
+
+      const audit = Array.isArray(data.audit) ? data.audit : [];
+      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
+        <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <b>${esc(councilAuditLabel(row.action))}</b>
+          <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
+        </div>
+      `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
+    } catch (error) {
+      const message = error?.message || "Повторите попытку.";
+      $("councilAdminUsers").textContent = "Ошибка: " + message;
+      $("councilAdminListings").textContent = "Ошибка загрузки.";
+      $("councilAdminAudit").textContent = "Ошибка загрузки.";
+    }
+  }
+
+  async function callCouncilManagement(action, targetId) {
+    if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
+    const { data, error } = await sb.functions.invoke("council-management", {
+      body: { action, target_id: targetId }
+    });
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || "Операция не выполнена.");
+    return data;
+  }
+
+  async function manageCouncilRole(targetId) {
+    if (!targetId || !confirm("Снять с пользователя полномочия Ученического совета? Его аккаунт останется обычным.")) return;
+    try {
+      await callCouncilManagement("revoke_role", targetId);
+      notice("Полномочия сняты.");
+      await loadCouncilAdminTools();
+    } catch (error) {
+      notice("Не удалось снять полномочия: " + (error?.message || "Ошибка."));
+    }
+  }
+
+  async function manageCouncilAccount(targetId) {
+    if (!targetId || !confirm("Удалить аккаунт пользователя? Действие необратимо: удалятся профиль, объявления, сообщения и его файлы.")) return;
+    if (!confirm("Подтвердите окончательное удаление аккаунта.")) return;
+    try {
+      await callCouncilManagement("delete_account", targetId);
+      notice("Аккаунт и связанные данные удалены.");
+      await loadCouncilAdminTools();
+      await loadAll();
+    } catch (error) {
+      notice("Не удалось удалить аккаунт: " + (error?.message || "Ошибка."));
+    }
+  }
+
+  async function manageSchoolListing(targetId) {
+    if (!targetId || !confirm("Навсегда удалить это объявление школы?")) return;
+    try {
+      await callCouncilManagement("delete_listing", targetId);
+      listings = listings.filter(row => row.id !== targetId);
+      notice("Объявление удалено.");
+      await loadCouncilAdminTools();
+      renderListings();
+      await renderProfile();
+    } catch (error) {
+      notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+    }
+  }
+
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
     $("profEmail").textContent = user.email;
     if (profile?.avatar_url) $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     else $("avatarPreview").textContent = user.email[0].toUpperCase();
-    $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + (profile?.role === 'school_admin' ? " · Ученический совет" : "");
+    const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
+    $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
 
     let myL = listings.filter(l => l.user_id === user.id);
     if (myL.length > 0) {
@@ -1631,8 +1769,11 @@ window.onunhandledrejection = function(event) {
     renderIdeas();
     await loadSchoolAdminAccess();
 
-    if (profile && profile.role === 'school_admin') {
+    const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
+    if (isCouncilMember) {
       $("adminIdeasDash").classList.remove("hidden");
+      $("councilAdminTools").classList.toggle("hidden", profile.role !== "school_admin");
+      if (profile.role === "school_admin") await loadCouncilAdminTools();
       updateIdeaCounters(); renderIdeaFolderContent();
       $("adminRequests").classList.remove("hidden");
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
@@ -1652,6 +1793,7 @@ window.onunhandledrejection = function(event) {
     } else {
       $("adminIdeasDash").classList.add("hidden");
       $("adminRequests").classList.add("hidden");
+      $("councilAdminTools").classList.add("hidden");
     }
   }
 
@@ -1819,7 +1961,7 @@ window.onunhandledrejection = function(event) {
 
     if (name === 'profile') {
       if (user) {
-        const ideasQuery = profile?.role === 'school_admin'
+        const ideasQuery = ["school_admin", "council_member"].includes(profile?.role)
           ? sb.from("ideas").select("*").eq('school_id', profile.school_id).order("created_at", { ascending: false })
           : sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
         ideasQuery.then(res => {
@@ -1897,6 +2039,10 @@ window.onunhandledrejection = function(event) {
     }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
+    else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); }
+    else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
+    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
+    else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
     else if (action === 'review-school-admin') { reviewSchoolAdminRequest(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
@@ -2072,7 +2218,7 @@ window.onunhandledrejection = function(event) {
     console.error("Auth error:", err);
     return loadAll();
   }).then(() => {
-    if(user && profile?.role === 'school_admin') $("evOption").style.display = "block";
+    if(user && ["school_admin", "council_member"].includes(profile?.role)) $("evOption").style.display = "block";
   });
 })();
 </script>
