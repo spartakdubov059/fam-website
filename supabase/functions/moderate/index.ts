@@ -143,6 +143,7 @@ serve(async (req: Request) => {
     // It is a classifier endpoint, not a text-generation model. Never send the same text
     // to a second provider if this provider is unavailable.
     if (OPENAI_KEY) {
+      console.info("moderation_provider_selected", "openai");
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12_000);
       let response: Response | null = null;
@@ -204,6 +205,11 @@ serve(async (req: Request) => {
         }, 200, headers);
       }
 
+      console.info("openai_moderation_completed", JSON.stringify({
+        flagged: moderationResult.flagged,
+        request_id: response.headers.get("x-request-id") ?? null,
+      }));
+
       if (moderationResult.flagged) {
         return jsonResponse({
           action: "pending",
@@ -216,6 +222,7 @@ serve(async (req: Request) => {
     }
 
     if (!OPENROUTER_KEY) {
+      console.warn("moderation_provider_selected", "none");
       console.error("moderation_config_error: no OPENAI_API_KEY or OPENROUTER_API_KEY configured");
       return jsonResponse({
         action: "pending",
