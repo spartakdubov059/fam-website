@@ -90,6 +90,7 @@ async function moderate(
   text: string,
   authorization: string,
   origin: string | null,
+  rulesOnly = false,
 ): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string }> {
   let response: Response;
   try {
@@ -101,7 +102,7 @@ async function moderate(
         "Content-Type": "application/json",
         ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Origin": origin } : {}),
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, rules_only: rulesOnly }),
     });
   } catch {
     return {
@@ -289,7 +290,7 @@ Deno.serve(async (req: Request) => {
       if (text.length < 2 || text.length > 1000) return fail("Идея должна содержать от 2 до 1000 символов.", 400, headers);
       if (!profile.school_id) return fail("Укажите школу в профиле перед отправкой идеи.", 400, headers);
 
-      const moderation = await moderate(text, authorization, origin);
+      const moderation = await moderate(text, authorization, origin, true);
       if (!moderation) return fail("Сервис модерации недоступен. Идея не отправлена.", 503, headers);
       if (moderation.action === "reject") {
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку." }, 200, headers);
