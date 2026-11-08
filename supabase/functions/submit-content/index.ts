@@ -85,6 +85,99 @@ async function adminRequest(
   }
   return { ok: response.ok, status: response.status, data };
 }
+function pendingListingImagePath(imageUrl: string, userId: string): string | null {
+  try {
+    const url = new URL(imageUrl);
+    const prefix = "/storage/v1/object/sign/listing-images-pending/" + userId + "/";
+    if (url.origin !== SUPABASE_URL || !url.pathname.startsWith(prefix) || !url.searchParams.has("token")) return null;
+    const tail = decodeURIComponent(url.pathname.slice(prefix.length));
+    if (!tail || tail.includes("..") || tail.includes("/") || !tail.startsWith("listing_" + userId + "_")) return null;
+    if (!/\.(?:jpe?g|png|webp)$/i.test(tail)) return null;
+    return userId + "/" + tail;
+  } catch {
+    return null;
+  }
+}
+
+function storageHeaders(contentType: string | null = null): Record<string, string> {
+  const headers: Record<string, string> = { "apikey": SUPABASE_SECRET_KEY };
+  if (LEGACY_SECRET_IS_JWT) headers["Authorization"] = "Bearer " + SUPABASE_SECRET_KEY;
+  if (contentType) headers["Content-Type"] = contentType;
+  return headers;
+}
+
+async function removePendingListingImage(imageUrl: string, userId: string): Promise<void> {
+  const path = pendingListingImagePath(imageUrl, userId);
+  if (!path) return;
+  try {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/listing-images-pending", {
+      method: "DELETE",
+      headers: storageHeaders("application/json"),
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!response.ok) console.warn("pending_listing_image_cleanup_failed", response.status);
+  } catch {
+    console.warn("pending_listing_image_cleanup_failed", "network_error");
+  }
+}
+
+async function publishPendingListingImage(
+  imageUrl: string,
+  userId: string,
+): Promise<{ url: string; path: string }> {
+  const pendingPath = pendingListingImagePath(imageUrl, userId);
+  if (!pendingPath) throw new Error("Не удалось подтвердить временный файл фотографии.");
+
+  const source = await fetch(imageUrl);
+  if (!source.ok) throw new Error("Не удалось получить фотографию для публикации.");
+  const mime = (source.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const extensions: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  const extension = extensions[mime];
+  if (!extension) throw new Error("Допускаются только JPG, PNG или WebP.");
+  const statedLength = Number(source.headers.get("content-length") || 0);
+  if (statedLength > 5 * 1024 * 1024) throw new Error("Фото больше допустимого размера.");
+  const bytes = new Uint8Array(await source.arrayBuffer());
+  if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error("Фото больше допустимого размера.");
+
+  const publicPath = "listing_" + userId + "_" + crypto.randomUUID() + "." + extension;
+  const uploaded = await fetch(SUPABASE_URL + "/storage/v1/object/listings-images/" + publicPath, {
+    method: "POST",
+    headers: {
+      ...storageHeaders(mime),
+      "x-upsert": "false",
+    },
+    body: bytes,
+  });
+  if (!uploaded.ok) {
+    console.warn("approved_listing_image_publish_failed", uploaded.status);
+    throw new Error("Не удалось сохранить проверенную фотографию.");
+  }
+
+  await removePendingListingImage(imageUrl, userId);
+  return {
+    url: SUPABASE_URL + "/storage/v1/object/public/listings-images/" + publicPath,
+    path: publicPath,
+  };
+}
+
+async function removePublishedListingImage(path: string): Promise<void> {
+  if (!/^listing_[0-9a-f-]{36}_[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path)) return;
+  try {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/listings-images", {
+      method: "DELETE",
+      headers: storageHeaders("application/json"),
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!response.ok) console.warn("unused_listing_image_cleanup_failed", response.status);
+  } catch {
+    console.warn("unused_listing_image_cleanup_failed", "network_error");
+  }
+}
+
 
 async function moderate(
   text: string,
@@ -92,6 +185,7 @@ async function moderate(
   origin: string | null,
   rulesOnly = false,
   imageUrl: string | null = null,
+  context: { kind: "listing" | "idea" | "message"; sender_id: string; receiver_id?: string | null; school_id: string } | null = null,
 ): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string; reason_code?: string }> {
   let response: Response;
   try {
@@ -108,6 +202,7 @@ async function moderate(
         text,
         rules_only: rulesOnly,
         ...(imageUrl ? { image_url: imageUrl } : {}),
+        ...(context ? { context } : {}),
       }),
     });
   } catch {
@@ -234,19 +329,25 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (imageUrl !== null) {
-        const requiredPrefix = SUPABASE_URL + "/storage/v1/object/public/listings-images/listing_" + userId + "_";
-        if (!imageUrl.startsWith(requiredPrefix) || imageUrl.length > 1200) {
-          return fail("Фото должно быть загружено в личную папку FAM.", 400, headers);
-        }
+      if (imageUrl !== null && !pendingListingImagePath(imageUrl, userId)) {
+        return fail("Фото должно быть загружено в защищённое временное хранилище FAM.", 400, headers);
       }
 
-      const moderation = await moderate(title + "\n" + description + "\n" + priceText, authorization, origin, false, imageUrl);
+      const moderation = await moderate(
+        title + "\n" + description + "\n" + priceText,
+        authorization,
+        origin,
+        false,
+        imageUrl,
+        { kind: "listing", sender_id: userId, school_id: profile.school_id },
+      );
       if (!moderation) return fail("Сервис модерации недоступен. Объявление не опубликовано.", 503, headers);
       if (moderation.action === "reject") {
-        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
+        if (imageUrl) await removePendingListingImage(imageUrl, userId);
+        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст или фотография не прошли проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
       }
       if (moderation.degraded) {
+        if (imageUrl) await removePendingListingImage(imageUrl, userId);
         return respond({
           ok: false,
           status: "pending",
@@ -255,11 +356,21 @@ Deno.serve(async (req: Request) => {
         }, 200, headers);
       }
       if (moderation.action === "pending") {
+        if (imageUrl) await removePendingListingImage(imageUrl, userId);
         return respond({
           ok: false,
           status: "pending",
-          error: "Объявление пока не опубликовано: текст требует дополнительной проверки. Измените формулировку и попробуйте ещё раз.",
+          reason_code: moderation.reason_code ?? null,
+          error: moderation.reason ?? "Объявление пока не опубликовано: нужна дополнительная проверка. Загрузите другое фото или обратитесь к администратору школы.",
         }, 200, headers);
+      }
+
+      let publishedImageUrl: string | null = null;
+      let publishedImagePath: string | null = null;
+      if (imageUrl) {
+        const publishedImage = await publishPendingListingImage(imageUrl, userId);
+        publishedImageUrl = publishedImage.url;
+        publishedImagePath = publishedImage.path;
       }
 
       const status = "active";
@@ -269,7 +380,7 @@ Deno.serve(async (req: Request) => {
         description,
         category,
         price_text: priceText || "Бесплатно",
-        image_url: imageUrl,
+        image_url: publishedImageUrl,
         status,
         is_event: isEvent,
         school_id: profile.school_id,
@@ -282,6 +393,7 @@ Deno.serve(async (req: Request) => {
       const insertResult = await adminRequest("listings?select=*", "POST", insertRow);
       const listing = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
       if (!insertResult.ok || !listing) {
+        if (publishedImagePath) await removePublishedListingImage(publishedImagePath);
         console.error("Listing insert failed:", insertResult.status);
         return fail("Не удалось сохранить объявление.", 500, headers);
       }
@@ -299,7 +411,11 @@ Deno.serve(async (req: Request) => {
       if (text.length < 2 || text.length > 1000) return fail("Идея должна содержать от 2 до 1000 символов.", 400, headers);
       if (!profile.school_id) return fail("Укажите школу в профиле перед отправкой идеи.", 400, headers);
 
-      const moderation = await moderate(text, authorization, origin, true);
+      const moderation = await moderate(text, authorization, origin, true, null, {
+        kind: "idea",
+        sender_id: userId,
+        school_id: profile.school_id,
+      });
       if (!moderation) return fail("Сервис модерации недоступен. Идея не отправлена.", 503, headers);
       if (moderation.action === "reject") {
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
@@ -342,7 +458,12 @@ Deno.serve(async (req: Request) => {
     const recipient = Array.isArray(recipientResult.data) ? recipientResult.data[0] : null;
     if (!recipientResult.ok || !recipient) return fail("Получатель не найден.", 404, headers);
 
-    const moderation = await moderate(body, authorization, origin);
+    const moderation = await moderate(body, authorization, origin, false, null, {
+      kind: "message",
+      sender_id: userId,
+      receiver_id: receiverId,
+      school_id: profile.school_id,
+    });
     if (!moderation) return fail("Сервис модерации недоступен. Сообщение не отправлено.", 503, headers);
     if (moderation.action !== "ok") {
       return respond({
