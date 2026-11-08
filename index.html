@@ -1959,6 +1959,7 @@ window.onunhandledrejection = function(event) {
     if (!confirm(message)) return;
     if (decision === "approve" && !confirm("Подтвердите окончательное удаление аккаунта.")) return;
     try {
+      await ensureRecentAdminAuthentication();
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "review_account_deletion", request_id: requestId, decision }
       });
@@ -2009,8 +2010,40 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  async function ensureRecentAdminAuthentication() {
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+    if (sessionError) throw sessionError;
+    const token = sessionData?.session?.access_token || "";
+    const parts = token.split(".");
+    let issuedAt = 0;
+    if (parts.length === 3) {
+      try {
+        const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
+        issuedAt = Number(JSON.parse(atob(padded))?.iat) || 0;
+      } catch (_) {
+        issuedAt = 0;
+      }
+    }
+    const age = Date.now() / 1000 - issuedAt;
+    if (issuedAt > 0 && age >= 0 && age <= 600) return true;
+
+    const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
+    if (!password) return false;
+    const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
+    if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
+    return true;
+  }
+
   async function callCouncilManagement(action, targetId) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
+    const { data: freshSession, error: sessionError } = await sb.auth.getSession();
+    if (sessionError) throw sessionError;
+    const accessToken = freshSession?.session?.access_token || "";
+    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing"];
+    if (sensitiveActions.includes(action)) {
+      await ensureRecentAdminAuthentication();
+    }
     const { data, error } = await sb.functions.invoke("council-management", {
       body: { action, target_id: targetId }
     });
