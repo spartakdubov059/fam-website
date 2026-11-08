@@ -6,7 +6,7 @@ FAM — школьная платформа для объявлений, иде�
 
 - [Рабочие роли команды и план внедрения](docs/AGENT_ROLES.md)
 - [Журнал изменений](CHANGELOG.md)
-- [Серверная модерация](supabase/functions/moderate/index.ts)
+- [Серверная модерация](supabase/functions/moderate/index.ts) и [второй ИИ-эксперт](supabase/functions/moderate/dispute-reviewer.ts)
 - [GitHub Actions: тесты модерации](.github/workflows/moderation-regression.yml)
 - [Автоматические тесты модерации](tests/moderation/content-safety.test.mjs)
 - [Локальный модуль контактной и тематической проверки](supabase/functions/moderate/content-safety.js)
