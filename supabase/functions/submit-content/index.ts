@@ -225,7 +225,9 @@ Deno.serve(async (req: Request) => {
       if (priceText.length > 50) return fail("Поле цены слишком длинное.", 400, headers);
 
       if (isEvent) {
-        if (profile.role !== "school_admin") return fail("Создавать мероприятия может только школьный совет.", 403, headers);
+        if (!["council_member", "school_admin"].includes(profile.role) || !profile.school_id) {
+          return fail("Публиковать мероприятия могут только участники Ученического совета и администраторы своей школы.", 403, headers);
+        }
         if (!["open", "request", "limited"].includes(eventType)) return fail("Недопустимый тип мероприятия.", 400, headers);
         if (eventType === "limited" && (!Number.isInteger(maxSeats) || maxSeats < 1 || maxSeats > 500)) {
           return fail("Укажите корректное количество мест.", 400, headers);
