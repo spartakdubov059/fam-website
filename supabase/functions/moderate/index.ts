@@ -85,11 +85,26 @@ function parseSafetyContext(raw: unknown): SafetyContext | null {
 }
 
 function safetySignalFromCategories(categories: string[]): { category: SafetyCategory; severity: "medium" | "high" } | null {
-  if (categories.some(category => ["harassment/threatening", "hate/threatening", "violence", "violence/graphic"].includes(category))) {
+  if (categories.some(category => [
+    "harassment/threatening",
+    "hate/threatening",
+    "violence",
+    "violence/graphic",
+    "illicit/violent",
+  ].includes(category))) {
     return { category: "threat_or_intimidation", severity: "high" };
   }
   if (categories.includes("hate")) return { category: "hate_or_discrimination", severity: "high" };
   if (categories.includes("harassment")) return { category: "targeted_harassment", severity: "medium" };
+  if (categories.some(category => [
+    "sexual",
+    "sexual/minors",
+    "self-harm",
+    "self-harm/intent",
+    "self-harm/instructions",
+  ].includes(category))) {
+    return { category: "unclear_safety_signal", severity: "high" };
+  }
   return null;
 }
 
@@ -114,6 +129,10 @@ async function recordCachedSignal(context: SafetyContext | null, cached: Record<
   const map: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
     targeted_harassment: { category: "targeted_harassment", severity: "medium" },
     negative_personal_call: { category: "negative_personal_call", severity: "medium" },
+    hate_or_discrimination: { category: "hate_or_discrimination", severity: "high" },
+    threat_or_intimidation: { category: "threat_or_intimidation", severity: "high" },
+    unclear_context: { category: "unclear_safety_signal", severity: "medium" },
+    policy_violation: { category: "unclear_safety_signal", severity: "medium" },
     spam_or_advertising: { category: "spam_or_repeated_abuse", severity: "medium" },
     image_requires_review: { category: "unsafe_image", severity: "medium" },
     personal_information: { category: "personal_data_in_image", severity: "medium" },
@@ -458,7 +477,16 @@ serve(async (req: Request) => {
         }));
 
         if (secondReview.action !== "ok") {
-          const signal = safetySignalFromCategories(flaggedCategories);
+          const reviewSignals: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
+            targeted_harassment: { category: "targeted_harassment", severity: "medium" },
+            hate_or_discrimination: { category: "hate_or_discrimination", severity: "high" },
+            threat_or_intimidation: { category: "threat_or_intimidation", severity: "high" },
+            negative_personal_call: { category: "negative_personal_call", severity: "medium" },
+            policy_violation: { category: "unclear_safety_signal", severity: "medium" },
+            unclear_context: { category: "unclear_safety_signal", severity: "medium" },
+          };
+          const semanticSignal = reviewSignals[secondReview.reason_code];
+          const signal = semanticSignal ?? safetySignalFromCategories(flaggedCategories);
           if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
           else await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
         }
