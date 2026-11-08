@@ -90,25 +90,49 @@ async function moderate(
   text: string,
   authorization: string,
   origin: string | null,
-): Promise<{ action: "ok" | "pending" | "reject"; reason?: string } | null> {
-  const response = await fetch(SUPABASE_URL + "/functions/v1/moderate", {
-    method: "POST",
-    headers: {
-      "Authorization": authorization,
-      "apikey": SUPABASE_PUBLISHABLE_KEY,
-      "Content-Type": "application/json",
-      ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Origin": origin } : {}),
-    },
-    body: JSON.stringify({ text }),
-  });
+): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean }> {
+  let response: Response;
+  try {
+    response = await fetch(SUPABASE_URL + "/functions/v1/moderate", {
+      method: "POST",
+      headers: {
+        "Authorization": authorization,
+        "apikey": SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Origin": origin } : {}),
+      },
+      body: JSON.stringify({ text }),
+    });
+  } catch {
+    return {
+      action: "pending",
+      degraded: true,
+      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+    };
+  }
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    console.warn("Moderation Edge Function returned:", response.status);
+    return {
+      action: "pending",
+      degraded: true,
+      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+    };
+  }
+
   const data = await response.json().catch(() => null);
-  if (!data || !["ok", "pending", "reject"].includes(data.action)) return null;
+  if (!data || !["ok", "pending", "reject"].includes(data.action)) {
+    return {
+      action: "pending",
+      degraded: true,
+      reason: "ИИ вернул некорректный ответ. Идея будет передана Совету на ручную проверку.",
+    };
+  }
 
   return {
     action: data.action,
     reason: typeof data.reason === "string" ? data.reason.slice(0, 180) : undefined,
+    degraded: data.degraded === true,
   };
 }
 
@@ -211,8 +235,23 @@ Deno.serve(async (req: Request) => {
       if (moderation.action === "reject") {
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку." }, 200, headers);
       }
+      if (moderation.degraded) {
+        return respond({
+          ok: false,
+          status: "pending",
+          degraded: true,
+          error: "ИИ-модерация временно недоступна. Объявление не опубликовано — попробуйте позже.",
+        }, 200, headers);
+      }
+      if (moderation.action === "pending") {
+        return respond({
+          ok: false,
+          status: "pending",
+          error: "Объявление пока не опубликовано: текст требует дополнительной проверки. Измените формулировку и попробуйте ещё раз.",
+        }, 200, headers);
+      }
 
-      const status = moderation.action === "pending" ? "hidden" : "active";
+      const status = "active";
       const insertRow = {
         user_id: userId,
         title,
@@ -271,7 +310,13 @@ Deno.serve(async (req: Request) => {
         return fail("Не удалось сохранить идею.", 500, headers);
       }
 
-      return respond({ ok: true, status: moderation.action, idea, reason: moderation.reason ?? null }, 200, headers);
+      return respond({
+        ok: true,
+        status: moderation.action,
+        degraded: moderation.degraded === true,
+        idea,
+        reason: moderation.reason ?? null,
+      }, 200, headers);
     }
 
     const body = typeof payload.body === "string" ? payload.body.trim() : "";
@@ -291,6 +336,7 @@ Deno.serve(async (req: Request) => {
       return respond({
         ok: false,
         status: moderation.action === "pending" ? "pending" : "rejected",
+        degraded: moderation.degraded === true,
         reason: moderation.reason ?? (moderation.action === "pending"
           ? "Сообщение требует дополнительной проверки."
           : "Сообщение не прошло проверку."),
