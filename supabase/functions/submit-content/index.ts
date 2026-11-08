@@ -91,7 +91,7 @@ async function moderate(
   authorization: string,
   origin: string | null,
   rulesOnly = false,
-): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string }> {
+): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string; reason_code?: string }> {
   let response: Response;
   try {
     response = await fetch(SUPABASE_URL + "/functions/v1/moderate", {
@@ -135,6 +135,7 @@ async function moderate(
     reason: typeof data.reason === "string" ? data.reason.slice(0, 180) : undefined,
     degraded: data.degraded === true,
     diagnostic_code: typeof data.diagnostic_code === "string" ? data.diagnostic_code : undefined,
+    reason_code: typeof data.reason_code === "string" ? data.reason_code : undefined,
   };
 }
 
@@ -235,7 +236,7 @@ Deno.serve(async (req: Request) => {
       const moderation = await moderate(title + "\n" + description + "\n" + priceText, authorization, origin);
       if (!moderation) return fail("Сервис модерации недоступен. Объявление не опубликовано.", 503, headers);
       if (moderation.action === "reject") {
-        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку." }, 200, headers);
+        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
       }
       if (moderation.degraded) {
         return respond({
@@ -293,7 +294,7 @@ Deno.serve(async (req: Request) => {
       const moderation = await moderate(text, authorization, origin, true);
       if (!moderation) return fail("Сервис модерации недоступен. Идея не отправлена.", 503, headers);
       if (moderation.action === "reject") {
-        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку." }, 200, headers);
+        return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
       }
 
       const insertResult = await adminRequest("ideas?select=*", "POST", {
@@ -341,8 +342,9 @@ Deno.serve(async (req: Request) => {
         status: moderation.action === "pending" ? "pending" : "rejected",
         degraded: moderation.degraded === true,
         reason: moderation.reason ?? (moderation.action === "pending"
-          ? "Сообщение требует дополнительной проверки."
+          ? "Сообщение не отправлено: требуется дополнительная проверка."
           : "Сообщение не прошло проверку."),
+        reason_code: moderation.reason_code ?? null,
       }, 200, headers);
     }
 
