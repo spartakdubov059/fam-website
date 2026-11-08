@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const own = await adminRequest(
-        "school_admin_requests?select=id,school_id,applicant_note,status,created_at,reviewed_at,review_note&user_id=eq."
+        "school_admin_requests?select=id,school_id,applicant_note,status,created_at,review_started_at,reviewed_at,review_note&user_id=eq."
         + encodeURIComponent(userId)
         + "&order=created_at.desc&limit=1",
       );
@@ -173,6 +173,15 @@ Deno.serve(async (req: Request) => {
         return json({ ok: false, error: "Школа аккаунта не найдена. Обратитесь к администратору FAM." }, 400, headers);
       }
 
+      const existing = await adminRequest(
+        "school_admin_requests?select=id,status,created_at,review_started_at&user_id=eq."
+        + encodeURIComponent(userId) + "&status=in.(pending,reviewing)&limit=1",
+      );
+      if (!existing.ok) return json({ ok: false, error: "Не удалось проверить предыдущую заявку." }, 503, headers);
+      if (Array.isArray(existing.data) && existing.data[0]) {
+        return json({ ok: true, already_pending: true, request: existing.data[0] }, 200, headers);
+      }
+
       const insert = await adminRequest("school_admin_requests?select=id,status,created_at", "POST", {
         user_id: userId,
         school_id: profile.school_id,
@@ -182,8 +191,8 @@ Deno.serve(async (req: Request) => {
       if (!insert.ok) {
         if (insert.status === 409 || insert.status === 400) {
           const existing = await adminRequest(
-            "school_admin_requests?select=id,status,created_at&user_id=eq." + encodeURIComponent(userId)
-            + "&status=eq.pending&limit=1",
+            "school_admin_requests?select=id,status,created_at,review_started_at&user_id=eq." + encodeURIComponent(userId)
+            + "&status=in.(pending,reviewing)&limit=1",
           );
           if (existing.ok && Array.isArray(existing.data) && existing.data[0]) {
             return json({ ok: true, already_pending: true, request: existing.data[0] }, 200, headers);
@@ -194,6 +203,24 @@ Deno.serve(async (req: Request) => {
       }
       const created = Array.isArray(insert.data) ? insert.data[0] : null;
       return json({ ok: true, request: created }, 200, headers);
+    }
+
+    if (action === "start_review") {
+      if (profile.role !== "school_admin" || !profile.school_id) {
+        return json({ ok: false, error: "Взять заявку на рассмотрение может только Совет своего лицея." }, 403, headers);
+      }
+      const requestId = typeof payload.request_id === "string" ? payload.request_id : "";
+      if (!UUID_RE.test(requestId)) return json({ ok: false, error: "Некорректный номер заявки." }, 400, headers);
+
+      const result = await adminRequest("rpc/start_school_admin_request_review", "POST", {
+        p_request_id: requestId,
+        p_reviewer_id: userId,
+      });
+      if (!result.ok) {
+        const message = result.data?.message || result.data?.details || "Не удалось взять заявку на рассмотрение.";
+        return json({ ok: false, error: String(message).slice(0, 200) }, result.status === 403 ? 403 : 409, headers);
+      }
+      return json({ ok: true, result: result.data }, 200, headers);
     }
 
     if (action === "review") {
