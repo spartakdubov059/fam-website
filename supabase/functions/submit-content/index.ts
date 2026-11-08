@@ -385,7 +385,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const profileResult = await adminRequest(
-      "profiles?select=id,school_id,role&id=eq." + encodeURIComponent(userId) + "&limit=1",
+      "profiles?select=id,school_id,role,avatar_url&id=eq." + encodeURIComponent(userId) + "&limit=1",
     );
     const profile = Array.isArray(profileResult.data) ? profileResult.data[0] : null;
     if (!profileResult.ok || !profile) return fail("Профиль пользователя не найден.", 403, headers);
