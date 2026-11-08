@@ -147,10 +147,14 @@ Deno.serve(async (req: Request) => {
         + "&order=created_at.desc&limit=1",
       );
       if (!own.ok) return json({ ok: false, error: "Не удалось загрузить статус заявки." }, 503, headers);
+      const ownRequest = Array.isArray(own.data) ? own.data[0] ?? null : null;
+      if (ownRequest?.applicant_note === "Член Ученического совета") {
+        ownRequest.applicant_note = "Участник Ученического совета";
+      }
       return json({
         ok: true,
         role: profile.role,
-        request: Array.isArray(own.data) ? own.data[0] ?? null : null,
+        request: ownRequest,
       }, 200, headers);
     }
 
