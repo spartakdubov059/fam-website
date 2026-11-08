@@ -90,7 +90,7 @@ async function moderate(
   text: string,
   authorization: string,
   origin: string | null,
-): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean }> {
+): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string }> {
   let response: Response;
   try {
     response = await fetch(SUPABASE_URL + "/functions/v1/moderate", {
@@ -133,6 +133,7 @@ async function moderate(
     action: data.action,
     reason: typeof data.reason === "string" ? data.reason.slice(0, 180) : undefined,
     degraded: data.degraded === true,
+    diagnostic_code: typeof data.diagnostic_code === "string" ? data.diagnostic_code : undefined,
   };
 }
 
@@ -314,6 +315,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         status: moderation.action,
         degraded: moderation.degraded === true,
+        diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
         reason: moderation.reason ?? null,
       }, 200, headers);
