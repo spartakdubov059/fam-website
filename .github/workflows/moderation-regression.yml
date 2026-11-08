@@ -6,10 +6,12 @@ on:
     paths:
       - 'supabase/functions/moderate/**'
       - 'tests/moderation/**'
+      - 'index.html'
   pull_request:
     paths:
       - 'supabase/functions/moderate/**'
       - 'tests/moderation/**'
+      - 'index.html'
 
 permissions:
   contents: read
@@ -27,3 +29,14 @@ jobs:
           node-version: 22
       - name: Run moderation tests
         run: node --test tests/moderation/*.test.mjs
+      - name: Check inline frontend JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
+            .filter((match) => !/\\bsrc\\s*=/.test(match[1]) && match[2].trim().length > 0);
+          if (scripts.length === 0) throw new Error('No inline JavaScript found in index.html');
+          fs.writeFileSync('/tmp/fam-inline-scripts.js', scripts.map((match) => match[2]).join('\\n;\\n'));
+          NODE
+          node --check /tmp/fam-inline-scripts.js
