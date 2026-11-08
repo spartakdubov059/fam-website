@@ -91,6 +91,7 @@ async function moderate(
   authorization: string,
   origin: string | null,
   rulesOnly = false,
+  imageUrl: string | null = null,
 ): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string; reason_code?: string }> {
   let response: Response;
   try {
@@ -99,10 +100,15 @@ async function moderate(
       headers: {
         "Authorization": authorization,
         "apikey": SUPABASE_PUBLISHABLE_KEY,
+        "x-fam-internal-key": SUPABASE_SECRET_KEY,
         "Content-Type": "application/json",
         ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Origin": origin } : {}),
       },
-      body: JSON.stringify({ text, rules_only: rulesOnly }),
+      body: JSON.stringify({
+        text,
+        rules_only: rulesOnly,
+        ...(imageUrl ? { image_url: imageUrl } : {}),
+      }),
     });
   } catch {
     return {
@@ -233,7 +239,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      const moderation = await moderate(title + "\n" + description + "\n" + priceText, authorization, origin);
+      const moderation = await moderate(title + "\n" + description + "\n" + priceText, authorization, origin, false, imageUrl);
       if (!moderation) return fail("Сервис модерации недоступен. Объявление не опубликовано.", 503, headers);
       if (moderation.action === "reject") {
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
