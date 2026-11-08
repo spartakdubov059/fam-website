@@ -63,7 +63,11 @@ serve(async (req: Request) => {
   }
 
   if (!OPENROUTER_KEY) {
-    return jsonResponse({ action: "reject", reason: "Сервис модерации временно недоступен." }, 503, headers);
+    return jsonResponse({
+      action: "pending",
+      degraded: true,
+      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+    }, 200, headers);
   }
 
   try {
@@ -87,30 +91,59 @@ serve(async (req: Request) => {
       }
     }
 
-    const chatRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + OPENROUTER_KEY,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://spartakdubov059.github.io",
-        "X-Title": "FAM School",
-      },
-      body: JSON.stringify({
-        model: "openrouter/free",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: JSON.stringify({ content_to_review: value }) },
-        ],
-        temperature: 0,
-        max_tokens: 120,
-      }),
-    });
+    let chatRes: Response | null = null;
 
-    if (!chatRes.ok) {
+    // The free router may temporarily have no healthy provider or hit its rate limit.
+    // Retry once for transient failures, then fail closed into manual review.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12_000);
+
+      try {
+        chatRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + OPENROUTER_KEY,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://spartakdubov059.github.io",
+            "X-Title": "FAM School",
+          },
+          body: JSON.stringify({
+            model: "openrouter/free",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: JSON.stringify({ content_to_review: value }) },
+            ],
+            temperature: 0,
+            max_tokens: 120,
+          }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        chatRes = null;
+        console.warn("OpenRouter moderation request failed:", error instanceof Error ? error.name : "unknown");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (chatRes?.ok) break;
+
+      const status = chatRes?.status ?? 0;
+      const transient = status === 0 || status === 429 || status === 502 || status === 503 || status === 504;
+      if (!transient || attempt === 1) break;
+
+      const retryAfter = Number(chatRes?.headers.get("Retry-After") ?? "");
+      if (Number.isFinite(retryAfter) && retryAfter > 2) break;
+      await new Promise(resolve => setTimeout(resolve, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500));
+    }
+
+    if (!chatRes?.ok) {
+      console.warn("OpenRouter moderation unavailable:", chatRes?.status ?? "network-timeout");
       return jsonResponse({
-        action: "reject",
-        reason: "Сервис проверки временно недоступен. Попробуйте позже.",
-      }, 503, headers);
+        action: "pending",
+        degraded: true,
+        reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+      }, 200, headers);
     }
 
     const chatData = await chatRes.json();
@@ -118,9 +151,10 @@ serve(async (req: Request) => {
 
     if (typeof answer !== "string" || !answer.trim()) {
       return jsonResponse({
-        action: "reject",
-        reason: "Сервис проверки вернул пустой ответ.",
-      }, 503, headers);
+        action: "pending",
+        degraded: true,
+        reason: "ИИ не вернул результат проверки. Идея будет передана Совету на ручную проверку.",
+      }, 200, headers);
     }
 
     let parsed: unknown;
@@ -128,15 +162,17 @@ serve(async (req: Request) => {
       parsed = JSON.parse(answer.trim());
     } catch {
       return jsonResponse({
-        action: "reject",
-        reason: "Не удалось надёжно проверить текст. Попробуйте позже.",
+        action: "pending",
+        degraded: true,
+        reason: "Не удалось надёжно разобрать ответ ИИ. Идея будет передана Совету на ручную проверку.",
       }, 200, headers);
     }
 
     if (!parsed || typeof parsed !== "object" || !("action" in parsed)) {
       return jsonResponse({
-        action: "reject",
-        reason: "Сервис проверки вернул некорректный ответ.",
+        action: "pending",
+        degraded: true,
+        reason: "ИИ вернул некорректный ответ. Идея будет передана Совету на ручную проверку.",
       }, 200, headers);
     }
 
@@ -148,12 +184,22 @@ serve(async (req: Request) => {
       return jsonResponse({ action: "pending", reason }, 200, headers);
     }
 
-    const reason = typeof result.reason === "string" ? result.reason.slice(0, 180) : "Текст не соответствует правилам FAM.";
-    return jsonResponse({ action: "reject", reason }, 200, headers);
-  } catch {
+    if (result.action === "reject") {
+      const reason = typeof result.reason === "string" ? result.reason.slice(0, 180) : "Текст не соответствует правилам FAM.";
+      return jsonResponse({ action: "reject", reason }, 200, headers);
+    }
+
     return jsonResponse({
-      action: "reject",
-      reason: "Сервис проверки временно недоступен.",
-    }, 503, headers);
+      action: "pending",
+      degraded: true,
+      reason: "ИИ не смог надёжно определить результат. Идея будет передана Совету на ручную проверку.",
+    }, 200, headers);
+  } catch (error) {
+    console.warn("Moderation failed safely:", error instanceof Error ? error.name : "unknown");
+    return jsonResponse({
+      action: "pending",
+      degraded: true,
+      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+    }, 200, headers);
   }
 });
