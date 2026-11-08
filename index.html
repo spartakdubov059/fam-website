@@ -1740,7 +1740,7 @@ window.onunhandledrejection = function(event) {
             <span class="idea-status status-work">${esc(statusText)}</span>
           </div>
           <div style="font-size:10px;color:var(--muted);margin:5px 0;">Запросил: ${esc(row.requester_email || "Участник совета")} · ${esc(councilRoleName(row.target_role))}</div>
-          <div style="font-size:10px;margin:5px 0;"><b>${esc(row.reason_code || "Причина")}</b><br>${esc(row.reason || "")}</div>
+          <div style="font-size:10px;margin:5px 0;"><b>${esc(deletionReasonLabel(row.reason_code))}</b><br>${esc(row.reason || "")}</div>
           <div style="font-size:9px;color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
           ${actions}
         </div>`;
@@ -1776,9 +1776,21 @@ window.onunhandledrejection = function(event) {
       pending: "Ожидает решения администратора",
       processing: "Рассматривается",
       approved: "Удаление одобрено",
-      rejected: "Запрос отклонён"
+      rejected: "Запрос отклонён",
+      cancelled: "Закрыто: аккаунт удалён отдельно"
     };
     return labels[status] || "Статус обновляется";
+  }
+
+  function deletionReasonLabel(code) {
+    const labels = {
+      rules_violation: "Нарушение правил FAM",
+      harassment: "Травля или агрессивное поведение",
+      fake_account: "Подозрение на фальшивый аккаунт",
+      spam: "Спам или повторные нарушения",
+      other: "Другая причина"
+    };
+    return labels[code] || "Причина не указана";
   }
 
   async function loadCouncilDeletionRequestPanel() {
