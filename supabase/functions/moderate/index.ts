@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
-import { reviewDisputedContent } from "./dispute-reviewer.js";
+import { reviewDisputedContent } from "./dispute-reviewer.ts";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
