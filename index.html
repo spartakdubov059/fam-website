@@ -1237,7 +1237,7 @@ window.onunhandledrejection = function(event) {
       notice(submission.degraded
         ? "⚠️ " + (submission.reason || "ИИ-проверка временно недоступна. Идея сохранена для ручной проверки Советом.")
         : submission.status === "pending"
-          ? "Идея отправлена на дополнительную проверку."
+          ? "Идея отправлена школьному Совету на ручную проверку."
           : "Идея отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
