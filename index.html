@@ -175,8 +175,84 @@
     .promo-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; font-size: 13px; align-self: flex-start; }
     .promo-cta svg { width: 15px; height: 15px; }
 
-    .profile-box { background: var(--surface); padding: 18px; border-radius: 24px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.06); }
+    .profile-box { background: var(--surface); padding: 16px; border-radius: 20px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.06); }
     .profile-email { word-break: break-all; font-size: 14px; margin: 0 0 4px; font-weight: 700; }
+    .profile-hero { padding:15px; }
+    .profile-hero-main { display:flex; align-items:center; gap:12px; min-width:0; }
+    .profile-identity { flex:1; min-width:0; }
+    .profile-meta { color:var(--muted); font-size:11px; line-height:1.4; }
+    .profile-avatar-edit { flex:0 0 auto; white-space:nowrap; }
+    .profile-hero-note { margin-top:10px; padding-top:9px; border-top:1px solid var(--border); color:var(--muted); font-size:10px; }
+    .profile-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+    .profile-shortcut { display:flex; align-items:center; gap:8px; min-width:0; text-align:left; padding:11px 9px; border-radius:15px; background:var(--surface); border:1px solid var(--border); color:var(--text); cursor:pointer; }
+    .profile-shortcut > span:nth-child(2) { min-width:0; flex:1; }
+    .profile-shortcut b,.profile-shortcut small { display:block; }
+    .profile-shortcut b { font-size:11px; line-height:1.3; }
+    .profile-shortcut small { margin-top:3px; color:var(--muted); font-size:9px; line-height:1.3; }
+    .profile-shortcut-icon { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; border-radius:10px; background:var(--bg); font-size:15px; }
+    .profile-shortcut-arrow { color:var(--muted); font-size:20px; line-height:1; }
+    .profile-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .profile-section-heading h3 { margin:3px 0 0; font-size:16px; }
+    .profile-eyebrow { font-size:9px; font-weight:800; letter-spacing:1px; color:var(--muted); }
+    .profile-section-icon { display:grid; place-items:center; flex:0 0 38px; width:38px; height:38px; border-radius:12px; background:var(--bg); font-size:19px; }
+    .profile-section-copy { margin:6px 0 10px; font-size:10px; line-height:1.5; color:var(--muted); }
+    .profile-access-card select { margin:4px 0 8px; }
+    .profile-access-status { margin:8px 0; font-size:11px; color:var(--muted); }
+    .profile-help { margin:8px 0; padding:9px 11px; border:1px solid var(--border); border-radius:12px; background:var(--bg); }
+    .profile-help > summary { cursor:pointer; color:var(--muted); font-size:10px; font-weight:700; }
+    .profile-help-body { padding-top:8px; color:var(--muted); font-size:10px; line-height:1.5; }
+    .profile-help-body p { margin:5px 0; }
+    .profile-disclosure { padding:0; overflow:hidden; }
+    .profile-disclosure > summary { display:flex; align-items:center; gap:9px; padding:14px 15px; list-style:none; cursor:pointer; }
+    .profile-disclosure > summary::-webkit-details-marker { display:none; }
+    .profile-disclosure-title { display:flex; align-items:center; gap:9px; flex:1; min-width:0; }
+    .profile-disclosure-title b,.profile-disclosure-title small { display:block; }
+    .profile-disclosure-title b { font-size:12px; }
+    .profile-disclosure-title small { margin-top:3px; font-size:9px; color:var(--muted); font-weight:400; }
+    .profile-disclosure-arrow { flex:0 0 auto; color:var(--muted); font-size:18px; transition:transform .18s ease; }
+    .profile-disclosure[open] > summary { border-bottom:1px solid var(--border); }
+    .profile-disclosure[open] > summary .profile-disclosure-arrow { transform:rotate(180deg); }
+    .profile-disclosure-count,.profile-count { display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 6px; border-radius:999px; background:var(--bg); color:var(--muted); font-size:10px; font-weight:800; }
+    .profile-disclosure-body { padding:13px 15px 15px; }
+    .profile-inline-disclosure { margin-top:8px; border:1px solid var(--border); border-radius:13px; overflow:hidden; background:var(--bg); }
+    .profile-inline-disclosure > summary { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; cursor:pointer; list-style:none; color:var(--muted); font-size:10px; font-weight:700; }
+    .profile-inline-disclosure > summary::-webkit-details-marker { display:none; }
+    .profile-inline-disclosure[open] > summary { border-bottom:1px solid var(--border); }
+    .profile-inline-disclosure > #myIdeasList { padding:0 10px 8px; }
+    .profile-council-disclosure { margin-top:12px; }
+    .profile-council-disclosure > summary { color:var(--text); }
+    .profile-subsection-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:14px; }
+    .profile-subsection-heading > b { font-size:11px; }
+    .profile-report-summary { margin:10px 0; color:var(--muted); font-size:10px; }
+    .profile-listings-grid .l-card { padding:6px; border-radius:13px; }
+    .profile-listings-grid .l-body { padding:8px 3px 3px; }
+    .profile-listings-grid .l-title { font-size:11px; }
+    .profile-listings-grid .l-imgwrap { aspect-ratio:5/4; }
+    .profile-empty-inline { text-align:center; padding:18px 8px; color:var(--muted); font-size:11px; }
+    .profile-card-delete { width:100%; margin-top:7px; padding:7px 9px; border:1px solid rgba(255,107,107,.28); border-radius:9px; background:rgba(255,107,107,.08); color:var(--danger); font-size:10px; font-weight:800; cursor:pointer; }
+    .profile-avatar-settings { display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+    .avatar-preview-small { width:38px!important; height:38px!important; flex:0 0 38px; font-size:15px!important; }
+    .profile-avatar-settings > div:nth-child(2) { flex:1; min-width:0; }
+    .profile-avatar-settings b { font-size:11px; }
+    .profile-avatar-settings p { margin:3px 0 0; font-size:9px; line-height:1.4; color:var(--muted); }
+    .profile-danger-area { margin-top:13px; }
+    .profile-danger-area > b { font-size:11px; color:var(--danger); }
+    .profile-danger-area > p { margin:5px 0 8px; font-size:10px; line-height:1.5; color:var(--muted); }
+    .profile-delete-help > summary { color:var(--danger); }
+    .profile-logout-button { width:100%; margin-top:10px; }
+    .profile-hero,#profileIdeasPanel,#profileListingsPanel,#schoolAdminAccess,#profileAccountPanel { scroll-margin-top:16px; }
+    @media (max-width:560px) {
+      .profile-box { padding:13px; border-radius:17px; }
+      .profile-hero { padding:13px; }
+      .profile-shortcuts { grid-template-columns:1fr; gap:7px; }
+      .profile-shortcut { min-height:54px; padding:9px 11px; }
+      .profile-hero-main { gap:9px; flex-wrap:wrap; }
+      .profile-avatar-edit { margin-left:auto; }
+      .profile-disclosure > summary { padding:12px; }
+      .profile-disclosure-body { padding:11px 12px 13px; }
+      .profile-listings-grid { gap:8px; }
+    }
+    @media (min-width:700px) { #profileSection { max-width:900px; margin-left:auto; margin-right:auto; } }
     .idea-folders { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .idea-folders::-webkit-scrollbar { display: none; }
     .idea-folder { flex: 0 0 auto; padding: 8px 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; white-space: nowrap; }
@@ -349,71 +425,57 @@
         <div style="font-size:10px;margin:0 0 4px;">Действует до: <b id="mySuspensionUntil"></b></div>
         <div style="font-size:10px;">Причина: <span id="mySuspensionReason"></span></div>
       </div>
-      <div id="schoolAdminAccess" class="profile-box hidden">
-        <h3 style="font-size:14px; margin:0 0 8px;">Доступ к панели Ученического совета</h3>
-        <p style="font-size:11px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
-          По умолчанию каждый аккаунт FAM — обычный пользователь. Членство в Ученическом совете и права администратора не назначаются автоматически.
-        </p>
-        <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете" style="font-size:12px; margin-bottom:8px;">
-          <option value="">Выберите должность</option>
-          <option value="Участник Ученического совета">Участник Ученического совета</option>
-          <option value="Администратор">Администратор</option>
-        </select>
-        <div style="font-size:10px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
-          <div><b style="color:var(--text);">Участник совета</b> — публикует школьные мероприятия, работает с идеями и заявками на свои мероприятия.</div>
-          <div><b style="color:var(--text);">Администратор</b> — имеет все права участника, а также рассматривает заявки, назначает и снимает полномочия, управляет объявлениями и аккаунтами своей школы.</div>
-          <div style="margin-top:6px;">Новая роль назначается только после одобрения действующим администратором. Самостоятельно повысить свои права нельзя.</div>
-        </div>
-        <div id="schoolAdminAccessStatus" style="font-size:11px; color:var(--muted); margin-bottom:8px;" aria-live="polite"></div>
-        <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">
-          Запросить доступ Совета
-        </button>
-      </div>
-      <div id="userSafetyReports" class="profile-box hidden">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <h3 style="font-size:14px;margin:0;">Агент безопасности пользователей</h3>
-          <button type="button" class="button button-secondary button-small" data-action="refresh-safety-reports">Обновить</button>
-        </div>
-        <p style="font-size:10px;line-height:1.5;color:var(--muted);margin:0 0 10px;">
-          Проверяются тексты сообщений, идей и объявлений, а также загружаемые фото. Агент выявляет признаки травли, угроз, дискриминации, личных негативных призывов и повторяющихся нарушений. Он не отслеживает клики и просмотры страниц и не строит психологические профили. В отчёте — только категория, повторяемость и время сигнала, без текста переписок и имён. Сигнал не доказывает нарушение: серьёзный случай должен проверить ответственный взрослый школы.
-        </p>
-        <div id="userSafetyReportsSummary" style="font-size:11px;color:var(--muted);margin:0 0 8px;" aria-live="polite">Загрузка сводки…</div>
-        <div id="userSafetyReportsList" aria-live="polite"><p style="font-size:11px;color:var(--muted);">Загрузка отчётов…</p></div>
-      </div>
-      <div class="profile-box">
-        <div class="avatar-upload">
+      <div class="profile-box profile-hero">
+        <div class="profile-hero-main">
           <div class="avatar-preview" id="avatarPreview">?</div>
-          <div style="flex:1; min-width:0;">
-            <h3 class="profile-email" id="profEmail"></h3>
-            <div id="profMeta" style="color:var(--muted); font-size:11px;"></div>
-          </div>
-          <label class="button button-secondary button-small" for="avatarInput" style="cursor:pointer;">Фото</label>
+          <div class="profile-identity"><h3 class="profile-email" id="profEmail"></h3><div id="profMeta" class="profile-meta"></div></div>
+          <label class="button button-secondary button-small profile-avatar-edit" for="avatarInput">Изменить фото</label>
           <input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
         </div>
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:8px 0 0;">Аватар доступен по публичной ссылке. Не используйте чужие фотографии, документы, пропуска или изображения с контактными данными.</p>
+        <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
-      
-      
-      <div id="adminRequests" class="hidden profile-box">
-        <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
-        <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Здесь отображаются заявки на ваши мероприятия.</p>
-        <div id="adminReqList"></div>
+      <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
+        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Почта идей</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
+        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
+        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
       </div>
-      <div class="profile-box">
-        <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">Идея проверяется по правилам FAM и рассматривается Советом</p>
+      <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
+        <p class="profile-section-copy">Обычный аккаунт FAM не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
+        <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете">
+          <option value="">Выберите нужную роль</option><option value="Участник Ученического совета">Участник Ученического совета</option><option value="Администратор">Администратор</option>
+        </select>
+        <details class="profile-help"><summary>Чем отличаются роли?</summary><div class="profile-help-body">
+          <p><b>Участник Совета:</b> работает с идеями, мероприятиями и заявками на свои мероприятия.</p>
+          <p><b>Администратор:</b> дополнительно рассматривает запросы, управляет полномочиями, объявлениями и аккаунтами своей школы.</p>
+          <p>Права назначаются только после проверки действующим администратором. Самостоятельно повысить их нельзя.</p>
+        </div></details>
+        <div id="schoolAdminAccessStatus" class="profile-access-status" aria-live="polite"></div>
+        <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">Отправить заявку</button>
+      </div>
+      <details id="userSafetyReports" class="profile-box profile-disclosure hidden">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🛡️</span><span><b>Отчёты безопасности</b><small>Сигналы о возможных нарушениях</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body">
+          <p class="profile-section-copy">Здесь отображаются обезличенные сигналы о возможной травле, угрозах, дискриминации и повторных нарушениях. Сигнал не доказывает нарушение: серьёзный случай проверяет ответственный взрослый школы.</p>
+          <button type="button" class="button button-secondary button-small" data-action="refresh-safety-reports">Обновить отчёты</button>
+          <div id="userSafetyReportsSummary" class="profile-report-summary" aria-live="polite">Загрузка сводки…</div>
+          <div id="userSafetyReportsList" aria-live="polite"><p style="font-size:11px;color:var(--muted);">Загрузка отчётов…</p></div>
+        </div>
+      </details>
+      <details id="adminRequests" class="hidden profile-box profile-disclosure">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🎟️</span><span><b>Заявки на мои мероприятия</b><small>Участники и статусы регистрации</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
+      </details>
+      <div class="profile-box profile-main-section" id="profileIdeasPanel">
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
           <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить</button>
         </form>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; margin-bottom:8px;">
-          <div style="font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase;">Мои идеи</div>
-          <button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="padding:4px 10px; font-size:10px; display:none;" data-action="clear-my-ideas">🗑 Очистить все</button>
-        </div>
-        <div id="myIdeasList"></div>
-        <div id="adminIdeasDash" class="hidden" style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
-          <h4 style="margin:0 0 12px; font-size:13px; color:var(--accent); font-weight:800;">Панель Ученического Совета</h4>
+        <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
+        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
+        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Рабочая панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
@@ -465,34 +527,28 @@
             <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
           </div>
           <div id="ideaFolderContent"></div>
-        </div>
+          </div></details>
       </div>
-      <div class="profile-box">
-        <h3 style="font-size:14px; margin:0 0 8px;">Мои объявления</h3>
-        <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
-        <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
-      </div>
+      <details class="profile-box profile-disclosure" id="profileListingsPanel">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body"><div class="l-grid profile-listings-grid" id="myListingsGrid" style="margin-top:0;"></div><div id="myListingsEmpty" class="hidden profile-empty-inline">У вас пока нет объявлений.</div></div>
+      </details>
       
-      <div class="profile-box" style="margin-top:12px;">
-        <h3 style="font-size:13px;margin:0 0 6px;">Удаление аккаунта</h3>
-        <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 9px;">Можно удалить свой аккаунт в любой момент. Будут удалены профиль, объявления и мероприятия, идеи, избранное, переписки, регистрации и все принадлежащие аккаунту фотографии и файлы. Восстановить их будет нельзя.</p>
-        <details>
-          <summary style="font-size:11px;font-weight:700;cursor:pointer;color:var(--danger);">Удалить мой аккаунт навсегда</summary>
-          <div style="margin-top:10px;">
-            <p style="font-size:10px;color:var(--muted);line-height:1.5;">Для защиты от случайного удаления войдите повторно, указав текущий пароль, и подтвердите действие фразой ниже. У последнего администратора школы сначала должен появиться другой администратор.</p>
-            <div class="form-group">
-              <label for="selfDeletePassword">Текущий пароль</label>
-              <input type="password" id="selfDeletePassword" class="form-control" autocomplete="current-password" maxlength="128">
-            </div>
-            <div class="form-group">
-              <label for="selfDeleteConfirmation">Введите: УДАЛИТЬ МОЙ АККАУНТ</label>
-              <input type="text" id="selfDeleteConfirmation" class="form-control" autocomplete="off" maxlength="40" placeholder="УДАЛИТЬ МОЙ АККАУНТ">
-            </div>
-            <button type="button" class="button button-danger" style="width:100%;" data-action="self-delete-account" id="selfDeleteAccountBtn">Удалить аккаунт и мои данные</button>
+      <details class="profile-box profile-disclosure profile-account-disclosure" id="profileAccountPanel">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">⚙️</span><span><b>Настройки и аккаунт</b><small>Безопасность профиля и выход</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body">
+          <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Аватары проходят автоматическую проверку перед обновлением.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
+          <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
+            <details class="profile-help profile-delete-help"><summary>Удалить мой аккаунт навсегда</summary><div class="profile-help-body">
+              <p>Для защиты от случайного удаления войдите повторно, укажите текущий пароль и подтвердите действие точной фразой. У последнего администратора школы сначала должен появиться другой администратор.</p>
+              <div class="form-group"><label for="selfDeletePassword">Текущий пароль</label><input type="password" id="selfDeletePassword" class="form-control" autocomplete="current-password" maxlength="128"></div>
+              <div class="form-group"><label for="selfDeleteConfirmation">Введите: УДАЛИТЬ МОЙ АККАУНТ</label><input type="text" id="selfDeleteConfirmation" class="form-control" autocomplete="off" maxlength="40" placeholder="УДАЛИТЬ МОЙ АККАУНТ"></div>
+              <button type="button" class="button button-danger" style="width:100%;" data-action="self-delete-account" id="selfDeleteAccountBtn">Удалить аккаунт и мои данные</button>
+            </div></details>
           </div>
-        </details>
-      </div>
-      <button class="button button-secondary" id="logoutBtn" style="width:100%; margin-top:12px;" data-action="logout">Выйти</button>
+          <button class="button button-secondary profile-logout-button" id="logoutBtn" data-action="logout">Выйти из аккаунта</button>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -1010,7 +1066,7 @@ window.onunhandledrejection = function(event) {
     ).join("");
   }
 
-  function listingCard(l, idx) {
+  function listingCard(l, idx, ownerControls = false) {
     const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
     const favClass = isFavorite(l.id) ? 'active' : '';
     let badge = l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || ''));
@@ -1050,6 +1106,11 @@ window.onunhandledrejection = function(event) {
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
         </div>
+        ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
+          ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+          : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
+            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            : ""}
       </div>
     </div>`;
   }
@@ -1301,7 +1362,9 @@ window.onunhandledrejection = function(event) {
   function renderIdeas() {
     let mine = ideas.filter(i => i.user_id === (user&&user.id));
     const clearBtn = $("clearMyIdeasBtn");
+    const myIdeasCount = $("myIdeasCount");
     if (clearBtn) clearBtn.style.display = mine.length > 0 ? 'inline-flex' : 'none';
+    if (myIdeasCount) myIdeasCount.textContent = String(mine.length);
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
       let st = (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'На рассмотрении')));
       let cls = (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
@@ -2071,6 +2134,41 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  async function deleteOwnListing(listingId) {
+    const listing = listings.find(row => row.id === listingId);
+    if (!user || profile?.role !== "student" || !listing || listing.user_id !== user.id) {
+      notice("Удалять можно только собственные объявления обычного аккаунта.");
+      return;
+    }
+    if (!confirm("Удалить объявление «" + (listing.title || "Без названия") + "»? Его нельзя будет восстановить.")) return;
+    try {
+      const { data, error } = await sb.from("listings").delete()
+        .eq("id", listingId).eq("user_id", user.id).select("id");
+      if (error) throw error;
+      if (!Array.isArray(data) || data.length !== 1) throw new Error("Объявление не удалено: проверьте права или обновите страницу.");
+      listings = listings.filter(row => row.id !== listingId);
+      renderListings();
+      renderFavorites();
+      await renderProfile();
+      if (listing.image_url) {
+        try {
+          const imageUrl = new URL(listing.image_url);
+          const marker = "/storage/v1/object/public/listing-images/";
+          const markerIndex = imageUrl.pathname.indexOf(marker);
+          if (markerIndex >= 0) {
+            const objectPath = decodeURIComponent(imageUrl.pathname.slice(markerIndex + marker.length));
+            if (objectPath.startsWith(user.id + "/")) await sb.storage.from("listing-images").remove([objectPath]);
+          }
+        } catch (cleanupError) {
+          console.warn("Не удалось удалить файл изображения объявления:", cleanupError);
+        }
+      }
+      notice("Объявление удалено.");
+    } catch (error) {
+      notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+    }
+  }
+
   async function deleteMyAccount() {
     if (!user || !user.email) return;
     const password = $("selfDeletePassword")?.value || "";
@@ -2221,15 +2319,22 @@ window.onunhandledrejection = function(event) {
     updateAuthUI();
     if(!user) return;
     $("profEmail").textContent = user.email;
-    if (profile?.avatar_url) $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
-    else $("avatarPreview").textContent = user.email[0].toUpperCase();
+    if (profile?.avatar_url) {
+      $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
+      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
+    } else {
+      $("avatarPreview").textContent = user.email[0].toUpperCase();
+      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = user.email[0].toUpperCase();
+    }
     const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
     $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
 
     let myL = listings.filter(l => l.user_id === user.id);
+    const myListingsCount = $("myListingsCount");
+    if (myListingsCount) myListingsCount.textContent = String(myL.length);
     if (myL.length > 0) {
       $("myListingsEmpty").classList.add("hidden");
-      $("myListingsGrid").innerHTML = myL.map((l, i) => listingCard(l, i + 1)).join("");
+      $("myListingsGrid").innerHTML = myL.map((l, i) => listingCard(l, i + 1, true)).join("");
     } else {
       $("myListingsEmpty").classList.remove("hidden");
       $("myListingsGrid").innerHTML = '';
@@ -2479,6 +2584,16 @@ window.onunhandledrejection = function(event) {
     b.onclick = (e) => { e.preventDefault(); showTab(b.dataset.tab); };
   });
 
+  function jumpToProfileSection(targetId) {
+    let target = targetId ? $(targetId) : null;
+    if (!target || target.classList.contains("hidden")) target = $("profileAccountPanel");
+    if (!target) return;
+    const details = target.closest("details");
+    if (details) details.open = true;
+    if (target.tagName === "DETAILS") target.open = true;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
@@ -2522,6 +2637,7 @@ window.onunhandledrejection = function(event) {
       if (user) openModal('listingModal'); else openModal('authModal');
     }
     else if (action === 'toggle-fav') { toggleFavoriteAction(btn.dataset.id); }
+    else if (action === 'delete-own-listing') { deleteOwnListing(btn.dataset.id); }
     else if (action === 'cancel-reg') { cancelRegAction(btn.dataset.id); }
     else if (action === 'start-chat') { window.startChat(btn.dataset.userId, btn.dataset.title); }
     else if (action === 'open-dialog') { window.startChat(btn.dataset.userId, "Диалог"); }
@@ -2530,6 +2646,7 @@ window.onunhandledrejection = function(event) {
       stopChatSession(true);
       loadDialogsList();
     }
+    else if (action === 'profile-jump') { jumpToProfileSection(btn.dataset.target); }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
     else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); loadUserSafetyReports(); }
