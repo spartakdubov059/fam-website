@@ -288,9 +288,9 @@
   <div id="aiOfflineBanner" class="ai-offline-banner hidden" role="status" aria-live="polite">
     <div class="icon">⚠️</div>
     <div>
-      <b>Ведутся технические работы!</b>
-      Сервис проверки временно недоступен. Отправка сообщений, объявлений и идей приостановлена до восстановления.<br>
-      <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Мы работаем над восстановлением. Попробуйте позже.</span>
+      <b>ИИ-модерация временно недоступна.</b>
+      Объявления не публикуются без проверки, сообщения временно не отправляются, а идеи сохраняются для ручной проверки школьным Советом.<br>
+      <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Попробуйте позже. Уже отправленные идеи можно проверить в панели Совета.</span>
     </div>
   </div>
 
@@ -765,7 +765,7 @@ window.onunhandledrejection = function(event) {
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
       <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-модерация активна</span>
+      <span class="ai-live"><i></i>ИИ-модерация · статус не проверен</span>
     </div>`);
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
       html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
