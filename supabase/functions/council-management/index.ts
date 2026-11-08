@@ -87,22 +87,36 @@ async function adminRequest(
   return { ok: response.ok, status: response.status, data };
 }
 
-async function storageList(bucket: string, prefix: string): Promise<string[]> {
-  const response = await fetch(SUPABASE_URL + "/storage/v1/object/list/" + encodeURIComponent(bucket), {
-    method: "POST",
-    headers: serviceHeaders(),
-    body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } }),
-  });
-  if (!response.ok) {
-    const diagnostic = await response.text();
-    console.warn("storage_list_failed", bucket, response.status, diagnostic.slice(0, 160));
-    throw new Error("Не удалось подготовить файлы аккаунта к удалению.");
+async function storageList(bucket: string, prefix: string, search?: string): Promise<string[]> {
+  const paths: string[] = [];
+  let offset = 0;
+  while (true) {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/list/" + encodeURIComponent(bucket), {
+      method: "POST",
+      headers: serviceHeaders(),
+      body: JSON.stringify({
+        prefix,
+        ...(search ? { search } : {}),
+        limit: 1000,
+        offset,
+        sortBy: { column: "name", order: "asc" },
+      }),
+    });
+    if (!response.ok) {
+      const diagnostic = await response.text();
+      console.warn("storage_list_failed", bucket, response.status, diagnostic.slice(0, 160));
+      throw new Error("Не удалось подготовить файлы аккаунта к удалению.");
+    }
+    const rows = await response.json().catch(() => []);
+    if (!Array.isArray(rows)) break;
+    const files = rows
+      .filter((row: any) => row && typeof row.name === "string" && row.name.length > 0 && !row.id /* folders have no id */)
+      .map((row: any) => prefix + row.name);
+    paths.push(...files);
+    if (rows.length < 1000) break;
+    offset += rows.length;
   }
-  const rows = await response.json().catch(() => []);
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .filter((row: any) => row && typeof row.name === "string" && row.name.length > 0)
-    .map((row: any) => prefix + row.name);
+  return paths;
 }
 
 async function storageRemove(bucket: string, paths: string[]): Promise<void> {
@@ -269,7 +283,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const removed = await adminRequest(
-        "listings?id=eq." + encodeURIComponent(targetId) + "&school_id=eq." + encodeURIComponent(actor.school_id),
+        "listings?id=eq." + encodeURIComponent(targetId),
         "DELETE",
       );
       if (!removed.ok) {
@@ -314,10 +328,15 @@ Deno.serve(async (req: Request) => {
 
       // Auth deletion fails while the user owns Storage objects. Remove only
       // objects whose paths belong to this exact account before deleting Auth.
-      const listingObjects = await storageList("listings-images", "listing_" + targetId + "_");
-      const avatarObjects = await storageList("avatars", targetId + "/");
-      await storageRemove("listings-images", listingObjects);
-      await storageRemove("avatars", avatarObjects);
+      const ownedObjects = [
+        { bucket: "avatars", paths: await storageList("avatars", targetId + "/") },
+        { bucket: "event-images", paths: await storageList("event-images", targetId + "/") },
+        { bucket: "listing-images", paths: await storageList("listing-images", targetId + "/") },
+        { bucket: "listings-images", paths: await storageList("listings-images", "", "listing_" + targetId + "_") },
+      ];
+      for (const bucket of ownedObjects) {
+        await storageRemove(bucket.bucket, bucket.paths);
+      }
 
       const deleteResponse = await fetch(
         SUPABASE_URL + "/auth/v1/admin/users/" + encodeURIComponent(targetId),
