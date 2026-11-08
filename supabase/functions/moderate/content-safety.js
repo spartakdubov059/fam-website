@@ -3,7 +3,8 @@ const URL_RE = /(?:https?:\/\/|www\.)[^\s<>()]+/iu;
 const SOCIAL_DOMAIN_RE = /(?:^|[^\p{L}\d])(?:t\.me|vk\.com|telegram\.me|wa\.me|discord\.gg|instagram\.com|youtube\.com)(?:\/[^\s]*)?/iu;
 const BARE_DOMAIN_RE = /(?:^|[^\p{L}\d])(?:[\p{L}\d](?:[\p{L}\d-]{0,61}[\p{L}\d])?\.)+(?:ru|рф|com|net|org|io|me|gg|info|site|online)(?:\/[^\s]*)?(?=$|[^\p{L}\d])/iu;
 const HANDLE_RE = /(?<![\p{L}\p{N}])@[a-z0-9_]{3,32}\b/iu;
-const ADDRESS_RE = /(?:^|[^\p{L}\p{N}])(?:ул(?:ица)?\.?|проспект|пр-т|переулок|пер\.?|дом|д\.?|квартира|кв\.?|подъезд|адрес)\s*[\p{L}\d№.,/-]{0,48}\d/iu;
+const STREET_ADDRESS_RE = /(?:^|[^\p{L}\p{N}])(?:ул(?:ица)?\.?|проспект|пр-т|переулок|пер\.?)\s+[\p{L}ё.-]{2,}(?:\s+[\p{L}ё.-]{2,}){0,4}\s*,?\s*(?:д\.?\s*)?\d{1,5}(?:\s*(?:корп(?:ус)?|стр(?:оение)?|кв(?:артира)?|подъезд)\.?\s*\d{1,5})?/iu;
+const HOUSE_ADDRESS_RE = /(?:^|[^\p{L}\p{N}])(?:дом|д\.?|квартира|кв\.?|подъезд|адрес)\s*[\p{L}\d№.,/-]{0,40}\d{1,5}/iu;
 const PHONE_RE = /(?<!\d)\+?\d(?:[ \t().-]*\d){9,14}(?!\d)/gu;
 const POSTCODE_RE = /(?:почтов(?:ый|ого)\s+индекс|индекс)\s*[:№-]?\s*\d{6}\b/iu;
 
@@ -31,7 +32,8 @@ export function containsContactData(value) {
     SOCIAL_DOMAIN_RE.test(withoutDates) ||
     BARE_DOMAIN_RE.test(withoutDates) ||
     HANDLE_RE.test(withoutDates) ||
-    ADDRESS_RE.test(withoutDates) ||
+    STREET_ADDRESS_RE.test(withoutDates) ||
+    HOUSE_ADDRESS_RE.test(withoutDates) ||
     POSTCODE_RE.test(withoutDates)
   ) return true;
 
