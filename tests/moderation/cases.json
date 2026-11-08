@@ -11,43 +11,45 @@
       "id": "safe_math_help",
       "kind": "listing",
       "text": "Помогу разобраться с математикой перед контрольной.",
-      "expected_action": "ok",
+      "expected_action": "no_local_block",
       "checks": ["безопасное учебное предложение"]
     },
     {
       "id": "safe_school_improvement",
       "kind": "idea",
       "text": "Предлагаю установить больше скамеек во дворе школы.",
-      "expected_action": "ok",
+      "expected_action": "no_local_block",
       "checks": ["безопасная школьная инициатива"]
     },
     {
       "id": "safe_gardening_word",
       "kind": "listing",
       "text": "Предлагаю посадить траву возле школьного корпуса.",
-      "expected_action": "ok",
-      "known_current_risk": "Текущий список локальных фрагментов содержит слово «трава» и может ошибочно отклонить обычный текст о благоустройстве."
+      "expected_action": "no_local_block",
+      "expected_action": "no_local_block",
+      "checks": ["обычное слово не блокируется локальным фильтром"]
     },
     {
       "id": "safe_cryptography_word",
       "kind": "listing",
       "text": "Готовлю доклад по криптографии для школьного кружка.",
       "expected_action": "ok",
-      "known_current_risk": "Текущий список локальных фрагментов содержит «крипт» и может ошибочно отклонять нейтральный учебный контекст."
+      "expected_action": "no_local_block",
+      "checks": ["корень «крипт» не используется как безусловный стоп-фрагмент"]
     },
     {
       "id": "phone_placeholder",
       "kind": "listing",
       "text": "Связаться со мной: +7 000 000-00-00",
-      "expected_action": "local_review_or_block_before_external_api",
+      "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
-      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+      "reason_code": "personal_contact_data"
     },
     {
       "id": "email_placeholder",
       "kind": "message",
       "text": "Моя почта: learner@example.invalid",
-      "expected_action": "local_review_or_block_before_external_api",
+      "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
       "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
     },
@@ -55,7 +57,7 @@
       "id": "link_placeholder",
       "kind": "listing",
       "text": "Моя страница проекта: https://example.invalid/contact",
-      "expected_action": "local_review_or_block_before_external_api",
+      "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
       "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
     },
@@ -63,7 +65,7 @@
       "id": "address_placeholder",
       "kind": "message",
       "text": "Адрес: ул. Тестовая, дом 0",
-      "expected_action": "local_review_or_block_before_external_api",
+      "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
       "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
     },
@@ -71,14 +73,14 @@
       "id": "name_is_not_contact_by_itself",
       "kind": "idea",
       "text": "Предлагаю пригласить Александра Петрова рассказать о школьном проекте.",
-      "expected_action": "ok",
+      "expected_action": "no_local_block",
       "checks": ["имя без контактных данных не должно автоматически считаться нарушением"]
     },
     {
       "id": "transliterated_safe_text",
       "kind": "listing",
       "text": "Pomogu s prezentatsiey po angliyskomu.",
-      "expected_action": "ok",
+      "expected_action": "no_local_block",
       "checks": ["нейтральный текст латиницей"]
     }
   ],
