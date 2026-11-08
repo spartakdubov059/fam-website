@@ -1227,7 +1227,7 @@ window.onunhandledrejection = function(event) {
 
       $("ideaText").value = "";
       notice(submission.degraded
-        ? "ИИ временно недоступен. Идея сохранена и отправлена Совету на ручную проверку."
+        ? "⚠️ " + (submission.reason || "ИИ-проверка временно недоступна. Идея сохранена для ручной проверки Советом.")
         : submission.status === "pending"
           ? "Идея отправлена на дополнительную проверку."
           : "Идея отправлена Совету!");
