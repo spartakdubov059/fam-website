@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'supabase/functions/moderate/**'
+      - 'supabase/functions/school-admin-access/**'
       - 'tests/moderation/**'
+      - 'tests/security/**'
       - 'index.html'
   pull_request:
     paths:
@@ -28,7 +30,7 @@ jobs:
         with:
           node-version: 22
       - name: Run moderation tests
-        run: node --test tests/moderation/*.test.mjs
+        run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
       - name: Check inline frontend JavaScript syntax
         run: |
           node <<'NODE'
