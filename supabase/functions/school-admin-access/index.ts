@@ -126,6 +126,27 @@ Deno.serve(async (req: Request) => {
 
     const action = payload.action;
 
+    if (action !== "status") {
+      const suspension = await adminRequest(
+        "account_suspensions?select=reason,expires_at&target_id=eq." + encodeURIComponent(userId)
+        + "&status=eq.active&expires_at=gt." + encodeURIComponent(new Date().toISOString())
+        + "&order=created_at.desc&limit=1",
+      );
+      if (!suspension.ok || !Array.isArray(suspension.data)) {
+        return json({ ok: false, error: "Не удалось проверить статус ограничений аккаунта." }, 503, headers);
+      }
+      const activeSuspension = suspension.data[0];
+      if (activeSuspension) {
+        return json({
+          ok: false,
+          suspended: true,
+          error: "Действия аккаунта временно ограничены до "
+            + new Date(activeSuspension.expires_at).toLocaleString("ru-RU")
+            + ". Причина: " + String(activeSuspension.reason || "").slice(0, 240),
+        }, 403, headers);
+      }
+    }
+
     if (action === "status") {
       if (profile.role === "school_admin") {
         if (!profile.school_id) return json({ ok: false, error: "У аккаунта не указана школа." }, 403, headers);
