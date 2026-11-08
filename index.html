@@ -1286,7 +1286,7 @@ window.onunhandledrejection = function(event) {
       let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
       if (myEvs.length > 0) {
         try {
-          const res = await sb.from("event_registrations").select("*, profiles(email)").in("event_id", myEvs).eq("status", "pending");
+          const res = await sb.from("event_registrations").select("*").in("event_id", myEvs).eq("status", "pending");
           if (res.error) throw res.error;
           let pending = res.data || [];
           $("adminReqList").innerHTML = pending.length ? pending.map(r => {
