@@ -142,9 +142,9 @@
     .pill-all { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 13px; }
     .pill-all svg { width: 15px; height: 15px; }
 
-    .l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 14px; }
-    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 24px; padding: 10px; display: flex; flex-direction: column; }
-    .l-imgwrap { position: relative; border-radius: 18px; overflow: hidden; aspect-ratio: 4/3; background: #101018; }
+    .l-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; }
+    .l-card { background: var(--surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 17px; padding: 8px; display: flex; flex-direction: column; min-width: 0; }
+    .l-imgwrap { position: relative; border-radius: 13px; overflow: hidden; aspect-ratio: 4/3; background: #101018; }
     .l-imgwrap img { width: 100%; height: 100%; object-fit: cover; }
     .card-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #23232e, #14141c); position: relative; }
     .card-placeholder::before { content: '✦'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 34px; color: rgba(139,92,246,0.5); }
@@ -152,8 +152,8 @@
     .l-fav.active { color: #FF6B6B; background: rgba(255,107,107,0.2); }
     .l-badge { position: absolute; left: 8px; bottom: 8px; z-index: 2; background: var(--gradient-violet); color: #fff; font-size: 10px; font-weight: 800; padding: 5px 10px; border-radius: 999px; }
     .l-body { padding: 10px 4px 4px; display: flex; flex-direction: column; flex-grow: 1; gap: 4px; }
-    .l-title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .l-price { font-size: 15px; font-weight: 900; }
+    .l-title { margin: 0; font-size: 12px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .l-price { font-size: 13px; font-weight: 900; }
     .l-foot { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; gap: 6px; }
     .l-seller { display: flex; align-items: center; gap: 7px; min-width: 0; }
     .l-ava { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,#2a2a36,#1c1c26); display: grid; place-items: center; font-size: 12px; }
@@ -182,6 +182,9 @@
     .idea-folder.active { background: var(--gradient-violet); color: white; border-color: transparent; }
     .idea-folder .folder-count { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,0.16); font-size: 10px; font-weight: 800; }
     .idea-card { background: var(--bg); padding: 12px; border-radius: 14px; margin-bottom: 8px; border: 1px solid var(--border); }
+    .safety-report-card { background: var(--bg); border: 1px solid var(--border); border-radius: 13px; padding: 10px; margin-bottom: 8px; }
+    .safety-report-card.is-high { border-color: rgba(255,107,107,.45); }
+    @media (max-width: 390px) { .l-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .l-card { padding: 7px; } }
     .idea-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
     .status-done { background: rgba(107,203,155,0.15); color: var(--success); }
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
@@ -370,15 +373,25 @@
           Запросить доступ Совета
         </button>
       </div>
-      <div class="profile-box">
-        <h3 style="font-size:14px; margin:0 0 8px;">Мои объявления</h3>
-        <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
-        <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
+      <div id="userSafetyReports" class="profile-box hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <h3 style="font-size:14px;margin:0;">Безопасность участников</h3>
+          <button type="button" class="button button-secondary button-small" data-action="refresh-safety-reports">Обновить</button>
+        </div>
+        <p style="font-size:10px;line-height:1.5;color:var(--muted);margin:0 0 10px;">
+          Агент анализирует только сигналы из FAM: травлю, угрозы, личные негативные призывы и повторяющиеся нарушения. Отчёты не содержат текстов личных сообщений, имён и прямых ID участников. Серьёзные ситуации передавайте ответственному взрослому школы.
+        </p>
+        <div id="userSafetyReportsList" aria-live="polite"><p style="font-size:11px;color:var(--muted);">Загрузка отчётов…</p></div>
       </div>
       <div id="adminRequests" class="hidden profile-box">
         <h3 style="font-size:14px; margin-bottom:8px;">Заявки на мероприятия</h3>
         <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Здесь отображаются заявки на ваши мероприятия.</p>
         <div id="adminReqList"></div>
+      </div>
+      <div class="profile-box">
+        <h3 style="font-size:14px; margin:0 0 8px;">Мои объявления</h3>
+        <div class="l-grid" id="myListingsGrid" style="margin-top:0;"></div>
+        <div id="myListingsEmpty" class="hidden" style="text-align:center; padding:20px; color:var(--muted); font-size:12px;">У вас пока нет объявлений</div>
       </div>
       <div class="profile-box">
         <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
@@ -1771,6 +1784,82 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  function safetyCategoryLabel(category) {
+    const labels = {
+      targeted_harassment: "Возможная травля",
+      hate_or_discrimination: "Ненависть или дискриминация",
+      threat_or_intimidation: "Угроза или запугивание",
+      negative_personal_call: "Личный негативный призыв",
+      spam_or_repeated_abuse: "Повторяющийся спам или нарушения",
+      unsafe_image: "Небезопасное изображение",
+      personal_data_in_image: "Личные данные на изображении",
+      unclear_safety_signal: "Неоднозначный сигнал безопасности"
+    };
+    return labels[category] || "Сигнал безопасности";
+  }
+
+  function safetySourceLabel(source) {
+    return source === "message" ? "сообщения" : source === "idea" ? "почта идей" : "фото";
+  }
+
+  async function loadUserSafetyReports() {
+    const box = $("userSafetyReports");
+    const list = $("userSafetyReportsList");
+    if (!box || !list) return;
+    if (!user || profile?.role !== "school_admin") {
+      box.classList.add("hidden");
+      return;
+    }
+    box.classList.remove("hidden");
+    list.innerHTML = '<p style="font-size:11px;color:var(--muted);">Загружаем отчёты…</p>';
+    try {
+      const { data, error } = await sb.functions.invoke("council-management", {
+        body: { action: "list_safety_reports" }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось получить отчёты.");
+      const reports = Array.isArray(data.reports) ? data.reports : [];
+      list.innerHTML = reports.length ? reports.map(report => {
+        const severity = report.severity === "high" ? "status-rejected" : "status-work";
+        const repeatText = report.repeated ? " · повторяется" : "";
+        const rangeText = report.first_seen && report.last_seen
+          ? `${new Date(report.first_seen).toLocaleString("ru-RU")} — ${new Date(report.last_seen).toLocaleString("ru-RU")}`
+          : "";
+        return `<div class="safety-report-card ${report.severity === "high" ? "is-high" : ""}">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
+            <b style="font-size:11px;">${esc(safetyCategoryLabel(report.category))}</b>
+            <span class="idea-status ${severity}">${report.severity === "high" ? "Повышенное внимание" : "Нужно проверить"}</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin:5px 0;">Источник: ${esc(safetySourceLabel(report.source_kind))} · эпизодов: ${Number(report.occurrences) || 1}${repeatText}</div>
+          <div style="font-size:9px;color:var(--muted);">${esc(rangeText)}</div>
+          <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="acknowledge-safety-report" data-fingerprint="${esc(report.fingerprint)}" data-category="${esc(report.category)}" data-source-kind="${esc(report.source_kind)}">Отметить как рассмотренный</button>
+        </div>`;
+      }).join("") : '<p style="font-size:11px;color:var(--muted);margin:0;">Новых сигналов нет. Если появится подозрение на травлю или угрозу, отчёт появится здесь.</p>';
+    } catch (error) {
+      list.innerHTML = `<p style="font-size:11px;color:var(--danger);">${esc(error?.message || "Не удалось загрузить отчёты.")}</p>`;
+    }
+  }
+
+  async function acknowledgeSafetyReport(button) {
+    if (!button || profile?.role !== "school_admin") return;
+    try {
+      const { data, error } = await sb.functions.invoke("council-management", {
+        body: {
+          action: "acknowledge_safety_report",
+          fingerprint: button.dataset.fingerprint,
+          category: button.dataset.category,
+          source_kind: button.dataset.sourceKind
+        }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось обновить отчёт.");
+      notice("Отчёт отмечен как рассмотренный.");
+      await loadUserSafetyReports();
+    } catch (error) {
+      notice("Не удалось отметить отчёт: " + (error?.message || "Ошибка."));
+    }
+  }
+
   function deletionStatusLabel(status) {
     const labels = {
       pending: "Ожидает решения администратора",
@@ -1992,7 +2081,10 @@ window.onunhandledrejection = function(event) {
     if (isCouncilMember) {
       $("adminIdeasDash").classList.remove("hidden");
       $("councilAdminTools").classList.toggle("hidden", profile.role !== "school_admin");
-      if (profile.role === "school_admin") await loadCouncilAdminTools();
+      if (profile.role === "school_admin") {
+        await loadCouncilAdminTools();
+        await loadUserSafetyReports();
+      }
       if (profile.role === "council_member") await loadCouncilDeletionRequestPanel();
       updateIdeaCounters(); renderIdeaFolderContent();
       $("adminRequests").classList.remove("hidden");
@@ -2015,6 +2107,7 @@ window.onunhandledrejection = function(event) {
       $("adminRequests").classList.add("hidden");
       $("councilAdminTools").classList.add("hidden");
       $("councilDeletionRequestPanel").classList.add("hidden");
+      $("userSafetyReports").classList.add("hidden");
     }
   }
 
@@ -2260,7 +2353,9 @@ window.onunhandledrejection = function(event) {
     }
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
-    else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); }
+    else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); loadUserSafetyReports(); }
+    else if (action === 'refresh-safety-reports') { loadUserSafetyReports(); }
+    else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
     else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'self-delete-account') { deleteMyAccount(); }
@@ -2345,17 +2440,23 @@ window.onunhandledrejection = function(event) {
         st.className = 'upload-status'; st.textContent = 'Загрузка фото...';
         uploadStatus.appendChild(st);
 
-        const fileName = `listing_${user.id}_${makeUniqueFileSuffix()}.${extension}`;
-        const { error } = await sb.storage.from('listings-images').upload(fileName, safeImage, {
-          cacheControl: '3600', upsert: false, contentType: safeImage.type
+        const fileName = `${user.id}/listing_${user.id}_${makeUniqueFileSuffix()}.${extension}`;
+        const pendingStorage = sb.storage.from('listing-images-pending');
+        const { error } = await pendingStorage.upload(fileName, safeImage, {
+          cacheControl: '600', upsert: false, contentType: safeImage.type
         });
         if (error) throw new Error("Ошибка загрузки фото: " + error.message);
         uploadedImagePath = fileName;
-        imageUrl = sb.storage.from('listings-images').getPublicUrl(fileName).data.publicUrl;
+        const { data: signed, error: signedError } = await pendingStorage.createSignedUrl(fileName, 10 * 60);
+        if (signedError || !signed?.signedUrl) {
+          await pendingStorage.remove([fileName]);
+          throw new Error("Не удалось подготовить защищённую ссылку для проверки фото.");
+        }
+        imageUrl = signed.signedUrl;
 
         uploadStatus.textContent = '';
         const suc = document.createElement('div');
-        suc.className = 'upload-status success'; suc.textContent = '✓ Фото загружено';
+        suc.className = 'upload-status success'; suc.textContent = '✓ Фото загружено приватно — проверяем перед публикацией';
         uploadStatus.appendChild(suc);
       }
 
@@ -2405,7 +2506,7 @@ window.onunhandledrejection = function(event) {
       if (uploadedImagePath) {
         // Best-effort cleanup for a file uploaded before a failed database insert.
         try {
-          const { error: removeError } = await sb.storage.from('listings-images').remove([uploadedImagePath]);
+          const { error: removeError } = await sb.storage.from('listing-images-pending').remove([uploadedImagePath]);
           if (removeError) console.warn("Не удалось удалить неиспользуемое фото:", removeError.message);
         } catch (cleanupError) {
           console.warn("Не удалось удалить неиспользуемое фото:", cleanupError);
