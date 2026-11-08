@@ -1,8 +1,17 @@
 const ALLOWED_COUNCIL_ROLES = new Set([
-  "Председатель Ученического совета",
-  "Заместитель председателя Ученического совета",
+  "Участник Ученического совета",
+  "Администратор",
+  // Legacy label is accepted for the existing pending application only.
   "Член Ученического совета",
 ]);
+
+function displayApplicantRole(value) {
+  if (value === "Администратор") return "Администратор";
+  if (value === "Участник Ученического совета" || value === "Член Ученического совета") {
+    return "Участник Ученического совета";
+  }
+  return typeof value === "string" ? value : "";
+}
 
 export function isAllowedApplicantNote(value) {
   return typeof value === "string" && ALLOWED_COUNCIL_ROLES.has(value.trim());
@@ -27,7 +36,7 @@ export function mapSchoolAdminRequests(rows) {
       : (typeof row?.id === "string" ? row.id : ""),
     user_id: typeof row?.user_id === "string" ? row.user_id.slice(0, 8) : "",
     applicant_email: maskApplicantEmail(row?.applicant_email),
-    applicant_note: typeof row?.applicant_note === "string" ? row.applicant_note : "",
+    applicant_note: displayApplicantRole(row?.applicant_note),
     status: typeof row?.status === "string" ? row.status : "pending",
     created_at: row?.created_at ?? null,
     review_started_at: row?.review_started_at ?? null,
