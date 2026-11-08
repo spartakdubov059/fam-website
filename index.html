@@ -482,7 +482,7 @@ window.onunhandledrejection = function(event) {
   let notifOpen = false;
   let heroRendered = false;
   let seenMap = {};
-  let isAiDown = false;
+  let isAiDown = null; // null means no real moderation result has been observed yet.
   let isListingSubmitting = false;
   let isChatSubmitting = false;
   let chatOpenTimeout = null;
@@ -543,12 +543,19 @@ window.onunhandledrejection = function(event) {
   }
 
   function updateAiStatus(down) {
-    isAiDown = Boolean(down);
+    // Only an explicit moderation response can mark this service up or down.
+    if (typeof down === "boolean") isAiDown = down;
     const banner = $("aiOfflineBanner");
-    if (isAiDown) banner.classList.remove("hidden");
+    if (isAiDown === true) banner.classList.remove("hidden");
     else banner.classList.add("hidden");
     const liveLabel = document.querySelector(".ai-live");
-    if (liveLabel) liveLabel.textContent = isAiDown ? "ИИ-модерация недоступна" : "ИИ-модерация активна";
+    if (liveLabel) {
+      liveLabel.textContent = isAiDown === null
+        ? "ИИ-модерация · статус не проверен"
+        : isAiDown
+          ? "ИИ-модерация недоступна"
+          : "ИИ-модерация активна";
+    }
   }
 
   function updateHints() {
@@ -1025,7 +1032,7 @@ window.onunhandledrejection = function(event) {
       const { data: submission, error } = await sb.functions.invoke("submit-content", {
         body: { kind: "message", receiver_id: recipientId, body: text }
       });
-      if (error) { updateAiStatus(true); throw error; }
+      if (error) throw error;
       updateAiStatus(submission?.degraded === true);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Сообщение не прошло модерацию.");
       $("chatInput").value = "";
@@ -1224,8 +1231,8 @@ window.onunhandledrejection = function(event) {
         body: { kind: "idea", text: txt }
       });
       hideAIThinking('ideaThinkingArea');
-      if (error) { updateAiStatus(true); throw error; }
-      updateAiStatus(submission?.degraded === true);
+      if (error) throw error;
+
       if (!submission?.ok) {
         return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку."));
       }
@@ -1633,7 +1640,7 @@ window.onunhandledrejection = function(event) {
           max_seats: (isEv && type === "limited") ? parseInt($("evSeats").value, 10) : 0
         }
       });
-      if (error) { updateAiStatus(true); throw error; }
+      if (error) throw error;
       updateAiStatus(submission?.degraded === true);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
