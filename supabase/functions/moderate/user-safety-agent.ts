@@ -43,15 +43,24 @@ export async function recordSafetySignal(args: {
   const isMessage = context.kind === "message";
   if (isMessage && (!context.receiver_id || !UUID_RE.test(context.receiver_id))) return false;
 
-  // Fingerprint preserves the directed sender/recipient pattern but is not reversible
-  // from the dashboard. Raw identifiers and message content are never written.
+  // A keyed HMAC keeps repeat grouping stable without exposing a guessable plain hash.
+  // The key is the server-only Supabase secret; it never reaches the browser or report UI.
+  // Raw participant IDs and message content are never written to the incident table.
   const fingerprintSource = isMessage
     ? [context.school_id, "message", context.sender_id, context.receiver_id].join("|")
     : [context.school_id, context.kind, context.sender_id].join("|");
 
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(fingerprintSource),
+  const hmacKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(serviceKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    hmacKey,
+    new TextEncoder().encode("fam-safety-fingerprint-v1|" + fingerprintSource),
   );
   const pairFingerprint = toHex(new Uint8Array(digest));
 
