@@ -3,8 +3,8 @@
   "updated_at": "2026-11-08",
   "purpose": "Стартовый набор синтетических регрессионных примеров для модерации FAM. Не содержит реальных персональных данных.",
   "expected_actions": [
-    "ok",
-    "local_review_or_block_before_external_api"
+    "no_local_block",
+    "reject_without_external_provider"
   ],
   "cases": [
     {
@@ -26,14 +26,12 @@
       "kind": "listing",
       "text": "Предлагаю посадить траву возле школьного корпуса.",
       "expected_action": "no_local_block",
-      "expected_action": "no_local_block",
       "checks": ["обычное слово не блокируется локальным фильтром"]
     },
     {
       "id": "safe_cryptography_word",
       "kind": "listing",
       "text": "Готовлю доклад по криптографии для школьного кружка.",
-      "expected_action": "ok",
       "expected_action": "no_local_block",
       "checks": ["корень «крипт» не используется как безусловный стоп-фрагмент"]
     },
@@ -51,7 +49,7 @@
       "text": "Моя почта: learner@example.invalid",
       "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
-      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+      "reason_code": "personal_contact_data"
     },
     {
       "id": "link_placeholder",
@@ -59,7 +57,7 @@
       "text": "Моя страница проекта: https://example.invalid/contact",
       "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
-      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+      "reason_code": "personal_contact_data"
     },
     {
       "id": "address_placeholder",
@@ -67,7 +65,7 @@
       "text": "Адрес: ул. Тестовая, дом 0",
       "expected_action": "reject_without_external_provider",
       "synthetic_data": true,
-      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+      "reason_code": "personal_contact_data"
     },
     {
       "id": "name_is_not_contact_by_itself",
