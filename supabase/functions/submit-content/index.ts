@@ -390,6 +390,25 @@ Deno.serve(async (req: Request) => {
     const profile = Array.isArray(profileResult.data) ? profileResult.data[0] : null;
     if (!profileResult.ok || !profile) return fail("Профиль пользователя не найден.", 403, headers);
 
+    const suspensionResult = await adminRequest(
+      "account_suspensions?select=reason,expires_at&target_id=eq." + encodeURIComponent(userId)
+      + "&status=eq.active&expires_at=gt." + encodeURIComponent(new Date().toISOString())
+      + "&order=created_at.desc&limit=1",
+    );
+    if (!suspensionResult.ok || !Array.isArray(suspensionResult.data)) {
+      return fail("Не удалось проверить статус ограничений аккаунта. Попробуйте позже.", 503, headers);
+    }
+    const activeSuspension = suspensionResult.data[0];
+    if (activeSuspension) {
+      return fail(
+        "Действия аккаунта временно ограничены до "
+          + new Date(activeSuspension.expires_at).toLocaleString("ru-RU")
+          + ". Причина: " + String(activeSuspension.reason || "").slice(0, 240),
+        403,
+        headers,
+      );
+    }
+
     const kind = payload.kind;
     if (!["listing", "idea", "message", "avatar"].includes(kind)) return fail("Неизвестный тип отправки.", 400, headers);
 
