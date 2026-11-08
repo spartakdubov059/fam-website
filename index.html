@@ -1959,7 +1959,8 @@ window.onunhandledrejection = function(event) {
     if (!confirm(message)) return;
     if (decision === "approve" && !confirm("Подтвердите окончательное удаление аккаунта.")) return;
     try {
-      await ensureRecentAdminAuthentication();
+      const confirmed = await ensureRecentAdminAuthentication();
+      if (!confirmed) return;
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "review_account_deletion", request_id: requestId, decision }
       });
@@ -2037,12 +2038,10 @@ window.onunhandledrejection = function(event) {
 
   async function callCouncilManagement(action, targetId) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const { data: freshSession, error: sessionError } = await sb.auth.getSession();
-    if (sessionError) throw sessionError;
-    const accessToken = freshSession?.session?.access_token || "";
     const sensitiveActions = ["revoke_role", "delete_account", "delete_listing"];
     if (sensitiveActions.includes(action)) {
-      await ensureRecentAdminAuthentication();
+      const confirmed = await ensureRecentAdminAuthentication();
+      if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
     }
     const { data, error } = await sb.functions.invoke("council-management", {
       body: { action, target_id: targetId }
