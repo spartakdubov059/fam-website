@@ -105,7 +105,7 @@ async function storageRemove(bucket: string, paths: string[]): Promise<void> {
   }
 }
 
-async function deleteAccountCompletely(userId: string): Promise<void> {
+async function deleteAccountCompletely(userId: string, preserveRequestId: string | null = null): Promise<void> {
   if (!UUID_RE.test(userId)) throw new Error("Некорректный аккаунт для удаления.");
 
   // This server-only RPC returns owned objects and legacy FAM paths.
@@ -137,6 +137,21 @@ async function deleteAccountCompletely(userId: string): Promise<void> {
   if (!verifyStorage.ok || !Array.isArray(verifyStorage.data) || verifyStorage.data.length > 0) {
     console.error("account_storage_cleanup_incomplete", verifyStorage.status);
     throw new Error("Не удалось полностью очистить файлы аккаунта. Удаление остановлено.");
+  }
+
+  // Close other open requests about this account. A request currently being
+  // approved is preserved until the reviewer marks it complete.
+  const requestFilter = "account_deletion_requests?target_id=eq." + encodeURIComponent(userId)
+    + "&status=in.(pending,processing)"
+    + (preserveRequestId ? "&id=neq." + encodeURIComponent(preserveRequestId) : "");
+  const closedRequests = await adminRequest(requestFilter, "PATCH", {
+    status: "cancelled",
+    reviewed_at: new Date().toISOString(),
+    review_note: "Аккаунт удалён отдельно; обращение закрыто.",
+  });
+  if (!closedRequests.ok) {
+    console.error("account_deletion_request_close_failed", closedRequests.status);
+    throw new Error("Не удалось закрыть связанные обращения. Аккаунт не удалён.");
   }
 
   // Remove masked contact snapshots from open or historical deletion requests.
@@ -373,6 +388,12 @@ Deno.serve(async (req: Request) => {
       const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
       const reasonCode = typeof payload.reason_code === "string" ? payload.reason_code : "";
       const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      const reasonDigits = reason.replace(/\D/g, "");
+      const containsContact = /(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason)
+        || reasonDigits.length >= 11;
+      if (containsContact) {
+        return json({ ok: false, error: "Не указывайте телефоны, электронную почту, ссылки и другие личные контакты. Опишите только факты." }, 400, headers);
+      }
       if (!UUID_RE.test(targetId) || targetId === actorId) {
         return json({ ok: false, error: "Выберите другой аккаунт." }, 400, headers);
       }
@@ -476,7 +497,7 @@ Deno.serve(async (req: Request) => {
         if (!target || target.school_id !== actor.school_id || !["student", "council_member"].includes(target.role)) {
           throw new Error("Аккаунт больше не подходит под условия удаления.");
         }
-        await deleteAccountCompletely(request.target_id);
+        await deleteAccountCompletely(request.target_id, requestId);
 
         const completed = await adminRequest(
           "account_deletion_requests?id=eq." + encodeURIComponent(requestId)
@@ -487,10 +508,14 @@ Deno.serve(async (req: Request) => {
         if (!completed.ok || !Array.isArray(completed.data) || completed.data.length !== 1) {
           console.error("account_deletion_request_completion_update_failed", completed.status);
         }
-        await recordAudit(actor.school_id, actorId, null, "account_deleted_by_request", {
-          request_id: requestId,
-          target_role: request.target_role,
-        });
+        try {
+          await recordAudit(actor.school_id, actorId, null, "account_deleted_by_request", {
+            request_id: requestId,
+            target_role: request.target_role,
+          });
+        } catch (auditError) {
+          console.error("account_deletion_audit_failed_after_delete", auditError instanceof Error ? auditError.name : "unknown");
+        }
         return json({ ok: true, status: "approved" }, 200, headers);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Не удалось удалить аккаунт.";
@@ -584,10 +609,14 @@ Deno.serve(async (req: Request) => {
       }
 
       await deleteAccountCompletely(targetId);
-      await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
-        target_role: target.role,
-        source: "admin_panel",
-      });
+      try {
+        await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
+          target_role: target.role,
+          source: "admin_panel",
+        });
+      } catch (auditError) {
+        console.error("admin_account_deletion_audit_failed", auditError instanceof Error ? auditError.name : "unknown");
+      }
       return json({ ok: true }, 200, headers);
     }
 
