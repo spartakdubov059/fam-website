@@ -69,7 +69,7 @@ export async function recordSafetySignal(args: {
       body: JSON.stringify({
         school_id: context.school_id,
         pair_fingerprint: pairFingerprint,
-        source_kind: context.kind === "listing" || context.kind === "image" ? "image" : context.kind,
+        source_kind: context.kind,
         category,
         severity,
       }),
