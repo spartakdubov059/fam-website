@@ -1308,15 +1308,15 @@ window.onunhandledrejection = function(event) {
     if (!file || !user) return;
     try {
       const extension = getImageExtension(file);
-      const fileName = `avatar_${user.id}.${extension}`;
-      const { error: uploadError } = await sb.storage.from('listings-images').upload(fileName, file, {
+      const fileName = `${user.id}/avatar.${extension}`;
+      const { error: uploadError } = await sb.storage.from('avatars').upload(fileName, file, {
         upsert: true,
         contentType: file.type,
         cacheControl: '3600'
       });
       if (uploadError) throw uploadError;
 
-      const { data } = sb.storage.from('listings-images').getPublicUrl(fileName);
+      const { data } = sb.storage.from('avatars').getPublicUrl(fileName);
       const { data: updatedProfile, error: profileError } = await sb.from("profiles")
         .update({ avatar_url: data.publicUrl }).eq("id", user.id).select("avatar_url").maybeSingle();
       if (profileError) throw profileError;
