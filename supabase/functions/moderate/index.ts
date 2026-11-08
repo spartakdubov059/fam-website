@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
@@ -7,28 +8,6 @@ const ALLOWED_ORIGINS = new Set([
   "https://spartakdubov059.github.io",
   "https://mellifluous-profiterole-48c13b.netlify.app",
 ]);
-
-const badWords = [
-  "нарко", "мефедрон", "спайс", "трава", "закладк", "колеса", "соль", "снюс", "насвай", "кокс", "героин", "амфетамин", "экстази", "мдма",
-  "сигарет", "вейп", "айкос", "жижа", "кальян", "табак", "электронк", "под", "стик",
-  "алкогол", "пиво", "водк", "вино", "спирт", "коньяк", "виски", "энергетик", "burn", "monster", "adrenaline",
-  "хуй", "пизд", "бля", "ебат", "долбо", "залуп", "муд", "гандон", "пидор", "лох", "дурак", "идиот", "тупой", "дебил", "кретин", "чмо",
-  "убий", "насили", "оружи", "нож", "пистолет", "взрывчатк", "порно", "секс", "интим", "18+", "казино", "ставк", "крипт", "биткоин",
-  "обман", "мошен", "кидал", "взлом", "хакер", "спам", "реклам", "телеграм", "ватсап", "whatsapp", "t.me"
-];
-
-
-function containsContactData(value: string): boolean {
-  const withoutDates = value.replace(/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/g, " ");
-  const patterns = [
-    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu,
-    /\+?\d(?:[\s().-]*\d){9,14}/u,
-    /\b(?:https?:\/\/|www\.|t\.me\/|vk\.com\/)/iu,
-    /(?<![\p{L}\p{N}])@[a-z0-9_]{3,}/iu,
-    /\b(?:ул(?:ица)?\.?|проспект|переулок|пер\.?|дом|квартира|подъезд|адрес)\b.{0,80}\d/iu,
-  ];
-  return patterns.some(pattern => pattern.test(withoutDates));
-}
 
 function extractJsonObject(raw: string): unknown | null {
   const trimmed = raw.trim();
@@ -116,26 +95,28 @@ serve(async (req: Request) => {
       }, 400, headers);
     }
 
-    const lowerText = value.toLocaleLowerCase("ru-RU");
-    const tokens = lowerText.split(/[^\p{L}\p{N}]+/u);
-    for (const word of badWords) {
-      // Very short fragments must match a complete word, not any larger word containing them.
-      const matched = word.length <= 4 ? tokens.includes(word) : lowerText.includes(word);
-      if (matched) {
-        return jsonResponse({
-          action: "reject",
-          reason: "Текст содержит тему, запрещённую правилами FAM.",
-        }, 200, headers);
-      }
+    // Detect personal contact data locally before any text is sent to an external provider.
+    // Rejected content is not stored in the FAM database or sent to OpenAI/OpenRouter.
+    if (containsContactData(value)) {
+      return jsonResponse({
+        action: "reject",
+        reason_code: "personal_contact_data",
+        reason: "Уберите из текста телефон, почту, ссылку, адрес или личный ник. FAM не разрешает публиковать контактные данные.",
+      }, 200, headers);
     }
 
-    // Ideas are always reviewed by the School Council, so do not spend an AI API call on them.
-    // Local prohibited-content and contact checks above still run before the item is queued.
+    // Ideas are reviewed by the School Council without spending an external AI request.
+    // Keep this local check conservative: sensitive topics are routed to the existing
+    // same-school idea review flow instead of being automatically rejected.
     if (payload?.rules_only === true) {
+      const policyFlag = findLocalPolicyFlag(value);
       return jsonResponse({
         action: "pending",
         manual_review: true,
-        reason: "Идея передана школьному Совету на ручную проверку.",
+        reason_code: policyFlag?.code ?? "council_review",
+        reason: policyFlag
+          ? "Тема требует внимательной проверки школьным Советом."
+          : "Идея передана школьному Совету на рассмотрение.",
       }, 200, headers);
     }
 
@@ -213,7 +194,7 @@ serve(async (req: Request) => {
       if (moderationResult.flagged) {
         return jsonResponse({
           action: "pending",
-          reason: "Автоматическая проверка отметила материал для дополнительной проверки.",
+          reason: "Автоматическая проверка не разрешила публикацию. Материал не отправлен.",
           provider: "openai",
         }, 200, headers);
       }
@@ -279,23 +260,23 @@ serve(async (req: Request) => {
     if (!chatRes?.ok) {
       const status = chatRes?.status ?? 0;
       let diagnosticCode = "provider_unavailable";
-      let reason = "Бесплатный ИИ-провайдер временно недоступен. Идея сохранена для ручной проверки Советом.";
+      let reason = "Бесплатный ИИ-провайдер временно недоступен. Материал не опубликован и не отправлен. Попробуйте позже.";
 
       if (status === 401 || status === 403) {
         diagnosticCode = "provider_key_rejected";
-        reason = "ИИ-провайдер не принял серверный ключ. Идея сохранена для ручной проверки Советом.";
+        reason = "ИИ-провайдер не принял серверный ключ. Материал не опубликован и не отправлен. Попробуйте позже.";
       } else if (status === 402) {
         diagnosticCode = "provider_credits_required";
-        reason = "Провайдер запросил оплату или пополнение. Идея сохранена для ручной проверки Советом.";
+        reason = "Провайдер запросил оплату или пополнение. Материал не опубликован и не отправлен. Попробуйте позже.";
       } else if (status === 404) {
         diagnosticCode = "no_privacy_compatible_provider";
-        reason = "Сейчас нет бесплатного ИИ-провайдера, который соответствует настройкам приватности FAM. Идея сохранена для ручной проверки Советом.";
+        reason = "Сейчас нет бесплатного ИИ-провайдера, который соответствует настройкам приватности FAM. Материал не опубликован и не отправлен. Попробуйте позже.";
       } else if (status === 429) {
         diagnosticCode = "provider_rate_limited";
-        reason = "Бесплатный лимит ИИ временно исчерпан. Идея сохранена для ручной проверки Советом.";
+        reason = "Бесплатный лимит ИИ временно исчерпан. Материал не опубликован и не отправлен. Попробуйте позже.";
       } else if (status === 400) {
         diagnosticCode = "provider_bad_request";
-        reason = "ИИ-провайдер отклонил формат запроса. Идея сохранена для ручной проверки Советом.";
+        reason = "ИИ-провайдер отклонил формат запроса. Материал не опубликован и не отправлен. Попробуйте позже.";
       }
 
       console.warn("moderation_provider_error", JSON.stringify({ status, diagnosticCode }));
@@ -328,7 +309,7 @@ serve(async (req: Request) => {
         action: "pending",
         degraded: true,
         diagnostic_code: "invalid_model_json",
-        reason: "ИИ ответил в неправильном формате. Идея сохранена для ручной проверки Советом.",
+        reason: "ИИ ответил в неправильном формате. Материал не опубликован и не отправлен. Попробуйте позже.",
       }, 200, headers);
     }
 
@@ -352,7 +333,7 @@ serve(async (req: Request) => {
       action: "pending",
       degraded: true,
       diagnostic_code: "unknown_model_action",
-      reason: "ИИ вернул неизвестный статус. Идея сохранена для ручной проверки Советом.",
+      reason: "ИИ вернул неизвестный статус. Материал не опубликован и не отправлен. Попробуйте позже.",
     }, 200, headers);
   } catch (error) {
     const errorName = error instanceof Error ? error.name : "unknown";
@@ -361,7 +342,7 @@ serve(async (req: Request) => {
       action: "pending",
       degraded: true,
       diagnostic_code: "moderation_internal_error",
-      reason: "Произошла внутренняя ошибка проверки. Идея сохранена для ручной проверки Советом.",
+      reason: "Произошла внутренняя ошибка проверки. Материал не опубликован и не отправлен. Попробуйте позже.",
     }, 200, headers);
   }
 });
