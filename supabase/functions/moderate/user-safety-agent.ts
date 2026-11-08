@@ -2,7 +2,7 @@
 // It receives only structured moderation signals and never stores raw message text or user IDs.
 
 export type SafetyContext = {
-  kind: "message" | "idea" | "listing";
+  kind: "message" | "idea" | "listing" | "image";
   sender_id: string;
   receiver_id?: string | null;
   school_id: string;
@@ -38,7 +38,7 @@ export async function recordSafetySignal(args: {
   const { context, category, severity, supabaseUrl, serviceKey } = args;
   if (!context || !supabaseUrl || !serviceKey) return false;
   if (!UUID_RE.test(context.sender_id) || typeof context.school_id !== "string" || !context.school_id) return false;
-  if (!["message", "idea", "listing"].includes(context.kind)) return false;
+  if (!["message", "idea", "listing", "image"].includes(context.kind)) return false;
 
   const isMessage = context.kind === "message";
   if (isMessage && (!context.receiver_id || !UUID_RE.test(context.receiver_id))) return false;
@@ -69,7 +69,7 @@ export async function recordSafetySignal(args: {
       body: JSON.stringify({
         school_id: context.school_id,
         pair_fingerprint: pairFingerprint,
-        source_kind: context.kind === "listing" ? "image" : context.kind,
+        source_kind: context.kind === "listing" || context.kind === "image" ? "image" : context.kind,
         category,
         severity,
       }),
