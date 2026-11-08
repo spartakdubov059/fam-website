@@ -1413,7 +1413,7 @@ window.onunhandledrejection = function(event) {
       if (!list) return;
       list.innerHTML = requests.length ? requests.map(request => `
         <div class="idea-card" style="margin-bottom:8px;">
-          <b style="font-size:11px;">Заявка от пользователя ${esc(String(request.user_id || "").slice(0,8))}…</b>
+          <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("пользователя " + String(request.user_id || "").slice(0,8) + "…"))}</b>
           <div style="font-size:10px; color:var(--muted); margin:5px 0;">${esc(request.applicant_note || "Роль в Совете не указана")}</div>
           <div style="font-size:9px; color:var(--muted); margin-bottom:8px;">${esc(new Date(request.created_at).toLocaleString("ru-RU"))}</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
