@@ -147,56 +147,45 @@ serve(async (req: Request) => {
     }
 
     let chatRes: Response | null = null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
 
-    // The free router may temporarily have no healthy provider or hit its rate limit.
-    // Retry once for transient failures, then fail closed into manual review.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12_000);
-
-      try {
-        chatRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": "Bearer " + OPENROUTER_KEY,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://spartakdubov059.github.io",
-            "X-Title": "FAM School",
+    try {
+      chatRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + OPENROUTER_KEY,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://spartakdubov059.github.io",
+          "X-Title": "FAM School",
+        },
+        body: JSON.stringify({
+          // Use only free models whose current OpenRouter pages confirm JSON output support.
+          // The provider filter also excludes endpoints that cannot honor these settings.
+          models: [
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it:free",
+          ],
+          provider: {
+            require_parameters: true,
+            data_collection: "deny",
           },
-          body: JSON.stringify({
-            model: "openrouter/free",
-            // Explicitly free fallbacks only; never silently switch to a paid model.
-            models: [
-              "nvidia/nemotron-3-ultra-550b-a55b:free",
-              "nvidia/nemotron-3-super-120b-a12b:free",
-              "cohere/north-mini-code:free",
-            ],
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: JSON.stringify({ content_to_review: value }) },
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0,
-            max_tokens: 240,
-          }),
-          signal: controller.signal,
-        });
-      } catch (error) {
-        chatRes = null;
-        console.warn("OpenRouter moderation request failed:", error instanceof Error ? error.name : "unknown");
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      if (chatRes?.ok) break;
-
-      const status = chatRes?.status ?? 0;
-      const transient = status === 0 || status === 429 || status === 502 || status === 503 || status === 504;
-      if (!transient || attempt === 1) break;
-
-      const retryAfter = Number(chatRes?.headers.get("Retry-After") ?? "");
-      if (Number.isFinite(retryAfter) && retryAfter > 2) break;
-      await new Promise(resolve => setTimeout(resolve, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500));
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: JSON.stringify({ content_to_review: value }) },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0,
+          max_tokens: 240,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      chatRes = null;
+      console.warn("OpenRouter moderation request failed:", error instanceof Error ? error.name : "unknown");
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (!chatRes?.ok) {
@@ -210,6 +199,9 @@ serve(async (req: Request) => {
       } else if (status === 402) {
         diagnosticCode = "provider_credits_required";
         reason = "Провайдер запросил оплату или пополнение. Идея сохранена для ручной проверки Советом.";
+      } else if (status === 404) {
+        diagnosticCode = "no_privacy_compatible_provider";
+        reason = "Сейчас нет бесплатного ИИ-провайдера, который соответствует настройкам приватности FAM. Идея сохранена для ручной проверки Советом.";
       } else if (status === 429) {
         diagnosticCode = "provider_rate_limited";
         reason = "Бесплатный лимит ИИ временно исчерпан. Идея сохранена для ручной проверки Советом.";
