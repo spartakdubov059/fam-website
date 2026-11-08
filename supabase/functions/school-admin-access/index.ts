@@ -161,8 +161,14 @@ Deno.serve(async (req: Request) => {
       }
 
       const note = typeof payload.applicant_note === "string" ? payload.applicant_note.trim() : "";
-      if (note.length < 5 || note.length > 160) {
-        return json({ ok: false, error: "Укажите должность или роль в ученическом Совете (от 5 до 160 символов)." }, 400, headers);
+      const allowedCouncilRoles = new Set([
+        "Председатель Ученического совета",
+        "Заместитель председателя Ученического совета",
+        "Секретарь Ученического совета",
+        "Член Ученического совета",
+      ]);
+      if (!allowedCouncilRoles.has(note)) {
+        return json({ ok: false, error: "Выберите свою роль из списка Ученического совета." }, 400, headers);
       }
 
       const school = await adminRequest(
