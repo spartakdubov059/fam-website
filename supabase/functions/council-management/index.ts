@@ -110,7 +110,7 @@ async function storageList(bucket: string, prefix: string, search?: string): Pro
     const rows = await response.json().catch(() => []);
     if (!Array.isArray(rows)) break;
     const files = rows
-      .filter((row: any) => row && typeof row.name === "string" && row.name.length > 0 && !row.id /* folders have no id */)
+      .filter((row: any) => row && typeof row.name === "string" && row.name.length > 0 && (typeof row.id === "string" || row.metadata != null))
       .map((row: any) => prefix + row.name);
     paths.push(...files);
     if (rows.length < 1000) break;
