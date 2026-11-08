@@ -677,7 +677,7 @@ window.onunhandledrejection = function(event) {
       allMsgs.forEach(m => {
         if (!m.sender_id || !m.receiver_id) return;
         const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
-        if (!dialogs[otherId]) dialogs[otherId] = { otherId, text: m.text, created_at: m.created_at };
+        if (!dialogs[otherId]) dialogs[otherId] = { otherId, text: m.body, created_at: m.created_at };
       });
       const list = Object.values(dialogs);
       if (list.length === 0) {
@@ -989,7 +989,7 @@ window.onunhandledrejection = function(event) {
       if (msgs.length === 0) {
         c.innerHTML = '<p style="color:var(--muted);text-align:center;font-size:12px;margin-top:20px;">История пуста. Напишите первое сообщение!</p>';
       } else {
-        c.innerHTML = msgs.map(m => `<div style="align-self:${m.sender_id === user.id ? 'flex-end' : 'flex-start'};background:${m.sender_id === user.id ? 'var(--gradient-violet)' : 'var(--bg)'};color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;word-break:break-word;">${esc(m.text)}</div>`).join("");
+        c.innerHTML = msgs.map(m => `<div style="align-self:${m.sender_id === user.id ? 'flex-end' : 'flex-start'};background:${m.sender_id === user.id ? 'var(--gradient-violet)' : 'var(--bg)'};color:#fff;padding:10px 14px;border-radius:16px;max-width:80%;font-size:12px;word-break:break-word;">${esc(m.body)}</div>`).join("");
       }
       c.scrollTop = c.scrollHeight;
 
@@ -1017,15 +1017,6 @@ window.onunhandledrejection = function(event) {
     let tempId = null;
 
     try {
-      const mod = await moderateText(text, "chat");
-      if (mod.status === "rejected") {
-        alert("ИИ-модерация: " + mod.reason);
-        return;
-      }
-      if (mod.status === "pending") {
-        alert("Сообщение требует дополнительной проверки и пока не отправлено.");
-        return;
-      }
       if (currentTab !== 'messages' || curChat !== recipientId) return;
 
       const c = $("chatMessages");
@@ -1038,8 +1029,11 @@ window.onunhandledrejection = function(event) {
       c.appendChild(tempMessage);
       c.scrollTop = c.scrollHeight;
 
-      const { error } = await sb.from("messages").insert({ sender_id: user.id, receiver_id: recipientId, text });
+      const { data: submission, error } = await sb.functions.invoke("submit-content", {
+        body: { kind: "message", receiver_id: recipientId, body: text }
+      });
       if (error) throw error;
+      if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Сообщение не прошло модерацию.");
       $("chatInput").value = "";
       if (curChat === recipientId && currentTab === 'messages') await loadChatMessages(recipientId);
     } catch (err) {
@@ -1232,26 +1226,21 @@ window.onunhandledrejection = function(event) {
     showAIThinking('ideaThinkingArea', 'ИИ проверяет');
 
     try {
-      const mod = await moderateText(txt, "idea");
+      const { data: submission, error } = await sb.functions.invoke("submit-content", {
+        body: { kind: "idea", text: txt }
+      });
       hideAIThinking('ideaThinkingArea');
-
-      if (mod.status === "rejected") {
+      if (error) throw error;
+      if (!submission?.ok) {
         $("ideaText").value = "";
-        return notice("🤖 " + mod.reason + "\n\nИдея не отправлена.");
+        return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку.") + "\n\nИдея не отправлена.");
       }
 
-      // pending для идей — сохраняем со статусом new (всё равно идёт на проверку Совету)
-      const aiStatus = mod.status === "pending" ? "pending" : "approved";
-
-      const { data, error } = await sb.from("ideas").insert({
-        user_id: user.id, school_id: profile?.school_id, text: txt,
-        ai_status: aiStatus, ai_summary: txt.slice(0,60), admin_status: 'new'
-      }).select().single();
-      if (error) throw error;
+      const data = submission.idea;
       if (data) ideas.unshift(data);
 
       $("ideaText").value = "";
-      notice(mod.status === "pending" ? "Идея отправлена на дополнительную проверку." : "Идея отправлена Совету!");
+      notice(submission.status === "pending" ? "Идея отправлена на дополнительную проверку." : "Идея отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
       hideAIThinking('ideaThinkingArea');
@@ -1605,13 +1594,7 @@ window.onunhandledrejection = function(event) {
       const combinedText = $("lTitle").value + " " + $("lDesc").value;
       const uploadStatus = $("uploadStatus");
 
-      const mod = await moderateText(combinedText, "listing");
-      if (mod.status === "rejected") {
-        alert("🤖 ИИ: " + mod.reason);
-        return;
-      }
-
-      btn.textContent = "Публикация...";
+      btn.textContent = "Загрузка фото и серверная проверка...";
 
       let isEv = $("lCat").value === "Мероприятия";
       let type = document.querySelector('input[name="evType"]:checked')?.value || 'open';
@@ -1639,18 +1622,25 @@ window.onunhandledrejection = function(event) {
         uploadStatus.appendChild(suc);
       }
 
-      // pending → объявление скрыто до проверки админом
-      let statusToSet = mod.status === "pending" ? "pending" : "active";
-
-      const { data, error } = await sb.from("listings").insert({
-        user_id: user.id, title: $("lTitle").value, description: $("lDesc").value,
-        category: $("lCat").value, price_text: $("lPrice").value || "Бесплатно",
-        image_url: imageUrl, status: statusToSet, is_event: isEv, school_id: profile?.school_id,
-        event_date: isEv ? $("evDate").value : null, event_time: isEv ? $("evTime").value : null,
-        event_type: isEv ? type : null, max_seats: (isEv && type === 'limited') ? parseInt($("evSeats").value) : 0
-      }).select().single();
-
+      const { data: submission, error } = await sb.functions.invoke("submit-content", {
+        body: {
+          kind: "listing",
+          title: $("lTitle").value,
+          description: $("lDesc").value,
+          category: $("lCat").value,
+          price_text: $("lPrice").value || "Бесплатно",
+          image_url: imageUrl,
+          event_date: isEv ? ($("evDate").value || null) : null,
+          event_time: isEv ? ($("evTime").value || null) : null,
+          event_type: isEv ? type : null,
+          max_seats: (isEv && type === "limited") ? parseInt($("evSeats").value, 10) : 0
+        }
+      });
       if (error) throw error;
+      if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
+
+      const data = submission.listing;
+      const statusToSet = data?.status;
       uploadedImagePath = null; // Storage object is now referenced by a saved listing.
       if (data && statusToSet === "active") listings.unshift(data);
 
@@ -1659,8 +1649,8 @@ window.onunhandledrejection = function(event) {
       uploadStatus.innerHTML = '';
       $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
 
-      if (statusToSet === "pending") {
-        alert("✅ Объявление отправлено на дополнительную проверку.");
+      if (submission.status === "pending") {
+        alert("✅ Объявление отправлено на дополнительную проверку и пока скрыто.");
       } else {
         renderListings();
       }
