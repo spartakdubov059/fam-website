@@ -353,7 +353,7 @@
       </div>
       <div class="profile-box">
         <h3 style="font-size:14px; margin:0 0 8px;">Почта идей</h3>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">ИИ проверит идею перед отправкой</p>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:8px;">Идея проверяется по правилам FAM и рассматривается Советом</p>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -1224,7 +1224,7 @@ window.onunhandledrejection = function(event) {
     let btn = $("ideaSubmitBtn");
     if (btn.disabled) return;
     btn.disabled = true;
-    showAIThinking('ideaThinkingArea', 'ИИ проверяет');
+    showAIThinking('ideaThinkingArea', 'Проверяем по правилам');
 
     try {
       const { data: submission, error } = await sb.functions.invoke("submit-content", {
@@ -1242,7 +1242,7 @@ window.onunhandledrejection = function(event) {
 
       $("ideaText").value = "";
       notice(submission.degraded
-        ? "⚠️ " + (submission.reason || "ИИ-проверка временно недоступна. Идея сохранена для ручной проверки Советом.")
+        ? "⚠️ " + (submission.reason || "Проверка временно недоступна. Идея не отправлена.")
         : submission.status === "pending"
           ? "Идея отправлена школьному Совету на ручную проверку."
           : "Идея отправлена Совету!");
