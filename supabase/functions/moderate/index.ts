@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
+import { reviewDisputedContent } from "./dispute-reviewer.js";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
@@ -203,10 +204,81 @@ serve(async (req: Request) => {
       }));
 
       if (moderationResult.flagged) {
+        const categories = moderationResult.categories && typeof moderationResult.categories === "object"
+          ? moderationResult.categories as Record<string, unknown>
+          : {};
+        const flaggedCategories = Object.entries(categories)
+          .filter(([, flagged]) => flagged === true)
+          .map(([category]) => category);
+
+        // Do not send high-risk categories to a generative second reviewer.
+        // These cases remain blocked from publication and require the dedicated
+        // adult-led safety process outside this automated reviewer.
+        const nonOverridableCategories = new Set([
+          "sexual",
+          "sexual/minors",
+          "self-harm",
+          "self-harm/intent",
+          "self-harm/instructions",
+          "violence/graphic",
+          "harassment/threatening",
+          "hate/threatening",
+          "illicit/violent",
+        ]);
+        const contextualCategories = new Set(["harassment", "hate", "violence", "illicit"]);
+        const requiresSeparateSafetyProcess = flaggedCategories.some(category =>
+          nonOverridableCategories.has(category) || !contextualCategories.has(category)
+        );
+
+        if (!flaggedCategories.length || requiresSeparateSafetyProcess || !OPENROUTER_KEY) {
+          console.info("moderation_second_review_skipped", JSON.stringify({
+            reason_code: !OPENROUTER_KEY
+              ? "second_reviewer_not_configured"
+              : requiresSeparateSafetyProcess
+                ? "sensitive_category_requires_separate_process"
+                : "missing_category_details",
+            categories: flaggedCategories,
+          }));
+          return jsonResponse({
+            action: "pending",
+            reason_code: "additional_safety_review",
+            reason: "Автоматическая проверка обнаружила возможный риск. Материал не опубликован и требует дополнительной проверки.",
+            provider: "openai",
+          }, 200, headers);
+        }
+
+        // The second-level FAM reviewer only receives contact-free text and
+        // only context-sensitive categories. Its decision cannot override
+        // high-risk flags or the local contact/policy checks above.
+        const secondReview = await reviewDisputedContent(value, OPENROUTER_KEY);
+        console.info("moderation_second_review_completed", JSON.stringify({
+          action: secondReview.action,
+          reason_code: secondReview.reason_code,
+          model: secondReview.model,
+        }));
+
+        if (secondReview.action === "ok") {
+          return jsonResponse({
+            action: "ok",
+            provider: "openai+fam_expert",
+            reason_code: secondReview.reason_code,
+          }, 200, headers);
+        }
+
+        if (secondReview.action === "reject") {
+          return jsonResponse({
+            action: "reject",
+            reason_code: secondReview.reason_code,
+            reason: secondReview.reason,
+            provider: "openai+fam_expert",
+          }, 200, headers);
+        }
+
         return jsonResponse({
           action: "pending",
-          reason: "Автоматическая проверка не разрешила публикацию. Материал не отправлен.",
-          provider: "openai",
+          reason_code: secondReview.reason_code,
+          reason: secondReview.reason,
+          provider: "openai+fam_expert",
         }, 200, headers);
       }
 
