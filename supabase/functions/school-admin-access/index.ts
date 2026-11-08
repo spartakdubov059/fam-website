@@ -129,9 +129,9 @@ Deno.serve(async (req: Request) => {
       if (profile.role === "school_admin") {
         if (!profile.school_id) return json({ ok: false, error: "У аккаунта не указана школа." }, 403, headers);
         const result = await adminRequest(
-          "school_admin_requests?select=id,user_id,school_id,applicant_note,status,created_at&school_id=eq."
-          + encodeURIComponent(profile.school_id)
-          + "&status=eq.pending&order=created_at.asc&limit=50",
+          "rpc/list_school_admin_requests",
+          "POST",
+          { p_reviewer_id: userId },
         );
         if (!result.ok) {
           console.error("school_admin_requests_list_failed", result.status);
