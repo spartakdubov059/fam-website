@@ -348,9 +348,13 @@
         <p style="font-size:11px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
           Если вы действительно состоите в Ученическом совете, укажите свою роль. Заявку проверит действующий администратор вашего лицея. Права не выдаются автоматически.
         </p>
-        <textarea id="schoolAdminRequestNote" class="form-control" rows="2" maxlength="160"
-          placeholder="Ваша должность в Совете, например: член Ученического совета"
-          aria-label="Должность в Ученическом совете" style="font-size:12px; margin-bottom:8px;"></textarea>
+        <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете" style="font-size:12px; margin-bottom:8px;">
+          <option value="">Выберите свою роль в Совете</option>
+          <option value="Председатель Ученического совета">Председатель</option>
+          <option value="Заместитель председателя Ученического совета">Заместитель председателя</option>
+          <option value="Секретарь Ученического совета">Секретарь</option>
+          <option value="Член Ученического совета">Член Совета</option>
+        </select>
         <div id="schoolAdminAccessStatus" style="font-size:11px; color:var(--muted); margin-bottom:8px;" aria-live="polite"></div>
         <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">
           Запросить доступ Совета
