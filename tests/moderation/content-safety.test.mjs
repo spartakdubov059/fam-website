@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { containsContactData, findLocalPolicyFlag } from "../../supabase/functions/moderate/content-safety.js";
 
 test("detects common contact details before text reaches an external provider", () => {
@@ -27,4 +28,16 @@ test("local idea checks flag sensitive topics without matching ordinary substrin
   assert.equal(findLocalPolicyFlag("Посадить траву на клумбе.") , null);
   assert.equal(findLocalPolicyFlag("Доклад по криптографии.") , null);
   assert.equal(findLocalPolicyFlag("Принести ножницы на урок труда.") , null);
+});
+
+
+test("synthetic moderation fixtures match the local privacy gate", () => {
+  const fixtures = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));
+  for (const item of fixtures.cases) {
+    if (item.expected_action === "reject_without_external_provider") {
+      assert.equal(containsContactData(item.text), true, item.id);
+    } else if (item.expected_action === "no_local_block") {
+      assert.equal(containsContactData(item.text), false, item.id);
+    }
+  }
 });
