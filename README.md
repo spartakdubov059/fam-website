@@ -6,11 +6,13 @@ FAM — школьная платформа для объявлений, иде�
 
 - [Рабочие роли команды и план внедрения](docs/AGENT_ROLES.md)
 - [Журнал изменений](CHANGELOG.md)
-- [Серверная модерация](supabase/functions/moderate/index.ts) и [второй ИИ-эксперт](supabase/functions/moderate/dispute-reviewer.ts)
+- [Серверная модерация](supabase/functions/moderate/index.ts), [Эксперт FAM](supabase/functions/moderate/dispute-reviewer.ts), [агент фотографий](supabase/functions/moderate/image-reviewer.ts) и [агент безопасности участников](supabase/functions/moderate/user-safety-agent.ts)
 - [GitHub Actions: тесты модерации](.github/workflows/moderation-regression.yml)
 - [Автоматические тесты модерации](tests/moderation/content-safety.test.mjs)
 - [Локальный модуль контактной и тематической проверки](supabase/functions/moderate/content-safety.js)
 - [Отправка пользовательского контента](supabase/functions/submit-content/index.ts)
+- [Иерархия агентов и правила безопасности](docs/AGENT_ROLES.md)
+- [Журнал безопасности и приватных фото](supabase/migrations/20261108232000_add_fam_safety_incidents_and_private_image_staging.sql)
 
 ## Правила безопасности
 
