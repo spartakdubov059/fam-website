@@ -2114,27 +2114,45 @@ window.onunhandledrejection = function(event) {
   $("avatarInput").onchange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+    let uploadedAvatarPath = null;
     try {
       const safeImage = await prepareImageForUpload(file, 2 * 1024 * 1024, 512);
       const extension = getImageExtension(safeImage);
-      const fileName = `${user.id}/avatar.${extension}`;
-      const { error: uploadError } = await sb.storage.from('avatars').upload(fileName, safeImage, {
-        upsert: true,
+      const fileName = `${user.id}/avatar_${user.id}_${makeUniqueFileSuffix()}.${extension}`;
+      const pendingStorage = sb.storage.from("avatars-pending");
+      const { error: uploadError } = await pendingStorage.upload(fileName, safeImage, {
+        upsert: false,
         contentType: safeImage.type,
-        cacheControl: '3600'
+        cacheControl: "600"
       });
       if (uploadError) throw uploadError;
+      uploadedAvatarPath = fileName;
 
-      const { data } = sb.storage.from('avatars').getPublicUrl(fileName);
-      const { data: updatedProfile, error: profileError } = await sb.from("profiles")
-        .update({ avatar_url: data.publicUrl }).eq("id", user.id).select("avatar_url").maybeSingle();
-      if (profileError) throw profileError;
-      if (!updatedProfile) throw new Error("Профиль не обновлён. Проверьте права доступа.");
-      if (profile) profile.avatar_url = updatedProfile.avatar_url;
+      const { data: signed, error: signedError } = await pendingStorage.createSignedUrl(fileName, 10 * 60);
+      if (signedError || !signed?.signedUrl) throw new Error("Не удалось подготовить защищённую ссылку для проверки аватара.");
+
+      const { data: submission, error } = await sb.functions.invoke("submit-content", {
+        body: { kind: "avatar", image_url: signed.signedUrl }
+      });
+      if (error) throw error;
+      if (!submission?.ok || submission.status !== "approved" || !submission.avatar_url) {
+        throw new Error(submission?.reason || submission?.error || "Фото не прошло проверку FAM. Выберите другое изображение.");
+      }
+
+      uploadedAvatarPath = null; // The server removed staging and published the approved avatar.
+      if (profile) profile.avatar_url = submission.avatar_url;
       updateAuthUI();
       await renderProfile();
+      notice("Аватар проверен и обновлён.");
     } catch (err) {
-      alert("Ошибка загрузки аватара: " + err.message);
+      if (uploadedAvatarPath) {
+        try {
+          await sb.storage.from("avatars-pending").remove([uploadedAvatarPath]);
+        } catch (cleanupError) {
+          console.warn("Не удалось удалить временный аватар:", cleanupError);
+        }
+      }
+      alert("Аватар не обновлён: " + (err?.message || "Ошибка проверки."));
     } finally {
       e.target.value = "";
     }
