@@ -30,6 +30,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://mellifluous-profiterole-48c13b.netlify.app",
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DELETE_CONFIRMATION = "УДАЛИТЬ МОЙ АККАУНТ";
+const REASON_CODES = new Set(["rules_violation", "harassment", "fake_account", "spam", "other"]);
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
@@ -87,38 +89,6 @@ async function adminRequest(
   return { ok: response.ok, status: response.status, data };
 }
 
-async function storageList(bucket: string, prefix: string, search?: string): Promise<string[]> {
-  const paths: string[] = [];
-  let offset = 0;
-  while (true) {
-    const response = await fetch(SUPABASE_URL + "/storage/v1/object/list/" + encodeURIComponent(bucket), {
-      method: "POST",
-      headers: serviceHeaders(),
-      body: JSON.stringify({
-        prefix,
-        ...(search ? { search } : {}),
-        limit: 1000,
-        offset,
-        sortBy: { column: "name", order: "asc" },
-      }),
-    });
-    if (!response.ok) {
-      const diagnostic = await response.text();
-      console.warn("storage_list_failed", bucket, response.status, diagnostic.slice(0, 160));
-      throw new Error("Не удалось подготовить файлы аккаунта к удалению.");
-    }
-    const rows = await response.json().catch(() => []);
-    if (!Array.isArray(rows)) break;
-    const files = rows
-      .filter((row: any) => row && typeof row.name === "string" && row.name.length > 0 && (typeof row.id === "string" || row.metadata != null))
-      .map((row: any) => prefix + row.name);
-    paths.push(...files);
-    if (rows.length < 1000) break;
-    offset += rows.length;
-  }
-  return paths;
-}
-
 async function storageRemove(bucket: string, paths: string[]): Promise<void> {
   if (!paths.length) return;
   for (let offset = 0; offset < paths.length; offset += 1000) {
@@ -129,15 +99,76 @@ async function storageRemove(bucket: string, paths: string[]): Promise<void> {
     });
     if (!response.ok) {
       const diagnostic = await response.text();
-      console.warn("storage_remove_failed", bucket, response.status, diagnostic.slice(0, 160));
-      throw new Error("Не удалось удалить файлы аккаунта из хранилища.");
+      console.error("storage_remove_failed", bucket, response.status, diagnostic.slice(0, 180));
+      throw new Error("Не удалось очистить фотографии аккаунта. Аккаунт не удалён.");
     }
+  }
+}
+
+async function deleteAccountCompletely(userId: string): Promise<void> {
+  if (!UUID_RE.test(userId)) throw new Error("Некорректный аккаунт для удаления.");
+
+  // This server-only RPC returns owned objects and legacy FAM paths.
+  const storageResult = await adminRequest("rpc/list_account_storage_objects", "POST", {
+    p_user_id: userId,
+  });
+  if (!storageResult.ok || !Array.isArray(storageResult.data)) {
+    console.error("account_storage_inventory_failed", storageResult.status);
+    throw new Error("Не удалось проверить все файлы аккаунта. Удаление остановлено.");
+  }
+
+  const grouped = new Map<string, string[]>();
+  for (const row of storageResult.data) {
+    if (typeof row?.bucket_id !== "string" || typeof row?.object_name !== "string") continue;
+    if (!/^[a-z0-9_-]{1,100}$/i.test(row.bucket_id) || !row.object_name || row.object_name.length > 1024) continue;
+    const current = grouped.get(row.bucket_id) ?? [];
+    current.push(row.object_name);
+    grouped.set(row.bucket_id, current);
+  }
+
+  for (const [bucket, paths] of grouped.entries()) {
+    await storageRemove(bucket, paths);
+  }
+
+  // Confirm that no object still owned by this user prevents Auth deletion.
+  const verifyStorage = await adminRequest("rpc/list_account_storage_objects", "POST", {
+    p_user_id: userId,
+  });
+  if (!verifyStorage.ok || !Array.isArray(verifyStorage.data) || verifyStorage.data.length > 0) {
+    console.error("account_storage_cleanup_incomplete", verifyStorage.status);
+    throw new Error("Не удалось полностью очистить файлы аккаунта. Удаление остановлено.");
+  }
+
+  // Remove masked contact snapshots from open or historical deletion requests.
+  const requesterScrub = await adminRequest(
+    "account_deletion_requests?requester_id=eq." + encodeURIComponent(userId),
+    "PATCH",
+    { requester_email_masked: null },
+  );
+  const targetScrub = await adminRequest(
+    "account_deletion_requests?target_id=eq." + encodeURIComponent(userId),
+    "PATCH",
+    { target_email_masked: null },
+  );
+  if (!requesterScrub.ok || !targetScrub.ok) {
+    console.error("account_deletion_snapshot_cleanup_failed", requesterScrub.status, targetScrub.status);
+    throw new Error("Не удалось очистить связанные данные о заявках. Аккаунт не удалён.");
+  }
+
+  const deleteResponse = await fetch(
+    SUPABASE_URL + "/auth/v1/admin/users/" + encodeURIComponent(userId),
+    { method: "DELETE", headers: serviceHeaders(false) },
+  );
+  if (!deleteResponse.ok) {
+    const diagnostic = await deleteResponse.text();
+    console.error("auth_user_delete_failed", deleteResponse.status, diagnostic.slice(0, 180));
+    throw new Error("Supabase не смог удалить аккаунт и связанные записи. Попробуйте позже.");
   }
 }
 
 async function recordAudit(
   schoolId: string,
-  actorId: string,
+  actorId: string | null,
   targetId: string | null,
   action: string,
   details: Record<string, unknown>,
@@ -151,7 +182,7 @@ async function recordAudit(
   });
   if (!result.ok) {
     console.error("council_admin_audit_write_failed", result.status, action);
-    throw new Error("Не удалось записать действие в журнал. Операция отменена.");
+    throw new Error("Не удалось записать действие в журнал.");
   }
 }
 
@@ -163,7 +194,7 @@ async function getSchoolProfile(userId: string): Promise<any | null> {
 }
 
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
-  const [users, listings, audit] = await Promise.all([
+  const [users, listings, audit, deletionRequests] = await Promise.all([
     adminRequest(
       "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
@@ -176,10 +207,14 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       "council_admin_audit?select=id,actor_id,target_id,action,details,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
     ),
+    adminRequest(
+      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
+      + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
+    ),
   ]);
 
-  if (!users.ok || !listings.ok || !audit.ok) {
-    console.error("council_overview_failed", users.status, listings.status, audit.status);
+  if (!users.ok || !listings.ok || !audit.ok || !deletionRequests.ok) {
+    console.error("council_overview_failed", users.status, listings.status, audit.status, deletionRequests.status);
     throw new Error("Не удалось загрузить панель управления.");
   }
 
@@ -207,7 +242,58 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       details: row.details ?? {},
       created_at: row.created_at,
     })),
+    deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
+      id: row.id,
+      target_id: row.target_id,
+      target_email: row.target_email_masked || "Аккаунт",
+      target_role: row.target_role,
+      requester_email: row.requester_email_masked || "Участник совета",
+      reason_code: row.reason_code,
+      reason: row.reason,
+      status: row.status,
+      created_at: row.created_at,
+    })),
   };
+}
+
+async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
+  const [targets, ownRequests] = await Promise.all([
+    adminRequest(
+      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(actor.school_id)
+      + "&id=neq." + encodeURIComponent(actorId)
+      + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
+    ),
+    adminRequest(
+      "account_deletion_requests?select=id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
+      + encodeURIComponent(actorId) + "&school_id=eq." + encodeURIComponent(actor.school_id)
+      + "&order=created_at.desc&limit=10",
+    ),
+  ]);
+  if (!targets.ok || !ownRequests.ok) throw new Error("Не удалось загрузить список аккаунтов.");
+  return {
+    targets: (targets.data ?? []).map((row: any) => ({
+      id: row.id,
+      email: maskEmail(row.email),
+      role: row.role,
+    })),
+    my_requests: ownRequests.data ?? [],
+  };
+}
+
+function tokenWasIssuedRecently(authorization: string): boolean {
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
+    const claims = JSON.parse(atob(padded));
+    const issuedAt = Number(claims?.iat);
+    const ageSeconds = Date.now() / 1000 - issuedAt;
+    return Number.isFinite(issuedAt) && ageSeconds >= 0 && ageSeconds <= 600;
+  } catch {
+    return false;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -225,6 +311,8 @@ Deno.serve(async (req: Request) => {
   if (!/^Bearer\s+\S+/i.test(authorization)) return json({ ok: false, error: "Войдите в аккаунт." }, 401, headers);
 
   try {
+    // Auth validates the bearer token; its signed iat is used only for the fresh
+    // sign-in requirement on permanent self-deletion.
     const authResponse = await fetch(SUPABASE_URL + "/auth/v1/user", {
       headers: { "apikey": PUBLISHABLE_KEY, "Authorization": authorization },
     });
@@ -234,20 +322,186 @@ Deno.serve(async (req: Request) => {
     if (!UUID_RE.test(actorId)) return json({ ok: false, error: "Не удалось подтвердить пользователя." }, 401, headers);
 
     const raw = await req.text();
-    if (new TextEncoder().encode(raw).byteLength > 8_192) return json({ ok: false, error: "Запрос слишком большой." }, 413, headers);
+    if (new TextEncoder().encode(raw).byteLength > 12_288) return json({ ok: false, error: "Запрос слишком большой." }, 413, headers);
     let payload: any;
     try { payload = JSON.parse(raw); } catch { return json({ ok: false, error: "Некорректный формат запроса." }, 400, headers); }
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return json({ ok: false, error: "Некорректный запрос." }, 400, headers);
 
     const actor = await getSchoolProfile(actorId);
     if (!actor) return json({ ok: false, error: "Профиль пользователя не найден." }, 403, headers);
-    if (actor.role !== "school_admin" || !actor.school_id) {
-      return json({ ok: false, error: "Эта панель доступна только администратору своей школы." }, 403, headers);
+    const action = payload.action;
+
+    // Any signed-in user may permanently delete their own account.
+    // Require a fresh password sign-in and an explicit confirmation phrase.
+    if (action === "delete_my_account") {
+      if (payload.confirmation !== DELETE_CONFIRMATION) {
+        return json({ ok: false, error: "Подтвердите удаление точной фразой." }, 400, headers);
+      }
+      if (!tokenWasIssuedRecently(authorization)) {
+        return json({ ok: false, error: "Для удаления войдите в аккаунт заново и повторите действие." }, 403, headers);
+      }
+
+      if (actor.role === "school_admin" && actor.school_id) {
+        const otherAdmins = await adminRequest(
+          "profiles?select=id&school_id=eq." + encodeURIComponent(actor.school_id)
+          + "&role=eq.school_admin&id=neq." + encodeURIComponent(actorId) + "&limit=1",
+        );
+        if (!otherAdmins.ok) return json({ ok: false, error: "Не удалось проверить наличие другого администратора." }, 503, headers);
+        if (!Array.isArray(otherAdmins.data) || otherAdmins.data.length === 0) {
+          return json({
+            ok: false,
+            error: "Вы последний администратор школы. Сначала назначьте другого администратора, затем удалите свой аккаунт.",
+          }, 409, headers);
+        }
+      }
+
+      await deleteAccountCompletely(actorId);
+      return json({ ok: true, deleted: true }, 200, headers);
     }
 
-    const action = payload.action;
+    // Council members may request removal of a different same-school student/member.
+    // Requests are never executed automatically; only a same-school admin can decide.
+    if (action === "list_request_targets" || action === "request_account_deletion") {
+      if (actor.role !== "council_member" || !actor.school_id) {
+        return json({ ok: false, error: "Отправлять такие запросы могут только участники совета." }, 403, headers);
+      }
+
+      if (action === "list_request_targets") {
+        return json({ ok: true, ...(await listCouncilTargets(actor, actorId)) }, 200, headers);
+      }
+
+      const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
+      const reasonCode = typeof payload.reason_code === "string" ? payload.reason_code : "";
+      const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      if (!UUID_RE.test(targetId) || targetId === actorId) {
+        return json({ ok: false, error: "Выберите другой аккаунт." }, 400, headers);
+      }
+      if (!REASON_CODES.has(reasonCode)) return json({ ok: false, error: "Выберите причину обращения." }, 400, headers);
+      if (reason.length < 15 || reason.length > 500) {
+        return json({ ok: false, error: "Пояснение должно содержать от 15 до 500 символов." }, 400, headers);
+      }
+
+      const target = await getSchoolProfile(targetId);
+      if (!target || target.school_id !== actor.school_id || !["student", "council_member"].includes(target.role)) {
+        return json({ ok: false, error: "Можно отправлять запросы только по обычным аккаунтам своей школы и участникам совета." }, 403, headers);
+      }
+
+      const existing = await adminRequest(
+        "account_deletion_requests?select=id,status,target_email_masked,created_at&school_id=eq."
+        + encodeURIComponent(actor.school_id) + "&target_id=eq." + encodeURIComponent(targetId)
+        + "&status=in.(pending,processing)&limit=1",
+      );
+      if (!existing.ok) return json({ ok: false, error: "Не удалось проверить предыдущие обращения." }, 503, headers);
+      if (Array.isArray(existing.data) && existing.data[0]) {
+        return json({ ok: true, already_exists: true, request: existing.data[0] }, 200, headers);
+      }
+
+      const insert = await adminRequest("account_deletion_requests?select=id,status,created_at", "POST", {
+        school_id: actor.school_id,
+        requester_id: actorId,
+        target_id: targetId,
+        requester_email_masked: maskEmail(actor.email || authUser.email),
+        target_email_masked: maskEmail(target.email),
+        target_role: target.role,
+        reason_code: reasonCode,
+        reason,
+        status: "pending",
+      });
+      if (!insert.ok) {
+        if (insert.status === 409 || insert.status === 400) {
+          return json({ ok: false, error: "По этому аккаунту уже есть открытое обращение." }, 409, headers);
+        }
+        console.error("account_deletion_request_insert_failed", insert.status);
+        return json({ ok: false, error: "Не удалось отправить обращение. Попробуйте позже." }, 503, headers);
+      }
+      const created = Array.isArray(insert.data) ? insert.data[0] ?? null : null;
+      return json({ ok: true, request: created }, 200, headers);
+    }
+
+    // All remaining management actions are administrator-only.
+    if (actor.role !== "school_admin" || !actor.school_id) {
+      return json({ ok: false, error: "Эта операция доступна только администратору своей школы." }, 403, headers);
+    }
+
     if (action === "overview") {
       return json({ ok: true, ...(await listOverview(actor.school_id)) }, 200, headers);
+    }
+
+    if (action === "review_account_deletion") {
+      const requestId = typeof payload.request_id === "string" ? payload.request_id : "";
+      const decision = payload.decision;
+      const reviewNote = typeof payload.review_note === "string" ? payload.review_note.trim().slice(0, 240) : "";
+      if (!UUID_RE.test(requestId) || !["approve", "reject"].includes(decision)) {
+        return json({ ok: false, error: "Некорректное решение по обращению." }, 400, headers);
+      }
+
+      const found = await adminRequest(
+        "account_deletion_requests?select=id,school_id,requester_id,target_id,target_email_masked,target_role,status,reason_code,reason&id=eq."
+        + encodeURIComponent(requestId) + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&limit=1",
+      );
+      const request = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
+      if (!request) return json({ ok: false, error: "Обращение не найдено в вашей школе." }, 404, headers);
+      if (request.status !== "pending") return json({ ok: false, error: "Обращение уже рассматривается или закрыто." }, 409, headers);
+
+      if (decision === "reject") {
+        const rejected = await adminRequest(
+          "account_deletion_requests?id=eq." + encodeURIComponent(requestId)
+          + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&status=eq.pending",
+          "PATCH",
+          { status: "rejected", reviewer_id: actorId, reviewed_at: new Date().toISOString(), review_note: reviewNote || null },
+        );
+        if (!rejected.ok || !Array.isArray(rejected.data) || rejected.data.length !== 1) {
+          return json({ ok: false, error: "Обращение уже обработано другим администратором." }, 409, headers);
+        }
+        await recordAudit(actor.school_id, actorId, request.target_id, "account_deletion_request_rejected", {
+          request_id: requestId,
+          reason_code: request.reason_code,
+        });
+        return json({ ok: true, status: "rejected" }, 200, headers);
+      }
+
+      const claimed = await adminRequest(
+        "account_deletion_requests?id=eq." + encodeURIComponent(requestId)
+        + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&status=eq.pending",
+        "PATCH",
+        { status: "processing", reviewer_id: actorId, reviewed_at: new Date().toISOString() },
+      );
+      if (!claimed.ok || !Array.isArray(claimed.data) || claimed.data.length !== 1) {
+        return json({ ok: false, error: "Обращение уже взял в работу другой администратор." }, 409, headers);
+      }
+
+      try {
+        if (!request.target_id) throw new Error("Аккаунт уже недоступен.");
+        const target = await getSchoolProfile(request.target_id);
+        if (!target || target.school_id !== actor.school_id || !["student", "council_member"].includes(target.role)) {
+          throw new Error("Аккаунт больше не подходит под условия удаления.");
+        }
+        await deleteAccountCompletely(request.target_id);
+
+        const completed = await adminRequest(
+          "account_deletion_requests?id=eq." + encodeURIComponent(requestId)
+          + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&status=eq.processing",
+          "PATCH",
+          { status: "approved", reviewer_id: actorId, reviewed_at: new Date().toISOString(), review_note: reviewNote || null },
+        );
+        if (!completed.ok || !Array.isArray(completed.data) || completed.data.length !== 1) {
+          console.error("account_deletion_request_completion_update_failed", completed.status);
+        }
+        await recordAudit(actor.school_id, actorId, null, "account_deleted_by_request", {
+          request_id: requestId,
+          target_role: request.target_role,
+        });
+        return json({ ok: true, status: "approved" }, 200, headers);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Не удалось удалить аккаунт.";
+        await adminRequest(
+          "account_deletion_requests?id=eq." + encodeURIComponent(requestId)
+          + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&status=eq.processing",
+          "PATCH",
+          { status: "pending", reviewer_id: null, reviewed_at: null, review_note: message.slice(0, 240) },
+        );
+        return json({ ok: false, error: message }, 503, headers);
+      }
     }
 
     const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
@@ -286,10 +540,7 @@ Deno.serve(async (req: Request) => {
         "listings?id=eq." + encodeURIComponent(targetId),
         "DELETE",
       );
-      if (!removed.ok) {
-        console.error("school_listing_delete_failed", removed.status);
-        return json({ ok: false, error: "Не удалось удалить объявление." }, 503, headers);
-      }
+      if (!removed.ok) return json({ ok: false, error: "Не удалось удалить объявление." }, 503, headers);
 
       let imageCleanup = "no_image";
       if (typeof listing.image_url === "string") {
@@ -314,52 +565,28 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      await recordAudit(actor.school_id, actorId, listing.user_id, "listing_deleted", {
+      await recordAudit(actor.school_id, actorId, null, "listing_deleted", {
         listing_id: targetId,
-        title: String(listing.title ?? "").slice(0, 100),
+        category: String(listing.category ?? "").slice(0, 40),
         image_cleanup: imageCleanup,
       });
       return json({ ok: true, image_cleanup: imageCleanup }, 200, headers);
     }
 
     if (action === "delete_account") {
-      if (targetId === actorId) return json({ ok: false, error: "Нельзя удалить собственный аккаунт из панели." }, 403, headers);
+      if (targetId === actorId) return json({ ok: false, error: "Для своего аккаунта используйте раздел «Удалить мой аккаунт»." }, 403, headers);
       const target = await getSchoolProfile(targetId);
       if (!target || target.school_id !== actor.school_id) {
         return json({ ok: false, error: "Аккаунт не найден в вашей школе." }, 404, headers);
       }
-      if (target.role === "school_admin") {
-        return json({ ok: false, error: "Сначала снимите полномочия администратора. Последнего администратора удалить нельзя." }, 403, headers);
-      }
       if (!["student", "council_member"].includes(target.role)) {
-        return json({ ok: false, error: "Этот аккаунт нельзя удалить из панели." }, 403, headers);
+        return json({ ok: false, error: "Удалять можно только аккаунты учеников и участников совета. Аккаунт администратора сначала должен передать полномочия." }, 403, headers);
       }
 
-      // Auth deletion fails while the user owns Storage objects. Remove only
-      // objects whose paths belong to this exact account before deleting Auth.
-      const ownedObjects = [
-        { bucket: "avatars", paths: await storageList("avatars", targetId + "/") },
-        { bucket: "event-images", paths: await storageList("event-images", targetId + "/") },
-        { bucket: "listing-images", paths: await storageList("listing-images", targetId + "/") },
-        { bucket: "listings-images", paths: await storageList("listings-images", "", "listing_" + targetId + "_") },
-      ];
-      for (const bucket of ownedObjects) {
-        await storageRemove(bucket.bucket, bucket.paths);
-      }
-
-      const deleteResponse = await fetch(
-        SUPABASE_URL + "/auth/v1/admin/users/" + encodeURIComponent(targetId),
-        { method: "DELETE", headers: serviceHeaders(false) },
-      );
-      if (!deleteResponse.ok) {
-        const diagnostic = await deleteResponse.text();
-        console.error("auth_user_delete_failed", deleteResponse.status, diagnostic.slice(0, 180));
-        return json({ ok: false, error: "Supabase не смог удалить аккаунт. Проверьте связанные файлы или данные и повторите позже." }, 503, headers);
-      }
-
-      await recordAudit(actor.school_id, actorId, targetId, "account_deleted", {
-        previous_role: target.role,
-        email: maskEmail(target.email),
+      await deleteAccountCompletely(targetId);
+      await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
+        target_role: target.role,
+        source: "admin_panel",
       });
       return json({ ok: true }, 200, headers);
     }
