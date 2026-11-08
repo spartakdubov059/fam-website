@@ -22,7 +22,7 @@
 - Добавлены 5 локальных регрессионных тестов и GitHub Actions workflow для их запуска при изменениях модерации.
 
 Развёртывание Supabase: `moderate v24 ACTIVE`, `submit-content v9 ACTIVE`, обе функции с `verify_jwt=true`.
-Локальная проверка Node.js 22: 5 тестов пройдены. Удалённый результат GitHub Actions пока не подтверждён доступным просмотром запусков.
+Локальная проверка Node.js 22: 5 тестов пройдены. GitHub Actions `Moderation regression tests` завершился `success`; проверка включает 5 Node.js тестов и синтаксис inline JavaScript. GitHub Pages build and deployment на том же commit также завершился `success`.
 Публикация фронтенда на Netlify не проверялась; изменения фронтенда сохранены в GitHub.
 
 
