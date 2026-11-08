@@ -149,7 +149,7 @@ Deno.serve(async (req: Request) => {
       if (!own.ok) return json({ ok: false, error: "Не удалось загрузить статус заявки." }, 503, headers);
       return json({
         ok: true,
-        role: "student",
+        role: profile.role,
         request: Array.isArray(own.data) ? own.data[0] ?? null : null,
       }, 200, headers);
     }
@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
 
       const note = typeof payload.applicant_note === "string" ? payload.applicant_note.trim() : "";
       if (!isAllowedApplicantNote(note)) {
-        return json({ ok: false, error: "Выберите свою роль из списка Ученического совета." }, 400, headers);
+        return json({ ok: false, error: "Выберите одну из двух ролей: участник Совета или администратор." }, 400, headers);
       }
 
       const school = await adminRequest(
@@ -237,7 +237,7 @@ Deno.serve(async (req: Request) => {
         p_request_id: requestId,
         p_reviewer_id: userId,
         p_approve: decision === "approve",
-        p_note: null, // Review notes are not collected in the UI.
+        p_note: note || null,
       });
       if (!result.ok) {
         console.warn("school_admin_request_review_failed", result.status);
