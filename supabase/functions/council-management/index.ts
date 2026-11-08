@@ -139,19 +139,14 @@ async function deleteAccountCompletely(userId: string, preserveRequestId: string
     throw new Error("Не удалось полностью очистить файлы аккаунта. Удаление остановлено.");
   }
 
-  // Close other open requests about this account. A request currently being
-  // approved is preserved until the reviewer marks it complete.
-  const requestFilter = "account_deletion_requests?target_id=eq." + encodeURIComponent(userId)
-    + "&status=in.(pending,processing)"
+  // Remember open requests to close only after Auth confirms the account deletion.
+  const openRequestFilter = "account_deletion_requests?select=id&target_id=eq."
+    + encodeURIComponent(userId) + "&status=in.(pending,processing)"
     + (preserveRequestId ? "&id=neq." + encodeURIComponent(preserveRequestId) : "");
-  const closedRequests = await adminRequest(requestFilter, "PATCH", {
-    status: "cancelled",
-    reviewed_at: new Date().toISOString(),
-    review_note: "Аккаунт удалён отдельно; обращение закрыто.",
-  });
-  if (!closedRequests.ok) {
-    console.error("account_deletion_request_close_failed", closedRequests.status);
-    throw new Error("Не удалось закрыть связанные обращения. Аккаунт не удалён.");
+  const openRequests = await adminRequest(openRequestFilter);
+  if (!openRequests.ok || !Array.isArray(openRequests.data)) {
+    console.error("account_deletion_request_inventory_failed", openRequests.status);
+    throw new Error("Не удалось проверить связанные обращения. Удаление остановлено.");
   }
 
   // Remove masked contact snapshots from open or historical deletion requests.
@@ -178,6 +173,25 @@ async function deleteAccountCompletely(userId: string, preserveRequestId: string
     const diagnostic = await deleteResponse.text();
     console.error("auth_user_delete_failed", deleteResponse.status, diagnostic.slice(0, 180));
     throw new Error("Supabase не смог удалить аккаунт и связанные записи. Попробуйте позже.");
+  }
+
+  const openRequestIds = openRequests.data
+    .map((row: any) => row?.id)
+    .filter((id: unknown): id is string => typeof id === "string" && UUID_RE.test(id));
+  if (openRequestIds.length) {
+    const cancelled = await adminRequest(
+      "account_deletion_requests?id=in.(" + openRequestIds.map(encodeURIComponent).join(",")
+      + ")&status=in.(pending,processing)",
+      "PATCH",
+      {
+        status: "cancelled",
+        reviewed_at: new Date().toISOString(),
+        review_note: "Аккаунт удалён отдельно; обращение закрыто.",
+      },
+    );
+    if (!cancelled.ok) {
+      console.error("account_deletion_request_close_failed_after_delete", cancelled.status);
+    }
   }
 }
 
