@@ -222,8 +222,21 @@ async function getSchoolProfile(userId: string): Promise<any | null> {
   return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
 }
 
+async function getActiveSuspension(userId: string): Promise<any | null> {
+  const result = await adminRequest(
+    "account_suspensions?select=id,school_id,target_id,target_role,duration_hours,reason,status,expires_at,created_at"
+    + "&target_id=eq." + encodeURIComponent(userId)
+    + "&status=eq.active&expires_at=gt." + encodeURIComponent(new Date().toISOString())
+    + "&order=created_at.desc&limit=1",
+  );
+  if (!result.ok || !Array.isArray(result.data)) {
+    throw new Error("Не удалось проверить статус ограничений аккаунта.");
+  }
+  return result.data[0] ?? null;
+}
+
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
-  const [users, listings, audit, deletionRequests] = await Promise.all([
+  const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
       "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
@@ -240,10 +253,15 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
     ),
+    adminRequest(
+      "account_suspensions?select=id,target_id,target_role,duration_hours,reason,expires_at,created_at&school_id=eq."
+      + encodeURIComponent(schoolId) + "&status=eq.active&expires_at=gt."
+      + encodeURIComponent(new Date().toISOString()) + "&order=expires_at.asc&limit=100",
+    ),
   ]);
 
-  if (!users.ok || !listings.ok || !audit.ok || !deletionRequests.ok) {
-    console.error("council_overview_failed", users.status, listings.status, audit.status, deletionRequests.status);
+  if (!users.ok || !listings.ok || !audit.ok || !deletionRequests.ok || !suspensions.ok) {
+    console.error("council_overview_failed", users.status, listings.status, audit.status, deletionRequests.status, suspensions.status);
     throw new Error("Не удалось загрузить панель управления.");
   }
 
@@ -280,6 +298,15 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       reason_code: row.reason_code,
       reason: row.reason,
       status: row.status,
+      created_at: row.created_at,
+    })),
+    suspensions: (suspensions.data ?? []).map((row: any) => ({
+      id: row.id,
+      target_id: row.target_id,
+      target_role: row.target_role,
+      duration_hours: row.duration_hours,
+      reason: row.reason,
+      expires_at: row.expires_at,
       created_at: row.created_at,
     })),
   };
@@ -422,6 +449,35 @@ Deno.serve(async (req: Request) => {
     if (!actor) return json({ ok: false, error: "Профиль пользователя не найден." }, 403, headers);
     const action = payload.action;
 
+    if (action === "my_suspension_status") {
+      const suspension = await getActiveSuspension(actorId);
+      return json({
+        ok: true,
+        suspended: !!suspension,
+        suspension: suspension ? {
+          reason: suspension.reason,
+          expires_at: suspension.expires_at,
+          duration_hours: suspension.duration_hours,
+        } : null,
+      }, 200, headers);
+    }
+
+    // A temporary restriction blocks all write/management actions, but leaves
+    // status visibility and self-deletion available to the account owner.
+    if (action !== "delete_my_account") {
+      const suspension = await getActiveSuspension(actorId);
+      if (suspension) {
+        return json({
+          ok: false,
+          suspended: true,
+          suspended_until: suspension.expires_at,
+          error: "Действия аккаунта временно ограничены до "
+            + new Date(suspension.expires_at).toLocaleString("ru-RU")
+            + ". Причина: " + String(suspension.reason || "").slice(0, 240),
+        }, 403, headers);
+      }
+    }
+
     // Any signed-in user may permanently delete their own account.
     // Require a fresh password sign-in and an explicit confirmation phrase.
     if (action === "delete_my_account") {
@@ -525,6 +581,8 @@ Deno.serve(async (req: Request) => {
       "delete_listing",
       "delete_account",
       "revoke_role",
+      "suspend_account",
+      "lift_suspension",
     ]);
     if (sensitiveActions.has(action) && !tokenWasIssuedRecently(authorization)) {
       return json({
@@ -535,6 +593,110 @@ Deno.serve(async (req: Request) => {
 
     if (action === "overview") {
       return json({ ok: true, ...(await listOverview(actor.school_id)) }, 200, headers);
+    }
+
+    if (action === "suspend_account") {
+      const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
+      const durationHours = Number(payload.duration_hours);
+      const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      const reasonDigits = reason.replace(/\\D/g, "");
+      const containsContact = /(?:https?:\\/\\/|www\\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,})/i.test(reason)
+        || reasonDigits.length >= 11;
+      if (!UUID_RE.test(targetId) || targetId === actorId) {
+        return json({ ok: false, error: "Нельзя ограничить собственный аккаунт." }, 400, headers);
+      }
+      if (![24, 72, 168].includes(durationHours)) {
+        return json({ ok: false, error: "Выберите срок 24 часа, 3 дня или 7 дней." }, 400, headers);
+      }
+      if (reason.length < 15 || reason.length > 400 || containsContact) {
+        return json({ ok: false, error: "Укажите нейтральную причину длиной 15–400 символов, без контактов и личных данных." }, 400, headers);
+      }
+
+      const target = await getSchoolProfile(targetId);
+      if (!target || target.school_id !== actor.school_id
+          || !["student", "council_member"].includes(target.role)) {
+        return json({ ok: false, error: "Ограничивать можно только обычные аккаунты и участников совета своей школы." }, 403, headers);
+      }
+
+      const previous = await adminRequest(
+        "account_suspensions?select=id,expires_at,status&school_id=eq."
+        + encodeURIComponent(actor.school_id) + "&target_id=eq." + encodeURIComponent(targetId)
+        + "&status=eq.active&order=created_at.desc&limit=1",
+      );
+      if (!previous.ok) return json({ ok: false, error: "Не удалось проверить действующее ограничение." }, 503, headers);
+      if (Array.isArray(previous.data) && previous.data[0]) {
+        const old = previous.data[0];
+        if (typeof old.expires_at === "string" && new Date(old.expires_at).getTime() > Date.now()) {
+          return json({ ok: false, error: "У аккаунта уже есть действующее ограничение." }, 409, headers);
+        }
+        await adminRequest(
+          "account_suspensions?id=eq." + encodeURIComponent(old.id) + "&status=eq.active",
+          "PATCH",
+          {
+            status: "expired",
+            lifted_at: old.expires_at || new Date().toISOString(),
+            lift_reason: "Срок ограничения истёк",
+          },
+        );
+      }
+
+      const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+      const inserted = await adminRequest("account_suspensions?select=id,target_id,duration_hours,reason,expires_at,status", "POST", {
+        school_id: actor.school_id,
+        target_id: targetId,
+        issued_by: actorId,
+        target_role: target.role,
+        duration_hours: durationHours,
+        reason,
+        status: "active",
+        expires_at: expiresAt,
+      });
+      if (!inserted.ok || !Array.isArray(inserted.data) || !inserted.data[0]) {
+        console.error("account_suspension_create_failed", inserted.status);
+        return json({ ok: false, error: "Не удалось установить временное ограничение." }, 503, headers);
+      }
+      const row = inserted.data[0];
+      await recordAudit(actor.school_id, actorId, targetId, "account_suspended", {
+        suspension_id: row.id,
+        duration_hours: durationHours,
+        expires_at: row.expires_at,
+        reason,
+      });
+      return json({ ok: true, suspension: row }, 200, headers);
+    }
+
+    if (action === "lift_suspension") {
+      const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
+      if (!UUID_RE.test(targetId) || targetId === actorId) {
+        return json({ ok: false, error: "Некорректный аккаунт." }, 400, headers);
+      }
+      const target = await getSchoolProfile(targetId);
+      if (!target || target.school_id !== actor.school_id
+          || !["student", "council_member"].includes(target.role)) {
+        return json({ ok: false, error: "Аккаунт не найден среди пользователей вашей школы." }, 404, headers);
+      }
+      const active = await adminRequest(
+        "account_suspensions?select=id,expires_at&school_id=eq."
+        + encodeURIComponent(actor.school_id) + "&target_id=eq." + encodeURIComponent(targetId)
+        + "&status=eq.active&expires_at=gt." + encodeURIComponent(new Date().toISOString())
+        + "&order=created_at.desc&limit=1",
+      );
+      const row = active.ok && Array.isArray(active.data) ? active.data[0] ?? null : null;
+      if (!row) return json({ ok: false, error: "Действующего ограничения нет." }, 404, headers);
+
+      const lifted = await adminRequest(
+        "account_suspensions?id=eq." + encodeURIComponent(row.id)
+        + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&status=eq.active",
+        "PATCH",
+        { status: "lifted", lifted_at: new Date().toISOString(), lifted_by: actorId, lift_reason: "Снято администратором" },
+      );
+      if (!lifted.ok || !Array.isArray(lifted.data) || lifted.data.length !== 1) {
+        return json({ ok: false, error: "Не удалось снять ограничение. Обновите список." }, 409, headers);
+      }
+      await recordAudit(actor.school_id, actorId, targetId, "account_suspension_lifted", {
+        suspension_id: row.id,
+      });
+      return json({ ok: true }, 200, headers);
     }
 
     if (action === "list_safety_reports") {
