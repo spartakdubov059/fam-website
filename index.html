@@ -343,6 +343,12 @@
       <button class="button button-primary" data-action="open-auth">Войти</button>
     </div>
     <div id="profileLoggedIn" class="hidden">
+      <div id="mySuspensionNotice" class="profile-box hidden" role="status" style="border-color:var(--danger);margin-bottom:12px;">
+        <h3 style="font-size:13px;margin:0 0 6px;color:var(--danger);">Временное ограничение аккаунта</h3>
+        <p style="font-size:10px;color:var(--muted);margin:0 0 6px;">Некоторые действия в FAM временно недоступны. Просматривать объявления и читать свои данные можно.</p>
+        <div style="font-size:10px;margin:0 0 4px;">Действует до: <b id="mySuspensionUntil"></b></div>
+        <div style="font-size:10px;">Причина: <span id="mySuspensionReason"></span></div>
+      </div>
       <div id="schoolAdminAccess" class="profile-box hidden">
         <h3 style="font-size:14px; margin:0 0 8px;">Доступ к панели Ученического совета</h3>
         <p style="font-size:11px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
@@ -1698,6 +1704,8 @@ window.onunhandledrejection = function(event) {
     const labels = {
       role_granted: "Выданы полномочия",
       role_revoked: "Полномочия сняты",
+      account_suspended: "Временно ограничен аккаунт",
+      account_suspension_lifted: "Временное ограничение снято",
       application_rejected: "Заявка отклонена",
       listing_deleted: "Удалено объявление",
       account_deleted: "Удалён аккаунт",
@@ -1706,6 +1714,34 @@ window.onunhandledrejection = function(event) {
       account_deletion_request_rejected: "Запрос на удаление отклонён"
     };
     return labels[action] || "Действие администратора";
+  }
+
+  async function loadMySuspensionNotice() {
+    const box = $("mySuspensionNotice");
+    if (!box) return;
+    if (!user) {
+      box.classList.add("hidden");
+      return;
+    }
+    try {
+      const { data, error } = await sb.functions.invoke("council-management", {
+        body: { action: "my_suspension_status" }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось проверить ограничения аккаунта.");
+      if (!data.suspended || !data.suspension) {
+        box.classList.add("hidden");
+        return;
+      }
+      $("mySuspensionUntil").textContent = data.suspension.expires_at
+        ? new Date(data.suspension.expires_at).toLocaleString("ru-RU")
+        : "время окончания уточняется";
+      $("mySuspensionReason").textContent = data.suspension.reason || "Причина не указана";
+      box.classList.remove("hidden");
+    } catch (error) {
+      console.warn("account_suspension_status_failed", error?.message || "unknown");
+      box.classList.add("hidden");
+    }
   }
 
   async function loadCouncilAdminTools() {
@@ -1727,20 +1763,51 @@ window.onunhandledrejection = function(event) {
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить управление школой.");
 
       const users = Array.isArray(data.users) ? data.users : [];
+      const activeSuspensions = Array.isArray(data.suspensions) ? data.suspensions : [];
+      const suspensionByUser = new Map(activeSuspensions.map(row => [row.target_id, row]));
       $("councilAdminUsers").innerHTML = users.length ? users.map(row => {
         const isSelf = row.id === user.id;
+        const canManage = !isSelf && ["student", "council_member"].includes(row.role);
         const canRevoke = !isSelf && ["council_member", "school_admin"].includes(row.role);
-        const canDelete = !isSelf && ["student", "council_member"].includes(row.role);
+        const canDelete = canManage;
+        const suspension = suspensionByUser.get(row.id);
         const actions = [
           canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
           canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button>` : ""
         ].filter(Boolean).join("");
+
+        let restrictionControl = "";
+        if (canManage && suspension) {
+          const until = suspension.expires_at ? new Date(suspension.expires_at).toLocaleString("ru-RU") : "—";
+          restrictionControl = `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+            <span class="idea-status status-rejected">Временно ограничен до ${esc(until)}</span>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px;">Причина: ${esc(suspension.reason || "Не указана")}</div>
+            <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="lift-council-suspension" data-id="${esc(row.id)}">Снять ограничение досрочно</button>
+          </div>`;
+        } else if (canManage) {
+          restrictionControl = `<details style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <summary style="font-size:10px;cursor:pointer;color:var(--muted);">Временно ограничить действия</summary>
+            <div style="margin-top:8px;">
+              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Срок ограничения</label>
+              <select class="form-control" data-suspension-hours style="font-size:11px;margin-bottom:7px;">
+                <option value="24">24 часа</option>
+                <option value="72">3 дня</option>
+                <option value="168">7 дней</option>
+              </select>
+              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Причина (15–400 символов)</label>
+              <textarea class="form-control" data-suspension-reason rows="2" maxlength="400" style="font-size:11px;" placeholder="Кратко опишите конкретное нарушение, без личных данных"></textarea>
+              <button type="button" class="button button-secondary button-small" style="margin-top:7px;" data-action="suspend-council-account" data-id="${esc(row.id)}">Установить ограничение</button>
+            </div>
+          </details>`;
+        }
+
         return `<div class="idea-card" style="margin-bottom:7px;">
           <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
             <b style="font-size:11px;">${esc(row.email || "Пользователь")}</b>
             <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
           </div>
           ${isSelf ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;">Ваш аккаунт</div>' : ""}
+          ${restrictionControl}
           ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${actions}</div>` : ""}
         </div>`;
       }).join("") : '<p style="font-size:10px;color:var(--muted);">Аккаунты не найдены.</p>';
@@ -2065,15 +2132,15 @@ window.onunhandledrejection = function(event) {
     return true;
   }
 
-  async function callCouncilManagement(action, targetId) {
+  async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing"];
+    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "suspend_account", "lift_suspension"];
     if (sensitiveActions.includes(action)) {
       const confirmed = await ensureRecentAdminAuthentication();
       if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
     }
     const { data, error } = await sb.functions.invoke("council-management", {
-      body: { action, target_id: targetId }
+      body: { action, target_id: targetId, ...extra }
     });
     if (error) throw error;
     if (!data?.ok) throw new Error(data?.error || "Операция не выполнена.");
@@ -2118,6 +2185,38 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  async function suspendCouncilAccount(button) {
+    if (!button || profile?.role !== "school_admin") return;
+    const card = button.closest(".idea-card");
+    const durationHours = Number(card?.querySelector("[data-suspension-hours]")?.value);
+    const reason = card?.querySelector("[data-suspension-reason]")?.value?.trim() || "";
+    if (![24, 72, 168].includes(durationHours)) return notice("Выберите срок ограничения.");
+    if (reason.length < 15 || reason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
+    const durationLabel = durationHours === 24 ? "24 часа" : durationHours === 72 ? "3 дня" : "7 дней";
+    if (!confirm("Временно ограничить действия этого аккаунта на " + durationLabel + "? Пользователь сможет войти и увидеть причину, но не сможет публиковать, писать или отправлять заявки.")) return;
+    try {
+      await callCouncilManagement("suspend_account", button.dataset.id, {
+        duration_hours: durationHours,
+        reason
+      });
+      notice("Временное ограничение установлено.");
+      await loadCouncilAdminTools();
+    } catch (error) {
+      notice("Не удалось установить ограничение: " + (error?.message || "Ошибка."));
+    }
+  }
+
+  async function liftCouncilSuspension(targetId) {
+    if (!targetId || !confirm("Досрочно снять временное ограничение с аккаунта?")) return;
+    try {
+      await callCouncilManagement("lift_suspension", targetId);
+      notice("Временное ограничение снято.");
+      await loadCouncilAdminTools();
+    } catch (error) {
+      notice("Не удалось снять ограничение: " + (error?.message || "Ошибка."));
+    }
+  }
+
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
@@ -2136,6 +2235,7 @@ window.onunhandledrejection = function(event) {
       $("myListingsGrid").innerHTML = '';
     }
     renderIdeas();
+    await loadMySuspensionNotice();
     await loadSchoolAdminAccess();
 
     const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
@@ -2441,6 +2541,8 @@ window.onunhandledrejection = function(event) {
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
     else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
+    else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
     else if (action === 'review-school-admin') { reviewSchoolAdminRequest(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
