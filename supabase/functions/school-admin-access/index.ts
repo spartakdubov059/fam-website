@@ -1,3 +1,4 @@
+import { isAllowedApplicantNote, mapSchoolAdminRequests } from "./access-controls.js";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 
 function readDefaultKey(variable: string): string {
@@ -137,7 +138,7 @@ Deno.serve(async (req: Request) => {
           console.error("school_admin_requests_list_failed", result.status);
           return json({ ok: false, error: "Не удалось загрузить заявки." }, 503, headers);
         }
-        return json({ ok: true, role: "school_admin", requests: result.data ?? [] }, 200, headers);
+        return json({ ok: true, role: "school_admin", requests: mapSchoolAdminRequests(result.data) }, 200, headers);
       }
 
       const own = await adminRequest(
@@ -161,13 +162,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const note = typeof payload.applicant_note === "string" ? payload.applicant_note.trim() : "";
-      const allowedCouncilRoles = new Set([
-        "Председатель Ученического совета",
-        "Заместитель председателя Ученического совета",
-        "Секретарь Ученического совета",
-        "Член Ученического совета",
-      ]);
-      if (!allowedCouncilRoles.has(note)) {
+      if (!isAllowedApplicantNote(note)) {
         return json({ ok: false, error: "Выберите свою роль из списка Ученического совета." }, 400, headers);
       }
 
@@ -215,7 +210,7 @@ Deno.serve(async (req: Request) => {
         p_request_id: requestId,
         p_reviewer_id: userId,
         p_approve: decision === "approve",
-        p_note: note || null,
+        p_note: null, // Review notes are not collected in the UI.
       });
       if (!result.ok) {
         console.warn("school_admin_request_review_failed", result.status);
