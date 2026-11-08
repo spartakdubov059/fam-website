@@ -1,0 +1,29 @@
+name: Moderation regression tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/moderate/**'
+      - 'tests/moderation/**'
+  pull_request:
+    paths:
+      - 'supabase/functions/moderate/**'
+      - 'tests/moderation/**'
+
+permissions:
+  contents: read
+
+jobs:
+  moderation-tests:
+    name: Russian content safety tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run moderation tests
+        run: node --test tests/moderation/*.test.mjs
