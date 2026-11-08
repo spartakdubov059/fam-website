@@ -340,6 +340,17 @@ serve(async (req: Request) => {
         }, 200, headers);
       }
       const policyReview = await reviewDisputedContent(value, OPENAI_KEY);
+      if (policyReview.action !== "ok") {
+        const policySignals: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
+          targeted_harassment: { category: "targeted_harassment", severity: "medium" },
+          hate_or_discrimination: { category: "hate_or_discrimination", severity: "high" },
+          threat_or_intimidation: { category: "threat_or_intimidation", severity: "high" },
+          negative_personal_call: { category: "negative_personal_call", severity: "medium" },
+          unclear_context: { category: "unclear_safety_signal", severity: "medium" },
+        };
+        const signal = policySignals[policyReview.reason_code];
+        if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
+      }
       return cacheAndRespond(cacheKey, {
         action: policyReview.action,
         reason_code: policyReview.reason_code,
