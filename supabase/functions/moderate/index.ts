@@ -16,6 +16,48 @@ const badWords = [
   "обман", "мошен", "кидал", "взлом", "хакер", "спам", "реклам", "телеграм", "ватсап", "whatsapp", "t.me"
 ];
 
+
+function containsContactData(value: string): boolean {
+  const withoutDates = value.replace(/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/g, " ");
+  const patterns = [
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu,
+    /\+?\d(?:[\s().-]*\d){9,14}/u,
+    /\b(?:https?:\/\/|www\.|t\.me\/|vk\.com\/)/iu,
+    /(?<![\p{L}\p{N}])@[a-z0-9_]{3,}/iu,
+    /\b(?:ул(?:ица)?\.?|проспект|переулок|пер\.?|дом|квартира|подъезд|адрес)\b.{0,80}\d/iu,
+  ];
+  return patterns.some(pattern => pattern.test(withoutDates));
+}
+
+function extractJsonObject(raw: string): unknown | null {
+  const trimmed = raw.trim();
+  const candidates = [
+    trimmed,
+    trimmed.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`\s*$/, "").trim(),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {
+      // Try the next representation.
+    }
+  }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const parsed = JSON.parse(trimmed.slice(start, end + 1));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {
+      // Never auto-approve text that is not valid JSON.
+    }
+  }
+  return null;
+}
+
 const SYSTEM_PROMPT = [
   "Ты — строгий модератор школьной платформы FAM, которой могут пользоваться несовершеннолетние.",
   "Проверяй объявления, идеи и сообщения на безопасность, законность, соответствие школьному сообществу и правилам платформы.",
@@ -63,10 +105,12 @@ serve(async (req: Request) => {
   }
 
   if (!OPENROUTER_KEY) {
+    console.error("moderation_config_error: OPENROUTER_API_KEY is not configured");
     return jsonResponse({
       action: "pending",
       degraded: true,
-      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+      diagnostic_code: "missing_api_key",
+      reason: "ИИ-модерация не настроена на сервере. Идея сохранена для ручной проверки Советом.",
     }, 200, headers);
   }
 
@@ -81,14 +125,25 @@ serve(async (req: Request) => {
       }, 400, headers);
     }
 
-    const lowerText = value.toLowerCase();
+    const lowerText = value.toLocaleLowerCase("ru-RU");
+    const tokens = lowerText.split(/[^\p{L}\p{N}]+/u);
     for (const word of badWords) {
-      if (lowerText.includes(word)) {
+      // Very short fragments must match a complete word, not any larger word containing them.
+      const matched = word.length <= 4 ? tokens.includes(word) : lowerText.includes(word);
+      if (matched) {
         return jsonResponse({
           action: "reject",
           reason: "Текст содержит тему, запрещённую правилами FAM.",
         }, 200, headers);
       }
+    }
+
+    // Do not forward direct contact details or precise addresses to third-party model providers.
+    if (containsContactData(value)) {
+      return jsonResponse({
+        action: "reject",
+        reason: "Уберите из текста телефон, почту, ссылку, ник или адрес. Не публикуйте личные контакты в FAM.",
+      }, 200, headers);
     }
 
     let chatRes: Response | null = null;
@@ -110,12 +165,19 @@ serve(async (req: Request) => {
           },
           body: JSON.stringify({
             model: "openrouter/free",
+            // Explicitly free fallbacks only; never silently switch to a paid model.
+            models: [
+              "nvidia/nemotron-3-ultra-550b-a55b:free",
+              "nvidia/nemotron-3-super-120b-a12b:free",
+              "cohere/north-mini-code:free",
+            ],
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: JSON.stringify({ content_to_review: value }) },
             ],
+            response_format: { type: "json_object" },
             temperature: 0,
-            max_tokens: 120,
+            max_tokens: 240,
           }),
           signal: controller.signal,
         });
@@ -138,11 +200,30 @@ serve(async (req: Request) => {
     }
 
     if (!chatRes?.ok) {
-      console.warn("OpenRouter moderation unavailable:", chatRes?.status ?? "network-timeout");
+      const status = chatRes?.status ?? 0;
+      let diagnosticCode = "provider_unavailable";
+      let reason = "Бесплатный ИИ-провайдер временно недоступен. Идея сохранена для ручной проверки Советом.";
+
+      if (status === 401 || status === 403) {
+        diagnosticCode = "provider_key_rejected";
+        reason = "ИИ-провайдер не принял серверный ключ. Идея сохранена для ручной проверки Советом.";
+      } else if (status === 402) {
+        diagnosticCode = "provider_credits_required";
+        reason = "Провайдер запросил оплату или пополнение. Идея сохранена для ручной проверки Советом.";
+      } else if (status === 429) {
+        diagnosticCode = "provider_rate_limited";
+        reason = "Бесплатный лимит ИИ временно исчерпан. Идея сохранена для ручной проверки Советом.";
+      } else if (status === 400) {
+        diagnosticCode = "provider_bad_request";
+        reason = "ИИ-провайдер отклонил формат запроса. Идея сохранена для ручной проверки Советом.";
+      }
+
+      console.warn("moderation_provider_error", JSON.stringify({ status, diagnosticCode }));
       return jsonResponse({
         action: "pending",
         degraded: true,
-        reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+        diagnostic_code: diagnosticCode,
+        reason,
       }, 200, headers);
     }
 
@@ -157,27 +238,25 @@ serve(async (req: Request) => {
       }, 200, headers);
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(answer.trim());
-    } catch {
+    const parsed = extractJsonObject(answer);
+    if (!parsed || !("action" in parsed)) {
+      console.warn("moderation_invalid_model_json", JSON.stringify({
+        model: typeof chatData?.model === "string" ? chatData.model : "unknown",
+        outputLength: answer.length,
+      }));
       return jsonResponse({
         action: "pending",
         degraded: true,
-        reason: "Не удалось надёжно разобрать ответ ИИ. Идея будет передана Совету на ручную проверку.",
-      }, 200, headers);
-    }
-
-    if (!parsed || typeof parsed !== "object" || !("action" in parsed)) {
-      return jsonResponse({
-        action: "pending",
-        degraded: true,
-        reason: "ИИ вернул некорректный ответ. Идея будет передана Совету на ручную проверку.",
+        diagnostic_code: "invalid_model_json",
+        reason: "ИИ ответил в неправильном формате. Идея сохранена для ручной проверки Советом.",
       }, 200, headers);
     }
 
     const result = parsed as { action?: unknown; reason?: unknown };
-    if (result.action === "ok") return jsonResponse({ action: "ok" }, 200, headers);
+    if (result.action === "ok") return jsonResponse({
+      action: "ok",
+      model: typeof chatData?.model === "string" ? chatData.model : null,
+    }, 200, headers);
 
     if (result.action === "pending") {
       const reason = typeof result.reason === "string" ? result.reason.slice(0, 180) : "Нужна дополнительная проверка.";
@@ -192,14 +271,17 @@ serve(async (req: Request) => {
     return jsonResponse({
       action: "pending",
       degraded: true,
-      reason: "ИИ не смог надёжно определить результат. Идея будет передана Совету на ручную проверку.",
+      diagnostic_code: "unknown_model_action",
+      reason: "ИИ вернул неизвестный статус. Идея сохранена для ручной проверки Советом.",
     }, 200, headers);
   } catch (error) {
-    console.warn("Moderation failed safely:", error instanceof Error ? error.name : "unknown");
+    const errorName = error instanceof Error ? error.name : "unknown";
+    console.warn("moderation_internal_error", errorName);
     return jsonResponse({
       action: "pending",
       degraded: true,
-      reason: "ИИ-проверка временно недоступна. Идея будет передана Совету на ручную проверку.",
+      diagnostic_code: "moderation_internal_error",
+      reason: "Произошла внутренняя ошибка проверки. Идея сохранена для ручной проверки Советом.",
     }, 200, headers);
   }
 });
