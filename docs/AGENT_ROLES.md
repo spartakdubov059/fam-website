@@ -88,3 +88,14 @@
 - Хранение данных по API endpoint: https://developers.openai.com/api/docs/guides/your-data
 
 Примечание по лимитам: Moderation API бесплатен по стоимости вызовов, но запросы всё равно ограничены rate limits аккаунта. На странице модели для уровня Free указаны 250 запросов в минуту и 5 000 запросов в день; фактические лимиты проекта нужно сверять в настройках OpenAI Platform. Для `/v1/moderations` таблица хранения OpenAI указывает отсутствие хранения содержимого в abuse-monitoring logs и application state; общее правило «до 30 дней» нельзя автоматически переносить на этот endpoint. Политика другого провайдера, включая OpenRouter, проверяется отдельно.
+
+
+## 7. Дополнительная проверка базы на 08.11.2026
+
+- В таблице `school_admin_requests` — 0 строк; клиентские роли `anon` и `authenticated` не имеют привилегий, RLS включён, политик нет. Доступ остаётся закрытым; не добавлять клиентскую политику без готового сценария проверки взрослых администраторов.
+- Базовые шаблоны email, URL, телефоноподобных номеров, подписанных адресов и публичных никнеймов проверены агрегированно по 22 объявлениям, 2 идеям и 3 сообщениям: совпадений не найдено. Проверка не читала и не выводила сами тексты и не обнаруживает все способы маскировки.
+
+Дополнительные ссылки:
+- Модель доступа Supabase Storage (public/private buckets): https://supabase.com/docs/guides/storage/buckets/fundamentals
+- Подписанные ссылки Supabase Storage: https://supabase.com/docs/guides/storage/serving/downloads
+- Leaked Password Protection: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
