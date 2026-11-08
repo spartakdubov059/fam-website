@@ -187,6 +187,13 @@
     .status-rejected { background: rgba(255,107,107,0.15); color: var(--danger); }
     .status-work { background: rgba(240,193,75,0.15); color: #F0C14B; }
     .status-new { background: rgba(91,140,255,0.15); color: #7EA6FF; }
+    .school-request-status { margin: 10px 0; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); }
+    .school-request-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .school-request-step { min-width: 0; padding: 8px 5px; border-radius: 9px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-size: 9px; line-height: 1.35; text-align: center; }
+    .school-request-step.is-done { border-color: rgba(107,203,155,0.35); color: var(--success); }
+    .school-request-step.is-active { border-color: rgba(91,140,255,0.55); color: #7EA6FF; background: rgba(91,140,255,0.10); font-weight: 800; }
+    .school-request-step.is-rejected { border-color: rgba(255,107,107,0.4); color: var(--danger); background: rgba(255,107,107,0.08); font-weight: 800; }
+    @media (max-width: 380px) { .school-request-progress { gap: 4px; } .school-request-step { font-size: 8px; padding: 7px 3px; } }
 
     .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
     .modal.open { display: flex; }
@@ -349,14 +356,17 @@
           По умолчанию каждый аккаунт FAM — обычный пользователь. Членство в Ученическом совете и права администратора не назначаются автоматически.
         </p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете" style="font-size:12px; margin-bottom:8px;">
-          <option value="">Выберите свою роль в Совете</option>
-          <option value="Член Ученического совета">Член Совета — участвует в работе и школьных инициативах</option>
-          <option value="Заместитель председателя Ученического совета">Заместитель председателя — помогает председателю и заменяет его</option>
-          <option value="Председатель Ученического совета">Председатель — организует работу и координирует Совет</option>
+          <option value="">Выберите роль в Совете</option>
+          <option value="Член Ученического совета">Член Совета</option>
+          <option value="Заместитель председателя Ученического совета">Заместитель председателя</option>
+          <option value="Председатель Ученического совета">Председатель</option>
         </select>
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:0 0 10px;">
-          Эти варианты описывают обязанности. После одобрения все три роли получают одну и ту же панель Совета.
-        </p>
+        <div style="font-size:10px; line-height:1.5; color:var(--muted); margin:0 0 10px;">
+          <div><b style="color:var(--text);">Член Совета</b> — участвует в инициативах и работе Совета.</div>
+          <div><b style="color:var(--text);">Заместитель председателя</b> — помогает руководить работой и заменяет председателя.</div>
+          <div><b style="color:var(--text);">Председатель</b> — организует работу и координирует Совет.</div>
+          <div style="margin-top:6px;">В FAM все три должности пока получают одинаковый набор прав панели. Отличаются обязанности, а не технические разрешения.</div>
+        </div>
         <div id="schoolAdminAccessStatus" style="font-size:11px; color:var(--muted); margin-bottom:8px;" aria-live="polite"></div>
         <button type="button" class="button button-primary" data-action="apply-school-admin" id="schoolAdminApplyBtn" style="width:100%;">
           Запросить доступ Совета
@@ -1345,15 +1355,42 @@ window.onunhandledrejection = function(event) {
     }
   };
 
-  function showSchoolAdminAccessStatus(label, detail, tone = "new") {
+  function showSchoolAdminAccessStatus(label, detail, tone = "new", stage = "none", meta = "") {
     const accessStatus = $("schoolAdminAccessStatus");
     if (!accessStatus) return;
     const safeTone = ["new", "work", "done", "rejected"].includes(tone) ? tone : "new";
+    let progress = "";
+    if (stage === "pending") {
+      progress = `
+        <div class="school-request-progress" aria-label="Этап заявки">
+          <div class="school-request-step is-done">✓ Заявка отправлена</div>
+          <div class="school-request-step is-active">2. Ожидает Совета</div>
+          <div class="school-request-step">3. Решение</div>
+        </div>`;
+    } else if (stage === "reviewing") {
+      progress = `
+        <div class="school-request-progress" aria-label="Этап заявки">
+          <div class="school-request-step is-done">✓ Заявка отправлена</div>
+          <div class="school-request-step is-active">2. Совет рассматривает</div>
+          <div class="school-request-step">3. Решение</div>
+        </div>`;
+    } else if (stage === "rejected") {
+      progress = `
+        <div class="school-request-progress" aria-label="Этап заявки">
+          <div class="school-request-step is-done">✓ Отправлена</div>
+          <div class="school-request-step is-done">✓ Рассмотрена</div>
+          <div class="school-request-step is-rejected">3. Отклонена</div>
+        </div>`;
+    }
     accessStatus.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
-        <span class="idea-status status-${safeTone}">${esc(label)}</span>
+      <div class="school-request-status" role="status" aria-live="polite">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
+          <span class="idea-status status-${safeTone}">${esc(label)}</span>
+        </div>
+        <div style="line-height:1.5;">${esc(detail)}</div>
+        ${meta ? `<div style="font-size:10px;color:var(--muted);margin-top:7px;">${esc(meta)}</div>` : ""}
+        ${progress}
       </div>
-      <div style="line-height:1.5;">${esc(detail)}</div>
     `;
   }
 
@@ -1392,9 +1429,16 @@ window.onunhandledrejection = function(event) {
 
         const request = data.request;
         if (request?.status === "pending") {
+          const requestedRole = request.applicant_note || "Роль Ученического совета";
+          const submittedAt = request.created_at
+            ? new Date(request.created_at).toLocaleString("ru-RU")
+            : "";
           showSchoolAdminAccessStatus(
             "Заявка отправлена",
-            "Она ожидает рассмотрения действующим Советом. Повторно отправлять заявку не нужно."
+            "Вы запросили роль «" + requestedRole + "». Сейчас заявка ожидает рассмотрения действующим Советом. Повторно отправлять её не нужно.",
+            "new",
+            "pending",
+            submittedAt ? "Отправлена: " + submittedAt : ""
           );
           if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
@@ -1404,16 +1448,25 @@ window.onunhandledrejection = function(event) {
             : "";
           showSchoolAdminAccessStatus(
             "Заявка на рассмотрении",
-            "Действующий представитель Совета взял её в работу" + (when ? " " + when : "") + ". Повторную заявку создавать не нужно.",
-            "work"
+            "Совет начал проверку вашей заявки. Новую заявку создавать не нужно.",
+            "work",
+            "reviewing",
+            when ? "Взята в работу: " + when : ""
           );
           if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
         } else if (request?.status === "rejected") {
+          const rejectedRole = request.applicant_note || "Роль Ученического совета";
+          const rejectedAt = request.reviewed_at
+            ? new Date(request.reviewed_at).toLocaleString("ru-RU")
+            : "";
           showSchoolAdminAccessStatus(
             "Заявка отклонена",
-            request.review_note || "Совет не подтвердил членство. Уточните причину у действующего представителя, затем при необходимости можно подать новую заявку.",
-            "rejected"
+            "Заявка на роль «" + rejectedRole + "» не одобрена. " +
+              (request.review_note || "Совет не подтвердил членство. При необходимости уточните причину у действующего представителя и отправьте новую заявку."),
+            "rejected",
+            "rejected",
+            rejectedAt ? "Решение принято: " + rejectedAt : ""
           );
           if (roleSelect) {
             roleSelect.disabled = !profile.school_id;
