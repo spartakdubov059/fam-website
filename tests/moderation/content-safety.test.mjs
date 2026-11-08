@@ -18,6 +18,8 @@ test("does not treat ordinary school text, dates, or common words as contact dat
   assert.equal(containsContactData("Посадим траву возле школы. Дата: 08.11.2026."), false);
   assert.equal(containsContactData("Доклад по криптографии и математике."), false);
   assert.equal(containsContactData("На урок принесли ножницы и соль для опыта."), false);
+  assert.equal(containsContactData("Бюджет проекта: 100 000 рублей."), false);
+  assert.equal(containsContactData("Почтовый индекс: 123456"), true);
 });
 
 test("local idea checks flag sensitive topics without matching ordinary substrings", () => {
