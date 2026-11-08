@@ -108,8 +108,9 @@ serve(async (req: Request) => {
     // Ideas are reviewed by the School Council without spending an external AI request.
     // Keep this local check conservative: sensitive topics are routed to the existing
     // same-school idea review flow instead of being automatically rejected.
+    const policyFlag = findLocalPolicyFlag(value);
+
     if (payload?.rules_only === true) {
-      const policyFlag = findLocalPolicyFlag(value);
       return jsonResponse({
         action: "pending",
         manual_review: true,
@@ -117,6 +118,16 @@ serve(async (req: Request) => {
         reason: policyFlag
           ? "Тема требует внимательной проверки школьным Советом."
           : "Идея передана школьному Совету на рассмотрение.",
+      }, 200, headers);
+    }
+
+    // OpenAI Moderation classifies general safety categories; enforce FAM-specific
+    // restricted-content rules locally as an additional layer for listings and chats.
+    if (policyFlag) {
+      return jsonResponse({
+        action: "reject",
+        reason_code: policyFlag.code,
+        reason: "FAM не разрешает публикации и сообщения на эту тему. Измените текст.",
       }, 200, headers);
     }
 
