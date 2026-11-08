@@ -599,9 +599,12 @@ Deno.serve(async (req: Request) => {
       const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
       const durationHours = Number(payload.duration_hours);
       const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
-      const reasonDigits = reason.replace(/\\D/g, "");
-      const containsContact = /(?:https?:\\/\\/|www\\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,})/i.test(reason)
-        || reasonDigits.length >= 11;
+      const digitCount = (reason.match(/[0-9]/g) || []).length;
+      const containsContact = reason.includes("http://")
+        || reason.includes("https://")
+        || /www[.]/i.test(reason)
+        || /[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}/i.test(reason)
+        || digitCount >= 11;
       if (!UUID_RE.test(targetId) || targetId === actorId) {
         return json({ ok: false, error: "Нельзя ограничить собственный аккаунт." }, 400, headers);
       }
