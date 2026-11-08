@@ -4,8 +4,8 @@ const SOCIAL_DOMAIN_RE = /(?:^|[^\p{L}\d])(?:t\.me|vk\.com|telegram\.me|wa\.me|d
 const BARE_DOMAIN_RE = /(?:^|[^\p{L}\d])(?:[\p{L}\d](?:[\p{L}\d-]{0,61}[\p{L}\d])?\.)+(?:ru|рф|com|net|org|io|me|gg|info|site|online)(?:\/[^\s]*)?(?=$|[^\p{L}\d])/iu;
 const HANDLE_RE = /(?<![\p{L}\p{N}])@[a-z0-9_]{3,32}\b/iu;
 const ADDRESS_RE = /(?:^|[^\p{L}\p{N}])(?:ул(?:ица)?\.?|проспект|пр-т|переулок|пер\.?|дом|д\.?|квартира|кв\.?|подъезд|адрес)\s*[\p{L}\d№.,/-]{0,48}\d/iu;
-const PHONE_RE = /(?<!\d)\+?\d(?:[ \t().-]*\d){8,14}(?!\d)/gu;
-const POSTCODE_RE = /(?:^|\D)\d{6}(?=\D|$)/u;
+const PHONE_RE = /(?<!\d)\+?\d(?:[ \t().-]*\d){9,14}(?!\d)/gu;
+const POSTCODE_RE = /(?:почтов(?:ый|ого)\s+индекс|индекс)\s*[:№-]?\s*\d{6}\b/iu;
 
 const LOCAL_REVIEW_RULES = [
   { code: "controlled_substances", pattern: /(?:^|[^\p{L}\p{N}])(?:наркот[\p{L}]*|мефедрон[\p{L}]*|спайс[\p{L}]*|закладк[\p{L}]*|героин[\p{L}]*|амфетамин[\p{L}]*|экстази[\p{L}]*|мдма|кокаин[\p{L}]*|снюс[\p{L}]*|насвай[\p{L}]*)(?=$|[^\p{L}\p{N}])/iu },
