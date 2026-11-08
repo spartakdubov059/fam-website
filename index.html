@@ -1958,11 +1958,18 @@ window.onunhandledrejection = function(event) {
       : "Отклонить запрос на удаление аккаунта?";
     if (!confirm(message)) return;
     if (decision === "approve" && !confirm("Подтвердите окончательное удаление аккаунта.")) return;
+    let reviewNote = "";
+    if (decision === "reject") {
+      const note = prompt("Укажите причину отказа (её увидит участник совета, до 240 символов).");
+      if (note === null) return;
+      reviewNote = note.trim().slice(0, 240);
+      if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
+    }
     try {
       const confirmed = await ensureRecentAdminAuthentication();
       if (!confirmed) return;
       const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "review_account_deletion", request_id: requestId, decision }
+        body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
