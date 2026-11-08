@@ -1,7 +1,6 @@
 const ALLOWED_COUNCIL_ROLES = new Set([
   "Председатель Ученического совета",
   "Заместитель председателя Ученического совета",
-  "Секретарь Ученического совета",
   "Член Ученического совета",
 ]);
 
@@ -29,6 +28,9 @@ export function mapSchoolAdminRequests(rows) {
     user_id: typeof row?.user_id === "string" ? row.user_id.slice(0, 8) : "",
     applicant_email: maskApplicantEmail(row?.applicant_email),
     applicant_note: typeof row?.applicant_note === "string" ? row.applicant_note : "",
+    status: typeof row?.status === "string" ? row.status : "pending",
     created_at: row?.created_at ?? null,
+    review_started_at: row?.review_started_at ?? null,
+    review_started_by: typeof row?.review_started_by === "string" ? row.review_started_by : null,
   })).filter((row) => row.id.length > 0);
 }
