@@ -105,6 +105,106 @@ function storageHeaders(contentType: string | null = null): Record<string, strin
   if (contentType) headers["Content-Type"] = contentType;
   return headers;
 }
+function pendingAvatarImagePath(imageUrl: string, userId: string): string | null {
+  try {
+    const url = new URL(imageUrl);
+    const prefix = "/storage/v1/object/sign/avatars-pending/" + userId + "/";
+    if (url.origin !== SUPABASE_URL || !url.pathname.startsWith(prefix) || !url.searchParams.has("token")) return null;
+    const tail = decodeURIComponent(url.pathname.slice(prefix.length));
+    if (!tail || tail.includes("..") || tail.includes("/") || !tail.startsWith("avatar_" + userId + "_")) return null;
+    if (!/\.(?:jpe?g|png|webp)$/i.test(tail)) return null;
+    return userId + "/" + tail;
+  } catch {
+    return null;
+  }
+}
+
+async function removePendingAvatarImage(imageUrl: string, userId: string): Promise<void> {
+  const path = pendingAvatarImagePath(imageUrl, userId);
+  if (!path) return;
+  try {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/avatars-pending", {
+      method: "DELETE",
+      headers: storageHeaders("application/json"),
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!response.ok) console.warn("pending_avatar_cleanup_failed", response.status);
+  } catch {
+    console.warn("pending_avatar_cleanup_failed", "network_error");
+  }
+}
+
+async function publishPendingAvatarImage(
+  imageUrl: string,
+  userId: string,
+): Promise<{ url: string; path: string }> {
+  const pendingPath = pendingAvatarImagePath(imageUrl, userId);
+  if (!pendingPath) throw new Error("Не удалось подтвердить временный файл аватара.");
+
+  const source = await fetch(imageUrl);
+  if (!source.ok) throw new Error("Не удалось получить аватар для публикации.");
+  const mime = (source.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const extensions: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  const extension = extensions[mime];
+  if (!extension) throw new Error("Допускаются только JPG, PNG или WebP.");
+  const statedLength = Number(source.headers.get("content-length") || 0);
+  if (statedLength > 2 * 1024 * 1024) throw new Error("Аватар больше допустимого размера.");
+  const bytes = new Uint8Array(await source.arrayBuffer());
+  if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Аватар больше допустимого размера.");
+
+  const publicPath = userId + "/avatar_" + crypto.randomUUID() + "." + extension;
+  const uploaded = await fetch(SUPABASE_URL + "/storage/v1/object/avatars/" + publicPath, {
+    method: "POST",
+    headers: {
+      ...storageHeaders(mime),
+      "x-upsert": "false",
+    },
+    body: bytes,
+  });
+  if (!uploaded.ok) {
+    console.warn("approved_avatar_publish_failed", uploaded.status);
+    throw new Error("Не удалось сохранить проверенный аватар.");
+  }
+
+  await removePendingAvatarImage(imageUrl, userId);
+  return {
+    url: SUPABASE_URL + "/storage/v1/object/public/avatars/" + publicPath,
+    path: publicPath,
+  };
+}
+
+async function removePublishedAvatarImage(path: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}\/avatar_[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path)) return;
+  try {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/avatars", {
+      method: "DELETE",
+      headers: storageHeaders("application/json"),
+      body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!response.ok) console.warn("unused_avatar_cleanup_failed", response.status);
+  } catch {
+    console.warn("unused_avatar_cleanup_failed", "network_error");
+  }
+}
+
+async function removePreviousOwnAvatarImage(imageUrl: unknown, userId: string): Promise<void> {
+  if (typeof imageUrl !== "string" || !imageUrl) return;
+  try {
+    const url = new URL(imageUrl);
+    const prefix = "/storage/v1/object/public/avatars/" + userId + "/";
+    if (url.origin !== SUPABASE_URL || !url.pathname.startsWith(prefix)) return;
+    const path = decodeURIComponent(url.pathname.slice("/storage/v1/object/public/avatars/".length));
+    if (path.includes("..")) return;
+    await removePublishedAvatarImage(path);
+  } catch {
+    // Legacy or external avatar URLs are left untouched.
+  }
+}
+
 
 async function removePendingListingImage(imageUrl: string, userId: string): Promise<void> {
   const path = pendingListingImagePath(imageUrl, userId);
@@ -185,7 +285,8 @@ async function moderate(
   origin: string | null,
   rulesOnly = false,
   imageUrl: string | null = null,
-  context: { kind: "listing" | "idea" | "message"; sender_id: string; receiver_id?: string | null; school_id: string } | null = null,
+  context: { kind: "listing" | "idea" | "message" | "image"; sender_id: string; receiver_id?: string | null; school_id: string } | null = null,
+  imagePurpose: "listing" | "avatar" = "listing",
 ): Promise<{ action: "ok" | "pending" | "reject"; reason?: string; degraded?: boolean; diagnostic_code?: string; reason_code?: string }> {
   let response: Response;
   try {
@@ -201,7 +302,7 @@ async function moderate(
       body: JSON.stringify({
         text,
         rules_only: rulesOnly,
-        ...(imageUrl ? { image_url: imageUrl } : {}),
+        ...(imageUrl ? { image_url: imageUrl, image_purpose: imagePurpose } : {}),
         ...(context ? { context } : {}),
       }),
     });
@@ -290,7 +391,57 @@ Deno.serve(async (req: Request) => {
     if (!profileResult.ok || !profile) return fail("Профиль пользователя не найден.", 403, headers);
 
     const kind = payload.kind;
-    if (!["listing", "idea", "message"].includes(kind)) return fail("Неизвестный тип отправки.", 400, headers);
+    if (!["listing", "idea", "message", "avatar"].includes(kind)) return fail("Неизвестный тип отправки.", 400, headers);
+
+    if (kind === "avatar") {
+      const imageUrl = typeof payload.image_url === "string" ? payload.image_url : "";
+      if (!pendingAvatarImagePath(imageUrl, userId)) {
+        return fail("Аватар должен быть загружен в защищённое временное хранилище FAM.", 400, headers);
+      }
+
+      const context = typeof profile.school_id === "string" && profile.school_id
+        ? { kind: "image" as const, sender_id: userId, school_id: profile.school_id }
+        : null;
+      const moderation = await moderate(
+        "Проверка аватара профиля",
+        authorization,
+        origin,
+        false,
+        imageUrl,
+        context,
+        "avatar",
+      );
+
+      if (moderation.action !== "ok" || moderation.degraded) {
+        await removePendingAvatarImage(imageUrl, userId);
+        return respond({
+          ok: false,
+          status: moderation.action === "reject" ? "rejected" : "pending",
+          reason: moderation.reason ?? "Аватар не прошёл проверку. Попробуйте другое изображение.",
+          reason_code: moderation.reason_code ?? null,
+        }, 200, headers);
+      }
+
+      const published = await publishPendingAvatarImage(imageUrl, userId);
+      const profileUpdate = await adminRequest(
+        "profiles?id=eq." + encodeURIComponent(userId) + "&select=avatar_url",
+        "PATCH",
+        { avatar_url: published.url },
+      );
+      const updatedProfile = Array.isArray(profileUpdate.data) ? profileUpdate.data[0] : null;
+      if (!profileUpdate.ok || !updatedProfile) {
+        await removePublishedAvatarImage(published.path);
+        console.error("approved_avatar_profile_update_failed", profileUpdate.status);
+        return fail("Фото проверено, но профиль не удалось обновить. Попробуйте ещё раз.", 500, headers);
+      }
+
+      await removePreviousOwnAvatarImage(profile.avatar_url, userId);
+      return respond({
+        ok: true,
+        status: "approved",
+        avatar_url: updatedProfile.avatar_url,
+      }, 200, headers);
+    }
 
     const quotaResult = await adminRequest("rpc/consume_content_quota", "POST", {
       p_user_id: userId,
