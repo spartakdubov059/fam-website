@@ -14,6 +14,8 @@ test("accepts only the four council roles exposed by the form", () => {
   assert.equal(isAllowedApplicantNote("Мой телефон +7 900 123-45-67"), false);
   assert.equal(isAllowedApplicantNote("learner@example.ru"), false);
   assert.equal(isAllowedApplicantNote("Администратор FAM"), false);
+  assert.equal(isAllowedApplicantNote("председатель ученического совета"), false);
+  assert.equal(isAllowedApplicantNote(undefined), false);
   assert.equal(isAllowedApplicantNote("Председатель Ученического совета\n@private_contact"), false);
 });
 
