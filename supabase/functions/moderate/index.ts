@@ -78,7 +78,7 @@ function parseSafetyContext(raw: unknown): SafetyContext | null {
   const receiverId = typeof value.receiver_id === "string" ? value.receiver_id : null;
   const schoolId = typeof value.school_id === "string" ? value.school_id : "";
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!["message", "idea", "listing"].includes(String(kind))) return null;
+  if (!["message", "idea", "listing", "image"].includes(String(kind))) return null;
   if (!uuid.test(senderId) || !schoolId || schoolId.length > 120) return null;
   if (kind === "message" && (!receiverId || !uuid.test(receiverId))) return null;
   return { kind: kind as SafetyContext["kind"], sender_id: senderId, receiver_id: receiverId, school_id: schoolId };
@@ -220,9 +220,12 @@ serve(async (req: Request) => {
     const value = typeof payload?.text === "string" ? payload.text.trim() : "";
     const imageUrl = typeof payload?.image_url === "string" ? payload.image_url.trim() : "";
     const safetyContext = parseSafetyContext(payload?.context);
-    const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/sign/listing-images-pending/";
+    const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : "listing";
+    const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : "listing-images-pending";
+    const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : "listing_";
+    const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/sign/" + pendingImageBucket + "/";
     const expectedImagePrefix = safetyContext?.sender_id
-      ? allowedImagePrefix + safetyContext.sender_id + "/listing_" + safetyContext.sender_id + "_"
+      ? allowedImagePrefix + safetyContext.sender_id + "/" + pendingImagePrefix + safetyContext.sender_id + "_"
       : "";
 
     if (value.length < 2 || value.length > 3000) {
@@ -468,7 +471,7 @@ serve(async (req: Request) => {
       }
 
       if (imageUrl) {
-        const imageReview = await reviewListingImage(value, imageUrl, OPENAI_KEY);
+        const imageReview = await reviewListingImage(value, imageUrl, OPENAI_KEY, imagePurpose);
         console.info("fam_image_review_completed", JSON.stringify({
           action: imageReview.action,
           reason_code: imageReview.reason_code,
