@@ -411,7 +411,7 @@
     <h2 id="authTitle" style="margin-top:0; font-size:20px; font-weight:900;">Вход</h2>
     <form id="authForm">
       <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
-        <select id="authSchool" class="form-control"><option value="Третий лицей">Третий лицей</option></select>
+        <select id="authSchool" class="form-control"><option value="lyceum_3">3 лицей — Сочи</option></select>
       </div>
       <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
       <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
@@ -501,6 +501,22 @@ window.onunhandledrejection = function(event) {
 
   function safeLocalStorageGet(key) { try { return localStorage.getItem(key); } catch(e) { return null; } }
   function safeLocalStorageSet(key, val) { try { localStorage.setItem(key, val); } catch(e) {} }
+
+  async function functionErrorText(error, fallback) {
+    const response = error?.context;
+    if (response && typeof response.clone === "function") {
+      try {
+        const body = await response.clone().json();
+        if (typeof body?.error === "string" && body.error.trim()) return body.error;
+        if (typeof body?.reason === "string" && body.reason.trim()) return body.reason;
+      } catch (e) {
+        // Fall back to the SDK message when the response has no JSON body.
+      }
+    }
+    return typeof error?.message === "string" && error.message.trim()
+      ? error.message
+      : fallback;
+  }
 
   const IMAGE_EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   function getImageExtension(file) {
@@ -1002,7 +1018,7 @@ window.onunhandledrejection = function(event) {
         body: { kind: "message", receiver_id: recipientId, body: text }
       });
       if (error) { updateAiStatus(true); throw error; }
-      updateAiStatus(false);
+      updateAiStatus(submission?.degraded === true);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Сообщение не прошло модерацию.");
       $("chatInput").value = "";
       if (curChat === recipientId && currentTab === 'messages') await loadChatMessages(recipientId);
@@ -1201,21 +1217,24 @@ window.onunhandledrejection = function(event) {
       });
       hideAIThinking('ideaThinkingArea');
       if (error) { updateAiStatus(true); throw error; }
-      updateAiStatus(false);
+      updateAiStatus(submission?.degraded === true);
       if (!submission?.ok) {
-        $("ideaText").value = "";
-        return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку.") + "\n\nИдея не отправлена.");
+        return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку."));
       }
 
       const data = submission.idea;
       if (data) ideas.unshift(data);
 
       $("ideaText").value = "";
-      notice(submission.status === "pending" ? "Идея отправлена на дополнительную проверку." : "Идея отправлена Совету!");
+      notice(submission.degraded
+        ? "ИИ временно недоступен. Идея сохранена и отправлена Совету на ручную проверку."
+        : submission.status === "pending"
+          ? "Идея отправлена на дополнительную проверку."
+          : "Идея отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
       hideAIThinking('ideaThinkingArea');
-      notice("Ошибка: " + err.message);
+      notice("Ошибка: " + await functionErrorText(err, "Не удалось отправить идею."));
     } finally {
       btn.disabled = false;
     }
@@ -1607,7 +1626,7 @@ window.onunhandledrejection = function(event) {
         }
       });
       if (error) { updateAiStatus(true); throw error; }
-      updateAiStatus(false);
+      updateAiStatus(submission?.degraded === true);
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
       const data = submission.listing;
@@ -1627,11 +1646,12 @@ window.onunhandledrejection = function(event) {
       }
     } catch (error) {
       const uploadStatus = $("uploadStatus");
+      const friendlyError = await functionErrorText(error, "Не удалось опубликовать объявление.");
       if (uploadStatus) {
         uploadStatus.textContent = '';
         const errDiv = document.createElement('div');
         errDiv.className = 'upload-status error';
-        errDiv.textContent = 'Ошибка: ' + error.message;
+        errDiv.textContent = 'Ошибка: ' + friendlyError;
         uploadStatus.appendChild(errDiv);
       }
       if (uploadedImagePath) {
@@ -1643,7 +1663,7 @@ window.onunhandledrejection = function(event) {
           console.warn("Не удалось удалить неиспользуемое фото:", cleanupError);
         }
       }
-      alert(error.message);
+      alert(await functionErrorText(error, "Не удалось опубликовать объявление."));
     } finally {
       isListingSubmitting = false;
       btn.disabled = false; btn.textContent = "Опубликовать";
