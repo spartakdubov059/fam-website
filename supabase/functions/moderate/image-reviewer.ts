@@ -32,7 +32,7 @@ const AVATAR_IMAGE_PROMPT = [
   "Отклоняй контакты, телефоны, адреса, QR-коды, ссылки, никнеймы, документы, пропуска, личные переписки, рекламу, сексуальное содержание, наготу, сцены жестокости, угрозы, травлю, ненависть и унижающие изображения.",
   "Не устанавливай, является ли изображённый человек владельцем аккаунта. Ответственность за загрузку собственной фотографии или изображения с разрешением лежит на пользователе.",
   "Если изображение неоднозначно, содержит несколько людей или персональные сведения, выбери manual_review. Не одобряй сомнительное изображение автоматически.",
-  "Не описывай потенциально сексуальное, унижающее или опасное содержимое. Верни только JSON с decision approve/reject/manual_review и reason_code."
+  "Верни только JSON с decision approve/reject/manual_review и reason_code. Для approve используй relevant_school_item (объявление) или safe_avatar (аватар). Для reject используй irrelevant_or_spam, personal_information, private_document или unsafe_content. Если сомневаешься — manual_review и unclear_or_needs_consent."
 ].join("\n");
 
 function parseJson(raw: string): Record<string, unknown> | null {
@@ -125,11 +125,14 @@ export async function reviewListingImage(
   const decision = parsed?.decision;
   const reasonCode = parsed?.reason_code;
 
-  if (decision === "approve" && reasonCode === "relevant_school_item") {
+  if (decision === "approve" && (
+    (purpose === "listing" && reasonCode === "relevant_school_item")
+    || (purpose === "avatar" && reasonCode === "safe_avatar")
+  )) {
     return {
       action: "ok",
       reason_code: "relevant_school_item",
-      reason: "Фотография подходит для школьного объявления.",
+      reason: purpose === "avatar" ? "Аватар соответствует правилам FAM." : "Фотография подходит для школьного объявления.",
       model: "gpt-5-mini",
     };
   }
