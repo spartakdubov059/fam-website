@@ -285,6 +285,68 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
   };
 }
 
+async function listSafetyReports(schoolId: string): Promise<Record<string, unknown>> {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const retention = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Keep only recent, content-free safety metadata.
+  await adminRequest(
+    "fam_safety_incidents?school_id=eq." + encodeURIComponent(schoolId)
+    + "&created_at=lt." + encodeURIComponent(retention),
+    "DELETE",
+  );
+
+  const result = await adminRequest(
+    "fam_safety_incidents?select=pair_fingerprint,source_kind,category,severity,created_at"
+    + "&school_id=eq." + encodeURIComponent(schoolId)
+    + "&created_at=gte." + encodeURIComponent(cutoff)
+    + "&reviewed_at=is.null&order=created_at.desc&limit=400",
+  );
+  if (!result.ok || !Array.isArray(result.data)) {
+    console.error("fam_safety_reports_list_failed", result.status);
+    throw new Error("Не удалось загрузить отчёты безопасности.");
+  }
+
+  const groups = new Map<string, any>();
+  for (const row of result.data) {
+    if (typeof row?.pair_fingerprint !== "string" || !/^[0-9a-f]{64}$/.test(row.pair_fingerprint)) continue;
+    const key = [row.pair_fingerprint, row.source_kind, row.category].join("|");
+    const current = groups.get(key) ?? {
+      fingerprint: row.pair_fingerprint,
+      source_kind: row.source_kind,
+      category: row.category,
+      occurrences: 0,
+      severity: "medium",
+      first_seen: row.created_at,
+      last_seen: row.created_at,
+    };
+    current.occurrences += 1;
+    if (row.severity === "high") current.severity = "high";
+    if (typeof row.created_at === "string") {
+      if (!current.first_seen || row.created_at < current.first_seen) current.first_seen = row.created_at;
+      if (!current.last_seen || row.created_at > current.last_seen) current.last_seen = row.created_at;
+    }
+    if (current.occurrences >= 3) current.severity = "high";
+    groups.set(key, current);
+  }
+
+  const reports = Array.from(groups.values())
+    .sort((a, b) => String(b.last_seen).localeCompare(String(a.last_seen)))
+    .slice(0, 50)
+    .map(row => ({
+      fingerprint: row.fingerprint,
+      source_kind: row.source_kind,
+      category: row.category,
+      occurrences: row.occurrences,
+      severity: row.severity,
+      repeated: row.occurrences >= 3,
+      first_seen: row.first_seen,
+      last_seen: row.last_seen,
+    }));
+
+  return { reports, period_days: 30 };
+}
+
 async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
   const [targets, ownRequests] = await Promise.all([
     adminRequest(
@@ -460,6 +522,45 @@ Deno.serve(async (req: Request) => {
 
     if (action === "overview") {
       return json({ ok: true, ...(await listOverview(actor.school_id)) }, 200, headers);
+    }
+
+    if (action === "list_safety_reports") {
+      return json({ ok: true, ...(await listSafetyReports(actor.school_id)) }, 200, headers);
+    }
+
+    if (action === "acknowledge_safety_report") {
+      const fingerprint = typeof payload.fingerprint === "string" ? payload.fingerprint : "";
+      const category = typeof payload.category === "string" ? payload.category : "";
+      const sourceKind = typeof payload.source_kind === "string" ? payload.source_kind : "";
+      const allowedCategories = new Set([
+        "targeted_harassment",
+        "hate_or_discrimination",
+        "threat_or_intimidation",
+        "negative_personal_call",
+        "spam_or_repeated_abuse",
+        "unsafe_image",
+        "personal_data_in_image",
+        "unclear_safety_signal",
+      ]);
+      if (!/^[0-9a-f]{64}$/.test(fingerprint) || !allowedCategories.has(category)
+          || !["message", "idea", "image"].includes(sourceKind)) {
+        return json({ ok: false, error: "Некорректный номер отчёта." }, 400, headers);
+      }
+
+      const reviewed = await adminRequest(
+        "fam_safety_incidents?school_id=eq." + encodeURIComponent(actor.school_id)
+        + "&pair_fingerprint=eq." + encodeURIComponent(fingerprint)
+        + "&category=eq." + encodeURIComponent(category)
+        + "&source_kind=eq." + encodeURIComponent(sourceKind)
+        + "&reviewed_at=is.null",
+        "PATCH",
+        { reviewed_at: new Date().toISOString(), reviewed_by: actorId },
+      );
+      if (!reviewed.ok) {
+        console.error("fam_safety_report_ack_failed", reviewed.status);
+        return json({ ok: false, error: "Не удалось отметить отчёт как рассмотренный." }, 503, headers);
+      }
+      return json({ ok: true }, 200, headers);
     }
 
     if (action === "review_account_deletion") {
