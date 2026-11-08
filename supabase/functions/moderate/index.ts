@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 const ALLOWED_ORIGINS = new Set([
@@ -104,16 +105,6 @@ serve(async (req: Request) => {
     return jsonResponse({ action: "reject", reason: "Метод запроса не поддерживается." }, 405, headers);
   }
 
-  if (!OPENROUTER_KEY) {
-    console.error("moderation_config_error: OPENROUTER_API_KEY is not configured");
-    return jsonResponse({
-      action: "pending",
-      degraded: true,
-      diagnostic_code: "missing_api_key",
-      reason: "ИИ-модерация не настроена на сервере. Идея сохранена для ручной проверки Советом.",
-    }, 200, headers);
-  }
-
   try {
     const payload = await req.json().catch(() => null);
     const value = typeof payload?.text === "string" ? payload.text.trim() : "";
@@ -138,11 +129,99 @@ serve(async (req: Request) => {
       }
     }
 
-    // Do not forward direct contact details or precise addresses to third-party model providers.
-    if (containsContactData(value)) {
+    // Ideas are always reviewed by the School Council, so do not spend an AI API call on them.
+    // Local prohibited-content and contact checks above still run before the item is queued.
+    if (payload?.rules_only === true) {
       return jsonResponse({
-        action: "reject",
-        reason: "Уберите из текста телефон, почту, ссылку, ник или адрес. Не публикуйте личные контакты в FAM.",
+        action: "pending",
+        manual_review: true,
+        reason: "Идея передана школьному Совету на ручную проверку.",
+      }, 200, headers);
+    }
+
+    // Prefer the dedicated OpenAI Moderation API when its server-side key is configured.
+    // It is a classifier endpoint, not a text-generation model. Never send the same text
+    // to a second provider if this provider is unavailable.
+    if (OPENAI_KEY) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12_000);
+      let response: Response | null = null;
+
+      try {
+        response = await fetch("https://api.openai.com/v1/moderations", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + OPENAI_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "omni-moderation-latest",
+            input: value,
+          }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        console.warn("openai_moderation_request_failed", error instanceof Error ? error.name : "unknown");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!response?.ok) {
+        const status = response?.status ?? 0;
+        let diagnosticCode = "openai_unavailable";
+        let reason = "Сервис проверки временно недоступен. Материал сохранён скрытым или передан на ручную проверку.";
+
+        if (status === 401 || status === 403) {
+          diagnosticCode = "openai_key_rejected";
+          reason = "Серверный ключ проверки не принят. Материал не опубликован и ожидает ручной проверки.";
+        } else if (status === 429) {
+          diagnosticCode = "openai_rate_limited";
+          reason = "Достигнут временный лимит проверки. Материал не опубликован и ожидает ручной проверки.";
+        } else if (status === 400) {
+          diagnosticCode = "openai_bad_request";
+          reason = "Сервис проверки отклонил запрос. Материал не опубликован и ожидает ручной проверки.";
+        }
+
+        console.warn("openai_moderation_provider_error", JSON.stringify({ status, diagnosticCode }));
+        return jsonResponse({
+          action: "pending",
+          degraded: true,
+          diagnostic_code: diagnosticCode,
+          reason,
+        }, 200, headers);
+      }
+
+      const resultBody = await response.json().catch(() => null);
+      const moderationResult = Array.isArray(resultBody?.results) ? resultBody.results[0] : null;
+
+      if (!moderationResult || typeof moderationResult.flagged !== "boolean") {
+        console.warn("openai_moderation_invalid_response");
+        return jsonResponse({
+          action: "pending",
+          degraded: true,
+          diagnostic_code: "openai_invalid_response",
+          reason: "Сервис проверки вернул неполный ответ. Материал ожидает ручной проверки.",
+        }, 200, headers);
+      }
+
+      if (moderationResult.flagged) {
+        return jsonResponse({
+          action: "pending",
+          reason: "Автоматическая проверка отметила материал для дополнительной проверки.",
+          provider: "openai",
+        }, 200, headers);
+      }
+
+      return jsonResponse({ action: "ok", provider: "openai" }, 200, headers);
+    }
+
+    if (!OPENROUTER_KEY) {
+      console.error("moderation_config_error: no OPENAI_API_KEY or OPENROUTER_API_KEY configured");
+      return jsonResponse({
+        action: "pending",
+        degraded: true,
+        diagnostic_code: "missing_api_key",
+        reason: "ИИ-модерация не настроена. Материал не опубликован и ожидает ручной проверки.",
       }, 200, headers);
     }
 
