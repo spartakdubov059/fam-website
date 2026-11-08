@@ -1,5 +1,5 @@
 // Dedicated FAM photo reviewer.
-// It checks only images attached to listings; it never identifies people.
+// It checks listing photos and profile avatars; it never identifies people.
 
 export type ImageReviewAction = "ok" | "reject" | "pending";
 export type ImageReviewResult = {
