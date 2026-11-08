@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
-import { reviewDisputedContent } from "./dispute-reviewer.ts";
+import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -32,9 +32,10 @@ const moderationCache = new Map<string, CachedModerationDecision>();
 const MODERATION_CACHE_TTL_MS = 5 * 60 * 1000;
 const MODERATION_CACHE_MAX_ENTRIES = 400;
 
-async function createModerationCacheKey(text: string, imageUrl: string): Promise<string> {
+async function createModerationCacheKey(text: string, imageUrl: string, mode = "content"): Promise<string> {
   const source = JSON.stringify({
     version: "fam-openai-moderation-v2",
+    mode,
     text,
     image_url: imageUrl,
   });
@@ -188,27 +189,41 @@ serve(async (req: Request) => {
       }, 200, headers);
     }
 
-    // Ideas are reviewed by the School Council without spending an external AI request.
-    // Keep this local check conservative: sensitive topics are routed to the existing
-    // same-school idea review flow instead of being automatically rejected.
+    // Local rules run first and keep contact data out of external requests.
     const policyFlag = findLocalPolicyFlag(value);
-
-    if (payload?.rules_only === true) {
-      return jsonResponse({
-        action: "pending",
-        manual_review: true,
-        reason_code: policyFlag?.code ?? "council_review",
-        reason: policyFlag
-          ? "Тема требует внимательной проверки школьным Советом."
-          : "Идея передана школьному Совету на рассмотрение.",
-      }, 200, headers);
-    }
-
-    const cacheKey = await createModerationCacheKey(value, imageUrl);
+    const isIdea = payload?.rules_only === true;
+    const cacheKey = await createModerationCacheKey(value, imageUrl, isIdea ? "idea" : "content");
     const cached = getCachedDecision(cacheKey);
     if (cached) {
-      console.info("moderation_cache_hit");
+      console.info(isIdea ? "idea_moderation_cache_hit" : "moderation_cache_hit");
       return jsonResponse(cached, 200, headers);
+    }
+
+    // Every new idea gets one contextual OpenAI review. It does not call the
+    // separate Moderation endpoint, keeping the cost to one AI request per unique idea.
+    if (isIdea) {
+      if (!OPENAI_KEY) {
+        return jsonResponse({
+          action: "pending",
+          degraded: true,
+          diagnostic_code: "idea_moderation_unavailable",
+          reason: "ИИ-проверка идей временно недоступна. Идея сохранена для дополнительной проверки Советом.",
+        }, 200, headers);
+      }
+
+      const ideaReview = await reviewIdeaContent(value, OPENAI_KEY, policyFlag?.code ?? null);
+      console.info("idea_moderation_completed", JSON.stringify({
+        action: ideaReview.action,
+        reason_code: ideaReview.reason_code,
+        model: ideaReview.model ?? null,
+      }));
+
+      return cacheAndRespond(cacheKey, {
+        action: ideaReview.action,
+        reason_code: ideaReview.reason_code,
+        reason: ideaReview.reason,
+        provider: "openai_idea_moderator",
+      }, headers);
     }
 
     // For locally flagged text, ask the OpenAI contextual agent first. This avoids
