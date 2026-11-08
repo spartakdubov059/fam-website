@@ -241,14 +241,16 @@ serve(async (req: Request) => {
         body: JSON.stringify({
           // Use only free models whose current OpenRouter pages confirm JSON output support.
           // The provider filter also excludes endpoints that cannot honor these settings.
+          // The primary model is explicit; the models array is the cross-model fallback chain.
+          // Both free models support JSON output and remain behind the no-data-collection filter.
+          model: "google/gemma-4-26b-a4b-it:free",
           models: [
-            "nvidia/nemotron-3-super-120b-a12b:free",
             "google/gemma-4-31b-it:free",
-            "google/gemma-4-26b-a4b-it:free",
           ],
           provider: {
             require_parameters: true,
             data_collection: "deny",
+            allow_fallbacks: true,
           },
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
