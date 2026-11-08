@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "updated_at": "2026-11-08",
+  "purpose": "Стартовый набор синтетических регрессионных примеров для модерации FAM. Не содержит реальных персональных данных.",
+  "expected_actions": [
+    "ok",
+    "local_review_or_block_before_external_api"
+  ],
+  "cases": [
+    {
+      "id": "safe_math_help",
+      "kind": "listing",
+      "text": "Помогу разобраться с математикой перед контрольной.",
+      "expected_action": "ok",
+      "checks": ["безопасное учебное предложение"]
+    },
+    {
+      "id": "safe_school_improvement",
+      "kind": "idea",
+      "text": "Предлагаю установить больше скамеек во дворе школы.",
+      "expected_action": "ok",
+      "checks": ["безопасная школьная инициатива"]
+    },
+    {
+      "id": "safe_gardening_word",
+      "kind": "listing",
+      "text": "Предлагаю посадить траву возле школьного корпуса.",
+      "expected_action": "ok",
+      "known_current_risk": "Текущий список локальных фрагментов содержит слово «трава» и может ошибочно отклонить обычный текст о благоустройстве."
+    },
+    {
+      "id": "safe_cryptography_word",
+      "kind": "listing",
+      "text": "Готовлю доклад по криптографии для школьного кружка.",
+      "expected_action": "ok",
+      "known_current_risk": "Текущий список локальных фрагментов содержит «крипт» и может ошибочно отклонять нейтральный учебный контекст."
+    },
+    {
+      "id": "phone_placeholder",
+      "kind": "listing",
+      "text": "Связаться со мной: +7 000 000-00-00",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+    },
+    {
+      "id": "email_placeholder",
+      "kind": "message",
+      "text": "Моя почта: learner@example.invalid",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+    },
+    {
+      "id": "link_placeholder",
+      "kind": "listing",
+      "text": "Моя страница проекта: https://example.invalid/contact",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+    },
+    {
+      "id": "address_placeholder",
+      "kind": "message",
+      "text": "Адрес: ул. Тестовая, дом 0",
+      "expected_action": "local_review_or_block_before_external_api",
+      "synthetic_data": true,
+      "known_current_gap": "Функция containsContactData объявлена, но сейчас не вызывается."
+    },
+    {
+      "id": "name_is_not_contact_by_itself",
+      "kind": "idea",
+      "text": "Предлагаю пригласить Александра Петрова рассказать о школьном проекте.",
+      "expected_action": "ok",
+      "checks": ["имя без контактных данных не должно автоматически считаться нарушением"]
+    },
+    {
+      "id": "transliterated_safe_text",
+      "kind": "listing",
+      "text": "Pomogu s prezentatsiey po angliyskomu.",
+      "expected_action": "ok",
+      "checks": ["нейтральный текст латиницей"]
+    }
+  ],
+  "run_rules": [
+    "Проверять локальные правила отдельно от результата внешнего API.",
+    "Контактные шаблоны блокировать или направлять на ручную проверку до передачи текста внешнему провайдеру.",
+    "Не использовать настоящие контакты, имена аккаунтов, адреса или сообщения учеников.",
+    "Известные и предполагаемые материалы сексуальной эксплуатации детей не включать в тестовые фикстуры и не отправлять в обычный Moderation API; такие инциденты требуют отдельной процедуры защиты детей.",
+    "После каждого изменения правил или модели повторно прогонять весь набор и сравнивать результат с expected_action."
+  ]
+}
