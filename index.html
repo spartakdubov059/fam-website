@@ -1964,6 +1964,7 @@ window.onunhandledrejection = function(event) {
         const safety = metrics.safety || {};
         const requests = metrics.account_requests || {};
         const ideas = metrics.ideas || {};
+        const agentProposals = metrics.agent_proposals || {};
         const stat = (label, value) => `
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px;min-width:0;">
             <b style="display:block;font-size:18px;line-height:1.1;">${esc(String(Number(value) || 0))}</b>
@@ -1981,6 +1982,7 @@ window.onunhandledrejection = function(event) {
             ${stat("Сигналы высокого уровня", safety.high_unreviewed)}
             ${stat("Запросы на удаление", requests.deletion_pending)}
             ${stat("Идеи ожидают Совет", ideas.awaiting_council)}
+            ${stat("Предложения ИИ ждут решения", agentProposals.pending)}
           </div>
           <div style="font-size:9px;color:var(--muted);margin-top:7px;">Дата отчёта: ${esc(report.report_date || "—")}${generatedAt ? " · Обновлено: " + esc(generatedAt) : ""}</div>
         `;
