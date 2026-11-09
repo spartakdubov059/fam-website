@@ -608,6 +608,7 @@ Deno.serve(async (req: Request) => {
     const sensitiveActions = new Set([
       "review_account_deletion",
       "delete_listing",
+      "set_listing_status",
       "delete_account",
       "revoke_role",
       "suspend_account",
