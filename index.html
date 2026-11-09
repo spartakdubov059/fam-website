@@ -1828,7 +1828,7 @@ window.onunhandledrejection = function(event) {
       return;
     }
     box.classList.remove("hidden");
-    $("councilAdminUsers").textContent = "Загружаем аккаунты...";
+    $("councilAdminUsers").textContent = "Загружаем учеников...";
     $("councilAdminListings").textContent = "Загружаем объявления...";
     $("councilAdminAudit").textContent = "Загружаем историю...";
     try {
@@ -1845,86 +1845,47 @@ window.onunhandledrejection = function(event) {
         const isSelf = row.id === user.id;
         const canManage = !isSelf && ["student", "council_member"].includes(row.role);
         const canRevoke = !isSelf && ["council_member", "school_admin"].includes(row.role);
-        const canDelete = canManage;
         const suspension = suspensionByUser.get(row.id);
         const actions = [
-          canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
-          canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button>` : ""
+          canRevoke ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"revoke-council-role\" data-id=\"" + esc(row.id) + "\">Снять роль Совета</button>" : "",
+          canManage ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"delete-council-account\" data-id=\"" + esc(row.id) + "\" data-name=\"" + esc(row.display_name) + "\" data-contact=\"" + esc(row.contact_hint) + "\" data-role=\"" + esc(councilRoleName(row.role)) + "\" data-date=\"" + esc(row.created_at || "") + "\" data-listings=\"" + (Number(row.listing_count) || 0) + "\">Удалить аккаунт</button>" : ""
         ].filter(Boolean).join("");
 
         let restrictionControl = "";
         if (canManage && suspension) {
           const until = suspension.expires_at ? new Date(suspension.expires_at).toLocaleString("ru-RU") : "—";
-          restrictionControl = `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
-            <span class="idea-status status-rejected">Временно ограничен до ${esc(until)}</span>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;">Причина: ${esc(suspension.reason || "Не указана")}</div>
-            <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="lift-council-suspension" data-id="${esc(row.id)}">Снять ограничение досрочно</button>
-          </div>`;
+          restrictionControl = "<div class=\"admin-card-status\"><span class=\"idea-status status-rejected\">Ограничен до " + esc(until) + "</span><div class=\"admin-card-muted\">Причина: " + esc(suspension.reason || "Не указана") + "</div><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"lift-council-suspension\" data-id=\"" + esc(row.id) + "\">Снять ограничение</button></div>";
         } else if (canManage) {
-          restrictionControl = `<details style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-            <summary style="font-size:10px;cursor:pointer;color:var(--muted);">Временно ограничить действия</summary>
-            <div style="margin-top:8px;">
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Срок ограничения</label>
-              <select class="form-control" data-suspension-hours style="font-size:11px;margin-bottom:7px;">
-                <option value="24">24 часа</option>
-                <option value="72">3 дня</option>
-                <option value="168">7 дней</option>
-              </select>
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Причина (15–400 символов)</label>
-              <textarea class="form-control" data-suspension-reason rows="2" maxlength="400" style="font-size:11px;" placeholder="Кратко опишите конкретное нарушение, без личных данных"></textarea>
-              <button type="button" class="button button-secondary button-small" style="margin-top:7px;" data-action="suspend-council-account" data-id="${esc(row.id)}">Установить ограничение</button>
-            </div>
-          </details>`;
+          restrictionControl = "<details class=\"admin-card-actions\"><summary>Временно ограничить</summary><div class=\"admin-card-action-body\"><select class=\"form-control\" data-suspension-hours aria-label=\"Срок ограничения\"><option value=\"24\">24 часа</option><option value=\"72\">3 дня</option><option value=\"168\">7 дней</option></select><textarea class=\"form-control\" data-suspension-reason rows=\"2\" maxlength=\"400\" placeholder=\"Причина — от 15 символов, без личных данных\"></textarea><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"suspend-council-account\" data-id=\"" + esc(row.id) + "\">Применить</button></div></details>";
         }
 
-        return `<div class="idea-card" style="margin-bottom:7px;">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(row.email || "Пользователь")}</b>
-            <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
-          </div>
-          ${isSelf ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;">Ваш аккаунт</div>' : ""}
-          ${restrictionControl}
-          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${actions}</div>` : ""}
-        </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);">Аккаунты не найдены.</p>';
+        return "<article class=\"idea-card admin-person-card\"><div class=\"admin-card-top\"><div><b>" + esc(row.display_name || "Ученик") + "</b><div class=\"admin-card-muted\">" + esc(row.contact_hint || "Контакт не указан") + "</div></div><span class=\"idea-status " + (row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new") + "\">" + esc(councilRoleName(row.role)) + "</span></div><div class=\"admin-card-meta\">ID " + esc(row.short_id || String(row.id).slice(0, 8)) + " · Регистрация " + (row.created_at ? esc(new Date(row.created_at).toLocaleDateString("ru-RU")) : "—") + " · Объявлений: " + (Number(row.listing_count) || 0) + (isSelf ? " · Это вы" : "") + "</div>" + restrictionControl + (actions ? "<details class=\"admin-card-actions\"><summary>Другие действия</summary><div class=\"admin-card-action-body\">" + actions + "</div></details>" : "") + "</article>";
+      }).join("") : "<p class=\"profile-empty-inline\">В этой школе пока нет других аккаунтов.</p>";
 
       const deletionRequests = Array.isArray(data.deletion_requests) ? data.deletion_requests : [];
       $("councilAdminDeletionRequests").innerHTML = deletionRequests.length ? deletionRequests.map(row => {
-        const statusText = row.status === "processing" ? "Уже рассматривается" : "Ожидает решения";
+        const statusText = row.status === "processing" ? "Рассматривается" : "Ожидает решения";
         const actions = row.status === "pending" && row.target_id
-          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-              <button type="button" class="button button-danger button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="approve">Одобрить удаление</button>
-              <button type="button" class="button button-secondary button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="reject">Отклонить</button>
-            </div>`
-          : '<span style="font-size:10px;color:var(--muted);">Ожидает завершения обработки</span>';
-        return `<div class="idea-card" style="margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(row.target_email || "Аккаунт")}</b>
-            <span class="idea-status status-work">${esc(statusText)}</span>
-          </div>
-          <div style="font-size:10px;color:var(--muted);margin:5px 0;">Запросил: ${esc(row.requester_email || "Участник совета")} · ${esc(councilRoleName(row.target_role))}</div>
-          <div style="font-size:10px;margin:5px 0;"><b>${esc(deletionReasonLabel(row.reason_code))}</b><br>${esc(row.reason || "")}</div>
-          <div style="font-size:9px;color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-          ${actions}
-        </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);">Нет открытых запросов на удаление.</p>';
+          ? "<div class=\"admin-card-actions-row\"><button type=\"button\" class=\"button button-danger button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"approve\" data-target-name=\"" + esc(row.target_display_name) + "\" data-target-contact=\"" + esc(row.target_contact_hint) + "\" data-target-role=\"" + esc(councilRoleName(row.target_role)) + "\" data-reason=\"" + esc(row.reason || "") + "\">Удалить</button><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"reject\">Отклонить запрос</button></div>"
+          : "<span class=\"admin-card-muted\">Ожидает завершения обработки</span>";
+        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.target_display_name || "Аккаунт") + "</b><span class=\"idea-status status-work\">" + esc(statusText) + "</span></div><div class=\"admin-card-muted\">" + esc(row.target_contact_hint || "Контакт скрыт") + " · " + esc(councilRoleName(row.target_role)) + "</div><div class=\"admin-card-meta\">Запрос от: " + esc(row.requester_display_name || "Участник Совета") + " · " + esc(row.requester_contact_hint || "") + "</div><p class=\"admin-card-reason\"><b>" + esc(deletionReasonLabel(row.reason_code)) + ":</b> " + esc(row.reason || "") + "</p><div class=\"admin-card-meta\">" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div>" + actions + "</article>";
+      }).join("") : "<p class=\"profile-empty-inline\">Новых запросов на удаление нет.</p>";
 
       const listingsData = Array.isArray(data.listings) ? data.listings : [];
-      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => `
-        <div class="idea-card" style="margin-bottom:7px;">
-          <div style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
-          <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
-          <button type="button" class="button button-danger button-small" data-action="delete-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
+      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => {
+        const hiddenByAdmin = row.admin_hidden === true;
+        const action = hiddenByAdmin
+          ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"moderate-school-listing\" data-decision=\"restore\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\">Вернуть на доску</button>"
+          : row.status === "active"
+            ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"moderate-school-listing\" data-decision=\"hide\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\">Скрыть с доски</button>"
+            : "<span class=\"admin-card-muted\">Ожидает проверки; не скрыто администратором</span>";
+        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.title || "Без названия") + "</b><span class=\"idea-status " + (hiddenByAdmin ? "status-rejected" : row.status === "active" ? "status-done" : "status-work") + "\">" + (hiddenByAdmin ? "Скрыто администратором" : row.status === "active" ? "Опубликовано" : "На проверке / скрыто") + "</span></div><div class=\"admin-card-muted\">" + esc(row.category || "Объявление") + " · " + esc(row.price_text || "Без цены") + "</div><p class=\"admin-card-reason\">" + esc(row.description || "Описание не указано") + "</p><div class=\"admin-card-meta\">Автор: " + esc(row.author_name || "Участник") + " · " + esc(row.author_contact_hint || "") + "</div>" + (hiddenByAdmin && row.admin_hidden_reason ? "<div class=\"admin-card-muted\">Причина скрытия: " + esc(row.admin_hidden_reason) + "</div>" : "") + "<div class=\"admin-card-actions-row\">" + action + "</div></article>";
+      }).join("") : "<p class=\"profile-empty-inline\">Объявлений пока нет.</p>";
 
       const audit = Array.isArray(data.audit) ? data.audit : [];
-      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
-        <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border);">
-          <b>${esc(councilAuditLabel(row.action))}</b>
-          <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
+      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row =>
+        "<div class=\"admin-audit-row\"><b>" + esc(councilAuditLabel(row.action)) + "</b><div>" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div></div>"
+      ).join("") : "<p class=\"profile-empty-inline\">История пока пустая.</p>";
       await loadFamAgentDashboard();
     } catch (error) {
       const message = error?.message || "Повторите попытку.";
