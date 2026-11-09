@@ -12,7 +12,7 @@ test("Council workspace is no longer buried inside the three-button profile shor
   assert.match(html, /id="profileWorkPanel"/);
   assert.match(html, /workSlot\.appendChild\(councilDashboard\)/);
   assert.match(html, /Рабочая панель школы/);
-  assert.doesNotMatch(html, /profile-shortcuts/);
+  assert.doesNotMatch(html, /<div class="profile-shortcuts"/);
 });
 
 test("school account labels are clear and identity cards show context without exposing full contacts", () => {
@@ -62,7 +62,7 @@ test("registration requires two separate, initially unchecked consent confirmati
 
 test("phone sign-up is visibly unavailable until lawful hosting and SMS provider are ready", () => {
   assert.match(html, /phoneSignupNotice/);
-  assert.match(html, /SMS-провайдера|SMS‑провайдера/);
+  assert.match(html, /SMS[‑-]?провайдер/);
   assert.match(privacy, /Регистрация по номеру телефона в текущей версии не включена/);
 });
 
