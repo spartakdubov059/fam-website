@@ -336,7 +336,42 @@
     .upload-status.error { background: rgba(255,107,107,0.15); color: var(--danger); }
     .clear-btn-wrapper { display: flex; justify-content: flex-end; margin-bottom: 12px; }
     .clear-folder-btn { padding: 6px 12px; font-size: 11px; border-radius: 10px; background: rgba(255,107,107,0.15); color: var(--danger); border: 1px solid rgba(255,107,107,0.3); font-weight: 700; }
-  </style>
+  
+/* FAM profile and admin workspace refresh */
+.auth-legal{display:grid;gap:10px;margin:10px 0 14px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:14px}
+.auth-consent{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;align-items:start;font-size:12px;line-height:1.45;color:var(--text)}
+.auth-consent input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--accent)}
+.auth-consent a,.footer-links a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.footer-links{display:flex;gap:14px;flex-wrap:wrap;font-size:11px}
+.profile-shortcuts{gap:8px}
+.profile-council-disclosure{margin-top:4px}
+.profile-inline-disclosure{border:1px solid var(--border);border-radius:13px;padding:10px;margin:8px 0;background:var(--surface)}
+.profile-inline-disclosure>summary,.admin-card-actions>summary{cursor:pointer;list-style:none;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.profile-inline-disclosure>summary::-webkit-details-marker,.admin-card-actions>summary::-webkit-details-marker{display:none}
+.profile-inline-disclosure>summary:after,.admin-card-actions>summary:after{content:"⌄";color:var(--muted);font-size:16px}
+.profile-inline-disclosure[open]>summary:after,.admin-card-actions[open]>summary:after{content:"⌃"}
+.admin-person-card{padding:12px}
+.admin-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.admin-card-top b{font-size:13px;line-height:1.35}
+.admin-card-meta,.admin-card-muted{font-size:10px;line-height:1.5;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+.admin-card-reason{font-size:11px;line-height:1.5;color:var(--text);margin:8px 0}
+.admin-card-status{border-top:1px solid var(--border);margin-top:9px;padding-top:9px;display:grid;gap:7px}
+.admin-card-actions{border-top:1px solid var(--border);margin-top:9px;padding-top:9px}
+.admin-card-action-body{display:grid;gap:7px;margin-top:9px}
+.admin-card-actions-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.admin-audit-row{font-size:11px;padding:8px 0;border-bottom:1px solid var(--border)}
+.admin-audit-row:last-child{border-bottom:0}
+.admin-audit-row>div{font-size:10px;color:var(--muted);margin-top:3px}
+.profile-empty-inline{font-size:11px;color:var(--muted);padding:8px 2px}
+#councilDeletionTargetDetails{margin-top:6px}
+@media(max-width:520px){
+  .footer{align-items:flex-start;flex-direction:column}
+  .footer-links{display:grid;gap:6px}
+  .admin-card-actions-row .button{flex:1}
+}
+
+</style>
 </head>
 <body>
   <noscript>
