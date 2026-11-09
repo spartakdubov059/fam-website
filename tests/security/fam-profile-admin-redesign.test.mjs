@@ -37,7 +37,7 @@ test("signup requires two explicit unchecked legal choices and links to both doc
 });
 
 test("email and phone registration use the selected Auth method and phone OTP", () => {
-  assert.match(frontend, /sb\.auth\.signUp\(\{ phone, password, options: \{ data \} \}\)/);
+  assert.match(frontend, /sb\.auth\.signUp\(\{ phone, password: pass, options: \{ data \} \}\)/);
   assert.match(frontend, /sb\.auth\.signUp\(\{ email: rawIdentifier, password: pass, options: \{ data \} \}\)/);
   assert.match(frontend, /sb\.auth\.verifyOtp\(\{ phone: pendingPhone, token, type: "sms" \}\)/);
   assert.match(frontend, /sb\.auth\.signInWithPassword\(\{ \.\.\.identity, password: pass \}\)/);
@@ -85,5 +85,5 @@ test("legal documents are separate drafts and disclose the required operator det
   assert.match(consent, /Согласие на обработку персональных данных/);
   assert.match(consent, /Supabase/i);
   assert.match(consent, /Франкфурт/i);
-  assert.match(consent, /оператор должен определить возрастные ограничения/i);
+  assert.match(consent, /оператор обязан определить возрастные ограничения/i);
 });
