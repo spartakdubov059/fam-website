@@ -12,7 +12,7 @@ FAM — школьная платформа для объявлений, иде�
 - [Локальный модуль контактной и тематической проверки](supabase/functions/moderate/content-safety.js)
 - [Отправка пользовательского контента](supabase/functions/submit-content/index.ts)
 - [Иерархия агентов и правила безопасности](docs/AGENT_ROLES.md)
-- [Журнал безопасности и приватных фото](supabase/migrations/20261108232000_add_fam_safety_incidents_and_private_image_staging.sql)
+- [Журнал безопасности и приватных фото](supabase/migrations/20261108202805_add_fam_safety_incidents_and_private_image_staging.sql)
 
 ## Правила безопасности
 
@@ -32,3 +32,6 @@ node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
 ```
 
 - [Проверка доступа Ученического совета](supabase/functions/school-admin-access/index.ts)
+- [Фоновый исполнитель безопасных задач FAM](supabase/functions/fam-agent-worker/index.ts)
+
+Фоновый исполнитель намеренно использует отдельный секрет `FAM_AGENT_WORKER_TOKEN` вместо пользовательского JWT (`verify_jwt=false` в настройках функции). Без корректного серверного токена он отвечает отказом; его SQL-очередь независимо разрешает только безопасную проверку очереди без пользовательских данных. Не размещайте этот токен в браузерном коде или репозитории.
