@@ -63,14 +63,14 @@ begin
       end,
       t.created_at
     for update skip locked
-    limit pg_catalog.least(pg_catalog.greatest(pg_catalog.coalesce(p_limit, 1), 1), 5)
+    limit least(greatest(coalesce(p_limit, 1), 1), 5)
   ), claimed as (
     update private.fam_agent_tasks as t
     set status = 'claimed',
         claimed_by = p_worker_id,
         claimed_at = pg_catalog.now(),
         lease_expires_at = pg_catalog.now() + pg_catalog.make_interval(
-          secs => pg_catalog.least(pg_catalog.greatest(pg_catalog.coalesce(p_lease_seconds, 120), 30), 300)
+          secs => least(greatest(coalesce(p_lease_seconds, 120), 30), 300)
         ),
         attempt_count = t.attempt_count + 1,
         updated_at = pg_catalog.now()
@@ -114,7 +114,7 @@ begin
   end if;
 
   v_summary := pg_catalog.left(
-    pg_catalog.coalesce(pg_catalog.nullif(pg_catalog.btrim(p_summary), ''), 'Задача обработана.'),
+    coalesce(nullif(pg_catalog.btrim(p_summary), ''), 'Задача обработана.'),
     1000
   );
 
