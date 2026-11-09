@@ -14,14 +14,16 @@ const frontend = readFileSync(new URL("../../index.html", import.meta.url), "utf
 const agreement = readFileSync(new URL("../../user-agreement.html", import.meta.url), "utf8");
 const consent = readFileSync(new URL("../../personal-data-consent.html", import.meta.url), "utf8");
 
-test("registration records a chosen display name and separate acceptance versions", () => {
+test("registration records a chosen display name and server-enforced separate acceptance versions", () => {
   assert.match(migration, /add column if not exists display_name text/i);
+  assert.match(migration, /profiles_display_name_safe/i);
   assert.match(migration, /create table if not exists private\.fam_user_legal_acceptances/i);
   assert.match(migration, /agreement_version text not null/i);
   assert.match(migration, /privacy_notice_version text not null/i);
   assert.match(migration, /personal_data_consent_version text not null/i);
-  assert.match(migration, /fam_terms_accepted' = 'true'/i);
-  assert.match(migration, /fam_pd_consent_accepted' = 'true'/i);
+  assert.match(migration, /fam_terms_accepted' is distinct from 'true'/i);
+  assert.match(migration, /fam_pd_consent_accepted' is distinct from 'true'/i);
+  assert.match(migration, /raise exception 'Для регистрации нужно отдельно принять/i);
   assert.match(migration, /insert into private\.fam_user_legal_acceptances/i);
 });
 
@@ -36,11 +38,14 @@ test("signup requires two explicit unchecked legal choices and links to both doc
   assert.match(frontend, /href="personal-data-consent\.html"/);
 });
 
-test("email and phone registration use the selected Auth method and phone OTP", () => {
-  assert.match(frontend, /sb\.auth\.signUp\(\{ phone, password: pass, options: \{ data \} \}\)/);
+test("email auth works while phone auth is visibly and technically disabled until localization is ready", () => {
+  assert.match(frontend, /id="authIdentifier" type="email"|type="email" id="authIdentifier"/);
+  assert.match(frontend, /Вход по телефону пока отключён/);
+  assert.match(frontend, /if \(!rawIdentifier\.includes\("@"\)\)[\s\S]*?Сейчас вход и регистрация доступны по почте/);
   assert.match(frontend, /sb\.auth\.signUp\(\{ email: rawIdentifier, password: pass, options: \{ data \} \}\)/);
-  assert.match(frontend, /sb\.auth\.verifyOtp\(\{ phone: pendingPhone, token, type: "sms" \}\)/);
-  assert.match(frontend, /sb\.auth\.signInWithPassword\(\{ \.\.\.identity, password: pass \}\)/);
+  assert.match(frontend, /sb\.auth\.signInWithPassword\(\{ email: rawIdentifier, password: pass \}\)/);
+  assert.doesNotMatch(frontend, /sb\.auth\.verifyOtp/);
+  assert.doesNotMatch(frontend, /sb\.auth\.signUp\(\{ phone/);
   assert.match(migration, /phone_hint = CASE/i);
 });
 
@@ -110,4 +115,22 @@ test("legal documents are separate drafts and disclose the required operator det
   assert.match(consent, /Supabase/i);
   assert.match(consent, /Франкфурт/i);
   assert.match(consent, /оператор обязан определить возрастные ограничения/i);
+});
+
+test("the school dashboard is moved to the first level of the profile and navigation is reduced", () => {
+  assert.match(frontend, /id="profileWorkPanel"/);
+  assert.match(frontend, /workSlot\.appendChild\(councilDashboard\)/);
+  assert.match(frontend, /Панель школы/);
+  assert.doesNotMatch(frontend, /<div class="profile-shortcuts"/);
+});
+
+test("the registration trigger rejects missing explicit consent even if the UI is bypassed", () => {
+  const triggerStart = migration.indexOf("CREATE OR REPLACE FUNCTION public.handle_new_user()");
+  const triggerEnd = migration.indexOf("REVOKE ALL ON FUNCTION public.handle_new_user()", triggerStart);
+  const trigger = migration.slice(triggerStart, triggerEnd);
+  assert.match(trigger, /fam_terms_accepted' IS DISTINCT FROM 'true'/i);
+  assert.match(trigger, /fam_pd_consent_accepted' IS DISTINCT FROM 'true'/i);
+  assert.match(trigger, /v_terms_version IS NULL/i);
+  assert.match(trigger, /v_privacy_version IS NULL/i);
+  assert.match(trigger, /v_consent_version IS NULL/i);
 });
