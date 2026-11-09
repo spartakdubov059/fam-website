@@ -78,6 +78,27 @@ test("admin listing moderation is reversible, school-scoped, and audited", () =>
   assert.doesNotMatch(frontend, /data-action="delete-school-listing"/);
 });
 
+test("account deletion opens a visual confirmation with identity and recent owned listings", () => {
+  assert.match(frontend, /id="adminConfirmModal"/);
+  assert.match(frontend, /id="adminConfirmDetails"/);
+  assert.match(frontend, /data-listing-titles=/);
+  assert.match(frontend, /Последние публикации:/);
+  assert.match(frontend, /pendingAdminReason = options\.reason/);
+  assert.match(controller, /listing_titles: owned\.slice\(0, 5\)/);
+  assert.match(controller, /target_created_at: target\?\.created_at/);
+});
+
+test("moderation dialog shows the author and listing details before reversible hide or restore", () => {
+  assert.match(frontend, /data-category=/);
+  assert.match(frontend, /data-description=/);
+  assert.match(frontend, /data-price=/);
+  assert.match(frontend, /Автор:<\/b>/);
+  assert.match(frontend, /Скрыть с доски/);
+  assert.match(frontend, /Вернуть на доску/);
+  assert.match(frontend, /Объявление будет скрыто с доски, но не удалено/);
+  assert.match(controller, /listing_titles: owned\.slice\(0, 5\)/);
+});
+
 test("legal documents are separate drafts and disclose the required operator details", () => {
   assert.match(agreement, /Пользовательское соглашение FAM/);
   assert.match(agreement, /Оператор сервиса:/);
