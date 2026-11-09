@@ -77,7 +77,6 @@ begin
       t.created_at
     for update skip locked
     limit least(greatest(coalesce(p_limit, 1), 1), 5)
-  )
   ), claimed as (
     update private.fam_agent_tasks as t
     set status = 'claimed',
@@ -96,7 +95,8 @@ begin
     returning task_id
   )
   select c.id, c.agent_key, c.task_type, c.approval_required
-  from claimed as c;
+  from claimed as c
+  join logged as l on l.task_id = c.id;
 end;
 $$;
 
