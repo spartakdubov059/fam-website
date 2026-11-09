@@ -923,8 +923,26 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "delete_listing") {
+      return json({
+        ok: false,
+        error: "Объявления школы больше не удаляются сразу. Используйте скрытие с причиной — его можно восстановить.",
+      }, 410, headers);
+    }
+
+    if (action === "moderate_listing") {
+      const decision = payload.decision === "hide" ? "hide" : payload.decision === "restore" ? "restore" : "";
+      const reason = typeof payload.reason === "string" ? payload.reason.trim().slice(0, 400) : "";
+      if (!decision) return json({ ok: false, error: "Выберите действие с объявлением." }, 400, headers);
+      if (decision === "hide") {
+        const digits = reason.replace(/\D/g, "");
+        const containsContact = /(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason) || digits.length >= 11;
+        if (reason.length < 15 || containsContact) {
+          return json({ ok: false, error: "Укажите причину длиной 15–400 символов без контактов и личных данных." }, 400, headers);
+        }
+      }
+
       const found = await adminRequest(
-        "listings?select=id,title,user_id,school_id,image_url,status&id=eq."
+        "listings?select=id,title,user_id,school_id,status,admin_hidden,category&id=eq."
         + encodeURIComponent(targetId) + "&limit=1",
       );
       const listing = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
@@ -936,44 +954,46 @@ Deno.serve(async (req: Request) => {
         ownerSchoolId = owner?.school_id ?? null;
       }
       if (ownerSchoolId !== actor.school_id) {
-        return json({ ok: false, error: "Можно удалять только объявления своей школы." }, 403, headers);
+        return json({ ok: false, error: "Можно управлять только объявлениями своей школы." }, 403, headers);
       }
 
-      const removed = await adminRequest(
-        "listings?id=eq." + encodeURIComponent(targetId),
-        "DELETE",
-      );
-      if (!removed.ok) return json({ ok: false, error: "Не удалось удалить объявление." }, 503, headers);
+      if (decision === "hide" && listing.admin_hidden === true) {
+        return json({ ok: false, error: "Объявление уже скрыто администратором." }, 409, headers);
+      }
+      if (decision === "restore" && listing.admin_hidden !== true) {
+        return json({ ok: false, error: "Это объявление не скрывалось администратором." }, 409, headers);
+      }
 
-      let imageCleanup = "no_image";
-      if (typeof listing.image_url === "string") {
-        try {
-          const buckets = ["listings-images", "listing-images"];
-          for (const bucket of buckets) {
-            const marker = "/storage/v1/object/public/" + bucket + "/";
-            const markerAt = listing.image_url.indexOf(marker);
-            if (markerAt < 0) continue;
-            const path = decodeURIComponent(listing.image_url.slice(markerAt + marker.length).split("?")[0]);
-            const belongsToOwner = path.startsWith("listing_" + listing.user_id + "_")
-              || path.startsWith(listing.user_id + "/");
-            if (path && belongsToOwner) {
-              await storageRemove(bucket, [path]);
-              imageCleanup = "removed";
-            }
-            break;
+      const patch = decision === "hide"
+        ? {
+            status: "hidden",
+            admin_hidden: true,
+            admin_hidden_reason: reason,
+            admin_hidden_by: actorId,
+            admin_hidden_at: new Date().toISOString(),
           }
-        } catch (error) {
-          imageCleanup = "failed";
-          console.warn("listing_image_cleanup_failed", error instanceof Error ? error.name : "unknown");
-        }
+        : {
+            status: "active",
+            admin_hidden: false,
+            admin_hidden_reason: null,
+            admin_hidden_by: null,
+            admin_hidden_at: null,
+          };
+      const updated = await adminRequest(
+        "listings?id=eq." + encodeURIComponent(targetId) + "&school_id=eq." + encodeURIComponent(ownerSchoolId),
+        "PATCH",
+        patch,
+      );
+      if (!updated.ok || !Array.isArray(updated.data) || updated.data.length !== 1) {
+        return json({ ok: false, error: "Не удалось обновить объявление. Обновите список." }, 503, headers);
       }
 
-      await recordAudit(actor.school_id, actorId, null, "listing_deleted", {
+      await recordAudit(actor.school_id, actorId, listing.user_id, decision === "hide" ? "listing_hidden" : "listing_restored", {
         listing_id: targetId,
-        category: String(listing.category ?? "").slice(0, 40),
-        image_cleanup: imageCleanup,
+        title: String(listing.title || "").slice(0, 100),
+        reason: decision === "hide" ? reason : "Восстановлено администратором",
       });
-      return json({ ok: true, image_cleanup: imageCleanup }, 200, headers);
+      return json({ ok: true, status: decision === "hide" ? "hidden" : "active" }, 200, headers);
     }
 
     if (action === "delete_account") {
@@ -985,11 +1005,21 @@ Deno.serve(async (req: Request) => {
       if (!["student", "council_member"].includes(target.role)) {
         return json({ ok: false, error: "Удалять можно только аккаунты учеников и участников совета. Аккаунт администратора сначала должен передать полномочия." }, 403, headers);
       }
+      const reason = typeof payload.reason === "string" ? payload.reason.trim().slice(0, 400) : "";
+      const digits = reason.replace(/\D/g, "");
+      const containsContact = /(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason) || digits.length >= 11;
+      if (reason.length < 15 || containsContact) {
+        return json({ ok: false, error: "Для удаления нужна причина длиной 15–400 символов без личных контактов." }, 400, headers);
+      }
 
       await deleteAccountCompletely(targetId);
       try {
         await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
+          target_short_id: String(targetId).slice(0, 8),
+          target_display_name: profileDisplayName(target),
           target_role: target.role,
+          target_contact_hint: contactHint(target.email, target.phone_hint),
+          reason,
           source: "admin_panel",
         });
       } catch (auditError) {
