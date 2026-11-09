@@ -2033,7 +2033,6 @@ window.onunhandledrejection = function(event) {
       notice(decision === "approve"
         ? "Предложение одобрено и сохранено для дальнейшего планирования."
         : "Предложение отклонено.");
-      await loadFamAgentDashboard();
       await loadCouncilAdminTools();
     } catch (error) {
       notice("Не удалось сохранить решение: " + (error?.message || "Ошибка."));
