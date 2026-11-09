@@ -253,6 +253,35 @@ begin
     where (v_metrics #>> '{listings,active}')::integer = 0
     on conflict do nothing;
 
+    -- Refresh the pending-proposal metric after this run's analyst agents finish.
+    v_metrics := pg_catalog.jsonb_set(
+      v_metrics,
+      '{agent_proposals,pending}',
+      pg_catalog.to_jsonb((
+        select pg_catalog.count(*)::integer
+        from private.fam_agent_ideas as i
+        where i.school_id = v_school_id and i.status = 'pending'
+      )),
+      true
+    );
+
+    v_summary := pg_catalog.format(
+      'FAM — сводка за %s: активных объявлений %s, новых за сутки %s; непроверенных сигналов безопасности %s, из них высокого уровня %s; запросов на удаление %s; идей ожидают Совет %s; предложений ИИ ждут решения %s; активных временных ограничений %s.',
+      pg_catalog.to_char(v_report_date, 'DD.MM.YYYY'),
+      v_metrics #>> '{listings,active}',
+      v_metrics #>> '{listings,new_24h}',
+      v_metrics #>> '{safety,unreviewed}',
+      v_metrics #>> '{safety,high_unreviewed}',
+      v_metrics #>> '{account_requests,deletion_pending}',
+      v_metrics #>> '{ideas,awaiting_council}',
+      v_metrics #>> '{agent_proposals,pending}',
+      v_metrics #>> '{account_requests,active_suspensions}'
+    );
+
+    update private.fam_agent_school_daily_reports
+    set summary = v_summary, metrics = v_metrics, generated_at = pg_catalog.now()
+    where school_id = v_school_id and report_date = v_report_date;
+
     v_count := v_count + 1;
   end loop;
 
