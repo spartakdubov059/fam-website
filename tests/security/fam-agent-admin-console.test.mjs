@@ -18,6 +18,7 @@ const frontend = readFileSync(
 test("school daily report table is private and scoped to a school", () => {
   assert.match(migration, /create table private\.fam_agent_school_daily_reports/i);
   assert.match(migration, /primary key \(school_id, report_date\)/i);
+  assert.match(migration, /alter table private\.fam_agent_ideas[\s\S]*?add column if not exists school_id text/i);
   assert.match(migration, /enable row level security/i);
   assert.match(migration, /force row level security/i);
   assert.match(migration, /using \(false\) with check \(false\)/i);
@@ -43,7 +44,8 @@ test("server checks school-admin role before agent dashboard and review actions"
 });
 
 test("proposal review changes only a still-pending idea and records the reviewer", () => {
-  assert.match(migration, /where i\.id = p_idea_id\s+and i\.status = 'pending'/i);
+  assert.match(migration, /where i\.id = p_idea_id\s+and i\.school_id = v_reviewer_school_id\s+and i\.status = 'pending'/i);
+  assert.match(migration, /where i\.school_id = p_school_id\s+and i\.status = 'pending'/i);
   assert.match(migration, /reviewed_by = p_reviewer_id/i);
   assert.match(migration, /reviewed_at = pg_catalog\.now\(\)/i);
   assert.match(migration, /p\.role = 'school_admin'/i);
