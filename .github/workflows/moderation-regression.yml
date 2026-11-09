@@ -4,16 +4,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/moderate/**'
-      - 'supabase/functions/school-admin-access/**'
-      - 'tests/moderation/**'
-      - 'tests/security/**'
+      - 'supabase/**'
+      - 'tests/**'
       - 'index.html'
+      - '.github/workflows/**'
   pull_request:
     paths:
-      - 'supabase/functions/moderate/**'
-      - 'tests/moderation/**'
+      - 'supabase/**'
+      - 'tests/**'
       - 'index.html'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
