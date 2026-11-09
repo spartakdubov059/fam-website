@@ -1120,7 +1120,7 @@ window.onunhandledrejection = function(event) {
         ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
           ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
           : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
             : ""}
       </div>
     </div>`;
@@ -2233,8 +2233,8 @@ window.onunhandledrejection = function(event) {
 
   async function deleteOwnListing(listingId) {
     const listing = listings.find(row => row.id === listingId);
-    if (!user || profile?.role !== "student" || !listing || listing.user_id !== user.id) {
-      notice("Удалять можно только собственные объявления обычного аккаунта.");
+    if (!user || !["student", "school_admin"].includes(profile?.role) || !listing || listing.user_id !== user.id) {
+      notice("Удалять можно только собственные объявления.");
       return;
     }
     if (!confirm("Удалить объявление «" + (listing.title || "Без названия") + "»? Его нельзя будет восстановить.")) return;
@@ -2810,11 +2810,12 @@ window.onunhandledrejection = function(event) {
     else if (action === 'refresh-safety-reports') { loadUserSafetyReports(); }
     else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
-    else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision); }
+    else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision, btn); }
     else if (action === 'self-delete-account') { deleteMyAccount(); }
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
-    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
-    else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id, btn); }
+    else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
+    else if (action === 'delete-school-listing') { deleteOwnListing(btn.dataset.id); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
