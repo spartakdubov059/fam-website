@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-const council = readFileSync(new URL("../supabase/functions/council-management/index.ts", import.meta.url), "utf8");
-const migration = readFileSync(new URL("../supabase/migrations/20261109193500_fam_profile_identity_and_signup_consents.sql", import.meta.url), "utf8");
-const terms = readFileSync(new URL("../terms.html", import.meta.url), "utf8");
-const privacy = readFileSync(new URL("../privacy.html", import.meta.url), "utf8");
-const consent = readFileSync(new URL("../personal-data-consent.html", import.meta.url), "utf8");
+const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+const council = readFileSync(new URL("../../supabase/functions/council-management/index.ts", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../../supabase/migrations/20261109193500_fam_profile_identity_and_signup_consents.sql", import.meta.url), "utf8");
+const terms = readFileSync(new URL("../../terms.html", import.meta.url), "utf8");
+const privacy = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
+const consent = readFileSync(new URL("../../personal-data-consent.html", import.meta.url), "utf8");
 
 test("the Council workspace is a clear top-level profile section", () => {
   assert.match(html, /id="adminIdeasDash" class="profile-box profile-disclosure/);
