@@ -15,6 +15,7 @@ FAM — школьная платформа для объявлений, иде�
 - [Журнал безопасности и приватных фото](supabase/migrations/20261108232000_add_fam_safety_incidents_and_private_image_staging.sql)
 - [Закрытая очередь заданий ИИ-агентов](supabase/migrations/20261109132440_create_private_fam_agent_task_queue.sql)
 - [Проект безопасного исполнителя очереди](docs/FAM_AGENT_WORKER_DESIGN.md)
+- [SQL-черновик закрытых RPC-функций исполнителя](supabase/sql/fam-agent-worker-rpcs.sql)
 - [Черновик Edge Function исполнителя](supabase/functions/fam-agent-worker/index.ts)
 
 ## Правила безопасности
