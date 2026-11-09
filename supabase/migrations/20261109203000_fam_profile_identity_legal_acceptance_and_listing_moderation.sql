@@ -32,6 +32,29 @@ ALTER TABLE public.profiles
   ALTER COLUMN display_name SET DEFAULT 'Участник',
   ALTER COLUMN display_name SET NOT NULL;
 
+-- Keep public-facing nicknames free of obvious contact data and links.
+UPDATE public.profiles
+SET display_name = 'Участник ' || UPPER(SUBSTRING(id::text, 1, 6))
+WHERE char_length(btrim(display_name)) NOT BETWEEN 2 AND 40
+   OR display_name ~* '(@|https?://|www\\.|[0-9]{9,})';
+
+DO $block$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.profiles'::regclass
+      AND conname = 'profiles_display_name_safe'
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD CONSTRAINT profiles_display_name_safe
+      CHECK (
+        char_length(btrim(display_name)) BETWEEN 2 AND 40
+        AND display_name !~* '(@|https?://|www\\.|[0-9]{9,})'
+      );
+  END IF;
+END;
+$block$;
+
 ALTER TABLE public.listings
   ADD COLUMN IF NOT EXISTS admin_hidden boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS admin_hidden_reason text,
@@ -100,8 +123,23 @@ BEGIN
     ),
     40
   );
-  IF v_display_name = '' THEN
-    v_display_name := 'Участник ' || UPPER(SUBSTRING(new.id::text, 1, 6));
+  IF char_length(v_display_name) NOT BETWEEN 2 AND 40
+     OR v_display_name ~* '(@|https?://|www\\.|[0-9]{9,})' THEN
+    RAISE EXCEPTION 'Имя в FAM должно быть псевдонимом длиной 2–40 символов без контактов и ссылок.'
+      USING ERRCODE = '22023';
+  END IF;
+
+  v_terms_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_terms_version', ''), 32), '');
+  v_privacy_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_privacy_version', ''), 32), '');
+  v_consent_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_pd_consent_version', ''), 32), '');
+
+  IF new.raw_user_meta_data->>'fam_terms_accepted' IS DISTINCT FROM 'true'
+     OR new.raw_user_meta_data->>'fam_pd_consent_accepted' IS DISTINCT FROM 'true'
+     OR v_terms_version IS NULL
+     OR v_privacy_version IS NULL
+     OR v_consent_version IS NULL THEN
+    RAISE EXCEPTION 'Для регистрации нужно отдельно принять Пользовательское соглашение и дать согласие на обработку персональных данных.'
+      USING ERRCODE = '22023';
   END IF;
 
   v_phone_hint := CASE
@@ -121,34 +159,24 @@ BEGIN
           ELSE public.profiles.display_name
         END;
 
-  v_terms_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_terms_version', ''), 32), '');
-  v_privacy_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_privacy_version', ''), 32), '');
-  v_consent_version := nullif(left(coalesce(new.raw_user_meta_data->>'fam_pd_consent_version', ''), 32), '');
   v_method := CASE WHEN new.phone IS NOT NULL AND new.phone <> '' THEN 'phone' ELSE 'email' END;
 
-  -- The registration UI requires two separate affirmative checkboxes.
-  -- Preserve a server-timestamped audit record when both confirmations were submitted.
-  IF new.raw_user_meta_data->>'fam_terms_accepted' = 'true'
-     AND new.raw_user_meta_data->>'fam_pd_consent_accepted' = 'true'
-     AND v_terms_version IS NOT NULL
-     AND v_privacy_version IS NOT NULL
-     AND v_consent_version IS NOT NULL THEN
-    INSERT INTO private.fam_user_legal_acceptances (
-      user_id, agreement_version, privacy_notice_version,
-      personal_data_consent_version, registration_method
-    )
-    VALUES (
-      new.id, v_terms_version, v_privacy_version,
-      v_consent_version, v_method
-    )
-    ON CONFLICT (user_id, agreement_version, personal_data_consent_version) DO NOTHING;
+  -- The trigger enforces consent even when a client bypasses the registration UI.
+  INSERT INTO private.fam_user_legal_acceptances (
+    user_id, agreement_version, privacy_notice_version,
+    personal_data_consent_version, registration_method
+  )
+  VALUES (
+    new.id, v_terms_version, v_privacy_version,
+    v_consent_version, v_method
+  )
+  ON CONFLICT (user_id, agreement_version, personal_data_consent_version) DO NOTHING;
 
-    UPDATE public.profiles
-    SET accepted_terms_version = v_terms_version,
-        accepted_privacy_version = v_privacy_version,
-        personal_data_consent_at = now()
-    WHERE id = new.id;
-  END IF;
+  UPDATE public.profiles
+  SET accepted_terms_version = v_terms_version,
+      accepted_privacy_version = v_privacy_version,
+      personal_data_consent_at = now()
+  WHERE id = new.id;
 
   RETURN new;
 END;
