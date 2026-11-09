@@ -496,7 +496,7 @@
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
       <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите улучшение для школы. Совет рассмотрит вашу идею.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -504,7 +504,9 @@
         </form>
         <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
         <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><span><b>Панель Совета</b><small style="display:block;color:var(--muted);font-size:10px;font-weight:500;">Заявки, участники и объявления школы</small></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
+        
+      </div>
+      <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><span><b>Панель Совета</b><small style="display:block;color:var(--muted);font-size:10px;font-weight:500;">Заявки, участники и объявления школы</small></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
@@ -569,7 +571,6 @@
           </div>
           <div id="ideaFolderContent"></div>
           </div></details>
-      </div>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body"><div class="l-grid profile-listings-grid" id="myListingsGrid" style="margin-top:0;"></div><div id="myListingsEmpty" class="hidden profile-empty-inline">У вас пока нет объявлений.</div></div>
@@ -1985,12 +1986,15 @@ window.onunhandledrejection = function(event) {
         </article>`;
       }).join("") : '<p style="font-size:11px;color:var(--muted);">Объявлений школы пока нет.</p>';
 
-      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
-        <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => {
+        const details = row.details || {};
+        const context = details.title || details.reason || "";
+        return `<div style="font-size:10px;padding:8px 0;border-bottom:1px solid var(--border);">
           <b>${esc(councilAuditLabel(row.action))}</b>
-          <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
+          ${context ? `<div style="margin-top:3px;">${esc(String(context).slice(0,220))}</div>` : ""}
+          <div style="color:var(--muted);margin-top:3px;">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
+        </div>`;
+      }).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
       await loadFamAgentDashboard();
     } catch (error) {
       const message = error?.message || "Повторите попытку.";
