@@ -229,11 +229,18 @@ async function recordAudit(
 }
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
-  const result = await adminRequest(
+  const current = await adminRequest(
     "profiles?select=id,school_id,role,email,phone_hint,display_name,created_at&id=eq."
     + encodeURIComponent(userId) + "&limit=1",
   );
-  return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
+  if (current.ok && Array.isArray(current.data)) return current.data[0] ?? null;
+
+  // Deploy previews can run before the profile identity migration reaches the database.
+  const legacy = await adminRequest(
+    "profiles?select=id,school_id,role,email,created_at&id=eq."
+    + encodeURIComponent(userId) + "&limit=1",
+  );
+  return legacy.ok && Array.isArray(legacy.data) ? legacy.data[0] ?? null : null;
 }
 
 async function getActiveSuspension(userId: string): Promise<any | null> {
@@ -251,14 +258,28 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
-    adminRequest(
-      "profiles?select=id,email,phone_hint,display_name,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
-      + "&order=created_at.desc&limit=100",
-    ),
-    adminRequest(
-      "listings?select=id,title,description,price_text,category,user_id,status,is_event,created_at,admin_hidden,admin_hidden_reason"
-      + "&school_id=eq." + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
-    ),
+    (async () => {
+      const current = await adminRequest(
+        "profiles?select=id,email,phone_hint,display_name,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+        + "&order=created_at.desc&limit=100",
+      );
+      if (current.ok) return current;
+      return await adminRequest(
+        "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+        + "&order=created_at.desc&limit=100",
+      );
+    })(),
+    (async () => {
+      const current = await adminRequest(
+        "listings?select=id,title,description,price_text,category,user_id,status,is_event,created_at,admin_hidden,admin_hidden_reason"
+        + "&school_id=eq." + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
+      );
+      if (current.ok) return current;
+      return await adminRequest(
+        "listings?select=id,title,description,price_text,category,user_id,status,is_event,created_at"
+        + "&school_id=eq." + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
+      );
+    })(),
     adminRequest(
       "council_admin_audit?select=id,actor_id,target_id,action,details,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
@@ -971,7 +992,13 @@ Deno.serve(async (req: Request) => {
         "listings?select=id,title,user_id,school_id,status,admin_hidden,category&id=eq."
         + encodeURIComponent(targetId) + "&limit=1",
       );
-      const listing = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
+      if (!found.ok) {
+        return json({
+          ok: false,
+          error: "Для скрытия и восстановления нужно сначала обновить базу FAM. В предпросмотре действие пока недоступно.",
+        }, 503, headers);
+      }
+      const listing = Array.isArray(found.data) ? found.data[0] ?? null : null;
       if (!listing) return json({ ok: false, error: "Объявление не найдено." }, 404, headers);
 
       let ownerSchoolId = listing.school_id;
