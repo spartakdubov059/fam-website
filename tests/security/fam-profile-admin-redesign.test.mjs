@@ -134,3 +134,12 @@ test("the registration trigger rejects missing explicit consent even if the UI i
   assert.match(trigger, /v_privacy_version IS NULL/i);
   assert.match(trigger, /v_consent_version IS NULL/i);
 });
+test("profile and admin preview tolerate the old database before the identity migration", () => {
+  assert.match(frontend, /select\("id,avatar_url,created_at,city,school_id,role"\)/);
+  assert.match(frontend, /user\.user_metadata\?\.display_name/);
+  assert.match(controller, /profiles\?select=id,school_id,role,email,phone_hint,display_name,created_at/);
+  assert.match(controller, /profiles\?select=id,school_id,role,email,created_at/);
+  assert.match(controller, /listings\?select=id,title,description,price_text,category,user_id,status,is_event,created_at/);
+  assert.match(controller, /Для скрытия и восстановления нужно сначала обновить базу FAM/);
+});
+
