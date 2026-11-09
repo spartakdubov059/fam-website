@@ -183,14 +183,9 @@
     .profile-meta { color:var(--muted); font-size:11px; line-height:1.4; }
     .profile-avatar-edit { flex:0 0 auto; white-space:nowrap; }
     .profile-hero-note { margin-top:10px; padding-top:9px; border-top:1px solid var(--border); color:var(--muted); font-size:10px; }
-    .profile-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
-    .profile-shortcut { display:flex; align-items:center; gap:8px; min-width:0; text-align:left; padding:11px 9px; border-radius:15px; background:var(--surface); border:1px solid var(--border); color:var(--text); cursor:pointer; }
-    .profile-shortcut > span:nth-child(2) { min-width:0; flex:1; }
-    .profile-shortcut b,.profile-shortcut small { display:block; }
-    .profile-shortcut b { font-size:11px; line-height:1.3; }
-    .profile-shortcut small { margin-top:3px; color:var(--muted); font-size:9px; line-height:1.3; }
-    .profile-shortcut-icon { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; border-radius:10px; background:var(--bg); font-size:15px; }
-    .profile-shortcut-arrow { color:var(--muted); font-size:20px; line-height:1; }
+    .profile-work-slot { margin:0 0 12px; }
+    .profile-work-slot > details { margin-top:0; }
+    .auth-phone-disabled { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.45; }
     .profile-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
     .profile-section-heading h3 { margin:3px 0 0; font-size:16px; }
     .profile-eyebrow { font-size:9px; font-weight:800; letter-spacing:1px; color:var(--muted); }
@@ -344,7 +339,6 @@
 .auth-consent a,.footer-links a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .footer-links{display:flex;gap:14px;flex-wrap:wrap;font-size:11px}
-.profile-shortcuts{gap:8px}
 .profile-council-disclosure{margin-top:4px}
 .profile-inline-disclosure{border:1px solid var(--border);border-radius:13px;padding:10px;margin:8px 0;background:var(--surface)}
 .profile-inline-disclosure>summary,.admin-card-actions>summary{cursor:pointer;list-style:none;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -479,13 +473,10 @@
         </div>
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
-      <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Почта идей</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
-      </div>
+      <div id="profileWorkPanel" class="profile-work-slot hidden"></div>
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
-        <p class="profile-section-copy">Обычный аккаунт FAM не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
+        <p class="profile-section-copy">Ученик не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете">
           <option value="">Выберите нужную роль</option><option value="Участник Ученического совета">Участник Ученического совета</option><option value="Администратор">Администратор</option>
         </select>
@@ -511,7 +502,7 @@
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
       <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Идеи школы</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -521,7 +512,7 @@
         <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
       </div>
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden">
-        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Панель Совета</b><small>Идеи и управление школой</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Панель школы</b><small>Участники, публикации и запросы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
@@ -659,7 +650,7 @@
         <select id="authSchool" class="form-control"><option value="lyceum_3">Лицей № 3 — Сочи</option></select>
       </div>
       <div class="form-group hidden" id="authDisplayNameGroup"><label for="authDisplayName">Имя в FAM или псевдоним</label><input type="text" id="authDisplayName" class="form-control" maxlength="40" autocomplete="nickname" placeholder="Например, Саша"></div>
-      <div class="form-group"><label for="authIdentifier">Почта или телефон</label><input type="text" id="authIdentifier" class="form-control" required maxlength="120" autocomplete="username" placeholder="name@example.com или +7 900 000-00-00"></div>
+      <div class="form-group"><label for="authIdentifier">Почта</label><input type="email" id="authIdentifier" class="form-control" required maxlength="120" autocomplete="email" placeholder="name@example.com"><p class="auth-phone-disabled">Вход по телефону пока отключён. Он появится после переноса хранения данных в Россию и настройки SMS‑подтверждения.</p></div>
       <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6" maxlength="128" autocomplete="current-password"></div>
       <div id="authLegalGroup" class="auth-legal hidden">
         <label class="auth-consent"><input type="checkbox" id="authTermsAccepted"><span>Я принимаю <a href="user-agreement.html" target="_blank" rel="noopener">Пользовательское соглашение FAM</a>.</span></label>
@@ -1721,7 +1712,7 @@ window.onunhandledrejection = function(event) {
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         } else {
           showSchoolAdminAccessStatus(
-            "Обычный пользователь",
+            "Ученик",
             profile.school_id
               ? "Это стандартный статус каждого нового аккаунта FAM. Если вы состоите в Ученическом совете, выберите свою роль и отправьте одну заявку."
               : "Это стандартный статус каждого нового аккаунта FAM. Сначала выберите школу в профиле."
@@ -2666,6 +2657,15 @@ window.onunhandledrejection = function(event) {
     await loadSchoolAdminAccess();
 
     const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
+    const workSlot = $("profileWorkPanel");
+    const councilDashboard = $("adminIdeasDash");
+    if (workSlot && councilDashboard && isCouncilMember) {
+      workSlot.classList.remove("hidden");
+      workSlot.appendChild(councilDashboard);
+      councilDashboard.classList.remove("hidden");
+    } else if (workSlot) {
+      workSlot.classList.add("hidden");
+    }
     if (isCouncilMember) {
       $("adminIdeasDash").classList.remove("hidden");
       $("councilAdminTools").classList.toggle("hidden", profile.role !== "school_admin");
@@ -2776,7 +2776,7 @@ window.onunhandledrejection = function(event) {
     $("authPassword").disabled = false;
     $("switchAuthBtn").classList.remove("hidden");
     $("authSubmitBtn").textContent = isRegistration ? "Создать аккаунт" : "Войти";
-    $("authIdentifier").placeholder = "name@example.com или +7 900 000-00-00";
+    $("authIdentifier").placeholder = "name@example.com";
     $("switchAuthBtn").textContent = isRegistration ? "У меня есть аккаунт" : "Создать аккаунт";
     $("authMsg").textContent = "";
   };
@@ -2803,9 +2803,12 @@ window.onunhandledrejection = function(event) {
       }
 
       const rawIdentifier = $("authIdentifier").value.trim();
-      if (!rawIdentifier) throw new Error("Введите почту или номер телефона.");
-      const isPhone = !rawIdentifier.includes("@");
-      const phone = isPhone ? normalizeFAMPhone(rawIdentifier) : "";
+      if (!rawIdentifier) throw new Error("Введите адрес электронной почты.");
+      if (!rawIdentifier.includes("@")) {
+        throw new Error("Сейчас вход и регистрация доступны по почте. Телефон включим после переноса базы в Россию и настройки SMS-подтверждения.");
+      }
+      const isPhone = false;
+      const phone = "";
       const school = $("authSchool").value;
 
       let res;
