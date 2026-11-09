@@ -73,3 +73,18 @@ test("legal documents are present and clearly marked as drafts pending operator 
   assert.match(privacy, /eu-central-1/);
   assert.match(terms, /безопасн/);
 });
+
+test("deploy preview remains compatible before display_name migration is applied", () => {
+  assert.match(manager, /profiles\?select=id,school_id,role,email,created_at,display_name/);
+  assert.match(manager, /profiles\?select=id,school_id,role,email,created_at&id=eq/);
+  assert.match(manager, /profiles\?select=id,email,role,created_at&school_id=eq/);
+  assert.match(html, /user\.user_metadata\?\.display_name/);
+});
+
+test("hiding or restoring a school listing requires a fresh administrator login on the server", () => {
+  const sensitive = manager.match(/const sensitiveActions = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? "";
+  assert.match(sensitive, /"set_listing_status"/);
+  assert.match(manager, /ownerSchoolId !== actor\.school_id/);
+  assert.match(manager, /listing_hidden/);
+  assert.match(manager, /listing_restored/);
+});
