@@ -60,8 +60,8 @@ test("account deletion presents identity, requires a reason, and uses fresh admi
   assert.match(frontend, /Проверить удаление аккаунта/);
   assert.match(frontend, /id="adminConfirmReason"/);
   assert.match(frontend, /data-listing-titles=/);
-  assert.match(frontend, /Регистрация: /);
-  assert.match(frontend, /Объявлений: /);
+  assert.match(frontend, /Регистрация:<\/b>/);
+  assert.match(frontend, /Объявлений:<\/b>/);
   assert.match(frontend, /callCouncilManagement\("delete_account", targetId, \{ reason: cleanReason \}\)/);
   assert.match(controller, /Для удаления нужна причина длиной 15–400 символов/);
 });
