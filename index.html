@@ -2598,48 +2598,144 @@ window.onunhandledrejection = function(event) {
     }
   };
 
+  function normalizeFAMPhone(value) {
+    const raw = String(value || "").trim();
+    const digits = raw.replace(/\D/g, "");
+    let phone = "";
+    if (raw.startsWith("+")) phone = "+" + digits;
+    else if (digits.length === 11 && digits.startsWith("8")) phone = "+7" + digits.slice(1);
+    else if (digits.length === 11 && digits.startsWith("7")) phone = "+" + digits;
+    else if (digits.length === 10) phone = "+7" + digits;
+    else throw new Error("Введите российский номер в формате +7 900 000-00-00.");
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) throw new Error("Проверьте номер телефона. Используйте международный формат.");
+    return phone;
+  }
+
   $("switchAuthBtn").onclick = () => {
-    if($("authTitle").textContent === "Вход") {
-      $("authTitle").textContent = "Регистрация";
-      $("schoolGroup").classList.remove("hidden");
-      $("switchAuthBtn").textContent = "У меня есть аккаунт";
-    } else {
-      $("authTitle").textContent = "Вход";
-      $("schoolGroup").classList.add("hidden");
-      $("switchAuthBtn").textContent = "Создать аккаунт";
-    }
+    const isRegistration = $("authTitle").textContent === "Вход";
+    $("authTitle").textContent = isRegistration ? "Регистрация" : "Вход";
+    $("schoolGroup").classList.toggle("hidden", !isRegistration);
+    $("authDisplayNameGroup").classList.toggle("hidden", !isRegistration);
+    $("authLegalGroup").classList.toggle("hidden", !isRegistration);
+    $("authDisplayName").required = isRegistration;
+    $("authTermsAccepted").checked = false;
+    $("authPrivacyAccepted").checked = false;
+    $("authOtpGroup").classList.add("hidden");
+    $("authOtp").required = false;
+    $("authOtp").value = "";
+    $("authForm").dataset.pendingPhone = "";
+    $("authIdentifier").disabled = false;
+    $("authPassword").disabled = false;
+    $("switchAuthBtn").classList.remove("hidden");
+    $("authSubmitBtn").textContent = isRegistration ? "Создать аккаунт" : "Войти";
+    $("authIdentifier").placeholder = "name@example.com или +7 900 000-00-00";
+    $("switchAuthBtn").textContent = isRegistration ? "У меня есть аккаунт" : "Создать аккаунт";
+    $("authMsg").textContent = "";
   };
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
-    let email = $("authEmail").value, pass = $("authPassword").value;
-    let isReg = $("authTitle").textContent === "Регистрация";
-    let school = $("authSchool").value;
+    const form = $("authForm");
+    const pass = $("authPassword").value;
+    const isReg = $("authTitle").textContent === "Регистрация";
+    const pendingPhone = form.dataset.pendingPhone || "";
+
+    $("authMsg").textContent = "";
+    $("authSubmitBtn").disabled = true;
     try {
+      if (pendingPhone) {
+        const token = $("authOtp").value.trim();
+        if (!/^\d{4,8}$/.test(token)) throw new Error("Введите код из SMS.");
+        const verified = await sb.auth.verifyOtp({ phone: pendingPhone, token, type: "sms" });
+        if (verified.error) throw new Error("Не удалось подтвердить номер. Проверьте код и попробуйте снова.");
+        form.dataset.pendingPhone = "";
+        closeModal("authModal");
+        location.reload();
+        return;
+      }
+
+      const rawIdentifier = $("authIdentifier").value.trim();
+      if (!rawIdentifier) throw new Error("Введите почту или номер телефона.");
+      const isPhone = !rawIdentifier.includes("@");
+      const phone = isPhone ? normalizeFAMPhone(rawIdentifier) : "";
+      const school = $("authSchool").value;
+
       let res;
       if (isReg) {
-        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school } } });
-        if (res.error) throw res.error;
-        if (!res.data.session) {
-          closeModal('authModal');
-          alert("Регистрация успешна! Проверьте почту для подтверждения.");
+        const displayName = $("authDisplayName").value.trim();
+        if (displayName.length < 2 || displayName.length > 40) {
+          throw new Error("Имя или псевдоним должен содержать от 2 до 40 символов.");
+        }
+        if (!$("authTermsAccepted").checked) {
+          throw new Error("Чтобы продолжить, примите Пользовательское соглашение.");
+        }
+        if (!$("authPrivacyAccepted").checked) {
+          throw new Error("Чтобы продолжить, отдельно подтвердите согласие на обработку персональных данных.");
+        }
+
+        const data = {
+          school_id: school,
+          display_name: displayName,
+          fam_terms_accepted: "true",
+          fam_terms_version: "2026-11-09",
+          fam_privacy_version: "2026-11-09",
+          fam_pd_consent_accepted: "true",
+          fam_pd_consent_version: "2026-11-09"
+        };
+        res = isPhone
+          ? await sb.auth.signUp({ phone, password: pass, options: { data } })
+          : await sb.auth.signUp({ email: rawIdentifier, password: pass, options: { data } });
+        if (res.error) {
+          const message = String(res.error.message || "");
+          if (isPhone && /phone|sms|provider|not enabled|not configured/i.test(message)) {
+            throw new Error("Регистрация по телефону пока не настроена. Администратору нужно включить Phone Auth и SMS-провайдера в Supabase. Сейчас войдите или зарегистрируйтесь по почте.");
+          }
+          throw res.error;
+        }
+
+        if (isPhone && !res.data.session) {
+          form.dataset.pendingPhone = phone;
+          $("authIdentifier").disabled = true;
+          $("authPassword").disabled = true;
+          $("authDisplayNameGroup").classList.add("hidden");
+          $("schoolGroup").classList.add("hidden");
+          $("authLegalGroup").classList.add("hidden");
+          $("authOtpGroup").classList.remove("hidden");
+          $("authOtp").required = true;
+          $("authSubmitBtn").textContent = "Подтвердить номер";
+          $("authMsg").textContent = "SMS отправлено. Введите код из сообщения.";
+          return;
+        }
+        if (!isPhone && !res.data.session) {
+          closeModal("authModal");
+          alert("Регистрация почти завершена. Проверьте почту и подтвердите адрес.");
           return;
         }
       } else {
-        res = await sb.auth.signInWithPassword({ email, password: pass });
-        if (res.error) throw res.error;
+        const identity = isPhone ? { phone } : { email: rawIdentifier };
+        res = await sb.auth.signInWithPassword({ ...identity, password: pass });
+        if (res.error) {
+          const message = String(res.error.message || "");
+          if (isPhone && /phone|sms|provider|not enabled|not configured/i.test(message)) {
+            throw new Error("Вход по телефону пока недоступен. Проверьте подтверждение номера и настройку SMS в Supabase. Можно войти по почте.");
+          }
+          throw res.error;
+        }
         const { data: pd, error: profileReadError } = await sb.from("profiles")
           .select("id,avatar_url,created_at,city,school_id,role,display_name,phone_hint")
           .eq("id", res.data.user.id).maybeSingle();
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
       }
-      closeModal('authModal');
-      if (isReg) alert("✅ Регистрация успешна!");
+
+      closeModal("authModal");
+      if (isReg) alert("Регистрация успешна!");
       location.reload();
     } catch(err) {
-      $("authMsg").textContent = err.message;
+      $("authMsg").textContent = err?.message || "Не удалось выполнить операцию. Повторите попытку.";
       $("authPassword").value = "";
+    } finally {
+      $("authSubmitBtn").disabled = false;
     }
   };
 
