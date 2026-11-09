@@ -1771,9 +1771,9 @@ window.onunhandledrejection = function(event) {
   }
 
   function councilRoleName(role) {
-    if (role === "school_admin") return "Администратор";
-    if (role === "council_member") return "Участник совета";
-    return "Обычный пользователь";
+    if (role === "school_admin") return "Администратор школы";
+    if (role === "council_member") return "Участник Совета";
+    return "Ученик";
   }
 
   function councilAuditLabel(action) {
@@ -1784,6 +1784,8 @@ window.onunhandledrejection = function(event) {
       account_suspension_lifted: "Временное ограничение снято",
       application_rejected: "Заявка отклонена",
       listing_deleted: "Удалено объявление",
+      listing_hidden: "Объявление скрыто",
+      listing_restored: "Объявление восстановлено",
       account_deleted: "Удалён аккаунт",
       account_deleted_by_admin: "Администратор удалил аккаунт",
       account_deleted_by_request: "Одобрен запрос на удаление аккаунта",
@@ -2193,16 +2195,21 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function reviewCouncilAccountDeletion(requestId, decision) {
+  async function reviewCouncilAccountDeletion(requestId, decision, triggerButton) {
     if (!user || profile?.role !== "school_admin" || !requestId || !["approve", "reject"].includes(decision)) return;
+    const name = triggerButton?.dataset.targetName || "Аккаунт";
+    const contact = triggerButton?.dataset.targetContact || "Контакт скрыт";
+    const role = triggerButton?.dataset.targetRole || "Ученик";
+    const reasonText = triggerButton?.dataset.reason || "Причина не указана";
     const message = decision === "approve"
-      ? "Навсегда удалить аккаунт? Будут удалены все принадлежащие ему данные и файлы."
+      ? "Удалить аккаунт из запроса Совета?\nАккаунт: " + name + "\nКонтакт: " + contact + "\nРоль: " + role + "\nПричина запроса: " + reasonText
+        + "\nБудут удалены данные и файлы. Это нельзя отменить."
       : "Отклонить запрос на удаление аккаунта?";
     if (!confirm(message)) return;
-    if (decision === "approve" && !confirm("Подтвердите окончательное удаление аккаунта.")) return;
+    if (decision === "approve" && !confirm("Последнее подтверждение: удалить " + name + " без возможности восстановления?")) return;
     let reviewNote = "";
     if (decision === "reject") {
-      const note = prompt("Укажите причину отказа (её увидит участник совета, до 240 символов).");
+      const note = prompt("Укажите короткую причину отказа (её увидит участник Совета).");
       if (note === null) return;
       reviewNote = note.trim().slice(0, 240);
       if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
@@ -2337,7 +2344,7 @@ window.onunhandledrejection = function(event) {
 
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "suspend_account", "lift_suspension"];
+    const sensitiveActions = ["revoke_role", "delete_account", "moderate_listing", "suspend_account", "lift_suspension"];
     if (sensitiveActions.includes(action)) {
       const confirmed = await ensureRecentAdminAuthentication();
       if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
@@ -2361,11 +2368,29 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageCouncilAccount(targetId) {
-    if (!targetId || !confirm("Удалить аккаунт пользователя? Действие необратимо: удалятся профиль, объявления, сообщения и его файлы.")) return;
-    if (!confirm("Подтвердите окончательное удаление аккаунта.")) return;
+  async function manageCouncilAccount(targetId, triggerButton) {
+    if (!targetId || profile?.role !== "school_admin") return;
+    const name = triggerButton?.dataset.name || "Ученик";
+    const contact = triggerButton?.dataset.contact || "Контакт скрыт";
+    const role = triggerButton?.dataset.role || "Ученик";
+    const registered = triggerButton?.dataset.date
+      ? new Date(triggerButton.dataset.date).toLocaleDateString("ru-RU")
+      : "неизвестно";
+    const listingsCount = Number(triggerButton?.dataset.listings) || 0;
+    const identity = "Аккаунт: " + name + "\nРоль: " + role + "\nКонтакт: " + contact
+      + "\nРегистрация: " + registered + "\nОбъявлений: " + listingsCount
+      + "\nID: " + String(targetId).slice(0, 8).toUpperCase();
+    const reason = prompt(identity + "\n\nУкажите причину удаления (15–400 символов). Удаление необратимо.");
+    if (reason === null) return;
+    const cleanReason = reason.trim();
+    if (cleanReason.length < 15 || cleanReason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
+    if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(cleanReason)
+        || cleanReason.replace(/\D/g, "").length >= 11) {
+      return notice("Не указывайте контакты или личные данные в причине.");
+    }
+    if (!confirm(identity + "\n\nБудут удалены аккаунт, объявления, переписки и файлы. Это нельзя отменить.\n\nПродолжить?")) return;
     try {
-      await callCouncilManagement("delete_account", targetId);
+      await callCouncilManagement("delete_account", targetId, { reason: cleanReason });
       notice("Аккаунт и связанные данные удалены.");
       await loadCouncilAdminTools();
       await loadAll();
@@ -2374,17 +2399,36 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageSchoolListing(targetId) {
-    if (!targetId || !confirm("Навсегда удалить это объявление школы?")) return;
+  async function manageSchoolListing(button) {
+    if (!button || profile?.role !== "school_admin") return;
+    const targetId = button.dataset.id || "";
+    const decision = button.dataset.decision || "";
+    const title = button.dataset.title || "Объявление";
+    const author = button.dataset.author || "Участник";
+    const contact = button.dataset.contact || "Контакт скрыт";
+    if (!targetId || !["hide", "restore"].includes(decision)) return;
+    let reason = "";
+    if (decision === "hide") {
+      const answer = prompt("Объявление: " + title + "\nАвтор: " + author + "\nКонтакт: " + contact
+        + "\n\nПочему нужно скрыть объявление? Укажите факты (15–400 символов).");
+      if (answer === null) return;
+      reason = answer.trim();
+      if (reason.length < 15 || reason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
+      if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason)
+          || reason.replace(/\D/g, "").length >= 11) return notice("Не указывайте контакты или личные данные.");
+      if (!confirm("Скрыть объявление «" + title + "» автора " + author + "?\nПричина: " + reason
+        + "\nОбъявление можно будет вернуть на доску.")) return;
+    } else {
+      if (!confirm("Вернуть объявление «" + title + "» автора " + author + " на доску?")) return;
+    }
+
     try {
-      await callCouncilManagement("delete_listing", targetId);
-      listings = listings.filter(row => row.id !== targetId);
-      notice("Объявление удалено.");
+      await callCouncilManagement("moderate_listing", targetId, { decision, reason });
+      notice(decision === "hide" ? "Объявление скрыто. Его можно восстановить." : "Объявление возвращено на доску.");
       await loadCouncilAdminTools();
-      renderListings();
-      await renderProfile();
+      await loadAll();
     } catch (error) {
-      notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+      notice("Не удалось изменить объявление: " + (error?.message || "Ошибка."));
     }
   }
 
