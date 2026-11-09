@@ -371,6 +371,16 @@
   .admin-card-actions-row .button{flex:1}
 }
 
+    .admin-confirm-modal .modal-content{width:min(480px,calc(100vw - 28px));max-height:86vh;overflow:auto}
+    .admin-confirm-details{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+    .admin-confirm-details p{margin:4px 0}
+    .admin-confirm-details ul{margin:6px 0;padding-left:18px}
+    .admin-confirm-reason{margin-top:12px}
+    .admin-confirm-check{display:flex;gap:9px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.45;margin:12px 0}
+    .admin-confirm-check input{margin-top:2px;accent-color:var(--accent)}
+    .admin-confirm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .admin-confirm-actions .button{flex:1}
+
 </style>
 </head>
 <body>
@@ -647,6 +657,25 @@
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
       <div id="authMsg" role="status" aria-live="polite" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
     </form>
+  </div>
+</div>
+
+<div class="modal admin-confirm-modal" id="adminConfirmModal" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
+  <div class="modal-content">
+    <button type="button" data-action="close-admin-confirm" style="float:right;background:none;border:none;color:white;font-size:20px;" aria-label="Закрыть">×</button>
+    <p class="admin-card-muted" style="margin:0;">ПРОВЕРЬТЕ ПЕРЕД ДЕЙСТВИЕМ</p>
+    <h2 id="adminConfirmTitle" style="margin:5px 0 0;font-size:19px;">Подтверждение</h2>
+    <div id="adminConfirmDetails" class="admin-confirm-details"></div>
+    <div id="adminConfirmReasonWrap" class="admin-confirm-reason hidden">
+      <label for="adminConfirmReason" style="display:block;font-size:11px;font-weight:700;margin-bottom:5px;">Причина / пояснение</label>
+      <textarea id="adminConfirmReason" class="form-control" rows="3" maxlength="400" placeholder="Опишите факты, без контактов и личных данных"></textarea>
+      <p id="adminConfirmReasonHint" class="admin-card-muted" style="margin:5px 0 0;">От 15 до 400 символов. Причина сохранится в истории.</p>
+    </div>
+    <label class="admin-confirm-check"><input type="checkbox" id="adminConfirmChecked"><span>Я проверил(а) указанные данные и понимаю последствия.</span></label>
+    <div class="admin-confirm-actions">
+      <button type="button" class="button button-secondary" data-action="close-admin-confirm">Отмена</button>
+      <button type="button" class="button button-danger" id="adminConfirmSubmit" disabled>Подтвердить</button>
+    </div>
   </div>
 </div>
 
@@ -1893,7 +1922,7 @@ window.onunhandledrejection = function(event) {
         const suspension = suspensionByUser.get(row.id);
         const actions = [
           canRevoke ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"revoke-council-role\" data-id=\"" + esc(row.id) + "\">Снять роль Совета</button>" : "",
-          canManage ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"delete-council-account\" data-id=\"" + esc(row.id) + "\" data-name=\"" + esc(row.display_name) + "\" data-contact=\"" + esc(row.contact_hint) + "\" data-role=\"" + esc(councilRoleName(row.role)) + "\" data-date=\"" + esc(row.created_at || "") + "\" data-listings=\"" + (Number(row.listing_count) || 0) + "\">Удалить аккаунт</button>" : ""
+          canManage ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"delete-council-account\" data-id=\"" + esc(row.id) + "\" data-name=\"" + esc(row.display_name) + "\" data-contact=\"" + esc(row.contact_hint) + "\" data-role=\"" + esc(councilRoleName(row.role)) + "\" data-date=\"" + esc(row.created_at || "") + "\" data-listings=\"" + (Number(row.listing_count) || 0) + "\" data-listing-titles=\"" + esc((row.listing_titles || []).map(item => item.title + " (" + item.status + ")").join(" · ")) + "\">Удалить аккаунт</button>" : ""
         ].filter(Boolean).join("");
 
         let restrictionControl = "";
@@ -1911,18 +1940,18 @@ window.onunhandledrejection = function(event) {
       $("councilAdminDeletionRequests").innerHTML = deletionRequests.length ? deletionRequests.map(row => {
         const statusText = row.status === "processing" ? "Рассматривается" : "Ожидает решения";
         const actions = row.status === "pending" && row.target_id
-          ? "<div class=\"admin-card-actions-row\"><button type=\"button\" class=\"button button-danger button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"approve\" data-target-name=\"" + esc(row.target_display_name) + "\" data-target-contact=\"" + esc(row.target_contact_hint) + "\" data-target-role=\"" + esc(councilRoleName(row.target_role)) + "\" data-reason=\"" + esc(row.reason || "") + "\">Удалить</button><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"reject\">Отклонить запрос</button></div>"
+          ? "<div class=\"admin-card-actions-row\"><button type=\"button\" class=\"button button-danger button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"approve\" data-target-name=\"" + esc(row.target_display_name) + "\" data-target-contact=\"" + esc(row.target_contact_hint) + "\" data-target-role=\"" + esc(councilRoleName(row.target_role)) + "\" data-reason=\"" + esc(row.reason || "") + "\" data-target-date=\"" + esc(row.target_created_at || "") + "\" data-target-listings=\"" + (Number(row.listing_count) || 0) + "\" data-target-listing-titles=\"" + esc((row.listing_titles || []).map(item => item.title + " (" + item.status + ")").join(" · ")) + "\">Проверить</button><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"reject\">Отклонить запрос</button></div>"
           : "<span class=\"admin-card-muted\">Ожидает завершения обработки</span>";
-        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.target_display_name || "Аккаунт") + "</b><span class=\"idea-status status-work\">" + esc(statusText) + "</span></div><div class=\"admin-card-muted\">" + esc(row.target_contact_hint || "Контакт скрыт") + " · " + esc(councilRoleName(row.target_role)) + "</div><div class=\"admin-card-meta\">Запрос от: " + esc(row.requester_display_name || "Участник Совета") + " · " + esc(row.requester_contact_hint || "") + "</div><p class=\"admin-card-reason\"><b>" + esc(deletionReasonLabel(row.reason_code)) + ":</b> " + esc(row.reason || "") + "</p><div class=\"admin-card-meta\">" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div>" + actions + "</article>";
+        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.target_display_name || "Аккаунт") + "</b><span class=\"idea-status status-work\">" + esc(statusText) + "</span></div><div class=\"admin-card-muted\">" + esc(row.target_contact_hint || "Контакт скрыт") + " · " + esc(councilRoleName(row.target_role)) + "</div><div class=\"admin-card-meta\">Запрос от: " + esc(row.requester_display_name || "Участник Совета") + " · " + esc(row.requester_contact_hint || "") + "</div><div class=\"admin-card-meta\">Регистрация цели: " + (row.target_created_at ? esc(new Date(row.target_created_at).toLocaleDateString("ru-RU")) : "—") + " · Объявлений: " + (Number(row.listing_count) || 0) + "</div><p class=\"admin-card-reason\"><b>" + esc(deletionReasonLabel(row.reason_code)) + ":</b> " + esc(row.reason || "") + "</p><div class=\"admin-card-meta\">" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div>" + actions + "</article>";
       }).join("") : "<p class=\"profile-empty-inline\">Новых запросов на удаление нет.</p>";
 
       const listingsData = Array.isArray(data.listings) ? data.listings : [];
       $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => {
         const hiddenByAdmin = row.admin_hidden === true;
         const action = hiddenByAdmin
-          ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"moderate-school-listing\" data-decision=\"restore\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\">Вернуть на доску</button>"
+          ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"moderate-school-listing\" data-decision=\"restore\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\" data-category=\"" + esc(row.category || "") + "\" data-description=\"" + esc(row.description || "") + "\" data-price=\"" + esc(row.price_text || "") + "\" data-date=\"" + esc(row.created_at || "") + "\">Вернуть на доску</button>"
           : row.status === "active"
-            ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"moderate-school-listing\" data-decision=\"hide\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\">Скрыть с доски</button>"
+            ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"moderate-school-listing\" data-decision=\"hide\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\" data-category=\"" + esc(row.category || "") + "\" data-description=\"" + esc(row.description || "") + "\" data-price=\"" + esc(row.price_text || "") + "\" data-date=\"" + esc(row.created_at || "") + "\">Скрыть с доски</button>"
             : "<span class=\"admin-card-muted\">Ожидает проверки; не скрыто администратором</span>";
         return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.title || "Без названия") + "</b><span class=\"idea-status " + (hiddenByAdmin ? "status-rejected" : row.status === "active" ? "status-done" : "status-work") + "\">" + (hiddenByAdmin ? "Скрыто администратором" : row.status === "active" ? "Опубликовано" : "На проверке / скрыто") + "</span></div><div class=\"admin-card-muted\">" + esc(row.category || "Объявление") + " · " + esc(row.price_text || "Без цены") + "</div><p class=\"admin-card-reason\">" + esc(row.description || "Описание не указано") + "</p><div class=\"admin-card-meta\">Автор: " + esc(row.author_name || "Участник") + " · " + esc(row.author_contact_hint || "") + "</div>" + (hiddenByAdmin && row.admin_hidden_reason ? "<div class=\"admin-card-muted\">Причина скрытия: " + esc(row.admin_hidden_reason) + "</div>" : "") + "<div class=\"admin-card-actions-row\">" + action + "</div></article>";
       }).join("") : "<p class=\"profile-empty-inline\">Объявлений пока нет.</p>";
@@ -2256,35 +2285,39 @@ window.onunhandledrejection = function(event) {
     const contact = triggerButton?.dataset.targetContact || "Контакт скрыт";
     const role = triggerButton?.dataset.targetRole || "Ученик";
     const reasonText = triggerButton?.dataset.reason || "Причина не указана";
-    const message = decision === "approve"
-      ? "Удалить аккаунт из запроса Совета?\nАккаунт: " + name + "\nКонтакт: " + contact + "\nРоль: " + role + "\nПричина запроса: " + reasonText
-        + "\nБудут удалены данные и файлы. Это нельзя отменить."
-      : "Отклонить запрос на удаление аккаунта?";
-    if (!confirm(message)) return;
-    if (decision === "approve" && !confirm("Последнее подтверждение: удалить " + name + " без возможности восстановления?")) return;
-    let reviewNote = "";
-    if (decision === "reject") {
-      const note = prompt("Укажите короткую причину отказа (её увидит участник Совета).");
-      if (note === null) return;
-      reviewNote = note.trim().slice(0, 240);
-      if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
-    }
-    try {
-      const confirmed = await ensureRecentAdminAuthentication();
-      if (!confirmed) return;
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
-      notice(decision === "approve" ? "Аккаунт и связанные данные удалены." : "Запрос отклонён.");
-      await loadCouncilAdminTools();
-      await loadAll();
-    } catch (error) {
-      notice("Не удалось обработать запрос: " + (error?.message || "Ошибка."));
-      await loadCouncilAdminTools();
-    }
+    const registered = triggerButton?.dataset.targetDate
+      ? new Date(triggerButton.dataset.targetDate).toLocaleDateString("ru-RU") : "неизвестно";
+    const listingsCount = Number(triggerButton?.dataset.targetListings) || 0;
+    const listingTitles = triggerButton?.dataset.targetListingTitles || "Нет связанных объявлений.";
+    const details = "<p><b>Аккаунт:</b> " + esc(name) + "</p>"
+      + "<p><b>Контакт:</b> " + esc(contact) + "</p><p><b>Роль:</b> " + esc(role) + "</p>"
+      + "<p><b>Регистрация:</b> " + esc(registered) + "</p><p><b>Объявлений:</b> " + listingsCount + "</p>"
+      + "<p><b>Последние публикации:</b> " + esc(listingTitles) + "</p>"
+      + "<p><b>Причина обращения:</b> " + esc(reasonText) + "</p>"
+      + (decision === "approve"
+        ? "<p style='color:var(--danger);'><b>Удаление необратимо.</b> Будут удалены аккаунт и связанные данные.</p>"
+        : "<p>Запрос будет отклонён. Участник Совета увидит причину отказа.</p>");
+    openAdminConfirmModal({
+      title: decision === "approve" ? "Проверить запрос на удаление" : "Отклонить запрос на удаление",
+      details,
+      buttonText: decision === "approve" ? "Удалить аккаунт" : "Отклонить запрос",
+      danger: decision === "approve",
+      reason: decision === "reject" ? { min: 10, max: 240, hint: "От 10 до 240 символов. Причину увидит автор запроса." } : null,
+      onConfirm: async reviewNote => {
+        const confirmed = await ensureRecentAdminAuthentication();
+        if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
+        const { data, error } = await sb.functions.invoke("council-management", {
+          body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
+        });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
+        notice(decision === "approve" ? "Аккаунт и связанные данные удалены." : "Запрос отклонён.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
   }
+
 
   async function deleteOwnListing(listingId) {
     const listing = listings.find(row => row.id === listingId);
@@ -2425,6 +2458,60 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  let pendingAdminConfirm = null;
+  let pendingAdminReason = null;
+
+  function updateAdminConfirmState() {
+    const checked = $("adminConfirmChecked")?.checked === true;
+    const reason = $("adminConfirmReason")?.value?.trim() || "";
+    const limits = pendingAdminReason;
+    const reasonOk = !limits || (reason.length >= limits.min && reason.length <= limits.max);
+    $("adminConfirmSubmit").disabled = !checked || !reasonOk;
+  }
+
+  function openAdminConfirmModal(options) {
+    pendingAdminConfirm = options.onConfirm;
+    pendingAdminReason = options.reason || null;
+    $("adminConfirmTitle").textContent = options.title;
+    $("adminConfirmDetails").innerHTML = options.details || "";
+    $("adminConfirmReasonWrap").classList.toggle("hidden", !pendingAdminReason);
+    $("adminConfirmReason").value = "";
+    $("adminConfirmReason").placeholder = options.reason?.placeholder || "Опишите факты, без контактов и личных данных";
+    $("adminConfirmReasonHint").textContent = options.reason?.hint || "От 15 до 400 символов. Причина сохранится в истории.";
+    $("adminConfirmChecked").checked = false;
+    $("adminConfirmSubmit").textContent = options.buttonText || "Подтвердить";
+    $("adminConfirmSubmit").classList.toggle("button-danger", options.danger !== false);
+    $("adminConfirmSubmit").classList.toggle("button-primary", options.danger === false);
+    updateAdminConfirmState();
+    openModal("adminConfirmModal");
+  }
+
+  function closeAdminConfirmModal() {
+    pendingAdminConfirm = null;
+    pendingAdminReason = null;
+    closeModal("adminConfirmModal");
+  }
+
+  $("adminConfirmChecked").addEventListener("change", updateAdminConfirmState);
+  $("adminConfirmReason").addEventListener("input", updateAdminConfirmState);
+  $("adminConfirmSubmit").addEventListener("click", async () => {
+    if (typeof pendingAdminConfirm !== "function") return;
+    updateAdminConfirmState();
+    if ($("adminConfirmSubmit").disabled) return;
+    const reason = $("adminConfirmReason").value.trim();
+    const action = pendingAdminConfirm;
+    $("adminConfirmSubmit").disabled = true;
+    $("adminConfirmSubmit").textContent = "Выполняем...";
+    try {
+      await action(reason);
+      closeAdminConfirmModal();
+    } catch (error) {
+      notice(error?.message || "Не удалось выполнить действие.");
+      $("adminConfirmSubmit").textContent = "Повторить";
+      updateAdminConfirmState();
+    }
+  });
+
   async function manageCouncilAccount(targetId, triggerButton) {
     if (!targetId || profile?.role !== "school_admin") return;
     const name = triggerButton?.dataset.name || "Ученик";
@@ -2434,26 +2521,32 @@ window.onunhandledrejection = function(event) {
       ? new Date(triggerButton.dataset.date).toLocaleDateString("ru-RU")
       : "неизвестно";
     const listingsCount = Number(triggerButton?.dataset.listings) || 0;
-    const identity = "Аккаунт: " + name + "\nРоль: " + role + "\nКонтакт: " + contact
-      + "\nРегистрация: " + registered + "\nОбъявлений: " + listingsCount
-      + "\nID: " + String(targetId).slice(0, 8).toUpperCase();
-    const reason = prompt(identity + "\n\nУкажите причину удаления (15–400 символов). Удаление необратимо.");
-    if (reason === null) return;
-    const cleanReason = reason.trim();
-    if (cleanReason.length < 15 || cleanReason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
-    if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(cleanReason)
-        || cleanReason.replace(/\D/g, "").length >= 11) {
-      return notice("Не указывайте контакты или личные данные в причине.");
-    }
-    if (!confirm(identity + "\n\nБудут удалены аккаунт, объявления, переписки и файлы. Это нельзя отменить.\n\nПродолжить?")) return;
-    try {
-      await callCouncilManagement("delete_account", targetId, { reason: cleanReason });
-      notice("Аккаунт и связанные данные удалены.");
-      await loadCouncilAdminTools();
-      await loadAll();
-    } catch (error) {
-      notice("Не удалось удалить аккаунт: " + (error?.message || "Ошибка."));
-    }
+    const titles = triggerButton?.dataset.listingTitles || "У участника пока нет объявлений.";
+    const identity = "<p><b>Аккаунт:</b> " + esc(name) + "</p>"
+      + "<p><b>Контакт:</b> " + esc(contact) + "</p>"
+      + "<p><b>Роль:</b> " + esc(role) + "</p>"
+      + "<p><b>Регистрация:</b> " + esc(registered) + "</p>"
+      + "<p><b>Объявлений:</b> " + listingsCount + "</p>"
+      + "<p><b>Последние публикации:</b> " + esc(titles) + "</p>"
+      + "<p><b>ID:</b> " + esc(String(targetId).slice(0, 8).toUpperCase()) + "</p>"
+      + "<p style='color:var(--danger);'><b>Удаление необратимо.</b> Аккаунт, публикации и связанные данные будут удалены.</p>";
+    openAdminConfirmModal({
+      title: "Проверить удаление аккаунта",
+      details: identity,
+      buttonText: "Удалить аккаунт",
+      danger: true,
+      reason: { min: 15, max: 400, hint: "От 15 до 400 символов. Не указывайте контактные данные." },
+      onConfirm: async cleanReason => {
+        if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(cleanReason)
+            || cleanReason.replace(/\D/g, "").length >= 11) {
+          throw new Error("Не указывайте контакты или личные данные в причине.");
+        }
+        await callCouncilManagement("delete_account", targetId, { reason: cleanReason });
+        notice("Аккаунт и связанные данные удалены.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
   }
 
   async function manageSchoolListing(button) {
@@ -2464,29 +2557,35 @@ window.onunhandledrejection = function(event) {
     const author = button.dataset.author || "Участник";
     const contact = button.dataset.contact || "Контакт скрыт";
     if (!targetId || !["hide", "restore"].includes(decision)) return;
-    let reason = "";
-    if (decision === "hide") {
-      const answer = prompt("Объявление: " + title + "\nАвтор: " + author + "\nКонтакт: " + contact
-        + "\n\nПочему нужно скрыть объявление? Укажите факты (15–400 символов).");
-      if (answer === null) return;
-      reason = answer.trim();
-      if (reason.length < 15 || reason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
-      if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason)
-          || reason.replace(/\D/g, "").length >= 11) return notice("Не указывайте контакты или личные данные.");
-      if (!confirm("Скрыть объявление «" + title + "» автора " + author + "?\nПричина: " + reason
-        + "\nОбъявление можно будет вернуть на доску.")) return;
-    } else {
-      if (!confirm("Вернуть объявление «" + title + "» автора " + author + " на доску?")) return;
-    }
-
-    try {
-      await callCouncilManagement("moderate_listing", targetId, { decision, reason });
-      notice(decision === "hide" ? "Объявление скрыто. Его можно восстановить." : "Объявление возвращено на доску.");
-      await loadCouncilAdminTools();
-      await loadAll();
-    } catch (error) {
-      notice("Не удалось изменить объявление: " + (error?.message || "Ошибка."));
-    }
+    const category = button.dataset.category || "не указана";
+    const description = button.dataset.description || "Описание не указано";
+    const price = button.dataset.price || "Без цены";
+    const createdAt = button.dataset.date ? new Date(button.dataset.date).toLocaleString("ru-RU") : "дата неизвестна";
+    const details = "<p><b>Объявление:</b> " + esc(title) + "</p>"
+      + "<p><b>Автор:</b> " + esc(author) + " · " + esc(contact) + "</p>"
+      + "<p><b>Категория:</b> " + esc(category) + " · <b>Цена:</b> " + esc(price) + "</p>"
+      + "<p><b>Описание:</b> " + esc(description) + "</p>"
+      + "<p><b>Опубликовано:</b> " + esc(createdAt) + "</p>"
+      + (decision === "hide"
+        ? "<p>Объявление будет скрыто с доски, но не удалено. Его можно восстановить.</p>"
+        : "<p>Объявление снова появится на доске.</p>");
+    openAdminConfirmModal({
+      title: decision === "hide" ? "Скрыть объявление?" : "Вернуть объявление?",
+      details,
+      buttonText: decision === "hide" ? "Скрыть с доски" : "Вернуть на доску",
+      danger: decision === "hide",
+      reason: decision === "hide" ? { min: 15, max: 400, hint: "От 15 до 400 символов. Не указывайте контакты." } : null,
+      onConfirm: async reason => {
+        if (decision === "hide" && (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason)
+            || reason.replace(/\D/g, "").length >= 11)) {
+          throw new Error("Не указывайте контакты или личные данные в причине.");
+        }
+        await callCouncilManagement("moderate_listing", targetId, { decision, reason: reason || "" });
+        notice(decision === "hide" ? "Объявление скрыто. Его можно восстановить." : "Объявление возвращено на доску.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
   }
 
   async function suspendCouncilAccount(button) {
@@ -2967,6 +3066,7 @@ window.onunhandledrejection = function(event) {
     else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
     else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision, btn); }
+    else if (action === 'close-admin-confirm') { closeAdminConfirmModal(); }
     else if (action === 'self-delete-account') { deleteMyAccount(); }
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id, btn); }
