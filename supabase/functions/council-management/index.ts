@@ -217,7 +217,7 @@ async function recordAudit(
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
   const result = await adminRequest(
-    "profiles?select=id,school_id,role,email,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
+    "profiles?select=id,school_id,role,email,created_at,display_name&id=eq." + encodeURIComponent(userId) + "&limit=1",
   );
   return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
 }
@@ -238,11 +238,11 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,role,created_at,display_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
-      "listings?select=id,title,category,user_id,status,is_event,created_at&school_id=eq."
+      "listings?select=id,title,category,user_id,status,is_event,created_at,school_id&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
     ),
     adminRequest(
@@ -265,22 +265,36 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     throw new Error("Не удалось загрузить панель управления.");
   }
 
+  const userRows = users.data ?? [];
+  const userById = new Map(userRows.map((row: any) => [row.id, row]));
+
   return {
-    users: (users.data ?? []).map((row: any) => ({
+    users: userRows.map((row: any) => ({
       id: row.id,
+      reference: typeof row.id === "string" ? row.id.slice(-6).toUpperCase() : "",
+      display_name: typeof row.display_name === "string" ? row.display_name : "",
       email: maskEmail(row.email),
       role: row.role,
       created_at: row.created_at,
+      listing_count: (listings.data ?? []).filter((item: any) => item.user_id === row.id).length,
     })),
-    listings: (listings.data ?? []).map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      user_id: row.user_id,
-      status: row.status,
-      is_event: row.is_event === true,
-      created_at: row.created_at,
-    })),
+    listings: (listings.data ?? []).map((row: any) => {
+      const owner = userById.get(row.user_id) as any;
+      return {
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        user_id: row.user_id,
+        status: row.status,
+        is_event: row.is_event === true,
+        created_at: row.created_at,
+        owner_display_name: typeof owner?.display_name === "string" ? owner.display_name : "",
+        owner_role: owner?.role === "school_admin" ? "Администратор школы"
+          : owner?.role === "council_member" ? "Участник Совета" : "Ученик",
+        owner_email: maskEmail(owner?.email),
+        owner_ref: typeof row.user_id === "string" ? row.user_id.slice(-6).toUpperCase() : "",
+      };
+    }),
     audit: (audit.data ?? []).map((row: any) => ({
       id: row.id,
       actor: typeof row.actor_id === "string" ? row.actor_id.slice(0, 8) : "",
@@ -292,6 +306,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
       id: row.id,
       target_id: row.target_id,
+      target_name: (userById.get(row.target_id) as any)?.display_name || "",
       target_email: row.target_email_masked || "Аккаунт",
       target_role: row.target_role,
       requester_email: row.requester_email_masked || "Участник совета",
@@ -880,6 +895,42 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, result: result.data }, 200, headers);
     }
 
+    if (action === "set_listing_status") {
+      const requestedStatus = payload.status;
+      if (!["active", "hidden"].includes(requestedStatus)) {
+        return json({ ok: false, error: "Допустимы только статусы «опубликовано» и «скрыто»." }, 400, headers);
+      }
+      const found = await adminRequest(
+        "listings?select=id,title,user_id,school_id,status&id=eq."
+        + encodeURIComponent(targetId) + "&limit=1",
+      );
+      const listing = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
+      if (!listing) return json({ ok: false, error: "Публикация не найдена." }, 404, headers);
+
+      let ownerSchoolId = listing.school_id;
+      if (!ownerSchoolId) {
+        const owner = await getSchoolProfile(listing.user_id);
+        ownerSchoolId = owner?.school_id ?? null;
+      }
+      if (ownerSchoolId !== actor.school_id) {
+        return json({ ok: false, error: "Можно менять статус только публикаций своей школы." }, 403, headers);
+      }
+
+      const changed = await adminRequest(
+        "listings?id=eq." + encodeURIComponent(targetId) + "&school_id=eq." + encodeURIComponent(actor.school_id),
+        "PATCH",
+        { status: requestedStatus },
+      );
+      if (!changed.ok || !Array.isArray(changed.data) || changed.data.length !== 1) {
+        return json({ ok: false, error: "Не удалось обновить публикацию. Обновите список." }, 409, headers);
+      }
+      await recordAudit(actor.school_id, actorId, null,
+        requestedStatus === "hidden" ? "listing_hidden" : "listing_restored",
+        { listing_id: targetId, title: String(listing.title ?? "").slice(0, 80) },
+      );
+      return json({ ok: true, status: requestedStatus }, 200, headers);
+    }
+
     if (action === "delete_listing") {
       const found = await adminRequest(
         "listings?select=id,title,user_id,school_id,image_url,status&id=eq."
@@ -948,6 +999,8 @@ Deno.serve(async (req: Request) => {
       try {
         await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
           target_role: target.role,
+          target_display_name: String(target.display_name ?? "").slice(0, 32),
+          target_reference: targetId.slice(-6).toUpperCase(),
           source: "admin_panel",
         });
       } catch (auditError) {
