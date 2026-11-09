@@ -657,7 +657,6 @@
         <label class="auth-consent"><input type="checkbox" id="authPrivacyAccepted"><span>Я ознакомился(ась) и даю отдельное <a href="personal-data-consent.html" target="_blank" rel="noopener">согласие на обработку персональных данных</a>.</span></label>
         <p class="admin-card-muted">Оба подтверждения обязательны для регистрации и не отмечены заранее. Для несовершеннолетних оператор должен обеспечить требуемое законом согласие законного представителя.</p>
       </div>
-      <div id="authOtpGroup" class="form-group hidden"><label for="authOtp">Код из SMS</label><input type="text" id="authOtp" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Введите код из сообщения"></div>
       <button type="submit" id="authSubmitBtn" class="button button-primary" style="width:100%;">Войти</button>
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
       <div id="authMsg" role="status" aria-live="polite" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
@@ -2746,19 +2745,6 @@ window.onunhandledrejection = function(event) {
     }
   };
 
-  function normalizeFAMPhone(value) {
-    const raw = String(value || "").trim();
-    const digits = raw.replace(/\D/g, "");
-    let phone = "";
-    if (raw.startsWith("+")) phone = "+" + digits;
-    else if (digits.length === 11 && digits.startsWith("8")) phone = "+7" + digits.slice(1);
-    else if (digits.length === 11 && digits.startsWith("7")) phone = "+" + digits;
-    else if (digits.length === 10) phone = "+7" + digits;
-    else throw new Error("Введите российский номер в формате +7 900 000-00-00.");
-    if (!/^\+[1-9]\d{7,14}$/.test(phone)) throw new Error("Проверьте номер телефона. Используйте международный формат.");
-    return phone;
-  }
-
   $("switchAuthBtn").onclick = () => {
     const isRegistration = $("authTitle").textContent === "Вход";
     $("authTitle").textContent = isRegistration ? "Регистрация" : "Вход";
@@ -2768,10 +2754,6 @@ window.onunhandledrejection = function(event) {
     $("authDisplayName").required = isRegistration;
     $("authTermsAccepted").checked = false;
     $("authPrivacyAccepted").checked = false;
-    $("authOtpGroup").classList.add("hidden");
-    $("authOtp").required = false;
-    $("authOtp").value = "";
-    $("authForm").dataset.pendingPhone = "";
     $("authIdentifier").disabled = false;
     $("authPassword").disabled = false;
     $("switchAuthBtn").classList.remove("hidden");
@@ -2783,32 +2765,17 @@ window.onunhandledrejection = function(event) {
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
-    const form = $("authForm");
     const pass = $("authPassword").value;
     const isReg = $("authTitle").textContent === "Регистрация";
-    const pendingPhone = form.dataset.pendingPhone || "";
 
     $("authMsg").textContent = "";
     $("authSubmitBtn").disabled = true;
     try {
-      if (pendingPhone) {
-        const token = $("authOtp").value.trim();
-        if (!/^\d{4,8}$/.test(token)) throw new Error("Введите код из SMS.");
-        const verified = await sb.auth.verifyOtp({ phone: pendingPhone, token, type: "sms" });
-        if (verified.error) throw new Error("Не удалось подтвердить номер. Проверьте код и попробуйте снова.");
-        form.dataset.pendingPhone = "";
-        closeModal("authModal");
-        location.reload();
-        return;
-      }
-
       const rawIdentifier = $("authIdentifier").value.trim();
       if (!rawIdentifier) throw new Error("Введите адрес электронной почты.");
       if (!rawIdentifier.includes("@")) {
         throw new Error("Сейчас вход и регистрация доступны по почте. Телефон включим после переноса базы в Россию и настройки SMS-подтверждения.");
       }
-      const isPhone = false;
-      const phone = "";
       const school = $("authSchool").value;
 
       let res;
@@ -2833,45 +2800,17 @@ window.onunhandledrejection = function(event) {
           fam_pd_consent_accepted: "true",
           fam_pd_consent_version: "2026-11-09"
         };
-        res = isPhone
-          ? await sb.auth.signUp({ phone, password: pass, options: { data } })
-          : await sb.auth.signUp({ email: rawIdentifier, password: pass, options: { data } });
-        if (res.error) {
-          const message = String(res.error.message || "");
-          if (isPhone && /phone|sms|provider|not enabled|not configured/i.test(message)) {
-            throw new Error("Регистрация по телефону пока не настроена. Администратору нужно включить Phone Auth и SMS-провайдера в Supabase. Сейчас войдите или зарегистрируйтесь по почте.");
-          }
-          throw res.error;
-        }
+        res = await sb.auth.signUp({ email: rawIdentifier, password: pass, options: { data } });
+        if (res.error) throw res.error;
 
-        if (isPhone && !res.data.session) {
-          form.dataset.pendingPhone = phone;
-          $("authIdentifier").disabled = true;
-          $("authPassword").disabled = true;
-          $("authDisplayNameGroup").classList.add("hidden");
-          $("schoolGroup").classList.add("hidden");
-          $("authLegalGroup").classList.add("hidden");
-          $("authOtpGroup").classList.remove("hidden");
-          $("authOtp").required = true;
-          $("authSubmitBtn").textContent = "Подтвердить номер";
-          $("authMsg").textContent = "SMS отправлено. Введите код из сообщения.";
-          return;
-        }
-        if (!isPhone && !res.data.session) {
+        if (!res.data.session) {
           closeModal("authModal");
           alert("Регистрация почти завершена. Проверьте почту и подтвердите адрес.");
           return;
         }
       } else {
-        const identity = isPhone ? { phone } : { email: rawIdentifier };
-        res = await sb.auth.signInWithPassword({ ...identity, password: pass });
-        if (res.error) {
-          const message = String(res.error.message || "");
-          if (isPhone && /phone|sms|provider|not enabled|not configured/i.test(message)) {
-            throw new Error("Вход по телефону пока недоступен. Проверьте подтверждение номера и настройку SMS в Supabase. Можно войти по почте.");
-          }
-          throw res.error;
-        }
+        res = await sb.auth.signInWithPassword({ email: rawIdentifier, password: pass });
+        if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
           .select("id,avatar_url,created_at,city,school_id,role,display_name,phone_hint")
           .eq("id", res.data.user.id).maybeSingle();
