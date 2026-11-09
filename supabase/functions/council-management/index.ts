@@ -61,6 +61,19 @@ function maskEmail(value: unknown): string {
   return local.slice(0, 1) + "***@" + domain;
 }
 
+function contactHint(email: unknown, phoneHint: unknown): string {
+  const maskedEmail = maskEmail(email);
+  if (maskedEmail !== "Пользователь") return maskedEmail;
+  return typeof phoneHint === "string" && phoneHint.trim()
+    ? phoneHint.trim().slice(0, 40)
+    : "Контакт не указан";
+}
+
+function profileDisplayName(row: any): string {
+  const name = typeof row?.display_name === "string" ? row.display_name.trim() : "";
+  return name ? name.slice(0, 40) : "Участник " + String(row?.id || "").slice(0, 6).toUpperCase();
+}
+
 function serviceHeaders(contentType = true): Record<string, string> {
   const headers: Record<string, string> = { "apikey": SECRET_KEY };
   if (SECRET_IS_JWT) headers["Authorization"] = "Bearer " + SECRET_KEY;
@@ -217,7 +230,8 @@ async function recordAudit(
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
   const result = await adminRequest(
-    "profiles?select=id,school_id,role,email,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
+    "profiles?select=id,school_id,role,email,phone_hint,display_name,created_at&id=eq."
+    + encodeURIComponent(userId) + "&limit=1",
   );
   return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
 }
@@ -238,19 +252,19 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,phone_hint,display_name,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
-      "listings?select=id,title,category,user_id,status,is_event,created_at&school_id=eq."
-      + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
+      "listings?select=id,title,description,price_text,category,user_id,status,is_event,created_at,admin_hidden,admin_hidden_reason"
+      + "&school_id=eq." + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
     ),
     adminRequest(
       "council_admin_audit?select=id,actor_id,target_id,action,details,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
+      "account_deletion_requests?select=id,target_id,requester_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
     ),
     adminRequest(
@@ -265,22 +279,40 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     throw new Error("Не удалось загрузить панель управления.");
   }
 
+  const profileById = new Map((users.data ?? []).map((row: any) => [row.id, row]));
+  const listingsByOwner = new Map<string, number>();
+  for (const listing of listings.data ?? []) {
+    if (listing.user_id) listingsByOwner.set(listing.user_id, (listingsByOwner.get(listing.user_id) ?? 0) + 1);
+  }
+
   return {
     users: (users.data ?? []).map((row: any) => ({
       id: row.id,
-      email: maskEmail(row.email),
+      short_id: String(row.id || "").slice(0, 8).toUpperCase(),
+      display_name: profileDisplayName(row),
+      contact_hint: contactHint(row.email, row.phone_hint),
       role: row.role,
       created_at: row.created_at,
+      listing_count: listingsByOwner.get(row.id) ?? 0,
     })),
-    listings: (listings.data ?? []).map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      user_id: row.user_id,
-      status: row.status,
-      is_event: row.is_event === true,
-      created_at: row.created_at,
-    })),
+    listings: (listings.data ?? []).map((row: any) => {
+      const owner = profileById.get(row.user_id);
+      return {
+        id: row.id,
+        title: row.title,
+        description: typeof row.description === "string" ? row.description.slice(0, 600) : "",
+        price_text: row.price_text,
+        category: row.category,
+        user_id: row.user_id,
+        author_name: owner ? profileDisplayName(owner) : "Автор недоступен",
+        author_contact_hint: owner ? contactHint(owner.email, owner.phone_hint) : "Контакт недоступен",
+        status: row.status,
+        admin_hidden: row.admin_hidden === true,
+        admin_hidden_reason: row.admin_hidden_reason || null,
+        is_event: row.is_event === true,
+        created_at: row.created_at,
+      };
+    }),
     audit: (audit.data ?? []).map((row: any) => ({
       id: row.id,
       actor: typeof row.actor_id === "string" ? row.actor_id.slice(0, 8) : "",
@@ -289,17 +321,23 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       details: row.details ?? {},
       created_at: row.created_at,
     })),
-    deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
-      id: row.id,
-      target_id: row.target_id,
-      target_email: row.target_email_masked || "Аккаунт",
-      target_role: row.target_role,
-      requester_email: row.requester_email_masked || "Участник совета",
-      reason_code: row.reason_code,
-      reason: row.reason,
-      status: row.status,
-      created_at: row.created_at,
-    })),
+    deletion_requests: (deletionRequests.data ?? []).map((row: any) => {
+      const target = profileById.get(row.target_id);
+      const requester = profileById.get(row.requester_id);
+      return {
+        id: row.id,
+        target_id: row.target_id,
+        target_display_name: target ? profileDisplayName(target) : "Аккаунт удалён или недоступен",
+        target_contact_hint: target ? contactHint(target.email, target.phone_hint) : row.target_email_masked || "Контакт скрыт",
+        target_role: row.target_role,
+        requester_display_name: requester ? profileDisplayName(requester) : "Участник Совета",
+        requester_contact_hint: requester ? contactHint(requester.email, requester.phone_hint) : row.requester_email_masked || "Контакт скрыт",
+        reason_code: row.reason_code,
+        reason: row.reason,
+        status: row.status,
+        created_at: row.created_at,
+      };
+    }),
     suspensions: (suspensions.data ?? []).map((row: any) => ({
       id: row.id,
       target_id: row.target_id,
@@ -377,7 +415,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
 async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
   const [targets, ownRequests] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(actor.school_id)
+      "profiles?select=id,email,phone_hint,display_name,role,created_at&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&id=neq." + encodeURIComponent(actorId)
       + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
     ),
@@ -391,8 +429,11 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
   return {
     targets: (targets.data ?? []).map((row: any) => ({
       id: row.id,
-      email: maskEmail(row.email),
+      short_id: String(row.id || "").slice(0, 8).toUpperCase(),
+      display_name: profileDisplayName(row),
+      contact_hint: contactHint(row.email, row.phone_hint),
       role: row.role,
+      created_at: row.created_at,
     })),
     my_requests: ownRequests.data ?? [],
   };
@@ -579,6 +620,7 @@ Deno.serve(async (req: Request) => {
     const sensitiveActions = new Set([
       "review_account_deletion",
       "delete_listing",
+      "moderate_listing",
       "delete_account",
       "revoke_role",
       "suspend_account",
