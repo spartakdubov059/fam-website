@@ -3,6 +3,11 @@
 -- Both functions run as the caller (SECURITY INVOKER).
 -- Only service_role can execute them; anon/authenticated/PUBLIC are revoked.
 
+create index if not exists fam_agent_ideas_reviewed_by_idx
+  on private.fam_agent_ideas (reviewed_by);
+create index if not exists fam_agent_tasks_idea_id_idx
+  on private.fam_agent_tasks (idea_id);
+
 create or replace function public.claim_fam_agent_tasks(
   p_worker_id text,
   p_limit integer default 3,
