@@ -56,7 +56,10 @@ test("admin overview returns readable names, masked contacts, and account contex
 });
 
 test("account deletion presents identity, requires a reason, and uses fresh admin authentication", () => {
-  assert.match(frontend, /Укажите причину удаления \(15–400 символов\)/);
+  assert.match(frontend, /id="adminConfirmModal"/);
+  assert.match(frontend, /Проверить удаление аккаунта/);
+  assert.match(frontend, /id="adminConfirmReason"/);
+  assert.match(frontend, /data-listing-titles=/);
   assert.match(frontend, /Регистрация: /);
   assert.match(frontend, /Объявлений: /);
   assert.match(frontend, /callCouncilManagement\("delete_account", targetId, \{ reason: cleanReason \}\)/);
