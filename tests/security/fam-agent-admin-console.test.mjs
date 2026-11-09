@@ -75,5 +75,5 @@ test("admin UI provides a private dashboard and explicit human review actions", 
   assert.match(frontend, /profile\?\.role !== "school_admin"/);
   assert.match(frontend, /Одобрить/);
   assert.match(frontend, /Отклонить/);
-  assert.match(frontend, /не читает личные переписки/i);
+  assert.match(frontend, /не читают личные переписки/i);
 });
