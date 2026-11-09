@@ -36,7 +36,7 @@ ALTER TABLE public.profiles
 UPDATE public.profiles
 SET display_name = 'Участник ' || UPPER(SUBSTRING(id::text, 1, 6))
 WHERE char_length(btrim(display_name)) NOT BETWEEN 2 AND 40
-   OR display_name ~* '(@|https?://|www\\.|[0-9]{9,})';
+   OR display_name ~* '(@|https?://|www\.|[0-9]{9,})';
 
 DO $block$
 BEGIN
@@ -49,7 +49,7 @@ BEGIN
       ADD CONSTRAINT profiles_display_name_safe
       CHECK (
         char_length(btrim(display_name)) BETWEEN 2 AND 40
-        AND display_name !~* '(@|https?://|www\\.|[0-9]{9,})'
+        AND display_name !~* '(@|https?://|www\.|[0-9]{9,})'
       );
   END IF;
 END;
@@ -124,7 +124,7 @@ BEGIN
     40
   );
   IF char_length(v_display_name) NOT BETWEEN 2 AND 40
-     OR v_display_name ~* '(@|https?://|www\\.|[0-9]{9,})' THEN
+     OR v_display_name ~* '(@|https?://|www\.|[0-9]{9,})' THEN
     RAISE EXCEPTION 'Имя в FAM должно быть псевдонимом длиной 2–40 символов без контактов и ссылок.'
       USING ERRCODE = '22023';
   END IF;
