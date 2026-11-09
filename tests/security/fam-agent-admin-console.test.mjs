@@ -32,6 +32,13 @@ test("admin dashboard RPCs are not executable by browser roles", () => {
   assert.match(migration, /grant execute on function public\.review_fam_agent_idea\(uuid, uuid, text\) to service_role/i);
 });
 
+test("daily report counts pending school-scoped AI proposals", () => {
+  assert.match(migration, /'agent_proposals', pg_catalog\.jsonb_build_object/i);
+  assert.match(migration, /where i\.school_id = v_school_id and i\.status = 'pending'/i);
+  assert.match(migration, /предложений ИИ ждут решения/i);
+  assert.match(frontend, /stat\("Предложения ИИ ждут решения", agentProposals\.pending\)/);
+});
+
 test("server checks school-admin role before agent dashboard and review actions", () => {
   const roleGate = controller.indexOf('if (actor.role !== "school_admin" || !actor.school_id)');
   const dashboardAction = controller.indexOf('if (action === "agent_dashboard")');
