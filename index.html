@@ -2494,12 +2494,12 @@ window.onunhandledrejection = function(event) {
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
-    $("profEmail").textContent = profile?.display_name || user.email || user.phone || "Аккаунт FAM";
+    $("profEmail").textContent = profile?.display_name || user.user_metadata?.display_name || user.email || user.phone || "Аккаунт FAM";
     if (profile?.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     } else {
-      const avatarLetter = String(profile?.display_name || user.email || user.phone || "F").trim().charAt(0).toUpperCase();
+      const avatarLetter = String(profile?.display_name || user.user_metadata?.display_name || user.email || user.phone || "F").trim().charAt(0).toUpperCase();
       $("avatarPreview").textContent = avatarLetter;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = avatarLetter;
     }
@@ -2663,7 +2663,7 @@ window.onunhandledrejection = function(event) {
         res = await sb.auth.signInWithPassword({ email, password: pass });
         if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
-          .select("id,avatar_url,created_at,city,school_id,role,display_name")
+          .select("id,avatar_url,created_at,city,school_id,role")
           .eq("id", res.data.user.id).maybeSingle();
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
@@ -3042,7 +3042,7 @@ window.onunhandledrejection = function(event) {
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles")
-      .select("id,avatar_url,created_at,city,school_id,role,display_name")
+      .select("id,avatar_url,created_at,city,school_id,role")
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
