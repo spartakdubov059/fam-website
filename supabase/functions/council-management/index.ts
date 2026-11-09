@@ -420,7 +420,7 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
       + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
+      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
       + encodeURIComponent(actorId) + "&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&order=created_at.desc&limit=10",
     ),
@@ -435,7 +435,16 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
       role: row.role,
       created_at: row.created_at,
     })),
-    my_requests: ownRequests.data ?? [],
+    my_requests: (ownRequests.data ?? []).map((row: any) => {
+      const target = (targets.data ?? []).find((candidate: any) => candidate.id === row.target_id);
+      return {
+        id: row.id,
+        target_display_name: target ? profileDisplayName(target) : "Аккаунт недоступен",
+        status: row.status,
+        created_at: row.created_at,
+        review_note: row.review_note,
+      };
+    }),
   };
 }
 
