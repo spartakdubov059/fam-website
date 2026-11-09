@@ -29,8 +29,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run moderation tests
-        run: node --test tests/moderation/*.test.mjs
+      - name: Run moderation and security tests
+        run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
       - name: Check inline frontend JavaScript syntax
         run: |
           node <<'NODE'
