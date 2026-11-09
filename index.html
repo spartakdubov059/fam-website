@@ -3206,7 +3206,7 @@ window.onunhandledrejection = function(event) {
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles")
-      .select("id,avatar_url,created_at,city,school_id,role")
+      .select("id,avatar_url,created_at,city,school_id,role,display_name")
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
