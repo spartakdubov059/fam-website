@@ -238,19 +238,19 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,role,created_at,display_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
-      "listings?select=id,title,category,user_id,status,is_event,created_at&school_id=eq."
-      + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
+      "listings?select=id,title,description,category,user_id,status,is_event,created_at,moderation_reason,moderated_at&school_id=eq."
+      + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
       "council_admin_audit?select=id,actor_id,target_id,action,details,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
+      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_id,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
     ),
     adminRequest(
@@ -265,22 +265,51 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     throw new Error("Не удалось загрузить панель управления.");
   }
 
-  return {
-    users: (users.data ?? []).map((row: any) => ({
+  const userRows = Array.isArray(users.data) ? users.data : [];
+  const listingRows = Array.isArray(listings.data) ? listings.data : [];
+  const userById = new Map(userRows.map((row: any) => [row.id, row]));
+  const listingsByUser = new Map<string, any[]>();
+  for (const listing of listingRows) {
+    const ownerId = typeof listing.user_id === "string" ? listing.user_id : "";
+    if (!ownerId) continue;
+    const existing = listingsByUser.get(ownerId) ?? [];
+    existing.push(listing);
+    listingsByUser.set(ownerId, existing);
+  }
+
+  const enrichedUsers = userRows.map((row: any) => {
+    const ownListings = listingsByUser.get(row.id) ?? [];
+    return {
       id: row.id,
-      email: maskEmail(row.email),
+      email: row.email || null,
+      display_name: typeof row.display_name === "string" ? row.display_name : null,
       role: row.role,
       created_at: row.created_at,
-    })),
-    listings: (listings.data ?? []).map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      user_id: row.user_id,
-      status: row.status,
-      is_event: row.is_event === true,
-      created_at: row.created_at,
-    })),
+      listing_count: ownListings.length,
+      active_listing_count: ownListings.filter((item: any) => item.status === "active").length,
+      listing_titles: ownListings.slice(0, 5).map((item: any) => String(item.title || "Без названия").slice(0, 100)),
+    };
+  });
+
+  return {
+    users: enrichedUsers,
+    listings: listingRows.map((row: any) => {
+      const owner = userById.get(row.user_id);
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        user_id: row.user_id,
+        owner_display_name: owner?.display_name || null,
+        owner_email: owner?.email || null,
+        status: row.status,
+        is_event: row.is_event === true,
+        created_at: row.created_at,
+        moderation_reason: row.moderation_reason || null,
+        moderated_at: row.moderated_at || null,
+      };
+    }),
     audit: (audit.data ?? []).map((row: any) => ({
       id: row.id,
       actor: typeof row.actor_id === "string" ? row.actor_id.slice(0, 8) : "",
@@ -289,17 +318,26 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       details: row.details ?? {},
       created_at: row.created_at,
     })),
-    deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
-      id: row.id,
-      target_id: row.target_id,
-      target_email: row.target_email_masked || "Аккаунт",
-      target_role: row.target_role,
-      requester_email: row.requester_email_masked || "Участник совета",
-      reason_code: row.reason_code,
-      reason: row.reason,
-      status: row.status,
-      created_at: row.created_at,
-    })),
+    deletion_requests: (deletionRequests.data ?? []).map((row: any) => {
+      const target = userById.get(row.target_id);
+      const requester = userById.get(row.requester_id);
+      const targetListings = listingsByUser.get(row.target_id) ?? [];
+      return {
+        id: row.id,
+        target_id: row.target_id,
+        target_email: target?.email || row.target_email_masked || null,
+        target_display_name: target?.display_name || null,
+        target_created_at: target?.created_at || null,
+        target_listing_count: targetListings.length,
+        target_role: row.target_role,
+        requester_display_name: requester?.display_name || null,
+        requester_email: requester?.email || row.requester_email_masked || null,
+        reason_code: row.reason_code,
+        reason: row.reason,
+        status: row.status,
+        created_at: row.created_at,
+      };
+    }),
     suspensions: (suspensions.data ?? []).map((row: any) => ({
       id: row.id,
       target_id: row.target_id,
@@ -311,7 +349,6 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     })),
   };
 }
-
 async function listSafetyReports(schoolId: string): Promise<Record<string, unknown>> {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const retention = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -579,6 +616,8 @@ Deno.serve(async (req: Request) => {
     const sensitiveActions = new Set([
       "review_account_deletion",
       "delete_listing",
+      "block_listing",
+      "restore_listing",
       "delete_account",
       "revoke_role",
       "suspend_account",
@@ -880,6 +919,59 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, result: result.data }, 200, headers);
     }
 
+    if (action === "block_listing" || action === "restore_listing") {
+      const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
+      const isBlock = action === "block_listing";
+      const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      const digitCount = (reason.match(/[0-9]/g) || []).length;
+      const containsContact = reason.includes("http://") || reason.includes("https://")
+        || /www[.]/i.test(reason)
+        || /[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}/i.test(reason)
+        || digitCount >= 11;
+      if (!UUID_RE.test(targetId)) return json({ ok: false, error: "Выберите объявление." }, 400, headers);
+      if (isBlock && (reason.length < 15 || reason.length > 400 || containsContact)) {
+        return json({ ok: false, error: "Укажите фактическую причину длиной 15–400 символов, без контактов и личных данных." }, 400, headers);
+      }
+
+      const found = await adminRequest(
+        "listings?select=id,title,category,user_id,school_id,status&id=eq."
+        + encodeURIComponent(targetId) + "&limit=1",
+      );
+      const listing = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
+      if (!listing) return json({ ok: false, error: "Объявление не найдено." }, 404, headers);
+
+      let ownerSchoolId = listing.school_id;
+      if (!ownerSchoolId) {
+        const owner = await getSchoolProfile(listing.user_id);
+        ownerSchoolId = owner?.school_id ?? null;
+      }
+      if (ownerSchoolId !== actor.school_id) {
+        return json({ ok: false, error: "Можно модерировать только объявления своей школы." }, 403, headers);
+      }
+      if (isBlock && listing.status !== "active") {
+        return json({ ok: false, error: "Объявление уже не опубликовано. Обновите панель." }, 409, headers);
+      }
+      if (!isBlock && listing.status !== "blocked") {
+        return json({ ok: false, error: "Объявление больше не скрыто. Обновите панель." }, 409, headers);
+      }
+
+      const patch = isBlock
+        ? { status: "blocked", moderation_reason: reason, moderated_by: actorId, moderated_at: new Date().toISOString() }
+        : { status: "active", moderation_reason: null, moderated_by: null, moderated_at: null };
+      const updated = await adminRequest(
+        "listings?id=eq." + encodeURIComponent(targetId),
+        "PATCH",
+        patch,
+      );
+      if (!updated.ok) return json({ ok: false, error: "Не удалось изменить статус объявления." }, 503, headers);
+      await recordAudit(actor.school_id, actorId, targetId, isBlock ? "listing_blocked" : "listing_restored", {
+        title: String(listing.title || "").slice(0, 120),
+        category: String(listing.category || "").slice(0, 40),
+        reason: isBlock ? reason : null,
+      });
+      return json({ ok: true, status: patch.status }, 200, headers);
+    }
+
     if (action === "delete_listing") {
       const found = await adminRequest(
         "listings?select=id,title,user_id,school_id,image_url,status&id=eq."
@@ -936,12 +1028,21 @@ Deno.serve(async (req: Request) => {
 
     if (action === "delete_account") {
       if (targetId === actorId) return json({ ok: false, error: "Для своего аккаунта используйте раздел «Удалить мой аккаунт»." }, 403, headers);
+      const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      const digitCount = (reason.match(/[0-9]/g) || []).length;
+      const containsContact = reason.includes("http://") || reason.includes("https://")
+        || /www[.]/i.test(reason)
+        || /[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}/i.test(reason)
+        || digitCount >= 11;
+      if (reason.length < 15 || reason.length > 400 || containsContact) {
+        return json({ ok: false, error: "Перед удалением укажите причину длиной 15–400 символов, без контактов и личных данных." }, 400, headers);
+      }
       const target = await getSchoolProfile(targetId);
       if (!target || target.school_id !== actor.school_id) {
         return json({ ok: false, error: "Аккаунт не найден в вашей школе." }, 404, headers);
       }
       if (!["student", "council_member"].includes(target.role)) {
-        return json({ ok: false, error: "Удалять можно только аккаунты учеников и участников совета. Аккаунт администратора сначала должен передать полномочия." }, 403, headers);
+        return json({ ok: false, error: "Удалять можно только аккаунты учеников и участников Совета. Аккаунт администратора сначала должен передать полномочия." }, 403, headers);
       }
 
       await deleteAccountCompletely(targetId);
@@ -949,6 +1050,7 @@ Deno.serve(async (req: Request) => {
         await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
           target_role: target.role,
           source: "admin_panel",
+          reason,
         });
       } catch (auditError) {
         console.error("admin_account_deletion_audit_failed", auditError instanceof Error ? auditError.name : "unknown");
