@@ -1885,7 +1885,8 @@ window.onunhandledrejection = function(event) {
       return;
     }
     box.classList.remove("hidden");
-    $("councilAdminUsers").textContent = "Загружаем аккаунты...";
+    $("councilAdminUsers").textContent = "Загружаем участников...";
+    $("councilAdminDeletionRequests").textContent = "Загружаем запросы...";
     $("councilAdminListings").textContent = "Загружаем объявления...";
     $("councilAdminAudit").textContent = "Загружаем историю...";
     try {
@@ -1896,6 +1897,76 @@ window.onunhandledrejection = function(event) {
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить управление школой.");
 
       const users = Array.isArray(data.users) ? data.users : [];
+      const listingsData = Array.isArray(data.listings) ? data.listings : [];
+      const deletionRequests = Array.isArray(data.deletion_requests) ? data.deletion_requests : [];
+      const activeSuspensions = Array.isArray(data.suspensions) ? data.suspensions : [];
+      const audit = Array.isArray(data.audit) ? data.audit : [];
+      window.councilAdminSnapshot = { users, listings: listingsData, deletionRequests, suspensions: activeSuspensions };
+      if ($("adminPeopleCount")) $("adminPeopleCount").textContent = String(users.length);
+      const suspensionByUser = new Map(activeSuspensions.map(row => [row.target_id, row]));
+
+      $("councilAdminUsers").innerHTML = users.length ? users.map(row => {
+        const isSelf = row.id === user.id;
+        const canManage = !isSelf && ["student", "council_member"].includes(row.role);
+        const canRevoke = !isSelf && row.role === "council_member";
+        const suspension = suspensionByUser.get(row.id);
+        const titles = Array.isArray(row.listing_titles) && row.listing_titles.length
+          ? `<ul>${row.listing_titles.map(title => `<li>${esc(title)}</li>`).join("")}</ul>`
+          : "<p>Пока нет объявлений.</p>";
+        let controls = "";
+        if (canManage && suspension) {
+          controls = `<div class="admin-action-row"><span class="idea-status status-rejected">Ограничен до ${esc(suspension.expires_at ? new Date(suspension.expires_at).toLocaleString("ru-RU") : "—")}</span>
+            <button type="button" class="button button-secondary button-small" data-action="lift-council-suspension" data-id="${esc(row.id)}">Снять ограничение</button></div>
+            <p class="admin-person-meta">Причина: ${esc(suspension.reason || "Не указана")}</p>`;
+        } else if (canManage) {
+          controls = `<details class="admin-person-details"><summary>Временно ограничить действия</summary><div class="admin-person-details-body">
+            <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Срок</label>
+            <select class="form-control" data-suspension-hours style="font-size:11px;margin-bottom:7px;">
+              <option value="24">24 часа</option><option value="72">3 дня</option><option value="168">7 дней</option>
+            </select>
+            <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Причина</label>
+            <textarea class="form-control" data-suspension-reason rows="2" maxlength="400" style="font-size:11px;" placeholder="Факты, без контактов и личных данных"></textarea>
+            <button type="button" class="button button-secondary button-small" style="margin-top:7px;" data-action="suspend-council-account" data-id="${esc(row.id)}">Ограничить на время</button>
+          </div></details>`;
+        }
+        return `<article class="admin-person-card">
+          <div class="admin-person-head">
+            <div><div class="admin-person-name">${esc(row.display_name || "Ученик без никнейма")}</div><div class="admin-person-meta">${esc(row.email || "Почта не указана")}</div></div>
+            <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
+          </div>
+          <div class="admin-person-meta">В FAM с ${row.created_at ? esc(new Date(row.created_at).toLocaleDateString("ru-RU")) : "неизвестной даты"} · Объявлений: ${Number(row.listing_count) || 0} · Активных: ${Number(row.active_listing_count) || 0} · ID …${esc(String(row.id || "").slice(-6))}</div>
+          ${isSelf ? '<p class="admin-person-meta">Это ваш аккаунт.</p>' : ""}
+          <details class="admin-person-details"><summary>Данные и действия</summary><div class="admin-person-details-body">
+            <p><b>Имя в профиле:</b> ${esc(row.display_name || "Не указано")}</p>
+            <p><b>Почта:</b> ${esc(row.email || "Не указана")}</p>
+            <p><b>Роль:</b> ${esc(councilRoleName(row.role))}</p>
+            <p><b>Последние объявления:</b></p>${titles}
+            ${controls}
+            ${canRevoke ? `<div class="admin-action-row"><button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять роль Совета</button></div>` : ""}
+            ${canManage ? `<div class="admin-action-row"><button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button></div>` : ""}
+          </div></details>
+        </article>`;
+      }).join("") : '<p style="font-size:11px;color:var(--muted);">Участники не найдены.</p>';
+
+      $("councilAdminDeletionRequests").innerHTML = deletionRequests.length ? deletionRequests.map(row => {
+        const statusText = row.status === "processing" ? "Уже рассматривается" : "Ожидает решения";
+        const actions = row.status === "pending" && row.target_id
+          ? `<div class="admin-action-row">
+              <button type="button" class="button button-danger button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="approve">Проверить удаление</button>
+              <button type="button" class="button button-secondary button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="reject">Отклонить запрос</button>
+            </div>`
+          : '<span class="admin-person-meta">Ожидает завершения обработки</span>';
+        return `<article class="admin-person-card">
+          <div class="admin-person-head"><b class="admin-person-name">${esc(row.target_display_name || row.target_email || "Ученик")}</b><span class="idea-status status-work">${esc(statusText)}</span></div>
+          <div class="admin-person-meta">Аккаунт: ${esc(row.target_email || "почта не указана")} · ${esc(councilRoleName(row.target_role))}</div>
+          <div class="admin-person-meta">Запросил: ${esc(row.requester_display_name || "Участник Совета")} · ${esc(row.requester_email || "почта не указана")}</div>
+          <div class="admin-person-meta">Объявлений у аккаунта: ${Number(row.target_listing_count) || 0} · ID …${esc(String(row.target_id || "").slice(-6))}</div>
+          <div style="font-size:10px;margin:7px 0;"><b>${esc(deletionReasonLabel(row.reason_code))}:</b> ${esc(row.reason || "")}</div>
+          <div class="admin-person-meta">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
+          ${actions}
+        </article>`;
+      }).join("") : '<p style="font-size:10px;color:var(--muted);">Нет открытых запросов на удаление.</p>';
+
       $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => {
         const blocked = row.status === "blocked";
         const action = row.status === "active"
@@ -1905,7 +1976,8 @@ window.onunhandledrejection = function(event) {
           <div class="admin-person-head"><b style="font-size:12px;">${esc(row.title || "Без названия")}</b><span class="idea-status ${blocked ? "status-rejected" : "status-new"}">${blocked ? "Скрыто администратором" : row.status === "active" ? "Опубликовано" : "Неактивно"}</span></div>
           <div class="admin-person-meta">${esc(row.category || "Объявление")} · Автор: ${esc(row.owner_display_name || "Без никнейма")} · ${esc(row.owner_email || "почта не указана")}</div>
           <details class="admin-person-details"><summary>Описание и причина модерации</summary><div class="admin-person-details-body">
-            <p>${esc(row.description || "Описание не заполнено")}</p><p>Дата: ${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "неизвестна"}</p>
+            <p>${esc(row.description || "Описание не заполнено")}</p>
+            <p>Дата: ${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "неизвестна"}</p>
             ${blocked ? `<p><b>Причина скрытия:</b> ${esc(row.moderation_reason || "Не указана")}</p>` : ""}
             <p>ID …${esc(String(row.id || "").slice(-6))}</p>
           </div></details>
@@ -1913,7 +1985,6 @@ window.onunhandledrejection = function(event) {
         </article>`;
       }).join("") : '<p style="font-size:11px;color:var(--muted);">Объявлений школы пока нет.</p>';
 
-      const audit = Array.isArray(data.audit) ? data.audit : [];
       $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
         <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border);">
           <b>${esc(councilAuditLabel(row.action))}</b>
