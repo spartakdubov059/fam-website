@@ -28,7 +28,7 @@ test("school account labels are clear and identity cards show context without ex
 
 test("permanent account deletion identifies the target and requires the short ID confirmation", () => {
   assert.match(html, /Имя: " \+ \(details\.name/);
-  assert.match(html, /Последние 6 символов ID/);
+  assert.match(html, /последние 6 символов ID/);
   assert.match(html, /ID не совпал/);
 });
 
