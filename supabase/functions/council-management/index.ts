@@ -586,7 +586,7 @@ Deno.serve(async (req: Request) => {
 
       const target = await getSchoolProfile(targetId);
       if (!target || target.school_id !== actor.school_id || !["student", "council_member"].includes(target.role)) {
-        return json({ ok: false, error: "Можно отправлять запросы только по обычным аккаунтам своей школы и участникам совета." }, 403, headers);
+        return json({ ok: false, error: "Можно отправлять запросы только по ученикам и участникам Совета своей школы." }, 403, headers);
       }
 
       const existing = await adminRequest(
@@ -989,7 +989,7 @@ Deno.serve(async (req: Request) => {
             admin_hidden_at: null,
           };
       const updated = await adminRequest(
-        "listings?id=eq." + encodeURIComponent(targetId) + "&school_id=eq." + encodeURIComponent(ownerSchoolId),
+        "listings?id=eq." + encodeURIComponent(targetId),
         "PATCH",
         patch,
       );
