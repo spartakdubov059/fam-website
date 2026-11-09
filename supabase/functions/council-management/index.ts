@@ -217,7 +217,7 @@ async function recordAudit(
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
   const result = await adminRequest(
-    "profiles?select=id,school_id,role,email,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
+    "profiles?select=id,school_id,role,email,display_name,phone_masked,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
   );
   return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
 }
@@ -238,7 +238,7 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,display_name,phone_masked,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
@@ -250,7 +250,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
+      "account_deletion_requests?select=id,target_id,requester_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
     ),
     adminRequest(
@@ -265,22 +265,34 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     throw new Error("Не удалось загрузить панель управления.");
   }
 
+  const profileById = new Map((users.data ?? []).map((row: any) => [row.id, row]));
+  const contactHint = (row: any) => {
+    if (typeof row?.phone_masked === "string" && row.phone_masked) return "Телефон " + row.phone_masked;
+    return maskEmail(row?.email) || "Контакт не указан";
+  };
   return {
     users: (users.data ?? []).map((row: any) => ({
       id: row.id,
+      display_name: typeof row.display_name === "string" ? row.display_name : "",
       email: maskEmail(row.email),
+      contact_hint: contactHint(row),
       role: row.role,
       created_at: row.created_at,
     })),
-    listings: (listings.data ?? []).map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      user_id: row.user_id,
-      status: row.status,
-      is_event: row.is_event === true,
-      created_at: row.created_at,
-    })),
+    listings: (listings.data ?? []).map((row: any) => {
+      const owner = profileById.get(row.user_id);
+      return {
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        user_id: row.user_id,
+        author_display_name: owner?.display_name || "",
+        author_contact: contactHint(owner),
+        status: row.status,
+        is_event: row.is_event === true,
+        created_at: row.created_at,
+      };
+    }),
     audit: (audit.data ?? []).map((row: any) => ({
       id: row.id,
       actor: typeof row.actor_id === "string" ? row.actor_id.slice(0, 8) : "",
@@ -289,17 +301,25 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       details: row.details ?? {},
       created_at: row.created_at,
     })),
-    deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
-      id: row.id,
-      target_id: row.target_id,
-      target_email: row.target_email_masked || "Аккаунт",
-      target_role: row.target_role,
-      requester_email: row.requester_email_masked || "Участник совета",
-      reason_code: row.reason_code,
-      reason: row.reason,
-      status: row.status,
-      created_at: row.created_at,
-    })),
+    deletion_requests: (deletionRequests.data ?? []).map((row: any) => {
+      const target = profileById.get(row.target_id);
+      const requester = profileById.get(row.requester_id);
+      return {
+        id: row.id,
+        target_id: row.target_id,
+        target_display_name: target?.display_name || "Имя не указано",
+        target_contact: contactHint(target) || row.target_email_masked || "Контакт не указан",
+        target_email: row.target_email_masked || "Контакт не указан",
+        target_role: row.target_role,
+        target_role_label: row.target_role === "council_member" ? "Участник Совета" : "Участник FAM",
+        requester_display_name: requester?.display_name || "",
+        requester_email: row.requester_email_masked || "Участник Совета",
+        reason_code: row.reason_code,
+        reason: row.reason,
+        status: row.status,
+        created_at: row.created_at,
+      };
+    }),
     suspensions: (suspensions.data ?? []).map((row: any) => ({
       id: row.id,
       target_id: row.target_id,
@@ -377,7 +397,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
 async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
   const [targets, ownRequests] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(actor.school_id)
+      "profiles?select=id,email,display_name,phone_masked,role,created_at&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&id=neq." + encodeURIComponent(actorId)
       + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
     ),
@@ -388,13 +408,28 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
     ),
   ]);
   if (!targets.ok || !ownRequests.ok) throw new Error("Не удалось загрузить список аккаунтов.");
+  const targetById = new Map((targets.data ?? []).map((row: any) => [row.id, row]));
+  const contactHint = (row: any) => {
+    if (typeof row?.phone_masked === "string" && row.phone_masked) return "Телефон " + row.phone_masked;
+    return maskEmail(row?.email) || "Контакт не указан";
+  };
   return {
     targets: (targets.data ?? []).map((row: any) => ({
       id: row.id,
+      display_name: row.display_name || "",
       email: maskEmail(row.email),
+      contact_hint: contactHint(row),
       role: row.role,
+      created_at: row.created_at,
     })),
-    my_requests: ownRequests.data ?? [],
+    my_requests: (ownRequests.data ?? []).map((row: any) => {
+      const target = targetById.get(row.target_id);
+      return {
+        ...row,
+        target_display_name: target?.display_name || "Имя не указано",
+        target_contact: contactHint(target) || row.target_email_masked || "Контакт не указан",
+      };
+    }),
   };
 }
 
@@ -569,6 +604,27 @@ Deno.serve(async (req: Request) => {
       }
       const created = Array.isArray(insert.data) ? insert.data[0] ?? null : null;
       return json({ ok: true, request: created }, 200, headers);
+    }
+
+    if (action === "update_own_display_name") {
+      const displayName = typeof payload.display_name === "string"
+        ? payload.display_name.trim().replace(/\s+/g, " ")
+        : "";
+      const containsContact = /(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(displayName)
+        || displayName.replace(/\D/g, "").length >= 7;
+      if (displayName.length < 2 || displayName.length > 32 || containsContact) {
+        return json({ ok: false, error: "Укажите имя или псевдоним длиной 2–32 символа, без контактов и ссылок." }, 400, headers);
+      }
+      const updated = await adminRequest(
+        "profiles?id=eq." + encodeURIComponent(actorId),
+        "PATCH",
+        { display_name: displayName },
+      );
+      if (!updated.ok || !Array.isArray(updated.data) || updated.data.length !== 1) {
+        console.error("profile_display_name_update_failed", updated.status);
+        return json({ ok: false, error: "Не удалось сохранить имя в профиле." }, 503, headers);
+      }
+      return json({ ok: true, display_name: displayName }, 200, headers);
     }
 
     // All remaining management actions are administrator-only.
