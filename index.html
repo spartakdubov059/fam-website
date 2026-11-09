@@ -511,6 +511,17 @@
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
             <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
+            <div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
+                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
+              </div>
+              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
+              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
+              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
+              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
+              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
+            </div>
             <h6 style="font-size:11px;margin:10px 0 6px;">Запросы участников на удаление</h6>
             <div id="councilAdminDeletionRequests" aria-live="polite"></div>
             <h6 style="font-size:11px;margin:12px 0 6px;">Аккаунты школы</h6>
@@ -1914,12 +1925,128 @@ window.onunhandledrejection = function(event) {
           <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
         </div>
       `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
+      await loadFamAgentDashboard();
     } catch (error) {
       const message = error?.message || "Повторите попытку.";
       $("councilAdminUsers").textContent = "Ошибка: " + message;
       $("councilAdminDeletionRequests").textContent = "Ошибка загрузки.";
       $("councilAdminListings").textContent = "Ошибка загрузки.";
       $("councilAdminAudit").textContent = "Ошибка загрузки.";
+    }
+  }
+
+  async function loadFamAgentDashboard() {
+    const panel = $("famAgentAdminPanel");
+    const reportBox = $("famAgentReportSummary");
+    const ideasBox = $("famAgentIdeasList");
+    if (!panel || !reportBox || !ideasBox) return;
+    if (!user || profile?.role !== "school_admin") {
+      panel.classList.add("hidden");
+      return;
+    }
+
+    panel.classList.remove("hidden");
+    reportBox.textContent = "Загружаем сводку...";
+    ideasBox.textContent = "Загружаем предложения...";
+    try {
+      const { data, error } = await sb.functions.invoke("council-management", {
+        body: { action: "agent_dashboard" }
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить панель аналитики.");
+
+      const report = data.report || null;
+      if (!report) {
+        reportBox.innerHTML = '<p style="font-size:10px;color:var(--muted);margin:0;">Ежедневная сводка ещё не сформирована. Нажмите «Обновить» позже.</p>';
+      } else {
+        const metrics = report.metrics || {};
+        const listings = metrics.listings || {};
+        const safety = metrics.safety || {};
+        const requests = metrics.account_requests || {};
+        const ideas = metrics.ideas || {};
+        const agentProposals = metrics.agent_proposals || {};
+        const stat = (label, value) => `
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px;min-width:0;">
+            <b style="display:block;font-size:18px;line-height:1.1;">${esc(String(Number(value) || 0))}</b>
+            <span style="display:block;font-size:9px;color:var(--muted);margin-top:4px;">${esc(label)}</span>
+          </div>`;
+        const generatedAt = report.generated_at
+          ? new Date(report.generated_at).toLocaleString("ru-RU")
+          : "";
+        reportBox.innerHTML = `
+          <p style="font-size:10px;line-height:1.45;margin:0 0 8px;">${esc(report.summary || "Сводка сформирована.")}</p>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;">
+            ${stat("Активные объявления", listings.active)}
+            ${stat("Новые за сутки", listings.new_24h)}
+            ${stat("Непроверенные сигналы", safety.unreviewed)}
+            ${stat("Высокий уровень", safety.high_unreviewed)}
+            ${stat("Запросы на удаление", requests.deletion_pending)}
+            ${stat("Идеи ждут Совет", ideas.awaiting_council)}
+            ${stat("Предложения агентов", agentProposals.pending)}
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:7px;">Дата отчёта: ${esc(report.report_date || "—")}${generatedAt ? " · Обновлено: " + esc(generatedAt) : ""}</div>
+        `;
+      }
+
+      const agentLabels = {
+        fam_safety_analyst: "Агент безопасности",
+        fam_council_analyst: "Агент Совета",
+        fam_operations_analyst: "Агент операций",
+        fam_growth_analyst: "Агент развития"
+      };
+      const agentIdeas = Array.isArray(data.agent_ideas) ? data.agent_ideas : [];
+      ideasBox.innerHTML = agentIdeas.length ? agentIdeas.map(idea => {
+        const riskLabel = idea.risk === "high" ? "Высокий риск" : idea.risk === "medium" ? "Средний риск" : "Низкий риск";
+        const riskClass = idea.risk === "high" ? "status-rejected" : idea.risk === "medium" ? "status-work" : "status-done";
+        const complexityLabel = idea.complexity === "large" ? "Сложность: высокая" : idea.complexity === "small" ? "Сложность: небольшая" : "Сложность: средняя";
+        const evidenceLabel = idea.evidence_kind === "observed" ? "Подтверждено цифрами" : "Гипотеза";
+        const createdAt = idea.created_at ? new Date(idea.created_at).toLocaleString("ru-RU") : "";
+        const agentLabel = agentLabels[idea.proposed_by] || "Аналитик FAM";
+        return `
+          <div class="idea-card" style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+              <b style="font-size:11px;flex:1;min-width:140px;">${esc(idea.title || "Предложение FAM")}</b>
+              <span class="idea-status ${riskClass}">${esc(riskLabel)}</span>
+            </div>
+            <div style="font-size:9px;color:var(--muted);margin-top:4px;">${esc(agentLabel)}</div>
+            <div style="font-size:10px;line-height:1.45;margin-top:6px;">${esc(idea.summary || "")}</div>
+            ${idea.benefit ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;"><b>Польза:</b> ${esc(idea.benefit)}</div>` : ""}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
+              <span class="idea-status status-new">${esc(complexityLabel)}</span>
+              <span class="idea-status status-work">${esc(evidenceLabel)}</span>
+            </div>
+            ${idea.evidence_summary ? `<div style="font-size:9px;color:var(--muted);margin-top:6px;">Основание: ${esc(idea.evidence_summary)}</div>` : ""}
+            ${createdAt ? `<div style="font-size:9px;color:var(--muted);margin-top:5px;">Предложено: ${esc(createdAt)}</div>` : ""}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">
+              <button type="button" class="button button-success button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="approve">Одобрить</button>
+              <button type="button" class="button button-secondary button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="reject">Отклонить</button>
+            </div>
+          </div>`;
+      }).join("") : '<p style="font-size:10px;color:var(--muted);margin:0;">Новых предложений пока нет. Когда показатели потребуют внимания, аналитические агенты добавят сюда рекомендации.</p>';
+    } catch (error) {
+      reportBox.textContent = "Сводка временно недоступна: " + (error?.message || "повторите попытку.");
+      ideasBox.textContent = "Не удалось загрузить предложения аналитиков.";
+    }
+  }
+
+  async function reviewFamAgentIdea(button) {
+    if (!button || !user || profile?.role !== "school_admin") return;
+    const ideaId = button.dataset.id || "";
+    const decision = button.dataset.decision || "";
+    if (!ideaId || !["approve", "reject"].includes(decision)) return;
+    const verb = decision === "approve" ? "одобрить" : "отклонить";
+    if (!confirm("Вы уверены, что хотите " + verb + " предложение аналитического агента?")) return;
+
+    button.disabled = true;
+    try {
+      await callCouncilManagement("review_agent_idea", ideaId, { decision });
+      notice(decision === "approve"
+        ? "Предложение одобрено и сохранено для дальнейшего планирования."
+        : "Предложение отклонено.");
+      await loadCouncilAdminTools();
+    } catch (error) {
+      notice("Не удалось сохранить решение: " + (error?.message || "Ошибка."));
+      button.disabled = false;
     }
   }
 
@@ -2673,6 +2800,8 @@ window.onunhandledrejection = function(event) {
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
     else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); loadUserSafetyReports(); }
+    else if (action === 'refresh-agent-dashboard') { loadFamAgentDashboard(); }
+    else if (action === 'review-fam-agent-idea') { reviewFamAgentIdea(btn); }
     else if (action === 'refresh-safety-reports') { loadUserSafetyReports(); }
     else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
