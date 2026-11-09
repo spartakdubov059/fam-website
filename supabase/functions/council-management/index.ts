@@ -1033,6 +1033,16 @@ Deno.serve(async (req: Request) => {
 
     if (action === "delete_account") {
       if (targetId === actorId) return json({ ok: false, error: "Для своего аккаунта используйте раздел «Удалить мой аккаунт»." }, 403, headers);
+      const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+      const digitCount = (reason.match(/[0-9]/g) || []).length;
+      const containsContact = reason.includes("http://")
+        || reason.includes("https://")
+        || /www[.]/i.test(reason)
+        || /[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}/i.test(reason)
+        || digitCount >= 11;
+      if (reason.length < 15 || reason.length > 400 || containsContact) {
+        return json({ ok: false, error: "Укажите проверенную причину длиной 15–400 символов, без контактов и личных данных." }, 400, headers);
+      }
       const target = await getSchoolProfile(targetId);
       if (!target || target.school_id !== actor.school_id) {
         return json({ ok: false, error: "Аккаунт не найден в вашей школе." }, 404, headers);
@@ -1046,6 +1056,7 @@ Deno.serve(async (req: Request) => {
         await recordAudit(actor.school_id, actorId, null, "account_deleted_by_admin", {
           target_role: target.role,
           source: "admin_panel",
+          reason,
         });
       } catch (auditError) {
         console.error("admin_account_deletion_audit_failed", auditError instanceof Error ? auditError.name : "unknown");
