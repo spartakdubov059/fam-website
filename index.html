@@ -559,23 +559,37 @@
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
             <p class="profile-section-copy">Сначала откройте нужный раздел. Учеников и объявления можно проверить перед действием.</p>
-            <details class="profile-inline-disclosure" open><summary>Ежедневная аналитика</summary>
-            <div class="profile-box" id="famAgentAdminPanel" style="margin:8px 0 12px;padding:12px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
-                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
+            <details class="profile-inline-disclosure" open>
+              <summary>Сводка и запросы</summary>
+              <div style="padding-top:8px;">
+                <div class="profile-box" id="famAgentAdminPanel" style="margin:8px 0 12px;padding:12px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                    <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
+                    <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
+                  </div>
+                  <p class="profile-section-copy">Только показатели школы. Агенты не читают личные переписки.</p>
+                  <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
+                  <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
+                  <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
+                  <p class="admin-card-muted">Предложения помощников требуют решения администратора; сами по себе они ничего не меняют.</p>
+                </div>
+                <h6 style="font-size:11px;margin:10px 0 6px;">Запросы на удаление</h6>
+                <div id="councilAdminDeletionRequests" aria-live="polite"></div>
               </div>
-              <p class="profile-section-copy">Только показатели школы. Агенты не читают личные переписки.</p>
-              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
-              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
-              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
-              <p class="admin-card-muted">Предложения помощников требуют решения администратора; сами по себе они ничего не меняют.</p>
-            </div>
             </details>
-            <details class="profile-inline-disclosure"><summary>Запросы на удаление</summary><div id="councilAdminDeletionRequests" aria-live="polite"></div></details>
-            <details class="profile-inline-disclosure"><summary>Ученики и аккаунты</summary><div id="councilAdminUsers" aria-live="polite"></div></details>
-            <details class="profile-inline-disclosure"><summary>Объявления школы</summary><div id="councilAdminListings" aria-live="polite"></div></details>
-            <details class="profile-inline-disclosure"><summary>История действий</summary><div id="councilAdminAudit" aria-live="polite"></div></details>
+            <details class="profile-inline-disclosure">
+              <summary>Участники и объявления</summary>
+              <div style="padding-top:8px;">
+                <h6 style="font-size:11px;margin:0 0 6px;">Ученики и аккаунты</h6>
+                <div id="councilAdminUsers" aria-live="polite"></div>
+                <h6 style="font-size:11px;margin:14px 0 6px;">Объявления школы</h6>
+                <div id="councilAdminListings" aria-live="polite"></div>
+              </div>
+            </details>
+            <details class="profile-inline-disclosure">
+              <summary>История действий</summary>
+              <div id="councilAdminAudit" aria-live="polite"></div>
+            </details>
           </div>
           <div class="idea-folders">
             <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
