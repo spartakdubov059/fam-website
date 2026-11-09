@@ -2155,11 +2155,26 @@ window.onunhandledrejection = function(event) {
       if (listing.image_url) {
         try {
           const imageUrl = new URL(listing.image_url);
-          const marker = "/storage/v1/object/public/listing-images/";
-          const markerIndex = imageUrl.pathname.indexOf(marker);
-          if (markerIndex >= 0) {
-            const objectPath = decodeURIComponent(imageUrl.pathname.slice(markerIndex + marker.length));
-            if (objectPath.startsWith(user.id + "/")) await sb.storage.from("listing-images").remove([objectPath]);
+          if (imageUrl.origin === SUPABASE_URL) {
+            const newBucketMarker = "/storage/v1/object/public/listings-images/";
+            const newBucketIndex = imageUrl.pathname.indexOf(newBucketMarker);
+            if (newBucketIndex >= 0) {
+              const objectPath = decodeURIComponent(imageUrl.pathname.slice(newBucketIndex + newBucketMarker.length));
+              const validName = new RegExp("^listing_" + user.id + "_[0-9a-f-]{36}\\.(?:jpg|png|webp)$", "i");
+              if (validName.test(objectPath)) {
+                await sb.storage.from("listings-images").remove([objectPath]);
+              }
+            } else {
+              // Older listings may still point to the legacy bucket layout.
+              const legacyMarker = "/storage/v1/object/public/listing-images/";
+              const legacyIndex = imageUrl.pathname.indexOf(legacyMarker);
+              if (legacyIndex >= 0) {
+                const objectPath = decodeURIComponent(imageUrl.pathname.slice(legacyIndex + legacyMarker.length));
+                if (objectPath.startsWith(user.id + "/") && !objectPath.includes("..")) {
+                  await sb.storage.from("listing-images").remove([objectPath]);
+                }
+              }
+            }
           }
         } catch (cleanupError) {
           console.warn("Не удалось удалить файл изображения объявления:", cleanupError);
