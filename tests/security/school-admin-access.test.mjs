@@ -6,17 +6,19 @@ import {
   mapSchoolAdminRequests,
 } from "../../supabase/functions/school-admin-access/access-controls.js";
 
-test("accepts only the four council roles exposed by the form", () => {
-  assert.equal(isAllowedApplicantNote("Председатель Ученического совета"), true);
-  assert.equal(isAllowedApplicantNote("Заместитель председателя Ученического совета"), true);
-  assert.equal(isAllowedApplicantNote("Секретарь Ученического совета"), true);
+test("accepts only the current Council roles and the legacy member label", () => {
+  assert.equal(isAllowedApplicantNote("Участник Ученического совета"), true);
+  assert.equal(isAllowedApplicantNote("Администратор"), true);
   assert.equal(isAllowedApplicantNote("Член Ученического совета"), true);
+  assert.equal(isAllowedApplicantNote("Председатель Ученического совета"), false);
+  assert.equal(isAllowedApplicantNote("Заместитель председателя Ученического совета"), false);
+  assert.equal(isAllowedApplicantNote("Секретарь Ученического совета"), false);
   assert.equal(isAllowedApplicantNote("Мой телефон +7 900 123-45-67"), false);
   assert.equal(isAllowedApplicantNote("learner@example.ru"), false);
   assert.equal(isAllowedApplicantNote("Администратор FAM"), false);
-  assert.equal(isAllowedApplicantNote("председатель ученического совета"), false);
+  assert.equal(isAllowedApplicantNote("участник ученического совета"), false);
   assert.equal(isAllowedApplicantNote(undefined), false);
-  assert.equal(isAllowedApplicantNote("Председатель Ученического совета\n@private_contact"), false);
+  assert.equal(isAllowedApplicantNote("Участник Ученического совета\\n@private_contact"), false);
 });
 
 test("masks applicant email before returning requests to the Council UI", () => {
