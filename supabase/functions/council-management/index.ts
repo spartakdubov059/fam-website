@@ -216,10 +216,17 @@ async function recordAudit(
 }
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
-  const result = await adminRequest(
+  const withDisplayName = await adminRequest(
     "profiles?select=id,school_id,role,email,created_at,display_name&id=eq." + encodeURIComponent(userId) + "&limit=1",
   );
-  return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
+  if (withDisplayName.ok && Array.isArray(withDisplayName.data)) {
+    return withDisplayName.data[0] ?? null;
+  }
+  // A Netlify Deploy Preview can run before the display_name migration is applied.
+  const legacy = await adminRequest(
+    "profiles?select=id,school_id,role,email,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
+  );
+  return legacy.ok && Array.isArray(legacy.data) ? legacy.data[0] ?? null : null;
 }
 
 async function getActiveSuspension(userId: string): Promise<any | null> {
@@ -237,10 +244,17 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
-    adminRequest(
-      "profiles?select=id,email,role,created_at,display_name&school_id=eq." + encodeURIComponent(schoolId)
-      + "&order=created_at.desc&limit=100",
-    ),
+    (async () => {
+      const modern = await adminRequest(
+        "profiles?select=id,email,role,created_at,display_name&school_id=eq." + encodeURIComponent(schoolId)
+        + "&order=created_at.desc&limit=100",
+      );
+      if (modern.ok) return modern;
+      return await adminRequest(
+        "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+        + "&order=created_at.desc&limit=100",
+      );
+    })(),
     adminRequest(
       "listings?select=id,title,category,user_id,status,is_event,created_at,school_id&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
