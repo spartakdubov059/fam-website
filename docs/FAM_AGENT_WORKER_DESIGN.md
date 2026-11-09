@@ -90,7 +90,7 @@ declare
   v_event_type text;
   v_summary text;
 begin
-  if p_status not in ('completed', 'blocked', 'failed') then
+  if p_status is null or p_status not in ('completed', 'blocked', 'failed') then
     raise exception 'invalid task status';
   end if;
 
