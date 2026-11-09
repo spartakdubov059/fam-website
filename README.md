@@ -28,7 +28,7 @@ FAM — школьная платформа для объявлений, иде�
 Запуск регрессионных тестов контактных данных и локальных правил:
 
 ```bash
-node --test tests/moderation/*.test.mjs
+node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
 ```
 
 - [Проверка доступа Ученического совета](supabase/functions/school-admin-access/index.ts)
