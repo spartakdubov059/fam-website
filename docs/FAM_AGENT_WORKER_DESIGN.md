@@ -37,6 +37,23 @@ begin
     raise exception 'invalid worker id';
   end if;
 
+  with exhausted as (
+    update private.fam_agent_tasks as t
+    set status = 'failed',
+        result_summary = 'Задача остановлена после исчерпания попыток.',
+        claimed_by = null,
+        lease_expires_at = null,
+        finished_at = now(),
+        updated_at = now()
+    where t.status in ('claimed', 'in_progress')
+      and t.lease_expires_at < now()
+      and t.attempt_count >= t.max_attempts
+    returning t.id
+  )
+  insert into private.fam_agent_task_events (task_id, event_type, actor, summary)
+  select e.id, 'failed', p_worker_id, 'Задача остановлена после исчерпания попыток.'
+  from exhausted;
+
   return query
   with candidates as (
     select t.id
@@ -61,16 +78,25 @@ begin
     for update skip locked
     limit least(greatest(coalesce(p_limit, 1), 1), 5)
   )
-  update private.fam_agent_tasks as t
-  set status = 'claimed',
-      claimed_by = p_worker_id,
-      claimed_at = now(),
-      lease_expires_at = now() + make_interval(secs => least(greatest(coalesce(p_lease_seconds, 120), 30), 300)),
-      attempt_count = t.attempt_count + 1,
-      updated_at = now()
-  from candidates as c
-  where t.id = c.id
-  returning t.id, t.agent_key, t.task_type, t.approval_required;
+  ), claimed as (
+    update private.fam_agent_tasks as t
+    set status = 'claimed',
+        claimed_by = p_worker_id,
+        claimed_at = now(),
+        lease_expires_at = now() + make_interval(secs => least(greatest(coalesce(p_lease_seconds, 120), 30), 300)),
+        attempt_count = t.attempt_count + 1,
+        updated_at = now()
+    from candidates as c
+    where t.id = c.id
+    returning t.id, t.agent_key, t.task_type, t.approval_required
+  ), logged as (
+    insert into private.fam_agent_task_events (task_id, event_type, actor, summary)
+    select c.id, 'claimed', p_worker_id, 'Задание передано безопасному исполнителю.'
+    from claimed as c
+    returning task_id
+  )
+  select c.id, c.agent_key, c.task_type, c.approval_required
+  from claimed as c;
 end;
 $$;
 
