@@ -280,10 +280,25 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
   }
 
   const profileById = new Map((users.data ?? []).map((row: any) => [row.id, row]));
-  const listingsByOwner = new Map<string, number>();
+  const listingsByOwner = new Map<string, any[]>();
   for (const listing of listings.data ?? []) {
-    if (listing.user_id) listingsByOwner.set(listing.user_id, (listingsByOwner.get(listing.user_id) ?? 0) + 1);
+    if (!listing.user_id) continue;
+    const existing = listingsByOwner.get(listing.user_id) ?? [];
+    existing.push(listing);
+    listingsByOwner.set(listing.user_id, existing);
   }
+
+  const getOwnerListingSummary = (ownerId: string) => {
+    const owned = listingsByOwner.get(ownerId) ?? [];
+    return {
+      listing_count: owned.length,
+      listing_titles: owned.slice(0, 5).map((item: any) => ({
+        title: String(item.title || "Без названия").slice(0, 100),
+        status: item.admin_hidden === true ? "Скрыто администратором" : item.status === "active" ? "Опубликовано" : "Неактивно",
+        category: String(item.category || "Объявление").slice(0, 40),
+      })),
+    };
+  };
 
   return {
     users: (users.data ?? []).map((row: any) => ({
@@ -293,7 +308,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       contact_hint: contactHint(row.email, row.phone_hint),
       role: row.role,
       created_at: row.created_at,
-      listing_count: listingsByOwner.get(row.id) ?? 0,
+      ...getOwnerListingSummary(row.id),
     })),
     listings: (listings.data ?? []).map((row: any) => {
       const owner = profileById.get(row.user_id);
@@ -330,6 +345,8 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
         target_display_name: target ? profileDisplayName(target) : "Аккаунт удалён или недоступен",
         target_contact_hint: target ? contactHint(target.email, target.phone_hint) : row.target_email_masked || "Контакт скрыт",
         target_role: row.target_role,
+        target_created_at: target?.created_at || null,
+        ...getOwnerListingSummary(row.target_id),
         requester_display_name: requester ? profileDisplayName(requester) : "Участник Совета",
         requester_contact_hint: requester ? contactHint(requester.email, requester.phone_hint) : row.requester_email_masked || "Контакт скрыт",
         reason_code: row.reason_code,
