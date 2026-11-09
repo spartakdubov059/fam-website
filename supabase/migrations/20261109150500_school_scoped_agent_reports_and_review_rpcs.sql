@@ -215,7 +215,7 @@ as $function$
 declare
   v_status text;
 begin
-  if p_idea_id is null or p_reviewer_id is null
+  if p_idea_id is null or p_reviewer_id is null or p_decision is null
      or p_decision not in ('approved', 'rejected') then
     raise exception 'Некорректное решение по предложению.'
       using errcode = '22023';
@@ -262,6 +262,22 @@ revoke all on function public.get_fam_agent_admin_dashboard(text) from public, a
 revoke all on function public.review_fam_agent_idea(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.get_fam_agent_admin_dashboard(text) to service_role;
 grant execute on function public.review_fam_agent_idea(uuid, uuid, text) to service_role;
+
+-- Stop the earlier project-wide report job: school admins must only see their own school's metrics.
+do $block$
+declare
+  v_old_job_id bigint;
+begin
+  select j.jobid into v_old_job_id
+  from cron.job as j
+  where j.jobname = 'fam-agent-daily-report'
+  limit 1;
+
+  if v_old_job_id is not null then
+    perform cron.unschedule(v_old_job_id);
+  end if;
+end;
+$block$;
 
 select cron.schedule(
   'fam-agent-school-daily-report',
