@@ -573,8 +573,8 @@
           <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
             <details class="profile-help profile-delete-help"><summary>Удалить мой аккаунт навсегда</summary><div class="profile-help-body">
               <p>Для защиты от случайного удаления войдите повторно, укажите текущий пароль и подтвердите действие точной фразой. У последнего администратора школы сначала должен появиться другой администратор.</p>
-              <div class="form-group"><label for="selfDeletePassword">Текущий пароль</label><input type="password" id="selfDeletePassword" class="form-control" autocomplete="current-password" maxlength="128"></div>
-              <div class="form-group"><label for="selfDeleteConfirmation">Введите: УДАЛИТЬ МОЙ АККАУНТ</label><input type="text" id="selfDeleteConfirmation" class="form-control" autocomplete="off" maxlength="40" placeholder="УДАЛИТЬ МОЙ АККАУНТ"></div>
+              <div class="form-group"><label for="selfDeletePassword">Пароль (при входе по почте)</label><input type="password" id="selfDeletePassword" class="form-control" autocomplete="current-password" maxlength="128"></div>
+              <p style="font-size:10px;color:var(--muted);">При входе по телефону подтверждение придёт SMS-кодом.</p><div class="form-group"><label for="selfDeleteConfirmation">Введите: УДАЛИТЬ МОЙ АККАУНТ</label><input type="text" id="selfDeleteConfirmation" class="form-control" autocomplete="off" maxlength="40" placeholder="УДАЛИТЬ МОЙ АККАУНТ"></div>
               <button type="button" class="button button-danger" style="width:100%;" data-action="self-delete-account" id="selfDeleteAccountBtn">Удалить аккаунт и мои данные</button>
             </div></details>
           </div>
@@ -1952,7 +1952,7 @@ window.onunhandledrejection = function(event) {
         <div class="idea-card" style="margin-bottom:7px;" data-listing-title="${esc(row.title || "Без названия")}" data-listing-author="${esc(row.author_display_name || "Имя не указано")}" data-listing-category="${esc(row.category || "Объявление")}">
           <div style="font-size:12px;font-weight:800;">${esc(row.title || "Без названия")}</div>
           <div class="admin-person-meta">Автор: ${esc(row.author_display_name || "Имя не указано")} · ${esc(row.author_contact || "контакт не указан")}<br>${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"} · ${row.created_at ? esc(new Date(row.created_at).toLocaleDateString("ru-RU")) : "дата неизвестна"}</div>
-          <button type="button" class="button button-danger button-small" style="margin-top:8px;" data-action="delete-school-listing" data-id="${esc(row.id)}">Удалить это объявление</button>
+          <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="toggle-school-listing" data-id="${esc(row.id)}" data-status="${esc(row.status)}">${row.status === "active" ? "Скрыть с доски" : "Вернуть на доску"}</button>
         </div>
       `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
 
@@ -2223,7 +2223,7 @@ window.onunhandledrejection = function(event) {
       const targets = Array.isArray(data.targets) ? data.targets : [];
       if (targetSelect) {
         targetSelect.innerHTML = '<option value="">Выберите аккаунт</option>' + targets.map(row =>
-          `<option value="${esc(row.id)}">${esc(row.email)} · ${esc(councilRoleName(row.role))}</option>`
+          `<option value="${esc(row.id)}">${esc(row.display_name || "Имя не указано")} · ${esc(row.contact_hint || row.email || "контакт не указан")} · ${esc(row.role === "council_member" ? "Совет" : "Участник FAM")}</option>`
         ).join("");
         targetSelect.disabled = targets.length === 0;
       }
@@ -2233,7 +2233,7 @@ window.onunhandledrejection = function(event) {
         <div style="font-size:10px;font-weight:700;margin:8px 0 5px;">Ваши обращения</div>
         ${ownRequests.map(row => `
           <div style="font-size:10px;padding:7px 0;border-top:1px solid var(--border);">
-            <b>${esc(row.target_email_masked || "Аккаунт")}</b>
+            <b>${esc(row.target_display_name || "Имя не указано")}</b><div style="color:var(--muted);margin-top:3px;">${esc(row.target_contact || row.target_email_masked || "Контакт не указан")}</div>
             <span style="color:var(--muted);"> · ${esc(deletionStatusLabel(row.status))}</span>
             <div style="color:var(--muted);margin-top:3px;">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
             ${row.review_note ? `<div style="margin-top:3px;">${esc(row.review_note)}</div>` : ""}
@@ -2351,31 +2351,58 @@ window.onunhandledrejection = function(event) {
     }
   }
 
+  async function reauthenticateCurrentUser(purpose) {
+    if (!user) return false;
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+    if (sessionError) throw sessionError;
+    const token = sessionData?.session?.access_token || "";
+    const parts = token.split(".");
+    let issuedAt = 0;
+    if (parts.length === 3) {
+      try {
+        const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
+        issuedAt = Number(JSON.parse(atob(padded))?.iat) || 0;
+      } catch (_) { issuedAt = 0; }
+    }
+    const age = Date.now() / 1000 - issuedAt;
+    if (issuedAt > 0 && age >= 0 && age <= 600) return true;
+
+    if (user.email) {
+      const password = $("selfDeletePassword")?.value || prompt("Для " + purpose + " введите пароль от аккаунта FAM.");
+      if (!password) return false;
+      const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
+      if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
+      return true;
+    }
+    if (user.phone) {
+      const { error: sendError } = await sb.auth.signInWithOtp({ phone: user.phone, options: { shouldCreateUser: false } });
+      if (sendError) throw new Error("Не удалось отправить SMS-код. Проверьте настройки SMS.");
+      const code = prompt("Для " + purpose + " введите шестизначный код из SMS:");
+      if (!code || !/^[0-9]{6}$/.test(code.trim())) return false;
+      const { error: verifyError } = await sb.auth.verifyOtp({ phone: user.phone, token: code.trim(), type: "sms" });
+      if (verifyError) throw new Error("Неверный или просроченный SMS-код.");
+      return true;
+    }
+    throw new Error("В аккаунте не найден способ повторного подтверждения входа.");
+  }
+
   async function deleteMyAccount() {
-    if (!user || !user.email) return;
-    const password = $("selfDeletePassword")?.value || "";
+    if (!user) return;
     const confirmation = $("selfDeleteConfirmation")?.value?.trim() || "";
     const button = $("selfDeleteAccountBtn");
-    if (!password) return notice("Введите текущий пароль для повторного входа.");
     if (confirmation !== "УДАЛИТЬ МОЙ АККАУНТ") return notice("Введите точную фразу подтверждения.");
     if (!confirm("Удалить ваш аккаунт FAM навсегда? Восстановить данные будет нельзя.")) return;
-
-    if (button) { button.disabled = true; button.textContent = "Проверяем пароль..."; }
+    if (button) { button.disabled = true; button.textContent = "Подтверждаем вход..."; }
     try {
-      // Re-authentication gives the server a freshly issued, short-lived JWT.
-      const { error: signInError } = await sb.auth.signInWithPassword({
-        email: user.email,
-        password
-      });
-      if (signInError) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
-
+      const authenticated = await reauthenticateCurrentUser("удаления аккаунта");
+      if (!authenticated) throw new Error("Повторное подтверждение отменено.");
       if (button) button.textContent = "Удаляем данные...";
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "delete_my_account", confirmation: "УДАЛИТЬ МОЙ АККАУНТ" }
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Не удалось удалить аккаунт.");
-
       try { await sb.auth.signOut({ scope: "local" }); } catch (_) {}
       alert("Аккаунт и связанные данные удалены.");
       location.replace(location.pathname);
@@ -2388,33 +2415,12 @@ window.onunhandledrejection = function(event) {
   }
 
   async function ensureRecentAdminAuthentication() {
-    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
-    if (sessionError) throw sessionError;
-    const token = sessionData?.session?.access_token || "";
-    const parts = token.split(".");
-    let issuedAt = 0;
-    if (parts.length === 3) {
-      try {
-        const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
-        issuedAt = Number(JSON.parse(atob(padded))?.iat) || 0;
-      } catch (_) {
-        issuedAt = 0;
-      }
-    }
-    const age = Date.now() / 1000 - issuedAt;
-    if (issuedAt > 0 && age >= 0 && age <= 600) return true;
-
-    const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
-    if (!password) return false;
-    const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
-    if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
-    return true;
+    return reauthenticateCurrentUser("чувствительного действия администратора");
   }
 
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "suspend_account", "lift_suspension"];
+    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "set_listing_visibility", "suspend_account", "lift_suspension"];
     if (sensitiveActions.includes(action)) {
       const confirmed = await ensureRecentAdminAuthentication();
       if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
@@ -2459,21 +2465,44 @@ window.onunhandledrejection = function(event) {
   async function manageSchoolListing(targetId) {
     if (!targetId) return;
     const deleteButton = Array.from(document.querySelectorAll('[data-action="delete-school-listing"]')).find(node => node.dataset.id === targetId);
-    const card = deleteButton?.closest(".idea-card");
-    const title = card?.dataset.listingTitle || "Без названия";
-    const author = card?.dataset.listingAuthor || "Имя не указано";
-    const category = card?.dataset.listingCategory || "Объявление";
-    const accepted = prompt("Удаляется объявление:\n" + title + "\nАвтор: " + author + "\nКатегория: " + category + "\n\nЭто действие необратимо. Введите УДАЛИТЬ для подтверждения.");
+    const card = deleteButton?.closest(".l-card");
+    const title = card?.querySelector(".l-title")?.textContent?.trim() || "Ваше объявление";
+    const accepted = prompt("Удалить ваше объявление навсегда?\n" + title + "\n\nЭто необратимо. Введите УДАЛИТЬ.");
     if (accepted !== "УДАЛИТЬ") return;
     try {
       await callCouncilManagement("delete_listing", targetId);
       listings = listings.filter(row => row.id !== targetId);
-      notice("Объявление удалено.");
+      notice("Ваше объявление удалено.");
       await loadCouncilAdminTools();
       renderListings();
       await renderProfile();
     } catch (error) {
       notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+    }
+  }
+
+  async function toggleSchoolListing(targetId, currentStatus) {
+    if (!targetId) return;
+    const button = Array.from(document.querySelectorAll('[data-action="toggle-school-listing"]')).find(node => node.dataset.id === targetId);
+    const card = button?.closest(".idea-card");
+    const title = card?.dataset.listingTitle || "Без названия";
+    const author = card?.dataset.listingAuthor || "Имя не указано";
+    const category = card?.dataset.listingCategory || "Объявление";
+    const status = currentStatus || button?.dataset.status || "active";
+    const nextStatus = status === "active" ? "hidden" : "active";
+    const phrase = nextStatus === "hidden" ? "СКРЫТЬ" : "ВЕРНУТЬ";
+    const promptText = nextStatus === "hidden"
+      ? "Скрыть объявление с доски?\n" + title + "\nАвтор: " + author + "\nКатегория: " + category + "\n\nОно останется в системе и его можно вернуть. Введите СКРЫТЬ."
+      : "Вернуть объявление на доску?\n" + title + "\nАвтор: " + author + "\nКатегория: " + category + "\n\nВведите ВЕРНУТЬ.";
+    if (prompt(promptText) !== phrase) return;
+    try {
+      await callCouncilManagement("set_listing_visibility", targetId, { status: nextStatus });
+      notice(nextStatus === "hidden" ? "Объявление скрыто с доски." : "Объявление возвращено на доску.");
+      await loadCouncilAdminTools();
+      await loadAll();
+      await renderProfile();
+    } catch (error) {
+      notice("Не удалось изменить видимость объявления: " + (error?.message || "Ошибка."));
     }
   }
 
@@ -2485,7 +2514,9 @@ window.onunhandledrejection = function(event) {
     if (![24, 72, 168].includes(durationHours)) return notice("Выберите срок ограничения.");
     if (reason.length < 15 || reason.length > 400) return notice("Причина должна содержать от 15 до 400 символов.");
     const durationLabel = durationHours === 24 ? "24 часа" : durationHours === 72 ? "3 дня" : "7 дней";
-    if (!confirm("Временно ограничить действия этого аккаунта на " + durationLabel + "? Пользователь сможет войти и увидеть причину, но не сможет публиковать, писать или отправлять заявки.")) return;
+    const personName = card?.dataset.personName || "Имя не указано";
+    const personContact = card?.dataset.personContact || "Контакт не указан";
+    if (!confirm("Ограничить аккаунт " + personName + " (" + personContact + ") на " + durationLabel + "? Причина: " + reason + ". Пользователь увидит причину ограничения.")) return;
     try {
       await callCouncilManagement("suspend_account", button.dataset.id, {
         duration_hours: durationHours,
@@ -3003,6 +3034,7 @@ window.onunhandledrejection = function(event) {
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
     else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'toggle-school-listing') { toggleSchoolListing(btn.dataset.id, btn.dataset.status); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
