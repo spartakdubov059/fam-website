@@ -595,6 +595,49 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, ...(await listOverview(actor.school_id)) }, 200, headers);
     }
 
+    if (action === "agent_dashboard") {
+      const dashboard = await adminRequest("rpc/get_fam_agent_admin_dashboard", "POST", {
+        p_school_id: actor.school_id,
+      });
+      if (!dashboard.ok || !dashboard.data || dashboard.data.ok !== true) {
+        console.error("fam_agent_dashboard_load_failed", dashboard.status);
+        return json({ ok: false, error: "Не удалось загрузить отчёты и предложения команды FAM." }, 503, headers);
+      }
+      return json({
+        ok: true,
+        report: dashboard.data.report ?? null,
+        agent_ideas: Array.isArray(dashboard.data.agent_ideas) ? dashboard.data.agent_ideas : [],
+      }, 200, headers);
+    }
+
+    if (action === "review_agent_idea") {
+      const ideaId = typeof payload.target_id === "string" ? payload.target_id : "";
+      const decision = payload.decision === "approve" ? "approved"
+        : payload.decision === "reject" ? "rejected" : "";
+      if (!UUID_RE.test(ideaId) || !decision) {
+        return json({ ok: false, error: "Выберите предложение и решение." }, 400, headers);
+      }
+
+      const reviewed = await adminRequest("rpc/review_fam_agent_idea", "POST", {
+        p_idea_id: ideaId,
+        p_reviewer_id: actorId,
+        p_decision: decision,
+      });
+      if (!reviewed.ok) {
+        console.error("fam_agent_idea_review_failed", reviewed.status);
+        return json({ ok: false, error: "Не удалось сохранить решение по предложению." }, 503, headers);
+      }
+      if (reviewed.data?.ok !== true) {
+        return json({ ok: false, error: "Это предложение уже рассмотрено или больше недоступно." }, 409, headers);
+      }
+
+      await recordAudit(actor.school_id, actorId, null, "fam_agent_idea_" + decision, {
+        idea_id: ideaId,
+      });
+      return json({ ok: true, status: decision }, 200, headers);
+    }
+
+
     if (action === "suspend_account") {
       const targetId = typeof payload.target_id === "string" ? payload.target_id : "";
       const durationHours = Number(payload.duration_hours);
