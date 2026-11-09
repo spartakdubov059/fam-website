@@ -1,6 +1,15 @@
 -- School-scoped, content-free FAM admin reports and human-reviewed analyst ideas.
 -- This migration never stores message text, direct user identifiers, email addresses, or raw moderation content.
 
+-- Agent proposals are scoped to a school. Existing project-wide legacy ideas remain unassigned
+-- (school_id IS NULL) and are intentionally not exposed in any school's dashboard.
+alter table private.fam_agent_ideas
+  add column if not exists school_id text
+  references public.schools(id) on update cascade on delete cascade;
+
+create index if not exists fam_agent_ideas_school_status_created_idx
+  on private.fam_agent_ideas (school_id, status, created_at desc);
+
 create table private.fam_agent_school_daily_reports (
   school_id text not null references public.schools(id) on update cascade on delete cascade,
   report_date date not null,
@@ -189,7 +198,8 @@ begin
     select i.id, i.title, i.summary, i.benefit, i.complexity, i.risk,
            i.evidence_kind, i.evidence_summary, i.proposed_by, i.created_at
     from private.fam_agent_ideas as i
-    where i.status = 'pending'
+    where i.school_id = p_school_id
+      and i.status = 'pending'
     order by i.created_at desc
     limit 20
   ) as pending;
@@ -214,6 +224,7 @@ set search_path = ''
 as $function$
 declare
   v_status text;
+  v_reviewer_school_id text;
 begin
   if p_idea_id is null or p_reviewer_id is null or p_decision is null
      or p_decision not in ('approved', 'rejected') then
@@ -221,12 +232,12 @@ begin
       using errcode = '22023';
   end if;
 
-  if not exists (
-    select 1
-    from public.profiles as p
-    where p.id = p_reviewer_id
-      and p.role = 'school_admin'
-  ) then
+  select p.school_id into v_reviewer_school_id
+  from public.profiles as p
+  where p.id = p_reviewer_id
+    and p.role = 'school_admin';
+
+  if v_reviewer_school_id is null then
     raise exception 'Решение доступно только администратору школы.'
       using errcode = '42501';
   end if;
@@ -241,6 +252,7 @@ begin
       end,
       updated_at = pg_catalog.now()
   where i.id = p_idea_id
+    and i.school_id = v_reviewer_school_id
     and i.status = 'pending'
   returning i.status into v_status;
 
