@@ -1156,9 +1156,11 @@ window.onunhandledrejection = function(event) {
   async function cancelRegAction(regId) {
     if (!confirm("Отменить заявку?")) return;
     try {
-      const { data, error } = await sb.from("event_registrations").delete().eq("id", regId).select("id");
+      const { data, error } = await sb.rpc("cancel_own_event_registration", {
+        p_registration_id: regId
+      });
       if (error) throw error;
-      if (!data || data.length !== 1) throw new Error("Заявка не отменена: возможно, нет прав или она уже удалена.");
+      if (!data?.ok) throw new Error("Запись не отменена: возможно, она уже отменена или недоступна.");
       regs = regs.filter(r => r.id !== regId);
       renderListings();
       notice("Заявка отменена");
