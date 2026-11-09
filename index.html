@@ -2295,7 +2295,7 @@ window.onunhandledrejection = function(event) {
   }
 
   async function deleteMyAccount() {
-    if (!user || !user.email) return;
+    if (!user || (!user.email && !user.phone)) return;
     const password = $("selfDeletePassword")?.value || "";
     const confirmation = $("selfDeleteConfirmation")?.value?.trim() || "";
     const button = $("selfDeleteAccountBtn");
@@ -2306,8 +2306,9 @@ window.onunhandledrejection = function(event) {
     if (button) { button.disabled = true; button.textContent = "Проверяем пароль..."; }
     try {
       // Re-authentication gives the server a freshly issued, short-lived JWT.
+      const loginIdentity = user.email ? { email: user.email } : { phone: user.phone };
       const { error: signInError } = await sb.auth.signInWithPassword({
-        email: user.email,
+        ...loginIdentity,
         password
       });
       if (signInError) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
@@ -2350,7 +2351,8 @@ window.onunhandledrejection = function(event) {
 
     const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
     if (!password) return false;
-    const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
+    const loginIdentity = user.email ? { email: user.email } : { phone: user.phone };
+    const { error } = await sb.auth.signInWithPassword({ ...loginIdentity, password });
     if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
     return true;
   }
@@ -2371,7 +2373,7 @@ window.onunhandledrejection = function(event) {
   }
 
   async function manageCouncilRole(targetId) {
-    if (!targetId || !confirm("Снять с пользователя полномочия Ученического совета? Его аккаунт останется обычным.")) return;
+    if (!targetId || !confirm("Снять с ученика полномочия Ученического совета? Сам аккаунт останется активным.")) return;
     try {
       await callCouncilManagement("revoke_role", targetId);
       notice("Полномочия сняты.");
@@ -2620,7 +2622,7 @@ window.onunhandledrejection = function(event) {
         res = await sb.auth.signInWithPassword({ email, password: pass });
         if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
-          .select("id,avatar_url,created_at,city,school_id,role")
+          .select("id,avatar_url,created_at,city,school_id,role,display_name,phone_hint")
           .eq("id", res.data.user.id).maybeSingle();
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
@@ -2999,7 +3001,7 @@ window.onunhandledrejection = function(event) {
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles")
-      .select("id,avatar_url,created_at,city,school_id,role")
+      .select("id,avatar_url,created_at,city,school_id,role,display_name,phone_hint")
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
