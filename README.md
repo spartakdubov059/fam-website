@@ -13,6 +13,7 @@ FAM — школьная платформа для объявлений, иде�
 - [Отправка пользовательского контента](supabase/functions/submit-content/index.ts)
 - [Иерархия агентов и правила безопасности](docs/AGENT_ROLES.md)
 - [Журнал безопасности и приватных фото](supabase/migrations/20261108232000_add_fam_safety_incidents_and_private_image_staging.sql)
+- [Закрытая очередь заданий ИИ-агентов](supabase/migrations/20261109132440_create_private_fam_agent_task_queue.sql)
 
 ## Правила безопасности
 
