@@ -1203,7 +1203,7 @@ window.onunhandledrejection = function(event) {
   }
 
   async function toggleFavoriteAction(listingId) {
-    if (!user) return openModal('authModal');
+    if (!user) return openAuthModal();
     try {
       const favIdx = favorites.findIndex(f => f.listing_id === listingId);
       if (favIdx !== -1) {
@@ -1251,7 +1251,7 @@ window.onunhandledrejection = function(event) {
   }
 
   window.startChat = function(userId, title, autoMessage = null) {
-    if (!user) return openModal('authModal');
+    if (!user) return openAuthModal();
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidPattern.test(String(userId || "")) || userId === user.id) {
       alert("Не удалось определить собеседника.");
@@ -1363,7 +1363,7 @@ window.onunhandledrejection = function(event) {
   };
 
   window.handleEventBtn = async function(id) {
-    if (!user) return openModal('authModal');
+    if (!user) return openAuthModal();
     const ev = listings.find(l => l.id === id);
     if (!ev || !ev.is_event) return alert("Мероприятие не найдено.");
     if (ev.user_id === user.id) return notice("Нельзя записаться на собственное мероприятие.");
@@ -1535,7 +1535,7 @@ window.onunhandledrejection = function(event) {
 
   $("ideaForm").onsubmit = async e => {
     e.preventDefault();
-    if(!user) return openModal('authModal');
+    if(!user) return openAuthModal();
     let txt = $("ideaText").value.trim();
     let btn = $("ideaSubmitBtn");
     if (btn.disabled) return;
@@ -2541,7 +2541,7 @@ window.onunhandledrejection = function(event) {
 
   async function suspendCouncilAccount(button) {
     if (!button || profile?.role !== "school_admin") return;
-    const card = button.closest(".idea-card");
+    const card = button.closest(".admin-person-card, .idea-card");
     const durationHours = Number(card?.querySelector("[data-suspension-hours]")?.value);
     const reason = card?.querySelector("[data-suspension-reason]")?.value?.trim() || "";
     if (![24, 72, 168].includes(durationHours)) return notice("Выберите срок ограничения.");
@@ -2692,6 +2692,7 @@ window.onunhandledrejection = function(event) {
     $("authMsg").textContent = "";
   }
   $("switchAuthBtn").onclick = () => setAuthMode($("registrationFields").classList.contains("hidden"));
+  function openAuthModal() { setAuthMode(false); openModal("authModal"); }
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
@@ -2868,7 +2869,7 @@ window.onunhandledrejection = function(event) {
 
     if (action === 'go-board') { e.preventDefault(); showTab('board'); }
     else if (action === 'go-profile') { e.preventDefault(); showTab('profile'); }
-    else if (action === 'open-auth') { e.preventDefault(); setAuthMode(false); openModal('authModal'); }
+    else if (action === 'open-auth') { e.preventDefault(); setAuthMode(false); openAuthModal(); }
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
@@ -2901,7 +2902,7 @@ window.onunhandledrejection = function(event) {
       $("listingsGrid").scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     else if (action === 'open-listing') {
-      if (user) openModal('listingModal'); else openModal('authModal');
+      if (user) openModal('listingModal'); else openAuthModal();
     }
     else if (action === 'toggle-fav') { toggleFavoriteAction(btn.dataset.id); }
     else if (action === 'delete-own-listing') { deleteOwnListing(btn.dataset.id); }
@@ -3090,7 +3091,7 @@ window.onunhandledrejection = function(event) {
 
   $("fabBtn").onclick = (e) => {
     e.stopPropagation();
-    if (user) openModal('listingModal'); else openModal('authModal');
+    if (user) openModal('listingModal'); else openAuthModal();
   };
 
   sb.auth.getSession().then(res => {
