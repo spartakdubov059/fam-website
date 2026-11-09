@@ -589,7 +589,7 @@
   <button class="tab-plus" id="fabBtn" aria-label="Создать объявление"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </nav>
 
-<footer class="footer"><span class="footer-brand">SPR Studio</span></footer>
+<footer class="footer"><span class="footer-brand">FAM.</span><div class="footer-links"><a href="user-agreement.html" target="_blank" rel="noopener">Пользовательское соглашение</a><a href="personal-data-consent.html" target="_blank" rel="noopener">Персональные данные</a></div></footer>
 
 <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="modal-content">
@@ -599,11 +599,18 @@
       <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
         <select id="authSchool" class="form-control"><option value="lyceum_3">Лицей № 3 — Сочи</option></select>
       </div>
-      <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
-      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
-      <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
+      <div class="form-group hidden" id="authDisplayNameGroup"><label for="authDisplayName">Имя в FAM или псевдоним</label><input type="text" id="authDisplayName" class="form-control" maxlength="40" autocomplete="nickname" placeholder="Например, Саша"></div>
+      <div class="form-group"><label for="authIdentifier">Почта или телефон</label><input type="text" id="authIdentifier" class="form-control" required maxlength="120" autocomplete="username" placeholder="name@example.com или +7 900 000-00-00"></div>
+      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6" maxlength="128" autocomplete="current-password"></div>
+      <div id="authLegalGroup" class="auth-legal hidden">
+        <label class="auth-consent"><input type="checkbox" id="authTermsAccepted"><span>Я принимаю <a href="user-agreement.html" target="_blank" rel="noopener">Пользовательское соглашение FAM</a>.</span></label>
+        <label class="auth-consent"><input type="checkbox" id="authPrivacyAccepted"><span>Я ознакомился(ась) и даю отдельное <a href="personal-data-consent.html" target="_blank" rel="noopener">согласие на обработку персональных данных</a>.</span></label>
+        <p class="admin-card-muted">Оба подтверждения обязательны для регистрации и не отмечены заранее. Для несовершеннолетних оператор должен обеспечить требуемое законом согласие законного представителя.</p>
+      </div>
+      <div id="authOtpGroup" class="form-group hidden"><label for="authOtp">Код из SMS</label><input type="text" id="authOtp" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Введите код из сообщения"></div>
+      <button type="submit" id="authSubmitBtn" class="button button-primary" style="width:100%;">Войти</button>
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
-      <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
+      <div id="authMsg" role="status" aria-live="polite" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
     </form>
   </div>
 </div>
