@@ -109,11 +109,18 @@ begin
           from public.ideas as i
           where i.school_id = v_school_id and i.admin_status = 'new'
         )
+      ),
+      'agent_proposals', pg_catalog.jsonb_build_object(
+        'pending', (
+          select pg_catalog.count(*)::integer
+          from private.fam_agent_ideas as i
+          where i.school_id = v_school_id and i.status = 'pending'
+        )
       )
     ) into v_metrics;
 
     v_summary := pg_catalog.format(
-      'FAM — сводка за %s: активных объявлений %s, новых за сутки %s; непроверенных сигналов безопасности %s, из них высокого уровня %s; запросов на удаление %s; идей ожидают Совет %s; активных временных ограничений %s.',
+      'FAM — сводка за %s: активных объявлений %s, новых за сутки %s; непроверенных сигналов безопасности %s, из них высокого уровня %s; запросов на удаление %s; идей ожидают Совет %s; предложений ИИ ждут решения %s; активных временных ограничений %s.',
       pg_catalog.to_char(v_report_date, 'DD.MM.YYYY'),
       v_metrics #>> '{listings,active}',
       v_metrics #>> '{listings,new_24h}',
@@ -121,6 +128,7 @@ begin
       v_metrics #>> '{safety,high_unreviewed}',
       v_metrics #>> '{account_requests,deletion_pending}',
       v_metrics #>> '{ideas,awaiting_council}',
+      v_metrics #>> '{agent_proposals,pending}',
       v_metrics #>> '{account_requests,active_suspensions}'
     );
 
