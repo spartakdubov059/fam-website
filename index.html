@@ -2450,10 +2450,12 @@ window.onunhandledrejection = function(event) {
     const card = deleteButton?.closest(".admin-person-card");
     const personName = card?.dataset.personName || "Имя не указано";
     const personContact = card?.dataset.personContact || "Контакт не указан";
-    const accepted = prompt("Проверьте выбранный аккаунт:\nИмя: " + personName + "\nКонтакт: " + personContact + "\nID: " + targetId.slice(0,8) + "\n\nУдалятся профиль, объявления, переписки и файлы. Введите УДАЛИТЬ для подтверждения.");
+    const reason = prompt("Почему требуется удалить аккаунт " + personName + " (" + personContact + ")? Укажи конкретный проверенный факт, без личных данных. Минимум 15 символов.");
+    if (!reason || reason.trim().length < 15 || reason.trim().length > 400) return notice("Нужна понятная причина длиной 15–400 символов.");
+    const accepted = prompt("Проверьте выбранный аккаунт:\nИмя: " + personName + "\nКонтакт: " + personContact + "\nID: " + targetId.slice(0,8) + "\nПричина: " + reason.trim() + "\n\nУдалятся профиль, объявления, переписки и файлы. Введите УДАЛИТЬ для подтверждения.");
     if (accepted !== "УДАЛИТЬ") return;
     try {
-      await callCouncilManagement("delete_account", targetId);
+      await callCouncilManagement("delete_account", targetId, { reason: reason.trim() });
       notice("Аккаунт и связанные данные удалены.");
       await loadCouncilAdminTools();
       await loadAll();
