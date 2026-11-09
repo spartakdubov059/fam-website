@@ -2137,8 +2137,10 @@ window.onunhandledrejection = function(event) {
     box.classList.remove("hidden");
     const targetSelect = $("councilDeletionTarget");
     const history = $("councilMyDeletionRequests");
+    const targetDetails = $("councilDeletionTargetDetails");
     if (targetSelect) targetSelect.innerHTML = '<option value="">Загружаем список...</option>';
     if (history) history.textContent = "Загружаем ваши обращения...";
+    if (targetDetails) targetDetails.textContent = "";
     try {
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "list_request_targets" }
@@ -2147,26 +2149,36 @@ window.onunhandledrejection = function(event) {
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить список аккаунтов.");
 
       const targets = Array.isArray(data.targets) ? data.targets : [];
+      const updateSelectedTarget = () => {
+        const row = targets.find(item => item.id === targetSelect?.value);
+        if (!targetDetails) return;
+        targetDetails.textContent = row
+          ? row.display_name + " · " + councilRoleName(row.role) + " · ID " + (row.short_id || "") + " · " + (row.contact_hint || "Контакт скрыт")
+          : "";
+      };
       if (targetSelect) {
-        targetSelect.innerHTML = '<option value="">Выберите аккаунт</option>' + targets.map(row =>
-          `<option value="${esc(row.id)}">${esc(row.email)} · ${esc(councilRoleName(row.role))}</option>`
+        targetSelect.innerHTML = '<option value="">Выберите ученика или участника</option>' + targets.map(row =>
+          '<option value="' + esc(row.id) + '">' + esc(row.display_name || "Участник") + ' · '
+          + esc(councilRoleName(row.role)) + ' · ' + esc(row.short_id || "") + '</option>'
         ).join("");
         targetSelect.disabled = targets.length === 0;
+        targetSelect.onchange = updateSelectedTarget;
       }
 
       const ownRequests = Array.isArray(data.my_requests) ? data.my_requests : [];
-      if (history) history.innerHTML = ownRequests.length ? `
-        <div style="font-size:10px;font-weight:700;margin:8px 0 5px;">Ваши обращения</div>
-        ${ownRequests.map(row => `
-          <div style="font-size:10px;padding:7px 0;border-top:1px solid var(--border);">
-            <b>${esc(row.target_email_masked || "Аккаунт")}</b>
-            <span style="color:var(--muted);"> · ${esc(deletionStatusLabel(row.status))}</span>
-            <div style="color:var(--muted);margin-top:3px;">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-            ${row.review_note ? `<div style="margin-top:3px;">${esc(row.review_note)}</div>` : ""}
-          </div>
-        `).join("")}
-      ` : '<p style="font-size:10px;color:var(--muted);margin-top:8px;">Вы ещё не отправляли запросы.</p>';
-      if (!targets.length && targetSelect) targetSelect.innerHTML = '<option value="">Нет доступных аккаунтов для обращения</option>';
+      if (history) history.innerHTML = ownRequests.length
+        ? '<div class="admin-card-meta">Мои прошлые обращения</div>' + ownRequests.map(row =>
+            '<div class="admin-audit-row"><b>' + esc(row.target_display_name || "Аккаунт") + '</b><div>'
+            + esc(deletionStatusLabel(row.status)) + ' · '
+            + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "")
+            + (row.review_note ? '<div>' + esc(row.review_note) + '</div>' : "")
+            + '</div></div>'
+          ).join("")
+        : '<p class="admin-card-muted">Вы ещё не отправляли запросы.</p>';
+      if (!targets.length && targetSelect) {
+        targetSelect.innerHTML = '<option value="">Нет доступных аккаунтов школы</option>';
+        if (targetDetails) targetDetails.textContent = "Нет доступных аккаунтов для обращения.";
+      }
     } catch (error) {
       if (targetSelect) targetSelect.innerHTML = '<option value="">Не удалось загрузить аккаунты</option>';
       if (history) history.textContent = "Ошибка: " + (error?.message || "Повторите попытку.");
@@ -2468,16 +2480,19 @@ window.onunhandledrejection = function(event) {
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
-    $("profEmail").textContent = user.email;
+    const displayName = profile?.display_name || user.email || user.phone || "Профиль FAM";
+    const accountHint = user.email || user.phone || "";
+    $("profEmail").textContent = displayName;
+    if ($("profMeta")) $("profMeta").textContent = getSchoolDisplayName(profile?.school_id)
+      + " · " + councilRoleName(profile?.role) + (accountHint ? " · " + accountHint : "");
+    const avatarLetter = String(displayName).trim().charAt(0).toUpperCase() || "F";
     if (profile?.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     } else {
-      $("avatarPreview").textContent = user.email[0].toUpperCase();
-      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = user.email[0].toUpperCase();
+      $("avatarPreview").textContent = avatarLetter;
+      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = avatarLetter;
     }
-    const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
-    $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
 
     let myL = listings.filter(l => l.user_id === user.id);
     const myListingsCount = $("myListingsCount");
