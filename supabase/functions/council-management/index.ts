@@ -402,7 +402,7 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
       + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
+      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
       + encodeURIComponent(actorId) + "&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&order=created_at.desc&limit=10",
     ),
@@ -639,6 +639,7 @@ Deno.serve(async (req: Request) => {
       "revoke_role",
       "suspend_account",
       "lift_suspension",
+      "set_listing_visibility",
     ]);
     if (sensitiveActions.has(action) && !tokenWasIssuedRecently(authorization)) {
       return json({
@@ -934,6 +935,46 @@ Deno.serve(async (req: Request) => {
         return json({ ok: false, error: String(message).slice(0, 220) }, result.status === 403 ? 403 : 409, headers);
       }
       return json({ ok: true, result: result.data }, 200, headers);
+    }
+
+    if (action === "set_listing_visibility") {
+      const requestedStatus = payload.status;
+      if (!["active", "hidden"].includes(requestedStatus)) {
+        return json({ ok: false, error: "Выберите: скрыть объявление или вернуть его на доску." }, 400, headers);
+      }
+      const found = await adminRequest(
+        "listings?select=id,title,category,user_id,school_id,status&id=eq."
+        + encodeURIComponent(targetId) + "&limit=1",
+      );
+      const listing = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;
+      if (!listing) return json({ ok: false, error: "Объявление не найдено." }, 404, headers);
+      let ownerSchoolId = listing.school_id;
+      if (!ownerSchoolId) {
+        const owner = await getSchoolProfile(listing.user_id);
+        ownerSchoolId = owner?.school_id ?? null;
+      }
+      if (ownerSchoolId !== actor.school_id) {
+        return json({ ok: false, error: "Можно менять видимость только объявлений своей школы." }, 403, headers);
+      }
+      if (listing.status === requestedStatus) {
+        return json({ ok: true, status: requestedStatus, unchanged: true }, 200, headers);
+      }
+      const updated = await adminRequest(
+        "listings?id=eq." + encodeURIComponent(targetId) + "&school_id=eq." + encodeURIComponent(actor.school_id),
+        "PATCH",
+        { status: requestedStatus },
+      );
+      if (!updated.ok || !Array.isArray(updated.data) || updated.data.length !== 1) {
+        console.error("school_listing_visibility_update_failed", updated.status);
+        return json({ ok: false, error: "Не удалось изменить видимость объявления." }, 503, headers);
+      }
+      await recordAudit(actor.school_id, actorId, listing.user_id, requestedStatus === "hidden" ? "listing_hidden_by_admin" : "listing_restored_by_admin", {
+        listing_id: targetId,
+        title: String(listing.title || "").slice(0, 80),
+        previous_status: listing.status,
+        status: requestedStatus,
+      });
+      return json({ ok: true, status: requestedStatus }, 200, headers);
     }
 
     if (action === "delete_listing") {
