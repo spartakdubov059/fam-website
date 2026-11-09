@@ -437,7 +437,6 @@
       <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Почта идей</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
       </div>
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
@@ -474,19 +473,23 @@
           <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить</button>
         </form>
         <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
-        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Рабочая панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
+        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
+      </div>
+      <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Панель Совета</b><small>Идеи и управление школой</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
           <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
-            <h5 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h5>
-            <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 10px;">Участник совета может сообщить администратору о проблемном аккаунте. Запрос не удаляет аккаунт автоматически — решение принимает администратор школы. Участник совета также не может самостоятельно удалять объявления: это право только администратора. Не указывайте телефоны, адреса и другие личные данные.</p>
+            <h5 style="font-size:12px;margin:0 0 6px;">Сообщить администратору об аккаунте</h5>
+            <p class="profile-section-copy">Выберите участника и кратко опишите проблему. Аккаунт не удаляется автоматически.</p>
             <div class="form-group">
               <label for="councilDeletionTarget">Аккаунт</label>
               <select id="councilDeletionTarget" class="form-control"><option value="">Загружаем список...</option></select>
+              <div id="councilDeletionTargetDetails" class="admin-card-meta" aria-live="polite"></div>
             </div>
             <div class="form-group">
               <label for="councilDeletionReasonCode">Причина</label>
@@ -507,29 +510,27 @@
           </div>
           <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-              <h5 style="font-size:12px;margin:0;">Управление школой</h5>
+              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
-            <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
-            <div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
+            <p class="profile-section-copy">Сначала откройте нужный раздел. Учеников и объявления можно проверить перед действием.</p>
+            <details class="profile-inline-disclosure" open><summary>Ежедневная аналитика</summary>
+            <div class="profile-box" id="famAgentAdminPanel" style="margin:8px 0 12px;padding:12px;">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
                 <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
                 <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
               </div>
-              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
+              <p class="profile-section-copy">Только показатели школы — без чтения личных переписок.</p>
               <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
               <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
               <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
-              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
+              <p class="admin-card-muted">Предложения помощников требуют решения администратора; сами по себе они ничего не меняют.</p>
             </div>
-            <h6 style="font-size:11px;margin:10px 0 6px;">Запросы участников на удаление</h6>
-            <div id="councilAdminDeletionRequests" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Аккаунты школы</h6>
-            <div id="councilAdminUsers" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Объявления школы</h6>
-            <div id="councilAdminListings" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">История действий</h6>
-            <div id="councilAdminAudit" aria-live="polite"></div>
+            </details>
+            <details class="profile-inline-disclosure"><summary>Запросы на удаление</summary><div id="councilAdminDeletionRequests" aria-live="polite"></div></details>
+            <details class="profile-inline-disclosure"><summary>Ученики и аккаунты</summary><div id="councilAdminUsers" aria-live="polite"></div></details>
+            <details class="profile-inline-disclosure"><summary>Объявления школы</summary><div id="councilAdminListings" aria-live="polite"></div></details>
+            <details class="profile-inline-disclosure"><summary>История действий</summary><div id="councilAdminAudit" aria-live="polite"></div></details>
           </div>
           <div class="idea-folders">
             <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
@@ -538,8 +539,8 @@
             <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
           </div>
           <div id="ideaFolderContent"></div>
-          </div></details>
-      </div>
+        </div>
+      </details>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body"><div class="l-grid profile-listings-grid" id="myListingsGrid" style="margin-top:0;"></div><div id="myListingsEmpty" class="hidden profile-empty-inline">У вас пока нет объявлений.</div></div>
