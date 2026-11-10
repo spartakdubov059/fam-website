@@ -36,7 +36,12 @@ test("approved tasks use only fixed, server-side aggregate RPCs", () => {
   assert.match(worker, /rpc\(["']get_fam_agent_task_system_health["']/);
 
   assert.doesNotMatch(worker, /task\??\.payload/);
-  assert.doesNotMatch(worker, /\.from\(["'](?:messages|profiles|listings|auth\.users)["']\)/i);
+  assert.doesNotMatch(worker, /\.payload\b/);
+  assert.doesNotMatch(worker, /\.from\(\s*["'](?:messages|profiles|listings)["']\s*\)/i);
+  assert.doesNotMatch(worker, /\/rest\/v1\/(?:messages|profiles|listings)\b/i);
+  assert.doesNotMatch(worker, /\b(?:from|join)\s+(?:public\.)?(?:messages|profiles|listings)\b/i);
+  assert.match(worker, /rpc\("get_fam_agent_task_daily_digest"/);
+  assert.match(worker, /rpc\("get_fam_agent_task_system_health"/);
   assert.doesNotMatch(worker, /\.delete\s*\(|\.update\s*\(|auth\.admin|storage\.from/);
 });
 
