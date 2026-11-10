@@ -516,6 +516,73 @@ Deno.serve(async (req: Request) => {
         if (imageUrl) await removePendingListingImage(imageUrl, userId);
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст или фотография не прошли проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
       }
+      const retryableImageReview = new Set([
+        "image_review_rate_limited",
+        "image_review_quota_exceeded",
+        "image_review_unavailable",
+        "image_review_no_decision",
+        "openai_rate_limited",
+        "openai_unavailable",
+        "openai_invalid_response",
+        "moderation_internal_error",
+      ]);
+      const retryableDiagnostics = new Set([
+        "openai_rate_limited",
+        "openai_unavailable",
+        "openai_invalid_response",
+        "moderation_internal_error",
+        "missing_api_key",
+      ]);
+      const shouldQueueImageReview = Boolean(imageUrl)
+        && moderation.action === "pending"
+        && (
+          moderation.degraded === true
+          || retryableImageReview.has(moderation.reason_code ?? "")
+          || retryableDiagnostics.has(moderation.diagnostic_code ?? "")
+        );
+
+      if (shouldQueueImageReview) {
+        const imagePath = pendingListingImagePath(imageUrl, userId);
+        if (!imagePath) {
+          await removePendingListingImage(imageUrl, userId);
+          return fail("Не удалось сохранить фото для повторной проверки. Выберите его ещё раз.", 400, headers);
+        }
+
+        const queued = await adminRequest("rpc/enqueue_listing_image_moderation_task", "POST", {
+          p_user_id: userId,
+          p_title: title,
+          p_description: description,
+          p_category: category,
+          p_price_text: priceText || "Бесплатно",
+          p_school_id: profile.school_id,
+          p_image_path: imagePath,
+          p_is_event: isEvent,
+          p_event_date: isEvent && typeof payload.event_date === "string" ? payload.event_date : null,
+          p_event_time: isEvent && typeof payload.event_time === "string" ? payload.event_time : null,
+          p_event_type: isEvent ? eventType : null,
+          p_max_seats: isEvent && eventType === "limited" ? maxSeats : 0,
+        });
+        const listingId = typeof queued.data?.listing_id === "string" ? queued.data.listing_id : "";
+        if (!queued.ok || !listingId) {
+          await removePendingListingImage(imageUrl, userId);
+          console.error("listing_image_moderation_enqueue_failed", queued.status);
+          return fail("Не удалось сохранить объявление в очередь проверки. Попробуйте отправить ещё раз.", 503, headers);
+        }
+
+        const savedListing = await adminRequest(
+          "listings?select=*&id=eq." + encodeURIComponent(listingId)
+            + "&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+        );
+        const pendingListing = Array.isArray(savedListing.data) ? savedListing.data[0] : null;
+
+        return respond({
+          ok: true,
+          status: "pending",
+          listing: pendingListing,
+          reason: "Объявление сохранено. Фото проверяется автоматически. Повторно отправлять объявление не нужно — оно появится после успешной проверки.",
+        }, 200, headers);
+      }
+
       if (moderation.degraded) {
         if (imageUrl) await removePendingListingImage(imageUrl, userId);
         return respond({
