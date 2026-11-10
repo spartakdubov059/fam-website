@@ -7,29 +7,31 @@ import {
   validateAgentPatch,
 } from "../../scripts/validate-local-agent-patch.mjs";
 
+const lowRisk = { risk: "low", requires_approval: false };
+
 const validPatch = [
-  "diff --git a/index.html b/index.html",
+  "diff --git a/docs/help.md b/docs/help.md",
   "index 1111111..2222222 100644",
-  "--- a/index.html",
-  "+++ b/index.html",
+  "--- a/docs/help.md",
+  "+++ b/docs/help.md",
   "@@ -1 +1 @@",
-  "-<title>Old</title>",
-  "+<title>New</title>",
+  "-Old help text",
+  "+New help text",
 ].join("\n");
 
-function jsPatch(change) {
+function filePatch(path, oldLine, newLine) {
   return [
-    "diff --git a/js/app.js b/js/app.js",
+    "diff --git a/" + path + " b/" + path,
     "index 1111111..2222222 100644",
-    "--- a/js/app.js",
-    "+++ b/js/app.js",
+    "--- a/" + path,
+    "+++ b/" + path,
     "@@ -1 +1 @@",
-    "-const label = 'Old';",
-    "+const label = '" + change + "';",
+    "-" + oldLine,
+    "+" + newLine,
   ].join("\n");
 }
 
-test("local agent only accepts website, docs and test paths", () => {
+test("local agent only accepts website, docs and safe test paths", () => {
   assert.equal(isAllowedAgentPath("index.html"), true);
   assert.equal(isAllowedAgentPath("css/style.css"), true);
   assert.equal(isAllowedAgentPath("js/app.js"), true);
@@ -49,62 +51,58 @@ test("local agent only accepts website, docs and test paths", () => {
 });
 
 test("patch parser extracts exact git diff paths and rejects renames", () => {
-  assert.deepEqual(extractPatchPaths(validPatch), ["index.html"]);
+  assert.deepEqual(extractPatchPaths(validPatch), ["docs/help.md"]);
   const rename = validPatch.replace(
-    "diff --git a/index.html b/index.html",
-    "diff --git a/index.html b/css/new.html",
+    "diff --git a/docs/help.md b/docs/help.md",
+    "diff --git a/docs/help.md b/css/new.html",
   );
   assert.throws(() => extractPatchPaths(rename), /Rename patches/);
 });
 
-test("critical or uncertain model output always requires human approval", () => {
-  assert.equal(requiresManualApproval({ risk: "low", requires_approval: false }, validPatch), false);
-  assert.equal(requiresManualApproval({ risk: "medium", requires_approval: false }, validPatch), true);
-  assert.equal(requiresManualApproval({ risk: "low", requires_approval: true }, validPatch), true);
-  assert.equal(
-    requiresManualApproval(
-      { risk: "low", requires_approval: false },
-      validPatch + "\n+// account_deletion workflow",
-    ),
-    true,
-  );
-  assert.equal(
-    requiresManualApproval(
-      { risk: "low", requires_approval: false },
-      jsPatch("read user profile"),
-    ),
-    true,
-  );
-  assert.equal(
-    requiresManualApproval(
-      { risk: "low", requires_approval: false },
-      jsPatch("toggle a simple visual hint"),
-    ),
-    false,
-  );
+test("docs-only changes can be automated after independent verification", () => {
+  assert.equal(requiresManualApproval(lowRisk, validPatch), false);
+  assert.deepEqual(validateAgentPatch(validPatch, lowRisk), {
+    paths: ["docs/help.md"],
+    requires_approval: false,
+  });
 });
 
-test("CSS-only visual updates can be automated without bypassing critical backend boundaries", () => {
-  const cssPatch = [
-    "diff --git a/css/style.css b/css/style.css",
-    "index 1111111..2222222 100644",
-    "--- a/css/style.css",
-    "+++ b/css/style.css",
-    "@@ -1 +1 @@",
-    "-.card { border-radius: 8px; }",
-    "+.card { border-radius: 14px; }",
-  ].join("\n");
-  assert.equal(requiresManualApproval({ risk: "low", requires_approval: false }, cssPatch), false);
+test("CSS visual changes can be automated, but external resources need review", () => {
+  const safeCss = filePatch("css/style.css", ".card { padding: 8px; }", ".card { padding: 12px; }");
+  const remoteCss = filePatch("css/style.css", ".card { padding: 8px; }", "@import url('https://example.com/a.css');");
+  assert.equal(requiresManualApproval(lowRisk, safeCss), false);
+  assert.equal(requiresManualApproval(lowRisk, remoteCss), true);
+});
+
+test("HTML, JavaScript and test-suite changes always require review", () => {
+  assert.equal(requiresManualApproval(lowRisk, filePatch("js/app.js", "const a = 1;", "const a = 2;")), true);
+  assert.equal(requiresManualApproval(lowRisk, filePatch("index.html", "<title>Old</title>", "<title>New</title>")), true);
+  assert.equal(requiresManualApproval(lowRisk, filePatch("tests/security/test.mjs", "assert.ok(true);", "assert.ok(false);")), true);
+});
+
+test("critical output or active HTML content requires manual approval", () => {
+  assert.equal(
+    requiresManualApproval(lowRisk, filePatch("index.html", "<p>Old</p>", "<script>alert(1)</script>")),
+    true,
+  );
+  assert.equal(
+    requiresManualApproval(lowRisk, filePatch("css/style.css", ".a { color: red; }", ".a { background: url(https://example.com/x); }")),
+    true,
+  );
+  assert.equal(
+    requiresManualApproval({ risk: "medium", requires_approval: false }, validPatch),
+    true,
+  );
+  assert.equal(
+    requiresManualApproval({ risk: "low", requires_approval: true }, validPatch),
+    true,
+  );
 });
 
 test("validator rejects forbidden paths and approves only verified low-risk diffs", () => {
-  assert.deepEqual(
-    validateAgentPatch(validPatch, { risk: "low", requires_approval: false }),
-    { paths: ["index.html"], requires_approval: false },
-  );
-  const forbidden = validPatch.replaceAll("index.html", "supabase/migrations/unsafe.sql");
+  const forbidden = validPatch.replaceAll("docs/help.md", "supabase/migrations/unsafe.sql");
   assert.throws(
-    () => validateAgentPatch(forbidden, { risk: "low", requires_approval: false }),
+    () => validateAgentPatch(forbidden, lowRisk),
     /outside the FAM agent allowlist/,
   );
 });
