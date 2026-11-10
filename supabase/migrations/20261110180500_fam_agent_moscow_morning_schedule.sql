@@ -17,31 +17,35 @@ begin
 
   v_old := $old$('fam-agent-school-daily-report','0 6 * * *')$old$;
   v_new := $new$('fam-agent-school-daily-report','30 3 * * *')$new$;
-  if position(v_old in v_definition) = 0 then
-    raise exception 'Expected school report schedule not found.';
+  if position(v_old in v_definition) > 0 then
+    v_definition := replace(v_definition, v_old, v_new);
+  elsif position(v_new in v_definition) = 0 then
+    raise exception 'School report schedule has an unexpected value.';
   end if;
-  v_definition := replace(v_definition, v_old, v_new);
 
   v_old := $old$('fam-agent-orchestrator-daily-digest','5 6 * * *')$old$;
   v_new := $new$('fam-agent-orchestrator-daily-digest','0 4 * * *')$new$;
-  if position(v_old in v_definition) = 0 then
-    raise exception 'Expected daily digest schedule not found.';
+  if position(v_old in v_definition) > 0 then
+    v_definition := replace(v_definition, v_old, v_new);
+  elsif position(v_new in v_definition) = 0 then
+    raise exception 'Daily digest schedule has an unexpected value.';
   end if;
-  v_definition := replace(v_definition, v_old, v_new);
 
   v_old := $old$('fam-agent-technical-system-health','10 6 * * *')$old$;
   v_new := $new$('fam-agent-technical-system-health','40 3 * * *')$new$;
-  if position(v_old in v_definition) = 0 then
-    raise exception 'Expected system health schedule not found.';
+  if position(v_old in v_definition) > 0 then
+    v_definition := replace(v_definition, v_old, v_new);
+  elsif position(v_new in v_definition) = 0 then
+    raise exception 'System health schedule has an unexpected value.';
   end if;
-  v_definition := replace(v_definition, v_old, v_new);
 
   v_old := $old$('fam-agent-site-error-audit','*/15 * * * *')$old$;
   v_new := $new$('fam-agent-site-error-audit','30 * * * *')$new$;
-  if position(v_old in v_definition) = 0 then
-    raise exception 'Expected site error audit schedule not found.';
+  if position(v_old in v_definition) > 0 then
+    v_definition := replace(v_definition, v_old, v_new);
+  elsif position(v_new in v_definition) = 0 then
+    raise exception 'Site error audit schedule has an unexpected value.';
   end if;
-  v_definition := replace(v_definition, v_old, v_new);
   execute v_definition;
 
   for v_job in
