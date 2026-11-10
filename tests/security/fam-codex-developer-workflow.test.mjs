@@ -26,7 +26,7 @@ const validator = readFileSync(
 test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /push:/);
-  assert.match(workflow, /branches: \\[main\\]/);
+  assert.ok(workflow.includes("branches: [main]"));
   assert.match(workflow, /github\.event_name == 'push'/);
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /cron: ["']15 3 \* \* \*["']/);
