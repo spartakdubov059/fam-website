@@ -2,14 +2,25 @@
  * Bounded retry policy for external image-review provider responses.
  * Keep this helper side-effect free so its decisions are covered by Node tests.
  */
+
+const EXHAUSTED_QUOTA_CODES = new Set([
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+  // OpenAI may report an exhausted prepaid balance with this distinct code.
+  "credit_balance_exhausted",
+]);
+
+export function isExhaustedImageReviewQuota(providerErrorCode) {
+  return typeof providerErrorCode === "string" && EXHAUSTED_QUOTA_CODES.has(providerErrorCode);
+}
+
 export function shouldRetryImageReviewRateLimit(
   status,
   providerErrorCode,
   attemptIndex,
 ) {
   if (status !== 429 || attemptIndex !== 0) return false;
-  return providerErrorCode !== "insufficient_quota"
-    && providerErrorCode !== "billing_hard_limit_reached";
+  return !isExhaustedImageReviewQuota(providerErrorCode);
 }
 
 /**
