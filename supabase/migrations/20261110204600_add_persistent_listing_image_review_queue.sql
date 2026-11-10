@@ -70,7 +70,7 @@ begin
     or p_category not in ('Вещи','Услуги','Творчество','Учёба','Мероприятия')
     or coalesce(char_length(p_price_text), 0) > 50
     or p_image_path is null
-    or p_image_path !~ ('^' || p_user_id::text || '/listing_' || p_user_id::text || '_[0-9a-f-]{36}\.(jpg|png|webp)$')
+    or p_image_path !~ ('^' || p_user_id::text || '/listing_' || p_user_id::text || '_[a-z0-9-]{1,50}\.(jpg|png|webp)$')
   then
     raise exception 'invalid_listing_image_moderation_payload' using errcode = '22023';
   end if;
