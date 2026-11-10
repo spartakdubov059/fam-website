@@ -143,3 +143,9 @@ test("profile and admin preview tolerate the old database before the identity mi
   assert.match(controller, /Для скрытия и восстановления нужно сначала обновить базу FAM/);
 });
 
+
+test("FAM dashboard keeps only safety signals; general analytics belong in the external daily report", () => {
+  assert.doesNotMatch(frontend, /famAgentAdminPanel|famAgentReportSummary|famAgentIdeasList|loadFamAgentDashboard|refresh-agent-dashboard|review-fam-agent-idea/);
+  assert.match(frontend, /loadUserSafetyReports/);
+  assert.match(frontend, /userSafetyReportsList/);
+});
