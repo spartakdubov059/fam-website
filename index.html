@@ -3544,7 +3544,6 @@ window.onunhandledrejection = function() {
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
       const data = submission.listing;
-      const statusToSet = data?.status;
       uploadedImagePath = null; // The server now owns the staged file or the published listing image.
       if (data) listings.unshift(data);
 
@@ -3554,6 +3553,7 @@ window.onunhandledrejection = function() {
       $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
 
       if (submission.status === "pending") {
+        await loadAll();
         renderProfile();
         alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
       } else {
