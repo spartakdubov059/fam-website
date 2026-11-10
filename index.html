@@ -2693,15 +2693,16 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageSchoolListing(button) {
-    const targetId = button?.dataset?.id;
+  async function manageSchoolListing(input) {
+    const button = input && typeof input === "object" ? input : null;
+    const targetId = typeof input === "string" ? input : button?.dataset?.id;
     if (!user || profile?.role !== "school_admin" || !targetId) return;
-    const title = button.closest(".idea-card")?.querySelector(".council-listing-title")?.textContent?.trim()
-      || "это объявление школы";
+    const listing = listings.find(row => row.id === targetId);
+    const title = button?.closest(".idea-card")?.querySelector(".council-listing-title")?.textContent?.trim()
+      || listing?.title || "это объявление школы";
     if (!confirm("Навсегда удалить «" + title + "»? Это действие необратимо.")) return;
-    const previousText = button.textContent;
-    button.disabled = true;
-    button.textContent = "Удаляем...";
+    const previousText = button?.textContent || "";
+    if (button) { button.disabled = true; button.textContent = "Удаляем..."; }
     try {
       await callCouncilManagement("delete_listing", targetId);
       listings = listings.filter(row => row.id !== targetId);
@@ -2712,11 +2713,9 @@ window.onunhandledrejection = function(event) {
     } catch (error) {
       notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
     } finally {
-      button.disabled = false;
-      button.textContent = previousText;
+      if (button) { button.disabled = false; button.textContent = previousText; }
     }
   }
-
   async function suspendCouncilAccount(button) {
     if (!button || profile?.role !== "school_admin") return;
     const card = button.closest(".idea-card");
@@ -3099,6 +3098,7 @@ window.onunhandledrejection = function(event) {
     else if (action === 'self-delete-account') { deleteMyAccount(); }
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
+    else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
     else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
