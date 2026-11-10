@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
+const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
   "Проведи аккуратный аудит исходников FAM и найди не более одной конкретной, воспроизводимой и низкорисковой ошибки интерфейса или клиентского поведения.",
