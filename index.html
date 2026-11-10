@@ -1189,7 +1189,27 @@ window.onunhandledrejection = function() {
     return new Date(t).toLocaleDateString('ru-RU');
   }
 
-  const NOTIFICATION_RELEASE_ID = "release:fam-notification-feed-2026-11";
+  // Append a stable, unique entry here for each site release. Read/dismiss state is per account.
+  const NOTIFICATION_RELEASES = Object.freeze([
+    {
+      id: "release:fam-notification-feed-2026-11",
+      title: "Обновление FAM",
+      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
+      time: Date.parse("2026-11-10T16:59:08Z")
+    },
+    {
+      id: "release:fam-agent-reports-2026-11",
+      title: "Обновление FAM",
+      text: "Технические сводки перенесены в отдельный отчёт главного агента и больше не смешиваются с уведомлениями школьной панели.",
+      time: Date.parse("2026-11-09T18:00:00Z")
+    },
+    {
+      id: "release:fam-admin-clarity-2026-11",
+      title: "Обновление FAM",
+      text: "Уточнены статусы проверки объявлений, подписи заявок и счётчик непрочитанных сообщений.",
+      time: Date.parse("2026-11-11T00:00:00Z")
+    }
+  ]);
   let notificationsCache = [];
   let notificationRefreshSeq = 0;
 
@@ -1291,11 +1311,9 @@ window.onunhandledrejection = function() {
       }
     };
 
-    add({
-      id: NOTIFICATION_RELEASE_ID, kind: "release", icon: "✨", title: "Обновление FAM",
-      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
-      time: Date.parse("2026-11-10T16:59:08Z")
-    });
+    NOTIFICATION_RELEASES.forEach(release => add({
+      ...release, kind: "release", icon: "✨"
+    }));
 
     if (isAiDown === true) add({
       id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
