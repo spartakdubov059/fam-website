@@ -74,10 +74,10 @@ test("all changes require owner approval before merge and production publication
   assert.match(validator, /export function requiresManualApproval/);
   assert.match(workflow, /gh pr create --draft/);
   assert.match(workflow, /отдельного явного разрешения владельца/);
-  assert.doesNotMatch(workflow, /gh pr merge\\b/);
-  assert.doesNotMatch(workflow, /pages: write/);
-  assert.doesNotMatch(workflow, /pages\\/builds/);
-  assert.doesNotMatch(workflow, /curl[^\\n]*github\\.io/);
+  assert.equal(workflow.includes("gh pr merge"), false);
+  assert.equal(workflow.includes("pages/builds"), false);
+  assert.equal(workflow.includes("pages: write"), false);
+  assert.equal(workflow.includes("github.io/fam-website"), false);
   assert.match(prompt, /Никогда не объединяй PR/);
   assert.match(prompt, /необратимые операции/);
   assert.match(prompt, /RLS/);
