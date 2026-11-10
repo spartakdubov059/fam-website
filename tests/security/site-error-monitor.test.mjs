@@ -46,9 +46,9 @@ test("site-error audit is scheduled and included in infrastructure health checks
   assert.match(migration, /'fam-agent-site-error-audit'[\s\S]*?'\*\/15 \* \* \* \*'/i);
 });
 
-test("Moscow schedule migration keeps five-minute worker polling and hourly site-error audits", () => {
+test("Moscow migration preserves five-minute worker expectation and moves site-error audit hourly", () => {
   assert.match(
-    scheduleMigration,
+    migration,
     /'fam-agent-worker-every-5-minutes'\s*,\s*'\*\/5 \* \* \* \*'/i,
   );
   assert.match(
