@@ -362,6 +362,85 @@
       .profile-section-heading { gap:9px; }
     }
 
+
+/* Safe profile visual refresh — presentation only; auth and data logic stay unchanged. */
+#profileLoggedIn > .profile-box,
+#profileLoggedIn > details.profile-box {
+  box-shadow: 0 10px 28px rgba(0,0,0,.16);
+}
+#profileLoggedIn .profile-hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012)), var(--surface);
+  border-color: rgba(212,216,227,.14);
+}
+#profileLoggedIn .profile-hero::after {
+  content: "";
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  right: -72px;
+  top: -82px;
+  border: 1px solid rgba(212,216,227,.12);
+  border-radius: 50%;
+  box-shadow: 0 0 0 16px rgba(212,216,227,.025), 0 0 0 34px rgba(212,216,227,.018);
+  pointer-events: none;
+}
+#profileLoggedIn .profile-hero-main,
+#profileLoggedIn .profile-hero-note { position: relative; z-index: 1; }
+#profileLoggedIn .profile-shortcuts { gap: 9px; }
+#profileLoggedIn .profile-shortcut {
+  min-height: 70px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+  border-color: rgba(255,255,255,.085);
+  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+}
+#profileLoggedIn .profile-shortcut:hover {
+  transform: translateY(-2px);
+  background: var(--surface-hover);
+  border-color: rgba(212,216,227,.32);
+}
+#profileLoggedIn .profile-shortcut:focus-visible,
+#profileLoggedIn .profile-inline-disclosure > summary:focus-visible,
+#profileLoggedIn .profile-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+#profileLoggedIn .profile-shortcut-icon {
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.055);
+}
+#profileLoggedIn .profile-main-section {
+  background: linear-gradient(150deg, rgba(255,255,255,.025), transparent 58%), var(--surface);
+  border-color: rgba(212,216,227,.11);
+}
+#profileLoggedIn .profile-section-heading h3 { letter-spacing: -.25px; }
+#profileLoggedIn .profile-council-disclosure {
+  margin-top: 12px;
+  border-color: rgba(212,216,227,.16);
+  background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 70%), var(--bg);
+}
+#profileLoggedIn .profile-council-disclosure > summary {
+  min-height: 48px;
+  padding: 12px 14px;
+  color: var(--text);
+}
+#profileLoggedIn .profile-council-disclosure[open] > summary {
+  background: rgba(255,255,255,.025);
+}
+#profileLoggedIn .profile-inline-disclosure > summary { transition: background .18s ease, color .18s ease; }
+#profileLoggedIn .profile-inline-disclosure > summary:hover { background: rgba(255,255,255,.035); color: var(--text); }
+@media (max-width: 520px) {
+  #profileLoggedIn .profile-shortcuts { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  #profileLoggedIn .profile-shortcut:last-child { grid-column: 1 / -1; }
+  #profileLoggedIn .profile-shortcut { min-height: 64px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #profileLoggedIn .profile-shortcut { transition: none; }
+  #profileLoggedIn .profile-shortcut:hover { transform: none; }
+}
+
   </style>
 </head>
 <body>
@@ -461,13 +540,13 @@
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
       <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Почта идей</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
+        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Идеи школы</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
       </div>
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
-        <p class="profile-section-copy">Обычный аккаунт FAM не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
+        <p class="profile-section-copy">Аккаунт ученика не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете">
           <option value="">Выберите нужную роль</option><option value="Участник Ученического совета">Участник Ученического совета</option><option value="Администратор">Администратор</option>
         </select>
@@ -493,7 +572,7 @@
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
       <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Идеи школы</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -501,7 +580,7 @@
         </form>
         <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
         <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Рабочая панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
+        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
@@ -533,7 +612,7 @@
           </div>
           <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-              <h5 style="font-size:12px;margin:0;">Управление школой</h5>
+              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
             <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
@@ -1797,9 +1876,9 @@ window.onunhandledrejection = function(event) {
   }
 
   function councilRoleName(role) {
-    if (role === "school_admin") return "Администратор";
-    if (role === "council_member") return "Участник совета";
-    return "Обычный пользователь";
+    if (role === "school_admin") return "Администратор школы";
+    if (role === "council_member") return "Участник Ученического совета";
+    return "Ученик";
   }
 
   function councilAuditLabel(action) {
