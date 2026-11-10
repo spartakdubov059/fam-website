@@ -129,9 +129,15 @@ export async function reviewListingImage(
     const isRateLimited = response?.status === 429;
     const isQuotaExhausted = providerErrorCode === "insufficient_quota"
       || providerErrorCode === "billing_hard_limit_reached";
+    const isAuthFailure = response?.status === 401 || response?.status === 403;
+    const isBadRequest = response?.status === 400;
     const reasonCode = isRateLimited
       ? (isQuotaExhausted ? "image_review_quota_exceeded" : "image_review_rate_limited")
-      : "image_review_unavailable";
+      : isAuthFailure
+        ? "image_review_key_rejected"
+        : isBadRequest
+          ? "image_review_bad_request"
+          : "image_review_unavailable";
 
     console.warn("fam_image_review_provider_error", JSON.stringify({
       status: response?.status ?? 0,
@@ -145,7 +151,11 @@ export async function reviewListingImage(
         ? "У сервиса проверки временно исчерпан лимит. Фото не признано запрещённым, но объявление не опубликовано — нужно восстановить доступность проверки."
         : isRateLimited
           ? "Сервис проверки временно ограничил запросы. Фото не признано запрещённым, но объявление пока не опубликовано. Попробуйте повторить отправку немного позже."
-          : "Сервис проверки фотографий временно недоступен. Фото не признано запрещённым, объявление не опубликовано.",
+          : isAuthFailure
+            ? "Не удалось авторизовать сервис проверки фотографий. Фото не признано запрещённым; объявление не опубликовано."
+            : isBadRequest
+              ? "Сервис проверки не принял формат запроса. Фото не признано запрещённым; объявление не опубликовано."
+              : "Сервис проверки фотографий временно недоступен. Фото не признано запрещённым, объявление не опубликовано.",
     };
   }
 
