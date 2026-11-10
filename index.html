@@ -612,6 +612,28 @@
     .notif-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
     .notif-empty { padding:18px; color:var(--muted); font-size:12px; text-align:center; }
 
+
+    .council-account-card { padding:11px; }
+    .council-account-topline { display:flex; justify-content:space-between; align-items:flex-start; gap:9px; flex-wrap:wrap; }
+    .council-account-title { display:block; font-size:11px; }
+    .council-account-code,.council-account-muted,.council-account-context { margin-top:4px; color:var(--muted); font-size:10px; line-height:1.45; overflow-wrap:anywhere; }
+    .council-account-posts-toggle { margin-top:9px; border-top:1px solid var(--border); padding-top:8px; }
+    .council-account-posts-toggle > summary { cursor:pointer; color:var(--text); font-size:10px; font-weight:800; }
+    .council-account-posts-list { padding-top:7px; }
+    .council-account-post { padding:7px 0; border-bottom:1px solid var(--border); }
+    .council-account-post:last-child { border-bottom:0; }
+    .council-account-post b,.council-account-post span { display:block; }
+    .council-account-post b { font-size:10px; }
+    .council-account-post span { margin-top:3px; color:var(--muted); font-size:9px; }
+    .council-account-restriction { margin-top:9px; padding-top:8px; border-top:1px solid var(--border); }
+    .council-account-restriction > summary,.council-field-label { cursor:pointer; color:var(--muted); font-size:10px; }
+    .council-account-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+    .council-listing-card { padding:11px; }
+    .council-listing-title { font-size:12px; font-weight:800; line-height:1.4; overflow-wrap:anywhere; }
+    .council-listing-meta,.council-listing-author { margin-top:5px; color:var(--muted); font-size:9px; line-height:1.45; }
+    .council-listing-price { margin-top:6px; font-size:10px; font-weight:800; }
+    .council-listing-author { margin-bottom:8px; }
+
   </style>
 </head>
 <body>
@@ -2418,52 +2440,80 @@ window.onunhandledrejection = function(event) {
       const users = Array.isArray(data.users) ? data.users : [];
       const activeSuspensions = Array.isArray(data.suspensions) ? data.suspensions : [];
       const suspensionByUser = new Map(activeSuspensions.map(row => [row.target_id, row]));
+      const listingsData = Array.isArray(data.listings) ? data.listings : [];
+      const listingsByUser = new Map();
+      listingsData.forEach(listing => {
+        if (!listing.user_id) return;
+        const current = listingsByUser.get(listing.user_id) || [];
+        current.push(listing);
+        listingsByUser.set(listing.user_id, current);
+      });
+      const usersById = new Map(users.map(row => [row.id, row]));
       $("councilAdminUsers").innerHTML = users.length ? users.map(row => {
         const isSelf = row.id === user.id;
         const canManage = !isSelf && ["student", "council_member"].includes(row.role);
         const canRevoke = !isSelf && ["council_member", "school_admin"].includes(row.role);
         const canDelete = canManage;
         const suspension = suspensionByUser.get(row.id);
+        const accountCode = String(row.id || "").slice(-6).toUpperCase();
+        const accountListings = listingsByUser.get(row.id) || [];
+        const registeredAt = row.created_at ? new Date(row.created_at).toLocaleDateString("ru-RU") : "дата неизвестна";
         const actions = [
           canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
-          canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button>` : ""
+          canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}" data-account-code="${esc(accountCode)}">Удалить аккаунт</button>` : ""
         ].filter(Boolean).join("");
+
+        const listingHistory = accountListings.length ? accountListings.slice(0, 5).map(listing => {
+          const postDate = listing.created_at ? new Date(listing.created_at).toLocaleDateString("ru-RU") : "";
+          const postState = listing.status === "active" ? "Опубликовано" : "Скрыто";
+          return `<div class="council-account-post">
+            <b>${esc(listing.title || "Без названия")}</b>
+            <span>${esc(listing.category || "Объявление")} · ${postState}${postDate ? " · " + esc(postDate) : ""}</span>
+          </div>`;
+        }).join("") : '<p class="council-account-muted">В последних объявлениях школы публикаций этого аккаунта нет.</p>';
 
         let restrictionControl = "";
         if (canManage && suspension) {
           const until = suspension.expires_at ? new Date(suspension.expires_at).toLocaleString("ru-RU") : "—";
-          restrictionControl = `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+          restrictionControl = `<div class="council-account-restriction">
             <span class="idea-status status-rejected">Временно ограничен до ${esc(until)}</span>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;">Причина: ${esc(suspension.reason || "Не указана")}</div>
+            <div class="council-account-muted">Причина: ${esc(suspension.reason || "Не указана")}</div>
             <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="lift-council-suspension" data-id="${esc(row.id)}">Снять ограничение досрочно</button>
           </div>`;
         } else if (canManage) {
-          restrictionControl = `<details style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-            <summary style="font-size:10px;cursor:pointer;color:var(--muted);">Временно ограничить действия</summary>
+          restrictionControl = `<details class="council-account-restriction">
+            <summary>Временно ограничить действия</summary>
             <div style="margin-top:8px;">
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Срок ограничения</label>
+              <label class="council-field-label">Срок ограничения</label>
               <select class="form-control" data-suspension-hours style="font-size:11px;margin-bottom:7px;">
                 <option value="24">24 часа</option>
                 <option value="72">3 дня</option>
                 <option value="168">7 дней</option>
               </select>
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Причина (15–400 символов)</label>
+              <label class="council-field-label">Причина (15–400 символов)</label>
               <textarea class="form-control" data-suspension-reason rows="2" maxlength="400" style="font-size:11px;" placeholder="Кратко опишите конкретное нарушение, без личных данных"></textarea>
               <button type="button" class="button button-secondary button-small" style="margin-top:7px;" data-action="suspend-council-account" data-id="${esc(row.id)}">Установить ограничение</button>
             </div>
           </details>`;
         }
 
-        return `<div class="idea-card" style="margin-bottom:7px;">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(row.email || "Пользователь")}</b>
+        return `<div class="idea-card council-account-card" style="margin-bottom:8px;">
+          <div class="council-account-topline">
+            <div>
+              <b class="council-account-title">${esc(row.email || "Аккаунт")}</b>
+              <div class="council-account-code">Аккаунт #${esc(accountCode)} · регистрация: ${esc(registeredAt)}</div>
+            </div>
             <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
           </div>
-          ${isSelf ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;">Ваш аккаунт</div>' : ""}
+          <details class="council-account-posts-toggle">
+            <summary>Публикации аккаунта: ${accountListings.length}${listingsData.length >= 100 ? " · последние 100 в школе" : ""}</summary>
+            <div class="council-account-posts-list">${listingHistory}</div>
+          </details>
+          ${isSelf ? '<div class="council-account-muted">Это ваш аккаунт — управлять им из этого списка нельзя.</div>' : ""}
           ${restrictionControl}
-          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${actions}</div>` : ""}
+          ${actions ? `<div class="council-account-actions">${actions}</div>` : ""}
         </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);">Аккаунты не найдены.</p>';
+      }).join("") : '<p class="council-account-muted">Аккаунты не найдены.</p>';
 
       const deletionRequests = Array.isArray(data.deletion_requests) ? data.deletion_requests : [];
       $("councilAdminDeletionRequests").innerHTML = deletionRequests.length ? deletionRequests.map(row => {
@@ -2480,20 +2530,35 @@ window.onunhandledrejection = function(event) {
             <span class="idea-status status-work">${esc(statusText)}</span>
           </div>
           <div style="font-size:10px;color:var(--muted);margin:5px 0;">Запросил: ${esc(row.requester_email || "Участник совета")} · ${esc(councilRoleName(row.target_role))}</div>
+          ${(() => {
+            const target = usersById.get(row.target_id);
+            const code = String(row.target_id || "").slice(-6).toUpperCase();
+            const targetPosts = listingsByUser.get(row.target_id) || [];
+            const postNames = targetPosts.slice(0, 3).map(item => item.title).filter(Boolean).join(" · ");
+            return `<div class="council-account-context">Аккаунт #${esc(code)}${target?.created_at ? " · регистрация " + esc(new Date(target.created_at).toLocaleDateString("ru-RU")) : ""}</div>`
+              + (postNames ? `<div class="council-account-context">Публикации: ${esc(postNames)}</div>` : "");
+          })()}
           <div style="font-size:10px;margin:5px 0;"><b>${esc(deletionReasonLabel(row.reason_code))}</b><br>${esc(row.reason || "")}</div>
           <div style="font-size:9px;color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
           ${actions}
         </div>`;
       }).join("") : '<p style="font-size:10px;color:var(--muted);">Нет открытых запросов на удаление.</p>';
 
-      const listingsData = Array.isArray(data.listings) ? data.listings : [];
-      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => `
-        <div class="idea-card" style="margin-bottom:7px;">
-          <div class="council-listing-title" style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
-          <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
+      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => {
+        const author = usersById.get(row.user_id);
+        const authorCode = String(row.user_id || "").slice(-6).toUpperCase();
+        const createdAt = row.created_at ? new Date(row.created_at).toLocaleString("ru-RU") : "дата неизвестна";
+        const eventDate = row.is_event && row.event_date
+          ? " · мероприятие: " + new Date(row.event_date).toLocaleDateString("ru-RU")
+          : "";
+        return `<div class="idea-card council-listing-card" style="margin-bottom:8px;">
+          <div class="council-listing-title">${esc(row.title || "Без названия")}</div>
+          <div class="council-listing-meta">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
+          <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
           <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
+        </div>`;
+      }).join("") : '<p class="council-account-muted">Объявлений школы пока нет.</p>';
 
       const audit = Array.isArray(data.audit) ? data.audit : [];
       $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
@@ -2861,9 +2926,12 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageCouncilAccount(targetId) {
-    if (!targetId || !confirm("Удалить аккаунт пользователя? Действие необратимо: удалятся профиль, объявления, сообщения и его файлы.")) return;
-    if (!confirm("Подтвердите окончательное удаление аккаунта.")) return;
+  async function manageCouncilAccount(button) {
+    const targetId = button?.dataset?.id;
+    const accountCode = button?.dataset?.accountCode || String(targetId || "").slice(-6).toUpperCase();
+    if (!targetId || profile?.role !== "school_admin") return;
+    if (!confirm("Удалить аккаунт #" + accountCode + " этой школы? Перед подтверждением проверьте его роль и публикации в карточке. Действие необратимо.")) return;
+    if (!confirm("Подтвердите окончательное удаление аккаунта #" + accountCode + ".")) return;
     try {
       await callCouncilManagement("delete_account", targetId);
       notice("Аккаунт и связанные данные удалены.");
@@ -3279,7 +3347,7 @@ window.onunhandledrejection = function(event) {
     else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'self-delete-account') { deleteMyAccount(); }
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
-    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
+    else if (action === 'delete-council-account') { manageCouncilAccount(btn); }
     else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
     else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
