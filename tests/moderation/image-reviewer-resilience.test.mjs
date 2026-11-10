@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   boundedRetryDelayMs,
+  isExhaustedImageReviewQuota,
   shouldRetryImageReviewRateLimit,
 } from "../../supabase/functions/moderate/image-reviewer-utils.js";
 
@@ -20,6 +21,9 @@ test("retries one transient image-review rate limit but not exhausted provider q
   assert.equal(shouldRetryImageReviewRateLimit(429, null, 0), true);
   assert.equal(shouldRetryImageReviewRateLimit(429, "insufficient_quota", 0), false);
   assert.equal(shouldRetryImageReviewRateLimit(429, "billing_hard_limit_reached", 0), false);
+  assert.equal(shouldRetryImageReviewRateLimit(429, "credit_balance_exhausted", 0), false);
+  assert.equal(isExhaustedImageReviewQuota("credit_balance_exhausted"), true);
+  assert.equal(isExhaustedImageReviewQuota("rate_limit_exceeded"), false);
   assert.equal(shouldRetryImageReviewRateLimit(429, "rate_limit_exceeded", 1), false);
   assert.equal(shouldRetryImageReviewRateLimit(500, "rate_limit_exceeded", 0), false);
 });
@@ -37,6 +41,7 @@ test("photo-review rate limits are reported as a provider problem, not a prohibi
   assert.match(reviewer, /Фото не признано запрещённым/);
   assert.match(reviewer, /image_review_quota_exceeded/);
   assert.match(reviewer, /shouldRetryImageReviewRateLimit/);
+  assert.match(reviewer, /isExhaustedImageReviewQuota/);
   assert.match(moderator, /image_review_rate_limited: \{ category: "unclear_safety_signal"/);
   assert.match(moderator, /image_review_quota_exceeded: \{ category: "unclear_safety_signal"/);
   assert.match(moderator, /Provider rate limits, quota, or outages are service failures, not user safety violations/);
