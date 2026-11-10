@@ -69,15 +69,16 @@ test("the test workflow can be explicitly dispatched for a token-created PR bran
   assert.match(workflow, /gh run watch "\$TEST_RUN_ID" --exit-status --interval 10/);
 });
 
-test("critical changes require manual approval; only tested low-risk PRs may merge", () => {
+test("all changes require owner approval before merge and production publication", () => {
   assert.match(validator, /CRITICAL_CHANGE_PATTERNS/);
   assert.match(validator, /export function requiresManualApproval/);
-  assert.match(workflow, /if: steps\.pr\.outputs\.requires_approval == 'false'/);
-  assert.match(workflow, /gh pr merge "\$PR_URL" --squash --delete-branch/);
   assert.match(workflow, /gh pr create --draft/);
-  assert.match(workflow, /pages: write/);
-  assert.match(workflow, /repos\/\$\{GITHUB_REPOSITORY\}\/pages\/builds/);
-  assert.match(workflow, /githubusercontent\.com\/|github\.io\/fam-website/);
+  assert.match(workflow, /отдельного явного разрешения владельца/);
+  assert.doesNotMatch(workflow, /gh pr merge\\b/);
+  assert.doesNotMatch(workflow, /pages: write/);
+  assert.doesNotMatch(workflow, /pages\\/builds/);
+  assert.doesNotMatch(workflow, /curl[^\\n]*github\\.io/);
+  assert.match(prompt, /Никогда не объединяй PR/);
   assert.match(prompt, /необратимые операции/);
   assert.match(prompt, /RLS/);
 });
