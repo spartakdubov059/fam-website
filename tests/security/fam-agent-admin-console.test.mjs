@@ -74,11 +74,14 @@ test("agent dashboards stay out of the FAM UI while the separate server report p
   assert.match(controller, /rpc\/get_fam_agent_admin_dashboard/);
 });
 
-test("bell notifications use stable IDs and persistent per-account dismissals", () => {
+test("bell notifications use stable IDs and database-persistent account read and dismissal states", () => {
   assert.match(frontend, /NOTIFICATION_RELEASE_ID/);
-  assert.match(frontend, /fam_notifications_dismissed_v2_/);
+  assert.match(frontend, /from\("notification_reads"\)/);
+  assert.match(frontend, /onConflict: "user_id,notification_key"/);
+  assert.match(frontend, /data-action="mark-notification-read"/);
   assert.match(frontend, /data-action="dismiss-notification"/);
-  assert.match(frontend, /data-action="clear-notifications"/);
+  assert.match(frontend, /markNotificationsRead\(unreadIds\)/);
+  assert.doesNotMatch(frontend, /saveDismissedNotifications/);
   assert.doesNotMatch(frontend, /fam_notif_seen/);
 });
 
@@ -99,5 +102,8 @@ test("school admin cards identify accounts and their recent school publications"
   assert.match(frontend, /Публикации аккаунта:/);
   assert.match(frontend, /Автор:/);
   assert.match(controller, /price_text/);
+  assert.match(controller, /description/);
   assert.match(controller, /event_date/);
+  assert.match(frontend, /Объявление #/);
+  assert.match(frontend, /Аккаунт #/);
 });

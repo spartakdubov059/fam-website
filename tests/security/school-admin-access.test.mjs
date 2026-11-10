@@ -37,7 +37,7 @@ test("maps RPC request_id to frontend id and minimizes applicant identifiers", (
   }]);
   assert.equal(mapped.length, 1);
   assert.equal(mapped[0].id, "6e8ecb53-2fb6-42a5-9ff8-d4d4b4d5b7c9");
-  assert.equal(mapped[0].user_id, "12345678");
+  assert.equal(mapped[0].user_id, "789ABC");
   assert.equal(mapped[0].applicant_email, "s***@example.ru");
   assert.equal(mapped[0].applicant_note, "Секретарь Ученического совета");
 });

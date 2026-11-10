@@ -34,7 +34,7 @@ export function mapSchoolAdminRequests(rows) {
     id: typeof row?.request_id === "string"
       ? row.request_id
       : (typeof row?.id === "string" ? row.id : ""),
-    user_id: typeof row?.user_id === "string" ? row.user_id.slice(0, 8) : "",
+    user_id: typeof row?.user_id === "string" ? row.user_id.slice(-6).toUpperCase() : "",
     applicant_email: maskApplicantEmail(row?.applicant_email),
     applicant_note: displayApplicantRole(row?.applicant_note),
     status: typeof row?.status === "string" ? row.status : "pending",

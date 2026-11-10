@@ -633,7 +633,35 @@
     .council-listing-price { margin-top:6px; font-size:10px; font-weight:800; }
     .council-listing-author { margin-bottom:8px; }
 
-  </style>
+  
+    .hero-slide.hero-brand { background: linear-gradient(140deg,#272B32 0%,#191C22 70%,#15171B 100%); }
+    .ai-live { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #E6E8EC; }
+    .db-emoji { font-size: 46px; right: 20px; top: 18px; }
+    .db-title { font-family: inherit; font-size: clamp(25px,5vw,35px); font-weight: 850; letter-spacing: -.04em; line-height: 1.12; max-width: min(76%,420px); overflow-wrap: anywhere; }
+    .db-sub { color: #D0D3D9; font-size: 13px; line-height: 1.45; margin: 10px 0 4px; max-width: min(76%,420px); }
+    .notif-item.is-read { opacity: .7; }
+    .notif-read-state { color: var(--muted); font-size: 10px; align-self: center; }
+    #profileLoggedIn .profile-council-disclosure { background: var(--surface); border: 1px solid var(--border); box-shadow: none; }
+    #adminIdeasDash > summary { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
+    #adminIdeasDash[open] > summary { border-bottom-color: var(--border); }
+    #adminIdeasDash .profile-disclosure-title b,
+    #adminIdeasDash .profile-disclosure-title small { color: var(--text); }
+    #adminIdeasDash > summary .profile-shortcut-icon { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    #adminIdeasDash .profile-disclosure-body, #councilAdminTools { background: var(--surface); border-color: var(--border); }
+    #adminIdeasDash .council-dashboard-note, #adminIdeasDash .profile-box,
+    #adminIdeasDash .profile-inline-disclosure, #adminIdeasDash .idea-card {
+      background: var(--bg); color: var(--text); border-color: var(--border); box-shadow: none;
+    }
+    #adminIdeasDash .profile-inline-disclosure > summary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
+    #adminIdeasDash .idea-folder { background: var(--surface); color: var(--text); border-color: var(--border); }
+    #adminIdeasDash .idea-folder.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    #adminIdeasDash .profile-section-copy, #adminIdeasDash .council-section-title { color: var(--muted); }
+    @media (max-width:420px) {
+      .db-emoji { font-size: 38px; right: 15px; top: 16px; }
+      .db-title, .db-sub { max-width: 74%; }
+    }
+
+</style>
 </head>
 <body>
   <noscript>
@@ -665,7 +693,7 @@
 </header>
 
 <div class="notif-panel hidden" id="notifPanel" role="dialog" aria-labelledby="notifTitle">
-  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><div class="notif-head-actions"><button class="button button-secondary button-small" data-action="clear-notifications">Скрыть всё</button><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div></div>
+  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><div class="notif-head-actions"><button class="button button-secondary button-small" data-action="mark-all-notifications-read">Отметить всё прочитанным</button><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div></div>
   <div id="notifContent"></div>
 </div>
 
@@ -674,7 +702,7 @@
     <div class="icon">⚠️</div>
     <div>
       <b>ИИ-модерация временно недоступна.</b>
-      Объявления не публикуются без проверки, сообщения временно не отправляются, а идеи сохраняются для ручной проверки школьным Советом.<br>
+      Объявления и сообщения не будут опубликованы без успешной проверки безопасности. Идеи, которые система не смогла проверить автоматически, останутся вне списка Совета до завершения дополнительной проверки.<br>
       <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Попробуйте позже. Уже отправленные идеи можно проверить в панели Совета.</span>
     </div>
   </div>
@@ -734,8 +762,8 @@
       
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
-            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
-            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
+            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на вступление и полномочия</h5>
+            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Заявки учеников вашей школы. До одобрения заявитель сохраняет обычный статус ученика.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
           <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
@@ -798,10 +826,10 @@
           </div></details>
       
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
-        <p class="profile-section-copy">Аккаунт ученика не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Заявка на вступление или полномочия</h3></div><span class="profile-section-icon">🏫</span></div>
+        <p class="profile-section-copy">Новый аккаунт имеет статус ученика. Отправьте заявку на вступление в Совет или на полномочия администратора — её рассмотрит администратор вашей школы.</p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете">
-          <option value="">Выберите нужную роль</option><option value="Участник Ученического совета">Участник Ученического совета</option><option value="Администратор">Администратор</option>
+          <option value="">Что вы хотите запросить?</option><option value="Участник Ученического совета">Вступить в Ученический совет</option><option value="Администратор">Получить полномочия администратора</option>
         </select>
         <details class="profile-help"><summary>Чем отличаются роли?</summary><div class="profile-help-body">
           <p><b>Участник Совета:</b> работает с идеями, мероприятиями и заявками на свои мероприятия.</p>
@@ -1095,10 +1123,10 @@ window.onunhandledrejection = function(event) {
     const liveLabel = document.querySelector(".ai-live");
     if (liveLabel) {
       liveLabel.textContent = isAiDown === null
-        ? "ИИ-модерация · статус не проверен"
+        ? "ИИ-проверка перед публикацией"
         : isAiDown
-          ? "ИИ-модерация недоступна"
-          : "ИИ-модерация активна";
+          ? "Проверка временно недоступна"
+          : "Проверка публикаций активна";
     }
   }
 
@@ -1149,36 +1177,24 @@ window.onunhandledrejection = function(event) {
     try {
       const value = JSON.parse(safeLocalStorageGet(key) || "[]");
       return Array.isArray(value) ? value.filter(item => typeof item === "string").slice(-500) : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function saveDismissedNotifications(ids) {
-    const key = notificationDismissKey();
-    if (!key) return;
-    const unique = Array.from(new Set(ids)).slice(-500);
-    safeLocalStorageSet(key, JSON.stringify(unique));
+    } catch (_) { return []; }
   }
 
   function updateBellBadge() {
-    const n = notificationsCache.length;
+    const unread = notificationsCache.filter(item => item.isRead !== true).length;
     const badge = $("bellBadge");
     if (!badge) return;
-    if (n > 0) {
-      badge.textContent = n > 9 ? "9+" : String(n);
+    if (unread > 0) {
+      badge.textContent = unread > 9 ? "9+" : String(unread);
       badge.classList.remove("hidden");
-    } else {
-      badge.classList.add("hidden");
-    }
+    } else badge.classList.add("hidden");
   }
 
   function renderNotifPanel() {
     const content = $("notifContent");
     if (!content) return;
-    const notes = notificationsCache;
-    content.innerHTML = notes.length ? notes.map(note => `
-      <article class="notif-item">
+    content.innerHTML = notificationsCache.length ? notificationsCache.map(note => `
+      <article class="notif-item${note.isRead ? " is-read" : ""}">
         <span class="notif-ico">${esc(note.icon || "🔔")}</span>
         <div class="notif-body">
           <div class="notif-title">${esc(note.title)}</div>
@@ -1188,11 +1204,14 @@ window.onunhandledrejection = function(event) {
             ${note.kind === "message" && note.senderId
               ? `<button type="button" class="button button-primary button-small" data-action="open-notification-chat" data-user-id="${esc(note.senderId)}">Открыть чат</button>`
               : ""}
+            ${note.isRead
+              ? '<span class="notif-read-state">✓ Прочитано</span>'
+              : `<button type="button" class="button button-secondary button-small" data-action="mark-notification-read" data-id="${esc(note.id)}">Отметить прочитанным</button>`}
             <button type="button" class="button button-secondary button-small" data-action="dismiss-notification" data-id="${esc(note.id)}">Убрать</button>
           </div>
         </div>
       </article>
-    `).join("") : '<p class="notif-empty">Новых уведомлений нет.</p>';
+    `).join("") : '<p class="notif-empty">Уведомлений пока нет. Новые события появятся здесь.</p>';
   }
 
   async function refreshNotificationFeed() {
@@ -1204,134 +1223,102 @@ window.onunhandledrejection = function(event) {
       return;
     }
 
-    const dismissed = new Set(readDismissedNotifications());
-    const items = [];
     const now = Date.now();
     const recentCutoff = now - 14 * 24 * 60 * 60 * 1000;
+    const legacyDismissed = readDismissedNotifications();
+
+    if (legacyDismissed.length) {
+      const legacyRows = legacyDismissed.map(id => ({
+        user_id: user.id,
+        notification_key: "dismissed:" + id,
+        read_at: new Date().toISOString()
+      }));
+      const { error } = await sb.from("notification_reads")
+        .upsert(legacyRows, { onConflict: "user_id,notification_key" });
+      if (error) console.warn("notification_legacy_migration_failed", error.message);
+    }
+
+    const readResult = await sb.from("notification_reads")
+      .select("notification_key").eq("user_id", user.id).limit(2000);
+    if (requestId !== notificationRefreshSeq || !user?.id) return;
+    if (readResult.error) console.warn("notification_read_state_load_failed", readResult.error.message);
+    const readIds = new Set(Array.isArray(readResult.data) ? readResult.data.map(row => row.notification_key) : []);
+    const dismissedIds = new Set([
+      ...legacyDismissed,
+      ...Array.from(readIds).filter(key => key.startsWith("dismissed:")).map(key => key.slice(10))
+    ]);
+
+    const items = [];
     const add = item => {
-      if (item && typeof item.id === "string" && !dismissed.has(item.id)) {
-        items.push({ ...item, time: Number.isFinite(item.time) ? item.time : now });
+      if (item && typeof item.id === "string" && !dismissedIds.has(item.id)) {
+        items.push({ ...item, isRead: item.isRead === true || readIds.has(item.id), time: Number.isFinite(item.time) ? item.time : now });
       }
     };
 
     add({
-      id: NOTIFICATION_RELEASE_ID,
-      kind: "release",
-      icon: "✨",
-      title: "Обновление FAM",
-      text: "Обновлены уведомления, профиль и рабочая панель Ученического совета.",
-      time: Date.parse("2026-11-10T15:17:40Z")
+      id: NOTIFICATION_RELEASE_ID, kind: "release", icon: "✨", title: "Обновление FAM",
+      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
+      time: Date.parse("2026-11-10T16:59:08Z")
     });
 
-    if (isAiDown === true) {
-      add({
-        id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
-        kind: "system",
-        icon: "⚠️",
-        title: "ИИ-модерация временно недоступна",
-        text: "Новые публикации и сообщения могут быть временно ограничены.",
-        time: now
-      });
-    }
+    if (isAiDown === true) add({
+      id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
+      kind: "system", icon: "⚠️", title: "ИИ-модерация временно недоступна",
+      text: "Новые публикации не будут опубликованы без успешной проверки безопасности.", time: now
+    });
 
     if (profile?.school_id) {
-      listings
-        .filter(row => row.school_id === profile.school_id
-          && row.user_id !== user.id
-          && new Date(row.created_at || 0).getTime() >= recentCutoff)
-        .slice(0, 8)
-        .forEach(row => {
-          add({
-            id: "school-listing:" + row.id,
-            kind: "listing",
-            icon: row.is_event ? "🎭" : "📌",
-            title: row.is_event ? "Новое мероприятие школы" : "Новое объявление школы",
-            text: row.title || "Опубликован новый материал",
-            time: new Date(row.created_at || now).getTime()
-          });
-        });
+      listings.filter(row => row.school_id === profile.school_id && row.user_id !== user.id
+        && new Date(row.created_at || 0).getTime() >= recentCutoff).slice(0, 8).forEach(row => add({
+        id: "school-listing:" + row.id, kind: "listing", icon: row.is_event ? "🎭" : "📌",
+        title: row.is_event ? "Новое мероприятие школы" : "Новое объявление школы",
+        text: row.title || "Опубликован новый материал", time: new Date(row.created_at || now).getTime()
+      }));
     }
 
     if (["school_admin", "council_member"].includes(profile?.role)) {
-      ideas
-        .filter(row => row.admin_status === "new"
-          && new Date(row.created_at || 0).getTime() >= recentCutoff)
-        .slice(0, 8)
-        .forEach(row => {
-          add({
-            id: "school-idea:" + row.id,
-            kind: "idea",
-            icon: "💡",
-            title: "Новая идея ученика",
-            text: String(row.text || "Предложена новая идея").slice(0, 110),
-            time: new Date(row.created_at || now).getTime()
-          });
-        });
+      ideas.filter(row => row.ai_status === "approved" && row.admin_status === "new"
+        && new Date(row.created_at || 0).getTime() >= recentCutoff).slice(0, 8).forEach(row => add({
+        id: "school-idea:" + row.id, kind: "idea", icon: "💡", title: "Новая идея ученика",
+        text: String(row.text || "Предложена новая идея").slice(0, 110),
+        time: new Date(row.created_at || now).getTime()
+      }));
     }
 
-    const myEventIds = listings
-      .filter(row => row.user_id === user.id && row.is_event)
-      .map(row => row.id)
-      .slice(0, 100);
-
-    const messagePromise = sb.from("messages")
-      .select("id,sender_id,body,created_at")
-      .eq("receiver_id", user.id)
-      .or("is_read.eq.false,is_read.is.null")
-      .order("created_at", { ascending: false })
-      .limit(30);
-
+    const myEventIds = listings.filter(row => row.user_id === user.id && row.is_event).map(row => row.id).slice(0, 100);
+    const messagePromise = sb.from("messages").select("id,sender_id,body,created_at,is_read")
+      .eq("receiver_id", user.id).order("created_at", { ascending: false }).limit(100);
     const registrationPromise = myEventIds.length
-      ? sb.from("event_registrations")
-          .select("id,event_id,status,created_at")
-          .in("event_id", myEventIds)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false })
-          .limit(20)
+      ? sb.from("event_registrations").select("id,event_id,status,created_at").in("event_id", myEventIds)
+          .eq("status", "pending").order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [], error: null });
-
-    const accessPromise = profile?.role === "school_admin"
+    const accessPromise = ["school_admin", "student"].includes(profile?.role)
       ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
-      : profile?.role === "student"
-        ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
-        : Promise.resolve({ data: null, error: null });
-
+      : Promise.resolve({ data: null, error: null });
     const deletionPromise = profile?.role === "school_admin"
       ? sb.functions.invoke("council-management", { body: { action: "overview" } })
       : Promise.resolve({ data: null, error: null });
 
     const [messagesResult, registrationsResult, accessResult, deletionResult] = await Promise.all([
-      messagePromise,
-      registrationPromise,
-      accessPromise,
-      deletionPromise
+      messagePromise, registrationPromise, accessPromise, deletionPromise
     ]);
-
     if (requestId !== notificationRefreshSeq || !user?.id) return;
 
     if (!messagesResult.error && Array.isArray(messagesResult.data)) {
-      messagesResult.data.forEach(message => {
-        const sender = String(message.sender_id || "");
-        add({
-          id: "message:" + message.id,
-          kind: "message",
-          recordId: message.id,
-          senderId: sender,
-          icon: "💬",
-          title: "Новое сообщение",
-          text: String(message.body || "Вам пришло сообщение").slice(0, 100),
-          time: new Date(message.created_at || now).getTime()
-        });
-      });
-    }
+      messagesResult.data.forEach(message => add({
+        id: "message:" + message.id, kind: "message", recordId: message.id,
+        senderId: String(message.sender_id || ""), isRead: message.is_read === true,
+        icon: "💬", title: message.is_read ? "Сообщение" : "Новое сообщение",
+        text: String(message.body || "Вам пришло сообщение").slice(0, 100),
+        time: new Date(message.created_at || now).getTime()
+      }));
+    } else if (messagesResult.error) console.warn("notification_messages_load_failed", messagesResult.error.message);
 
     if (!registrationsResult.error && Array.isArray(registrationsResult.data)) {
       registrationsResult.data.forEach(row => {
         const event = listings.find(item => item.id === row.event_id);
         add({
-          id: "event-registration:" + row.id,
-          kind: "registration",
-          icon: "🎟️",
+          id: "event-registration:" + row.id, kind: "registration", icon: "🎟️",
           title: "Заявка на мероприятие",
           text: event?.title ? "Новая заявка на «" + event.title + "»" : "Появилась новая заявка на ваше мероприятие",
           time: new Date(row.created_at || now).getTime()
@@ -1342,99 +1329,106 @@ window.onunhandledrejection = function(event) {
     if (!accessResult.error && accessResult.data?.ok) {
       if (profile?.role === "school_admin") {
         (Array.isArray(accessResult.data.requests) ? accessResult.data.requests : [])
-          .filter(row => ["pending", "reviewing"].includes(row.status))
-          .forEach(row => {
-            add({
-              id: "school-access-request:" + row.id,
-              kind: "access-request",
-              icon: "🏫",
-              title: "Заявка на доступ к Совету",
-              text: row.applicant_note || "Поступила заявка на проверку полномочий.",
-              time: new Date(row.created_at || now).getTime()
-            });
-          });
+          .filter(row => ["pending", "reviewing"].includes(row.status)).forEach(row => add({
+            id: "school-access-request:" + row.id, kind: "access-request", icon: "🏫",
+            title: "Заявка на вступление или полномочия",
+            text: row.applicant_note || "Поступила новая заявка.",
+            time: new Date(row.created_at || now).getTime()
+          }));
       } else if (profile?.role === "student") {
         const request = accessResult.data.request;
         if (request && ["approved", "rejected"].includes(request.status)
-            && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) {
-          add({
-            id: "school-access-result:" + request.id + ":" + request.status,
-            kind: "access-result",
+          && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) add({
+            id: "school-access-result:" + request.id + ":" + request.status, kind: "access-result",
             icon: request.status === "approved" ? "✅" : "ℹ️",
             title: request.status === "approved" ? "Заявка одобрена" : "Заявка рассмотрена",
-            text: request.status === "approved"
-              ? "Ваша заявка на доступ к Ученическому совету одобрена."
+            text: request.status === "approved" ? "Ваша заявка на вступление в Ученический совет одобрена."
               : (request.review_note || "Ваша заявка рассмотрена. Откройте профиль, чтобы проверить статус."),
             time: new Date(request.reviewed_at || request.created_at || now).getTime()
           });
-        }
       }
     }
 
     if (!deletionResult.error && deletionResult.data?.ok) {
-      const pendingRequests = Array.isArray(deletionResult.data.deletion_requests)
-        ? deletionResult.data.deletion_requests
-        : [];
-      pendingRequests.forEach(row => {
-        add({
-          id: "account-deletion-request:" + row.id,
-          kind: "deletion-request",
-          icon: "🛡️",
-          title: "Запрос на проверку аккаунта",
-          text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6))
-            + " · " + deletionReasonLabel(row.reason_code),
-          time: new Date(row.created_at || now).getTime()
-        });
-      });
+      const pendingRequests = Array.isArray(deletionResult.data.deletion_requests) ? deletionResult.data.deletion_requests : [];
+      pendingRequests.forEach(row => add({
+        id: "account-deletion-request:" + row.id, kind: "deletion-request", icon: "🛡️",
+        title: "Запрос на проверку аккаунта",
+        text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6)) + " · " + deletionReasonLabel(row.reason_code),
+        time: new Date(row.created_at || now).getTime()
+      }));
     }
 
     if (requestId !== notificationRefreshSeq) return;
     notificationsCache = items.sort((a, b) => b.time - a.time).slice(0, 60);
-    updateBellBadge();
-    if (notifOpen) renderNotifPanel();
+    if (notifOpen) {
+      const unreadIds = notificationsCache.filter(item => item.isRead !== true).map(item => item.id);
+      if (unreadIds.length) await markNotificationsRead(unreadIds);
+      renderNotifPanel();
+    } else updateBellBadge();
   }
 
-  async function dismissNotification(notificationId) {
-    const note = notificationsCache.find(item => item.id === notificationId);
-    if (!note || !user?.id) return;
-    if (note.kind === "message" && note.recordId) {
-      const { error } = await sb.from("messages")
-        .update({ is_read: true })
-        .eq("id", note.recordId)
-        .eq("receiver_id", user.id)
-        .or("is_read.eq.false,is_read.is.null");
+  async function markNotificationsRead(notificationIds) {
+    if (!user?.id) return false;
+    const ids = new Set(Array.isArray(notificationIds) ? notificationIds.filter(id => typeof id === "string") : []);
+    const selected = notificationsCache.filter(item => ids.has(item.id) && item.isRead !== true);
+    if (!selected.length) return true;
+
+    const messageIds = selected.filter(item => item.kind === "message" && item.recordId).map(item => item.recordId);
+    if (messageIds.length) {
+      const { error } = await sb.from("messages").update({ is_read: true })
+        .eq("receiver_id", user.id).in("id", messageIds).or("is_read.eq.false,is_read.is.null");
       if (error) {
-        notice("Не удалось отметить сообщение прочитанным. Откройте чат и попробуйте ещё раз.");
+        notice("Не удалось отметить сообщения прочитанными. Откройте чат и попробуйте ещё раз.");
+        return false;
+      }
+    }
+
+    const rows = selected.map(item => ({
+      user_id: user.id, notification_key: item.id, read_at: new Date().toISOString()
+    }));
+    const { error } = await sb.from("notification_reads").upsert(rows, { onConflict: "user_id,notification_key" });
+    if (error) {
+      notice("Не удалось сохранить прочтение уведомлений. Попробуйте обновить страницу.");
+      return false;
+    }
+    selected.forEach(item => { item.isRead = true; });
+    updateBellBadge();
+    if (notifOpen) renderNotifPanel();
+    await updateChatBadge();
+    return true;
+  }
+
+  async function markNotificationRead(id) { return markNotificationsRead([id]); }
+
+  async function dismissNotification(id) {
+    if (!user?.id || typeof id !== "string") return;
+    const item = notificationsCache.find(row => row.id === id);
+    if (!item) return;
+    if (item.kind === "message" && item.recordId) {
+      const { error } = await sb.from("messages").update({ is_read: true })
+        .eq("id", item.recordId).eq("receiver_id", user.id);
+      if (error) {
+        notice("Не удалось убрать уведомление. Попробуйте ещё раз.");
         return;
       }
-    } else {
-      saveDismissedNotifications([...readDismissedNotifications(), notificationId]);
     }
-    await refreshNotificationFeed();
+    const { error } = await sb.from("notification_reads").upsert([{
+      user_id: user.id, notification_key: "dismissed:" + id, read_at: new Date().toISOString()
+    }], { onConflict: "user_id,notification_key" });
+    if (error) {
+      notice("Не удалось сохранить удаление уведомления.");
+      return;
+    }
+    notificationsCache = notificationsCache.filter(row => row.id !== id);
+    updateBellBadge();
+    renderNotifPanel();
     await updateChatBadge();
   }
 
   async function clearNotifications() {
-    if (!user?.id) return;
-    const messageIds = notificationsCache
-      .filter(item => item.kind === "message" && item.recordId)
-      .map(item => item.id);
-    const localIds = notificationsCache
-      .filter(item => item.kind !== "message")
-      .map(item => item.id);
-    saveDismissedNotifications([...readDismissedNotifications(), ...localIds]);
-
-    if (messageIds.length) {
-      const { error } = await sb.from("messages")
-        .update({ is_read: true })
-        .eq("receiver_id", user.id)
-        .or("is_read.eq.false,is_read.is.null");
-      if (error) {
-        notice("Не удалось отметить все сообщения прочитанными. Остальные уведомления скрыты.");
-      }
-    }
-    await refreshNotificationFeed();
-    await updateChatBadge();
+    const ids = notificationsCache.map(item => item.id);
+    for (const id of ids) await dismissNotification(id);
   }
 
   window.closeNotifPanel = () => {
@@ -1571,7 +1565,7 @@ window.onunhandledrejection = function(event) {
       if (user && user.id) {
         promises.push(sb.from("event_registrations").select("*").eq("user_id", user.id));
         const ideasQuery = ["school_admin", "council_member"].includes(profile?.role)
-          ? sb.from("ideas").select("*").eq('school_id', profile.school_id).order("created_at", { ascending: false })
+          ? sb.from("ideas").select("*").eq('school_id', profile.school_id).eq("ai_status", "approved").order("created_at", { ascending: false })
           : sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
         promises.push(ideasQuery);
         promises.push(sb.from("favorites").select("*").eq("user_id", user.id));
@@ -1627,16 +1621,16 @@ window.onunhandledrejection = function(event) {
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
       <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-модерация · статус не проверен</span>
+      <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
     </div>`);
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
       html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
     });
     const designed = [
-      { g: 'linear-gradient(140deg,#2A1B4A,#171226 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
-      { g: 'linear-gradient(140deg,#123324,#0C2418 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
-      { g: 'linear-gradient(140deg,#4A3F14,#26200C 70%)', e: '🤖', t: 'ИИ-модерация', s: 'защита 24/7', action: null },
-      { g: 'linear-gradient(140deg,#1E2749,#131A30 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
+      { g: 'linear-gradient(140deg,#2A2E36,#191C22 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
+      { g: 'linear-gradient(140deg,#30343B,#1B1E24 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
+      { g: 'linear-gradient(140deg,#34383F,#1D2026 70%)', e: '🤖', t: 'Проверка публикаций', s: 'ИИ-фильтр спама и личных данных', action: null },
+      { g: 'linear-gradient(140deg,#292F38,#171B21 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
     ];
     designed.forEach(b => {
       const attrs = b.action === 'cat' ? `data-action="cat" data-cat="${b.cat}"` : (b.action ? `data-action="${b.action}"` : '');
@@ -1977,9 +1971,14 @@ window.onunhandledrejection = function(event) {
     if (clearBtn) clearBtn.style.display = mine.length > 0 ? 'inline-flex' : 'none';
     if (myIdeasCount) myIdeasCount.textContent = String(mine.length);
     $("myIdeasList").innerHTML = mine.length ? mine.map(i => {
-      let st = (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'На рассмотрении')));
-      let cls = (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
-      let waitMsg = cls === 'status-new' ? `<div style="font-size:10px; color:#F0C14B; margin-top:6px; font-weight:700;">⏳ Ожидает решения Совета</div>` : '';
+      const safetyPending = i.ai_status === "pending";
+      let st = safetyPending ? "Дополнительная проверка безопасности"
+        : (i.admin_status === 'done' ? 'Выполнено' : (i.admin_status === 'in_progress' ? 'В работе' : (i.admin_status === 'rejected' ? 'Отклонено' : 'Ожидает решения Совета')));
+      let cls = safetyPending ? "status-work"
+        : (i.admin_status === 'done' ? 'status-done' : (i.admin_status === 'in_progress' ? 'status-work' : (i.admin_status === 'rejected' ? 'status-rejected' : 'status-new')));
+      let waitMsg = safetyPending
+        ? '<div style="font-size:10px;color:var(--muted);margin-top:6px;">Идея пока не показывается Совету: автоматическая проверка безопасности не завершилась однозначно.</div>'
+        : (cls === 'status-new' ? `<div style="font-size:10px; color:#F0C14B; margin-top:6px; font-weight:700;">⏳ Ожидает решения Совета</div>` : '');
       return `<div class="idea-card" style="${cls === 'status-new' ? 'border-color: rgba(240,193,75,0.3);' : ''}">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:flex-start;gap:10px;">
           <b style="font-size:12px;">${esc(i.text)}</b><span class="idea-status ${cls}">${st}</span>
@@ -1989,10 +1988,11 @@ window.onunhandledrejection = function(event) {
 
   function updateIdeaCounters() {
     if (!profile || !["school_admin", "council_member"].includes(profile.role)) return;
-    $("countNew").textContent = ideas.filter(i => i.admin_status === 'new').length;
-    $("countWork").textContent = ideas.filter(i => i.admin_status === 'in_progress').length;
-    $("countDone").textContent = ideas.filter(i => i.admin_status === 'done').length;
-    $("countRejected").textContent = ideas.filter(i => i.admin_status === 'rejected').length;
+    const councilIdeas = ideas.filter(i => i.ai_status === "approved");
+    $("countNew").textContent = councilIdeas.filter(i => i.admin_status === 'new').length;
+    $("countWork").textContent = councilIdeas.filter(i => i.admin_status === 'in_progress').length;
+    $("countDone").textContent = councilIdeas.filter(i => i.admin_status === 'done').length;
+    $("countRejected").textContent = councilIdeas.filter(i => i.admin_status === 'rejected').length;
   }
 
   window.updateIdea = async function(id, status) {
@@ -2003,7 +2003,7 @@ window.onunhandledrejection = function(event) {
     if (!["in_progress", "done", "rejected"].includes(status)) return;
     try {
       const { data, error } = await sb.from("ideas").update({ admin_status: status })
-        .eq("id", id).eq("school_id", profile.school_id).select();
+        .eq("id", id).eq("school_id", profile.school_id).eq("ai_status", "approved").select();
       if (error) throw error;
       if (!data || data.length === 0) { alert("Нет прав для изменения этой идеи."); return; }
       const idx = ideas.findIndex(i => i.id === id);
@@ -2024,10 +2024,11 @@ window.onunhandledrejection = function(event) {
   function renderIdeaFolderContent() {
     const content = $("ideaFolderContent");
     let filtered = [];
-    if (currentIdeaFolder === 'new') filtered = ideas.filter(i => i.admin_status === 'new');
-    else if (currentIdeaFolder === 'work') filtered = ideas.filter(i => i.admin_status === 'in_progress');
-    else if (currentIdeaFolder === 'done') filtered = ideas.filter(i => i.admin_status === 'done');
-    else if (currentIdeaFolder === 'rejected') filtered = ideas.filter(i => i.admin_status === 'rejected');
+    const councilIdeas = ideas.filter(i => i.ai_status === "approved");
+    if (currentIdeaFolder === 'new') filtered = councilIdeas.filter(i => i.admin_status === 'new');
+    else if (currentIdeaFolder === 'work') filtered = councilIdeas.filter(i => i.admin_status === 'in_progress');
+    else if (currentIdeaFolder === 'done') filtered = councilIdeas.filter(i => i.admin_status === 'done');
+    else if (currentIdeaFolder === 'rejected') filtered = councilIdeas.filter(i => i.admin_status === 'rejected');
     if (filtered.length === 0) { content.innerHTML = '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">В этой папке пока пусто</p>'; return; }
     const showClear = profile?.role === "school_admin" && ['work','done','rejected'].includes(currentIdeaFolder);
     const names = { work: 'в работе', done: 'выполненные', rejected: 'отклонённые' };
@@ -2101,8 +2102,8 @@ window.onunhandledrejection = function(event) {
       notice(submission.degraded
         ? "⚠️ " + (submission.reason || "Проверка временно недоступна. Идея не отправлена.")
         : submission.status === "pending"
-          ? "Идея отправлена школьному Совету на ручную проверку."
-          : "Идея отправлена Совету!");
+          ? "Идея сохранена на дополнительную проверку безопасности. Пока проверка не завершена, Совет её не увидит."
+          : "Идея прошла автоматическую проверку и отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
       hideAIThinking('ideaThinkingArea');
@@ -2186,13 +2187,13 @@ window.onunhandledrejection = function(event) {
 
         const request = data.request;
         if (request?.status === "pending") {
-          const requestedRole = request.applicant_note || "Роль Ученического совета";
+          const requestedRole = request.applicant_note === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет";
           const submittedAt = request.created_at
             ? new Date(request.created_at).toLocaleString("ru-RU")
             : "";
           showSchoolAdminAccessStatus(
             "Заявка отправлена",
-            "Вы запросили роль «" + requestedRole + "». Сейчас заявка ожидает рассмотрения действующим Советом. Повторно отправлять её не нужно.",
+            "Вы отправили заявку на " + requestedRole + ". До решения администратора ваш статус остаётся «Ученик». Повторно отправлять её не нужно.",
             "new",
             "pending",
             submittedAt ? "Отправлена: " + submittedAt : ""
@@ -2213,13 +2214,13 @@ window.onunhandledrejection = function(event) {
           if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
         } else if (request?.status === "rejected") {
-          const rejectedRole = request.applicant_note || "Роль Ученического совета";
+          const rejectedRole = request.applicant_note === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет";
           const rejectedAt = request.reviewed_at
             ? new Date(request.reviewed_at).toLocaleString("ru-RU")
             : "";
           showSchoolAdminAccessStatus(
             "Заявка отклонена",
-            "Заявка на роль «" + rejectedRole + "» не одобрена. " +
+            "Заявка на " + rejectedRole + " не одобрена. " +
               (request.review_note || "Совет не подтвердил членство. При необходимости уточните причину у действующего представителя и отправьте новую заявку."),
             "rejected",
             "rejected",
@@ -2265,7 +2266,9 @@ window.onunhandledrejection = function(event) {
       const requests = Array.isArray(data.requests) ? data.requests : [];
       if (!list) return;
       list.innerHTML = requests.length ? requests.map(request => {
-        const statusText = request.status === "reviewing" ? "На рассмотрении" : "Ожидает рассмотрения";
+        const statusText = request.status === "reviewing" ? "Взята на рассмотрение" : "Ожидает рассмотрения";
+        const requestType = request.applicant_note === "Администратор" ? "Заявка на полномочия администратора школы" : "Заявка на вступление в Ученический совет";
+        const accountCode = String(request.user_id || "").slice(-6).toUpperCase();
         let actions = "";
         if (request.status === "pending") {
           actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.id)}">Взять на рассмотрение</button>`;
@@ -2282,11 +2285,12 @@ window.onunhandledrejection = function(event) {
           : "";
         return `
           <div class="idea-card" style="margin-bottom:8px;">
-            <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("пользователя " + String(request.user_id || "").slice(0,8) + "…"))}</b>
-            <div style="font-size:10px; color:var(--muted); margin:5px 0;">${esc(request.applicant_note || "Роль в Совете не указана")}</div>
-            <div style="font-size:10px; margin:5px 0;">Статус: <b>${esc(statusText)}</b></div>
-            <div style="font-size:9px; color:var(--muted); margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>
+            <b style="font-size:11px;">${esc(requestType)}</b>
+            <div style="font-size:10px;color:var(--muted);margin:5px 0;">Аккаунт #${esc(accountCode || "—")} · ${esc(request.applicant_email || "почта скрыта")}</div>
+            <div style="font-size:10px;margin:5px 0;">Запрошено: <b>${esc(request.applicant_note || "не указано")}</b></div>
+            <div style="font-size:10px;margin:5px 0;">Статус: <b>${esc(statusText)}</b> · заявитель пока ученик</div>
+            <div style="font-size:9px;color:var(--muted);margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
           </div>
         `;
       }).join("") : '<p style="font-size:11px; color:var(--muted); margin:0;">Новых заявок пока нет.</p>';
@@ -2465,9 +2469,11 @@ window.onunhandledrejection = function(event) {
         const listingHistory = accountListings.length ? accountListings.slice(0, 5).map(listing => {
           const postDate = listing.created_at ? new Date(listing.created_at).toLocaleDateString("ru-RU") : "";
           const postState = listing.status === "active" ? "Опубликовано" : "Скрыто";
+          const shortDescription = String(listing.description || "").trim().slice(0, 180);
           return `<div class="council-account-post">
             <b>${esc(listing.title || "Без названия")}</b>
             <span>${esc(listing.category || "Объявление")} · ${postState}${postDate ? " · " + esc(postDate) : ""}</span>
+            ${shortDescription ? `<span>${esc(shortDescription)}</span>` : ""}
           </div>`;
         }).join("") : '<p class="council-account-muted">В последних объявлениях школы публикаций этого аккаунта нет.</p>';
 
@@ -2550,12 +2556,16 @@ window.onunhandledrejection = function(event) {
         const eventDate = row.is_event && row.event_date
           ? " · мероприятие: " + new Date(row.event_date).toLocaleDateString("ru-RU")
           : "";
+        const description = String(row.description || "").trim().slice(0, 260);
+        const listingCode = String(row.id || "").slice(-6).toUpperCase();
         return `<div class="idea-card council-listing-card" style="margin-bottom:8px;">
           <div class="council-listing-title">${esc(row.title || "Без названия")}</div>
-          <div class="council-listing-meta">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          ${description ? `<div class="council-listing-context">${esc(description)}</div>` : '<div class="council-listing-context">Описание не заполнено.</div>'}
+          ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
           ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
-          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
+          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить это объявление</button>
         </div>`;
       }).join("") : '<p class="council-account-muted">Объявлений школы пока нет.</p>';
 
@@ -2772,8 +2782,8 @@ window.onunhandledrejection = function(event) {
       if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
     }
     try {
-      const confirmed = await ensureRecentAdminAuthentication();
-      if (!confirmed) return;
+      const { data: authData, error: authError } = await sb.auth.getUser();
+      if (authError || !authData?.user?.id || authData.user.id !== user.id) throw new Error("Сессия завершена. Войдите в аккаунт заново.");
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
       });
@@ -2874,37 +2884,11 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function ensureRecentAdminAuthentication() {
-    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
-    if (sessionError) throw sessionError;
-    const token = sessionData?.session?.access_token || "";
-    const parts = token.split(".");
-    let issuedAt = 0;
-    if (parts.length === 3) {
-      try {
-        const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
-        issuedAt = Number(JSON.parse(atob(padded))?.iat) || 0;
-      } catch (_) {
-        issuedAt = 0;
-      }
-    }
-    const age = Date.now() / 1000 - issuedAt;
-    if (issuedAt > 0 && age >= 0 && age <= 600) return true;
-
-    const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
-    if (!password) return false;
-    const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
-    if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
-    return true;
-  }
-
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "suspend_account", "lift_suspension"];
-    if (sensitiveActions.includes(action)) {
-      const confirmed = await ensureRecentAdminAuthentication();
-      if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
+    const { data: authData, error: authError } = await sb.auth.getUser();
+    if (authError || !authData?.user?.id || authData.user.id !== user.id) {
+      throw new Error("Сессия завершена. Войдите в аккаунт заново.");
     }
     const { data, error } = await sb.functions.invoke("council-management", {
       body: { action, target_id: targetId, ...extra }
@@ -3292,7 +3276,9 @@ window.onunhandledrejection = function(event) {
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
+    else if (action === 'mark-notification-read') { markNotificationRead(btn.dataset.id); }
     else if (action === 'dismiss-notification') { dismissNotification(btn.dataset.id); }
+    else if (action === 'mark-all-notifications-read') { markNotificationsRead(notificationsCache.map(item => item.id)); }
     else if (action === 'clear-notifications') { clearNotifications(); }
     else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
