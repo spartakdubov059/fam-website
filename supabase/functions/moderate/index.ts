@@ -60,6 +60,9 @@ function cacheAndRespond(
   body: Record<string, unknown>,
   headers: Record<string, string>,
 ): Response {
+  // Pending decisions can represent transient provider failures. Do not cache them:
+  // a retry must perform a fresh review instead of replaying the temporary error.
+  if (body.action === "pending") return jsonResponse(body, 200, headers);
   if (!moderationCache.has(key) && moderationCache.size >= MODERATION_CACHE_MAX_ENTRIES) {
     const oldestKey = moderationCache.keys().next().value;
     if (oldestKey) moderationCache.delete(oldestKey);
