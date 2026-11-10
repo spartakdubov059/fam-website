@@ -244,8 +244,6 @@
     @media (max-width:560px) {
       .profile-box { padding:13px; border-radius:17px; }
       .profile-hero { padding:13px; }
-      .profile-shortcuts { grid-template-columns:1fr; gap:7px; }
-      .profile-shortcut { min-height:54px; padding:9px 11px; }
       .profile-hero-main { gap:9px; flex-wrap:wrap; }
       .profile-avatar-edit { margin-left:auto; }
       .profile-disclosure > summary { padding:12px; }
@@ -590,7 +588,6 @@
 #councilAdminTools > div[style*="justify-content:space-between"] { margin-bottom: 12px !important; }
 #councilAdminTools h5 { color: #F7F9FC; font-size: 13px !important; }
 #councilAdminTools > p { color: #D2D9E3 !important; }
-#famAgentAdminPanel { background: #202731 !important; border-color: #5E6D81 !important; }
 #councilAdminDeletionRequests,
 #councilAdminUsers,
 #councilAdminListings,
@@ -603,6 +600,17 @@
   #profileLoggedIn .profile-shortcut { transition: none; }
   #profileLoggedIn .profile-shortcut:hover { transform: none; }
 }
+
+
+    .notif-head-actions { display:flex; align-items:center; gap:6px; }
+    .notif-item { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); }
+    .notif-body { min-width:0; flex:1; }
+    .notif-ico { flex:0 0 30px; width:30px; height:30px; display:grid; place-items:center; border-radius:10px; background:var(--surface-hover); }
+    .notif-title { font-size:12px; font-weight:800; color:var(--text); }
+    .notif-text { margin-top:3px; font-size:11px; color:var(--muted); line-height:1.45; overflow-wrap:anywhere; }
+    .notif-time { margin-top:5px; font-size:9px; color:var(--muted); }
+    .notif-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .notif-empty { padding:18px; color:var(--muted); font-size:12px; text-align:center; }
 
   </style>
 </head>
@@ -636,7 +644,7 @@
 </header>
 
 <div class="notif-panel hidden" id="notifPanel" role="dialog" aria-labelledby="notifTitle">
-  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div>
+  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><div class="notif-head-actions"><button class="button button-secondary button-small" data-action="clear-notifications">Скрыть всё</button><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div></div>
   <div id="notifContent"></div>
 </div>
 
@@ -702,11 +710,7 @@
         </div>
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
-      <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Идеи школы</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
-      </div>
+      
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
@@ -743,17 +747,7 @@
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
             <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
-            <details class="profile-inline-disclosure council-subpanel"><summary>Аналитика и предложения агентов FAM</summary><div class="council-subpanel-content"><div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
-                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
-              </div>
-              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
-              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
-              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
-              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
-              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
-            </div></div></details>
+            
             
             <details class="profile-inline-disclosure council-subpanel" open>
               <summary>Запросы участников на удаление</summary>
@@ -951,7 +945,6 @@ window.onunhandledrejection = function(event) {
   let previousTab = 'board';
   let notifOpen = false;
   let heroRendered = false;
-  let seenMap = {};
   let isAiDown = null; // null means no real moderation result has been observed yet.
   let isListingSubmitting = false;
   let isChatSubmitting = false;
@@ -1121,51 +1114,348 @@ window.onunhandledrejection = function(event) {
     return new Date(t).toLocaleDateString('ru-RU');
   }
 
-  function buildNotifications() {
-    const notes = [{ icon: '🚀', title: 'Обновление', text: 'Новый дизайн и ИИ-модерация.', time: Date.now() - 45 * 60000 }];
-    if (isAiDown) notes.unshift({ icon: '⚠️', title: 'Технические работы', text: 'ИИ временно недоступен.', time: Date.now() });
-    if (user && profile && profile.school_id) {
-      listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 4).forEach(e => {
-        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        notes.push({ icon: '🎭', title: 'Событие школы', text: e.title + (ds ? ' · ' + ds : ''), time: new Date(e.created_at || Date.now()).getTime() });
-      });
+  const NOTIFICATION_RELEASE_ID = "release:fam-notification-feed-2026-11";
+  let notificationsCache = [];
+  let notificationRefreshSeq = 0;
+
+  function notificationDismissKey() {
+    return user?.id ? "fam_notifications_dismissed_v2_" + user.id : null;
+  }
+
+  function readDismissedNotifications() {
+    const key = notificationDismissKey();
+    if (!key) return [];
+    try {
+      const value = JSON.parse(safeLocalStorageGet(key) || "[]");
+      return Array.isArray(value) ? value.filter(item => typeof item === "string").slice(-500) : [];
+    } catch (_) {
+      return [];
     }
-    return notes.sort((a, b) => b.time - a.time);
+  }
+
+  function saveDismissedNotifications(ids) {
+    const key = notificationDismissKey();
+    if (!key) return;
+    const unique = Array.from(new Set(ids)).slice(-500);
+    safeLocalStorageSet(key, JSON.stringify(unique));
   }
 
   function updateBellBadge() {
-    const seen = parseInt(safeLocalStorageGet('fam_notif_seen') || '0', 10);
-    const n = buildNotifications().filter(x => x.time > seen).length;
-    const b = $("bellBadge");
-    if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove("hidden"); }
-    else b.classList.add("hidden");
+    const n = notificationsCache.length;
+    const badge = $("bellBadge");
+    if (!badge) return;
+    if (n > 0) {
+      badge.textContent = n > 9 ? "9+" : String(n);
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
   }
 
   function renderNotifPanel() {
-    const notes = buildNotifications();
-    $("notifContent").innerHTML = notes.length ? notes.map(n =>
-      `<div class="notif-item"><span class="notif-ico">${n.icon}</span><div style="min-width:0;"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${timeAgo(n.time)}</div></div></div>`
-    ).join("") : '<p style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Пока нет уведомлений</p>';
+    const content = $("notifContent");
+    if (!content) return;
+    const notes = notificationsCache;
+    content.innerHTML = notes.length ? notes.map(note => `
+      <article class="notif-item">
+        <span class="notif-ico">${esc(note.icon || "🔔")}</span>
+        <div class="notif-body">
+          <div class="notif-title">${esc(note.title)}</div>
+          <div class="notif-text">${esc(note.text)}</div>
+          <div class="notif-time">${timeAgo(note.time)}</div>
+          <div class="notif-actions">
+            ${note.kind === "message" && note.senderId
+              ? `<button type="button" class="button button-primary button-small" data-action="open-notification-chat" data-user-id="${esc(note.senderId)}">Открыть чат</button>`
+              : ""}
+            <button type="button" class="button button-secondary button-small" data-action="dismiss-notification" data-id="${esc(note.id)}">Убрать</button>
+          </div>
+        </div>
+      </article>
+    `).join("") : '<p class="notif-empty">Новых уведомлений нет.</p>';
   }
 
-  window.closeNotifPanel = () => { notifOpen = false; $("notifPanel").classList.add("hidden"); };
-  function toggleNotif() {
-    if (notifOpen) { closeNotifPanel(); return; }
-    notifOpen = true;
-    renderNotifPanel();
-    $("notifPanel").classList.remove("hidden");
-    safeLocalStorageSet('fam_notif_seen', String(Date.now()));
+  async function refreshNotificationFeed() {
+    const requestId = ++notificationRefreshSeq;
+    if (!user?.id) {
+      notificationsCache = [];
+      updateBellBadge();
+      if (notifOpen) renderNotifPanel();
+      return;
+    }
+
+    const dismissed = new Set(readDismissedNotifications());
+    const items = [];
+    const now = Date.now();
+    const recentCutoff = now - 14 * 24 * 60 * 60 * 1000;
+    const add = item => {
+      if (item && typeof item.id === "string" && !dismissed.has(item.id)) {
+        items.push({ ...item, time: Number.isFinite(item.time) ? item.time : now });
+      }
+    };
+
+    add({
+      id: NOTIFICATION_RELEASE_ID,
+      kind: "release",
+      icon: "✨",
+      title: "Обновление FAM",
+      text: "Обновлены уведомления, профиль и рабочая панель Ученического совета.",
+      time: Date.parse("2026-11-10T15:17:40Z")
+    });
+
+    if (isAiDown === true) {
+      add({
+        id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
+        kind: "system",
+        icon: "⚠️",
+        title: "ИИ-модерация временно недоступна",
+        text: "Новые публикации и сообщения могут быть временно ограничены.",
+        time: now
+      });
+    }
+
+    if (profile?.school_id) {
+      listings
+        .filter(row => row.school_id === profile.school_id
+          && row.user_id !== user.id
+          && new Date(row.created_at || 0).getTime() >= recentCutoff)
+        .slice(0, 8)
+        .forEach(row => {
+          add({
+            id: "school-listing:" + row.id,
+            kind: "listing",
+            icon: row.is_event ? "🎭" : "📌",
+            title: row.is_event ? "Новое мероприятие школы" : "Новое объявление школы",
+            text: row.title || "Опубликован новый материал",
+            time: new Date(row.created_at || now).getTime()
+          });
+        });
+    }
+
+    if (["school_admin", "council_member"].includes(profile?.role)) {
+      ideas
+        .filter(row => row.admin_status === "new"
+          && new Date(row.created_at || 0).getTime() >= recentCutoff)
+        .slice(0, 8)
+        .forEach(row => {
+          add({
+            id: "school-idea:" + row.id,
+            kind: "idea",
+            icon: "💡",
+            title: "Новая идея ученика",
+            text: String(row.text || "Предложена новая идея").slice(0, 110),
+            time: new Date(row.created_at || now).getTime()
+          });
+        });
+    }
+
+    const myEventIds = listings
+      .filter(row => row.user_id === user.id && row.is_event)
+      .map(row => row.id)
+      .slice(0, 100);
+
+    const messagePromise = sb.from("messages")
+      .select("id,sender_id,body,created_at")
+      .eq("receiver_id", user.id)
+      .eq("is_read", false)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const registrationPromise = myEventIds.length
+      ? sb.from("event_registrations")
+          .select("id,event_id,status,created_at")
+          .in("event_id", myEventIds)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [], error: null });
+
+    const accessPromise = profile?.role === "school_admin"
+      ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
+      : profile?.role === "student"
+        ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
+        : Promise.resolve({ data: null, error: null });
+
+    const deletionPromise = profile?.role === "school_admin"
+      ? sb.functions.invoke("council-management", { body: { action: "overview" } })
+      : Promise.resolve({ data: null, error: null });
+
+    const [messagesResult, registrationsResult, accessResult, deletionResult] = await Promise.all([
+      messagePromise,
+      registrationPromise,
+      accessPromise,
+      deletionPromise
+    ]);
+
+    if (requestId !== notificationRefreshSeq || !user?.id) return;
+
+    if (!messagesResult.error && Array.isArray(messagesResult.data)) {
+      messagesResult.data.forEach(message => {
+        const sender = String(message.sender_id || "");
+        add({
+          id: "message:" + message.id,
+          kind: "message",
+          recordId: message.id,
+          senderId: sender,
+          icon: "💬",
+          title: "Новое сообщение",
+          text: String(message.body || "Вам пришло сообщение").slice(0, 100),
+          time: new Date(message.created_at || now).getTime()
+        });
+      });
+    }
+
+    if (!registrationsResult.error && Array.isArray(registrationsResult.data)) {
+      registrationsResult.data.forEach(row => {
+        const event = listings.find(item => item.id === row.event_id);
+        add({
+          id: "event-registration:" + row.id,
+          kind: "registration",
+          icon: "🎟️",
+          title: "Заявка на мероприятие",
+          text: event?.title ? "Новая заявка на «" + event.title + "»" : "Появилась новая заявка на ваше мероприятие",
+          time: new Date(row.created_at || now).getTime()
+        });
+      });
+    }
+
+    if (!accessResult.error && accessResult.data?.ok) {
+      if (profile?.role === "school_admin") {
+        (Array.isArray(accessResult.data.requests) ? accessResult.data.requests : [])
+          .filter(row => ["pending", "reviewing"].includes(row.status))
+          .forEach(row => {
+            add({
+              id: "school-access-request:" + row.id,
+              kind: "access-request",
+              icon: "🏫",
+              title: "Заявка на доступ к Совету",
+              text: row.applicant_note || "Поступила заявка на проверку полномочий.",
+              time: new Date(row.created_at || now).getTime()
+            });
+          });
+      } else if (profile?.role === "student") {
+        const request = accessResult.data.request;
+        if (request && ["approved", "rejected"].includes(request.status)
+            && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) {
+          add({
+            id: "school-access-result:" + request.id + ":" + request.status,
+            kind: "access-result",
+            icon: request.status === "approved" ? "✅" : "ℹ️",
+            title: request.status === "approved" ? "Заявка одобрена" : "Заявка рассмотрена",
+            text: request.status === "approved"
+              ? "Ваша заявка на доступ к Ученическому совету одобрена."
+              : (request.review_note || "Ваша заявка рассмотрена. Откройте профиль, чтобы проверить статус."),
+            time: new Date(request.reviewed_at || request.created_at || now).getTime()
+          });
+        }
+      }
+    }
+
+    if (!deletionResult.error && deletionResult.data?.ok) {
+      const pendingRequests = Array.isArray(deletionResult.data.deletion_requests)
+        ? deletionResult.data.deletion_requests
+        : [];
+      pendingRequests.forEach(row => {
+        add({
+          id: "account-deletion-request:" + row.id,
+          kind: "deletion-request",
+          icon: "🛡️",
+          title: "Запрос на проверку аккаунта",
+          text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6))
+            + " · " + deletionReasonLabel(row.reason_code),
+          time: new Date(row.created_at || now).getTime()
+        });
+      });
+    }
+
+    if (requestId !== notificationRefreshSeq) return;
+    notificationsCache = items.sort((a, b) => b.time - a.time).slice(0, 60);
     updateBellBadge();
+    if (notifOpen) renderNotifPanel();
   }
-  $("bellBtn").onclick = (e) => { e.stopPropagation(); toggleNotif(); };
-  document.addEventListener('click', e => {
-    if (notifOpen && !e.target.closest('#notifPanel') && !e.target.closest('#bellBtn')) closeNotifPanel();
+
+  async function dismissNotification(notificationId) {
+    const note = notificationsCache.find(item => item.id === notificationId);
+    if (!note || !user?.id) return;
+    if (note.kind === "message" && note.recordId) {
+      const { error } = await sb.from("messages")
+        .update({ is_read: true })
+        .eq("id", note.recordId)
+        .eq("receiver_id", user.id)
+        .eq("is_read", false);
+      if (error) {
+        notice("Не удалось отметить сообщение прочитанным. Откройте чат и попробуйте ещё раз.");
+        return;
+      }
+    } else {
+      saveDismissedNotifications([...readDismissedNotifications(), notificationId]);
+    }
+    await refreshNotificationFeed();
+    await updateChatBadge();
+  }
+
+  async function clearNotifications() {
+    if (!user?.id) return;
+    const messageIds = notificationsCache
+      .filter(item => item.kind === "message" && item.recordId)
+      .map(item => item.id);
+    const localIds = notificationsCache
+      .filter(item => item.kind !== "message")
+      .map(item => item.id);
+    saveDismissedNotifications([...readDismissedNotifications(), ...localIds]);
+
+    if (messageIds.length) {
+      const { error } = await sb.from("messages")
+        .update({ is_read: true })
+        .eq("receiver_id", user.id)
+        .eq("is_read", false);
+      if (error) {
+        notice("Не удалось отметить все сообщения прочитанными. Остальные уведомления скрыты.");
+      }
+    }
+    await refreshNotificationFeed();
+    await updateChatBadge();
+  }
+
+  window.closeNotifPanel = () => {
+    notifOpen = false;
+    $("notifPanel").classList.add("hidden");
+  };
+
+  async function toggleNotif() {
+    if (notifOpen) {
+      closeNotifPanel();
+      return;
+    }
+    notifOpen = true;
+    $("notifPanel").classList.remove("hidden");
+    $("notifContent").innerHTML = '<p class="notif-empty">Загружаем уведомления…</p>';
+    await refreshNotificationFeed();
+    renderNotifPanel();
+  }
+
+  $("bellBtn").onclick = event => {
+    event.stopPropagation();
+    toggleNotif();
+  };
+
+  document.addEventListener("click", event => {
+    if (notifOpen && !event.target.closest("#notifPanel") && !event.target.closest("#bellBtn")) {
+      closeNotifPanel();
+    }
   });
 
-  function markChatSeen(otherId) {
-    if (!user || !otherId) return;
-    seenMap[otherId] = new Date().toISOString();
-    safeLocalStorageSet(`fam_chat_seen_map_${user.id}`, JSON.stringify(seenMap));
+  async function markChatSeen(otherId) {
+    if (!user?.id || !otherId) return false;
+    const { error } = await sb.from("messages")
+      .update({ is_read: true })
+      .eq("receiver_id", user.id)
+      .eq("sender_id", otherId)
+      .eq("is_read", false);
+    if (error) {
+      console.warn("chat_mark_read_failed", error.message || "unknown");
+      return false;
+    }
+    return true;
   }
 
   function setBadge(n) {
@@ -1175,20 +1465,26 @@ window.onunhandledrejection = function(event) {
   }
 
   async function updateChatBadge() {
-    if (document.hidden) return;
-    if (!user || !user.id) { setBadge(0); return; }
+    if (!user?.id) {
+      setBadge(0);
+      return;
+    }
     try {
-      const { data, error } = await sb.from('messages').select('sender_id, created_at').eq('receiver_id', user.id).order('created_at', { ascending: false }).limit(500);
-      if (error) return;
-      let unread = 0;
-      (data || []).forEach(m => {
-        const seenAt = seenMap[m.sender_id] || '1970-01-01T00:00:00.000Z';
-        if (new Date(m.created_at) > new Date(seenAt)) unread++;
-      });
-      setBadge(unread);
-    } catch (e) {}
+      const { data, error } = await sb.from("messages")
+        .select("id")
+        .eq("receiver_id", user.id)
+        .eq("is_read", false)
+        .limit(1000);
+      if (error) throw error;
+      setBadge(Array.isArray(data) ? data.length : 0);
+    } catch (error) {
+      console.warn("chat_unread_count_failed", error?.message || "unknown");
+    }
   }
   setInterval(updateChatBadge, 15000);
+  setInterval(() => {
+    if (!document.hidden && user?.id) refreshNotificationFeed();
+  }, 60000);
 
   async function loadDialogsList() {
     if (!user) return;
@@ -1268,7 +1564,7 @@ window.onunhandledrejection = function(event) {
         favorites = (!results[4].error && results[4].data) || [];
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
-      renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge();
+      renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
     } catch (e) { console.error("Ошибка loadAll:", e); }
   }
@@ -1531,8 +1827,9 @@ window.onunhandledrejection = function(event) {
       c.scrollTop = c.scrollHeight;
 
       if (currentTab === 'messages' && !$("chatView").classList.contains("hidden") && curChat === otherId) {
-        markChatSeen(otherId);
-        updateChatBadge();
+        await markChatSeen(otherId);
+        await updateChatBadge();
+        await refreshNotificationFeed();
       }
     } catch (e) {
       if (requestSeq !== chatLoadSeq) return;
@@ -2205,128 +2502,12 @@ window.onunhandledrejection = function(event) {
           <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
         </div>
       `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
-      await loadFamAgentDashboard();
     } catch (error) {
       const message = error?.message || "Повторите попытку.";
       $("councilAdminUsers").textContent = "Ошибка: " + message;
       $("councilAdminDeletionRequests").textContent = "Ошибка загрузки.";
       $("councilAdminListings").textContent = "Ошибка загрузки.";
       $("councilAdminAudit").textContent = "Ошибка загрузки.";
-    }
-  }
-
-  async function loadFamAgentDashboard() {
-    const panel = $("famAgentAdminPanel");
-    const reportBox = $("famAgentReportSummary");
-    const ideasBox = $("famAgentIdeasList");
-    if (!panel || !reportBox || !ideasBox) return;
-    if (!user || profile?.role !== "school_admin") {
-      panel.classList.add("hidden");
-      return;
-    }
-
-    panel.classList.remove("hidden");
-    reportBox.textContent = "Загружаем сводку...";
-    ideasBox.textContent = "Загружаем предложения...";
-    try {
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "agent_dashboard" }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить панель аналитики.");
-
-      const report = data.report || null;
-      if (!report) {
-        reportBox.innerHTML = '<p style="font-size:10px;color:var(--muted);margin:0;">Ежедневная сводка ещё не сформирована. Нажмите «Обновить» позже.</p>';
-      } else {
-        const metrics = report.metrics || {};
-        const listings = metrics.listings || {};
-        const safety = metrics.safety || {};
-        const requests = metrics.account_requests || {};
-        const ideas = metrics.ideas || {};
-        const agentProposals = metrics.agent_proposals || {};
-        const stat = (label, value) => `
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px;min-width:0;">
-            <b style="display:block;font-size:18px;line-height:1.1;">${esc(String(Number(value) || 0))}</b>
-            <span style="display:block;font-size:9px;color:var(--muted);margin-top:4px;">${esc(label)}</span>
-          </div>`;
-        const generatedAt = report.generated_at
-          ? new Date(report.generated_at).toLocaleString("ru-RU")
-          : "";
-        reportBox.innerHTML = `
-          <p style="font-size:10px;line-height:1.45;margin:0 0 8px;">${esc(report.summary || "Сводка сформирована.")}</p>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;">
-            ${stat("Активные объявления", listings.active)}
-            ${stat("Новые за сутки", listings.new_24h)}
-            ${stat("Непроверенные сигналы", safety.unreviewed)}
-            ${stat("Высокий уровень", safety.high_unreviewed)}
-            ${stat("Запросы на удаление", requests.deletion_pending)}
-            ${stat("Идеи ждут Совет", ideas.awaiting_council)}
-            ${stat("Предложения агентов", agentProposals.pending)}
-          </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:7px;">Дата отчёта: ${esc(report.report_date || "—")}${generatedAt ? " · Обновлено: " + esc(generatedAt) : ""}</div>
-        `;
-      }
-
-      const agentLabels = {
-        fam_safety_analyst: "Агент безопасности",
-        fam_council_analyst: "Агент Совета",
-        fam_operations_analyst: "Агент операций",
-        fam_growth_analyst: "Агент развития"
-      };
-      const agentIdeas = Array.isArray(data.agent_ideas) ? data.agent_ideas : [];
-      ideasBox.innerHTML = agentIdeas.length ? agentIdeas.map(idea => {
-        const riskLabel = idea.risk === "high" ? "Высокий риск" : idea.risk === "medium" ? "Средний риск" : "Низкий риск";
-        const riskClass = idea.risk === "high" ? "status-rejected" : idea.risk === "medium" ? "status-work" : "status-done";
-        const complexityLabel = idea.complexity === "large" ? "Сложность: высокая" : idea.complexity === "small" ? "Сложность: небольшая" : "Сложность: средняя";
-        const evidenceLabel = idea.evidence_kind === "observed" ? "Подтверждено цифрами" : "Гипотеза";
-        const createdAt = idea.created_at ? new Date(idea.created_at).toLocaleString("ru-RU") : "";
-        const agentLabel = agentLabels[idea.proposed_by] || "Аналитик FAM";
-        return `
-          <div class="idea-card" style="margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-              <b style="font-size:11px;flex:1;min-width:140px;">${esc(idea.title || "Предложение FAM")}</b>
-              <span class="idea-status ${riskClass}">${esc(riskLabel)}</span>
-            </div>
-            <div style="font-size:9px;color:var(--muted);margin-top:4px;">${esc(agentLabel)}</div>
-            <div style="font-size:10px;line-height:1.45;margin-top:6px;">${esc(idea.summary || "")}</div>
-            ${idea.benefit ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;"><b>Польза:</b> ${esc(idea.benefit)}</div>` : ""}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
-              <span class="idea-status status-new">${esc(complexityLabel)}</span>
-              <span class="idea-status status-work">${esc(evidenceLabel)}</span>
-            </div>
-            ${idea.evidence_summary ? `<div style="font-size:9px;color:var(--muted);margin-top:6px;">Основание: ${esc(idea.evidence_summary)}</div>` : ""}
-            ${createdAt ? `<div style="font-size:9px;color:var(--muted);margin-top:5px;">Предложено: ${esc(createdAt)}</div>` : ""}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">
-              <button type="button" class="button button-success button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="approve">Одобрить</button>
-              <button type="button" class="button button-secondary button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="reject">Отклонить</button>
-            </div>
-          </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);margin:0;">Новых предложений пока нет. Когда показатели потребуют внимания, аналитические агенты добавят сюда рекомендации.</p>';
-    } catch (error) {
-      reportBox.textContent = "Сводка временно недоступна: " + (error?.message || "повторите попытку.");
-      ideasBox.textContent = "Не удалось загрузить предложения аналитиков.";
-    }
-  }
-
-  async function reviewFamAgentIdea(button) {
-    if (!button || !user || profile?.role !== "school_admin") return;
-    const ideaId = button.dataset.id || "";
-    const decision = button.dataset.decision || "";
-    if (!ideaId || !["approve", "reject"].includes(decision)) return;
-    const verb = decision === "approve" ? "одобрить" : "отклонить";
-    if (!confirm("Вы уверены, что хотите " + verb + " предложение аналитического агента?")) return;
-
-    button.disabled = true;
-    try {
-      await callCouncilManagement("review_agent_idea", ideaId, { decision });
-      notice(decision === "approve"
-        ? "Предложение одобрено и сохранено для дальнейшего планирования."
-        : "Предложение отклонено.");
-      await loadCouncilAdminTools();
-    } catch (error) {
-      notice("Не удалось сохранить решение: " + (error?.message || "Ошибка."));
-      button.disabled = false;
     }
   }
 
@@ -3044,6 +3225,9 @@ window.onunhandledrejection = function(event) {
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
+    else if (action === 'dismiss-notification') { dismissNotification(btn.dataset.id); }
+    else if (action === 'clear-notifications') { clearNotifications(); }
+    else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
       const category = btn.dataset.category;
       if (["Вещи", "Услуги", "Учёба", "Мероприятия"].includes(category)) {
@@ -3089,8 +3273,6 @@ window.onunhandledrejection = function(event) {
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
     else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); loadUserSafetyReports(); }
-    else if (action === 'refresh-agent-dashboard') { loadFamAgentDashboard(); }
-    else if (action === 'review-fam-agent-idea') { reviewFamAgentIdea(btn); }
     else if (action === 'refresh-safety-reports') { loadUserSafetyReports(); }
     else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
@@ -3272,9 +3454,6 @@ window.onunhandledrejection = function(event) {
     return null;
   }).then(res => {
     if(res && res.data) profile = res.data;
-    if (user) {
-      try { seenMap = JSON.parse(safeLocalStorageGet(`fam_chat_seen_map_${user.id}`) || '{}'); } catch(e) { seenMap = {}; }
-    }
     updateAuthUI();
     requestAnimationFrame(() => positionIndicator(false));
     setTimeout(() => positionIndicator(false), 100);
