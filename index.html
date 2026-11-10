@@ -2459,9 +2459,11 @@ window.onunhandledrejection = function(event) {
         const listingHistory = accountListings.length ? accountListings.slice(0, 5).map(listing => {
           const postDate = listing.created_at ? new Date(listing.created_at).toLocaleDateString("ru-RU") : "";
           const postState = listing.status === "active" ? "Опубликовано" : "Скрыто";
+          const shortDescription = String(listing.description || "").trim().slice(0, 180);
           return `<div class="council-account-post">
             <b>${esc(listing.title || "Без названия")}</b>
             <span>${esc(listing.category || "Объявление")} · ${postState}${postDate ? " · " + esc(postDate) : ""}</span>
+            ${shortDescription ? `<span>${esc(shortDescription)}</span>` : ""}
           </div>`;
         }).join("") : '<p class="council-account-muted">В последних объявлениях школы публикаций этого аккаунта нет.</p>';
 
@@ -2544,12 +2546,16 @@ window.onunhandledrejection = function(event) {
         const eventDate = row.is_event && row.event_date
           ? " · мероприятие: " + new Date(row.event_date).toLocaleDateString("ru-RU")
           : "";
+        const description = String(row.description || "").trim().slice(0, 260);
+        const listingCode = String(row.id || "").slice(-6).toUpperCase();
         return `<div class="idea-card council-listing-card" style="margin-bottom:8px;">
           <div class="council-listing-title">${esc(row.title || "Без названия")}</div>
-          <div class="council-listing-meta">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          ${description ? `<div class="council-listing-context">${esc(description)}</div>` : '<div class="council-listing-context">Описание не заполнено.</div>'}
+          ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
           ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
-          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
+          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить это объявление</button>
         </div>`;
       }).join("") : '<p class="council-account-muted">Объявлений школы пока нет.</p>';
 
