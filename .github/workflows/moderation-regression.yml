@@ -1,6 +1,7 @@
 name: Moderation regression tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
