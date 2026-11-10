@@ -36,12 +36,13 @@ test("agent uses local open weights and never needs a paid API key", () => {
   assert.doesNotMatch(runner, /api\.openai\.com|OPENAI_API_KEY/);
 });
 
-test("model receives no GitHub write permission and can only propose allowlisted paths", () => {
+test("model receives read-only repository access and can only propose allowlisted paths", () => {
   assert.match(workflow, /generate:[\s\S]*?permissions:\n\s+contents: read/);
   assert.match(workflow, /index\.html\|css\/\*\|js\/\*\|assets\/\*\|docs\/\*\|tests\/\*/);
-  assert.match(validator, /isAllowedAgentPath/);
-  assert.match(prompt, /Запрещено изменять \.github\/\*\*, любые supabase\/\*/);
-  assert.match(prompt, /Не запускай git push, gh pr create\/merge/);
+  assert.match(validator, /export function isAllowedAgentPath/);
+  assert.match(prompt, /Не меняй файлы \.github\/\*\*, scripts\/\*\*, supabase\/\*\*/);
+  assert.match(prompt, /Не запускай shell-команды/);
+  assert.match(prompt, /персональные данные/);
 });
 
 test("the independent verification job runs without model or write credentials", () => {
@@ -49,22 +50,23 @@ test("the independent verification job runs without model or write credentials",
   assert.match(workflow, /node --test tests\/moderation\/\*\.test\.mjs tests\/security\/\*\.test\.mjs/);
   assert.match(workflow, /node --check \/tmp\/fam-inline-scripts\.js/);
   assert.match(workflow, /git diff --check HEAD/);
+  assert.match(workflow, /has_tests=false/);
+  assert.match(workflow, /Изменение кода сайта не содержит регрессионного теста/);
 });
 
-test("critical changes require manual approval; low-risk fixes wait for tests before merge", () => {
-  assert.match(validator, /requiresManualApproval/);
-  assert.match(validator, /account[_ -]?deletion/);
-  assert.match(validator, /security definer/);
+test("critical changes require manual approval; only passed low-risk PRs may merge", () => {
+  assert.match(validator, /CRITICAL_CHANGE_PATTERNS/);
+  assert.match(validator, /export function requiresManualApproval/);
   assert.match(workflow, /if: steps\.pr\.outputs\.requires_approval == 'false'/);
   assert.match(workflow, /gh pr checks "\$PR_URL" --watch --fail-fast/);
   assert.match(workflow, /gh pr merge "\$PR_URL" --squash --delete-branch/);
   assert.match(workflow, /gh pr create --draft/);
   assert.match(workflow, /pages build and deployment/);
+  assert.match(prompt, /необратимые операции/);
+  assert.match(prompt, /RLS/);
 });
 
-test("workflow does not modify Supabase schema, secrets or account data", () => {
+test("workflow does not run database migrations or modify production Supabase", () => {
   assert.doesNotMatch(workflow, /supabase db (?:push|reset|migrate)|supabase functions deploy/i);
-  assert.match(prompt, /персональные данные/);
-  assert.match(prompt, /RLS/);
-  assert.match(prompt, /необратимые операции/);
+  assert.doesNotMatch(workflow, /OPENAI_API_KEY|openai-api-key/i);
 });
