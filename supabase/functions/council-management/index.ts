@@ -242,8 +242,8 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
-      "listings?select=id,title,category,user_id,status,is_event,created_at&school_id=eq."
-      + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=40",
+      "listings?select=id,title,price_text,category,user_id,status,is_event,event_date,created_at&school_id=eq."
+      + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
       "council_admin_audit?select=id,actor_id,target_id,action,details,created_at&school_id=eq."
@@ -275,10 +275,12 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     listings: (listings.data ?? []).map((row: any) => ({
       id: row.id,
       title: row.title,
+      price_text: row.price_text,
       category: row.category,
       user_id: row.user_id,
       status: row.status,
       is_event: row.is_event === true,
+      event_date: row.event_date,
       created_at: row.created_at,
     })),
     audit: (audit.data ?? []).map((row: any) => ({

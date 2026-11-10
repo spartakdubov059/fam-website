@@ -68,12 +68,36 @@ test("analyst decisions are recorded and only affect still-pending ideas", () =>
   assert.match(controller, /recordAudit\(actor\.school_id, actorId, null, "fam_agent_idea_"/);
 });
 
-test("admin UI provides a private dashboard and explicit human review actions", () => {
-  assert.match(frontend, /id="famAgentAdminPanel"/);
-  assert.match(frontend, /data-action="refresh-agent-dashboard"/);
-  assert.match(frontend, /data-action="review-fam-agent-idea"/);
-  assert.match(frontend, /profile\?\.role !== "school_admin"/);
-  assert.match(frontend, /Одобрить/);
-  assert.match(frontend, /Отклонить/);
-  assert.match(frontend, /не читают личные переписки/i);
+test("agent dashboards stay out of the FAM UI while the separate server report pipeline remains available", () => {
+  assert.doesNotMatch(frontend, /famAgentAdminPanel|famAgentReportSummary|famAgentIdeasList|loadFamAgentDashboard|refresh-agent-dashboard|review-fam-agent-idea|agent_dashboard/);
+  assert.match(controller, /if \(action === "agent_dashboard"\)/);
+  assert.match(controller, /rpc\/get_fam_agent_admin_dashboard/);
+});
+
+test("bell notifications use stable IDs and persistent per-account dismissals", () => {
+  assert.match(frontend, /NOTIFICATION_RELEASE_ID/);
+  assert.match(frontend, /fam_notifications_dismissed_v2_/);
+  assert.match(frontend, /data-action="dismiss-notification"/);
+  assert.match(frontend, /data-action="clear-notifications"/);
+  assert.doesNotMatch(frontend, /fam_notif_seen/);
+});
+
+test("chat unread state uses the database is_read flag instead of local timestamps", () => {
+  assert.match(frontend, /\.or\("is_read\.eq\.false,is_read\.is\.null"\)/);
+  assert.match(frontend, /\.update\(\{ is_read: true \}\)/);
+  assert.match(frontend, /async function markChatSeen/);
+  assert.doesNotMatch(frontend, /fam_chat_seen_map_/);
+});
+
+test("profile has one announcements section and no duplicate shortcut row", () => {
+  assert.doesNotMatch(frontend, /class="profile-shortcuts"/);
+  assert.equal((frontend.match(/id="profileListingsPanel"/g) || []).length, 1);
+});
+
+test("school admin cards identify accounts and their recent school publications", () => {
+  assert.match(frontend, /Аккаунт #/);
+  assert.match(frontend, /Публикации аккаунта:/);
+  assert.match(frontend, /Автор:/);
+  assert.match(controller, /price_text/);
+  assert.match(controller, /event_date/);
 });
