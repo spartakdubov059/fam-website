@@ -39,5 +39,5 @@ test("worker claims only the allowlisted non-destructive monitoring task", () =>
 });
 
 test("site-error audit is scheduled and included in infrastructure health checks", () => {
-  assert.match(migration, /'fam-agent-site-error-audit'[\s\S]*?'\*\/15 \* \* \*'/i);
+  assert.match(migration, /'fam-agent-site-error-audit'[\s\S]*?'\*\/15 \* \* \* \*'/i);
 });
