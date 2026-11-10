@@ -2614,7 +2614,7 @@ window.onunhandledrejection = function(event) {
     try {
       let res;
       if (isReg) {
-        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school } } });
+        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school }, emailRedirectTo: "https://spartakdubov059.github.io/fam-website/" } });
         if (res.error) throw res.error;
         if (!res.data.session) {
           closeModal('authModal');
