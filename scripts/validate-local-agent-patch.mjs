@@ -34,7 +34,7 @@ const CRITICAL_CHANGE_PATTERNS = [
   /moderation[_ -]?(?:decision|action|policy)/i,
   /auth(?:entication|orization)?/i,
   /jwt|access[_ -]?token|refresh[_ -]?token|session/i,
-  /school[_ -]?admin|admin[_ -]?(?:panel|role|access|permission)/i,
+  /school[_ -]?admin|admin[_ -]?(?:panel|role|access|permission)/i,\n  /\\b(?:profile|user|users|student|students|account)\\b/i,
   /(?:user|profile|account)[_. -]?(?:id|role|permission|delete|remove|block|suspend)/i,
   /(?:role|permission)[_. -]?(?:change|grant|revoke|update)/i,
   /security definer|service_role|\b(?:RLS|GRANT|REVOKE)\b/i,
