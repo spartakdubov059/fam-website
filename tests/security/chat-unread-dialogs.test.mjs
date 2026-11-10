@@ -12,6 +12,14 @@ test("chat list identifies the conversation that owns unread messages", () => {
   assert.match(frontend, /chat-unread-pill/);
 });
 
+test("chat history remains available when unread-detail metadata cannot be loaded", () => {
+  const loader = frontend.slice(frontend.indexOf("async function loadDialogsList()"), frontend.indexOf("function updateAuthUI()"));
+  assert.match(loader, /if \(sentResult\.error\) throw sentResult\.error/);
+  assert.match(loader, /if \(receivedResult\.error\) throw receivedResult\.error/);
+  assert.match(loader, /if \(unreadMessagesResult\.error \|\| !Number\.isFinite\(unreadMessagesResult\.count\)\)/);
+  assert.doesNotMatch(loader, /if \(unreadMessagesResult\.error\) throw/);
+});
+
 test("old unread conversations remain visible even outside the recent preview window", () => {
   assert.match(frontend, /Preserve a conversation even when its unread message is older/);
   assert.match(frontend, /text: "Есть непрочитанные сообщения"/);
