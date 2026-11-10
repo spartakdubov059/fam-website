@@ -45,6 +45,13 @@ test("release history can deliver multiple stable update notifications", () => {
   assert.ok((frontend.match(/id: "release:/g) || []).length >= 3);
 });
 
+test("Council panel header uses the neutral FAM profile palette", () => {
+  const councilHeaderStyles = frontend.slice(frontend.lastIndexOf("Keep the Council panel header"));
+  assert.ok(councilHeaderStyles.includes("#adminIdeasDash > summary"));
+  assert.ok(councilHeaderStyles.includes("background: var(--surface)"));
+  assert.ok(councilHeaderStyles.includes("color: var(--text)"));
+});
+
 test("one concise announcements section is rendered in the profile", () => {
   assert.equal((frontend.match(/id="profileListingsPanel"/g) || []).length, 1);
 });
