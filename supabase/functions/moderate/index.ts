@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
 import { reviewListingImage } from "./image-reviewer.ts";
+import { splitFlaggedCategoriesByInputType } from "./moderation-input-types.js";
 import { recordSafetySignal, type SafetyContext, type SafetyCategory } from "./user-safety-agent.ts";
 
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
@@ -443,10 +444,15 @@ serve(async (req: Request) => {
         const flaggedCategories = Object.entries(categories)
           .filter(([, flagged]) => flagged === true)
           .map(([category]) => category);
+        const appliedInputTypes = moderationResult.category_applied_input_types
+          && typeof moderationResult.category_applied_input_types === "object"
+          ? moderationResult.category_applied_input_types as Record<string, unknown>
+          : {};
+        const flaggedByInput = splitFlaggedCategoriesByInputType(flaggedCategories, appliedInputTypes);
 
-        // Do not send high-risk categories to a generative second reviewer.
-        // These cases remain blocked from publication and require the dedicated
-        // adult-led safety process outside this automated reviewer.
+        // Do not send high-risk categories or image-specific flags to a generative reviewer.
+        // The API's applied-input-types field is essential: some categories (such as harassment)
+        // are text-only even when an image is included in the same moderation request.
         const nonOverridableCategories = new Set([
           "sexual",
           "sexual/minors",
@@ -462,9 +468,10 @@ serve(async (req: Request) => {
         const requiresSeparateSafetyProcess = flaggedCategories.some(category =>
           nonOverridableCategories.has(category) || !contextualCategories.has(category)
         );
+        const requiresImageHumanReview = flaggedByInput.image.length > 0 || flaggedByInput.unresolved.length > 0;
 
-        if (!flaggedCategories.length || requiresSeparateSafetyProcess || imageUrl) {
-          const reasonCode = imageUrl
+        if (!flaggedCategories.length || requiresSeparateSafetyProcess || requiresImageHumanReview) {
+          const reasonCode = requiresImageHumanReview
             ? "image_requires_human_review"
             : requiresSeparateSafetyProcess
               ? "sensitive_category_requires_separate_process"
@@ -472,29 +479,35 @@ serve(async (req: Request) => {
           console.info("moderation_second_review_skipped", JSON.stringify({
             reason_code: reasonCode,
             categories: flaggedCategories,
+            categories_applied_to_text: flaggedByInput.text,
+            categories_applied_to_image: flaggedByInput.image,
+            categories_with_unknown_input_type: flaggedByInput.unresolved,
           }));
-          if (imageUrl) {
+          if (requiresImageHumanReview) {
             await writeSafetySignal(safetyContext, "unsafe_image", "high");
           } else {
             const signal = safetySignalFromCategories(flaggedCategories);
             if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
+            else await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
           }
           return cacheAndRespond(cacheKey, {
             action: "pending",
             reason_code: reasonCode,
-            reason: imageUrl
+            reason: requiresImageHumanReview
               ? "ИИ обнаружил возможный риск на изображении. Материал скрыт и требует проверки."
-              : "Автоматическая проверка обнаружила возможный риск. Материал скрыт и требует отдельной проверки.",
+              : "Автоматическая проверка обнаружила возможный риск в тексте объявления. Материал скрыт и требует отдельной проверки.",
             provider: "openai",
           }, headers);
         }
 
-        // The OpenAI contextual agent sees text only and cannot override high-risk flags.
+        // Contextual text-only flags (for example, harassment) are reviewed as text.
+        // If the text is cleared, the attached image must still pass its own visual review below.
         const secondReview = await reviewDisputedContent(value, OPENAI_KEY);
         console.info("moderation_second_review_completed", JSON.stringify({
           action: secondReview.action,
           reason_code: secondReview.reason_code,
           model: secondReview.model,
+          text_only_flags: flaggedByInput.text,
         }));
 
         if (secondReview.action !== "ok") {
@@ -510,13 +523,23 @@ serve(async (req: Request) => {
           const signal = semanticSignal ?? safetySignalFromCategories(flaggedCategories);
           if (signal) await writeSafetySignal(safetyContext, signal.category, signal.severity);
           else await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
+
+          return cacheAndRespond(cacheKey, {
+            action: secondReview.action,
+            reason_code: secondReview.reason_code,
+            reason: secondReview.reason,
+            provider: "openai+gpt-5-mini",
+          }, headers);
         }
-        return cacheAndRespond(cacheKey, {
-          action: secondReview.action,
-          reason_code: secondReview.reason_code,
-          reason: secondReview.reason,
-          provider: "openai+gpt-5-mini",
-        }, headers);
+
+        if (!imageUrl) {
+          return cacheAndRespond(cacheKey, {
+            action: secondReview.action,
+            reason_code: secondReview.reason_code,
+            reason: secondReview.reason,
+            provider: "openai+gpt-5-mini",
+          }, headers);
+        }
       }
 
       if (imageUrl) {
