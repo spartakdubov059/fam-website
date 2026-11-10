@@ -265,7 +265,7 @@ $block$;
 
 select cron.schedule(
   'fam-listing-image-moderation-every-2-minutes',
-  '*/2 * * * *',
+  '* * * * *',
   $job$
   select net.http_post(
     url := 'https://tfacqpljrvfpcrhdovbu.supabase.co/functions/v1/fam-listing-image-worker',
