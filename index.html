@@ -1278,7 +1278,7 @@ window.onunhandledrejection = function(event) {
     const messagePromise = sb.from("messages")
       .select("id,sender_id,body,created_at")
       .eq("receiver_id", user.id)
-      .eq("is_read", false)
+      .or("is_read.eq.false,is_read.is.null")
       .order("created_at", { ascending: false })
       .limit(30);
 
@@ -1403,7 +1403,7 @@ window.onunhandledrejection = function(event) {
         .update({ is_read: true })
         .eq("id", note.recordId)
         .eq("receiver_id", user.id)
-        .eq("is_read", false);
+        .or("is_read.eq.false,is_read.is.null");
       if (error) {
         notice("Не удалось отметить сообщение прочитанным. Откройте чат и попробуйте ещё раз.");
         return;
@@ -1429,7 +1429,7 @@ window.onunhandledrejection = function(event) {
       const { error } = await sb.from("messages")
         .update({ is_read: true })
         .eq("receiver_id", user.id)
-        .eq("is_read", false);
+        .or("is_read.eq.false,is_read.is.null");
       if (error) {
         notice("Не удалось отметить все сообщения прочитанными. Остальные уведомления скрыты.");
       }
@@ -1472,7 +1472,7 @@ window.onunhandledrejection = function(event) {
       .update({ is_read: true })
       .eq("receiver_id", user.id)
       .eq("sender_id", otherId)
-      .eq("is_read", false);
+      .or("is_read.eq.false,is_read.is.null");
     if (error) {
       console.warn("chat_mark_read_failed", error.message || "unknown");
       return false;
@@ -1495,7 +1495,7 @@ window.onunhandledrejection = function(event) {
       const { data, error } = await sb.from("messages")
         .select("id")
         .eq("receiver_id", user.id)
-        .eq("is_read", false)
+        .or("is_read.eq.false,is_read.is.null")
         .limit(1000);
       if (error) throw error;
       setBadge(Array.isArray(data) ? data.length : 0);
