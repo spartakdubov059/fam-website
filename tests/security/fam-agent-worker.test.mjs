@@ -14,18 +14,24 @@ test("worker uses a dedicated server-side token and rejects missing credentials"
   assert.match(worker, /error: "unauthorized"/);
 });
 
-test("worker processes only the three explicitly allowlisted no-approval task types", () => {
+test("worker processes only the four explicitly allowlisted no-approval task types", () => {
   assert.match(worker, /const queueHealthTask = task\?\.agent_key === "quality"/);
   assert.match(worker, /task\?\.task_type === "queue_health_check"/);
+  assert.match(worker, /task\?\.approval_required === false/);
 
   assert.match(worker, /const dailyReportTask = task\?\.agent_key === "orchestrator"/);
   assert.match(worker, /task\?\.task_type === "daily_report_digest"/);
 
   assert.match(worker, /const systemHealthTask = task\?\.agent_key === "technical"/);
   assert.match(worker, /task\?\.task_type === "system_health_check"/);
-  assert.match(worker, /task\?\.approval_required === false/);
 
-  assert.match(worker, /const safeTask = queueHealthTask \|\| dailyReportTask \|\| systemHealthTask/);
+  assert.match(worker, /const siteErrorTask = task\?\.agent_key === "technical"/);
+  assert.match(worker, /task\?\.task_type === "site_error_digest"/);
+
+  assert.match(
+    worker,
+    /const safeTask = queueHealthTask \|\| dailyReportTask \|\| systemHealthTask \|\| siteErrorTask;/,
+  );
   assert.match(worker, /let status: "completed" \| "blocked" = "blocked"/);
   assert.match(worker, /Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя/);
 });
@@ -34,6 +40,7 @@ test("approved tasks use only fixed, server-side aggregate RPCs", () => {
   assert.match(worker, /rpc\(["']get_fam_agent_queue_health["']/);
   assert.match(worker, /rpc\(["']get_fam_agent_task_daily_digest["']/);
   assert.match(worker, /rpc\(["']get_fam_agent_task_system_health["']/);
+  assert.match(worker, /rpc\(["']get_fam_agent_task_site_error_digest["']/);
 
   assert.doesNotMatch(worker, /task\??\.payload/);
   assert.doesNotMatch(worker, /\.from\(["'](?:messages|profiles|listings|auth\.users)["']\)/i);

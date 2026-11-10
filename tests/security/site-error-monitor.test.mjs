@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL("../../supabase/migrations/20261110173255_fam_site_error_monitoring.sql", import.meta.url),
   "utf8",
 );
+const scheduleMigration = readFileSync(
+  new URL("../../supabase/migrations/20261110180500_fam_agent_moscow_morning_schedule.sql", import.meta.url),
+  "utf8",
+);
 const worker = readFileSync(
   new URL("../../supabase/functions/fam-agent-worker/index.ts", import.meta.url),
   "utf8",
@@ -40,4 +44,15 @@ test("worker claims only the allowlisted non-destructive monitoring task", () =>
 
 test("site-error audit is scheduled and included in infrastructure health checks", () => {
   assert.match(migration, /'fam-agent-site-error-audit'[\s\S]*?'\*\/15 \* \* \* \*'/i);
+});
+
+test("Moscow migration preserves five-minute worker expectation and moves site-error audit hourly", () => {
+  assert.match(
+    migration,
+    /'fam-agent-worker-every-5-minutes'\s*,\s*'\*\/5 \* \* \* \*'/i,
+  );
+  assert.match(
+    scheduleMigration,
+    /'fam-agent-site-error-audit'\s*,\s*'30 \* \* \* \*'/i,
+  );
 });
