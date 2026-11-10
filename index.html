@@ -1626,8 +1626,11 @@ window.onunhandledrejection = function() {
 
   async function loadAll() {
     try {
+      const listingsQuery = user && user.id
+        ? sb.from("listings").select("*").or("status.eq.active,user_id.eq." + user.id)
+        : sb.from("listings").select("*").eq("status", "active");
       let promises = [
-        sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50),
+        listingsQuery.order("created_at", { ascending: false }).limit(50),
         sb.from("event_occupancy").select("*")
       ];
       if (user && user.id) {
@@ -1746,7 +1749,11 @@ window.onunhandledrejection = function() {
   function listingCard(l, idx, ownerControls = false) {
     const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
     const favClass = isFavorite(l.id) ? 'active' : '';
-    let badge = l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || ''));
+    let badge = l.moderation_status === "pending" ? "Проверяется ⏳"
+      : l.moderation_status === "manual_review" ? "Дополнительная проверка"
+      : l.moderation_status === "rejected" ? "Не прошло проверку"
+      : l.moderation_status === "failed" ? "Проверка не завершена"
+      : (l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || '')));
     let capacityHTML = '';
     if (l.is_event) {
       const taken = getTaken(l.id), max = l.max_seats || 0;
@@ -1796,6 +1803,7 @@ window.onunhandledrejection = function() {
     const grid = $("listingsGrid");
     const search = $("searchInput").value.toLowerCase();
     const filtered = listings.filter(l =>
+      l.status === "active" &&
       (curCat==="Все" || l.category===curCat) &&
       ((l.title || '').toLowerCase().includes(search) || (l.description && l.description.toLowerCase().includes(search)))
     );
@@ -1806,7 +1814,7 @@ window.onunhandledrejection = function() {
 
   function renderFavorites() {
     const grid = $("favoritesGrid");
-    const favListings = listings.filter(l => isFavorite(l.id));
+    const favListings = listings.filter(l => l.status === "active" && isFavorite(l.id));
     if (favListings.length === 0) { grid.innerHTML = ''; $("favoritesEmpty").classList.remove("hidden"); }
     else { $("favoritesEmpty").classList.add("hidden"); grid.innerHTML = favListings.map((l, i) => listingCard(l, i + 1)).join(""); }
   }
@@ -3533,8 +3541,8 @@ window.onunhandledrejection = function() {
 
       const data = submission.listing;
       const statusToSet = data?.status;
-      uploadedImagePath = null; // Storage object is now referenced by a saved listing.
-      if (data && statusToSet === "active") listings.unshift(data);
+      uploadedImagePath = null; // The server now owns the staged file or the published listing image.
+      if (data) listings.unshift(data);
 
       closeModal('listingModal');
       $("listingForm").reset();
@@ -3542,7 +3550,8 @@ window.onunhandledrejection = function() {
       $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
 
       if (submission.status === "pending") {
-        alert("✅ Объявление отправлено на дополнительную проверку и пока скрыто.");
+        renderProfile();
+        alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
       } else {
         renderListings();
       }
