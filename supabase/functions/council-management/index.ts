@@ -997,6 +997,14 @@ Deno.serve(async (req: Request) => {
         return json({ ok: false, error: "Можно управлять только объявлениями своей школы." }, 403, headers);
       }
 
+      // Never turn a listing hidden by its owner or another workflow back on via admin restore.
+      if (decision === "hide" && listing.status !== "active") {
+        return json({
+          ok: false,
+          error: "Можно скрывать только опубликованные объявления. Уже скрытые публикации не изменяются.",
+        }, 409, headers);
+      }
+
       if (decision === "hide" && listing.admin_hidden === true) {
         return json({ ok: false, error: "Объявление уже скрыто администратором." }, 409, headers);
       }
