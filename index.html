@@ -661,6 +661,21 @@
       .db-title, .db-sub { max-width: 74%; }
     }
 
+/* Keep the Council panel header on the same neutral palette as the rest of FAM. */
+#adminIdeasDash > summary {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+#adminIdeasDash[open] > summary { border-bottom-color: var(--border); }
+#adminIdeasDash .profile-disclosure-title b { color: var(--text); }
+#adminIdeasDash .profile-disclosure-title small { color: var(--muted); }
+#adminIdeasDash > summary .profile-shortcut-icon {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
 </style>
 </head>
 <body>
@@ -762,7 +777,7 @@
       
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
-            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на вступление и полномочия</h5>
+            <h5 style="font-size:12px; margin:0 0 8px;">Заявки учеников на вступление и полномочия</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Заявки учеников вашей школы. До одобрения заявитель сохраняет обычный статус ученика.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
@@ -1189,7 +1204,27 @@ window.onunhandledrejection = function() {
     return new Date(t).toLocaleDateString('ru-RU');
   }
 
-  const NOTIFICATION_RELEASE_ID = "release:fam-notification-feed-2026-11";
+  // Append a stable, unique entry here for each site release. Read/dismiss state is per account.
+  const NOTIFICATION_RELEASES = Object.freeze([
+    {
+      id: "release:fam-notification-feed-2026-11",
+      title: "Обновление FAM",
+      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
+      time: Date.parse("2026-11-10T16:59:08Z")
+    },
+    {
+      id: "release:fam-agent-reports-2026-11",
+      title: "Обновление FAM",
+      text: "Технические сводки перенесены в отдельный отчёт главного агента и больше не смешиваются с уведомлениями школьной панели.",
+      time: Date.parse("2026-11-09T18:00:00Z")
+    },
+    {
+      id: "release:fam-admin-clarity-2026-11",
+      title: "Обновление FAM",
+      text: "Уточнены статусы проверки объявлений, подписи заявок и счётчик непрочитанных сообщений.",
+      time: Date.parse("2026-11-10T22:00:00Z")
+    }
+  ]);
   let notificationsCache = [];
   let notificationRefreshSeq = 0;
 
@@ -1273,6 +1308,10 @@ window.onunhandledrejection = function() {
     if (readResult.error) {
       console.warn("notification_read_state_load_failed");
       reportFamSiteError("notifications_load_failed", "notifications");
+      // Fail closed: keep the last known feed instead of resurrecting dismissed items.
+      if (notifOpen) renderNotifPanel();
+      else updateBellBadge();
+      return;
     }
     const readIds = new Set(Array.isArray(readResult.data) ? readResult.data.map(row => row.notification_key) : []);
     const dismissedIds = new Set([
@@ -1287,11 +1326,9 @@ window.onunhandledrejection = function() {
       }
     };
 
-    add({
-      id: NOTIFICATION_RELEASE_ID, kind: "release", icon: "✨", title: "Обновление FAM",
-      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
-      time: Date.parse("2026-11-10T16:59:08Z")
-    });
+    NOTIFICATION_RELEASES.forEach(release => add({
+      ...release, kind: "release", icon: "✨"
+    }));
 
     if (isAiDown === true) add({
       id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
@@ -1330,12 +1367,8 @@ window.onunhandledrejection = function() {
     const deletionPromise = profile?.role === "school_admin"
       ? sb.functions.invoke("council-management", { body: { action: "overview" } })
       : Promise.resolve({ data: null, error: null });
-    const technicalAlertsPromise = profile?.role === "school_admin"
-      ? sb.rpc("get_fam_admin_technical_alerts")
-      : Promise.resolve({ data: [], error: null });
-
-    const [messagesResult, registrationsResult, accessResult, deletionResult, technicalAlertsResult] = await Promise.all([
-      messagePromise, registrationPromise, accessPromise, deletionPromise, technicalAlertsPromise
+    const [messagesResult, registrationsResult, accessResult, deletionResult] = await Promise.all([
+      messagePromise, registrationPromise, accessPromise, deletionPromise
     ]);
     if (requestId !== notificationRefreshSeq || !user?.id) return;
 
@@ -1366,8 +1399,10 @@ window.onunhandledrejection = function() {
         (Array.isArray(accessResult.data.requests) ? accessResult.data.requests : [])
           .filter(row => ["pending", "reviewing"].includes(row.status)).forEach(row => add({
             id: "school-access-request:" + row.id, kind: "access-request", icon: "🏫",
-            title: "Заявка на вступление или полномочия",
-            text: row.applicant_note || "Поступила новая заявка.",
+            title: row.applicant_note === "Администратор"
+              ? "Заявка на полномочия администратора школы"
+              : "Заявка на вступление в Ученический совет",
+            text: "Новая заявка от ученика. До решения администратора роль не изменяется.",
             time: new Date(row.created_at || now).getTime()
           }));
       } else if (profile?.role === "student") {
@@ -1392,39 +1427,6 @@ window.onunhandledrejection = function() {
         text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6)) + " · " + deletionReasonLabel(row.reason_code),
         time: new Date(row.created_at || now).getTime()
       }));
-    }
-
-    if (technicalAlertsResult.error) {
-      console.warn("notification_technical_alerts_load_failed");
-    } else if (Array.isArray(technicalAlertsResult.data)) {
-      const technicalEventLabels = {
-        database_request_failed: "Ошибки базы данных",
-        supabase_sdk_unavailable: "Сбой подключения к Supabase",
-        auth_backend_failed: "Ошибки входа в аккаунт",
-        js_runtime: "Ошибки JavaScript",
-        listings_load_failed: "Ошибки загрузки объявлений",
-        notifications_load_failed: "Ошибки уведомлений"
-      };
-      const technicalAreaLabels = {
-        auth: "вход",
-        listings: "объявления",
-        notifications: "уведомления",
-        database: "база данных",
-        other: "другой раздел"
-      };
-      technicalAlertsResult.data.forEach(alert => {
-        const count = Math.max(0, Math.min(1000, Number(alert.event_count) || 0));
-        const eventLabel = technicalEventLabels[alert.event_code] || "Техническая ошибка";
-        const areaLabel = technicalAreaLabels[alert.page_area] || "раздел сайта";
-        add({
-          id: String(alert.notification_key || ""),
-          kind: "system",
-          icon: alert.severity === "critical" ? "🚨" : "⚠️",
-          title: alert.severity === "critical" ? "Критический сбой FAM" : "Техническое предупреждение FAM",
-          text: eventLabel + ": " + count + " случаев за час. Раздел: " + areaLabel + ".",
-          time: new Date(alert.hour_bucket || now).getTime()
-        });
-      });
     }
 
     if (requestId !== notificationRefreshSeq) return;
@@ -1553,13 +1555,12 @@ window.onunhandledrejection = function() {
       return;
     }
     try {
-      const { data, error } = await sb.from("messages")
-        .select("id")
+      const { count, error } = await sb.from("messages")
+        .select("id", { count: "exact", head: true })
         .eq("receiver_id", user.id)
-        .or("is_read.eq.false,is_read.is.null")
-        .limit(1000);
+        .or("is_read.eq.false,is_read.is.null");
       if (error) throw error;
-      setBadge(Array.isArray(data) ? data.length : 0);
+      setBadge(Number.isFinite(count) ? count : 0);
     } catch (error) {
       console.warn("chat_unread_count_failed", error?.message || "unknown");
     }
@@ -2374,7 +2375,7 @@ window.onunhandledrejection = function() {
           <div class="idea-card" style="margin-bottom:8px;">
             <b style="font-size:11px;">${esc(requestType)}</b>
             <div style="font-size:10px;color:var(--muted);margin:5px 0;">Аккаунт #${esc(accountCode || "—")} · ${esc(request.applicant_email || "почта скрыта")}</div>
-            <div style="font-size:10px;margin:5px 0;">Запрошено: <b>${esc(request.applicant_note || "не указано")}</b></div>
+            <div style="font-size:10px;margin:5px 0;">Цель заявки: <b>${request.applicant_note === "Администратор" ? "получить полномочия администратора школы" : "вступить в Ученический совет"}</b></div>
             <div style="font-size:10px;margin:5px 0;">Статус: <b>${esc(statusText)}</b> · заявитель пока ученик</div>
             <div style="font-size:9px;color:var(--muted);margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
@@ -2556,10 +2557,16 @@ window.onunhandledrejection = function() {
         const listingHistory = accountListings.length ? accountListings.slice(0, 5).map(listing => {
           const postDate = listing.created_at ? new Date(listing.created_at).toLocaleDateString("ru-RU") : "";
           const postState = listing.status === "active" ? "Опубликовано" : "Скрыто";
+          const moderationState = listing.moderation_status === "approved" ? "Проверено"
+            : listing.moderation_status === "pending" ? "На проверке"
+            : listing.moderation_status === "manual_review" ? "Нужна дополнительная проверка"
+            : listing.moderation_status === "rejected" ? "Отклонено модерацией"
+            : listing.moderation_status === "failed" ? "Проверка не завершена"
+            : "Статус проверки неизвестен";
           const shortDescription = String(listing.description || "").trim().slice(0, 180);
           return `<div class="council-account-post">
             <b>${esc(listing.title || "Без названия")}</b>
-            <span>${esc(listing.category || "Объявление")} · ${postState}${postDate ? " · " + esc(postDate) : ""}</span>
+            <span>${esc(listing.category || "Объявление")} · ${postState} · ${moderationState}${postDate ? " · " + esc(postDate) : ""}</span>
             ${shortDescription ? `<span>${esc(shortDescription)}</span>` : ""}
           </div>`;
         }).join("") : '<p class="council-account-muted">В последних объявлениях школы публикаций этого аккаунта нет.</p>';
@@ -2645,9 +2652,15 @@ window.onunhandledrejection = function() {
           : "";
         const description = String(row.description || "").trim().slice(0, 260);
         const listingCode = String(row.id || "").slice(-6).toUpperCase();
+        const moderationState = row.moderation_status === "approved" ? "Проверено"
+          : row.moderation_status === "pending" ? "На проверке"
+          : row.moderation_status === "manual_review" ? "Нужна дополнительная проверка"
+          : row.moderation_status === "rejected" ? "Отклонено модерацией"
+          : row.moderation_status === "failed" ? "Проверка не завершена"
+          : "Статус проверки неизвестен";
         return `<div class="idea-card council-listing-card" style="margin-bottom:8px;">
           <div class="council-listing-title">${esc(row.title || "Без названия")}</div>
-          <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${esc(createdAt)}${esc(eventDate)}</div>
+          <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${moderationState} · ${esc(createdAt)}${esc(eventDate)}</div>
           ${description ? `<div class="council-listing-context">${esc(description)}</div>` : '<div class="council-listing-context">Описание не заполнено.</div>'}
           ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
           ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}

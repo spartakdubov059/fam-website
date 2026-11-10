@@ -75,7 +75,8 @@ test("agent dashboards stay out of the FAM UI while the separate server report p
 });
 
 test("bell notifications use stable IDs and database-persistent account read and dismissal states", () => {
-  assert.match(frontend, /NOTIFICATION_RELEASE_ID/);
+  assert.match(frontend, /NOTIFICATION_RELEASES/);
+  assert.match(frontend, /NOTIFICATION_RELEASES\.forEach\(release => add\(/);
   assert.match(frontend, /from\("notification_reads"\)/);
   assert.match(frontend, /onConflict: "user_id,notification_key"/);
   assert.match(frontend, /data-action="mark-notification-read"/);
