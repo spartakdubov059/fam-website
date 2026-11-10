@@ -6,27 +6,31 @@
   <title>FAM — Свои рядом</title>
 
   <meta name="description" content="FAM — школьная доска объявлений. Найди своих: вещи, услуги, учёба и афиша рядом с тобой.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#0F1014">
+  <meta name="color-scheme" content="dark">
   <link rel="canonical" href="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:title" content="FAM — Свои рядом">
   <meta property="og:description" content="Школьная доска объявлений. Вещи, услуги, учёба и афиша.">
   <meta property="og:image" content="https://spartakdubov059.github.io/fam-website/banner-1.png">
   <meta property="og:url" content="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="FAM — Свои рядом">
   <meta name="twitter:description" content="Школьная доска объявлений.">
+  <meta name="twitter:image" content="https://spartakdubov059.github.io/fam-website/banner-1.png">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
   
   <style>
     :root {
       --bg: #0F1014; --surface: #1A1C22; --surface-hover: #23262E;
       --accent: #D4D8E3; --accent-hover: #F0F3FA; --text: #F5F6F8;
       --muted: #AEB3C0; --border: #2A2D36; --danger: #FF6B6B; --success: #6BCB9B;
-      --violet: #8B5CF6; --violet2: #5B8CFF; --lime: #C8F542; --pink: #F472B6;
-      --gradient-violet: linear-gradient(135deg, #8B5CF6 0%, #5B8CFF 100%);
+      --violet: #718AB8; --violet2: #78A8F4; --lime: #CCD6E8; --pink: #A8BCE0;
+      --gradient-violet: linear-gradient(135deg, #829AC5 0%, #4C76B7 100%);
       --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
       --ios-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
       --smooth: cubic-bezier(0.4, 0, 0.2, 1);
@@ -38,12 +42,12 @@
     button { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
     .bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-    .bg-decor::before { content: ''; position: absolute; top: -230px; left: -190px; width: 520px; height: 520px; border-radius: 50%; border: 85px solid rgba(139,92,246,0.5); transform: rotate(-15deg); animation: decorSpin 26s linear infinite; }
-    .bg-decor::after { content: ''; position: absolute; top: -280px; right: -220px; width: 580px; height: 580px; border-radius: 50%; border: 55px solid transparent; border-top-color: rgba(200,245,66,0.85); border-right-color: rgba(200,245,66,0.85); transform: rotate(35deg); animation: decorSpinRev 30s linear infinite; }
+    .bg-decor::before { content: ''; position: absolute; top: -230px; left: -190px; width: 520px; height: 520px; border-radius: 50%; border: 1px solid rgba(150,170,205,0.12); transform: rotate(-15deg); animation: decorSpin 26s linear infinite; }
+    .bg-decor::after { content: ''; position: absolute; top: -280px; right: -220px; width: 580px; height: 580px; border-radius: 50%; border: 1px solid transparent; border-top-color: rgba(120,160,220,0.12); border-right-color: rgba(120,160,220,0.12); transform: rotate(35deg); animation: decorSpinRev 30s linear infinite; }
     @keyframes decorSpin { from { transform: rotate(-15deg); } to { transform: rotate(345deg); } }
     @keyframes decorSpinRev { from { transform: rotate(35deg); } to { transform: rotate(-325deg); } }
     .bg-decor .ring2 { position: absolute; top: -140px; left: -100px; width: 340px; height: 340px; border-radius: 50%; border: 26px solid rgba(91,140,255,0.35); }
-    .bg-decor .slash { position: absolute; top: 40px; right: -60px; width: 260px; height: 60px; background: var(--lime); border-radius: 999px; transform: rotate(-35deg); opacity: 0.9; }
+    .bg-decor .slash { display: none; }
 
     .header { position: sticky; top: 0; z-index: 10; background: rgba(15,16,20,0.85); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid rgba(255,255,255,0.06); animation: slideDown 0.5s ease; }
     @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -102,14 +106,14 @@
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
-    .hero-script { font-family: 'Caveat', cursive, sans-serif; font-size: 52px; line-height: 1; font-weight: 700; color: #fff; transform: rotate(-2deg); }
-    .hero-script span { color: var(--pink); text-decoration: underline; text-decoration-thickness: 4px; text-underline-offset: 8px; }
+    .hero-script { font-family: inherit; font-size: 52px; line-height: 1.05; font-weight: 800; color: #fff; transform: none; margin: 0; letter-spacing: -0.045em; }
+    .hero-script span { color: var(--violet2); text-decoration: none; }
     .hero-sub { color: #cfcfda; font-size: 15px; margin: 12px 0 18px; max-width: 250px; }
     .hero-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 11px 20px; font-weight: 800; font-size: 14px; align-self: flex-start; }
     .hero-cta svg { width: 16px; height: 16px; }
     .hero-spark { position: absolute; right: 42px; top: 50%; font-size: 34px; color: #fff; }
-    .hero-graffiti { position: absolute; right: 22px; bottom: 14px; font-family: 'Caveat', cursive, sans-serif; font-size: 36px; font-weight: 700; color: #fff; transform: rotate(-6deg); }
-    .ai-live { position: absolute; left: 24px; bottom: 18px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: rgba(139,92,246,0.16); border: 1px solid rgba(139,92,246,0.4); font-size: 11px; font-weight: 700; color: #cbb8ff; }
+    .hero-graffiti { position: absolute; right: 22px; bottom: 14px; font-family: inherit; font-size: 36px; font-weight: 700; color: #fff; transform: rotate(-6deg); }
+    .ai-live { position: absolute; left: 24px; bottom: 18px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: rgba(120,160,220,0.10); border: 1px solid rgba(150,175,215,0.22); font-size: 11px; font-weight: 700; color: #D8E2F2; }
     .ai-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); }
     .hero-event { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.4) 55%, transparent 100%); padding: 22px; display: flex; flex-direction: column; justify-content: flex-end; }
     .school-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--gradient-violet); color: white; padding: 5px 12px; border-radius: 999px; font-size: 10px; font-weight: 800; align-self: flex-start; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
@@ -117,7 +121,7 @@
     .event-meta { font-size: 12px; color: #d6d6e2; margin-bottom: 12px; }
     .db-emoji { font-size: 62px; position: absolute; right: 22px; top: 22px; transform: rotate(10deg); animation: giftFloat 3.5s ease-in-out infinite; }
     @keyframes giftFloat { 0%,100% { transform: rotate(10deg) translateY(0); } 50% { transform: rotate(5deg) translateY(-8px); } }
-    .db-title { font-family: 'Caveat', cursive, sans-serif; font-size: 40px; font-weight: 700; color: #fff; line-height: 1; max-width: 70%; }
+    .db-title { font-family: inherit; font-size: 40px; font-weight: 700; color: #fff; line-height: 1; max-width: 70%; }
     .db-sub { color: #cfcfda; font-size: 14px; margin: 8px 0 16px; max-width: 65%; }
     .hero-dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0 4px; }
     .hero-dot { width: 8px; height: 8px; border-radius: 999px; background: #33333e; border: none; padding: 0; transition: all .35s var(--spring); }
@@ -170,7 +174,7 @@
 
     .promo-card { border-radius: 24px; background: linear-gradient(140deg, #2A1B4A, #171226 70%); border: 1px solid rgba(139,92,246,0.3); position: relative; overflow: hidden; padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 12px; min-height: 190px; }
     .promo-gift { position: absolute; right: -8px; top: 12px; font-size: 70px; transform: rotate(12deg); }
-    .promo-script { font-family: 'Caveat', cursive, sans-serif; font-size: 29px; font-weight: 700; line-height: 1.05; color: #fff; max-width: 72%; }
+    .promo-script { font-family: inherit; font-size: 29px; font-weight: 700; line-height: 1.05; color: #fff; max-width: 72%; }
     .promo-script b { color: var(--lime); }
     .promo-cta { display: inline-flex; align-items: center; gap: 8px; background: #fff; color: #0B0B10; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 800; font-size: 13px; align-self: flex-start; }
     .promo-cta svg { width: 15px; height: 15px; }
@@ -679,6 +683,17 @@
   border-color: var(--border);
 }
 
+    /* Keyboard focus is visible throughout the application. */
+    :where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+      outline: 2px solid var(--violet2);
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 560px) {
+      .hero-script { font-size: clamp(36px, 10vw, 48px); }
+      .hero-sub { max-width: 70%; }
+    }
+
 </style>
 </head>
 <body>
@@ -780,12 +795,12 @@
       
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
-            <h5 style="font-size:12px; margin:0 0 8px;">Заявки учеников на вступление и полномочия</h5>
+            <h3 style="font-size:12px; margin:0 0 8px;">Заявки учеников на вступление и полномочия</h3>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Заявки учеников вашей школы. До одобрения заявитель сохраняет обычный статус ученика.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
           <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
-            <h5 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h5>
+            <h3 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h3>
             <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 10px;">Участник совета может сообщить администратору о проблемном аккаунте. Запрос не удаляет аккаунт автоматически — решение принимает администратор школы. Участник совета также не может самостоятельно удалять объявления: это право только администратора. Не указывайте телефоны, адреса и другие личные данные.</p>
             <div class="form-group">
               <label for="councilDeletionTarget">Аккаунт</label>
@@ -810,7 +825,7 @@
           </div>
           <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
+              <h3 style="font-size:12px;margin:0;">Администрирование школы</h3>
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
             <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
@@ -823,9 +838,9 @@
             <details class="profile-inline-disclosure council-subpanel">
               <summary>Участники и объявления школы</summary>
               <div class="council-subpanel-content">
-                <h6 class="council-section-title">Аккаунты школы</h6>
+                <h4 class="council-section-title">Аккаунты школы</h4>
                 <div id="councilAdminUsers" aria-live="polite"></div>
-                <h6 class="council-section-title">Объявления школы</h6>
+                <h4 class="council-section-title">Объявления школы</h4>
                 <div id="councilAdminListings" aria-live="polite"></div>
               </div>
             </details>
@@ -912,7 +927,7 @@
       <h3 id="chatWith" style="font-size:14px; margin-bottom:10px;"></h3>
       <div id="chatMessages" style="max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
       <form id="chatForm" style="display:flex; gap:6px;">
-        <input id="chatInput" class="form-control" style="flex:1; font-size:13px;" placeholder="Написать..." maxlength="1000" aria-label="Текст сообщения">
+        <input type="text" id="chatInput" class="form-control" style="flex:1; font-size:13px;" placeholder="Написать..." maxlength="1000" aria-label="Текст сообщения" autocomplete="off">
         <button type="submit" class="button button-primary">→</button>
       </form>
       <p style="font-size:9px;color:var(--muted);line-height:1.4;margin:6px 2px 0;">Сообщения автоматически проверяются ИИ на нарушения правил FAM и безопасность участников.</p>
@@ -976,7 +991,7 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Фото объявления доступно по публичной ссылке. Загружайте только изображения предметов — без лиц, документов, школьных пропусков и контактных данных. Автоматическая проверка содержимого фото пока не выполняется.</p>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Фото объявления доступно по публичной ссылке. Загружайте только изображения предметов — без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM; если автоматическая проверка временно недоступна или не может принять уверенное решение, публикация остаётся на дополнительной проверке и не считается одобренной.</p>
         <div id="uploadStatus"></div>
       </div>
       <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
@@ -1784,7 +1799,7 @@ window.onunhandledrejection = function() {
     let html = [];
     html.push(`<div class="hero-slide hero-brand">
       <span class="hero-crown">👑</span>
-      <div class="hero-script">Найди <span>своих.</span></div>
+      <h1 class="hero-script">Найди <span>своих.</span></h1>
       <p class="hero-sub">Объявления, идеи и помощь рядом</p>
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
@@ -1792,7 +1807,7 @@ window.onunhandledrejection = function() {
       <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
     </div>`);
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
-      html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
+      html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" decoding="async" alt="Иллюстрация FAM — Свои рядом"></div>`);
     });
     const designed = [
       { g: 'linear-gradient(140deg,#2A2E36,#191C22 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
@@ -1819,6 +1834,15 @@ window.onunhandledrejection = function() {
       });
     }
     box.innerHTML = html.join("");
+    // Keep error handling outside HTML attributes for a stricter Content Security Policy.
+    box.querySelectorAll(".hero-img img").forEach(image => {
+      image.addEventListener("error", () => {
+        const slide = image.closest(".hero-slide");
+        if (slide) slide.remove();
+        syncHeroDots();
+        if (!box.children.length) stopHeroTimer();
+      }, { once: true });
+    });
     syncHeroDots();
     updateAiStatus(isAiDown);
     startHeroTimer();
