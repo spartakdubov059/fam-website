@@ -39,6 +39,12 @@ test("school admin overview returns listing moderation status", () => {
   assert.ok(frontend.includes("Нужна дополнительная проверка"));
 });
 
+test("release history can deliver multiple stable update notifications", () => {
+  assert.ok(frontend.includes("NOTIFICATION_RELEASES = Object.freeze(["));
+  assert.ok(frontend.includes("NOTIFICATION_RELEASES.forEach(release => add("));
+  assert.ok((frontend.match(/id: "release:/g) || []).length >= 3);
+});
+
 test("one concise announcements section is rendered in the profile", () => {
   assert.equal((frontend.match(/id="profileListingsPanel"/g) || []).length, 1);
 });
