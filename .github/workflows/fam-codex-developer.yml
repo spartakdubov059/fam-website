@@ -24,6 +24,12 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Получить исходники FAM без сохранения GitHub credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
       - name: Проверить наличие API-ключа и задачу
         env:
           FAM_TASK: ${{ inputs.task }}
@@ -51,12 +57,6 @@ jobs:
             mode: 0o600,
           });
           NODE
-
-      - name: Получить исходники FAM без сохранения GitHub credentials
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
-        with:
-          ref: main
-          persist-credentials: false
 
       - name: Запустить изолированного ИИ-разработчика Codex
         id: codex
@@ -90,6 +90,7 @@ jobs:
           done
           git diff --check HEAD
           mkdir -p "$RUNNER_TEMP/fam-codex"
+          git rev-parse HEAD > "$RUNNER_TEMP/fam-codex/base.sha"
           git diff --binary HEAD > "$RUNNER_TEMP/fam-codex/fam-codex.patch"
           test -s "$RUNNER_TEMP/fam-codex/fam-codex.patch"
 
@@ -97,7 +98,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
         with:
           name: fam-codex-patch
-          path: ${{ runner.temp }}/fam-codex/fam-codex.patch
+          path: |
+            ${{ runner.temp }}/fam-codex/fam-codex.patch
+            ${{ runner.temp }}/fam-codex/base.sha
           if-no-files-found: error
           retention-days: 1
 
@@ -124,6 +127,12 @@ jobs:
       - name: Применить patch и проверить разрешённые файлы
         run: |
           set -euo pipefail
+          EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-codex/base.sha")"
+          ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
+          if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
+            echo "::error::Основная ветка изменилась во время генерации. Запустите агента повторно, чтобы он работал с актуальным кодом."
+            exit 1
+          fi
           git apply --binary "$RUNNER_TEMP/fam-codex/fam-codex.patch"
           mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
           if (( ${#changed_files[@]} == 0 )); then
@@ -155,11 +164,11 @@ jobs:
           node <<'NODE'
           const fs = require("node:fs");
           const html = fs.readFileSync("index.html", "utf8");
-          const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
+          const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
             .map((match) => match[2])
             .filter((script) => script.trim().length > 0);
           if (scripts.length === 0) throw new Error("No inline JavaScript found in index.html");
-          fs.writeFileSync("/tmp/fam-inline-scripts.js", scripts.join("\\n;\\n"));
+          fs.writeFileSync("/tmp/fam-inline-scripts.js", scripts.join("\n;\n"));
           NODE
           node --check /tmp/fam-inline-scripts.js
 
@@ -189,6 +198,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-codex/base.sha")"
+          ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
+          if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
+            echo "::error::Основная ветка изменилась во время генерации. Запустите агента повторно, чтобы он работал с актуальным кодом."
+            exit 1
+          fi
           git apply --binary "$RUNNER_TEMP/fam-codex/fam-codex.patch"
           mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
           if (( ${#changed_files[@]} == 0 )); then
