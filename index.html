@@ -610,7 +610,10 @@
     .notif-time { margin-top:5px; font-size:9px; color:var(--muted); }
     .notif-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
     .notif-empty { padding:18px; color:var(--muted); font-size:12px; text-align:center; }
-
+    .chat-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
+    .chat-dialog-heading > b { min-width:0; overflow-wrap:anywhere; }
+    .chat-unread-pill { flex:0 0 auto; max-width:55%; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:var(--surface-hover); color:var(--text); font-size:9px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .chat-unread-note { margin:8px 2px; color:var(--muted); font-size:10px; line-height:1.45; }
 
     .council-account-card { padding:11px; }
     .council-account-topline { display:flex; justify-content:space-between; align-items:flex-start; gap:9px; flex-wrap:wrap; }
@@ -1302,18 +1305,44 @@ window.onunhandledrejection = function() {
       }
     }
 
-    const readResult = await sb.from("notification_reads")
-      .select("notification_key").eq("user_id", user.id).limit(2000);
+    // PostgREST can cap a response at the project's maximum row setting. Page the
+    // per-account state in a stable order so old dismissals cannot disappear after
+    // a long account history and cause removed notifications to return.
+    const NOTIFICATION_READ_PAGE_SIZE = 500;
+    const NOTIFICATION_READ_MAX_PAGES = 20;
+    const readKeys = [];
+    let readStateError = null;
+    let readStateComplete = false;
+    for (let page = 0; page < NOTIFICATION_READ_MAX_PAGES; page++) {
+      const from = page * NOTIFICATION_READ_PAGE_SIZE;
+      const { data, error } = await sb.from("notification_reads")
+        .select("notification_key")
+        .eq("user_id", user.id)
+        .order("notification_key", { ascending: true })
+        .range(from, from + NOTIFICATION_READ_PAGE_SIZE - 1);
+      if (error) {
+        readStateError = error;
+        break;
+      }
+      const pageRows = Array.isArray(data) ? data : [];
+      pageRows.forEach(row => {
+        if (typeof row?.notification_key === "string") readKeys.push(row.notification_key);
+      });
+      if (pageRows.length < NOTIFICATION_READ_PAGE_SIZE) {
+        readStateComplete = true;
+        break;
+      }
+    }
     if (requestId !== notificationRefreshSeq || !user?.id) return;
-    if (readResult.error) {
+    if (readStateError || !readStateComplete) {
       console.warn("notification_read_state_load_failed");
       reportFamSiteError("notifications_load_failed", "notifications");
-      // Fail closed: keep the last known feed instead of resurrecting dismissed items.
+      // Fail closed if the full state cannot be read: never resurrect dismissed items.
       if (notifOpen) renderNotifPanel();
       else updateBellBadge();
       return;
     }
-    const readIds = new Set(Array.isArray(readResult.data) ? readResult.data.map(row => row.notification_key) : []);
+    const readIds = new Set(readKeys);
     const dismissedIds = new Set([
       ...legacyDismissed,
       ...Array.from(readIds).filter(key => key.startsWith("dismissed:")).map(key => key.slice(10))
@@ -1545,8 +1574,20 @@ window.onunhandledrejection = function() {
 
   function setBadge(n) {
     const b = $('chatBadge');
-    if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove('hidden'); }
-    else b.classList.add('hidden');
+    if (!b) return;
+    if (n === null) {
+      b.textContent = "?";
+      b.title = "Не удалось проверить непрочитанные сообщения";
+      b.classList.remove("hidden");
+      return;
+    }
+    b.title = n > 0 ? "Непрочитанные сообщения" : "";
+    if (n > 0) {
+      b.textContent = n > 9 ? "9+" : String(n);
+      b.classList.remove("hidden");
+    } else {
+      b.classList.add("hidden");
+    }
   }
 
   async function updateChatBadge() {
@@ -1560,8 +1601,11 @@ window.onunhandledrejection = function() {
         .eq("receiver_id", user.id)
         .or("is_read.eq.false,is_read.is.null");
       if (error) throw error;
-      setBadge(Number.isFinite(count) ? count : 0);
+      if (!Number.isFinite(count)) throw new Error("unread_count_unavailable");
+      setBadge(count);
     } catch (error) {
+      // Do not leave an old number visible when the server could not verify it.
+      setBadge(null);
       console.warn("chat_unread_count_failed", error?.message || "unknown");
     }
   }
@@ -1575,31 +1619,70 @@ window.onunhandledrejection = function() {
     const dialogsList = $("dialogsList");
     dialogsList.innerHTML = '<p style="text-align:center; color:var(--muted); font-size:12px;">Загрузка чатов...</p>';
     try {
-      const [sentResult, receivedResult] = await Promise.all([
-        sb.from('messages').select('*').eq('sender_id', user.id).order('created_at', { ascending: false }).limit(500),
-        sb.from('messages').select('*').eq('receiver_id', user.id).order('created_at', { ascending: false }).limit(500)
+      const [sentResult, receivedResult, unreadMessagesResult] = await Promise.all([
+        sb.from("messages").select("*").eq("sender_id", user.id).order("created_at", { ascending: false }).limit(500),
+        sb.from("messages").select("*").eq("receiver_id", user.id).order("created_at", { ascending: false }).limit(500),
+        sb.from("messages").select("sender_id", { count: "exact" })
+          .eq("receiver_id", user.id)
+          .or("is_read.eq.false,is_read.is.null")
+          .order("created_at", { ascending: false })
+          .limit(1000)
       ]);
       if (sentResult.error) throw sentResult.error;
       if (receivedResult.error) throw receivedResult.error;
+      if (unreadMessagesResult.error) throw unreadMessagesResult.error;
       const allMsgs = [...(sentResult.data || []), ...(receivedResult.data || [])]
         .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      const unreadByOther = new Map();
+      (Array.isArray(unreadMessagesResult.data) ? unreadMessagesResult.data : []).forEach(message => {
+        if (typeof message.sender_id !== "string") return;
+        unreadByOther.set(message.sender_id, (unreadByOther.get(message.sender_id) || 0) + 1);
+      });
       const dialogs = {};
       allMsgs.forEach(m => {
         if (!m.sender_id || !m.receiver_id) return;
         const otherId = m.sender_id === user.id ? m.receiver_id : m.sender_id;
-        if (!dialogs[otherId]) dialogs[otherId] = { otherId, text: m.body, created_at: m.created_at };
+        if (!dialogs[otherId]) {
+          dialogs[otherId] = {
+            otherId,
+            text: m.body,
+            created_at: m.created_at,
+            unreadCount: unreadByOther.get(otherId) || 0
+          };
+        }
       });
+      // Preserve a conversation even when its unread message is older than the
+      // recent-message preview window.
+      unreadByOther.forEach((unreadCount, otherId) => {
+        if (!dialogs[otherId]) {
+          dialogs[otherId] = {
+            otherId,
+            text: "Есть непрочитанные сообщения",
+            created_at: null,
+            unreadCount
+          };
+        }
+      });
+      const knownUnread = Array.from(unreadByOther.values()).reduce((sum, value) => sum + value, 0);
+      const exactUnread = Number.isFinite(unreadMessagesResult.count) ? unreadMessagesResult.count : knownUnread;
+      const unlistedUnreadCount = Math.max(0, exactUnread - knownUnread);
       const list = Object.values(dialogs);
       if (list.length === 0) {
         dialogsList.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p style="font-size: 12px; margin: 0;">Нет активных диалогов<br>Нажмите «Написать» на карточке товара</p></div>';
       } else {
         dialogsList.innerHTML = list.map(d => `
-          <div class="idea-card" data-action="open-dialog" data-user-id="${esc(d.otherId)}" style="cursor:pointer; margin-bottom:8px;">
-            <b style="font-size:12px;">Пользователь ${esc(d.otherId.slice(0,8))}...</b>
+          <div class="idea-card chat-dialog-card" data-action="open-dialog" data-user-id="${esc(d.otherId)}" style="cursor:pointer; margin-bottom:8px;">
+            <div class="chat-dialog-heading">
+              <b style="font-size:12px;">Пользователь ${esc(d.otherId.slice(0,8))}...</b>
+              ${d.unreadCount > 0 ? `<span class="chat-unread-pill">Непрочитано: ${d.unreadCount > 999 ? "999+" : d.unreadCount}</span>` : ""}
+            </div>
             <div style="font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px;">${esc(d.text)}</div>
-            <div style="font-size:9px; color:var(--muted); margin-top:4px;">${timeAgo(d.created_at)}</div>
+            ${d.created_at ? `<div style="font-size:9px; color:var(--muted); margin-top:4px;">${timeAgo(d.created_at)}</div>` : ""}
           </div>
-        `).join('');
+        `).join('')
+          + (unlistedUnreadCount > 0
+            ? `<p class="chat-unread-note">Ещё ${unlistedUnreadCount > 999 ? "999+" : unlistedUnreadCount} непрочитанных сообщений не вошли в последние 1000 записей. Откройте нужный диалог, чтобы синхронизировать их статус.</p>`
+            : "");
       }
     } catch (e) {
       console.error("Ошибка загрузки чатов:", e);
