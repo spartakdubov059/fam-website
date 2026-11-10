@@ -336,6 +336,32 @@
     .upload-status.error { background: rgba(255,107,107,0.15); color: var(--danger); }
     .clear-btn-wrapper { display: flex; justify-content: flex-end; margin-bottom: 12px; }
     .clear-folder-btn { padding: 6px 12px; font-size: 11px; border-radius: 10px; background: rgba(255,107,107,0.15); color: var(--danger); border: 1px solid rgba(255,107,107,0.3); font-weight: 700; }
+  
+    /* Safe profile refresh: presentation only; existing data and actions stay unchanged. */
+    .profile-hero { border:1px solid var(--border); border-radius:20px; box-shadow:0 12px 32px rgba(0,0,0,.12); }
+    .profile-hero-main { gap:14px; }
+    .profile-identity { min-width:0; }
+    .profile-email { overflow-wrap:anywhere; }
+    .profile-main-section { border:1px solid var(--border); border-radius:18px; }
+    .profile-section-heading { align-items:center; }
+    .profile-section-heading h3 { letter-spacing:-.02em; }
+    .profile-disclosure { border:1px solid var(--border); border-radius:16px; background:var(--surface); }
+    .profile-disclosure > summary { min-height:54px; transition:background .18s ease; }
+    .profile-disclosure > summary:active { background:var(--surface-hover); }
+    .profile-disclosure-body { border-top:0; }
+    .profile-inline-disclosure { border-radius:12px; }
+    .profile-box .button { transition:transform .16s ease, opacity .16s ease; }
+    .profile-box .button:active { transform:scale(.985); }
+    .profile-box :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    /* General analytics stay in the existing daily report; FAM keeps the safety-agent area. */
+    #famAgentAdminPanel { display:none !important; }
+    @media (max-width:520px) {
+      .profile-hero { border-radius:16px; }
+      .profile-disclosure > summary { padding:13px 12px; }
+      .profile-disclosure-body { padding:12px; }
+      .profile-section-heading { gap:9px; }
+    }
+
   </style>
 </head>
 <body>
