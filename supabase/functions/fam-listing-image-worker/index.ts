@@ -162,6 +162,27 @@ async function removeObject(bucket, path) {
   }
 }
 
+async function removePublishedImageIfUnreferenced(path) {
+  const imageUrl = SUPABASE_URL + "/storage/v1/object/public/listings-images/" + path;
+  try {
+    const response = await fetch(
+      SUPABASE_URL + "/rest/v1/listings?select=id&image_url=eq." + encodeURIComponent(imageUrl) + "&limit=1",
+      { headers: adminHeaders() },
+    );
+    if (!response.ok) {
+      console.warn("fam_image_worker_public_reference_check_failed", response.status);
+      return;
+    }
+    const rows = await response.json().catch(() => null);
+    if (Array.isArray(rows) && rows.length === 0) {
+      await removeObject("listings-images", path);
+    }
+  } catch {
+    // On an ambiguous database response, keep the public object rather than breaking a listing.
+    console.warn("fam_image_worker_public_reference_check_failed", "network_error");
+  }
+}
+
 async function finish(task, state, details = {}) {
   const result = await rpc("finish_listing_image_moderation_task", {
     p_queue_id: task.queue_id,
@@ -228,7 +249,7 @@ async function processTask(task) {
     await removeObject("listing-images-pending", task.image_path);
     return "approved";
   } catch (error) {
-    if (publishedPath) await removeObject("listings-images", publishedPath);
+    if (publishedPath) await removePublishedImageIfUnreferenced(publishedPath);
     const fallback = {
       action: "pending",
       degraded: true,
@@ -254,7 +275,7 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "unauthorized" }, 401);
   }
 
-  let limit = 2;
+  let limit = 1;
   try {
     const body = await req.json();
     if (Number.isInteger(body?.limit)) limit = Math.max(1, Math.min(4, body.limit));
