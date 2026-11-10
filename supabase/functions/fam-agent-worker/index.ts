@@ -112,7 +112,10 @@ Deno.serve(async (req: Request) => {
       const systemHealthTask = task?.agent_key === "technical" &&
         task?.task_type === "system_health_check" &&
         task?.approval_required === false;
-      const safeTask = queueHealthTask || dailyReportTask || systemHealthTask;
+      const siteErrorTask = task?.agent_key === "technical" &&
+        task?.task_type === "site_error_digest" &&
+        task?.approval_required === false;
+      const safeTask = queueHealthTask || dailyReportTask || systemHealthTask || siteErrorTask;
 
       let status: "completed" | "blocked" = "blocked";
       let summary = "Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя.";
@@ -208,6 +211,30 @@ Deno.serve(async (req: Request) => {
           "; ошибок задач за сутки: " + failedLast24h + ". " +
           (scheduleIssues.length ? "Проблемные расписания: " + scheduleIssues.join(", ") + ". " : "") +
           "Проверялись только служебные настройки и агрегаты; пользовательские данные не читались.";
+      } else if (siteErrorTask) {
+        // Read only fixed, aggregated event counters; no text, identifiers, URLs, or stack traces are stored.
+        const digest = await rpc("get_fam_agent_task_site_error_digest", {
+          p_task_id: task.id,
+          p_worker_id: WORKER_ID,
+        });
+        if (!digest || typeof digest !== "object" || Array.isArray(digest)) {
+          throw new Error("site_error_digest_unavailable");
+        }
+
+        const total24h = count(digest.total_events_24h);
+        const lastHour = count(digest.events_last_hour);
+        const events = Array.isArray(digest.events) ? digest.events.slice(0, 6) : [];
+        const details = events.map((item: any) =>
+          String(item?.event_code ?? "unknown") + "/" +
+          String(item?.page_area ?? "unknown") + ": " +
+          count(item?.occurrences)
+        ).join("; ");
+
+        status = "completed";
+        summary = "Проверка клиентских ошибок FAM: за 24 часа зарегистрировано " +
+          total24h + " событий, за последний час — " + lastHour + ". " +
+          (details ? "Категории: " + details + ". " : "") +
+          "Собраны только агрегированные коды ошибок и разделы; личные данные не собирались.";
       }
       const saved = await rpc("finish_fam_agent_task", {
         p_task_id: task.id,
