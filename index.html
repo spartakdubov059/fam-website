@@ -2192,7 +2192,7 @@ window.onunhandledrejection = function(event) {
       const listingsData = Array.isArray(data.listings) ? data.listings : [];
       $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => `
         <div class="idea-card" style="margin-bottom:7px;">
-          <div style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
+          <div class="council-listing-title" style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
           <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
           <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
         </div>
