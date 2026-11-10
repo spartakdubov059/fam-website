@@ -1630,7 +1630,11 @@ window.onunhandledrejection = function() {
       ]);
       if (sentResult.error) throw sentResult.error;
       if (receivedResult.error) throw receivedResult.error;
-      if (unreadMessagesResult.error) throw unreadMessagesResult.error;
+      if (unreadMessagesResult.error || !Number.isFinite(unreadMessagesResult.count)) {
+        // Keep the chat list usable even when only unread-detail metadata is unavailable.
+        setBadge(null);
+        console.warn("chat_unread_details_load_failed", unreadMessagesResult.error?.message || "unknown");
+      }
       const allMsgs = [...(sentResult.data || []), ...(receivedResult.data || [])]
         .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
       const unreadByOther = new Map();
@@ -1664,7 +1668,9 @@ window.onunhandledrejection = function() {
         }
       });
       const knownUnread = Array.from(unreadByOther.values()).reduce((sum, value) => sum + value, 0);
-      const exactUnread = Number.isFinite(unreadMessagesResult.count) ? unreadMessagesResult.count : knownUnread;
+      const exactUnread = !unreadMessagesResult.error && Number.isFinite(unreadMessagesResult.count)
+        ? unreadMessagesResult.count
+        : knownUnread;
       const unlistedUnreadCount = Math.max(0, exactUnread - knownUnread);
       const list = Object.values(dialogs);
       if (list.length === 0) {
