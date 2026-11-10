@@ -30,6 +30,12 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Зафиксировать исходный commit main
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-codex"
+          git rev-parse HEAD > "$RUNNER_TEMP/fam-codex-base.sha"
+
       - name: Проверить наличие API-ключа и задачу
         env:
           FAM_TASK: ${{ inputs.task }}
@@ -73,6 +79,12 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .fam-codex-task.md
+          EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-codex-base.sha")"
+          ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
+          if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
+            echo "::error::Codex изменил git history. Создание patch остановлено."
+            exit 1
+          fi
           git add -N -- .
           mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
           if (( ${#changed_files[@]} == 0 )); then
@@ -90,9 +102,13 @@ jobs:
           done
           git diff --check HEAD
           mkdir -p "$RUNNER_TEMP/fam-codex"
-          git rev-parse HEAD > "$RUNNER_TEMP/fam-codex/base.sha"
+          cp "$RUNNER_TEMP/fam-codex-base.sha" "$RUNNER_TEMP/fam-codex/base.sha"
           git diff --binary HEAD > "$RUNNER_TEMP/fam-codex/fam-codex.patch"
           test -s "$RUNNER_TEMP/fam-codex/fam-codex.patch"
+          if (( $(wc -c < "$RUNNER_TEMP/fam-codex/fam-codex.patch") > 2000000 )); then
+            echo "::error::Patch превышает безопасный лимит 2 МБ."
+            exit 1
+          fi
 
       - name: Передать только проверенный по путям patch
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
@@ -220,15 +236,15 @@ jobs:
             esac
           done
           git diff --check HEAD
+          BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
+          git switch -c "$BRANCH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git -c core.hooksPath=/dev/null commit -m "Propose FAM code update with Codex"
-          BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
-          git branch "$BRANCH"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
-          git diff --stat main...HEAD > "$RUNNER_TEMP/fam-codex-diff-stat.txt"
+          git diff --stat "main...$BRANCH" > "$RUNNER_TEMP/fam-codex-diff-stat.txt"
           {
             echo "## Предложение ИИ-разработчика FAM"
             echo
