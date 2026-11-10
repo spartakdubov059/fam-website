@@ -375,6 +375,26 @@
     .admin-confirm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
     .admin-confirm-actions .button{flex:1}
 
+    #adminIdeasDash.profile-disclosure{background:var(--surface);border:1px solid rgba(255,255,255,.06);box-shadow:none}
+    #adminIdeasDash.profile-disclosure>summary{background:var(--surface);color:var(--text)}
+    #adminIdeasDash.profile-disclosure>summary:hover{background:var(--surface-hover)}
+    #adminIdeasDash.profile-disclosure>summary .profile-disclosure-title b{color:var(--text)}
+    .hero-slide.hero-text{min-height:220px;padding:28px 24px 24px;align-items:flex-start;justify-content:center;gap:0}
+    .hero-slide.hero-text .db-emoji{font-size:clamp(42px,12vw,60px);right:18px;top:18px}
+    .hero-slide.hero-text .db-title{font-family:inherit;font-size:clamp(24px,7vw,34px);font-weight:850;line-height:1.08;letter-spacing:-.035em;max-width:min(76%,280px);overflow-wrap:anywhere;text-wrap:balance}
+    .hero-slide.hero-text .db-sub{font-size:clamp(12px,3.5vw,14px);line-height:1.4;margin:9px 0 0;max-width:min(76%,280px);overflow-wrap:anywhere}
+    .school-review-count{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:3px 8px;border-radius:999px;background:var(--bg);color:var(--muted);font-size:9px;font-weight:800;vertical-align:middle}
+    .notif-read-state{display:block;margin-top:4px;color:var(--muted);font-size:9px}
+    .notif-item.is-unread{border-left:2px solid var(--accent);padding-left:9px}
+    .notif-item.is-read{opacity:.76}
+    .notif-item[data-action="open-admin-applications"]{cursor:pointer}
+    .notif-item[data-action="open-admin-applications"]:hover{background:var(--surface-hover)}
+    @media(max-width:420px){
+      .hero-slide.hero-text{padding:24px 18px 22px;min-height:210px}
+      .hero-slide.hero-text .db-title{max-width:72%;font-size:27px}
+      .hero-slide.hero-text .db-sub{max-width:72%;font-size:12px}
+      .hero-slide.hero-text .db-emoji{right:14px;top:18px}
+    }
 </style>
 </head>
 <body>
@@ -502,7 +522,7 @@
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
       <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Идеи школы</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Идеи школы</h3><p class="profile-section-copy">ИИ проверяет идеи на спам, рекламу, личные контакты и небезопасные призывы. Только сомнительные случаи передаются Совету на ручную проверку.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
@@ -515,8 +535,8 @@
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Панель школы</b><small>Участники, публикации и запросы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
-            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
-            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
+            <h5 style="font-size:12px; margin:0 0 6px;">Заявки на вступление в Ученический совет <span id="schoolAdminReviewCount" class="school-review-count">0</span></h5>
+            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Здесь видны запросы учеников вашей школы. До одобрения это только заявка — полномочия ещё не выданы.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
           <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
@@ -735,6 +755,8 @@ window.onunhandledrejection = function(event) {
   let currentTab = 'board';
   let previousTab = 'board';
   let notifOpen = false;
+  let schoolAdminAccessRequests = [];
+  let adminApplicationPanelAutoOpened = false;
   let heroRendered = false;
   let seenMap = {};
   let isAiDown = null; // null means no real moderation result has been observed yet.
@@ -866,7 +888,7 @@ window.onunhandledrejection = function(event) {
     const liveLabel = document.querySelector(".ai-live");
     if (liveLabel) {
       liveLabel.textContent = isAiDown === null
-        ? "ИИ-модерация · статус не проверен"
+        ? "ИИ-модерация · проверяет публикации"
         : isAiDown
           ? "ИИ-модерация недоступна"
           : "ИИ-модерация активна";
@@ -906,40 +928,120 @@ window.onunhandledrejection = function(event) {
     return new Date(t).toLocaleDateString('ru-RU');
   }
 
+  function notificationReadKey() {
+    return "fam_notif_read_v2_" + (user?.id || "guest");
+  }
+
+  function getReadNotificationIds() {
+    try {
+      const parsed = JSON.parse(safeLocalStorageGet(notificationReadKey()) || "[]");
+      return new Set(Array.isArray(parsed) ? parsed.filter(x => typeof x === "string") : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  function markNotificationsRead(notes) {
+    const read = getReadNotificationIds();
+    (Array.isArray(notes) ? notes : []).forEach(note => {
+      if (note && typeof note.id === "string") read.add(note.id);
+    });
+    safeLocalStorageSet(notificationReadKey(), JSON.stringify(Array.from(read).slice(-500)));
+  }
+
   function buildNotifications() {
-    const notes = [{ icon: '🚀', title: 'Обновление', text: 'Новый дизайн и ИИ-модерация.', time: Date.now() - 45 * 60000 }];
-    if (isAiDown) notes.unshift({ icon: '⚠️', title: 'Технические работы', text: 'ИИ временно недоступен.', time: Date.now() });
-    if (user && profile && profile.school_id) {
-      listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 4).forEach(e => {
-        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        notes.push({ icon: '🎭', title: 'Событие школы', text: e.title + (ds ? ' · ' + ds : ''), time: new Date(e.created_at || Date.now()).getTime() });
+    const notes = [{
+      id: "system:fam-update-2026-11-10",
+      icon: "🚀",
+      title: "Обновление FAM",
+      text: "Появились новые возможности и улучшения.",
+      time: Date.now() - 45 * 60000
+    }];
+
+    if (isAiDown === true) {
+      notes.unshift({
+        id: "system:moderation-unavailable",
+        icon: "⚠️",
+        title: "ИИ-модерация временно недоступна",
+        text: "Новые публикации не должны обходить проверку.",
+        time: Date.now()
       });
     }
-    return notes.sort((a, b) => b.time - a.time);
+
+    if (user && profile?.role === "school_admin") {
+      schoolAdminAccessRequests.forEach(request => {
+        const isReviewing = request.status === "reviewing";
+        const requestedRole = request.applicant_note === "Администратор"
+          ? "запрашивает полномочия администратора школы"
+          : "просит вступить в Ученический совет";
+        notes.push({
+          id: "school-access:" + request.id,
+          icon: "🏫",
+          title: "Заявка на вступление в Ученический совет",
+          text: (request.applicant_email || "Ученик") + " · " + requestedRole
+            + (isReviewing ? " · уже рассматривается" : " · ожидает решения"),
+          time: new Date(request.review_started_at || request.created_at || Date.now()).getTime(),
+          action: "open-admin-applications"
+        });
+      });
+    }
+
+    if (user && profile?.school_id) {
+      listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 6).forEach(event => {
+        const ds = event.event_date ? new Date(event.event_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
+        notes.push({
+          id: "school-event:" + event.id,
+          icon: "🎭",
+          title: "Событие школы",
+          text: event.title + (ds ? " · " + ds : ""),
+          time: new Date(event.created_at || Date.now()).getTime()
+        });
+      });
+    }
+
+    return notes.filter(note => typeof note.id === "string").sort((a, b) => b.time - a.time);
   }
 
   function updateBellBadge() {
-    const seen = parseInt(safeLocalStorageGet('fam_notif_seen') || '0', 10);
-    const n = buildNotifications().filter(x => x.time > seen).length;
-    const b = $("bellBadge");
-    if (n > 0) { b.textContent = n > 9 ? '9+' : n; b.classList.remove("hidden"); }
-    else b.classList.add("hidden");
+    const read = getReadNotificationIds();
+    const unread = buildNotifications().filter(note => !read.has(note.id));
+    const badge = $("bellBadge");
+    if (!badge) return;
+    if (unread.length > 0) {
+      badge.textContent = unread.length > 9 ? "9+" : String(unread.length);
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
   }
 
-  function renderNotifPanel() {
-    const notes = buildNotifications();
-    $("notifContent").innerHTML = notes.length ? notes.map(n =>
-      `<div class="notif-item"><span class="notif-ico">${n.icon}</span><div style="min-width:0;"><div class="notif-title">${esc(n.title)}</div><div class="notif-text">${esc(n.text)}</div><div class="notif-time">${timeAgo(n.time)}</div></div></div>`
-    ).join("") : '<p style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Пока нет уведомлений</p>';
+  function renderNotifPanel(notes = buildNotifications()) {
+    const read = getReadNotificationIds();
+    $("notifContent").innerHTML = notes.length ? notes.map(note => {
+      const isRead = read.has(note.id);
+      const action = note.action === "open-admin-applications"
+        ? ' data-action="open-admin-applications"'
+        : "";
+      return `<div class="notif-item ${isRead ? "is-read" : "is-unread"}"${action}>
+        <span class="notif-ico">${note.icon}</span>
+        <div style="min-width:0;flex:1;">
+          <div class="notif-title">${esc(note.title)}</div>
+          <div class="notif-text">${esc(note.text)}</div>
+          <div class="notif-time">${timeAgo(note.time)}</div>
+          <span class="notif-read-state">${isRead ? "Прочитано" : "Новое"}</span>
+        </div>
+      </div>`;
+    }).join("") : '<p style="color:var(--muted);font-size:12px;text-align:center;padding:16px;">Пока нет уведомлений</p>';
   }
 
   window.closeNotifPanel = () => { notifOpen = false; $("notifPanel").classList.add("hidden"); };
   function toggleNotif() {
     if (notifOpen) { closeNotifPanel(); return; }
+    const notes = buildNotifications();
+    markNotificationsRead(notes);
     notifOpen = true;
-    renderNotifPanel();
+    renderNotifPanel(notes);
     $("notifPanel").classList.remove("hidden");
-    safeLocalStorageSet('fam_notif_seen', String(Date.now()));
     updateBellBadge();
   }
   $("bellBtn").onclick = (e) => { e.stopPropagation(); toggleNotif(); };
@@ -1095,20 +1197,20 @@ window.onunhandledrejection = function(event) {
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
       <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-модерация · статус не проверен</span>
+      <span class="ai-live"><i></i>ИИ-модерация · проверяет публикации</span>
     </div>`);
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
       html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
     });
     const designed = [
-      { g: 'linear-gradient(140deg,#2A1B4A,#171226 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
-      { g: 'linear-gradient(140deg,#123324,#0C2418 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
-      { g: 'linear-gradient(140deg,#4A3F14,#26200C 70%)', e: '🤖', t: 'ИИ-модерация', s: 'защита 24/7', action: null },
-      { g: 'linear-gradient(140deg,#1E2749,#131A30 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
+      { g: 'linear-gradient(140deg,#2A1B4A,#171226 70%)', e: '🎁', t: 'Объявления бесплатно', s: 'Размещай и находи нужное', action: 'open-listing' },
+      { g: 'linear-gradient(140deg,#123324,#0C2418 70%)', e: '🛍️', t: 'Вещи и услуги рядом', s: 'Полезные предложения школы', action: 'cat', cat: 'Вещи' },
+      { g: 'linear-gradient(140deg,#4A3F14,#26200C 70%)', e: '🤖', t: 'Проверка ИИ', s: 'Спам, контакты и безопасность', action: null },
+      { g: 'linear-gradient(140deg,#1E2749,#131A30 70%)', e: '🎓', t: 'Учёба вместе', s: 'Помощь с подготовкой и проектами', action: 'cat', cat: 'Учёба' }
     ];
     designed.forEach(b => {
       const attrs = b.action === 'cat' ? `data-action="cat" data-cat="${b.cat}"` : (b.action ? `data-action="${b.action}"` : '');
-      html.push(`<div class="hero-slide" style="background:${b.g}" ${attrs}><span class="db-emoji">${b.e}</span><div class="db-title">${b.t}</div><div class="db-sub">${b.s}</div></div>`);
+      html.push(`<div class="hero-slide hero-text" style="background:${b.g}" ${attrs}><span class="db-emoji">${b.e}</span><div class="db-title">${esc(b.t)}</div><div class="db-sub">${esc(b.s)}</div></div>`);
     });
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
@@ -1548,7 +1650,7 @@ window.onunhandledrejection = function(event) {
     let btn = $("ideaSubmitBtn");
     if (btn.disabled) return;
     btn.disabled = true;
-    showAIThinking('ideaThinkingArea', 'Проверяем по правилам');
+    showAIThinking('ideaThinkingArea', 'ИИ проверяет спам, контакты и безопасность');
 
     try {
       const { data: submission, error } = await sb.functions.invoke("submit-content", {
@@ -1566,10 +1668,10 @@ window.onunhandledrejection = function(event) {
 
       $("ideaText").value = "";
       notice(submission.degraded
-        ? "⚠️ " + (submission.reason || "Проверка временно недоступна. Идея не отправлена.")
+        ? "⚠️ ИИ не смог завершить проверку. Идея сохранена и не считается одобренной; Совет сможет проверить её дополнительно."
         : submission.status === "pending"
-          ? "Идея отправлена школьному Совету на ручную проверку."
-          : "Идея отправлена Совету!");
+          ? "ИИ не смог уверенно оценить идею. Она передана Совету на дополнительную проверку."
+          : "ИИ проверил идею. Она отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
       hideAIThinking('ideaThinkingArea');
@@ -1653,13 +1755,16 @@ window.onunhandledrejection = function(event) {
 
         const request = data.request;
         if (request?.status === "pending") {
-          const requestedRole = request.applicant_note || "Роль Ученического совета";
+          const requestsAdmin = request.applicant_note === "Администратор";
+          const requestTitle = requestsAdmin
+            ? "Заявка на полномочия администратора школы"
+            : "Заявка на вступление в Ученический совет";
           const submittedAt = request.created_at
             ? new Date(request.created_at).toLocaleString("ru-RU")
             : "";
           showSchoolAdminAccessStatus(
-            "Заявка отправлена",
-            "Вы запросили роль «" + requestedRole + "». Сейчас заявка ожидает рассмотрения действующим Советом. Повторно отправлять её не нужно.",
+            requestTitle,
+            "Это ещё не членство и не выданные полномочия. Сейчас ваш статус — «Ученик». Заявка ожидает решения действующего администратора школы.",
             "new",
             "pending",
             submittedAt ? "Отправлена: " + submittedAt : ""
@@ -1671,8 +1776,10 @@ window.onunhandledrejection = function(event) {
             ? new Date(request.review_started_at).toLocaleString("ru-RU")
             : "";
           showSchoolAdminAccessStatus(
-            "Заявка на рассмотрении",
-            "Совет начал проверку вашей заявки. Новую заявку создавать не нужно.",
+            request.applicant_note === "Администратор"
+              ? "Заявка на полномочия администратора — на рассмотрении"
+              : "Заявка на вступление в Ученический совет — на рассмотрении",
+            "Это пока только заявка. Ваш текущий статус остаётся «Ученик» до решения администратора.",
             "work",
             "reviewing",
             when ? "Взята в работу: " + when : ""
@@ -1685,9 +1792,11 @@ window.onunhandledrejection = function(event) {
             ? new Date(request.reviewed_at).toLocaleString("ru-RU")
             : "";
           showSchoolAdminAccessStatus(
-            "Заявка отклонена",
-            "Заявка на роль «" + rejectedRole + "» не одобрена. " +
-              (request.review_note || "Совет не подтвердил членство. При необходимости уточните причину у действующего представителя и отправьте новую заявку."),
+            request.applicant_note === "Администратор"
+              ? "Заявка на полномочия администратора отклонена"
+              : "Заявка на вступление в Ученический совет отклонена",
+            "Вы остаетесь учеником. " +
+              (request.review_note || "Администратор не одобрил заявку. При необходимости уточните причину и отправьте новую."),
             "rejected",
             "rejected",
             rejectedAt ? "Решение принято: " + rejectedAt : ""
@@ -1716,6 +1825,8 @@ window.onunhandledrejection = function(event) {
 
     if (accessBox) accessBox.classList.add("hidden");
     if (profile.role !== "school_admin") {
+      schoolAdminAccessRequests = [];
+      updateBellBadge();
       if (reviewBox) reviewBox.classList.add("hidden");
       return;
     }
@@ -1730,37 +1841,62 @@ window.onunhandledrejection = function(event) {
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить заявки.");
       const requests = Array.isArray(data.requests) ? data.requests : [];
+      schoolAdminAccessRequests = requests;
+      updateBellBadge();
+      if (notifOpen) renderNotifPanel();
+      const pendingCount = requests.filter(request => request.status === "pending").length;
+      const reviewingCount = requests.filter(request => request.status === "reviewing").length;
+      const countLabel = $("schoolAdminReviewCount");
+      if (countLabel) countLabel.textContent = requests.length
+        ? (pendingCount ? "Новые: " + pendingCount : "В работе: " + reviewingCount)
+        : "0";
       if (!list) return;
       list.innerHTML = requests.length ? requests.map(request => {
-        const statusText = request.status === "reviewing" ? "На рассмотрении" : "Ожидает рассмотрения";
+        const isReviewing = request.status === "reviewing";
+        const statusText = isReviewing ? "На рассмотрении" : "Ожидает решения";
+        const requestedRole = request.applicant_note === "Администратор"
+          ? "Просит полномочия администратора школы"
+          : "Просит вступить в Ученический совет";
         let actions = "";
         if (request.status === "pending") {
-          actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.id)}">Взять на рассмотрение</button>`;
-        } else if (request.status === "reviewing" && request.review_started_by === user.id) {
+          actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.id)}">Взять заявку в работу</button>`;
+        } else if (isReviewing && request.review_started_by === user.id) {
           actions = `
-            <button type="button" class="button button-success button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="approve">Подтвердить</button>
-            <button type="button" class="button button-danger button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="reject">Отклонить</button>
+            <button type="button" class="button button-primary button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="approve">Подтвердить заявку</button>
+            <button type="button" class="button button-secondary button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="reject">Отклонить</button>
           `;
-        } else if (request.status === "reviewing") {
-          actions = '<span style="font-size:10px;color:var(--muted);">Заявку уже рассматривает другой администратор.</span>';
+        } else if (isReviewing) {
+          actions = '<span style="font-size:10px;color:var(--muted);">Заявку уже проверяет другой администратор.</span>';
         }
         const reviewDate = request.review_started_at
           ? new Date(request.review_started_at).toLocaleString("ru-RU")
           : "";
         return `
-          <div class="idea-card" style="margin-bottom:8px;">
-            <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("пользователя " + String(request.user_id || "").slice(0,8) + "…"))}</b>
-            <div style="font-size:10px; color:var(--muted); margin:5px 0;">${esc(request.applicant_note || "Роль в Совете не указана")}</div>
-            <div style="font-size:10px; margin:5px 0;">Статус: <b>${esc(statusText)}</b></div>
-            <div style="font-size:9px; color:var(--muted); margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
-            <div style="display:flex; gap:6px; flex-wrap:wrap;">${actions}</div>
-          </div>
+          <article class="idea-card" style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
+              <b style="font-size:11px;">Заявка от ${esc(request.applicant_email || ("ученика " + String(request.user_id || "").slice(0,8) + "…"))}</b>
+              <span class="idea-status ${isReviewing ? "status-work" : "status-new"}">${esc(statusText)}</span>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin:5px 0;">${esc(requestedRole)}</div>
+            <div style="font-size:9px;color:var(--muted);margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
+          </article>
         `;
-      }).join("") : '<p style="font-size:11px; color:var(--muted); margin:0;">Новых заявок пока нет.</p>';
+      }).join("") : '<p style="font-size:11px;color:var(--muted);margin:0;">Заявок пока нет. Новые запросы появятся здесь.</p>';
+      if (requests.length && !adminApplicationPanelAutoOpened) {
+        const dashboard = $("adminIdeasDash");
+        if (dashboard) dashboard.open = true;
+        adminApplicationPanelAutoOpened = true;
+      }
     } catch (error) {
       if (list) list.textContent = "Не удалось загрузить заявки. " + (error?.message || "");
     }
   }
+
+  setInterval(() => {
+    if (document.hidden || !user || profile?.role !== "school_admin") return;
+    loadSchoolAdminAccess();
+  }, 60000);
 
   async function submitSchoolAdminRequest() {
     if (!user || profile?.role !== "student" || !profile?.school_id) {
@@ -1788,8 +1924,8 @@ window.onunhandledrejection = function(event) {
       if (noteEl) noteEl.value = "";
       await loadSchoolAdminAccess();
       notice(data.already_pending
-        ? "Заявка уже существует и ожидает рассмотрения."
-        : "Заявка отправлена. Теперь её статус виден в профиле.");
+        ? "Заявка уже существует и ожидает решения. Пока вы остаётесь учеником."
+        : "Заявка отправлена. До одобрения вы остаётесь учеником.");
     } catch (error) {
       notice("Ошибка: " + (error?.message || "Не удалось отправить заявку."));
     } finally {
@@ -2181,8 +2317,6 @@ window.onunhandledrejection = function(event) {
       danger: decision === "approve",
       reason: decision === "reject" ? { min: 10, max: 240, hint: "От 10 до 240 символов. Причину увидит автор запроса." } : null,
       onConfirm: async reviewNote => {
-        const confirmed = await ensureRecentAdminAuthentication();
-        if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
         const { data, error } = await sb.functions.invoke("council-management", {
           body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
         });
@@ -2283,39 +2417,8 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function ensureRecentAdminAuthentication() {
-    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
-    if (sessionError) throw sessionError;
-    const token = sessionData?.session?.access_token || "";
-    const parts = token.split(".");
-    let issuedAt = 0;
-    if (parts.length === 3) {
-      try {
-        const raw = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        const padded = raw + "=".repeat((4 - raw.length % 4) % 4);
-        issuedAt = Number(JSON.parse(atob(padded))?.iat) || 0;
-      } catch (_) {
-        issuedAt = 0;
-      }
-    }
-    const age = Date.now() / 1000 - issuedAt;
-    if (issuedAt > 0 && age >= 0 && age <= 600) return true;
-
-    const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
-    if (!password) return false;
-    const loginIdentity = user.email ? { email: user.email } : { phone: user.phone };
-    const { error } = await sb.auth.signInWithPassword({ ...loginIdentity, password });
-    if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
-    return true;
-  }
-
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "moderate_listing", "suspend_account", "lift_suspension"];
-    if (sensitiveActions.includes(action)) {
-      const confirmed = await ensureRecentAdminAuthentication();
-      if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
-    }
     const { data, error } = await sb.functions.invoke("council-management", {
       body: { action, target_id: targetId, ...extra }
     });
@@ -2323,7 +2426,6 @@ window.onunhandledrejection = function(event) {
     if (!data?.ok) throw new Error(data?.error || "Операция не выполнена.");
     return data;
   }
-
   async function manageCouncilRole(targetId) {
     if (!targetId || !confirm("Снять с ученика полномочия Ученического совета? Сам аккаунт останется активным.")) return;
     try {
@@ -2844,6 +2946,16 @@ window.onunhandledrejection = function(event) {
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
+    else if (action === 'open-admin-applications') {
+      closeNotifPanel();
+      showTab("profile");
+      requestAnimationFrame(() => {
+        const dashboard = $("adminIdeasDash");
+        if (dashboard) dashboard.open = true;
+        const review = $("schoolAdminReview");
+        if (review) review.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
     else if (action === 'select-hint-category') {
       const category = btn.dataset.category;
       if (["Вещи", "Услуги", "Учёба", "Мероприятия"].includes(category)) {
