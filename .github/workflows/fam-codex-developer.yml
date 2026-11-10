@@ -6,6 +6,12 @@ on:
     paths:
       - ".github/workflows/fam-codex-developer.yml"
       - ".github/prompts/fam-codex-developer.md"
+      - "index.html"
+      - "css/**"
+      - "js/**"
+      - "assets/**"
+      - "docs/**"
+      - "tests/**"
       - "scripts/run-local-coder.mjs"
       - "scripts/validate-local-agent-patch.mjs"
       - "tests/security/fam-local-agent.test.mjs"
@@ -183,7 +189,7 @@ jobs:
           EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-agent/base.sha")"
           ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
           if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
-            echo "::error::Основная ветка изменилась после генерации. Patch устарел; автоматическая публикация отменена."
+            echo "::error::Основная ветка изменилась после генерации. Patch устарел; подготовка PR отменена."
             exit 1
           fi
           git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
@@ -249,8 +255,8 @@ jobs:
           NODE
           node --check /tmp/fam-inline-scripts.js
 
-  publish:
-    name: Создать PR и опубликовать только безопасное исправление
+  prepare_review:
+    name: Подготовить PR и проверить исправление без публикации
     needs: [generate, verify]
     if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
     runs-on: ubuntu-latest
@@ -260,7 +266,6 @@ jobs:
       pull-requests: write
       checks: read
       actions: write
-      pages: write
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -274,7 +279,7 @@ jobs:
           name: fam-local-agent-result
           path: ${{ runner.temp }}/fam-agent
 
-      - name: Создать PR и решить, нужна ли ручная проверка
+      - name: Создать PR; публикация всегда требует решения владельца
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
@@ -284,7 +289,7 @@ jobs:
           EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-agent/base.sha")"
           ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
           if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
-            echo "::error::main изменилась после тестов. Старый patch не публикуется."
+            echo "::error::main изменилась после тестов. Старый patch не применяется."
             exit 1
           fi
           git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
@@ -309,19 +314,19 @@ jobs:
             echo "- Patch прошёл независимые тесты и проверку безопасности в отдельном job этого запуска."
             echo "- Supabase, миграции, права доступа и аккаунты не менялись."
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            echo "- Автоматическая публикация допускается только при низком риске и отсутствии признаков критических действий."
+            echo "- Production этим workflow не изменяется."
+            echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
           if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
             PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
             echo "requires_approval=true" >> "$GITHUB_OUTPUT"
           else
-            PR_URL="$(gh pr create --base main --head "$BRANCH" --title "Автоисправление FAM после тестов" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
+            PR_URL="$(gh pr create --base main --head "$BRANCH" --title "Исправление FAM после тестов — ожидает разрешения" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
             echo "requires_approval=false" >> "$GITHUB_OUTPUT"
           fi
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Дождаться проверок PR и объединить низкорисковое исправление
-        if: steps.pr.outputs.requires_approval == 'false'
+      - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
@@ -345,47 +350,10 @@ jobs:
             echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
             exit 1
           fi
-          gh pr merge "$PR_URL" --squash --delete-branch
-          MERGE_SHA=""
-          for attempt in $(seq 1 12); do
-            MERGE_SHA="$(gh pr view "$PR_URL" --json mergeCommit --jq '.mergeCommit.oid // empty')"
-            [[ -n "$MERGE_SHA" ]] && break
-            sleep 5
-          done
-          if [[ -z "$MERGE_SHA" ]]; then
-            echo "::error::PR объединён, но merge commit не удалось подтвердить."
-            exit 1
-          fi
-          echo "Merged commit: $MERGE_SHA"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null
-          BUILD_STATUS=""
-          BUILD_COMMIT=""
-          for attempt in $(seq 1 120); do
-            BUILD_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest")"
-            BUILD_STATUS="$(jq -r '.status // empty' <<< "$BUILD_JSON")"
-            BUILD_COMMIT="$(jq -r '.commit // empty' <<< "$BUILD_JSON")"
-            if [[ "$BUILD_STATUS" == "errored" ]]; then
-              echo "::error::GitHub Pages build завершился с ошибкой."
-              exit 1
-            fi
-            if [[ "$BUILD_STATUS" == "built" && "$BUILD_COMMIT" == "$MERGE_SHA" ]]; then
-              break
-            fi
-            sleep 10
-          done
-          if [[ "$BUILD_STATUS" != "built" || "$BUILD_COMMIT" != "$MERGE_SHA" ]]; then
-            echo "::error::Не удалось подтвердить GitHub Pages build для merge commit $MERGE_SHA."
-            exit 1
-          fi
-          curl --fail --silent --show-error --location --retry 10 --retry-delay 5 \
-            --retry-all-errors --output /tmp/fam-production.html \
-            "https://spartakdubov059.github.io/fam-website/"
-          grep -qi "<html" /tmp/fam-production.html
-          echo "GitHub Pages deployment succeeded for $MERGE_SHA; production HTTP response verified."
-
+          gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
       - name: Сохранить отчёт о PR
         if: always()
         run: |
           echo "Результат локального ИИ-разработчика FAM:"
           echo "PR: ${{ steps.pr.outputs.pr_url }}"
-          echo "Требуется ручное разрешение: ${{ steps.pr.outputs.requires_approval }}"
+          echo "Автоматическое объединение и публикация запрещены; PR ожидает отдельного разрешения владельца."
