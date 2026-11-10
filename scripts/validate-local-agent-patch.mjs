@@ -48,6 +48,26 @@ const CRITICAL_CHANGE_PATTERNS = [
   /irreversible|irreversib(?:le|ility)/i,
 ];
 
+const HTML_ACTIVE_CONTENT_PATTERNS = [
+  /<\s*script\b/i,
+  /<\s*iframe\b|<\s*object\b|<\s*embed\b/i,
+  /<\s*form\b|<\s*input\b/i,
+  /\bon[a-z][a-z0-9_-]*\s*=/i,
+  /javascript\s*:/i,
+  /<\s*base\b/i,
+  /<\s*meta\b[^>]*http-equiv/i,
+  /\b(?:src|href)\s*=\s*["']\s*(?:https?:)?\/\//i,
+];
+
+const CSS_EXTERNAL_RESOURCE_PATTERNS = [
+  /@import\b/i,
+  /url\(\s*["']?\s*(?:https?:)?\/\//i,
+  /url\(\s*["']?\s*data:text\/html/i,
+  /\bexpression\s*\(/i,
+  /-moz-binding\b/i,
+  /\bbehavior\s*:/i,
+];
+
 function changedLinesOnly(patch) {
   return patch
     .split(/\r?\n/)
@@ -57,11 +77,25 @@ function changedLinesOnly(patch) {
 
 export function requiresManualApproval(summary, patch) {
   if (!summary || summary.risk !== "low" || summary.requires_approval !== false) return true;
-  const codePaths = extractPatchPaths(patch).filter((path) =>
-    path === "index.html" || path.startsWith("js/")
-  );
-  if (codePaths.length === 0) return false;
+
+  const paths = extractPatchPaths(patch);
+  // Until dynamic browser/security tests exist, executable site logic, markup,
+  // and test-suite modifications must receive a human review.
+  if (paths.some((path) =>
+    path === "index.html" ||
+    path.startsWith("js/") ||
+    path.startsWith("tests/")
+  )) return true;
+
   const changedText = changedLinesOnly(patch);
+  if (paths.some((path) => path.startsWith("css/")) &&
+      CSS_EXTERNAL_RESOURCE_PATTERNS.some((pattern) => pattern.test(changedText))) {
+    return true;
+  }
+  if (paths.some((path) => path === "index.html") &&
+      HTML_ACTIVE_CONTENT_PATTERNS.some((pattern) => pattern.test(changedText))) {
+    return true;
+  }
   return CRITICAL_CHANGE_PATTERNS.some((pattern) => pattern.test(changedText));
 }
 
