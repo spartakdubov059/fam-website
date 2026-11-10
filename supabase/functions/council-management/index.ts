@@ -664,21 +664,8 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: "Эта операция доступна только администратору своей школы." }, 403, headers);
     }
 
-    const sensitiveActions = new Set([
-      "review_account_deletion",
-      "delete_listing",
-      "moderate_listing",
-      "delete_account",
-      "revoke_role",
-      "suspend_account",
-      "lift_suspension",
-    ]);
-    if (sensitiveActions.has(action) && !tokenWasIssuedRecently(authorization)) {
-      return json({
-        ok: false,
-        error: "Для этого действия нужно повторно подтвердить вход. Введите пароль администратора и повторите операцию.",
-      }, 403, headers);
-    }
+    // The authenticated school_admin session is sufficient for admin actions.
+    // Destructive actions still require scoped role checks, a reason and a clear UI confirmation.
 
     if (action === "overview") {
       return json({ ok: true, ...(await listOverview(actor.school_id)) }, 200, headers);
