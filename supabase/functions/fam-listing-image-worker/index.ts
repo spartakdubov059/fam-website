@@ -81,9 +81,9 @@ async function createSignedImageUrl(path) {
   if (!response.ok || typeof data?.signedURL !== "string") {
     throw new Error("pending_image_sign_failed");
   }
-  return data.signedURL.startsWith("http")
-    ? data.signedURL
-    : SUPABASE_URL + (data.signedURL.startsWith("/") ? "" : "/") + data.signedURL;
+  if (data.signedURL.startsWith("http")) return data.signedURL;
+  if (data.signedURL.startsWith("/storage/v1/")) return SUPABASE_URL + data.signedURL;
+  return SUPABASE_URL + "/storage/v1" + (data.signedURL.startsWith("/") ? "" : "/") + data.signedURL;
 }
 
 async function callModeration(task, imageUrl) {
