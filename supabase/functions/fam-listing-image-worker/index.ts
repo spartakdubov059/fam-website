@@ -63,7 +63,7 @@ async function rpc(name, body) {
 function safePendingPath(task) {
   const userId = String(task.user_id || "");
   const path = String(task.image_path || "");
-  if (!/^[0-9a-f-]{36}$/i.test(userId)) return false;
+  if (!/^[a-z0-9-]{1,50}$/i.test(userId)) return false;
   return new RegExp("^" + userId + "/listing_" + userId + "_[0-9a-f-]{36}\\.(?:jpg|png|webp)$", "i").test(path);
 }
 
