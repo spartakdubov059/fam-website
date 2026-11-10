@@ -256,7 +256,7 @@ declare
   existing_job record;
 begin
   for existing_job in
-    select jobid from cron.job where jobname = 'fam-listing-image-moderation-every-2-minutes'
+    select jobid from cron.job where jobname = 'fam-listing-image-moderation-every-minute'
   loop
     perform cron.unschedule(existing_job.jobid);
   end loop;
@@ -264,7 +264,7 @@ end;
 $block$;
 
 select cron.schedule(
-  'fam-listing-image-moderation-every-2-minutes',
+  'fam-listing-image-moderation-every-minute',
   '* * * * *',
   $job$
   select net.http_post(
