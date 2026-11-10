@@ -103,24 +103,31 @@ Deno.serve(async (req: Request) => {
     let completed = 0;
     let blocked = 0;
     for (const task of tasks) {
-      const safeTask = task?.agent_key === "quality" &&
+      const queueHealthTask = task?.agent_key === "quality" &&
         task?.task_type === "queue_health_check" &&
         task?.approval_required === false;
+      const dailyReportTask = task?.agent_key === "orchestrator" &&
+        task?.task_type === "daily_report_digest" &&
+        task?.approval_required === false;
+      const systemHealthTask = task?.agent_key === "technical" &&
+        task?.task_type === "system_health_check" &&
+        task?.approval_required === false;
+      const safeTask = queueHealthTask || dailyReportTask || systemHealthTask;
 
       let status: "completed" | "blocked" = "blocked";
       let summary = "Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя.";
 
-      if (safeTask) {
+      const count = (value: unknown): number => {
+        const parsedValue = Number(value);
+        return Number.isSafeInteger(parsedValue) && parsedValue >= 0 ? parsedValue : 0;
+      };
+
+      if (queueHealthTask) {
         // This RPC returns aggregate queue counts only; it never reads task payloads or student content.
         const health = await rpc("get_fam_agent_queue_health", {});
         if (!health || typeof health !== "object" || Array.isArray(health)) {
           throw new Error("invalid_queue_health_response");
         }
-
-        const count = (value: unknown): number => {
-          const parsed = Number(value);
-          return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
-        };
 
         const queued = count(health.queued);
         const claimed = count(health.claimed);
@@ -135,8 +142,73 @@ Deno.serve(async (req: Request) => {
           "ошибки за 24 часа: " + failedLast24h + "; просроченные аренды: " + expiredLeases + "; " +
           "возраст старейшей ожидающей задачи, минут: " + oldestQueuedMinutes + ". " +
           "Содержимое задач и личные данные не читались.";
-      }
+      } else if (dailyReportTask) {
+        // The RPC verifies this task is currently leased to this worker and returns an allowlisted
+        // operational-only digest. Safety and account-related metrics are intentionally excluded.
+        const digest = await rpc("get_fam_agent_task_daily_digest", {
+          p_task_id: task.id,
+          p_worker_id: WORKER_ID,
+        });
+        if (!digest || typeof digest !== "object" || Array.isArray(digest)) {
+          throw new Error("daily_report_digest_unavailable");
+        }
 
+        const reportDate = typeof digest.report_date === "string" ? digest.report_date : "дата не указана";
+        status = "completed";
+        summary = "Ежедневная операционная сводка FAM за " + reportDate + ". " +
+          "Активных объявлений: " + count(digest.active_listings) + "; новых за сутки: " +
+          count(digest.new_listings_24h) + "; предложений ждут решения: " + count(digest.pending_ideas) + "; " +
+          "задач в очереди: " + count(digest.queued_tasks) + "; выполнено задач за сутки: " +
+          count(digest.completed_tasks_24h) + "; заблокировано за сутки: " +
+          count(digest.blocked_tasks_24h) + "; ошибок за сутки: " + count(digest.failed_tasks_24h) + ". " +
+          "Использованы только агрегированные рабочие показатели; личные данные, сообщения, " +
+          "объявления, сигналы безопасности и обращения по аккаунтам не читались.";
+      } else if (systemHealthTask) {
+        // The RPC exposes fixed infrastructure metadata and aggregate counters only.
+        // It verifies that this exact task is leased to the current worker.
+        const health = await rpc("get_fam_agent_task_system_health", {
+          p_task_id: task.id,
+          p_worker_id: WORKER_ID,
+        });
+        if (!health || typeof health !== "object" || Array.isArray(health)) {
+          throw new Error("system_health_result_unavailable");
+        }
+
+        const extensions = health.extensions && typeof health.extensions === "object"
+          ? health.extensions
+          : {};
+        const jobs = Array.isArray(health.scheduled_jobs) ? health.scheduled_jobs : [];
+        const permissions = health.rpc_permissions && typeof health.rpc_permissions === "object"
+          ? health.rpc_permissions
+          : {};
+        const queue = health.queue && typeof health.queue === "object" ? health.queue : {};
+        const extensionChecks = [extensions.pg_cron, extensions.pg_net];
+        const installedExtensions = extensionChecks.filter((item: any) => item?.installed === true).length;
+        const activeSchedules = jobs.filter((item: any) =>
+          item?.active === true && item?.schedule_matches === true
+        ).length;
+        const rpcChecks = Object.values(permissions).filter((value) => value === true).length;
+        const rpcTotal = Object.keys(permissions).length;
+        const overallOk = health.overall_ok === true;
+
+        const queued = count(queue.queued);
+        const expiredLeases = count(queue.expired_leases);
+        const failedLast24h = count(queue.failed_last_24h);
+        const scheduleIssues = jobs
+          .filter((item: any) => item?.active !== true || item?.schedule_matches !== true)
+          .map((item: any) => String(item?.job ?? "неизвестное расписание"))
+          .slice(0, 4);
+
+        status = "completed";
+        summary = "Техническая проверка FAM: " +
+          (overallOk ? "критические проверки пройдены. " : "обнаружены технические замечания. ") +
+          "Расширения установлены: " + installedExtensions + "/2; расписания активны и соответствуют настройкам: " +
+          activeSchedules + "/" + jobs.length + "; права RPC: " + rpcChecks + "/" + rpcTotal + "; " +
+          "задач в очереди: " + queued + "; просроченных блокировок: " + expiredLeases +
+          "; ошибок задач за сутки: " + failedLast24h + ". " +
+          (scheduleIssues.length ? "Проблемные расписания: " + scheduleIssues.join(", ") + ". " : "") +
+          "Проверялись только служебные настройки и агрегаты; пользовательские данные не читались.";
+      }
       const saved = await rpc("finish_fam_agent_task", {
         p_task_id: task.id,
         p_worker_id: WORKER_ID,
