@@ -1,0 +1,233 @@
+name: FAM Codex developer
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Задача для ИИ-разработчика FAM (не более 3000 символов)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-codex-developer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Подготовка исправления Codex
+    if: github.actor == 'spartakdubov059' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Проверить наличие API-ключа и задачу
+        env:
+          FAM_TASK: ${{ inputs.task }}
+          FAM_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$FAM_OPENAI_API_KEY" ]]; then
+            echo "::error::Не настроен секрет OPENAI_API_KEY. Добавьте его в GitHub Actions Secrets; сам ключ не отправляйте в чат и не выводите в логи."
+            exit 1
+          fi
+          if [[ -z "${FAM_TASK//[[:space:]]/}" ]]; then
+            echo "::error::Задача не должна быть пустой."
+            exit 1
+          fi
+          if (( ${#FAM_TASK} > 3000 )); then
+            echo "::error::Задача превышает 3000 символов."
+            exit 1
+          fi
+          node <<'NODE'
+          const fs = require("node:fs");
+          const task = (process.env.FAM_TASK || "").trim();
+          if (!task) throw new Error("Empty task");
+          fs.writeFileSync(".fam-codex-task.md", "# Задача пользователя\n\n" + task + "\n", {
+            encoding: "utf8",
+            mode: 0o600,
+          });
+          NODE
+
+      - name: Получить исходники FAM без сохранения GitHub credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Запустить изолированного ИИ-разработчика Codex
+        id: codex
+        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # openai/codex-action v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-version: "0.167.0"
+          permission-profile: ":workspace"
+          safety-strategy: "drop-sudo"
+          allow-users: "spartakdubov059"
+          prompt-file: ".github/prompts/fam-codex-developer.md"
+
+      - name: Проверить область изменений и упаковать патч
+        run: |
+          set -euo pipefail
+          rm -f .fam-codex-task.md
+          git add -N -- .
+          mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
+          if (( ${#changed_files[@]} == 0 )); then
+            echo "::error::Codex не подготовил изменений."
+            exit 1
+          fi
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              index.html|css/*|js/*|assets/*|docs/*|tests/*) ;;
+              *)
+                echo "::error::Изменён запрещённый путь: $file"
+                exit 1
+                ;;
+            esac
+          done
+          git diff --check HEAD
+          mkdir -p "$RUNNER_TEMP/fam-codex"
+          git diff --binary HEAD > "$RUNNER_TEMP/fam-codex/fam-codex.patch"
+          test -s "$RUNNER_TEMP/fam-codex/fam-codex.patch"
+
+      - name: Передать только проверенный по путям patch
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: fam-codex-patch
+          path: ${{ runner.temp }}/fam-codex/fam-codex.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    name: Независимые тесты без API-ключа
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Получить чистую основную ветку
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Скачать предложенный patch
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-codex-patch
+          path: ${{ runner.temp }}/fam-codex
+
+      - name: Применить patch и проверить разрешённые файлы
+        run: |
+          set -euo pipefail
+          git apply --binary "$RUNNER_TEMP/fam-codex/fam-codex.patch"
+          mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
+          if (( ${#changed_files[@]} == 0 )); then
+            echo "::error::Patch не содержит изменений."
+            exit 1
+          fi
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              index.html|css/*|js/*|assets/*|docs/*|tests/*) ;;
+              *)
+                echo "::error::Patch затрагивает запрещённый путь: $file"
+                exit 1
+                ;;
+            esac
+          done
+          git diff --check HEAD
+
+      - name: Установить Node.js для регрессионных проверок
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Выполнить регрессионные тесты
+        run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
+
+      - name: Проверить синтаксис встроенного JavaScript
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync("index.html", "utf8");
+          const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
+            .map((match) => match[2])
+            .filter((script) => script.trim().length > 0);
+          if (scripts.length === 0) throw new Error("No inline JavaScript found in index.html");
+          fs.writeFileSync("/tmp/fam-inline-scripts.js", scripts.join("\\n;\\n"));
+          NODE
+          node --check /tmp/fam-inline-scripts.js
+
+  publish-draft-pr:
+    name: Создать черновик Pull Request
+    needs: [generate, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Получить чистую основную ветку
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Скачать проверенный patch
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-codex-patch
+          path: ${{ runner.temp }}/fam-codex
+
+      - name: Повторно проверить patch и создать отдельную ветку
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git apply --binary "$RUNNER_TEMP/fam-codex/fam-codex.patch"
+          mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
+          if (( ${#changed_files[@]} == 0 )); then
+            echo "::error::Нет изменений для Pull Request."
+            exit 1
+          fi
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              index.html|css/*|js/*|assets/*|docs/*|tests/*) ;;
+              *)
+                echo "::error::Публикация запрещена: patch затрагивает $file"
+                exit 1
+                ;;
+            esac
+          done
+          git diff --check HEAD
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git -c core.hooksPath=/dev/null commit -m "Propose FAM code update with Codex"
+          BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
+          git branch "$BRANCH"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
+          git diff --stat main...HEAD > "$RUNNER_TEMP/fam-codex-diff-stat.txt"
+          {
+            echo "## Предложение ИИ-разработчика FAM"
+            echo
+            echo "- Задача запущена вручную владельцем репозитория."
+            echo "- Изменения подготовлены в отдельной ветке."
+            echo "- Независимые регрессионные тесты и проверка JavaScript прошли в отдельном задании без API-ключа и прав записи."
+            echo "- Production, Supabase, миграции, авторизация и аккаунты этим процессом не изменяются."
+            echo "- Этот PR создан как черновик. Он не объединяется и не публикуется автоматически."
+            echo
+            echo "### Изменённые файлы"
+            cat "$RUNNER_TEMP/fam-codex-diff-stat.txt"
+            echo
+            echo "Перед публикацией требуется ручная проверка и явное решение владельца FAM."
+          } > "$RUNNER_TEMP/fam-codex-pr-body.md"
+          gh pr create --draft --base main --head "$BRANCH" \
+            --title "Предложение Codex: обновление FAM" \
+            --body-file "$RUNNER_TEMP/fam-codex-pr-body.md"
