@@ -119,6 +119,8 @@ test("admin listing moderation is reversible, school-scoped, and audited", () =>
   assert.match(migration, /add column if not exists admin_hidden_reason text/i);
   assert.match(controller, /if \(action === "moderate_listing"\)/);
   assert.match(controller, /ownerSchoolId !== actor\.school_id/);
+  assert.match(controller, /decision === "hide" && listing\.status !== "active"/);
+  assert.match(controller, /Уже скрытые публикации не изменяются/);
   assert.match(controller, /status: "hidden"/);
   assert.match(controller, /status: "active"/);
   assert.match(controller, /"listing_hidden"/);
