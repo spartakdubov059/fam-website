@@ -1626,8 +1626,11 @@ window.onunhandledrejection = function() {
 
   async function loadAll() {
     try {
+      const listingsQuery = user && user.id
+        ? sb.from("listings").select("*").or("status.eq.active,user_id.eq." + user.id)
+        : sb.from("listings").select("*").eq("status", "active");
       let promises = [
-        sb.from("listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(50),
+        listingsQuery.order("created_at", { ascending: false }).limit(50),
         sb.from("event_occupancy").select("*")
       ];
       if (user && user.id) {
@@ -1746,7 +1749,11 @@ window.onunhandledrejection = function() {
   function listingCard(l, idx, ownerControls = false) {
     const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
     const favClass = isFavorite(l.id) ? 'active' : '';
-    let badge = l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || ''));
+    let badge = l.moderation_status === "pending" ? "Проверяется ⏳"
+      : l.moderation_status === "manual_review" ? "Проверка приостановлена"
+      : l.moderation_status === "rejected" ? "Не прошло проверку"
+      : l.moderation_status === "failed" ? "Проверка не завершена"
+      : (l.is_event ? 'Афиша 🎭' : (idx === 0 ? 'Популярное 🔥' : '📦 ' + esc(l.category || '')));
     let capacityHTML = '';
     if (l.is_event) {
       const taken = getTaken(l.id), max = l.max_seats || 0;
@@ -1783,11 +1790,15 @@ window.onunhandledrejection = function() {
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
         </div>
-        ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
-          ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-          : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-            : ""}
+        ${ownerControls && user && l.user_id === user.id && profile?.role === "student" && ["pending","manual_review"].includes(l.moderation_status)
+          ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
+          : ownerControls && user && l.user_id === user.id && profile?.role === "student"
+            ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin" && ["pending","manual_review"].includes(l.moderation_status)
+              ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
+              : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
+                ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+                : ""}
       </div>
     </div>`;
   }
@@ -1796,6 +1807,7 @@ window.onunhandledrejection = function() {
     const grid = $("listingsGrid");
     const search = $("searchInput").value.toLowerCase();
     const filtered = listings.filter(l =>
+      l.status === "active" &&
       (curCat==="Все" || l.category===curCat) &&
       ((l.title || '').toLowerCase().includes(search) || (l.description && l.description.toLowerCase().includes(search)))
     );
@@ -1806,7 +1818,7 @@ window.onunhandledrejection = function() {
 
   function renderFavorites() {
     const grid = $("favoritesGrid");
-    const favListings = listings.filter(l => isFavorite(l.id));
+    const favListings = listings.filter(l => l.status === "active" && isFavorite(l.id));
     if (favListings.length === 0) { grid.innerHTML = ''; $("favoritesEmpty").classList.remove("hidden"); }
     else { $("favoritesEmpty").classList.add("hidden"); grid.innerHTML = favListings.map((l, i) => listingCard(l, i + 1)).join(""); }
   }
@@ -3094,7 +3106,7 @@ window.onunhandledrejection = function() {
       if (profile.role === "council_member") await loadCouncilDeletionRequestPanel();
       updateIdeaCounters(); renderIdeaFolderContent();
       $("adminRequests").classList.remove("hidden");
-      let myEvs = listings.filter(l => l.user_id === user.id && l.is_event).map(l => l.id);
+      let myEvs = listings.filter(l => l.user_id === user.id && l.is_event && l.status === "active").map(l => l.id);
       if (myEvs.length > 0) {
         try {
           const res = await sb.from("event_registrations").select("*").in("event_id", myEvs).eq("status", "pending");
@@ -3532,9 +3544,8 @@ window.onunhandledrejection = function() {
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
       const data = submission.listing;
-      const statusToSet = data?.status;
-      uploadedImagePath = null; // Storage object is now referenced by a saved listing.
-      if (data && statusToSet === "active") listings.unshift(data);
+      uploadedImagePath = null; // The server now owns the staged file or the published listing image.
+      if (data) listings.unshift(data);
 
       closeModal('listingModal');
       $("listingForm").reset();
@@ -3542,7 +3553,9 @@ window.onunhandledrejection = function() {
       $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
 
       if (submission.status === "pending") {
-        alert("✅ Объявление отправлено на дополнительную проверку и пока скрыто.");
+        await loadAll();
+        renderProfile();
+        alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
       } else {
         renderListings();
       }
