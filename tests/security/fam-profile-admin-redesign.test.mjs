@@ -60,7 +60,7 @@ test("admin overview returns readable names, masked contacts, and account contex
   assert.match(frontend, /return "Ученик"/);
 });
 
-test("account deletion presents identity, requires a reason, and uses fresh admin authentication", () => {
+test("account deletion presents identity and reason without asking an already signed-in admin for the password again", () => {
   assert.match(frontend, /id="adminConfirmModal"/);
   assert.match(frontend, /Проверить удаление аккаунта/);
   assert.match(frontend, /id="adminConfirmReason"/);
@@ -69,6 +69,49 @@ test("account deletion presents identity, requires a reason, and uses fresh admi
   assert.match(frontend, /Объявлений:<\/b>/);
   assert.match(frontend, /callCouncilManagement\("delete_account", targetId, \{ reason: cleanReason \}\)/);
   assert.match(controller, /Для удаления нужна причина длиной 15–400 символов/);
+});
+
+test("school admin actions rely on the authenticated school_admin session, not a second password prompt", () => {
+  assert.doesNotMatch(frontend, /ensureRecentAdminAuthentication/);
+  assert.doesNotMatch(controller, /sensitiveActions/);
+  assert.match(controller, /actor\.role !== "school_admin"/);
+  assert.match(controller, /if \(action === "delete_my_account"\)[\s\S]*?tokenWasIssuedRecently\(authorization\)/);
+  assert.match(frontend, /if \(!user \|\| profile\?\.role !== "school_admin"\)/);
+});
+
+test("incoming school council applications are visible, counted, and correctly described as requests", () => {
+  assert.match(frontend, /Заявки на вступление в Ученический совет/);
+  assert.match(frontend, /schoolAdminReviewCount/);
+  assert.match(frontend, /schoolAdminAccessRequests = requests/);
+  assert.match(frontend, /Просит вступить в Ученический совет/);
+  assert.match(frontend, /Заявка на вступление в Ученический совет/);
+  assert.match(frontend, /Сейчас ваш статус — «Ученик»/);
+  assert.match(frontend, /Взять заявку в работу/);
+  assert.match(frontend, /Подтвердить заявку/);
+});
+
+test("opening the notification bell marks the notifications currently shown as read; later IDs stay new", () => {
+  assert.match(frontend, /fam_notif_read_v2_/);
+  assert.match(frontend, /function markNotificationsRead\(notes\)/);
+  assert.match(frontend, /markNotificationsRead\(notes\)/);
+  assert.match(frontend, /schoolAdminAccessRequests\.forEach/);
+  assert.match(frontend, /setInterval\(\(\) => \{[\s\S]*?loadSchoolAdminAccess\(\)/);
+  assert.match(frontend, /open-admin-applications/);
+});
+
+test("text-only hero banners use readable responsive typography and do not claim 24/7 moderation", () => {
+  assert.match(frontend, /hero-slide hero-text/);
+  assert.match(frontend, /\.hero-slide\.hero-text \.db-title/);
+  assert.match(frontend, /Проверка ИИ/);
+  assert.match(frontend, /ИИ-модерация · проверяет публикации/);
+  assert.doesNotMatch(frontend, /защита 24\/7/);
+  assert.doesNotMatch(frontend, /ИИ-модерация · статус не проверен/);
+});
+
+test("idea submission explains automatic AI checks and sends only uncertain cases to the Council for review", () => {
+  assert.match(frontend, /ИИ проверяет идеи на спам, рекламу, личные контакты и небезопасные призывы/);
+  assert.match(frontend, /ИИ не смог уверенно оценить идею/);
+  assert.match(frontend, /ИИ проверяет спам, контакты и безопасность/);
 });
 
 test("admin listing moderation is reversible, school-scoped, and audited", () => {
