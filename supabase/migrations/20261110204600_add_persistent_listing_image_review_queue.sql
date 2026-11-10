@@ -274,7 +274,7 @@ select cron.schedule(
       'x-fam-agent-token',
       (select decrypted_secret from vault.decrypted_secrets where name = 'fam_agent_worker_token')
     ),
-    body := '{"limit":2}'::jsonb,
+    body := '{"limit":1}'::jsonb,
     timeout_milliseconds := 30000
   );
   $job$
