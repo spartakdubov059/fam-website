@@ -83,7 +83,7 @@ test("bell notifications use stable IDs and persistent per-account dismissals", 
 });
 
 test("chat unread state uses the database is_read flag instead of local timestamps", () => {
-  assert.match(frontend, /\.eq\("is_read", false\)/);
+  assert.match(frontend, /\.or\("is_read\.eq\.false,is_read\.is\.null"\)/);
   assert.match(frontend, /\.update\(\{ is_read: true \}\)/);
   assert.match(frontend, /async function markChatSeen/);
   assert.doesNotMatch(frontend, /fam_chat_seen_map_/);
