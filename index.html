@@ -968,16 +968,42 @@
 </div>
 
 <script>
-window.onerror = function(message, source, lineno) {
-  console.error("Ошибка:", message, "Строка:", lineno);
+const FAM_DIAGNOSTICS_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+const FAM_DIAGNOSTICS_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+const FAM_DIAGNOSTIC_CODES = new Set([
+  "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
+  "listings_load_failed", "notifications_load_failed",
+  "database_request_failed", "auth_backend_failed"
+]);
+const FAM_DIAGNOSTIC_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
+
+function reportFamSiteError(eventCode, pageArea) {
+  if (!FAM_DIAGNOSTIC_CODES.has(eventCode) || !FAM_DIAGNOSTIC_AREAS.has(pageArea)) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  fetch(FAM_DIAGNOSTICS_URL + "/rest/v1/rpc/report_fam_site_error", {
+    method: "POST",
+    headers: {
+      "apikey": FAM_DIAGNOSTICS_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ p_event_code: eventCode, p_page_area: pageArea }),
+    keepalive: true
+  }).catch(() => {});
+}
+
+window.onerror = function() {
+  console.error("Ошибка JavaScript FAM");
+  reportFamSiteError("js_runtime", "other");
   return false;
 };
-window.onunhandledrejection = function(event) {
-  console.error("Необработанный промис:", event.reason);
+window.onunhandledrejection = function() {
+  console.error("Необработанный промис FAM");
+  reportFamSiteError("unhandled_rejection", "other");
 };
 
 (function(){
   if (typeof supabase === 'undefined') {
+    reportFamSiteError("supabase_sdk_unavailable", "database");
     document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#FF6B6B;font-family:sans-serif;font-size:16px;">Ошибка загрузки Supabase. Проверьте интернет-соединение.</div>';
     return;
   }
@@ -1235,13 +1261,19 @@ window.onunhandledrejection = function(event) {
       }));
       const { error } = await sb.from("notification_reads")
         .upsert(legacyRows, { onConflict: "user_id,notification_key" });
-      if (error) console.warn("notification_legacy_migration_failed", error.message);
+      if (error) {
+        console.warn("notification_legacy_migration_failed");
+        reportFamSiteError("notifications_load_failed", "notifications");
+      }
     }
 
     const readResult = await sb.from("notification_reads")
       .select("notification_key").eq("user_id", user.id).limit(2000);
     if (requestId !== notificationRefreshSeq || !user?.id) return;
-    if (readResult.error) console.warn("notification_read_state_load_failed", readResult.error.message);
+    if (readResult.error) {
+      console.warn("notification_read_state_load_failed");
+      reportFamSiteError("notifications_load_failed", "notifications");
+    }
     const readIds = new Set(Array.isArray(readResult.data) ? readResult.data.map(row => row.notification_key) : []);
     const dismissedIds = new Set([
       ...legacyDismissed,
@@ -1571,6 +1603,10 @@ window.onunhandledrejection = function(event) {
         promises.push(sb.from("favorites").select("*").eq("user_id", user.id));
       }
       const results = await Promise.all(promises);
+      if (results[0]?.error) reportFamSiteError("listings_load_failed", "listings");
+      if (results[1]?.error || results.slice(2).some(result => result?.error)) {
+        reportFamSiteError("database_request_failed", "database");
+      }
       if (!results[0].error) listings = results[0].data || [];
       if (!results[1].error) occupancy = results[1].data || [];
       if (user && user.id) {
@@ -1581,7 +1617,10 @@ window.onunhandledrejection = function(event) {
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
-    } catch (e) { console.error("Ошибка loadAll:", e); }
+    } catch (e) {
+      console.error("Ошибка загрузки данных FAM");
+      reportFamSiteError("database_request_failed", "database");
+    }
   }
 
   const getTaken = id => { let o = occupancy.find(x=>x.event_id===id); return o?parseInt(o.taken):0; };
@@ -3129,6 +3168,9 @@ window.onunhandledrejection = function(event) {
       if (isReg) alert("✅ Регистрация успешна!");
       location.reload();
     } catch(err) {
+      if (Number(err?.status) >= 500 || err?.name === "AuthRetryableFetchError" || err instanceof TypeError) {
+        reportFamSiteError("auth_backend_failed", "auth");
+      }
       $("authMsg").textContent = err.message;
       $("authPassword").value = "";
     }
