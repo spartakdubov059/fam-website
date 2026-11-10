@@ -441,6 +441,169 @@
   #profileLoggedIn .profile-shortcut:hover { transform: none; }
 }
 
+
+/* FAM designer pass: opaque, high-contrast profile controls and a visible Council workspace. */
+#profileLoggedIn .profile-shortcut {
+  min-height: 70px;
+  background: #303946;
+  border: 1px solid #738198;
+  color: #F7F9FC;
+  box-shadow: 0 7px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.07);
+  opacity: 1;
+}
+#profileLoggedIn .profile-shortcut:hover {
+  background: #3C4858;
+  border-color: #9AA8BC;
+  transform: translateY(-2px);
+}
+#profileLoggedIn .profile-shortcut-icon {
+  background: #4B596D;
+  color: #FFFFFF;
+  border: 1px solid #8291A7;
+}
+#profileLoggedIn .button-primary {
+  background: #DCE3ED;
+  border: 1px solid #FFFFFF;
+  color: #151B25;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18);
+}
+#profileLoggedIn .button-primary:hover { background: #FFFFFF; color: #111722; }
+#profileLoggedIn .button-secondary {
+  background: #3B4656;
+  border: 1px solid #77869B;
+  color: #FFFFFF;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18);
+}
+#profileLoggedIn .button-secondary:hover { background: #4A586B; border-color: #A3B1C4; }
+#profileLoggedIn .button-danger {
+  background: #B83F4D;
+  border: 1px solid #F08A94;
+  color: #FFFFFF;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18);
+}
+#profileLoggedIn .button-danger:hover { background: #D34C5C; }
+#profileLoggedIn .button-success {
+  background: #267A5C;
+  border: 1px solid #72C6A5;
+  color: #FFFFFF;
+}
+#profileLoggedIn .idea-folder {
+  background: #303946;
+  border: 1px solid #738198;
+  color: #F3F6FA;
+}
+#profileLoggedIn .idea-folder.active {
+  background: #DCE3ED;
+  border-color: #FFFFFF;
+  color: #151B25;
+}
+#profileLoggedIn .button:focus-visible,
+#profileLoggedIn .profile-shortcut:focus-visible,
+#profileLoggedIn .idea-folder:focus-visible,
+#profileLoggedIn summary:focus-visible {
+  outline: 3px solid #C6D6F0;
+  outline-offset: 3px;
+}
+#profileLoggedIn .button:disabled {
+  opacity: .62;
+  filter: saturate(.7);
+}
+#profileLoggedIn .profile-council-disclosure {
+  margin: 14px 0;
+  border: 1px solid #75849A;
+  border-radius: 20px;
+  background: #202731;
+  box-shadow: 0 12px 30px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+#adminIdeasDash > summary {
+  min-height: 76px;
+  padding: 14px 16px;
+  background: #303B4A;
+  color: #FFFFFF;
+  border-bottom: 1px solid #637187;
+}
+#adminIdeasDash[open] > summary { border-bottom-color: #77869B; }
+#adminIdeasDash .profile-disclosure-title b { font-size: 14px; color: #FFFFFF; }
+#adminIdeasDash .profile-disclosure-title small { font-size: 11px; color: #D4DCE7; }
+#adminIdeasDash > summary .profile-shortcut-icon {
+  width: 38px; height: 38px; flex-basis: 38px;
+  background: #526176; border: 1px solid #94A2B7; font-size: 18px;
+}
+#adminIdeasDash .profile-disclosure-body { padding: 14px; background: #202731; }
+#adminIdeasDash .council-dashboard-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  color: #D8E0EA;
+  background: #2B3542;
+  border: 1px solid #59697F;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+#adminIdeasDash .profile-box {
+  background: #272F3A;
+  border: 1px solid #5E6D81;
+  border-radius: 15px;
+}
+#adminIdeasDash .profile-section-copy { color: #D2D9E3; }
+#adminIdeasDash .profile-inline-disclosure {
+  background: #252E39;
+  border: 1px solid #65748A;
+  border-radius: 14px;
+  margin-top: 10px;
+}
+#adminIdeasDash .profile-inline-disclosure > summary {
+  min-height: 44px;
+  padding: 11px 13px;
+  background: #303B4A;
+  border-radius: 12px;
+  color: #FFFFFF;
+  font-size: 12px;
+}
+#adminIdeasDash .profile-inline-disclosure[open] > summary {
+  background: #3A4758;
+  border-bottom: 1px solid #718097;
+  border-radius: 12px 12px 0 0;
+}
+#adminIdeasDash .council-subpanel-content { padding: 12px; }
+#adminIdeasDash .council-section-title {
+  margin: 12px 0 7px;
+  color: #E7ECF3;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+#adminIdeasDash .idea-card {
+  background: #242D38;
+  border: 1px solid #536276;
+  border-radius: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.16);
+}
+#adminIdeasDash .idea-folders { gap: 8px; }
+#adminIdeasDash .idea-folder { padding: 9px 14px; }
+#councilAdminTools {
+  background: #252E39;
+  border: 1px solid #718097;
+  border-radius: 16px;
+  padding: 12px;
+}
+#councilAdminTools > div[style*="justify-content:space-between"] { margin-bottom: 12px !important; }
+#councilAdminTools h5 { color: #F7F9FC; font-size: 13px !important; }
+#councilAdminTools > p { color: #D2D9E3 !important; }
+#famAgentAdminPanel { background: #202731 !important; border-color: #5E6D81 !important; }
+#councilAdminDeletionRequests,
+#councilAdminUsers,
+#councilAdminListings,
+#councilAdminAudit { min-width: 0; }
+@media (max-width: 560px) {
+  #profileLoggedIn .profile-shortcuts { grid-template-columns: 1fr; }
+  #profileLoggedIn .profile-shortcut { min-height: 58px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #profileLoggedIn .profile-shortcut { transition: none; }
+  #profileLoggedIn .profile-shortcut:hover { transform: none; }
+}
+
   </style>
 </head>
 <body>
@@ -544,6 +707,81 @@
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
         <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
       </div>
+      <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
+          <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
+            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
+            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
+            <div id="schoolAdminReviewList" aria-live="polite"></div>
+          </div>
+          <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
+            <h5 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h5>
+            <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 10px;">Участник совета может сообщить администратору о проблемном аккаунте. Запрос не удаляет аккаунт автоматически — решение принимает администратор школы. Участник совета также не может самостоятельно удалять объявления: это право только администратора. Не указывайте телефоны, адреса и другие личные данные.</p>
+            <div class="form-group">
+              <label for="councilDeletionTarget">Аккаунт</label>
+              <select id="councilDeletionTarget" class="form-control"><option value="">Загружаем список...</option></select>
+            </div>
+            <div class="form-group">
+              <label for="councilDeletionReasonCode">Причина</label>
+              <select id="councilDeletionReasonCode" class="form-control">
+                <option value="rules_violation">Нарушение правил FAM</option>
+                <option value="harassment">Травля или агрессивное поведение</option>
+                <option value="fake_account">Подозрение на фальшивый аккаунт</option>
+                <option value="spam">Спам или повторные нарушения</option>
+                <option value="other">Другая причина</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="councilDeletionReason">Пояснение</label>
+              <textarea id="councilDeletionReason" class="form-control" rows="3" maxlength="500" placeholder="Опишите факты, без личных данных и оскорблений"></textarea>
+            </div>
+            <button type="button" class="button button-secondary" style="width:100%;" data-action="submit-account-deletion-request">Отправить администратору</button>
+            <div id="councilMyDeletionRequests" style="margin-top:10px;" aria-live="polite"></div>
+          </div>
+          <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
+              <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
+            </div>
+            <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
+            <details class="profile-inline-disclosure council-subpanel"><summary>Аналитика и предложения агентов FAM</summary><div class="council-subpanel-content"><div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
+                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
+              </div>
+              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
+              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
+              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
+              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
+              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
+            </div></div></details>
+            
+            <details class="profile-inline-disclosure council-subpanel" open>
+              <summary>Запросы участников на удаление</summary>
+              <div class="council-subpanel-content"><div id="councilAdminDeletionRequests" aria-live="polite"></div></div>
+            </details>
+            <details class="profile-inline-disclosure council-subpanel">
+              <summary>Участники и объявления школы</summary>
+              <div class="council-subpanel-content">
+                <h6 class="council-section-title">Аккаунты школы</h6>
+                <div id="councilAdminUsers" aria-live="polite"></div>
+                <h6 class="council-section-title">Объявления школы</h6>
+                <div id="councilAdminListings" aria-live="polite"></div>
+              </div>
+            </details>
+            <details class="profile-inline-disclosure council-subpanel">
+              <summary>История действий</summary>
+              <div class="council-subpanel-content"><div id="councilAdminAudit" aria-live="polite"></div></div>
+            </details>
+          </div>
+          <details class="profile-inline-disclosure council-subpanel" open><summary>Идеи учеников</summary><div class="council-subpanel-content"><div class="idea-folders">
+            <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
+            <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
+            <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
+            <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
+          </div>
+          <div id="ideaFolderContent"></div></div></details>
+          </div></details>
+      
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
         <p class="profile-section-copy">Аккаунт ученика не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
@@ -580,70 +818,7 @@
         </form>
         <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
         <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
-          <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
-            <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
-            <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
-            <div id="schoolAdminReviewList" aria-live="polite"></div>
-          </div>
-          <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
-            <h5 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h5>
-            <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 10px;">Участник совета может сообщить администратору о проблемном аккаунте. Запрос не удаляет аккаунт автоматически — решение принимает администратор школы. Участник совета также не может самостоятельно удалять объявления: это право только администратора. Не указывайте телефоны, адреса и другие личные данные.</p>
-            <div class="form-group">
-              <label for="councilDeletionTarget">Аккаунт</label>
-              <select id="councilDeletionTarget" class="form-control"><option value="">Загружаем список...</option></select>
-            </div>
-            <div class="form-group">
-              <label for="councilDeletionReasonCode">Причина</label>
-              <select id="councilDeletionReasonCode" class="form-control">
-                <option value="rules_violation">Нарушение правил FAM</option>
-                <option value="harassment">Травля или агрессивное поведение</option>
-                <option value="fake_account">Подозрение на фальшивый аккаунт</option>
-                <option value="spam">Спам или повторные нарушения</option>
-                <option value="other">Другая причина</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="councilDeletionReason">Пояснение</label>
-              <textarea id="councilDeletionReason" class="form-control" rows="3" maxlength="500" placeholder="Опишите факты, без личных данных и оскорблений"></textarea>
-            </div>
-            <button type="button" class="button button-secondary" style="width:100%;" data-action="submit-account-deletion-request">Отправить администратору</button>
-            <div id="councilMyDeletionRequests" style="margin-top:10px;" aria-live="polite"></div>
-          </div>
-          <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
-              <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
-            </div>
-            <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
-            <div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
-                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
-              </div>
-              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
-              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
-              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
-              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
-              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
-            </div>
-            <h6 style="font-size:11px;margin:10px 0 6px;">Запросы участников на удаление</h6>
-            <div id="councilAdminDeletionRequests" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Аккаунты школы</h6>
-            <div id="councilAdminUsers" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Объявления школы</h6>
-            <div id="councilAdminListings" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">История действий</h6>
-            <div id="councilAdminAudit" aria-live="polite"></div>
-          </div>
-          <div class="idea-folders">
-            <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
-            <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
-            <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
-            <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
-          </div>
-          <div id="ideaFolderContent"></div>
-          </div></details>
+        
       </div>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
@@ -2019,7 +2194,7 @@ window.onunhandledrejection = function(event) {
         <div class="idea-card" style="margin-bottom:7px;">
           <div style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
           <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
-          <button type="button" class="button button-danger button-small" data-action="delete-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
+          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
         </div>
       `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
 
@@ -2518,8 +2693,15 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageSchoolListing(targetId) {
-    if (!targetId || !confirm("Навсегда удалить это объявление школы?")) return;
+  async function manageSchoolListing(button) {
+    const targetId = button?.dataset?.id;
+    if (!user || profile?.role !== "school_admin" || !targetId) return;
+    const title = button.closest(".idea-card")?.querySelector(".council-listing-title")?.textContent?.trim()
+      || "это объявление школы";
+    if (!confirm("Навсегда удалить «" + title + "»? Это действие необратимо.")) return;
+    const previousText = button.textContent;
+    button.disabled = true;
+    button.textContent = "Удаляем...";
     try {
       await callCouncilManagement("delete_listing", targetId);
       listings = listings.filter(row => row.id !== targetId);
@@ -2529,6 +2711,9 @@ window.onunhandledrejection = function(event) {
       await renderProfile();
     } catch (error) {
       notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+    } finally {
+      button.disabled = false;
+      button.textContent = previousText;
     }
   }
 
