@@ -1,5 +1,6 @@
 // Dedicated FAM photo reviewer.
 // It checks listing photos and profile avatars; it never identifies people.
+import { boundedRetryDelayMs, shouldRetryImageReviewRateLimit } from "./image-reviewer-utils.js";
 
 export type ImageReviewAction = "ok" | "reject" | "pending";
 export type ImageReviewResult = {
@@ -61,52 +62,90 @@ export async function reviewListingImage(
     };
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12_000);
   let response: Response | null = null;
+  let providerErrorCode: string | null = null;
 
-  try {
-    response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-5-mini",
-        messages: [
-          { role: "system", content: purpose === "avatar" ? AVATAR_IMAGE_PROMPT : LISTING_IMAGE_PROMPT },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: (purpose === "avatar" ? "Подпись аватара (только для контекста): " : "Текст объявления (только для контекста): ") + listingText.slice(0, 1200),
-              },
-              {
-                type: "image_url",
-                image_url: { url: imageUrl, detail: "high" },
-              },
-            ],
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 120,
-      }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    console.warn("fam_image_review_request_failed", error instanceof Error ? error.name : "unknown");
-  } finally {
-    clearTimeout(timeoutId);
+  // One bounded retry handles transient per-model rate limits without weakening moderation.
+  // Quota/billing exhaustion is not retried because another request cannot resolve it.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12_000);
+
+    try {
+      const currentResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-5-mini",
+          messages: [
+            { role: "system", content: purpose === "avatar" ? AVATAR_IMAGE_PROMPT : LISTING_IMAGE_PROMPT },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: (purpose === "avatar" ? "Подпись аватара (только для контекста): " : "Текст объявления (только для контекста): ") + listingText.slice(0, 1200),
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: imageUrl, detail: "high" },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 120,
+        }),
+        signal: controller.signal,
+      });
+      response = currentResponse;
+
+      if (currentResponse.ok || currentResponse.status !== 429) break;
+
+      const errorBody = await currentResponse.clone().json().catch(() => null);
+      const rawCode = errorBody?.error?.code ?? errorBody?.error?.type ?? null;
+      providerErrorCode = typeof rawCode === "string" ? rawCode.slice(0, 80) : null;
+
+      if (!shouldRetryImageReviewRateLimit(currentResponse.status, providerErrorCode, attempt)) break;
+
+      const delayMs = boundedRetryDelayMs(currentResponse.headers.get("retry-after"));
+      console.info("fam_image_review_rate_limit_retry", JSON.stringify({
+        attempt: attempt + 1,
+        delay_ms: delayMs,
+      }));
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    } catch (error) {
+      console.warn("fam_image_review_request_failed", error instanceof Error ? error.name : "unknown");
+      break;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   if (!response?.ok) {
-    console.warn("fam_image_review_provider_error", response?.status ?? 0);
+    const isRateLimited = response?.status === 429;
+    const isQuotaExhausted = providerErrorCode === "insufficient_quota"
+      || providerErrorCode === "billing_hard_limit_reached";
+    const reasonCode = isRateLimited
+      ? (isQuotaExhausted ? "image_review_quota_exceeded" : "image_review_rate_limited")
+      : "image_review_unavailable";
+
+    console.warn("fam_image_review_provider_error", JSON.stringify({
+      status: response?.status ?? 0,
+      provider_code: providerErrorCode,
+    }));
+
     return {
       action: "pending",
-      reason_code: response?.status === 429 ? "image_review_rate_limited" : "image_review_unavailable",
-      reason: "ИИ не смог проверить фотографию. Она не опубликована; попробуйте другое фото позже.",
+      reason_code: reasonCode,
+      reason: isQuotaExhausted
+        ? "У сервиса проверки временно исчерпан лимит. Фото не признано запрещённым, но объявление не опубликовано — нужно восстановить доступность проверки."
+        : isRateLimited
+          ? "Сервис проверки временно ограничил запросы. Фото не признано запрещённым, но объявление пока не опубликовано. Попробуйте повторить отправку немного позже."
+          : "Сервис проверки фотографий временно недоступен. Фото не признано запрещённым, объявление не опубликовано.",
     };
   }
 
