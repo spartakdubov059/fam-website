@@ -351,8 +351,7 @@
     .profile-box .button { transition:transform .16s ease, opacity .16s ease; }
     .profile-box .button:active { transform:scale(.985); }
     .profile-box :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
-    /* General analytics stay in the existing daily report; FAM keeps the safety-agent area. */
-    #famAgentAdminPanel { display:none !important; }
+    /* Agent analytics are intentionally not rendered inside the FAM application. */
     @media (max-width:520px) {
       .profile-hero { border-radius:16px; }
       .profile-disclosure > summary { padding:13px 12px; }
