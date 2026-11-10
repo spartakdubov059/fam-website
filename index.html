@@ -183,14 +183,9 @@
     .profile-meta { color:var(--muted); font-size:11px; line-height:1.4; }
     .profile-avatar-edit { flex:0 0 auto; white-space:nowrap; }
     .profile-hero-note { margin-top:10px; padding-top:9px; border-top:1px solid var(--border); color:var(--muted); font-size:10px; }
-    .profile-shortcuts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
-    .profile-shortcut { display:flex; align-items:center; gap:8px; min-width:0; text-align:left; padding:11px 9px; border-radius:15px; background:var(--surface); border:1px solid var(--border); color:var(--text); cursor:pointer; }
-    .profile-shortcut > span:nth-child(2) { min-width:0; flex:1; }
-    .profile-shortcut b,.profile-shortcut small { display:block; }
-    .profile-shortcut b { font-size:11px; line-height:1.3; }
-    .profile-shortcut small { margin-top:3px; color:var(--muted); font-size:9px; line-height:1.3; }
-    .profile-shortcut-icon { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; border-radius:10px; background:var(--bg); font-size:15px; }
-    .profile-shortcut-arrow { color:var(--muted); font-size:20px; line-height:1; }
+    .profile-work-slot { margin:0 0 12px; }
+    .profile-work-slot > details { margin-top:0; }
+    .auth-phone-disabled { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.45; }
     .profile-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
     .profile-section-heading h3 { margin:3px 0 0; font-size:16px; }
     .profile-eyebrow { font-size:9px; font-weight:800; letter-spacing:1px; color:var(--muted); }
@@ -336,7 +331,51 @@
     .upload-status.error { background: rgba(255,107,107,0.15); color: var(--danger); }
     .clear-btn-wrapper { display: flex; justify-content: flex-end; margin-bottom: 12px; }
     .clear-folder-btn { padding: 6px 12px; font-size: 11px; border-radius: 10px; background: rgba(255,107,107,0.15); color: var(--danger); border: 1px solid rgba(255,107,107,0.3); font-weight: 700; }
-  </style>
+  
+/* FAM profile and admin workspace refresh */
+.auth-legal{display:grid;gap:10px;margin:10px 0 14px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:14px}
+.auth-consent{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;align-items:start;font-size:12px;line-height:1.45;color:var(--text)}
+.auth-consent input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--accent)}
+.auth-consent a,.footer-links a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.footer-links{display:flex;gap:14px;flex-wrap:wrap;font-size:11px}
+.profile-council-disclosure{margin-top:4px}
+.profile-inline-disclosure{border:1px solid var(--border);border-radius:13px;padding:10px;margin:8px 0;background:var(--surface)}
+.profile-inline-disclosure>summary,.admin-card-actions>summary{cursor:pointer;list-style:none;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.profile-inline-disclosure>summary::-webkit-details-marker,.admin-card-actions>summary::-webkit-details-marker{display:none}
+.profile-inline-disclosure>summary:after,.admin-card-actions>summary:after{content:"⌄";color:var(--muted);font-size:16px}
+.profile-inline-disclosure[open]>summary:after,.admin-card-actions[open]>summary:after{content:"⌃"}
+.admin-person-card{padding:12px}
+.admin-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.admin-card-top b{font-size:13px;line-height:1.35}
+.admin-card-meta,.admin-card-muted{font-size:10px;line-height:1.5;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+.admin-card-reason{font-size:11px;line-height:1.5;color:var(--text);margin:8px 0}
+.admin-card-status{border-top:1px solid var(--border);margin-top:9px;padding-top:9px;display:grid;gap:7px}
+.admin-card-actions{border-top:1px solid var(--border);margin-top:9px;padding-top:9px}
+.admin-card-action-body{display:grid;gap:7px;margin-top:9px}
+.admin-card-actions-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.admin-audit-row{font-size:11px;padding:8px 0;border-bottom:1px solid var(--border)}
+.admin-audit-row:last-child{border-bottom:0}
+.admin-audit-row>div{font-size:10px;color:var(--muted);margin-top:3px}
+.profile-empty-inline{font-size:11px;color:var(--muted);padding:8px 2px}
+#councilDeletionTargetDetails{margin-top:6px}
+@media(max-width:520px){
+  .footer{align-items:flex-start;flex-direction:column}
+  .footer-links{display:grid;gap:6px}
+  .admin-card-actions-row .button{flex:1}
+}
+
+    .admin-confirm-modal .modal-content{width:min(480px,calc(100vw - 28px));max-height:86vh;overflow:auto}
+    .admin-confirm-details{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+    .admin-confirm-details p{margin:4px 0}
+    .admin-confirm-details ul{margin:6px 0;padding-left:18px}
+    .admin-confirm-reason{margin-top:12px}
+    .admin-confirm-check{display:flex;gap:9px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.45;margin:12px 0}
+    .admin-confirm-check input{margin-top:2px;accent-color:var(--accent)}
+    .admin-confirm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .admin-confirm-actions .button{flex:1}
+
+</style>
 </head>
 <body>
   <noscript>
@@ -434,14 +473,10 @@
         </div>
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
-      <div class="profile-shortcuts" aria-label="Быстрые действия профиля">
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileIdeasPanel"><span class="profile-shortcut-icon">💡</span><span><b>Почта идей</b><small>Предложить или посмотреть</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="profileListingsPanel"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и удаление</small></span><span class="profile-shortcut-arrow">›</span></button>
-        <button type="button" class="profile-shortcut" data-action="profile-jump" data-target="schoolAdminAccess"><span class="profile-shortcut-icon">🏫</span><span><b>Доступы и настройки</b><small>Роли и профиль</small></span><span class="profile-shortcut-arrow">›</span></button>
-      </div>
+      <div id="profileWorkPanel" class="profile-work-slot hidden"></div>
       <div id="schoolAdminAccess" class="profile-box profile-access-card hidden">
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЛНОМОЧИЯ</span><h3>Доступ к панели Ученического совета</h3></div><span class="profile-section-icon">🏫</span></div>
-        <p class="profile-section-copy">Обычный аккаунт FAM не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
+        <p class="profile-section-copy">Ученик не получает права Совета автоматически. Отправьте заявку — её проверит действующий администратор школы.</p>
         <select id="schoolAdminRequestNote" class="form-control" aria-label="Роль в Ученическом совете">
           <option value="">Выберите нужную роль</option><option value="Участник Ученического совета">Участник Ученического совета</option><option value="Администратор">Администратор</option>
         </select>
@@ -467,26 +502,30 @@
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
       <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Почта идей</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ОБРАТНАЯ СВЯЗЬ</span><h3>Идеи школы</h3><p class="profile-section-copy">Предложите, что можно улучшить в школе. ИИ проверит сообщение, затем оно попадёт Совету.</p></div><span class="profile-section-icon">💡</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
           <div id="ideaThinkingArea"></div>
           <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить</button>
         </form>
         <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
-        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        <details id="adminIdeasDash" class="profile-inline-disclosure profile-council-disclosure hidden"><summary><b>Рабочая панель Ученического совета</b><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body">
+        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
+      </div>
+      <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Панель школы</b><small>Участники, публикации и запросы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body">
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h5 style="font-size:12px; margin:0 0 8px;">Заявки на доступ к панели</h5>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Перед подтверждением проверьте через школу, что заявитель действительно состоит в Совете.</p>
             <div id="schoolAdminReviewList" aria-live="polite"></div>
           </div>
           <div id="councilDeletionRequestPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
-            <h5 style="font-size:12px;margin:0 0 6px;">Запрос на удаление аккаунта</h5>
-            <p style="font-size:10px;color:var(--muted);line-height:1.5;margin:0 0 10px;">Участник совета может сообщить администратору о проблемном аккаунте. Запрос не удаляет аккаунт автоматически — решение принимает администратор школы. Участник совета также не может самостоятельно удалять объявления: это право только администратора. Не указывайте телефоны, адреса и другие личные данные.</p>
+            <h5 style="font-size:12px;margin:0 0 6px;">Сообщить администратору об аккаунте</h5>
+            <p class="profile-section-copy">Выберите участника и кратко опишите проблему. Аккаунт не удаляется автоматически.</p>
             <div class="form-group">
               <label for="councilDeletionTarget">Аккаунт</label>
               <select id="councilDeletionTarget" class="form-control"><option value="">Загружаем список...</option></select>
+              <div id="councilDeletionTargetDetails" class="admin-card-meta" aria-live="polite"></div>
             </div>
             <div class="form-group">
               <label for="councilDeletionReasonCode">Причина</label>
@@ -507,29 +546,30 @@
           </div>
           <div id="councilAdminTools" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-              <h5 style="font-size:12px;margin:0;">Управление школой</h5>
+              <h5 style="font-size:12px;margin:0;">Администрирование школы</h5>
               <button type="button" class="button button-secondary button-small" data-action="refresh-council-admin">Обновить</button>
             </div>
-            <p style="font-size:10px;color:var(--muted);margin:0 0 10px;">Доступно только администраторам. Удаление аккаунта необратимо и удаляет связанные данные и фотографии.</p>
-            <div class="profile-box" id="famAgentAdminPanel" style="margin:0 0 12px;padding:12px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-                <h5 style="font-size:12px;margin:0;">Ежедневная аналитика FAM</h5>
-                <button type="button" class="button button-secondary button-small" data-action="refresh-agent-dashboard">Обновить</button>
+            <p class="profile-section-copy">Сначала откройте нужный раздел. Учеников и объявления можно проверить перед действием.</p>
+            <details class="profile-inline-disclosure" open>
+              <summary>Сводка и запросы</summary>
+              <div style="padding-top:8px;">
+
+                <div id="councilAdminDeletionRequests" aria-live="polite"></div>
               </div>
-              <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Сводка только по вашей школе. Аналитики используют агрегированные показатели и не читают личные переписки или личные данные учеников.</p>
-              <div id="famAgentReportSummary" aria-live="polite">Загрузка сводки...</div>
-              <h6 style="font-size:11px;margin:14px 0 6px;">Предложения аналитических агентов</h6>
-              <div id="famAgentIdeasList" aria-live="polite">Загрузка предложений...</div>
-              <p style="font-size:9px;line-height:1.45;color:var(--muted);margin:8px 0 0;">Предложения сформированы по правилам на основе числовой сводки. Одобрение сохраняет решение для дальнейшего планирования и ничего не меняет автоматически в аккаунтах или коде.</p>
-            </div>
-            <h6 style="font-size:11px;margin:10px 0 6px;">Запросы участников на удаление</h6>
-            <div id="councilAdminDeletionRequests" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Аккаунты школы</h6>
-            <div id="councilAdminUsers" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">Объявления школы</h6>
-            <div id="councilAdminListings" aria-live="polite"></div>
-            <h6 style="font-size:11px;margin:12px 0 6px;">История действий</h6>
-            <div id="councilAdminAudit" aria-live="polite"></div>
+            </details>
+            <details class="profile-inline-disclosure">
+              <summary>Участники и объявления</summary>
+              <div style="padding-top:8px;">
+                <h6 style="font-size:11px;margin:0 0 6px;">Ученики и аккаунты</h6>
+                <div id="councilAdminUsers" aria-live="polite"></div>
+                <h6 style="font-size:11px;margin:14px 0 6px;">Объявления школы</h6>
+                <div id="councilAdminListings" aria-live="polite"></div>
+              </div>
+            </details>
+            <details class="profile-inline-disclosure">
+              <summary>История действий</summary>
+              <div id="councilAdminAudit" aria-live="polite"></div>
+            </details>
           </div>
           <div class="idea-folders">
             <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
@@ -538,8 +578,8 @@
             <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
           </div>
           <div id="ideaFolderContent"></div>
-          </div></details>
-      </div>
+        </div>
+      </details>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body"><div class="l-grid profile-listings-grid" id="myListingsGrid" style="margin-top:0;"></div><div id="myListingsEmpty" class="hidden profile-empty-inline">У вас пока нет объявлений.</div></div>
@@ -588,7 +628,7 @@
   <button class="tab-plus" id="fabBtn" aria-label="Создать объявление"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </nav>
 
-<footer class="footer"><span class="footer-brand">SPR Studio</span></footer>
+<footer class="footer"><span class="footer-brand">FAM.</span><div class="footer-links"><a href="user-agreement.html" target="_blank" rel="noopener">Пользовательское соглашение</a><a href="personal-data-consent.html" target="_blank" rel="noopener">Персональные данные</a></div></footer>
 
 <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="modal-content">
@@ -598,12 +638,37 @@
       <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
         <select id="authSchool" class="form-control"><option value="lyceum_3">Лицей № 3 — Сочи</option></select>
       </div>
-      <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
-      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
-      <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
+      <div class="form-group hidden" id="authDisplayNameGroup"><label for="authDisplayName">Имя в FAM или псевдоним</label><input type="text" id="authDisplayName" class="form-control" maxlength="40" autocomplete="nickname" placeholder="Например, Саша"></div>
+      <div class="form-group"><label for="authIdentifier">Почта</label><input type="email" id="authIdentifier" class="form-control" required maxlength="120" autocomplete="email" placeholder="name@example.com"><p class="auth-phone-disabled">Вход по телефону пока отключён. Он появится после переноса хранения данных в Россию и настройки SMS‑подтверждения.</p></div>
+      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6" maxlength="128" autocomplete="current-password"></div>
+      <div id="authLegalGroup" class="auth-legal hidden">
+        <label class="auth-consent"><input type="checkbox" id="authTermsAccepted"><span>Я принимаю <a href="user-agreement.html" target="_blank" rel="noopener">Пользовательское соглашение FAM</a>.</span></label>
+        <label class="auth-consent"><input type="checkbox" id="authPrivacyAccepted"><span>Я ознакомился(ась) и даю отдельное <a href="personal-data-consent.html" target="_blank" rel="noopener">согласие на обработку персональных данных</a>.</span></label>
+        <p class="admin-card-muted">Оба подтверждения обязательны для регистрации и не отмечены заранее. Для несовершеннолетних оператор должен обеспечить требуемое законом согласие законного представителя.</p>
+      </div>
+      <button type="submit" id="authSubmitBtn" class="button button-primary" style="width:100%;">Войти</button>
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
-      <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
+      <div id="authMsg" role="status" aria-live="polite" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
     </form>
+  </div>
+</div>
+
+<div class="modal admin-confirm-modal" id="adminConfirmModal" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
+  <div class="modal-content">
+    <button type="button" data-action="close-admin-confirm" style="float:right;background:none;border:none;color:white;font-size:20px;" aria-label="Закрыть">×</button>
+    <p class="admin-card-muted" style="margin:0;">ПРОВЕРЬТЕ ПЕРЕД ДЕЙСТВИЕМ</p>
+    <h2 id="adminConfirmTitle" style="margin:5px 0 0;font-size:19px;">Подтверждение</h2>
+    <div id="adminConfirmDetails" class="admin-confirm-details"></div>
+    <div id="adminConfirmReasonWrap" class="admin-confirm-reason hidden">
+      <label for="adminConfirmReason" style="display:block;font-size:11px;font-weight:700;margin-bottom:5px;">Причина / пояснение</label>
+      <textarea id="adminConfirmReason" class="form-control" rows="3" maxlength="400" placeholder="Опишите факты, без контактов и личных данных"></textarea>
+      <p id="adminConfirmReasonHint" class="admin-card-muted" style="margin:5px 0 0;">От 15 до 400 символов. Причина сохранится в истории.</p>
+    </div>
+    <label class="admin-confirm-check"><input type="checkbox" id="adminConfirmChecked"><span>Я проверил(а) указанные данные и понимаю последствия.</span></label>
+    <div class="admin-confirm-actions">
+      <button type="button" class="button button-secondary" data-action="close-admin-confirm">Отмена</button>
+      <button type="button" class="button button-danger" id="adminConfirmSubmit" disabled>Подтвердить</button>
+    </div>
   </div>
 </div>
 
@@ -1120,7 +1185,7 @@ window.onunhandledrejection = function(event) {
         ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
           ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
           : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
             : ""}
       </div>
     </div>`;
@@ -1635,7 +1700,7 @@ window.onunhandledrejection = function(event) {
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         } else {
           showSchoolAdminAccessStatus(
-            "Обычный пользователь",
+            "Ученик",
             profile.school_id
               ? "Это стандартный статус каждого нового аккаунта FAM. Если вы состоите в Ученическом совете, выберите свою роль и отправьте одну заявку."
               : "Это стандартный статус каждого нового аккаунта FAM. Сначала выберите школу в профиле."
@@ -1771,9 +1836,9 @@ window.onunhandledrejection = function(event) {
   }
 
   function councilRoleName(role) {
-    if (role === "school_admin") return "Администратор";
-    if (role === "council_member") return "Участник совета";
-    return "Обычный пользователь";
+    if (role === "school_admin") return "Администратор школы";
+    if (role === "council_member") return "Участник Совета";
+    return "Ученик";
   }
 
   function councilAuditLabel(action) {
@@ -1784,6 +1849,8 @@ window.onunhandledrejection = function(event) {
       account_suspension_lifted: "Временное ограничение снято",
       application_rejected: "Заявка отклонена",
       listing_deleted: "Удалено объявление",
+      listing_hidden: "Объявление скрыто",
+      listing_restored: "Объявление восстановлено",
       account_deleted: "Удалён аккаунт",
       account_deleted_by_admin: "Администратор удалил аккаунт",
       account_deleted_by_request: "Одобрен запрос на удаление аккаунта",
@@ -1828,7 +1895,7 @@ window.onunhandledrejection = function(event) {
       return;
     }
     box.classList.remove("hidden");
-    $("councilAdminUsers").textContent = "Загружаем аккаунты...";
+    $("councilAdminUsers").textContent = "Загружаем учеников...";
     $("councilAdminListings").textContent = "Загружаем объявления...";
     $("councilAdminAudit").textContent = "Загружаем историю...";
     try {
@@ -1845,208 +1912,53 @@ window.onunhandledrejection = function(event) {
         const isSelf = row.id === user.id;
         const canManage = !isSelf && ["student", "council_member"].includes(row.role);
         const canRevoke = !isSelf && ["council_member", "school_admin"].includes(row.role);
-        const canDelete = canManage;
         const suspension = suspensionByUser.get(row.id);
         const actions = [
-          canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
-          canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}">Удалить аккаунт</button>` : ""
+          canRevoke ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"revoke-council-role\" data-id=\"" + esc(row.id) + "\">Снять роль Совета</button>" : "",
+          canManage ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"delete-council-account\" data-id=\"" + esc(row.id) + "\" data-name=\"" + esc(row.display_name) + "\" data-contact=\"" + esc(row.contact_hint) + "\" data-role=\"" + esc(councilRoleName(row.role)) + "\" data-date=\"" + esc(row.created_at || "") + "\" data-listings=\"" + (Number(row.listing_count) || 0) + "\" data-listing-titles=\"" + esc((row.listing_titles || []).map(item => item.title + " (" + item.status + ")").join(" · ")) + "\">Удалить аккаунт</button>" : ""
         ].filter(Boolean).join("");
 
         let restrictionControl = "";
         if (canManage && suspension) {
           const until = suspension.expires_at ? new Date(suspension.expires_at).toLocaleString("ru-RU") : "—";
-          restrictionControl = `<div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
-            <span class="idea-status status-rejected">Временно ограничен до ${esc(until)}</span>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;">Причина: ${esc(suspension.reason || "Не указана")}</div>
-            <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="lift-council-suspension" data-id="${esc(row.id)}">Снять ограничение досрочно</button>
-          </div>`;
+          restrictionControl = "<div class=\"admin-card-status\"><span class=\"idea-status status-rejected\">Ограничен до " + esc(until) + "</span><div class=\"admin-card-muted\">Причина: " + esc(suspension.reason || "Не указана") + "</div><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"lift-council-suspension\" data-id=\"" + esc(row.id) + "\">Снять ограничение</button></div>";
         } else if (canManage) {
-          restrictionControl = `<details style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-            <summary style="font-size:10px;cursor:pointer;color:var(--muted);">Временно ограничить действия</summary>
-            <div style="margin-top:8px;">
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Срок ограничения</label>
-              <select class="form-control" data-suspension-hours style="font-size:11px;margin-bottom:7px;">
-                <option value="24">24 часа</option>
-                <option value="72">3 дня</option>
-                <option value="168">7 дней</option>
-              </select>
-              <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">Причина (15–400 символов)</label>
-              <textarea class="form-control" data-suspension-reason rows="2" maxlength="400" style="font-size:11px;" placeholder="Кратко опишите конкретное нарушение, без личных данных"></textarea>
-              <button type="button" class="button button-secondary button-small" style="margin-top:7px;" data-action="suspend-council-account" data-id="${esc(row.id)}">Установить ограничение</button>
-            </div>
-          </details>`;
+          restrictionControl = "<details class=\"admin-card-actions\"><summary>Временно ограничить</summary><div class=\"admin-card-action-body\"><select class=\"form-control\" data-suspension-hours aria-label=\"Срок ограничения\"><option value=\"24\">24 часа</option><option value=\"72\">3 дня</option><option value=\"168\">7 дней</option></select><textarea class=\"form-control\" data-suspension-reason rows=\"2\" maxlength=\"400\" placeholder=\"Причина — от 15 символов, без личных данных\"></textarea><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"suspend-council-account\" data-id=\"" + esc(row.id) + "\">Применить</button></div></details>";
         }
 
-        return `<div class="idea-card" style="margin-bottom:7px;">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(row.email || "Пользователь")}</b>
-            <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
-          </div>
-          ${isSelf ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;">Ваш аккаунт</div>' : ""}
-          ${restrictionControl}
-          ${actions ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${actions}</div>` : ""}
-        </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);">Аккаунты не найдены.</p>';
+        return "<article class=\"idea-card admin-person-card\"><div class=\"admin-card-top\"><div><b>" + esc(row.display_name || "Ученик") + "</b><div class=\"admin-card-muted\">" + esc(row.contact_hint || "Контакт не указан") + "</div></div><span class=\"idea-status " + (row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new") + "\">" + esc(councilRoleName(row.role)) + "</span></div><div class=\"admin-card-meta\">ID " + esc(row.short_id || String(row.id).slice(0, 8)) + " · Регистрация " + (row.created_at ? esc(new Date(row.created_at).toLocaleDateString("ru-RU")) : "—") + " · Объявлений: " + (Number(row.listing_count) || 0) + (isSelf ? " · Это вы" : "") + "</div>" + restrictionControl + (actions ? "<details class=\"admin-card-actions\"><summary>Другие действия</summary><div class=\"admin-card-action-body\">" + actions + "</div></details>" : "") + "</article>";
+      }).join("") : "<p class=\"profile-empty-inline\">В этой школе пока нет других аккаунтов.</p>";
 
       const deletionRequests = Array.isArray(data.deletion_requests) ? data.deletion_requests : [];
       $("councilAdminDeletionRequests").innerHTML = deletionRequests.length ? deletionRequests.map(row => {
-        const statusText = row.status === "processing" ? "Уже рассматривается" : "Ожидает решения";
+        const statusText = row.status === "processing" ? "Рассматривается" : "Ожидает решения";
         const actions = row.status === "pending" && row.target_id
-          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-              <button type="button" class="button button-danger button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="approve">Одобрить удаление</button>
-              <button type="button" class="button button-secondary button-small" data-action="review-account-deletion" data-id="${esc(row.id)}" data-decision="reject">Отклонить</button>
-            </div>`
-          : '<span style="font-size:10px;color:var(--muted);">Ожидает завершения обработки</span>';
-        return `<div class="idea-card" style="margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(row.target_email || "Аккаунт")}</b>
-            <span class="idea-status status-work">${esc(statusText)}</span>
-          </div>
-          <div style="font-size:10px;color:var(--muted);margin:5px 0;">Запросил: ${esc(row.requester_email || "Участник совета")} · ${esc(councilRoleName(row.target_role))}</div>
-          <div style="font-size:10px;margin:5px 0;"><b>${esc(deletionReasonLabel(row.reason_code))}</b><br>${esc(row.reason || "")}</div>
-          <div style="font-size:9px;color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-          ${actions}
-        </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);">Нет открытых запросов на удаление.</p>';
+          ? "<div class=\"admin-card-actions-row\"><button type=\"button\" class=\"button button-danger button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"approve\" data-target-name=\"" + esc(row.target_display_name) + "\" data-target-contact=\"" + esc(row.target_contact_hint) + "\" data-target-role=\"" + esc(councilRoleName(row.target_role)) + "\" data-reason=\"" + esc(row.reason || "") + "\" data-target-date=\"" + esc(row.target_created_at || "") + "\" data-target-listings=\"" + (Number(row.listing_count) || 0) + "\" data-target-listing-titles=\"" + esc((row.listing_titles || []).map(item => item.title + " (" + item.status + ")").join(" · ")) + "\">Проверить</button><button type=\"button\" class=\"button button-secondary button-small\" data-action=\"review-account-deletion\" data-id=\"" + esc(row.id) + "\" data-decision=\"reject\">Отклонить запрос</button></div>"
+          : "<span class=\"admin-card-muted\">Ожидает завершения обработки</span>";
+        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.target_display_name || "Аккаунт") + "</b><span class=\"idea-status status-work\">" + esc(statusText) + "</span></div><div class=\"admin-card-muted\">" + esc(row.target_contact_hint || "Контакт скрыт") + " · " + esc(councilRoleName(row.target_role)) + "</div><div class=\"admin-card-meta\">Запрос от: " + esc(row.requester_display_name || "Участник Совета") + " · " + esc(row.requester_contact_hint || "") + "</div><div class=\"admin-card-meta\">Регистрация цели: " + (row.target_created_at ? esc(new Date(row.target_created_at).toLocaleDateString("ru-RU")) : "—") + " · Объявлений: " + (Number(row.listing_count) || 0) + "</div><p class=\"admin-card-reason\"><b>" + esc(deletionReasonLabel(row.reason_code)) + ":</b> " + esc(row.reason || "") + "</p><div class=\"admin-card-meta\">" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div>" + actions + "</article>";
+      }).join("") : "<p class=\"profile-empty-inline\">Новых запросов на удаление нет.</p>";
 
       const listingsData = Array.isArray(data.listings) ? data.listings : [];
-      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => `
-        <div class="idea-card" style="margin-bottom:7px;">
-          <div style="font-size:11px;font-weight:700;">${esc(row.title || "Без названия")}</div>
-          <div style="font-size:10px;color:var(--muted);margin:4px 0;">${esc(row.category || "Объявление")} · ${row.status === "active" ? "Активно" : "Скрыто"}</div>
-          <button type="button" class="button button-danger button-small" data-action="delete-school-listing" data-id="${esc(row.id)}">Удалить объявление</button>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">Объявлений школы пока нет.</p>';
+      $("councilAdminListings").innerHTML = listingsData.length ? listingsData.map(row => {
+        const hiddenByAdmin = row.admin_hidden === true;
+        const action = hiddenByAdmin
+          ? "<button type=\"button\" class=\"button button-secondary button-small\" data-action=\"moderate-school-listing\" data-decision=\"restore\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\" data-category=\"" + esc(row.category || "") + "\" data-description=\"" + esc(row.description || "") + "\" data-price=\"" + esc(row.price_text || "") + "\" data-date=\"" + esc(row.created_at || "") + "\">Вернуть на доску</button>"
+          : row.status === "active"
+            ? "<button type=\"button\" class=\"button button-danger button-small\" data-action=\"moderate-school-listing\" data-decision=\"hide\" data-id=\"" + esc(row.id) + "\" data-title=\"" + esc(row.title || "") + "\" data-author=\"" + esc(row.author_name || "") + "\" data-contact=\"" + esc(row.author_contact_hint || "") + "\" data-category=\"" + esc(row.category || "") + "\" data-description=\"" + esc(row.description || "") + "\" data-price=\"" + esc(row.price_text || "") + "\" data-date=\"" + esc(row.created_at || "") + "\">Скрыть с доски</button>"
+            : "<span class=\"admin-card-muted\">Ожидает проверки; не скрыто администратором</span>";
+        return "<article class=\"idea-card\"><div class=\"admin-card-top\"><b>" + esc(row.title || "Без названия") + "</b><span class=\"idea-status " + (hiddenByAdmin ? "status-rejected" : row.status === "active" ? "status-done" : "status-work") + "\">" + (hiddenByAdmin ? "Скрыто администратором" : row.status === "active" ? "Опубликовано" : "На проверке / скрыто") + "</span></div><div class=\"admin-card-muted\">" + esc(row.category || "Объявление") + " · " + esc(row.price_text || "Без цены") + "</div><p class=\"admin-card-reason\">" + esc(row.description || "Описание не указано") + "</p><div class=\"admin-card-meta\">Автор: " + esc(row.author_name || "Участник") + " · " + esc(row.author_contact_hint || "") + "</div>" + (hiddenByAdmin && row.admin_hidden_reason ? "<div class=\"admin-card-muted\">Причина скрытия: " + esc(row.admin_hidden_reason) + "</div>" : "") + "<div class=\"admin-card-actions-row\">" + action + "</div></article>";
+      }).join("") : "<p class=\"profile-empty-inline\">Объявлений пока нет.</p>";
 
       const audit = Array.isArray(data.audit) ? data.audit : [];
-      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row => `
-        <div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border);">
-          <b>${esc(councilAuditLabel(row.action))}</b>
-          <div style="color:var(--muted);">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-        </div>
-      `).join("") : '<p style="font-size:10px;color:var(--muted);">История пока пустая.</p>';
-      await loadFamAgentDashboard();
+      $("councilAdminAudit").innerHTML = audit.length ? audit.map(row =>
+        "<div class=\"admin-audit-row\"><b>" + esc(councilAuditLabel(row.action)) + "</b><div>" + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "") + "</div></div>"
+      ).join("") : "<p class=\"profile-empty-inline\">История пока пустая.</p>";
     } catch (error) {
       const message = error?.message || "Повторите попытку.";
       $("councilAdminUsers").textContent = "Ошибка: " + message;
       $("councilAdminDeletionRequests").textContent = "Ошибка загрузки.";
       $("councilAdminListings").textContent = "Ошибка загрузки.";
       $("councilAdminAudit").textContent = "Ошибка загрузки.";
-    }
-  }
-
-  async function loadFamAgentDashboard() {
-    const panel = $("famAgentAdminPanel");
-    const reportBox = $("famAgentReportSummary");
-    const ideasBox = $("famAgentIdeasList");
-    if (!panel || !reportBox || !ideasBox) return;
-    if (!user || profile?.role !== "school_admin") {
-      panel.classList.add("hidden");
-      return;
-    }
-
-    panel.classList.remove("hidden");
-    reportBox.textContent = "Загружаем сводку...";
-    ideasBox.textContent = "Загружаем предложения...";
-    try {
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "agent_dashboard" }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить панель аналитики.");
-
-      const report = data.report || null;
-      if (!report) {
-        reportBox.innerHTML = '<p style="font-size:10px;color:var(--muted);margin:0;">Ежедневная сводка ещё не сформирована. Нажмите «Обновить» позже.</p>';
-      } else {
-        const metrics = report.metrics || {};
-        const listings = metrics.listings || {};
-        const safety = metrics.safety || {};
-        const requests = metrics.account_requests || {};
-        const ideas = metrics.ideas || {};
-        const agentProposals = metrics.agent_proposals || {};
-        const stat = (label, value) => `
-          <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px;min-width:0;">
-            <b style="display:block;font-size:18px;line-height:1.1;">${esc(String(Number(value) || 0))}</b>
-            <span style="display:block;font-size:9px;color:var(--muted);margin-top:4px;">${esc(label)}</span>
-          </div>`;
-        const generatedAt = report.generated_at
-          ? new Date(report.generated_at).toLocaleString("ru-RU")
-          : "";
-        reportBox.innerHTML = `
-          <p style="font-size:10px;line-height:1.45;margin:0 0 8px;">${esc(report.summary || "Сводка сформирована.")}</p>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;">
-            ${stat("Активные объявления", listings.active)}
-            ${stat("Новые за сутки", listings.new_24h)}
-            ${stat("Непроверенные сигналы", safety.unreviewed)}
-            ${stat("Высокий уровень", safety.high_unreviewed)}
-            ${stat("Запросы на удаление", requests.deletion_pending)}
-            ${stat("Идеи ждут Совет", ideas.awaiting_council)}
-            ${stat("Предложения агентов", agentProposals.pending)}
-          </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:7px;">Дата отчёта: ${esc(report.report_date || "—")}${generatedAt ? " · Обновлено: " + esc(generatedAt) : ""}</div>
-        `;
-      }
-
-      const agentLabels = {
-        fam_safety_analyst: "Агент безопасности",
-        fam_council_analyst: "Агент Совета",
-        fam_operations_analyst: "Агент операций",
-        fam_growth_analyst: "Агент развития"
-      };
-      const agentIdeas = Array.isArray(data.agent_ideas) ? data.agent_ideas : [];
-      ideasBox.innerHTML = agentIdeas.length ? agentIdeas.map(idea => {
-        const riskLabel = idea.risk === "high" ? "Высокий риск" : idea.risk === "medium" ? "Средний риск" : "Низкий риск";
-        const riskClass = idea.risk === "high" ? "status-rejected" : idea.risk === "medium" ? "status-work" : "status-done";
-        const complexityLabel = idea.complexity === "large" ? "Сложность: высокая" : idea.complexity === "small" ? "Сложность: небольшая" : "Сложность: средняя";
-        const evidenceLabel = idea.evidence_kind === "observed" ? "Подтверждено цифрами" : "Гипотеза";
-        const createdAt = idea.created_at ? new Date(idea.created_at).toLocaleString("ru-RU") : "";
-        const agentLabel = agentLabels[idea.proposed_by] || "Аналитик FAM";
-        return `
-          <div class="idea-card" style="margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-              <b style="font-size:11px;flex:1;min-width:140px;">${esc(idea.title || "Предложение FAM")}</b>
-              <span class="idea-status ${riskClass}">${esc(riskLabel)}</span>
-            </div>
-            <div style="font-size:9px;color:var(--muted);margin-top:4px;">${esc(agentLabel)}</div>
-            <div style="font-size:10px;line-height:1.45;margin-top:6px;">${esc(idea.summary || "")}</div>
-            ${idea.benefit ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;"><b>Польза:</b> ${esc(idea.benefit)}</div>` : ""}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
-              <span class="idea-status status-new">${esc(complexityLabel)}</span>
-              <span class="idea-status status-work">${esc(evidenceLabel)}</span>
-            </div>
-            ${idea.evidence_summary ? `<div style="font-size:9px;color:var(--muted);margin-top:6px;">Основание: ${esc(idea.evidence_summary)}</div>` : ""}
-            ${createdAt ? `<div style="font-size:9px;color:var(--muted);margin-top:5px;">Предложено: ${esc(createdAt)}</div>` : ""}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;">
-              <button type="button" class="button button-success button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="approve">Одобрить</button>
-              <button type="button" class="button button-secondary button-small" data-action="review-fam-agent-idea" data-id="${esc(idea.id)}" data-decision="reject">Отклонить</button>
-            </div>
-          </div>`;
-      }).join("") : '<p style="font-size:10px;color:var(--muted);margin:0;">Новых предложений пока нет. Когда показатели потребуют внимания, аналитические агенты добавят сюда рекомендации.</p>';
-    } catch (error) {
-      reportBox.textContent = "Сводка временно недоступна: " + (error?.message || "повторите попытку.");
-      ideasBox.textContent = "Не удалось загрузить предложения аналитиков.";
-    }
-  }
-
-  async function reviewFamAgentIdea(button) {
-    if (!button || !user || profile?.role !== "school_admin") return;
-    const ideaId = button.dataset.id || "";
-    const decision = button.dataset.decision || "";
-    if (!ideaId || !["approve", "reject"].includes(decision)) return;
-    const verb = decision === "approve" ? "одобрить" : "отклонить";
-    if (!confirm("Вы уверены, что хотите " + verb + " предложение аналитического агента?")) return;
-
-    button.disabled = true;
-    try {
-      await callCouncilManagement("review_agent_idea", ideaId, { decision });
-      notice(decision === "approve"
-        ? "Предложение одобрено и сохранено для дальнейшего планирования."
-        : "Предложение отклонено.");
-      await loadCouncilAdminTools();
-    } catch (error) {
-      notice("Не удалось сохранить решение: " + (error?.message || "Ошибка."));
-      button.disabled = false;
     }
   }
 
@@ -2173,8 +2085,10 @@ window.onunhandledrejection = function(event) {
     box.classList.remove("hidden");
     const targetSelect = $("councilDeletionTarget");
     const history = $("councilMyDeletionRequests");
+    const targetDetails = $("councilDeletionTargetDetails");
     if (targetSelect) targetSelect.innerHTML = '<option value="">Загружаем список...</option>';
     if (history) history.textContent = "Загружаем ваши обращения...";
+    if (targetDetails) targetDetails.textContent = "";
     try {
       const { data, error } = await sb.functions.invoke("council-management", {
         body: { action: "list_request_targets" }
@@ -2183,26 +2097,36 @@ window.onunhandledrejection = function(event) {
       if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить список аккаунтов.");
 
       const targets = Array.isArray(data.targets) ? data.targets : [];
+      const updateSelectedTarget = () => {
+        const row = targets.find(item => item.id === targetSelect?.value);
+        if (!targetDetails) return;
+        targetDetails.textContent = row
+          ? row.display_name + " · " + councilRoleName(row.role) + " · ID " + (row.short_id || "") + " · " + (row.contact_hint || "Контакт скрыт")
+          : "";
+      };
       if (targetSelect) {
-        targetSelect.innerHTML = '<option value="">Выберите аккаунт</option>' + targets.map(row =>
-          `<option value="${esc(row.id)}">${esc(row.email)} · ${esc(councilRoleName(row.role))}</option>`
+        targetSelect.innerHTML = '<option value="">Выберите ученика или участника</option>' + targets.map(row =>
+          '<option value="' + esc(row.id) + '">' + esc(row.display_name || "Участник") + ' · '
+          + esc(councilRoleName(row.role)) + ' · ' + esc(row.short_id || "") + '</option>'
         ).join("");
         targetSelect.disabled = targets.length === 0;
+        targetSelect.onchange = updateSelectedTarget;
       }
 
       const ownRequests = Array.isArray(data.my_requests) ? data.my_requests : [];
-      if (history) history.innerHTML = ownRequests.length ? `
-        <div style="font-size:10px;font-weight:700;margin:8px 0 5px;">Ваши обращения</div>
-        ${ownRequests.map(row => `
-          <div style="font-size:10px;padding:7px 0;border-top:1px solid var(--border);">
-            <b>${esc(row.target_email_masked || "Аккаунт")}</b>
-            <span style="color:var(--muted);"> · ${esc(deletionStatusLabel(row.status))}</span>
-            <div style="color:var(--muted);margin-top:3px;">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
-            ${row.review_note ? `<div style="margin-top:3px;">${esc(row.review_note)}</div>` : ""}
-          </div>
-        `).join("")}
-      ` : '<p style="font-size:10px;color:var(--muted);margin-top:8px;">Вы ещё не отправляли запросы.</p>';
-      if (!targets.length && targetSelect) targetSelect.innerHTML = '<option value="">Нет доступных аккаунтов для обращения</option>';
+      if (history) history.innerHTML = ownRequests.length
+        ? '<div class="admin-card-meta">Мои прошлые обращения</div>' + ownRequests.map(row =>
+            '<div class="admin-audit-row"><b>' + esc(row.target_display_name || "Аккаунт") + '</b><div>'
+            + esc(deletionStatusLabel(row.status)) + ' · '
+            + (row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : "")
+            + (row.review_note ? '<div>' + esc(row.review_note) + '</div>' : "")
+            + '</div></div>'
+          ).join("")
+        : '<p class="admin-card-muted">Вы ещё не отправляли запросы.</p>';
+      if (!targets.length && targetSelect) {
+        targetSelect.innerHTML = '<option value="">Нет доступных аккаунтов школы</option>';
+        if (targetDetails) targetDetails.textContent = "Нет доступных аккаунтов для обращения.";
+      }
     } catch (error) {
       if (targetSelect) targetSelect.innerHTML = '<option value="">Не удалось загрузить аккаунты</option>';
       if (history) history.textContent = "Ошибка: " + (error?.message || "Повторите попытку.");
@@ -2232,41 +2156,50 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function reviewCouncilAccountDeletion(requestId, decision) {
+  async function reviewCouncilAccountDeletion(requestId, decision, triggerButton) {
     if (!user || profile?.role !== "school_admin" || !requestId || !["approve", "reject"].includes(decision)) return;
-    const message = decision === "approve"
-      ? "Навсегда удалить аккаунт? Будут удалены все принадлежащие ему данные и файлы."
-      : "Отклонить запрос на удаление аккаунта?";
-    if (!confirm(message)) return;
-    if (decision === "approve" && !confirm("Подтвердите окончательное удаление аккаунта.")) return;
-    let reviewNote = "";
-    if (decision === "reject") {
-      const note = prompt("Укажите причину отказа (её увидит участник совета, до 240 символов).");
-      if (note === null) return;
-      reviewNote = note.trim().slice(0, 240);
-      if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
-    }
-    try {
-      const confirmed = await ensureRecentAdminAuthentication();
-      if (!confirmed) return;
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
-      notice(decision === "approve" ? "Аккаунт и связанные данные удалены." : "Запрос отклонён.");
-      await loadCouncilAdminTools();
-      await loadAll();
-    } catch (error) {
-      notice("Не удалось обработать запрос: " + (error?.message || "Ошибка."));
-      await loadCouncilAdminTools();
-    }
+    const name = triggerButton?.dataset.targetName || "Аккаунт";
+    const contact = triggerButton?.dataset.targetContact || "Контакт скрыт";
+    const role = triggerButton?.dataset.targetRole || "Ученик";
+    const reasonText = triggerButton?.dataset.reason || "Причина не указана";
+    const registered = triggerButton?.dataset.targetDate
+      ? new Date(triggerButton.dataset.targetDate).toLocaleDateString("ru-RU") : "неизвестно";
+    const listingsCount = Number(triggerButton?.dataset.targetListings) || 0;
+    const listingTitles = triggerButton?.dataset.targetListingTitles || "Нет связанных объявлений.";
+    const details = "<p><b>Аккаунт:</b> " + esc(name) + "</p>"
+      + "<p><b>Контакт:</b> " + esc(contact) + "</p><p><b>Роль:</b> " + esc(role) + "</p>"
+      + "<p><b>Регистрация:</b> " + esc(registered) + "</p><p><b>Объявлений:</b> " + listingsCount + "</p>"
+      + "<p><b>Последние публикации:</b> " + esc(listingTitles) + "</p>"
+      + "<p><b>Причина обращения:</b> " + esc(reasonText) + "</p>"
+      + (decision === "approve"
+        ? "<p style='color:var(--danger);'><b>Удаление необратимо.</b> Будут удалены аккаунт и связанные данные.</p>"
+        : "<p>Запрос будет отклонён. Участник Совета увидит причину отказа.</p>");
+    openAdminConfirmModal({
+      title: decision === "approve" ? "Проверить запрос на удаление" : "Отклонить запрос на удаление",
+      details,
+      buttonText: decision === "approve" ? "Удалить аккаунт" : "Отклонить запрос",
+      danger: decision === "approve",
+      reason: decision === "reject" ? { min: 10, max: 240, hint: "От 10 до 240 символов. Причину увидит автор запроса." } : null,
+      onConfirm: async reviewNote => {
+        const confirmed = await ensureRecentAdminAuthentication();
+        if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
+        const { data, error } = await sb.functions.invoke("council-management", {
+          body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
+        });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
+        notice(decision === "approve" ? "Аккаунт и связанные данные удалены." : "Запрос отклонён.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
   }
+
 
   async function deleteOwnListing(listingId) {
     const listing = listings.find(row => row.id === listingId);
-    if (!user || profile?.role !== "student" || !listing || listing.user_id !== user.id) {
-      notice("Удалять можно только собственные объявления обычного аккаунта.");
+    if (!user || !["student", "school_admin"].includes(profile?.role) || !listing || listing.user_id !== user.id) {
+      notice("Удалять можно только собственные объявления.");
       return;
     }
     if (!confirm("Удалить объявление «" + (listing.title || "Без названия") + "»? Его нельзя будет восстановить.")) return;
@@ -2314,7 +2247,7 @@ window.onunhandledrejection = function(event) {
   }
 
   async function deleteMyAccount() {
-    if (!user || !user.email) return;
+    if (!user || (!user.email && !user.phone)) return;
     const password = $("selfDeletePassword")?.value || "";
     const confirmation = $("selfDeleteConfirmation")?.value?.trim() || "";
     const button = $("selfDeleteAccountBtn");
@@ -2325,8 +2258,9 @@ window.onunhandledrejection = function(event) {
     if (button) { button.disabled = true; button.textContent = "Проверяем пароль..."; }
     try {
       // Re-authentication gives the server a freshly issued, short-lived JWT.
+      const loginIdentity = user.email ? { email: user.email } : { phone: user.phone };
       const { error: signInError } = await sb.auth.signInWithPassword({
-        email: user.email,
+        ...loginIdentity,
         password
       });
       if (signInError) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
@@ -2369,14 +2303,15 @@ window.onunhandledrejection = function(event) {
 
     const password = prompt("Для защиты школьных аккаунтов повторно подтвердите вход: введите текущий пароль администратора.");
     if (!password) return false;
-    const { error } = await sb.auth.signInWithPassword({ email: user.email, password });
+    const loginIdentity = user.email ? { email: user.email } : { phone: user.phone };
+    const { error } = await sb.auth.signInWithPassword({ ...loginIdentity, password });
     if (error) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
     return true;
   }
 
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
-    const sensitiveActions = ["revoke_role", "delete_account", "delete_listing", "suspend_account", "lift_suspension"];
+    const sensitiveActions = ["revoke_role", "delete_account", "moderate_listing", "suspend_account", "lift_suspension"];
     if (sensitiveActions.includes(action)) {
       const confirmed = await ensureRecentAdminAuthentication();
       if (!confirmed) throw new Error("Операция отменена: повторный вход не подтверждён.");
@@ -2390,7 +2325,7 @@ window.onunhandledrejection = function(event) {
   }
 
   async function manageCouncilRole(targetId) {
-    if (!targetId || !confirm("Снять с пользователя полномочия Ученического совета? Его аккаунт останется обычным.")) return;
+    if (!targetId || !confirm("Снять с ученика полномочия Ученического совета? Сам аккаунт останется активным.")) return;
     try {
       await callCouncilManagement("revoke_role", targetId);
       notice("Полномочия сняты.");
@@ -2400,31 +2335,134 @@ window.onunhandledrejection = function(event) {
     }
   }
 
-  async function manageCouncilAccount(targetId) {
-    if (!targetId || !confirm("Удалить аккаунт пользователя? Действие необратимо: удалятся профиль, объявления, сообщения и его файлы.")) return;
-    if (!confirm("Подтвердите окончательное удаление аккаунта.")) return;
-    try {
-      await callCouncilManagement("delete_account", targetId);
-      notice("Аккаунт и связанные данные удалены.");
-      await loadCouncilAdminTools();
-      await loadAll();
-    } catch (error) {
-      notice("Не удалось удалить аккаунт: " + (error?.message || "Ошибка."));
-    }
+  let pendingAdminConfirm = null;
+  let pendingAdminReason = null;
+
+  function updateAdminConfirmState() {
+    const checked = $("adminConfirmChecked")?.checked === true;
+    const reason = $("adminConfirmReason")?.value?.trim() || "";
+    const limits = pendingAdminReason;
+    const reasonOk = !limits || (reason.length >= limits.min && reason.length <= limits.max);
+    $("adminConfirmSubmit").disabled = !checked || !reasonOk;
   }
 
-  async function manageSchoolListing(targetId) {
-    if (!targetId || !confirm("Навсегда удалить это объявление школы?")) return;
+  function openAdminConfirmModal(options) {
+    pendingAdminConfirm = options.onConfirm;
+    pendingAdminReason = options.reason || null;
+    $("adminConfirmTitle").textContent = options.title;
+    $("adminConfirmDetails").innerHTML = options.details || "";
+    $("adminConfirmReasonWrap").classList.toggle("hidden", !pendingAdminReason);
+    $("adminConfirmReason").value = "";
+    $("adminConfirmReason").placeholder = options.reason?.placeholder || "Опишите факты, без контактов и личных данных";
+    $("adminConfirmReasonHint").textContent = options.reason?.hint || "От 15 до 400 символов. Причина сохранится в истории.";
+    $("adminConfirmChecked").checked = false;
+    $("adminConfirmSubmit").textContent = options.buttonText || "Подтвердить";
+    $("adminConfirmSubmit").classList.toggle("button-danger", options.danger !== false);
+    $("adminConfirmSubmit").classList.toggle("button-primary", options.danger === false);
+    updateAdminConfirmState();
+    openModal("adminConfirmModal");
+  }
+
+  function closeAdminConfirmModal() {
+    pendingAdminConfirm = null;
+    pendingAdminReason = null;
+    closeModal("adminConfirmModal");
+  }
+
+  $("adminConfirmChecked").addEventListener("change", updateAdminConfirmState);
+  $("adminConfirmReason").addEventListener("input", updateAdminConfirmState);
+  $("adminConfirmSubmit").addEventListener("click", async () => {
+    if (typeof pendingAdminConfirm !== "function") return;
+    updateAdminConfirmState();
+    if ($("adminConfirmSubmit").disabled) return;
+    const reason = $("adminConfirmReason").value.trim();
+    const action = pendingAdminConfirm;
+    $("adminConfirmSubmit").disabled = true;
+    $("adminConfirmSubmit").textContent = "Выполняем...";
     try {
-      await callCouncilManagement("delete_listing", targetId);
-      listings = listings.filter(row => row.id !== targetId);
-      notice("Объявление удалено.");
-      await loadCouncilAdminTools();
-      renderListings();
-      await renderProfile();
+      await action(reason);
+      closeAdminConfirmModal();
     } catch (error) {
-      notice("Не удалось удалить объявление: " + (error?.message || "Ошибка."));
+      notice(error?.message || "Не удалось выполнить действие.");
+      $("adminConfirmSubmit").textContent = "Повторить";
+      updateAdminConfirmState();
     }
+  });
+
+  async function manageCouncilAccount(targetId, triggerButton) {
+    if (!targetId || profile?.role !== "school_admin") return;
+    const name = triggerButton?.dataset.name || "Ученик";
+    const contact = triggerButton?.dataset.contact || "Контакт скрыт";
+    const role = triggerButton?.dataset.role || "Ученик";
+    const registered = triggerButton?.dataset.date
+      ? new Date(triggerButton.dataset.date).toLocaleDateString("ru-RU")
+      : "неизвестно";
+    const listingsCount = Number(triggerButton?.dataset.listings) || 0;
+    const titles = triggerButton?.dataset.listingTitles || "У участника пока нет объявлений.";
+    const identity = "<p><b>Аккаунт:</b> " + esc(name) + "</p>"
+      + "<p><b>Контакт:</b> " + esc(contact) + "</p>"
+      + "<p><b>Роль:</b> " + esc(role) + "</p>"
+      + "<p><b>Регистрация:</b> " + esc(registered) + "</p>"
+      + "<p><b>Объявлений:</b> " + listingsCount + "</p>"
+      + "<p><b>Последние публикации:</b> " + esc(titles) + "</p>"
+      + "<p><b>ID:</b> " + esc(String(targetId).slice(0, 8).toUpperCase()) + "</p>"
+      + "<p style='color:var(--danger);'><b>Удаление необратимо.</b> Аккаунт, публикации и связанные данные будут удалены.</p>";
+    openAdminConfirmModal({
+      title: "Проверить удаление аккаунта",
+      details: identity,
+      buttonText: "Удалить аккаунт",
+      danger: true,
+      reason: { min: 15, max: 400, hint: "От 15 до 400 символов. Не указывайте контактные данные." },
+      onConfirm: async cleanReason => {
+        if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(cleanReason)
+            || cleanReason.replace(/\D/g, "").length >= 11) {
+          throw new Error("Не указывайте контакты или личные данные в причине.");
+        }
+        await callCouncilManagement("delete_account", targetId, { reason: cleanReason });
+        notice("Аккаунт и связанные данные удалены.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
+  }
+
+  async function manageSchoolListing(button) {
+    if (!button || profile?.role !== "school_admin") return;
+    const targetId = button.dataset.id || "";
+    const decision = button.dataset.decision || "";
+    const title = button.dataset.title || "Объявление";
+    const author = button.dataset.author || "Участник";
+    const contact = button.dataset.contact || "Контакт скрыт";
+    if (!targetId || !["hide", "restore"].includes(decision)) return;
+    const category = button.dataset.category || "не указана";
+    const description = button.dataset.description || "Описание не указано";
+    const price = button.dataset.price || "Без цены";
+    const createdAt = button.dataset.date ? new Date(button.dataset.date).toLocaleString("ru-RU") : "дата неизвестна";
+    const details = "<p><b>Объявление:</b> " + esc(title) + "</p>"
+      + "<p><b>Автор:</b> " + esc(author) + " · " + esc(contact) + "</p>"
+      + "<p><b>Категория:</b> " + esc(category) + " · <b>Цена:</b> " + esc(price) + "</p>"
+      + "<p><b>Описание:</b> " + esc(description) + "</p>"
+      + "<p><b>Опубликовано:</b> " + esc(createdAt) + "</p>"
+      + (decision === "hide"
+        ? "<p>Объявление будет скрыто с доски, но не удалено. Его можно восстановить.</p>"
+        : "<p>Объявление снова появится на доске.</p>");
+    openAdminConfirmModal({
+      title: decision === "hide" ? "Скрыть объявление?" : "Вернуть объявление?",
+      details,
+      buttonText: decision === "hide" ? "Скрыть с доски" : "Вернуть на доску",
+      danger: decision === "hide",
+      reason: decision === "hide" ? { min: 15, max: 400, hint: "От 15 до 400 символов. Не указывайте контакты." } : null,
+      onConfirm: async reason => {
+        if (decision === "hide" && (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason)
+            || reason.replace(/\D/g, "").length >= 11)) {
+          throw new Error("Не указывайте контакты или личные данные в причине.");
+        }
+        await callCouncilManagement("moderate_listing", targetId, { decision, reason: reason || "" });
+        notice(decision === "hide" ? "Объявление скрыто. Его можно восстановить." : "Объявление возвращено на доску.");
+        await loadCouncilAdminTools();
+        await loadAll();
+      }
+    });
   }
 
   async function suspendCouncilAccount(button) {
@@ -2462,16 +2500,19 @@ window.onunhandledrejection = function(event) {
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
-    $("profEmail").textContent = user.email;
+    const displayName = profile?.display_name || user.user_metadata?.display_name || user.email || user.phone || "Профиль FAM";
+    const accountHint = user.email || user.phone || "";
+    $("profEmail").textContent = displayName;
+    if ($("profMeta")) $("profMeta").textContent = getSchoolDisplayName(profile?.school_id)
+      + " · " + councilRoleName(profile?.role) + (accountHint ? " · " + accountHint : "");
+    const avatarLetter = String(displayName).trim().charAt(0).toUpperCase() || "F";
     if (profile?.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     } else {
-      $("avatarPreview").textContent = user.email[0].toUpperCase();
-      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = user.email[0].toUpperCase();
+      $("avatarPreview").textContent = avatarLetter;
+      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = avatarLetter;
     }
-    const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
-    $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
 
     let myL = listings.filter(l => l.user_id === user.id);
     const myListingsCount = $("myListingsCount");
@@ -2488,6 +2529,15 @@ window.onunhandledrejection = function(event) {
     await loadSchoolAdminAccess();
 
     const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
+    const workSlot = $("profileWorkPanel");
+    const councilDashboard = $("adminIdeasDash");
+    if (workSlot && councilDashboard && isCouncilMember) {
+      workSlot.classList.remove("hidden");
+      workSlot.appendChild(councilDashboard);
+      councilDashboard.classList.remove("hidden");
+    } else if (workSlot) {
+      workSlot.classList.add("hidden");
+    }
     if (isCouncilMember) {
       $("adminIdeasDash").classList.remove("hidden");
       $("councilAdminTools").classList.toggle("hidden", profile.role !== "school_admin");
@@ -2569,34 +2619,70 @@ window.onunhandledrejection = function(event) {
   };
 
   $("switchAuthBtn").onclick = () => {
-    if($("authTitle").textContent === "Вход") {
-      $("authTitle").textContent = "Регистрация";
-      $("schoolGroup").classList.remove("hidden");
-      $("switchAuthBtn").textContent = "У меня есть аккаунт";
-    } else {
-      $("authTitle").textContent = "Вход";
-      $("schoolGroup").classList.add("hidden");
-      $("switchAuthBtn").textContent = "Создать аккаунт";
-    }
+    const isRegistration = $("authTitle").textContent === "Вход";
+    $("authTitle").textContent = isRegistration ? "Регистрация" : "Вход";
+    $("schoolGroup").classList.toggle("hidden", !isRegistration);
+    $("authDisplayNameGroup").classList.toggle("hidden", !isRegistration);
+    $("authLegalGroup").classList.toggle("hidden", !isRegistration);
+    $("authDisplayName").required = isRegistration;
+    $("authTermsAccepted").checked = false;
+    $("authPrivacyAccepted").checked = false;
+    $("authIdentifier").disabled = false;
+    $("authPassword").disabled = false;
+    $("switchAuthBtn").classList.remove("hidden");
+    $("authSubmitBtn").textContent = isRegistration ? "Создать аккаунт" : "Войти";
+    $("authIdentifier").placeholder = "name@example.com";
+    $("switchAuthBtn").textContent = isRegistration ? "У меня есть аккаунт" : "Создать аккаунт";
+    $("authMsg").textContent = "";
   };
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
-    let email = $("authEmail").value, pass = $("authPassword").value;
-    let isReg = $("authTitle").textContent === "Регистрация";
-    let school = $("authSchool").value;
+    const pass = $("authPassword").value;
+    const isReg = $("authTitle").textContent === "Регистрация";
+
+    $("authMsg").textContent = "";
+    $("authSubmitBtn").disabled = true;
     try {
+      const rawIdentifier = $("authIdentifier").value.trim();
+      if (!rawIdentifier) throw new Error("Введите адрес электронной почты.");
+      if (!rawIdentifier.includes("@")) {
+        throw new Error("Сейчас вход и регистрация доступны по почте. Телефон включим после переноса базы в Россию и настройки SMS-подтверждения.");
+      }
+      const school = $("authSchool").value;
+
       let res;
       if (isReg) {
-        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school } } });
+        const displayName = $("authDisplayName").value.trim();
+        if (displayName.length < 2 || displayName.length > 40) {
+          throw new Error("Имя или псевдоним должен содержать от 2 до 40 символов.");
+        }
+        if (!$("authTermsAccepted").checked) {
+          throw new Error("Чтобы продолжить, примите Пользовательское соглашение.");
+        }
+        if (!$("authPrivacyAccepted").checked) {
+          throw new Error("Чтобы продолжить, отдельно подтвердите согласие на обработку персональных данных.");
+        }
+
+        const data = {
+          school_id: school,
+          display_name: displayName,
+          fam_terms_accepted: "true",
+          fam_terms_version: "2026-11-09",
+          fam_privacy_version: "2026-11-09",
+          fam_pd_consent_accepted: "true",
+          fam_pd_consent_version: "2026-11-09"
+        };
+        res = await sb.auth.signUp({ email: rawIdentifier, password: pass, options: { data } });
         if (res.error) throw res.error;
+
         if (!res.data.session) {
-          closeModal('authModal');
-          alert("Регистрация успешна! Проверьте почту для подтверждения.");
+          closeModal("authModal");
+          alert("Регистрация почти завершена. Проверьте почту и подтвердите адрес.");
           return;
         }
       } else {
-        res = await sb.auth.signInWithPassword({ email, password: pass });
+        res = await sb.auth.signInWithPassword({ email: rawIdentifier, password: pass });
         if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
           .select("id,avatar_url,created_at,city,school_id,role")
@@ -2604,12 +2690,15 @@ window.onunhandledrejection = function(event) {
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
       }
-      closeModal('authModal');
-      if (isReg) alert("✅ Регистрация успешна!");
+
+      closeModal("authModal");
+      if (isReg) alert("Регистрация успешна!");
       location.reload();
     } catch(err) {
-      $("authMsg").textContent = err.message;
+      $("authMsg").textContent = err?.message || "Не удалось выполнить операцию. Повторите попытку.";
       $("authPassword").value = "";
+    } finally {
+      $("authSubmitBtn").disabled = false;
     }
   };
 
@@ -2800,16 +2889,16 @@ window.onunhandledrejection = function(event) {
     else if (action === 'clear-my-ideas') { window.clearMyIdeas(); }
     else if (action === 'apply-school-admin') { submitSchoolAdminRequest(); }
     else if (action === 'refresh-council-admin') { loadCouncilAdminTools(); loadUserSafetyReports(); }
-    else if (action === 'refresh-agent-dashboard') { loadFamAgentDashboard(); }
-    else if (action === 'review-fam-agent-idea') { reviewFamAgentIdea(btn); }
     else if (action === 'refresh-safety-reports') { loadUserSafetyReports(); }
     else if (action === 'acknowledge-safety-report') { acknowledgeSafetyReport(btn); }
     else if (action === 'submit-account-deletion-request') { submitCouncilAccountDeletionRequest(); }
-    else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision); }
+    else if (action === 'review-account-deletion') { reviewCouncilAccountDeletion(btn.dataset.id, btn.dataset.decision, btn); }
+    else if (action === 'close-admin-confirm') { closeAdminConfirmModal(); }
     else if (action === 'self-delete-account') { deleteMyAccount(); }
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
-    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id); }
-    else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'delete-council-account') { manageCouncilAccount(btn.dataset.id, btn); }
+    else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
+    else if (action === 'delete-school-listing') { deleteOwnListing(btn.dataset.id); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }

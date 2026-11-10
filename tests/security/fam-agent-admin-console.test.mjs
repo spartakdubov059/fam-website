@@ -68,12 +68,12 @@ test("analyst decisions are recorded and only affect still-pending ideas", () =>
   assert.match(controller, /recordAudit\(actor\.school_id, actorId, null, "fam_agent_idea_"/);
 });
 
-test("admin UI provides a private dashboard and explicit human review actions", () => {
-  assert.match(frontend, /id="famAgentAdminPanel"/);
-  assert.match(frontend, /data-action="refresh-agent-dashboard"/);
-  assert.match(frontend, /data-action="review-fam-agent-idea"/);
-  assert.match(frontend, /profile\?\.role !== "school_admin"/);
-  assert.match(frontend, /Одобрить/);
-  assert.match(frontend, /Отклонить/);
-  assert.match(frontend, /не читают личные переписки/i);
+test("FAM browser UI does not duplicate the daily analytics dashboard; analytics remain available to the external daily report", () => {
+  assert.doesNotMatch(frontend, /famAgentAdminPanel|famAgentReportSummary|famAgentIdeasList|refresh-agent-dashboard|review-fam-agent-idea/);
+  assert.match(migration, /fam-agent-school-daily-report/);
+  assert.match(migration, /fam_safety_analyst/);
+  assert.match(migration, /fam_council_analyst/);
+  assert.match(migration, /fam_operations_analyst/);
+  assert.match(migration, /fam_growth_analyst/);
+  assert.match(frontend, /loadUserSafetyReports/);
 });
