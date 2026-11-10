@@ -1330,9 +1330,12 @@ window.onunhandledrejection = function() {
     const deletionPromise = profile?.role === "school_admin"
       ? sb.functions.invoke("council-management", { body: { action: "overview" } })
       : Promise.resolve({ data: null, error: null });
+    const technicalAlertsPromise = profile?.role === "school_admin"
+      ? sb.rpc("get_fam_admin_technical_alerts")
+      : Promise.resolve({ data: [], error: null });
 
-    const [messagesResult, registrationsResult, accessResult, deletionResult] = await Promise.all([
-      messagePromise, registrationPromise, accessPromise, deletionPromise
+    const [messagesResult, registrationsResult, accessResult, deletionResult, technicalAlertsResult] = await Promise.all([
+      messagePromise, registrationPromise, accessPromise, deletionPromise, technicalAlertsPromise
     ]);
     if (requestId !== notificationRefreshSeq || !user?.id) return;
 
@@ -1389,6 +1392,39 @@ window.onunhandledrejection = function() {
         text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6)) + " · " + deletionReasonLabel(row.reason_code),
         time: new Date(row.created_at || now).getTime()
       }));
+    }
+
+    if (technicalAlertsResult.error) {
+      console.warn("notification_technical_alerts_load_failed");
+    } else if (Array.isArray(technicalAlertsResult.data)) {
+      const technicalEventLabels = {
+        database_request_failed: "Ошибки базы данных",
+        supabase_sdk_unavailable: "Сбой подключения к Supabase",
+        auth_backend_failed: "Ошибки входа в аккаунт",
+        js_runtime: "Ошибки JavaScript",
+        listings_load_failed: "Ошибки загрузки объявлений",
+        notifications_load_failed: "Ошибки уведомлений"
+      };
+      const technicalAreaLabels = {
+        auth: "вход",
+        listings: "объявления",
+        notifications: "уведомления",
+        database: "база данных",
+        other: "другой раздел"
+      };
+      technicalAlertsResult.data.forEach(alert => {
+        const count = Math.max(0, Math.min(1000, Number(alert.event_count) || 0));
+        const eventLabel = technicalEventLabels[alert.event_code] || "Техническая ошибка";
+        const areaLabel = technicalAreaLabels[alert.page_area] || "раздел сайта";
+        add({
+          id: String(alert.notification_key || ""),
+          kind: "system",
+          icon: alert.severity === "critical" ? "🚨" : "⚠️",
+          title: alert.severity === "critical" ? "Критический сбой FAM" : "Техническое предупреждение FAM",
+          text: eventLabel + ": " + count + " случаев за час. Раздел: " + areaLabel + ".",
+          time: new Date(alert.hour_bucket || now).getTime()
+        });
+      });
     }
 
     if (requestId !== notificationRefreshSeq) return;
