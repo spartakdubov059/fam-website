@@ -10,36 +10,61 @@ const prompt = readFileSync(
   new URL("../../.github/prompts/fam-codex-developer.md", import.meta.url),
   "utf8",
 );
+const runner = readFileSync(
+  new URL("../../scripts/run-local-coder.mjs", import.meta.url),
+  "utf8",
+);
+const validator = readFileSync(
+  new URL("../../scripts/validate-local-agent-patch.mjs", import.meta.url),
+  "utf8",
+);
 
-test("Codex developer is manually started only by the repository owner on main", () => {
+test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /schedule:/);
+  assert.match(workflow, /cron: ["']15 3 \* \* \*["']/);
   assert.match(workflow, /github\.actor == 'spartakdubov059'/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
-  assert.doesNotMatch(workflow, /^\s*(push|pull_request|schedule):/m);
 });
 
-test("Codex is pinned and receives a workspace-only coding profile", () => {
-  assert.match(workflow, /openai\/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675/);
-  assert.match(workflow, /codex-version: "0\.167\.0"/);
-  assert.match(workflow, /permission-profile: ":workspace"/);
-  assert.match(workflow, /safety-strategy: "drop-sudo"/);
-  assert.match(workflow, /openai-api-key: \$\{\{ secrets\.OPENAI_API_KEY \}\}/);
+test("agent uses local open weights and never needs a paid API key", () => {
+  assert.match(workflow, /Qwen2\.5-Coder-7B-Instruct-GGUF/);
+  assert.match(workflow, /ggml-org\/llama\.cpp/);
+  assert.match(workflow, /127\.0\.0\.1:8080/);
+  assert.match(runner, /127\.0\.0\.1:8080\/v1\/chat\/completions/);
+  assert.doesNotMatch(workflow, /OPENAI_API_KEY|openai-api-key|openai\/codex-action/i);
+  assert.doesNotMatch(runner, /api\.openai\.com|OPENAI_API_KEY/);
 });
 
-test("AI changes are restricted to site source, documentation and tests", () => {
+test("model receives no GitHub write permission and can only propose allowlisted paths", () => {
+  assert.match(workflow, /generate:[\s\S]*?permissions:\n\s+contents: read/);
   assert.match(workflow, /index\.html\|css\/\*\|js\/\*\|assets\/\*\|docs\/\*\|tests\/\*/);
+  assert.match(validator, /isAllowedAgentPath/);
   assert.match(prompt, /Запрещено изменять \.github\/\*\*, любые supabase\/\*/);
   assert.match(prompt, /Не запускай git push, gh pr create\/merge/);
 });
 
-test("tests run in a separate job without OpenAI API key and write access", () => {
+test("the independent verification job runs without model or write credentials", () => {
   assert.match(workflow, /verify:\n[\s\S]*?permissions:\n\s+contents: read/);
   assert.match(workflow, /node --test tests\/moderation\/\*\.test\.mjs tests\/security\/\*\.test\.mjs/);
-  assert.match(workflow, /publish-draft-pr:/);
-  assert.match(workflow, /needs: \[generate, verify\]/);
+  assert.match(workflow, /node --check \/tmp\/fam-inline-scripts\.js/);
+  assert.match(workflow, /git diff --check HEAD/);
 });
 
-test("final job only creates a draft PR and never merges or deploys", () => {
+test("critical changes require manual approval; low-risk fixes wait for tests before merge", () => {
+  assert.match(validator, /requiresManualApproval/);
+  assert.match(validator, /account[_ -]?deletion/);
+  assert.match(validator, /security definer/);
+  assert.match(workflow, /if: steps\.pr\.outputs\.requires_approval == 'false'/);
+  assert.match(workflow, /gh pr checks "\$PR_URL" --watch --fail-fast/);
+  assert.match(workflow, /gh pr merge "\$PR_URL" --squash --delete-branch/);
   assert.match(workflow, /gh pr create --draft/);
-  assert.doesNotMatch(workflow, /gh pr merge|supabase functions deploy|git push origin main/i);
+  assert.match(workflow, /pages build and deployment/);
+});
+
+test("workflow does not modify Supabase schema, secrets or account data", () => {
+  assert.doesNotMatch(workflow, /supabase db (?:push|reset|migrate)|supabase functions deploy/i);
+  assert.match(prompt, /персональные данные/);
+  assert.match(prompt, /RLS/);
+  assert.match(prompt, /необратимые операции/);
 });
