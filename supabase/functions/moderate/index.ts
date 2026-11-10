@@ -134,16 +134,17 @@ async function recordCachedSignal(context: SafetyContext | null, cached: Record<
     unclear_context: { category: "unclear_safety_signal", severity: "medium" },
     policy_violation: { category: "unclear_safety_signal", severity: "medium" },
     spam_or_advertising: { category: "spam_or_repeated_abuse", severity: "medium" },
-    image_requires_review: { category: "unsafe_image", severity: "medium" },
-    image_requires_human_review: { category: "unsafe_image", severity: "high" },
+    image_requires_review: { category: "unclear_safety_signal", severity: "medium" },
+    image_requires_human_review: { category: "unclear_safety_signal", severity: "high" },
     sensitive_category_requires_separate_process: { category: "unclear_safety_signal", severity: "high" },
     additional_safety_review: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_unavailable: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_empty_response: { category: "unclear_safety_signal", severity: "medium" },
-    image_review_rate_limited: { category: "unsafe_image", severity: "medium" },
-    image_review_unavailable: { category: "unsafe_image", severity: "medium" },
-    image_review_no_decision: { category: "unsafe_image", severity: "medium" },
+    image_review_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_quota_exceeded: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_unavailable: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_no_decision: { category: "unclear_safety_signal", severity: "medium" },
     personal_information: { category: "personal_data_in_image", severity: "medium" },
     private_document: { category: "personal_data_in_image", severity: "medium" },
     unsafe_content: { category: "unsafe_image", severity: "high" },
@@ -528,9 +529,12 @@ serve(async (req: Request) => {
         if (imageReview.action !== "ok") {
           if (["personal_information", "private_document"].includes(imageReview.reason_code)) {
             await writeSafetySignal(safetyContext, "personal_data_in_image", "medium");
-          } else {
-            await writeSafetySignal(safetyContext, "unsafe_image", imageReview.action === "pending" ? "medium" : "high");
+          } else if (imageReview.action === "reject") {
+            await writeSafetySignal(safetyContext, "unsafe_image", "high");
+          } else if (["image_requires_review", "image_requires_human_review"].includes(imageReview.reason_code)) {
+            await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
           }
+          // Provider rate limits, quota, or outages are service failures, not user safety violations.
           return cacheAndRespond(cacheKey, {
             action: imageReview.action,
             reason_code: imageReview.reason_code,
