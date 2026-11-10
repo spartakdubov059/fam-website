@@ -20,7 +20,7 @@ test("listing image moderation worker is scheduled every minute", () => {
 test("image worker requires the dedicated internal token and POST requests", () => {
   assert.match(worker, /Deno\.env\.get\(["']FAM_AGENT_WORKER_TOKEN["']\)/);
   assert.match(worker, /x-fam-agent-token/);
-  assert.match(worker, /sameSecret\(req\.headers\.get\("x-fam-agent-token"\)/);
+  assert.match(worker, /sameSecret\(req\.headers\.get\("x-fam-agent-token"\)\s*\|\|\s*""\s*,\s*WORKER_TOKEN\)/);
   assert.match(worker, /req\.method !== "POST"/);
 });
 
