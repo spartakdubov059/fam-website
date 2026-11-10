@@ -661,6 +661,21 @@
       .db-title, .db-sub { max-width: 74%; }
     }
 
+/* Keep the Council panel header on the same neutral palette as the rest of FAM. */
+#adminIdeasDash > summary {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+#adminIdeasDash[open] > summary { border-bottom-color: var(--border); }
+#adminIdeasDash .profile-disclosure-title b { color: var(--text); }
+#adminIdeasDash .profile-disclosure-title small { color: var(--muted); }
+#adminIdeasDash > summary .profile-shortcut-icon {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
 </style>
 </head>
 <body>
