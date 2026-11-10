@@ -21,6 +21,14 @@ test("worker processes only the explicitly permitted no-approval quality check",
   assert.match(worker, /"Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя\."/);
 });
 
+test("worker reads aggregate queue metrics for its approved health check only", () => {
+  assert.match(worker, /rpc\("get_fam_agent_queue_health", \{\}\)/);
+  assert.match(worker, /failed_last_24h/);
+  assert.match(worker, /expired_leases/);
+  assert.match(worker, /Содержимое задач и личные данные не читались/);
+  assert.doesNotMatch(worker, /\.payload|messages|profiles|listings/);
+});
+
 test("worker caps batch size and uses bounded task leases", () => {
   assert.match(worker, /Math\.min\(5, Math\.max\(1, body\.limit\)\)/);
   assert.match(worker, /p_lease_seconds: 120/);
