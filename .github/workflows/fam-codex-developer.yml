@@ -182,16 +182,16 @@ jobs:
                 ;;
             esac
           done
-          has_source=false
+          has_behavior_code=false
           has_tests=false
           for file in "${changed_files[@]}"; do
             case "$file" in
-              index.html|css/*|js/*|assets/*) has_source=true ;;
+              index.html|js/*) has_behavior_code=true ;;
               tests/*) has_tests=true ;;
             esac
           done
-          if [[ "$has_source" == "true" && "$has_tests" != "true" ]]; then
-            echo "::error::Изменение кода сайта не содержит регрессионного теста."
+          if [[ "$has_behavior_code" == "true" && "$has_tests" != "true" ]]; then
+            echo "::error::Изменение HTML/JavaScript не содержит регрессионного теста."
             exit 1
           fi
           git diff --check HEAD
@@ -229,6 +229,7 @@ jobs:
       pull-requests: write
       checks: read
       actions: read
+      pages: write
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -274,8 +275,9 @@ jobs:
             echo
             echo "- Модель: Qwen2.5-Coder-7B-Instruct-GGUF, запущена локально на временном GitHub runner."
             echo "- Внешние платные API не использовались."
-            echo "- Patch прошёл независимые тесты и проверку безопасности."
+            echo "- Patch прошёл независимые тесты и проверку безопасности в отдельном job этого запуска."
             echo "- Supabase, миграции, права доступа и аккаунты не менялись."
+            echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Автоматическая публикация допускается только при низком риске и отсутствии признаков критических действий."
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
           if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
@@ -294,7 +296,24 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.pr_url }}
         run: |
           set -euo pipefail
-          gh pr checks "$PR_URL" --watch --fail-fast
+          BRANCH_SHA="$(git rev-parse HEAD)"
+          gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
+          TEST_RUN_ID=""
+          for attempt in $(seq 1 60); do
+            TEST_RUN_ID="$(gh run list --workflow .github/workflows/moderation-regression.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,event --jq ".[] | select(.headSha == \"$BRANCH_SHA\" and .event == \"workflow_dispatch\") | .databaseId" | head -n 1)"
+            [[ -n "$TEST_RUN_ID" ]] && break
+            sleep 5
+          done
+          if [[ -z "$TEST_RUN_ID" ]]; then
+            echo "::error::Не найден отдельный запуск регрессионных тестов для ветки агента."
+            exit 1
+          fi
+          gh run watch "$TEST_RUN_ID" --exit-status --interval 10
+          TEST_CONCLUSION="$(gh run view "$TEST_RUN_ID" --json conclusion --jq '.conclusion')"
+          if [[ "$TEST_CONCLUSION" != "success" ]]; then
+            echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
+            exit 1
+          fi
           gh pr merge "$PR_URL" --squash --delete-branch
           MERGE_SHA=""
           for attempt in $(seq 1 12); do
@@ -307,23 +326,31 @@ jobs:
             exit 1
           fi
           echo "Merged commit: $MERGE_SHA"
-          RUN_ID=""
-          for attempt in $(seq 1 60); do
-            RUN_ID="$(gh run list --branch main --limit 30 --json databaseId,headSha,name --jq ".[] | select(.headSha == \"$MERGE_SHA\" and (.name | ascii_downcase | contains(\"pages build and deployment\"))) | .databaseId" | head -n 1)"
-            [[ -n "$RUN_ID" ]] && break
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null
+          BUILD_STATUS=""
+          BUILD_COMMIT=""
+          for attempt in $(seq 1 120); do
+            BUILD_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest")"
+            BUILD_STATUS="$(jq -r '.status // empty' <<< "$BUILD_JSON")"
+            BUILD_COMMIT="$(jq -r '.commit // empty' <<< "$BUILD_JSON")"
+            if [[ "$BUILD_STATUS" == "errored" ]]; then
+              echo "::error::GitHub Pages build завершился с ошибкой."
+              exit 1
+            fi
+            if [[ "$BUILD_STATUS" == "built" && "$BUILD_COMMIT" == "$MERGE_SHA" ]]; then
+              break
+            fi
             sleep 10
           done
-          if [[ -z "$RUN_ID" ]]; then
-            echo "::error::Не найден запуск GitHub Pages для merge commit. Публикация не подтверждена."
+          if [[ "$BUILD_STATUS" != "built" || "$BUILD_COMMIT" != "$MERGE_SHA" ]]; then
+            echo "::error::Не удалось подтвердить GitHub Pages build для merge commit $MERGE_SHA."
             exit 1
           fi
-          gh run watch "$RUN_ID" --exit-status --interval 10
-          CONCLUSION="$(gh run view "$RUN_ID" --json conclusion --jq '.conclusion')"
-          if [[ "$CONCLUSION" != "success" ]]; then
-            echo "::error::GitHub Pages deployment завершился неуспешно: $CONCLUSION"
-            exit 1
-          fi
-          echo "GitHub Pages deployment succeeded for $MERGE_SHA"
+          curl --fail --silent --show-error --location --retry 10 --retry-delay 5 \
+            --retry-all-errors --output /tmp/fam-production.html \
+            "https://spartakdubov059.github.io/fam-website/"
+          grep -qi "<html" /tmp/fam-production.html
+          echo "GitHub Pages deployment succeeded for $MERGE_SHA; production HTTP response verified."
 
       - name: Сохранить отчёт о PR
         if: always()
