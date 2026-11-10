@@ -14,10 +14,13 @@ export function extractPatchPaths(patch) {
 
 export function isAllowedAgentPath(path) {
   if (path.startsWith("/") || path.split("/").includes("..")) return false;
-  return path === "index.html" ||
-    path.startsWith("css/") ||
+  if (path === "index.html") return true;
+  if (/^assets\//.test(path)) {
+    // Only inert raster images are permitted; SVG/HTML/JS assets can contain executable content.
+    return /\.(?:png|jpe?g|webp|avif|gif)$/i.test(path);
+  }
+  return path.startsWith("css/") ||
     path.startsWith("js/") ||
-    path.startsWith("assets/") ||
     path.startsWith("docs/") ||
     path.startsWith("tests/");
 }
@@ -29,17 +32,36 @@ const CRITICAL_CHANGE_PATTERNS = [
   /suspend(?:ed|ing)?[_ -]?(?:account|user)/i,
   /ban(?:ned|ning)?[_ -]?(?:account|user)/i,
   /moderation[_ -]?(?:decision|action|policy)/i,
-  /auth\.users|service_role|security definer/i,
-  /\b(?:RLS|GRANT|REVOKE)\b/,
-  /storage[_ -]?polic(?:y|ies)/i,
-  /api[_ -]?key|secret[_ -]?key|access[_ -]?token/i,
-  /role[_ -]?(?:change|grant|permission)|permission[_ -]?change/i,
+  /auth(?:entication|orization)?/i,
+  /jwt|access[_ -]?token|refresh[_ -]?token|session/i,
+  /school[_ -]?admin|admin[_ -]?(?:panel|role|access|permission)/i,
+  /(?:user|profile|account)[_. -]?(?:id|role|permission|delete|remove|block|suspend)/i,
+  /(?:role|permission)[_. -]?(?:change|grant|revoke|update)/i,
+  /security definer|service_role|\b(?:RLS|GRANT|REVOKE)\b/i,
+  /storage[_ -]?polic(?:y|ies)|upload[_ -]?(?:permission|policy)/i,
+  /api[_ -]?key|secret[_ -]?key|private[_ -]?key/i,
+  /personal[_ -]?data|private[_ -]?(?:message|content|data)/i,
+  /(?:messages|chat)[_. -]?(?:read|write|delete|access|permission)/i,
+  /\.rpc\s*\(|auth\.users|auth\.uid\s*\(/i,
   /bulk[_ -]?(?:delete|update|migration)/i,
+  /irreversible|irreversib(?:le|ility)/i,
 ];
+
+function changedLinesOnly(patch) {
+  return patch
+    .split(/\r?\n/)
+    .filter((line) => /^[+-](?![+-])/.test(line))
+    .join("\n");
+}
 
 export function requiresManualApproval(summary, patch) {
   if (!summary || summary.risk !== "low" || summary.requires_approval !== false) return true;
-  return CRITICAL_CHANGE_PATTERNS.some((pattern) => pattern.test(patch));
+  const codePaths = extractPatchPaths(patch).filter((path) =>
+    path === "index.html" || path.startsWith("js/")
+  );
+  if (codePaths.length === 0) return false;
+  const changedText = changedLinesOnly(patch);
+  return CRITICAL_CHANGE_PATTERNS.some((pattern) => pattern.test(changedText));
 }
 
 export function validateAgentPatch(patch, summary) {
