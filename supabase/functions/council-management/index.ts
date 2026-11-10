@@ -242,7 +242,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
-      "listings?select=id,title,description,price_text,category,user_id,status,is_event,event_date,city,created_at&school_id=eq."
+      "listings?select=id,title,description,price_text,category,user_id,status,moderation_status,is_event,event_date,city,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
@@ -281,6 +281,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       city: row.city,
       user_id: row.user_id,
       status: row.status,
+      moderation_status: row.moderation_status,
       is_event: row.is_event === true,
       event_date: row.event_date,
       created_at: row.created_at,
