@@ -1,6 +1,6 @@
 // Dedicated FAM photo reviewer.
 // It checks listing photos and profile avatars; it never identifies people.
-import { boundedRetryDelayMs, shouldRetryImageReviewRateLimit } from "./image-reviewer-utils.js";
+import { boundedRetryDelayMs, isExhaustedImageReviewQuota, shouldRetryImageReviewRateLimit } from "./image-reviewer-utils.js";
 
 export type ImageReviewAction = "ok" | "reject" | "pending";
 export type ImageReviewResult = {
@@ -127,8 +127,7 @@ export async function reviewListingImage(
 
   if (!response?.ok) {
     const isRateLimited = response?.status === 429;
-    const isQuotaExhausted = providerErrorCode === "insufficient_quota"
-      || providerErrorCode === "billing_hard_limit_reached";
+    const isQuotaExhausted = isExhaustedImageReviewQuota(providerErrorCode);
     const isAuthFailure = response?.status === 401 || response?.status === 403;
     const isBadRequest = response?.status === 400;
     const reasonCode = isRateLimited
