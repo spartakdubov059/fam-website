@@ -107,10 +107,35 @@ Deno.serve(async (req: Request) => {
         task?.task_type === "queue_health_check" &&
         task?.approval_required === false;
 
-      const status = safeTask ? "completed" : "blocked";
-      const summary = safeTask
-        ? "Проверка очереди выполнена. Пользовательские данные и частные сообщения не запрашивались."
-        : "Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя.";
+      let status: "completed" | "blocked" = "blocked";
+      let summary = "Задача остановлена: её тип не входит в разрешённый список безопасного исполнителя.";
+
+      if (safeTask) {
+        // This RPC returns aggregate queue counts only; it never reads task payloads or student content.
+        const health = await rpc("get_fam_agent_queue_health", {});
+        if (!health || typeof health !== "object" || Array.isArray(health)) {
+          throw new Error("invalid_queue_health_response");
+        }
+
+        const count = (value: unknown): number => {
+          const parsed = Number(value);
+          return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+        };
+
+        const queued = count(health.queued);
+        const claimed = count(health.claimed);
+        const inProgress = count(health.in_progress);
+        const failedLast24h = count(health.failed_last_24h);
+        const expiredLeases = count(health.expired_leases);
+        const oldestQueuedMinutes = count(health.oldest_queued_minutes);
+
+        status = "completed";
+        summary = "Аудит очереди завершён. " +
+          "Ожидают: " + queued + "; захвачены: " + claimed + "; выполняются: " + inProgress + "; " +
+          "ошибки за 24 часа: " + failedLast24h + "; просроченные аренды: " + expiredLeases + "; " +
+          "возраст старейшей ожидающей задачи, минут: " + oldestQueuedMinutes + ". " +
+          "Содержимое задач и личные данные не читались.";
+      }
 
       const saved = await rpc("finish_fam_agent_task", {
         p_task_id: task.id,
