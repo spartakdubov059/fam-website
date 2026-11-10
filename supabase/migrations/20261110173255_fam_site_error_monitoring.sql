@@ -323,7 +323,7 @@ begin
       to_regprocedure('public.claim_fam_agent_tasks(text,integer,integer)') is not null
       and has_function_privilege('service_role','public.claim_fam_agent_tasks(text,integer,integer)','EXECUTE')
       and to_regprocedure('public.finish_fam_agent_task(uuid,text,text,text)') is not null
-      and has_function_privilege('service_role','public.finish_fam_agent_tasks(uuid,text,text,text)','EXECUTE') is not null
+      and has_function_privilege('service_role','public.finish_fam_agent_task(uuid,text,text,text)','EXECUTE') is not null
       and to_regprocedure('public.get_fam_agent_task_daily_digest(uuid,text)') is not null
       and has_function_privilege('service_role','public.get_fam_agent_task_daily_digest(uuid,text)','EXECUTE')
       and to_regprocedure('public.get_fam_agent_task_site_error_digest(uuid,text)') is not null
