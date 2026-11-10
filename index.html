@@ -633,7 +633,35 @@
     .council-listing-price { margin-top:6px; font-size:10px; font-weight:800; }
     .council-listing-author { margin-bottom:8px; }
 
-  </style>
+  
+    .hero-slide.hero-brand { background: linear-gradient(140deg,#272B32 0%,#191C22 70%,#15171B 100%); }
+    .ai-live { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.16); color: #E6E8EC; }
+    .db-emoji { font-size: 46px; right: 20px; top: 18px; }
+    .db-title { font-family: inherit; font-size: clamp(25px,5vw,35px); font-weight: 850; letter-spacing: -.04em; line-height: 1.12; max-width: min(76%,420px); overflow-wrap: anywhere; }
+    .db-sub { color: #D0D3D9; font-size: 13px; line-height: 1.45; margin: 10px 0 4px; max-width: min(76%,420px); }
+    .notif-item.is-read { opacity: .7; }
+    .notif-read-state { color: var(--muted); font-size: 10px; align-self: center; }
+    #profileLoggedIn .profile-council-disclosure { background: var(--surface); border: 1px solid var(--border); box-shadow: none; }
+    #adminIdeasDash > summary { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
+    #adminIdeasDash[open] > summary { border-bottom-color: var(--border); }
+    #adminIdeasDash .profile-disclosure-title b,
+    #adminIdeasDash .profile-disclosure-title small { color: var(--text); }
+    #adminIdeasDash > summary .profile-shortcut-icon { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    #adminIdeasDash .profile-disclosure-body, #councilAdminTools { background: var(--surface); border-color: var(--border); }
+    #adminIdeasDash .council-dashboard-note, #adminIdeasDash .profile-box,
+    #adminIdeasDash .profile-inline-disclosure, #adminIdeasDash .idea-card {
+      background: var(--bg); color: var(--text); border-color: var(--border); box-shadow: none;
+    }
+    #adminIdeasDash .profile-inline-disclosure > summary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
+    #adminIdeasDash .idea-folder { background: var(--surface); color: var(--text); border-color: var(--border); }
+    #adminIdeasDash .idea-folder.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    #adminIdeasDash .profile-section-copy, #adminIdeasDash .council-section-title { color: var(--muted); }
+    @media (max-width:420px) {
+      .db-emoji { font-size: 38px; right: 15px; top: 16px; }
+      .db-title, .db-sub { max-width: 74%; }
+    }
+
+</style>
 </head>
 <body>
   <noscript>
@@ -665,7 +693,7 @@
 </header>
 
 <div class="notif-panel hidden" id="notifPanel" role="dialog" aria-labelledby="notifTitle">
-  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><div class="notif-head-actions"><button class="button button-secondary button-small" data-action="clear-notifications">Скрыть всё</button><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div></div>
+  <div class="notif-head"><b id="notifTitle">Уведомления 🔔</b><div class="notif-head-actions"><button class="button button-secondary button-small" data-action="mark-all-notifications-read">Отметить всё прочитанным</button><button class="button button-secondary button-small" data-action="close-notif">Закрыть</button></div></div>
   <div id="notifContent"></div>
 </div>
 
@@ -674,7 +702,7 @@
     <div class="icon">⚠️</div>
     <div>
       <b>ИИ-модерация временно недоступна.</b>
-      Объявления не публикуются без проверки, сообщения временно не отправляются, а идеи сохраняются для ручной проверки школьным Советом.<br>
+      Объявления и сообщения не будут опубликованы без успешной проверки безопасности. Идеи, которые система не смогла проверить автоматически, останутся вне списка Совета до завершения дополнительной проверки.<br>
       <span style="opacity:0.8; font-size:11px; display:block; margin-top:4px;">Попробуйте позже. Уже отправленные идеи можно проверить в панели Совета.</span>
     </div>
   </div>
@@ -1095,10 +1123,10 @@ window.onunhandledrejection = function(event) {
     const liveLabel = document.querySelector(".ai-live");
     if (liveLabel) {
       liveLabel.textContent = isAiDown === null
-        ? "ИИ-модерация · статус не проверен"
+        ? "ИИ-проверка перед публикацией"
         : isAiDown
-          ? "ИИ-модерация недоступна"
-          : "ИИ-модерация активна";
+          ? "Проверка временно недоступна"
+          : "Проверка публикаций активна";
     }
   }
 
@@ -1149,36 +1177,24 @@ window.onunhandledrejection = function(event) {
     try {
       const value = JSON.parse(safeLocalStorageGet(key) || "[]");
       return Array.isArray(value) ? value.filter(item => typeof item === "string").slice(-500) : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function saveDismissedNotifications(ids) {
-    const key = notificationDismissKey();
-    if (!key) return;
-    const unique = Array.from(new Set(ids)).slice(-500);
-    safeLocalStorageSet(key, JSON.stringify(unique));
+    } catch (_) { return []; }
   }
 
   function updateBellBadge() {
-    const n = notificationsCache.length;
+    const unread = notificationsCache.filter(item => item.isRead !== true).length;
     const badge = $("bellBadge");
     if (!badge) return;
-    if (n > 0) {
-      badge.textContent = n > 9 ? "9+" : String(n);
+    if (unread > 0) {
+      badge.textContent = unread > 9 ? "9+" : String(unread);
       badge.classList.remove("hidden");
-    } else {
-      badge.classList.add("hidden");
-    }
+    } else badge.classList.add("hidden");
   }
 
   function renderNotifPanel() {
     const content = $("notifContent");
     if (!content) return;
-    const notes = notificationsCache;
-    content.innerHTML = notes.length ? notes.map(note => `
-      <article class="notif-item">
+    content.innerHTML = notificationsCache.length ? notificationsCache.map(note => `
+      <article class="notif-item${note.isRead ? " is-read" : ""}">
         <span class="notif-ico">${esc(note.icon || "🔔")}</span>
         <div class="notif-body">
           <div class="notif-title">${esc(note.title)}</div>
@@ -1188,11 +1204,14 @@ window.onunhandledrejection = function(event) {
             ${note.kind === "message" && note.senderId
               ? `<button type="button" class="button button-primary button-small" data-action="open-notification-chat" data-user-id="${esc(note.senderId)}">Открыть чат</button>`
               : ""}
+            ${note.isRead
+              ? '<span class="notif-read-state">✓ Прочитано</span>'
+              : `<button type="button" class="button button-secondary button-small" data-action="mark-notification-read" data-id="${esc(note.id)}">Отметить прочитанным</button>`}
             <button type="button" class="button button-secondary button-small" data-action="dismiss-notification" data-id="${esc(note.id)}">Убрать</button>
           </div>
         </div>
       </article>
-    `).join("") : '<p class="notif-empty">Новых уведомлений нет.</p>';
+    `).join("") : '<p class="notif-empty">Уведомлений пока нет. Новые события появятся здесь.</p>';
   }
 
   async function refreshNotificationFeed() {
@@ -1204,134 +1223,102 @@ window.onunhandledrejection = function(event) {
       return;
     }
 
-    const dismissed = new Set(readDismissedNotifications());
-    const items = [];
     const now = Date.now();
     const recentCutoff = now - 14 * 24 * 60 * 60 * 1000;
+    const legacyDismissed = readDismissedNotifications();
+
+    if (legacyDismissed.length) {
+      const legacyRows = legacyDismissed.map(id => ({
+        user_id: user.id,
+        notification_key: "dismissed:" + id,
+        read_at: new Date().toISOString()
+      }));
+      const { error } = await sb.from("notification_reads")
+        .upsert(legacyRows, { onConflict: "user_id,notification_key" });
+      if (error) console.warn("notification_legacy_migration_failed", error.message);
+    }
+
+    const readResult = await sb.from("notification_reads")
+      .select("notification_key").eq("user_id", user.id).limit(2000);
+    if (requestId !== notificationRefreshSeq || !user?.id) return;
+    if (readResult.error) console.warn("notification_read_state_load_failed", readResult.error.message);
+    const readIds = new Set(Array.isArray(readResult.data) ? readResult.data.map(row => row.notification_key) : []);
+    const dismissedIds = new Set([
+      ...legacyDismissed,
+      ...Array.from(readIds).filter(key => key.startsWith("dismissed:")).map(key => key.slice(10))
+    ]);
+
+    const items = [];
     const add = item => {
-      if (item && typeof item.id === "string" && !dismissed.has(item.id)) {
-        items.push({ ...item, time: Number.isFinite(item.time) ? item.time : now });
+      if (item && typeof item.id === "string" && !dismissedIds.has(item.id)) {
+        items.push({ ...item, isRead: item.isRead === true || readIds.has(item.id), time: Number.isFinite(item.time) ? item.time : now });
       }
     };
 
     add({
-      id: NOTIFICATION_RELEASE_ID,
-      kind: "release",
-      icon: "✨",
-      title: "Обновление FAM",
-      text: "Обновлены уведомления, профиль и рабочая панель Ученического совета.",
-      time: Date.parse("2026-11-10T15:17:40Z")
+      id: NOTIFICATION_RELEASE_ID, kind: "release", icon: "✨", title: "Обновление FAM",
+      text: "Прочтение и скрытие уведомлений теперь сохраняются в аккаунте.",
+      time: Date.parse("2026-11-10T16:59:08Z")
     });
 
-    if (isAiDown === true) {
-      add({
-        id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
-        kind: "system",
-        icon: "⚠️",
-        title: "ИИ-модерация временно недоступна",
-        text: "Новые публикации и сообщения могут быть временно ограничены.",
-        time: now
-      });
-    }
+    if (isAiDown === true) add({
+      id: "system:ai-down:" + new Date().toISOString().slice(0, 10),
+      kind: "system", icon: "⚠️", title: "ИИ-модерация временно недоступна",
+      text: "Новые публикации не будут опубликованы без успешной проверки безопасности.", time: now
+    });
 
     if (profile?.school_id) {
-      listings
-        .filter(row => row.school_id === profile.school_id
-          && row.user_id !== user.id
-          && new Date(row.created_at || 0).getTime() >= recentCutoff)
-        .slice(0, 8)
-        .forEach(row => {
-          add({
-            id: "school-listing:" + row.id,
-            kind: "listing",
-            icon: row.is_event ? "🎭" : "📌",
-            title: row.is_event ? "Новое мероприятие школы" : "Новое объявление школы",
-            text: row.title || "Опубликован новый материал",
-            time: new Date(row.created_at || now).getTime()
-          });
-        });
+      listings.filter(row => row.school_id === profile.school_id && row.user_id !== user.id
+        && new Date(row.created_at || 0).getTime() >= recentCutoff).slice(0, 8).forEach(row => add({
+        id: "school-listing:" + row.id, kind: "listing", icon: row.is_event ? "🎭" : "📌",
+        title: row.is_event ? "Новое мероприятие школы" : "Новое объявление школы",
+        text: row.title || "Опубликован новый материал", time: new Date(row.created_at || now).getTime()
+      }));
     }
 
     if (["school_admin", "council_member"].includes(profile?.role)) {
-      ideas
-        .filter(row => row.admin_status === "new"
-          && new Date(row.created_at || 0).getTime() >= recentCutoff)
-        .slice(0, 8)
-        .forEach(row => {
-          add({
-            id: "school-idea:" + row.id,
-            kind: "idea",
-            icon: "💡",
-            title: "Новая идея ученика",
-            text: String(row.text || "Предложена новая идея").slice(0, 110),
-            time: new Date(row.created_at || now).getTime()
-          });
-        });
+      ideas.filter(row => row.ai_status === "approved" && row.admin_status === "new"
+        && new Date(row.created_at || 0).getTime() >= recentCutoff).slice(0, 8).forEach(row => add({
+        id: "school-idea:" + row.id, kind: "idea", icon: "💡", title: "Новая идея ученика",
+        text: String(row.text || "Предложена новая идея").slice(0, 110),
+        time: new Date(row.created_at || now).getTime()
+      }));
     }
 
-    const myEventIds = listings
-      .filter(row => row.user_id === user.id && row.is_event)
-      .map(row => row.id)
-      .slice(0, 100);
-
-    const messagePromise = sb.from("messages")
-      .select("id,sender_id,body,created_at")
-      .eq("receiver_id", user.id)
-      .or("is_read.eq.false,is_read.is.null")
-      .order("created_at", { ascending: false })
-      .limit(30);
-
+    const myEventIds = listings.filter(row => row.user_id === user.id && row.is_event).map(row => row.id).slice(0, 100);
+    const messagePromise = sb.from("messages").select("id,sender_id,body,created_at,is_read")
+      .eq("receiver_id", user.id).order("created_at", { ascending: false }).limit(100);
     const registrationPromise = myEventIds.length
-      ? sb.from("event_registrations")
-          .select("id,event_id,status,created_at")
-          .in("event_id", myEventIds)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false })
-          .limit(20)
+      ? sb.from("event_registrations").select("id,event_id,status,created_at").in("event_id", myEventIds)
+          .eq("status", "pending").order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [], error: null });
-
-    const accessPromise = profile?.role === "school_admin"
+    const accessPromise = ["school_admin", "student"].includes(profile?.role)
       ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
-      : profile?.role === "student"
-        ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
-        : Promise.resolve({ data: null, error: null });
-
+      : Promise.resolve({ data: null, error: null });
     const deletionPromise = profile?.role === "school_admin"
       ? sb.functions.invoke("council-management", { body: { action: "overview" } })
       : Promise.resolve({ data: null, error: null });
 
     const [messagesResult, registrationsResult, accessResult, deletionResult] = await Promise.all([
-      messagePromise,
-      registrationPromise,
-      accessPromise,
-      deletionPromise
+      messagePromise, registrationPromise, accessPromise, deletionPromise
     ]);
-
     if (requestId !== notificationRefreshSeq || !user?.id) return;
 
     if (!messagesResult.error && Array.isArray(messagesResult.data)) {
-      messagesResult.data.forEach(message => {
-        const sender = String(message.sender_id || "");
-        add({
-          id: "message:" + message.id,
-          kind: "message",
-          recordId: message.id,
-          senderId: sender,
-          icon: "💬",
-          title: "Новое сообщение",
-          text: String(message.body || "Вам пришло сообщение").slice(0, 100),
-          time: new Date(message.created_at || now).getTime()
-        });
-      });
-    }
+      messagesResult.data.forEach(message => add({
+        id: "message:" + message.id, kind: "message", recordId: message.id,
+        senderId: String(message.sender_id || ""), isRead: message.is_read === true,
+        icon: "💬", title: message.is_read ? "Сообщение" : "Новое сообщение",
+        text: String(message.body || "Вам пришло сообщение").slice(0, 100),
+        time: new Date(message.created_at || now).getTime()
+      }));
+    } else if (messagesResult.error) console.warn("notification_messages_load_failed", messagesResult.error.message);
 
     if (!registrationsResult.error && Array.isArray(registrationsResult.data)) {
       registrationsResult.data.forEach(row => {
         const event = listings.find(item => item.id === row.event_id);
         add({
-          id: "event-registration:" + row.id,
-          kind: "registration",
-          icon: "🎟️",
+          id: "event-registration:" + row.id, kind: "registration", icon: "🎟️",
           title: "Заявка на мероприятие",
           text: event?.title ? "Новая заявка на «" + event.title + "»" : "Появилась новая заявка на ваше мероприятие",
           time: new Date(row.created_at || now).getTime()
@@ -1342,99 +1329,106 @@ window.onunhandledrejection = function(event) {
     if (!accessResult.error && accessResult.data?.ok) {
       if (profile?.role === "school_admin") {
         (Array.isArray(accessResult.data.requests) ? accessResult.data.requests : [])
-          .filter(row => ["pending", "reviewing"].includes(row.status))
-          .forEach(row => {
-            add({
-              id: "school-access-request:" + row.id,
-              kind: "access-request",
-              icon: "🏫",
-              title: "Заявка на доступ к Совету",
-              text: row.applicant_note || "Поступила заявка на проверку полномочий.",
-              time: new Date(row.created_at || now).getTime()
-            });
-          });
+          .filter(row => ["pending", "reviewing"].includes(row.status)).forEach(row => add({
+            id: "school-access-request:" + row.id, kind: "access-request", icon: "🏫",
+            title: "Заявка на вступление или полномочия",
+            text: row.applicant_note || "Поступила новая заявка.",
+            time: new Date(row.created_at || now).getTime()
+          }));
       } else if (profile?.role === "student") {
         const request = accessResult.data.request;
         if (request && ["approved", "rejected"].includes(request.status)
-            && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) {
-          add({
-            id: "school-access-result:" + request.id + ":" + request.status,
-            kind: "access-result",
+          && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) add({
+            id: "school-access-result:" + request.id + ":" + request.status, kind: "access-result",
             icon: request.status === "approved" ? "✅" : "ℹ️",
             title: request.status === "approved" ? "Заявка одобрена" : "Заявка рассмотрена",
-            text: request.status === "approved"
-              ? "Ваша заявка на доступ к Ученическому совету одобрена."
+            text: request.status === "approved" ? "Ваша заявка на вступление в Ученический совет одобрена."
               : (request.review_note || "Ваша заявка рассмотрена. Откройте профиль, чтобы проверить статус."),
             time: new Date(request.reviewed_at || request.created_at || now).getTime()
           });
-        }
       }
     }
 
     if (!deletionResult.error && deletionResult.data?.ok) {
-      const pendingRequests = Array.isArray(deletionResult.data.deletion_requests)
-        ? deletionResult.data.deletion_requests
-        : [];
-      pendingRequests.forEach(row => {
-        add({
-          id: "account-deletion-request:" + row.id,
-          kind: "deletion-request",
-          icon: "🛡️",
-          title: "Запрос на проверку аккаунта",
-          text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6))
-            + " · " + deletionReasonLabel(row.reason_code),
-          time: new Date(row.created_at || now).getTime()
-        });
-      });
+      const pendingRequests = Array.isArray(deletionResult.data.deletion_requests) ? deletionResult.data.deletion_requests : [];
+      pendingRequests.forEach(row => add({
+        id: "account-deletion-request:" + row.id, kind: "deletion-request", icon: "🛡️",
+        title: "Запрос на проверку аккаунта",
+        text: (row.target_email || "Аккаунт " + String(row.target_id || "").slice(-6)) + " · " + deletionReasonLabel(row.reason_code),
+        time: new Date(row.created_at || now).getTime()
+      }));
     }
 
     if (requestId !== notificationRefreshSeq) return;
     notificationsCache = items.sort((a, b) => b.time - a.time).slice(0, 60);
-    updateBellBadge();
-    if (notifOpen) renderNotifPanel();
+    if (notifOpen) {
+      const unreadIds = notificationsCache.filter(item => item.isRead !== true).map(item => item.id);
+      if (unreadIds.length) await markNotificationsRead(unreadIds);
+      renderNotifPanel();
+    } else updateBellBadge();
   }
 
-  async function dismissNotification(notificationId) {
-    const note = notificationsCache.find(item => item.id === notificationId);
-    if (!note || !user?.id) return;
-    if (note.kind === "message" && note.recordId) {
-      const { error } = await sb.from("messages")
-        .update({ is_read: true })
-        .eq("id", note.recordId)
-        .eq("receiver_id", user.id)
-        .or("is_read.eq.false,is_read.is.null");
+  async function markNotificationsRead(notificationIds) {
+    if (!user?.id) return false;
+    const ids = new Set(Array.isArray(notificationIds) ? notificationIds.filter(id => typeof id === "string") : []);
+    const selected = notificationsCache.filter(item => ids.has(item.id) && item.isRead !== true);
+    if (!selected.length) return true;
+
+    const messageIds = selected.filter(item => item.kind === "message" && item.recordId).map(item => item.recordId);
+    if (messageIds.length) {
+      const { error } = await sb.from("messages").update({ is_read: true })
+        .eq("receiver_id", user.id).in("id", messageIds).or("is_read.eq.false,is_read.is.null");
       if (error) {
-        notice("Не удалось отметить сообщение прочитанным. Откройте чат и попробуйте ещё раз.");
+        notice("Не удалось отметить сообщения прочитанными. Откройте чат и попробуйте ещё раз.");
+        return false;
+      }
+    }
+
+    const rows = selected.map(item => ({
+      user_id: user.id, notification_key: item.id, read_at: new Date().toISOString()
+    }));
+    const { error } = await sb.from("notification_reads").upsert(rows, { onConflict: "user_id,notification_key" });
+    if (error) {
+      notice("Не удалось сохранить прочтение уведомлений. Попробуйте обновить страницу.");
+      return false;
+    }
+    selected.forEach(item => { item.isRead = true; });
+    updateBellBadge();
+    if (notifOpen) renderNotifPanel();
+    await updateChatBadge();
+    return true;
+  }
+
+  async function markNotificationRead(id) { return markNotificationsRead([id]); }
+
+  async function dismissNotification(id) {
+    if (!user?.id || typeof id !== "string") return;
+    const item = notificationsCache.find(row => row.id === id);
+    if (!item) return;
+    if (item.kind === "message" && item.recordId) {
+      const { error } = await sb.from("messages").update({ is_read: true })
+        .eq("id", item.recordId).eq("receiver_id", user.id);
+      if (error) {
+        notice("Не удалось убрать уведомление. Попробуйте ещё раз.");
         return;
       }
-    } else {
-      saveDismissedNotifications([...readDismissedNotifications(), notificationId]);
     }
-    await refreshNotificationFeed();
+    const { error } = await sb.from("notification_reads").upsert([{
+      user_id: user.id, notification_key: "dismissed:" + id, read_at: new Date().toISOString()
+    }], { onConflict: "user_id,notification_key" });
+    if (error) {
+      notice("Не удалось сохранить удаление уведомления.");
+      return;
+    }
+    notificationsCache = notificationsCache.filter(row => row.id !== id);
+    updateBellBadge();
+    renderNotifPanel();
     await updateChatBadge();
   }
 
   async function clearNotifications() {
-    if (!user?.id) return;
-    const messageIds = notificationsCache
-      .filter(item => item.kind === "message" && item.recordId)
-      .map(item => item.id);
-    const localIds = notificationsCache
-      .filter(item => item.kind !== "message")
-      .map(item => item.id);
-    saveDismissedNotifications([...readDismissedNotifications(), ...localIds]);
-
-    if (messageIds.length) {
-      const { error } = await sb.from("messages")
-        .update({ is_read: true })
-        .eq("receiver_id", user.id)
-        .or("is_read.eq.false,is_read.is.null");
-      if (error) {
-        notice("Не удалось отметить все сообщения прочитанными. Остальные уведомления скрыты.");
-      }
-    }
-    await refreshNotificationFeed();
-    await updateChatBadge();
+    const ids = notificationsCache.map(item => item.id);
+    for (const id of ids) await dismissNotification(id);
   }
 
   window.closeNotifPanel = () => {
@@ -1627,7 +1621,7 @@ window.onunhandledrejection = function(event) {
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
       <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-модерация · статус не проверен</span>
+      <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
     </div>`);
     ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
       html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" alt="Баннер" onerror="this.closest('.hero-slide').remove(); syncHeroDots();"></div>`);
@@ -3292,7 +3286,9 @@ window.onunhandledrejection = function(event) {
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
+    else if (action === 'mark-notification-read') { markNotificationRead(btn.dataset.id); }
     else if (action === 'dismiss-notification') { dismissNotification(btn.dataset.id); }
+    else if (action === 'mark-all-notifications-read') { markNotificationsRead(notificationsCache.map(item => item.id)); }
     else if (action === 'clear-notifications') { clearNotifications(); }
     else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
