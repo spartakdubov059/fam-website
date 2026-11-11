@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,
         p_limit: 1,
-        p_lease_seconds: 1800,
+        p_lease_seconds: 7200,
       });
       if (!Array.isArray(tasks) || tasks.length > 1) {
         return json({ ok: false, error: "invalid_queue_response" }, 502);
