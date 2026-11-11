@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { buildAgentReport } from "./fam-agent-report.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
@@ -156,11 +157,15 @@ const planSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
+      finding_status: { type: "string", enum: ["no_issue", "needs_research", "blocked", "issue_found"] },
+      problem_summary: { type: "string" },
+      root_cause: { type: "string" },
+      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
       files: { type: "array", items: { type: "string" }, maxItems: 4 },
       keywords: { type: "array", items: { type: "string" }, maxItems: 18 },
       plan: { type: "string" },
     },
-    required: ["files", "keywords", "plan"],
+    required: ["finding_status", "problem_summary", "root_cause", "evidence", "files", "keywords", "plan"],
   },
 };
 
@@ -173,6 +178,8 @@ const plan = await askModel([
       "Выбери только реально существующие пути из переданного списка. Разрешены index.html, css/, js/, assets/, docs/ и tests/.",
       "Не выбирай .github/, scripts/, supabase/, миграции, SQL, Edge Functions, конфигурацию доступа, Auth, роли, платежи, секреты или деплой.",
       "Если задача затрагивает аккаунты, персональные данные, модерацию, права доступа, удаление/блокировки или необратимые операции — выбери пустой список файлов.",
+      "Сначала выбери finding_status: no_issue, needs_research, blocked или issue_found. Ставь issue_found только при конкретном свидетельстве в задаче или инвентаре; предположение отмечай как needs_research.",
+      "Кратко заполни problem_summary, root_cause и evidence. Не выдумывай строки кода или факты, которых нет в переданных данных.",
       "Для большого index.html укажи точные символы/строки поиска из списка symbols и keywords.",
       "Если задача не даёт основания для конкретного исправления, верни files=[] и объясни это.",
       "Верни только JSON по заданной схеме.",
@@ -188,12 +195,19 @@ if (!Array.isArray(plan.files) || plan.files.length === 0) {
   const outDir = process.env.RUNNER_TEMP || "/tmp";
   mkdirSync(join(outDir, "fam-agent"), { recursive: true });
   writeFileSync(join(outDir, "fam-agent", "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
-  writeFileSync(join(outDir, "fam-agent", "summary.json"), JSON.stringify({
-    patch_available: false,
-    summary: String(plan.plan || "Модель не обнаружила безопасного изменения."),
-    risk: "low",
+  const report = buildAgentReport({
+    finding_status: plan.finding_status,
+    summary: plan.plan,
+    problem_summary: plan.problem_summary,
+    root_cause: plan.root_cause,
+    evidence: plan.evidence,
+    selected_files: plan.files,
+    proposed_change: plan.plan,
+    risk: plan.finding_status === "no_issue" ? "low" : "high",
     requires_approval: true,
-  }, null, 2));
+    tests: [],
+  });
+  writeFileSync(join(outDir, "fam-agent", "summary.json"), JSON.stringify(report, null, 2) + "\n");
   if (process.env.GITHUB_OUTPUT) {
     const { appendFileSync } = await import("node:fs");
     appendFileSync(process.env.GITHUB_OUTPUT, "has_patch=false\n");
@@ -217,13 +231,18 @@ const patchSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
+      finding_status: { type: "string", enum: ["no_issue", "needs_research", "blocked", "issue_found"] },
+      problem_summary: { type: "string" },
+      root_cause: { type: "string" },
+      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
       unified_diff: { type: "string" },
       summary: { type: "string" },
+      proposed_change: { type: "string" },
       risk: { type: "string", enum: ["low", "medium", "high"] },
       requires_approval: { type: "boolean" },
       tests: { type: "array", items: { type: "string" }, maxItems: 12 },
     },
-    required: ["unified_diff", "summary", "risk", "requires_approval", "tests"],
+    required: ["finding_status", "problem_summary", "root_cause", "evidence", "unified_diff", "summary", "proposed_change", "risk", "requires_approval", "tests"],
   },
 };
 
@@ -239,6 +258,8 @@ const result = await askModel([
       "Запрещено менять аутентификацию, роли, безопасность, модерационные решения, действия над аккаунтами, персональные данные, секреты, базу данных, SQL, RLS, миграции, Edge Functions, CI/CD и деплой.",
       "Если для решения нужно затронуть запрещённую область или данных недостаточно, верни пустой unified_diff, risk=high и requires_approval=true.",
       "Для любой правки кода сайта добавь соответствующий регрессионный тест. Не изменяй тесты лишь для маскировки ошибки.",
+      "Верни finding_status: no_issue, needs_research, blocked или issue_found. Ставь issue_found только при воспроизводимом дефекте с доказательствами из переданных фрагментов.",
+      "В evidence укажи точный путь и строку/фрагмент из переданных данных; если доказательства недостаточны, выбери needs_research и оставь diff пустым.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
       "unified_diff должен быть применим git apply и содержать заголовки diff --git a/path b/path.",
       "Если не можешь достоверно выполнить задачу по предоставленным фрагментам, верни пустой diff.",
@@ -261,15 +282,19 @@ const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
 const patch = String(result.unified_diff || "").trim();
-const summary = {
-  patch_available: patch.length > 0,
-  summary: String(result.summary || "").slice(0, 1800),
-  risk: ["low", "medium", "high"].includes(result.risk) ? result.risk : "high",
-  requires_approval: result.requires_approval !== false,
-  tests: Array.isArray(result.tests) ? result.tests.slice(0, 12) : [],
+const summary = buildAgentReport({
+  finding_status: result.finding_status,
+  problem_summary: result.problem_summary,
+  root_cause: result.root_cause,
+  evidence: result.evidence,
+  summary: result.summary,
+  proposed_change: result.proposed_change,
   selected_files: selected,
-  model: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M",
-};
+  unified_diff: patch,
+  risk: result.risk,
+  requires_approval: result.requires_approval,
+  tests: result.tests,
+});
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
 
 if (!patch) {

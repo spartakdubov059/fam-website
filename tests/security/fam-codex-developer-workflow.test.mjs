@@ -22,6 +22,14 @@ const validator = readFileSync(
   new URL("../../scripts/validate-local-agent-patch.mjs", import.meta.url),
   "utf8",
 );
+const agentReport = readFileSync(
+  new URL("../../scripts/fam-agent-report.mjs", import.meta.url),
+  "utf8",
+);
+const reportRenderer = readFileSync(
+  new URL("../../scripts/render-fam-agent-report.mjs", import.meta.url),
+  "utf8",
+);
 
 test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -50,6 +58,22 @@ test("model receives read-only repository access and can only propose allowliste
   assert.match(prompt, /Не меняй файлы \.github\/\*\*, scripts\/\*\*, supabase\/\*\*/);
   assert.match(prompt, /Не запускай shell-команды/);
   assert.match(prompt, /персональные данные/);
+});
+
+test("coder records findings and exposes no-patch outcomes in the workflow summary", () => {
+  assert.match(runner, /finding_status/);
+  assert.match(runner, /problem_summary/);
+  assert.match(runner, /root_cause/);
+  assert.match(runner, /evidence/);
+  assert.match(runner, /proposed_change/);
+  assert.match(agentReport, /verification_status/);
+  assert.match(agentReport, /not_run_no_patch/);
+  assert.match(reportRenderer, /GITHUB_STEP_SUMMARY/);
+  assert.match(workflow, /Показать структурированный результат модели/);
+  assert.match(workflow, /steps\.agent\.outcome == 'success'/);
+  assert.match(workflow, /verified-report\.md/);
+  assert.match(workflow, /verified-report\.md" \\\n\s+passed/);
+  assert.match(reportRenderer, /Only a verified patch may be marked as passed/);
 });
 
 test("independent verification runs without model or write credentials", () => {
