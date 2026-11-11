@@ -148,6 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           OUTPUT_ROOT="$RUNNER_TEMP/fam-benchmark-output"
+          mkdir -p "$OUTPUT_ROOT"
           SUMMARY="$OUTPUT_ROOT/fam-agent/summary.json"
           PATCH="$OUTPUT_ROOT/fam-agent/fam-agent.patch"
           QA_STATUS="not_run_no_patch"
