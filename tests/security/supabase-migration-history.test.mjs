@@ -11,11 +11,13 @@ test("migration filenames match the versions already recorded in FAM production"
     "20261109152842_school_scoped_agent_reports_and_free_analysts.sql",
     "20261110181754_20261110180500_fam_agent_moscow_morning_schedule.sql",
     "20261110210025_add_persistent_listing_image_review_queue.sql",
+    "20261111164217_restrict_unapproved_ideas_from_council.sql",
   ];
   const staleFiles = [
     "20261109162500_school_scoped_agent_reports_and_free_analysts.sql",
     "20261110180500_fam_agent_moscow_morning_schedule.sql",
     "20261110204600_add_persistent_listing_image_review_queue.sql",
+    "20261111163500_restrict_unapproved_ideas_from_council.sql",
   ];
 
   for (const file of appliedFiles) {
