@@ -74,7 +74,7 @@ test("cloud monitor checks production pages and ignores stale GitHub failures", 
   });
 
   assert.equal(report.ok, true);
-  assert.equal(report.checks.length, 4);
+  assert.equal(report.checks.length, 5);
   assert.deepEqual(report.recent_failures, []);
 });
 
@@ -170,7 +170,7 @@ test("monitor detects a stale daily Qwen run even without recent CI failures", a
       head_branch: "main",
       status: "completed",
       conclusion: "success",
-      created_at: "2026-11-09T23:00:00Z",
+      created_at: "2026-11-09T22:00:00Z",
     }] }),
     baseUrl: siteBase,
     repository: "owner/repo",
