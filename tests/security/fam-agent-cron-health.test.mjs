@@ -95,7 +95,7 @@ test("missing, duplicate, disabled, mismatched, and unknown schedules fail close
 
 test("SQL health RPC explicitly expects the Qwen task producer schedule", () => {
   const migration = readFileSync(
-    new URL("../../supabase/migrations/20261111183000_monitor_qwen_coder_producer_schedule.sql", import.meta.url),
+    new URL("../../supabase/migrations/20261111183253_monitor_qwen_coder_producer_schedule.sql", import.meta.url),
     "utf8",
   );
   assert.match(migration, /fam-agent-coder-task-producer/);
