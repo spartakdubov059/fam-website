@@ -58,7 +58,6 @@ test("maps model results to fixed result codes only", () => {
   assert.equal(chooseResultCode({}, false), "model_failed");
 });
 
-
 test("reads the persisted model summary before selecting a queue result", async () => {
   const directory = await mkdtemp(join(tmpdir(), "fam-agent-bridge-"));
   const summaryPath = join(directory, "summary.json");
