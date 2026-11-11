@@ -20,6 +20,8 @@ test("interactive controls have a visible keyboard focus treatment and honor red
 test("banner image fallback does not use inline event attributes", () => {
   assert.doesNotMatch(frontend, /\sonerror\s*=/i);
   assert.ok(frontend.includes('querySelectorAll(".hero-img img")'));
+  assert.ok(frontend.includes('<source srcset="${src}.webp" type="image/webp">'));
+  assert.ok(frontend.includes('src="${src}.jpg" width="1200" height="675"'));
   assert.ok(frontend.includes('addEventListener("error"'));
 });
 
@@ -33,6 +35,10 @@ test("social previews and crawler metadata are complete for the public homepage"
   assert.ok(frontend.includes('name="theme-color"'));
   assert.ok(frontend.includes('property="og:locale" content="ru_RU"'));
   assert.ok(frontend.includes('name="twitter:image"'));
+  assert.ok(frontend.includes('property="og:image:type" content="image/jpeg"'));
+  assert.ok(frontend.includes('property="og:image:width" content="1200"'));
+  assert.ok(frontend.includes('property="og:image:height" content="675"'));
+  assert.ok(frontend.includes("/fam-website/banner-1.jpg"));
   assert.ok(frontend.includes('rel="canonical"'));
   assert.ok(robots.includes("Sitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml"));
   assert.ok(sitemap.includes("<loc>https://spartakdubov059.github.io/fam-website/</loc>"));

@@ -12,14 +12,19 @@
   <link rel="canonical" href="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:title" content="FAM — Свои рядом">
   <meta property="og:description" content="Школьная доска объявлений. Вещи, услуги, учёба и афиша.">
-  <meta property="og:image" content="https://spartakdubov059.github.io/fam-website/banner-1.png">
+  <meta property="og:image" content="https://spartakdubov059.github.io/fam-website/banner-1.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="675">
+  <meta property="og:image:alt" content="Друзья FAM вместе проводят время; сообщество ближе, чем кажется">
   <meta property="og:url" content="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="FAM — Свои рядом">
   <meta name="twitter:description" content="Школьная доска объявлений.">
-  <meta name="twitter:image" content="https://spartakdubov059.github.io/fam-website/banner-1.png">
+  <meta name="twitter:image" content="https://spartakdubov059.github.io/fam-website/banner-1.jpg">
+  <meta name="twitter:image:alt" content="Друзья FAM вместе проводят время; сообщество ближе, чем кажется">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
@@ -103,6 +108,7 @@
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
+    .hero-slide.hero-img picture { display: block; width: 100%; height: 100%; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
@@ -1806,8 +1812,16 @@ window.onunhandledrejection = function() {
       <span class="hero-graffiti">FAM.</span>
       <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
     </div>`);
-    ["banner-1.png","banner-2.png","banner-3.png","banner-4.png","banner-5.png","banner-6.png"].forEach(src => {
-      html.push(`<div class="hero-slide hero-img"><img src="${src}" loading="lazy" decoding="async" alt="Иллюстрация FAM — Свои рядом"></div>`);
+    const banners = [
+      { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
+      { src: "banner-2", alt: "Баннер FAM о школьном медиацентре: снимаем, пишем и создаём." },
+      { src: "banner-3", alt: "Баннер FAM о походах, новых маршрутах и прогулках на природе." },
+      { src: "banner-4", alt: "Баннер FAM об учёбе, проектах и знаниях." },
+      { src: "banner-5", alt: "Баннер FAM о творчестве, идеях и вдохновляющих проектах." },
+      { src: "banner-6", alt: "Баннер FAM о концертах, квизах и встречах." }
+    ];
+    banners.forEach(({ src, alt }) => {
+      html.push(`<div class="hero-slide hero-img"><picture><source srcset="${src}.webp" type="image/webp"><img src="${src}.jpg" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></picture></div>`);
     });
     const designed = [
       { g: 'linear-gradient(140deg,#2A2E36,#191C22 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
