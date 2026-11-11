@@ -4,7 +4,7 @@
 create or replace function public.claim_fam_agent_coder_tasks(
   p_worker_id text,
   p_limit integer default 1,
-  p_lease_seconds integer default 1800
+  p_lease_seconds integer default 7200
 )
 returns table (
   id uuid,
@@ -223,3 +223,10 @@ $function$;
 
 revoke all on function private.enqueue_fam_agent_coder_task() from public,anon,authenticated;
 grant execute on function private.enqueue_fam_agent_coder_task() to postgres,service_role;
+
+-- Run the privacy-safe producer shortly before the existing daily Qwen workflow.
+select cron.schedule(
+  'fam-agent-coder-task-producer',
+  '10 3 * * *',
+  'select private.enqueue_fam_agent_coder_task();'
+);
