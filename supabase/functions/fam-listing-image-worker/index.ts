@@ -235,6 +235,30 @@ async function processTask(task) {
       return "rejected";
     }
 
+    if (moderation.action === "pending" && moderation.reason_code === "image_review_quota_exceeded") {
+      // Image review quota is a provider-capacity issue, not evidence that the image is safe.
+      // Re-check the listing text without the image; if approved, publish text-only and discard
+      // the unreviewed image so users can continue using FAM without bypassing image safety.
+      const textOnly = await callModeration(task, null);
+      if (textOnly.action === "ok") {
+        await finish(task, "approved", {
+          reason_code: "text_only_fallback_after_image_quota",
+          reason: "Текст прошёл проверку. Фото не опубликовано из-за временного лимита проверки изображений.",
+        });
+        await removeObject("listing-images-pending", task.image_path);
+        return "approved";
+      }
+      if (textOnly.action === "reject") {
+        await finish(task, "rejected", {
+          reason_code: textOnly.reason_code || "text_rejected",
+          reason: textOnly.reason || "Текст объявления не прошёл проверку.",
+        });
+        await removeObject("listing-images-pending", task.image_path);
+        return "rejected";
+      }
+      return await scheduleRetryOrManual(task, textOnly);
+    }
+
     if (moderation.action === "pending") {
       return await scheduleRetryOrManual(task, moderation);
     }
