@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   TASK_PROMPTS,
   validateClaimResponse,
   chooseResultCode,
+  readTaskSummary,
   bridgeRequest,
 } from "../../scripts/fam-agent-bridge.mjs";
 
@@ -52,6 +56,27 @@ test("maps model results to fixed result codes only", () => {
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
   assert.equal(chooseResultCode(null), "model_failed");
   assert.equal(chooseResultCode({}, false), "model_failed");
+});
+
+
+test("reads the persisted model summary before selecting a queue result", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "fam-agent-bridge-"));
+  const summaryPath = join(directory, "summary.json");
+  const expected = { finding_status: "needs_research", patch_available: false };
+
+  try {
+    await writeFile(summaryPath, JSON.stringify(expected), "utf8");
+    const summary = await readTaskSummary(summaryPath);
+    assert.deepEqual(summary, expected);
+    assert.equal(chooseResultCode(summary, true), "model_no_patch");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("missing or malformed summaries map to a safe null result", async () => {
+  assert.equal(await readTaskSummary(""), null);
+  assert.equal(await readTaskSummary("/path/that/does/not/exist/fam-summary.json"), null);
 });
 
 test("bridge request never logs or returns the supplied token", async () => {
