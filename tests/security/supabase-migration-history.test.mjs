@@ -1,0 +1,27 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const migrationDirectory = fileURLToPath(new URL("../../supabase/migrations/", import.meta.url));
+
+test("migration filenames match the versions already recorded in FAM production", () => {
+  const files = new Set(readdirSync(migrationDirectory));
+  const appliedFiles = [
+    "20261109152842_school_scoped_agent_reports_and_free_analysts.sql",
+    "20261110181754_20261110180500_fam_agent_moscow_morning_schedule.sql",
+    "20261110210025_add_persistent_listing_image_review_queue.sql",
+  ];
+  const staleFiles = [
+    "20261109162500_school_scoped_agent_reports_and_free_analysts.sql",
+    "20261110180500_fam_agent_moscow_morning_schedule.sql",
+    "20261110204600_add_persistent_listing_image_review_queue.sql",
+  ];
+
+  for (const file of appliedFiles) {
+    assert.ok(files.has(file), `Missing production migration version: ${file}`);
+  }
+  for (const file of staleFiles) {
+    assert.ok(!files.has(file), `Stale migration version could be reapplied: ${file}`);
+  }
+});

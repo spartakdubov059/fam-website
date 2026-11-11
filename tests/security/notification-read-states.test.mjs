@@ -30,6 +30,15 @@ test("opening the bell marks visible notifications read and persists their state
   assert.match(frontend, /filter\(item => item\.isRead !== true\)\.length/);
 });
 
+test("notification read states are fully paged and fail closed when pagination is incomplete", () => {
+  assert.match(frontend, /NOTIFICATION_READ_PAGE_SIZE = 500/);
+  assert.match(frontend, /NOTIFICATION_READ_MAX_PAGES = 20/);
+  assert.match(frontend, /\.range\(from, from \+ NOTIFICATION_READ_PAGE_SIZE - 1\)/);
+  assert.match(frontend, /readStateComplete/);
+  assert.match(frontend, /if \(readStateError \|\| !readStateComplete\)/);
+  assert.match(frontend, /Fail closed if the full state cannot be read/);
+});
+
 test("manual notification removal is stored in the database", () => {
   assert.match(frontend, /notification_key: "dismissed:" \+ id/);
   assert.match(frontend, /dismissedIds/);

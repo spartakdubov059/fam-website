@@ -10,7 +10,7 @@ const adminFunction = readFileSync(
 
 test("notification read-state failures do not resurrect dismissed notifications", () => {
   assert.ok(frontend.includes("notification_read_state_load_failed"));
-  assert.ok(frontend.includes("Fail closed: keep the last known feed"));
+  assert.ok(frontend.includes("Fail closed if the full state cannot be read"));
   assert.ok(frontend.includes('notification_key: "dismissed:" + id'));
 });
 
