@@ -26,6 +26,9 @@ test("accepts a single allowlisted aggregate task", () => {
   });
   assert.equal(task.id, id);
   assert.match(task.prompt, /js_runtime/);
+  assert.match(task.prompt, /index\.html/);
+  assert.match(task.prompt, /window\.onerror/);
+  assert.match(task.prompt, /window\.onunhandledrejection/);
   assert.equal(Object.keys(TASK_PROMPTS).length, 3);
 });
 
