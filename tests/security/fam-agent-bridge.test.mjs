@@ -74,8 +74,17 @@ test("reads the persisted model summary before selecting a queue result", async 
 });
 
 test("missing or malformed summaries map to a safe null result", async () => {
-  assert.equal(await readTaskSummary(""), null);
-  assert.equal(await readTaskSummary("/path/that/does/not/exist/fam-summary.json"), null);
+  const directory = await mkdtemp(join(tmpdir(), "fam-agent-bridge-invalid-"));
+  const malformedPath = join(directory, "malformed.json");
+
+  try {
+    await writeFile(malformedPath, "{invalid json", "utf8");
+    assert.equal(await readTaskSummary(""), null);
+    assert.equal(await readTaskSummary(join(directory, "missing.json")), null);
+    assert.equal(await readTaskSummary(malformedPath), null);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("bridge request never logs or returns the supplied token", async () => {
