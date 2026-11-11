@@ -17,16 +17,22 @@ function safeText(value, limit = 240) {
 }
 
 function escapeMarkdown(value, limit = 240) {
-  return safeText(value, limit)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/`/g, "&#96;")
-    .replace(/\[/g, "&#91;")
-    .replace(/\]/g, "&#93;")
-    .replace(/\(/g, "&#40;")
-    .replace(/\)/g, "&#41;")
-    .replace(/[|*_~#]/g, (character) => "&#" + character.charCodeAt(0) + ";");
+  const entities = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "`": "&#96;",
+    "[": "&#91;",
+    "]": "&#93;",
+    "(": "&#40;",
+    ")": "&#41;",
+    "|": "&#124;",
+    "*": "&#42;",
+    "_": "&#95;",
+    "~": "&#126;",
+    "#": "&#35;",
+  };
+  return safeText(value, limit).replace(/[&<>`\[\]()|*_~#]/g, (character) => entities[character]);
 }
 
 function delay(ms) {

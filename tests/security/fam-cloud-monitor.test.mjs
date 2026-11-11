@@ -119,5 +119,6 @@ test("monitor summary distinguishes its cadence and escapes workflow names", () 
   assert.match(summary, /не непрерывный мониторинг/);
   assert.match(summary, /&lt;script&gt;/);
   assert.doesNotMatch(summary, /\[untrusted\]\(https:\/\/bad\.invalid\)/);
-  assert.match(summary, /\[\[untrusted\]\(https:\/\/bad\.invalid\)\]\(https:\/\/github\.com/);
+  assert.match(summary, /\[&#91;untrusted&#93;&#40;https:\/\/bad\.invalid&#41;\]\(https:\/\/github\.com/);
+  assert.doesNotMatch(summary, /&&#35;/);
 });
