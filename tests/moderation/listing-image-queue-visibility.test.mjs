@@ -7,7 +7,7 @@ import { dirname, resolve } from "node:path";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const html = await readFile(resolve(root, "index.html"), "utf8");
 const migration = await readFile(
-  resolve(root, "supabase/migrations/20261110204600_add_persistent_listing_image_review_queue.sql"),
+  resolve(root, "supabase/migrations/20261110210025_add_persistent_listing_image_review_queue.sql"),
   "utf8",
 );
 
