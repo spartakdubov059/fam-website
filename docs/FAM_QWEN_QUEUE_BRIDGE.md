@@ -1,6 +1,6 @@
 # Безопасное подключение Qwen к очереди FAM
 
-Статус: проектирование завершено; production-изменения не применялись.
+Статус: реализация подготовлена в PR #38; production-миграция и Edge Function ещё не применялись/не развёртывались.
 
 ## Цель
 
@@ -23,7 +23,7 @@ Qwen никогда не получает:
 
 Задание не должно передавать модели текст из `title`, `description` или произвольного JSON `payload`. Текст инструкции строится на стороне GitHub Actions из локального allowlist по `task_key`.
 
-## Контракт RPC (предлагаемый)
+## Реализация в PR #38\n\nПодготовлены файлы:\n- `supabase/migrations/20261111170000_fam_agent_coder_queue_bridge.sql` — две RPC, privacy-safe producer и ежедневное Cron-расписание.\n- `supabase/functions/fam-agent-coder-bridge/index.ts` — POST-only мост с ограниченным телом запроса, проверкой токена и фиксированными RPC.\n- `scripts/fam-agent-bridge.mjs` — клиент GitHub Actions с локальным allowlist инструкций и фиксированными result codes.\n- `tests/security/fam-agent-bridge.test.mjs` — тесты формы задания, UUID, диапазонов, кодов результата и клиента моста.\n- `.github/workflows/fam-codex-developer.yml` — опциональный claim/finish; если секреты отсутствуют или очередь пуста, сохраняется прежний режим.\n\nПроизводитель запускается ежедневно в 03:10 UTC, Qwen workflow — в 03:15 UTC. Производитель использует только агрегаты `private.fam_site_error_counts` и создаёт не более одного активного coder-задания. Аренда задания — до 2 часов.\n\n## Контракт RPC (предлагаемый)
 
 Нужны две новые функции, доступные только `service_role`:
 
@@ -86,3 +86,4 @@ Edge Function вызывает только две фиксированные RP
 - Qwen не получил права на merge, deploy, Auth, RLS, миграции или изменение секретов.
 
 Перед активацией нужен отдельный просмотр SQL-миграции и явное подтверждение её применения к production. После этого можно подключить GitHub Actions secret через интерфейс GitHub без передачи секрета в чат.
+\n\n## Текущий статус активации\n\nКод подготовлен в ветке PR, но ещё не активирован в production. Для включения потребуется: (1) проверить и отдельно подтвердить применение SQL-миграции, которая также создаёт Cron job; (2) развернуть `fam-agent-coder-bridge` с `--no-verify-jwt` и существующими `SUPABASE_URL`, `SUPABASE_SECRET_KEYS`/service key и `FAM_AGENT_WORKER_TOKEN`; (3) добавить в GitHub Actions secrets `FAM_AGENT_BRIDGE_URL` и `FAM_AGENT_WORKER_TOKEN` через интерфейс GitHub. Секрет не передавать в чат. После этого выполнить ручной workflow_dispatch и проверить claim/finish, не разрешая автоматическое объединение PR.\n
