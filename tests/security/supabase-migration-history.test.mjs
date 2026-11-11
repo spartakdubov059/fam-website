@@ -14,6 +14,7 @@ test("migration filenames match the versions already recorded in FAM production"
     "20261111164217_restrict_unapproved_ideas_from_council.sql",
     "20261111182622_recover_expired_fam_coder_tasks_after_final_attempt.sql",
     "20261111183253_monitor_qwen_coder_producer_schedule.sql",
+    "20261111184531_scope_qwen_retry_reaper_to_claimed_system_tasks.sql",
   ];
   const staleFiles = [
     "20261109162500_school_scoped_agent_reports_and_free_analysts.sql",
