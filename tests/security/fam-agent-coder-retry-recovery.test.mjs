@@ -32,3 +32,15 @@ test("Qwen retry recovery preserves worker-only RPC access and atomic allowliste
   assert.match(migration, /audit_accessibility/i);
   assert.doesNotMatch(migration, /drop table|delete from private\.fam_agent_tasks/i);
 });
+
+
+test("Qwen lease recovery only closes expired tasks owned by the Qwen worker and allowed source", () => {
+  const scopedMigration = readFileSync(
+    new URL("../../supabase/migrations/20261111184531_scope_qwen_retry_reaper_to_claimed_system_tasks.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(scopedMigration, /t\.source in \('system', 'scheduled_audit'\)/i);
+  assert.match(scopedMigration, /t\.claimed_by = p_worker_id/i);
+  assert.match(scopedMigration, /t\.status in \('claimed', 'in_progress'\)/i);
+  assert.match(scopedMigration, /t\.attempt_count >= t\.max_attempts/i);
+});
