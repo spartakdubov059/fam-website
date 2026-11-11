@@ -1,0 +1,40 @@
+name: FAM cloud site monitor
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: fam-cloud-site-monitor-main
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Read-only site and CI smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout monitoring code without write credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Check production pages and recent main workflows
+        run: node scripts/run-fam-cloud-monitor.mjs
