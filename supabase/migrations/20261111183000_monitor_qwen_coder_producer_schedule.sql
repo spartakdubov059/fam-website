@@ -15,9 +15,9 @@ begin
   v_new := $new$('fam-agent-site-error-audit','30 * * * *'),
       ('fam-agent-coder-task-producer','10 3 * * *')$new$;
 
-  if pg_catalog.position(v_old in v_definition) > 0 then
+  if pg_catalog.strpos(v_definition, v_old) > 0 then
     v_definition := pg_catalog.replace(v_definition, v_old, v_new);
-  elsif pg_catalog.position(v_new in v_definition) = 0 then
+  elsif pg_catalog.strpos(v_definition, v_new) = 0 then
     raise exception 'The expected cron schedule list has an unexpected shape.';
   end if;
 
