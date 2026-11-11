@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   TASK_PROMPTS,
   validateClaimResponse,
   chooseResultCode,
+  readTaskSummary,
   bridgeRequest,
 } from "../../scripts/fam-agent-bridge.mjs";
 
@@ -22,6 +26,9 @@ test("accepts a single allowlisted aggregate task", () => {
   });
   assert.equal(task.id, id);
   assert.match(task.prompt, /js_runtime/);
+  assert.match(task.prompt, /index\.html/);
+  assert.match(task.prompt, /window\.onerror/);
+  assert.match(task.prompt, /window\.onunhandledrejection/);
   assert.equal(Object.keys(TASK_PROMPTS).length, 3);
 });
 
@@ -52,6 +59,35 @@ test("maps model results to fixed result codes only", () => {
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
   assert.equal(chooseResultCode(null), "model_failed");
   assert.equal(chooseResultCode({}, false), "model_failed");
+});
+
+test("reads the persisted model summary before selecting a queue result", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "fam-agent-bridge-"));
+  const summaryPath = join(directory, "summary.json");
+  const expected = { finding_status: "needs_research", patch_available: false };
+
+  try {
+    await writeFile(summaryPath, JSON.stringify(expected), "utf8");
+    const summary = await readTaskSummary(summaryPath);
+    assert.deepEqual(summary, expected);
+    assert.equal(chooseResultCode(summary, true), "model_no_patch");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("missing or malformed summaries map to a safe null result", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "fam-agent-bridge-invalid-"));
+  const malformedPath = join(directory, "malformed.json");
+
+  try {
+    await writeFile(malformedPath, "{invalid json", "utf8");
+    assert.equal(await readTaskSummary(""), null);
+    assert.equal(await readTaskSummary(join(directory, "missing.json")), null);
+    assert.equal(await readTaskSummary(malformedPath), null);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("bridge request never logs or returns the supplied token", async () => {

@@ -1,8 +1,9 @@
 import { appendFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
 export const TASK_PROMPTS = Object.freeze({
   audit_frontend_runtime:
-    "Проведи узкий аудит клиентской обработки ошибок JavaScript FAM. Ищи только воспроизводимые ошибки в публичном интерфейсе; не меняй Auth, безопасность, модерацию, серверные функции или базу данных.",
+    "Проведи узкий аудит клиентской обработки ошибок JavaScript FAM. Код публичного интерфейса и встроенный JavaScript находятся в корневом index.html; каталогов js/ и css/ в репозитории нет. Обязательно включи index.html в список файлов для анализа. Проверь window.onerror, window.onunhandledrejection и reportFamSiteError. Ищи только воспроизводимые ошибки в публичном интерфейсе; не меняй Auth, безопасность, модерацию, серверные функции или базу данных.",
   audit_client_resilience:
     "Проведи узкий аудит устойчивости загрузки публичных объявлений FAM. Ищи только безопасную обработку сетевых ошибок и пустых ответов; не читай и не изменяй пользовательские записи.",
   audit_accessibility:
@@ -40,6 +41,15 @@ export function validateClaimResponse(data) {
       ", раздел " + task.page_area +
       ", агрегированное число событий " + task.occurrences + ".",
   });
+}
+
+export async function readTaskSummary(filePath) {
+  if (typeof filePath !== "string" || filePath.length === 0) return null;
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 export function chooseResultCode(summary, executionSucceeded = true) {
@@ -104,13 +114,7 @@ async function main() {
   if (mode === "finish") {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
-    let summary = null;
-    try {
-      const raw = process.env.FAM_SUMMARY_PATH;
-      if (raw) summary = JSON.parse((await import("node:fs/promises")).readFile(raw, "utf8"));
-    } catch {
-      summary = null;
-    }
+    const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
     const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
     const result = await bridgeRequest({
       url, token, body: { action: "finish", task_id: taskId, result_code: code },
