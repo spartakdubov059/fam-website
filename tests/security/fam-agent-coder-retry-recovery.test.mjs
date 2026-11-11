@@ -42,5 +42,10 @@ test("Qwen lease recovery only closes expired tasks owned by the Qwen worker and
   assert.match(scopedMigration, /t\.source in \('system', 'scheduled_audit'\)/i);
   assert.match(scopedMigration, /t\.claimed_by = p_worker_id/i);
   assert.match(scopedMigration, /t\.status in \('claimed', 'in_progress'\)/i);
-  assert.match(scopedMigration, /t\.attempt_count >= t\.max_attempts/i);
+
+  const recoveryMigration = readFileSync(
+    new URL("../../supabase/migrations/20261111182622_recover_expired_fam_coder_tasks_after_final_attempt.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(recoveryMigration, /t\.attempt_count >= t\.max_attempts/i);
 });
