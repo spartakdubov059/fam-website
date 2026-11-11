@@ -9,9 +9,12 @@ export const TASK_PROMPTS = Object.freeze({
     "Проведи узкий аудит доступности публичного интерфейса FAM: клавиатурная навигация, подписи элементов и фокус. Не меняй Auth, безопасность, серверные функции или базу данных.",
 });
 
-const RESULT_CODES = new Set([
-  "model_completed", "model_no_patch", "model_failed", "model_blocked",
+const EVENT_CODES = new Set([
+  "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
+  "listings_load_failed", "notifications_load_failed",
+  "database_request_failed", "auth_backend_failed",
 ]);
+const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateClaimResponse(data) {
@@ -24,8 +27,8 @@ export function validateClaimResponse(data) {
     !task || typeof task !== "object" ||
     !UUID_RE.test(task.id) ||
     !Object.hasOwn(TASK_PROMPTS, task.task_key) ||
-    typeof task.event_code !== "string" ||
-    typeof task.page_area !== "string" ||
+    !EVENT_CODES.has(task.event_code) ||
+    !PAGE_AREAS.has(task.page_area) ||
     !Number.isSafeInteger(task.occurrences) ||
     task.occurrences < 0 || task.occurrences > 1000
   ) throw new Error("Bridge returned an invalid task.");
