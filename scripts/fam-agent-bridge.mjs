@@ -43,7 +43,6 @@ export function validateClaimResponse(data) {
   });
 }
 
-
 export async function readTaskSummary(filePath) {
   if (typeof filePath !== "string" || filePath.length === 0) return null;
   try {
