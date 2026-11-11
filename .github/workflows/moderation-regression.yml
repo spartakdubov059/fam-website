@@ -34,6 +34,10 @@ jobs:
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
       - name: Check Qwen bridge client syntax
         run: node --check scripts/fam-agent-bridge.mjs
+      - name: Check local Qwen model runner syntax
+        run: node --check scripts/run-local-coder.mjs
+      - name: Check local model HTTP client syntax
+        run: node --check scripts/local-model-http.mjs
       - name: Check inline frontend JavaScript syntax
         run: |
           node <<'NODE'
