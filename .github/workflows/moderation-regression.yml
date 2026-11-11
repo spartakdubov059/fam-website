@@ -32,6 +32,8 @@ jobs:
           node-version: 22
       - name: Run moderation tests
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
+      - name: Check Qwen bridge client syntax
+        run: node --check scripts/fam-agent-bridge.mjs
       - name: Check inline frontend JavaScript syntax
         run: |
           node <<'NODE'
