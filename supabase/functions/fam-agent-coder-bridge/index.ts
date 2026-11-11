@@ -21,6 +21,12 @@ const SUPABASE_SECRET_KEY =
 const LEGACY_SECRET_IS_JWT = SUPABASE_SECRET_KEY.startsWith("eyJ");
 const WORKER_ID = "fam-agent-qwen-coder-v1";
 const MAX_BODY_BYTES = 2048;
+const EVENT_CODES = new Set([
+  "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
+  "listings_load_failed", "notifications_load_failed",
+  "database_request_failed", "auth_backend_failed",
+]);
+const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 
 function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
