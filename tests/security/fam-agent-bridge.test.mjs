@@ -73,7 +73,7 @@ test("bridge request never logs or returns the supplied token", async () => {
 import { readFileSync } from "node:fs";
 
 const migration = readFileSync(
-  new URL("../../supabase/migrations/20261111170000_fam_agent_coder_queue_bridge.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261111153059_fam_agent_coder_queue_bridge.sql", import.meta.url),
   "utf8",
 );
 const edgeSource = readFileSync(
