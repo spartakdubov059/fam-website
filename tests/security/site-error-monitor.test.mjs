@@ -11,11 +11,11 @@ const scheduleMigration = readFileSync(
   "utf8",
 );
 const cronReadAccessMigration = readFileSync(
-  new URL("../../supabase/migrations/20261111050302_fam_agent_worker_cron_read_access.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261111052856_fam_agent_worker_cron_read_access.sql", import.meta.url),
   "utf8",
 );
 const telemetryRoleMigration = readFileSync(
-  new URL("../../supabase/migrations/20261111050303_fam_site_error_telemetry_anon_only.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261111052812_fam_site_error_telemetry_anon_only.sql", import.meta.url),
   "utf8",
 );
 const technicalHealthMigration = readFileSync(
