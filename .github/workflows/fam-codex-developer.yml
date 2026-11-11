@@ -14,6 +14,8 @@ on:
       - "tests/**"
       - "scripts/run-local-coder.mjs"
       - "scripts/validate-local-agent-patch.mjs"
+      - "scripts/fam-agent-report.mjs"
+      - "scripts/render-fam-agent-report.mjs"
       - "tests/security/fam-local-agent.test.mjs"
   workflow_dispatch:
     inputs:
@@ -149,6 +151,10 @@ jobs:
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
           fi
+
+      - name: Показать структурированный результат модели
+        if: always() && steps.agent.outcome == 'success'
+        run: node scripts/render-fam-agent-report.mjs "$RUNNER_TEMP/fam-agent/summary.json" "$GITHUB_STEP_SUMMARY"
 
       - name: Сохранить patch и отчёт модели
         if: always() && steps.agent.outcome == 'success'
@@ -286,6 +292,10 @@ jobs:
           REQUIRES_APPROVAL: ${{ needs.verify.outputs.requires_approval }}
         run: |
           set -euo pipefail
+          node scripts/render-fam-agent-report.mjs \
+            "$RUNNER_TEMP/fam-agent/summary.json" \
+            "$RUNNER_TEMP/fam-agent/verified-report.md" \
+            passed
           EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-agent/base.sha")"
           ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
           if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
@@ -303,11 +313,8 @@ jobs:
           git -c core.hooksPath=/dev/null commit -m "Propose verified low-risk FAM update"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
-          SUMMARY="$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.summary||'Безопасное исправление FAM').slice(0,1600))" "$RUNNER_TEMP/fam-agent/summary.json")"
           {
-            echo "## Локальный ИИ-разработчик FAM"
-            echo
-            echo "$SUMMARY"
+            cat "$RUNNER_TEMP/fam-agent/verified-report.md"
             echo
             echo "- Модель: Qwen2.5-Coder-7B-Instruct-GGUF, запущена локально на временном GitHub runner."
             echo "- Внешние платные API не использовались."
