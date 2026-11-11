@@ -111,3 +111,17 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
 });
+
+test("rejects unrecognized telemetry enum values before building a model prompt", () => {
+  for (const field of ["event_code", "page_area"]) {
+    const task = {
+      id,
+      task_key: "audit_frontend_runtime",
+      event_code: "js_runtime",
+      page_area: "other",
+      occurrences: 2,
+    };
+    task[field] = "untrusted arbitrary text";
+    assert.throws(() => validateClaimResponse({ ok: true, task }));
+  }
+});
