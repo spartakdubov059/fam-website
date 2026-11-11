@@ -4,6 +4,7 @@ const EXPECTED_CRON_JOBS = new Map([
   ["fam-agent-orchestrator-daily-digest", 30 * 60 * 60 * 1000],
   ["fam-agent-technical-system-health", 30 * 60 * 60 * 1000],
   ["fam-agent-site-error-audit", 3 * 60 * 60 * 1000],
+  ["fam-agent-coder-task-producer", 30 * 60 * 60 * 1000],
 ]);
 
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;

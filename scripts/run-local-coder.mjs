@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { postJson } from "./local-model-http.mjs";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
@@ -44,27 +45,18 @@ function parseJson(content) {
 }
 
 async function askModel(messages, schema, maxTokens) {
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal: AbortSignal.timeout(20 * 60 * 1000),
-    body: JSON.stringify({
-      model: "Qwen2.5-Coder-7B-Instruct",
-      messages,
-      temperature: 0.1,
-      top_p: 0.9,
-      max_tokens: maxTokens,
-      stream: false,
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: schema.name, strict: true, schema: schema.schema },
-      },
-    }),
-  });
-  if (!response.ok) {
-    throw new Error("Local inference failed with HTTP " + response.status);
-  }
-  const result = await response.json();
+  const result = await postJson(API_URL, {
+    model: "Qwen2.5-Coder-7B-Instruct",
+    messages,
+    temperature: 0.1,
+    top_p: 0.9,
+    max_tokens: maxTokens,
+    stream: false,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: schema.name, strict: true, schema: schema.schema },
+    },
+  }, { timeoutMs: 45 * 60 * 1000 });
   const content = result?.choices?.[0]?.message?.content;
   return parseJson(content);
 }
