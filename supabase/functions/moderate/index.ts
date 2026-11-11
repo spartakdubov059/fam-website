@@ -160,6 +160,7 @@ async function recordCachedSignal(context: SafetyContext | null, cached: Record<
 const ALLOWED_ORIGINS = new Set([
   "https://spartakdubov059.github.io",
   "https://mellifluous-profiterole-48c13b.netlify.app",
+  "https://famru.netlify.app",
 ]);
 
 function extractJsonObject(raw: string): unknown | null {

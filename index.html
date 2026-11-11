@@ -970,6 +970,25 @@
   </div>
 </div>
 
+<div class="modal" id="adminReauthModal" role="dialog" aria-modal="true" aria-labelledby="adminReauthTitle">
+  <div class="modal-content">
+    <button type="button" id="adminReauthClose" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
+    <h2 id="adminReauthTitle" style="margin-top:0; font-size:20px; font-weight:900;">Подтвердите вход</h2>
+    <p style="color:var(--muted); font-size:13px; line-height:1.5;">Для защиты действий администратора подтвердите пароль. После проверки действие продолжится автоматически.</p>
+    <form id="adminReauthForm">
+      <div class="form-group">
+        <label for="adminReauthPassword">Текущий пароль</label>
+        <input type="password" id="adminReauthPassword" class="form-control" required autocomplete="current-password" maxlength="128">
+      </div>
+      <div id="adminReauthMessage" role="alert" style="min-height:18px; color:var(--danger); font-size:12px; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" id="adminReauthCancel" class="button button-secondary" style="flex:1;">Отмена</button>
+        <button type="submit" id="adminReauthSubmit" class="button button-primary" style="flex:1;">Подтвердить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal" id="listingModal" role="dialog" aria-modal="true" aria-labelledby="listingTitle">
   <div class="modal-content">
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
@@ -1919,15 +1938,11 @@ window.onunhandledrejection = function() {
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
         </div>
-        ${ownerControls && user && l.user_id === user.id && profile?.role === "student" && ["pending","manual_review"].includes(l.moderation_status)
-          ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
-          : ownerControls && user && l.user_id === user.id && profile?.role === "student"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-            : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin" && ["pending","manual_review"].includes(l.moderation_status)
-              ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
-              : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-                ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-                : ""}
+        ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
+          ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+          : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
+            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            : ""}
       </div>
     </div>`;
   }
@@ -3112,12 +3127,112 @@ window.onunhandledrejection = function() {
     }
   }
 
+  async function confirmAdminReauthentication() {
+    if (!user?.email) throw new Error("Не удалось определить почту администратора. Войдите в аккаунт заново.");
+
+    const modal = $("adminReauthModal");
+    const form = $("adminReauthForm");
+    const passwordField = $("adminReauthPassword");
+    const message = $("adminReauthMessage");
+    const submit = $("adminReauthSubmit");
+    const cancel = $("adminReauthCancel");
+    const close = $("adminReauthClose");
+
+    if (!modal || !form || !passwordField || !message || !submit || !cancel || !close) {
+      throw new Error("Не удалось открыть окно подтверждения входа.");
+    }
+
+    form.reset();
+    message.textContent = "";
+    submit.disabled = false;
+    submit.textContent = "Подтвердить";
+    modal.classList.add("open");
+    passwordField.focus();
+
+    return await new Promise(resolve => {
+      let settled = false;
+
+      const finish = (confirmed) => {
+        if (settled) return;
+        settled = true;
+        form.onsubmit = null;
+        cancel.onclick = null;
+        close.onclick = null;
+        modal.onclick = null;
+        document.removeEventListener("keydown", handleKey);
+        modal.classList.remove("open");
+        passwordField.value = "";
+        submit.disabled = false;
+        submit.textContent = "Подтвердить";
+        resolve(confirmed);
+      };
+
+      const handleKey = (event) => {
+        if (event.key === "Escape") finish(false);
+      };
+
+      form.onsubmit = async (event) => {
+        event.preventDefault();
+        const password = passwordField.value;
+        if (!password) {
+          message.textContent = "Введите текущий пароль.";
+          return;
+        }
+
+        submit.disabled = true;
+        submit.textContent = "Проверяем...";
+        message.textContent = "";
+
+        try {
+          const { data, error } = await sb.auth.signInWithPassword({
+            email: user.email,
+            password
+          });
+          if (error || !data?.session?.access_token || data?.user?.id !== user.id) {
+            throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте ещё раз.");
+          }
+          finish(true);
+        } catch (_) {
+          message.textContent = "Не удалось подтвердить пароль. Проверьте его и попробуйте ещё раз.";
+        } finally {
+          if (!settled) {
+            submit.disabled = false;
+            submit.textContent = "Подтвердить";
+            passwordField.focus();
+          }
+        }
+      };
+
+      cancel.onclick = () => finish(false);
+      close.onclick = () => finish(false);
+      modal.onclick = (event) => {
+        if (event.target === modal) finish(false);
+      };
+      document.addEventListener("keydown", handleKey);
+    });
+  }
+
   async function callCouncilManagement(action, targetId, extra = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
+
+    const sensitiveActions = new Set([
+      "review_account_deletion",
+      "delete_listing",
+      "delete_account",
+      "revoke_role",
+      "suspend_account",
+      "lift_suspension"
+    ]);
+    if (sensitiveActions.has(action)) {
+      const confirmed = await confirmAdminReauthentication();
+      if (!confirmed) throw new Error("Подтверждение действия отменено.");
+    }
+
     const { data: authData, error: authError } = await sb.auth.getUser();
     if (authError || !authData?.user?.id || authData.user.id !== user.id) {
       throw new Error("Сессия завершена. Войдите в аккаунт заново.");
     }
+
     const { data, error } = await sb.functions.invoke("council-management", {
       body: { action, target_id: targetId, ...extra }
     });
