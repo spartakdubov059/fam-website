@@ -7,7 +7,7 @@ const migration = readFileSync(
   "utf8",
 );
 const scheduleMigration = readFileSync(
-  new URL("../../supabase/migrations/20261110180500_fam_agent_moscow_morning_schedule.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261110181754_20261110180500_fam_agent_moscow_morning_schedule.sql", import.meta.url),
   "utf8",
 );
 const worker = readFileSync(
