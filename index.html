@@ -834,6 +834,24 @@ main { max-width: 1120px; padding-top: 10px; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
 
+
+/* Keep the tested semantic hero H1 visible, with a quieter layout */
+.hero-wrap { display: block !important; margin: 28px 0 18px; }
+.hero { display: block !important; overflow: visible !important; }
+#bannerCarousel .hero-slide:not(:first-child) { display: none !important; }
+.hero-slide.hero-brand {
+  min-height: 0; padding: 0 0 8px; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; overflow: visible;
+}
+.hero-script {
+  font-family: inherit; font-size: clamp(34px, 5vw, 52px);
+  font-weight: 700; color: var(--text); letter-spacing: -.055em;
+  line-height: 1.05; transform: none;
+}
+.hero-script span { color: var(--muted); text-decoration: none; }
+.hero-sub { color: var(--muted); font-size: 14px; margin: 10px 0 0; max-width: none; }
+.hero-crown, .hero-spark, .hero-graffiti, .hero-cta, .hero-dots { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -881,7 +899,6 @@ main { max-width: 1120px; padding-top: 10px; }
   </div>
 
   <section id="boardSection">
-    <div class="board-intro"><h1>Свои рядом.</h1><p>Объявления, идеи и помощь от ребят рядом.</p></div>
     <div class="hero-wrap">
       <div class="hero" id="bannerCarousel"></div>
       <div class="hero-dots" id="heroDots"></div>
@@ -1940,7 +1957,7 @@ window.onunhandledrejection = function() {
     let html = [];
     html.push(`<div class="hero-slide hero-brand">
       <span class="hero-crown">👑</span>
-      <h2 class="hero-script">Найди <span>своих.</span></h2>
+      <h1 class="hero-script">Найди <span>своих.</span></h1>
       <p class="hero-sub">Объявления, идеи и помощь рядом</p>
       <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
       <span class="hero-spark">✦</span>
