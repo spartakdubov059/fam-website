@@ -64,7 +64,7 @@ begin
         claimed_by = p_worker_id,
         claimed_at = pg_catalog.now(),
         lease_expires_at = pg_catalog.now() + pg_catalog.make_interval(
-          secs => least(greatest(coalesce(p_lease_seconds, 1800), 300), 1800)
+          secs => least(greatest(coalesce(p_lease_seconds, 7200), 300), 7200)
         ),
         attempt_count = t.attempt_count + 1,
         updated_at = pg_catalog.now()
