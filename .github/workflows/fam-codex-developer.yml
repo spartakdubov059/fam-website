@@ -162,7 +162,6 @@ jobs:
 
       - name: Вернуть результат задания в очередь
         if: always() && steps.coder-queue.outputs.claimed == 'true'
-        continue-on-error: true
         env:
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
