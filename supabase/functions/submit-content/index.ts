@@ -29,6 +29,7 @@ const LEGACY_SECRET_IS_JWT = SUPABASE_SECRET_KEY.startsWith("eyJ");
 const ALLOWED_ORIGINS = new Set([
   "https://spartakdubov059.github.io",
   "https://mellifluous-profiterole-48c13b.netlify.app",
+  "https://famru.netlify.app",
 ]);
 
 const CATEGORIES = new Set(["Вещи", "Услуги", "Творчество", "Учёба", "Мероприятия"]);
