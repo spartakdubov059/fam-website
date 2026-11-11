@@ -1,4 +1,5 @@
 import { appendFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
 export const TASK_PROMPTS = Object.freeze({
   audit_frontend_runtime:
@@ -40,6 +41,16 @@ export function validateClaimResponse(data) {
       ", раздел " + task.page_area +
       ", агрегированное число событий " + task.occurrences + ".",
   });
+}
+
+
+export async function readTaskSummary(filePath) {
+  if (typeof filePath !== "string" || filePath.length === 0) return null;
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 export function chooseResultCode(summary, executionSucceeded = true) {
@@ -104,13 +115,7 @@ async function main() {
   if (mode === "finish") {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
-    let summary = null;
-    try {
-      const raw = process.env.FAM_SUMMARY_PATH;
-      if (raw) summary = JSON.parse((await import("node:fs/promises")).readFile(raw, "utf8"));
-    } catch {
-      summary = null;
-    }
+    const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
     const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
     const result = await bridgeRequest({
       url, token, body: { action: "finish", task_id: taskId, result_code: code },
