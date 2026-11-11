@@ -13,6 +13,8 @@ on:
       - "docs/**"
       - "tests/**"
       - "scripts/run-local-coder.mjs"
+      - "scripts/fam-agent-bridge.mjs"
+      - "supabase/functions/fam-agent-coder-bridge/**"
       - "scripts/validate-local-agent-patch.mjs"
       - "scripts/fam-agent-report.mjs"
       - "scripts/render-fam-agent-report.mjs"
@@ -110,10 +112,16 @@ jobs:
             -DGGML_OPENMP=ON
           cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
 
+      - name: Получить одно безопасное задание из очереди (необязательно)
+        id: coder-queue
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_MANUAL_TASK: ${{ inputs.task }}
+        run: node scripts/fam-agent-bridge.mjs claim
+
       - name: Запустить локальную модель и подготовить patch
         id: agent
-        env:
-          FAM_TASK: ${{ inputs.task }}
         run: |
           set -euo pipefail
           MODEL="$RUNNER_TEMP/fam-model/qwen2.5-coder-7b-q4_k_m.gguf"
@@ -151,6 +159,17 @@ jobs:
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
           fi
+
+      - name: Вернуть результат задания в очередь
+        if: always() && steps.coder-queue.outputs.claimed == 'true'
+        continue-on-error: true
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ env.FAM_CODER_TASK_ID }}
+          FAM_MODEL_STEP_OUTCOME: ${{ steps.agent.outcome }}
+          FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
+        run: node scripts/fam-agent-bridge.mjs finish
 
       - name: Показать структурированный результат модели
         if: always() && steps.agent.outcome == 'success'
