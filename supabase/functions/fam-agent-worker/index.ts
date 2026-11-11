@@ -1,3 +1,5 @@
+import { analyzeCronRunHealth } from "./cron-health.mjs";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const WORKER_TOKEN = Deno.env.get("FAM_AGENT_WORKER_TOKEN") ?? "";
 
@@ -190,26 +192,32 @@ Deno.serve(async (req: Request) => {
         const activeSchedules = jobs.filter((item: any) =>
           item?.active === true && item?.schedule_matches === true
         ).length;
+        const cronHealth = analyzeCronRunHealth(jobs, Date.now());
         const rpcChecks = Object.values(permissions).filter((value) => value === true).length;
         const rpcTotal = Object.keys(permissions).length;
-        const overallOk = health.overall_ok === true;
+        // The database RPC checks configuration; this second check verifies the latest real
+        // pg_cron executions so an enabled but failing/stale schedule is never reported healthy.
+        const overallOk = health.overall_ok === true && cronHealth.ok;
 
         const queued = count(queue.queued);
         const expiredLeases = count(queue.expired_leases);
         const failedLast24h = count(queue.failed_last_24h);
-        const scheduleIssues = jobs
-          .filter((item: any) => item?.active !== true || item?.schedule_matches !== true)
-          .map((item: any) => String(item?.job ?? "неизвестное расписание"))
-          .slice(0, 4);
+        const cronIssues = cronHealth.issues.slice(0, 4).map((issue) =>
+          issue.job + ": " + issue.reason
+        );
+        const moreCronIssues = Math.max(0, cronHealth.issues.length - cronIssues.length);
 
         status = "completed";
         summary = "Техническая проверка FAM: " +
           (overallOk ? "критические проверки пройдены. " : "обнаружены технические замечания. ") +
           "Расширения установлены: " + installedExtensions + "/2; расписания активны и соответствуют настройкам: " +
-          activeSchedules + "/" + jobs.length + "; права RPC: " + rpcChecks + "/" + rpcTotal + "; " +
+          activeSchedules + "/" + jobs.length + "; последние запуски Cron подтверждены: " +
+          cronHealth.successful + "/" + cronHealth.checked + "; проблем расписаний: " +
+          cronHealth.issues.length + "; права RPC: " + rpcChecks + "/" + rpcTotal + "; " +
           "задач в очереди: " + queued + "; просроченных блокировок: " + expiredLeases +
           "; ошибок задач за сутки: " + failedLast24h + ". " +
-          (scheduleIssues.length ? "Проблемные расписания: " + scheduleIssues.join(", ") + ". " : "") +
+          (cronIssues.length ? "Проблемы последних запусков: " + cronIssues.join("; ") +
+            (moreCronIssues ? "; и ещё " + moreCronIssues : "") + ". " : "") +
           "Проверялись только служебные настройки и агрегаты; пользовательские данные не читались.";
       } else if (siteErrorTask) {
         // Read only fixed, aggregated event counters; no text, identifiers, URLs, or stack traces are stored.
