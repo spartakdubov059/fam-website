@@ -1938,15 +1938,11 @@ window.onunhandledrejection = function() {
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
         </div>
-        ${ownerControls && user && l.user_id === user.id && profile?.role === "student" && ["pending","manual_review"].includes(l.moderation_status)
-          ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
-          : ownerControls && user && l.user_id === user.id && profile?.role === "student"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-            : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin" && ["pending","manual_review"].includes(l.moderation_status)
-              ? `<span class="profile-card-delete" style="cursor:default;opacity:.7;">Удаление доступно после проверки</span>`
-              : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-                ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
-                : ""}
+        ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
+          ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+          : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
+            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            : ""}
       </div>
     </div>`;
   }
