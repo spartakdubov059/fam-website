@@ -759,6 +759,19 @@
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
     }
+    @keyframes famAuroraShift {
+      0% { background-position: 0% 35%; }
+      100% { background-position: 100% 65%; }
+    }
+    .hero-slide {
+      background-size: 170% 170%;
+      animation: famAuroraShift 18s ease-in-out infinite alternate;
+    }
+    .button-primary, .hero-cta, .tabbar-indicator,
+    .l-badge, .tab-plus, .header-avatar {
+      background-size: 200% 200%;
+      animation: famGradientFlow 11s ease-in-out infinite;
+    }
     .button-primary {
       color: #11130F;
       background: linear-gradient(110deg, #B7F36B 0%, #C6E98C 42%, #C4A7FF 100%);
@@ -875,7 +888,8 @@
       border-color: transparent;
     }
     @media (prefers-reduced-motion: reduce) {
-      .logo-title, .hero-script span { animation: none; }
+      .logo-title, .hero-script span, .hero-slide, .button-primary, .hero-cta,
+      .tabbar-indicator, .l-badge, .tab-plus, .header-avatar { animation: none; }
       .logo-title, .hero-script span {
         background-position: 50% 50%;
       }
