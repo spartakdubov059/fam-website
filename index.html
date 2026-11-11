@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <script>
+    (function () {
+      if (window.location.hostname !== "spartakdubov059.github.io") return;
+
+      var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
+      var targetPath = match ? (match[1] || "/") : "/";
+
+      window.location.replace(
+        "https://famru.netlify.app" +
+        targetPath +
+        window.location.search +
+        window.location.hash
+      );
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FAM — Свои рядом</title>
