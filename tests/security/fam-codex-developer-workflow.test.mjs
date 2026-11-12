@@ -111,3 +111,27 @@ test("workflow does not run database migrations or modify production Supabase", 
   assert.doesNotMatch(workflow, /supabase db (?:push|reset|migrate)|supabase functions deploy/i);
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|openai-api-key/i);
 });
+
+test("the local coder uses exact edit operations and Git-generated patches", () => {
+  assert.match(runner, /extractExplicitTargetPaths/);
+  assert.match(runner, /applyTextEdits/);
+  assert.match(runner, /"diff"/);
+  assert.match(runner, /"--check", "--reverse"/);
+  assert.match(runner, /for \(const \[path, source\] of originalSources\)/);
+  assert.match(runner, /Keep the generation checkout pristine/);
+  assert.doesNotMatch(runner, /unified_diff:\s*\{\s*type:\s*"string"/);
+  assert.match(prompt, /точные операции search\/replace/);
+  assert.match(prompt, /runner сам внесёт точные изменения и сформирует patch через git diff/);
+});
+
+test("the main agent workflow tests the exact edit helper", () => {
+  assert.match(workflow, /local-model-edits\.test\.mjs/);
+  assert.match(workflow, /node --check scripts\/local-model-edits\.mjs/);
+});
+
+
+test("explicitly referenced unselected tests are supplied as read-only source context", () => {
+  assert.match(runner, /const readOnlyExcerpts = taskReferencedSource/);
+  assert.match(runner, /Контекст только для чтения/);
+  assert.match(runner, /Остальные файлы в source_context помечены как контекст только для чтения/);
+});
