@@ -1,0 +1,40 @@
+--- a/backend/src/ydb-image-moderation-repository.mjs
++++ b/backend/src/ydb-image-moderation-repository.mjs
+@@ -186,0 +187,16 @@
++        // An expiring lease can pass the first SELECT but fail the guarded UPDATE.
++        // YDB UPDATE does not return affected rows here. Confirm our state change
++        // in the same serializable transaction before modifying the listing.
++        const transitionText = `
++          DECLARE $queueId AS Uuid;
++          DECLARE $status AS Utf8;
++          SELECT id FROM ${QUEUE_TABLE}
++          WHERE id = $queueId AND status = $status
++            AND lease_token IS NULL AND locked_until IS NULL
++          LIMIT 1;
++        `;
++        const transitioned = firstRow(await runQuery(tx, transitionText, [
++          ['queueId', queueId], ['status', status],
++        ], 3_000));
++        if (!transitioned) return false;
++
+--- a/tests/ydb-image-moderation-repository.test.mjs
++++ b/tests/ydb-image-moderation-repository.test.mjs
+@@ -192,0 +193,18 @@
++
++test('finishTask aborts listing writes when lease expires after precheck and guarded UPDATE touches no row', async () => {
++  // Simulate YDB accepting the initial lease check, then the database time
++  // crossing the lease expiry before UPDATE. In that case the UPDATE is a no-op.
++  const { sql, calls } = fakeSql(async (queryText) => {
++    if (queryText.includes('SELECT id FROM fam_priv_listing_image_moderation_queue')) {
++      if (queryText.includes('lease_token IS NULL')) return [[]];
++      return [[{ id: queueId }]];
++    }
++    if (queryText.includes('SELECT id FROM fam_pub_listings')) return [[{ id: listingId }]];
++    return [[]];
++  });
++  const repository = createYdbImageModerationRepository({ sql });
++  assert.equal(await repository.finishTask({ task: task(), status: 'approved', imageUrl: 'https://media.example.test/safe.webp' }), false);
++  const confirmation = calls.find((call) => call.queryText?.includes('lease_token IS NULL'));
++  assert.ok(confirmation, 'must confirm UPDATE transitioned the queue row');
++  assert.equal(calls.some((call) => call.queryText?.includes('UPDATE fam_pub_listings')), false);
++});
