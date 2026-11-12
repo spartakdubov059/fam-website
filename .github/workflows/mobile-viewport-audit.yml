@@ -29,3 +29,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run FAM responsive browser audit
         run: node tests/ui/mobile-viewport-audit.mjs
+      - name: Run School Pulse mobile visual and voting audit
+        run: node tests/ui/school-pulse-visual-audit.mjs
