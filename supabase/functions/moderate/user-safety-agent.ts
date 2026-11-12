@@ -45,8 +45,8 @@ function safeEvidenceExcerpt(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const cleaned = value
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, "[почта скрыта]")
-    .replace(/(?:https?:\\/\\/|www\\.)\\S+/gi, "[ссылка скрыта]")
-    .replace(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g, "[номер скрыт]")
+    .replace(/(?:https?:\\/\\/|www\\.)\S+/gi, "[ссылка скрыта]")
+    .replace(/(?:\\+?\d[\d\\s().-]{7,}\d)/g, "[номер скрыт]")
     .replace(/[\\u0000-\\u001F\\u007F]/g, " ")
     .replace(/\\s+/g, " ")
     .trim()
