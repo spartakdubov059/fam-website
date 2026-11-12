@@ -19,7 +19,11 @@ test("deleting your own school-admin listing skips password reauthentication", (
   const helper = frontend.slice(helperStart, helperEnd);
   assert.match(helper, /options\.skipReauth\s*!==\s*true/);
   assert.match(helper, /sensitiveActions\.has\(action\)/);
-  assert.doesNotMatch(helper, /"delete_listing"/);
+  const sensitiveStart = helper.indexOf("const sensitiveActions = new Set([");
+  const sensitiveEnd = helper.indexOf("]);", sensitiveStart);
+  assert.ok(sensitiveStart >= 0 && sensitiveEnd > sensitiveStart);
+  assert.doesNotMatch(helper.slice(sensitiveStart, sensitiveEnd), /"delete_listing"/);
+  assert.match(helper, /action === "delete_listing"/);
 
   const adminDeleteStart = frontend.indexOf("async function manageSchoolListing(");
   const adminDeleteEnd = frontend.indexOf("\n  async function suspendCouncilAccount", adminDeleteStart);
