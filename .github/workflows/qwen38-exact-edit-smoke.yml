@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: fam-deepseek-exact-edit-smoke
+  group: fam-qwen38-exact-edit-smoke
   cancel-in-progress: false
 jobs:
   smoke:
