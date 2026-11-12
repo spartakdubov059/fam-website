@@ -5,8 +5,11 @@ import { chromium } from "playwright";
 
 const sourceHtml = await readFile(resolve(process.cwd(), "index.html"), "utf8");
 const priceFormatter = await readFile(resolve(process.cwd(), "price-format.js"), "utf8");
-const html = sourceHtml.replace('<script src="price-format.js"></script>', `<script>${priceFormatter}</script>`);
-assert.notEqual(html, sourceHtml, "price formatter must be included in the browser audit page");
+const galleryScript = await readFile(resolve(process.cwd(), "listing-gallery.js"), "utf8");
+const html = sourceHtml
+  .replace('<script src="price-format.js"></script>', `<script>${priceFormatter}</script>`)
+  .replace('<script src="./listing-gallery.js"></script>', `<script>${galleryScript}</script>`);
+assert.notEqual(html, sourceHtml, "price formatter and gallery must be included in the browser audit page");
 const listing = {
   id: "e65ad519-bcb1-4b6b-8514-5e1b2b82a1e9",
   user_id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b",
@@ -32,7 +35,11 @@ const approvedListing = {
   status: "active",
   moderation_status: "approved",
   photo_status: "approved",
-  image_url: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
+  image_url: "https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/test-photo-1.jpg",
+  image_urls: [
+    "https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/test-photo-1.jpg",
+    "https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/test-photo-2.jpg"
+  ],
   is_event: false
 };
 
@@ -80,6 +87,9 @@ await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", r
 );
 await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
   route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+);
+await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/**", route =>
+  route.fulfill({ status: 200, contentType: "image/gif", body: Buffer.from("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=", "base64") })
 );
 
 try {
@@ -268,6 +278,10 @@ try {
     });
     assert.equal(approvedImage.complete, true, "approved photo must finish loading in details");
     assert.ok(approvedImage.naturalWidth > 0 && approvedImage.naturalHeight > 0, "approved photo must have non-zero intrinsic dimensions");
+    assert.equal(await page.locator(".listing-detail-thumb").count(), 2, "two approved photos must have thumbnails");
+    await page.locator('.listing-detail-thumb[data-photo-index="1"]').click();
+    assert.match(await page.locator("#listingDetailMainPhoto").getAttribute("src"), /test-photo-2\.jpg$/);
+    assert.equal(await page.locator('.listing-detail-thumb[data-photo-index="1"]').getAttribute("aria-pressed"), "true");
     const approvedDescription = await page.locator("#listingDetailsBody .listing-detail-description").textContent();
     assert.equal(approvedDescription, approvedListing.description, "approved listing description must be rendered");
     await page.locator('[data-action="close-listing-details"]').click();
