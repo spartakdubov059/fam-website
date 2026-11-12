@@ -1596,6 +1596,7 @@ window.onunhandledrejection = function() {
     updateHints();
     renderDescriptionHelper();
   });
+  $("lPrice").addEventListener("input", renderDescriptionHelper);
 
   function timeAgo(isoOrMs) {
     if (!isoOrMs) return '';
