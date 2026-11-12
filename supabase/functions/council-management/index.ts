@@ -952,6 +952,14 @@ Deno.serve(async (req: Request) => {
       if (ownerSchoolId !== actor.school_id) {
         return json({ ok: false, error: "Можно удалять только объявления своей школы." }, 403, headers);
       }
+      // Owners may remove their own listings with the current authenticated session.
+      // Deleting another member's listing still requires a recent password sign-in.
+      if (listing.user_id !== actorId && !tokenWasIssuedRecently(authorization)) {
+        return json({
+          ok: false,
+          error: "Для удаления чужого объявления администратору нужно повторно подтвердить вход.",
+        }, 403, headers);
+      }
 
       const removed = await adminRequest(
         "listings?id=eq." + encodeURIComponent(targetId),
