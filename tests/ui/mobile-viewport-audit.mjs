@@ -75,6 +75,42 @@ try {
   await page.setContent(html, { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
 
+  // Verify the category helper through the real form inputs and its click action.
+  // This detects whether the current implementation is model-backed or only keyword-based.
+  await page.evaluate(() => window.openModal("listingModal"));
+  const categoryHintResults = [];
+  const checkHint = async ({ title, description = "", currentCategory = "Вещи", expectedCategory = null, shouldSelect = false }) => {
+    await page.locator("#lCat").selectOption(currentCategory);
+    await page.locator("#lTitle").fill(title);
+    await page.locator("#lDesc").fill(description);
+    await page.waitForTimeout(360);
+    const hintButton = page.locator("#aiHints [data-action='select-hint-category']");
+    const count = await hintButton.count();
+    if (expectedCategory) {
+      assert.equal(count, 1, `category suggestion missing for "${title}"`);
+      const label = await hintButton.textContent();
+      assert.match(label, new RegExp(expectedCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\  await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
+
+  const widths = [")));
+      if (shouldSelect) {
+        await hintButton.click();
+        assert.equal(await page.locator("#lCat").inputValue(), expectedCategory, "suggested category must be selectable");
+      }
+    } else {
+      assert.equal(count, 0, `unexpected category suggestion for "${title}"`);
+    }
+    categoryHintResults.push({ title, suggestion: expectedCategory || null, selected: shouldSelect });
+  };
+
+  await checkHint({ title: "VR-шлем Meta Quest 3", expectedCategory: null });
+  await checkHint({ title: "Продам VR-шлем Meta Quest 3", currentCategory: "Услуги", expectedCategory: "Вещи", shouldSelect: true });
+  await checkHint({ title: "Репетитор по английскому", currentCategory: "Вещи", expectedCategory: "Услуги", shouldSelect: true });
+  await checkHint({ title: "Подготовка к ОГЭ по математике", currentCategory: "Вещи", expectedCategory: "Учёба", shouldSelect: true });
+  await checkHint({ title: "Квиз по робототехнике", currentCategory: "Вещи", expectedCategory: "Мероприятия", shouldSelect: true });
+  await checkHint({ title: "Конспект по физике", expectedCategory: null });
+  await checkHint({ title: "Люблю объяснять сложные темы", description: "Подготовка к контрольной по алгебре", currentCategory: "Вещи", expectedCategory: "Учёба" });
+  await page.locator('[data-action="close-listing-modal"]').click();
+
   const widths = [
     { width: 360, height: 844, columns: 2 },
     { width: 360, height: 640, columns: 2 },
@@ -235,12 +271,12 @@ try {
       listingFormWidth: Math.round(formMetrics.width),
       guestSections: "PASS",
       approvedPhoto: "PASS",
-      result: "PASS"
+      categoryHints: "PASS"
     }));
   }
 
   assert.deepEqual(pageErrors, [], "page must not throw JavaScript errors during viewport tests");
-  console.log(`FAM responsive viewport audit: ${widths.length}/${widths.length} sizes passed (mobile, landscape, tablet and iPad).`);
+  console.log(`FAM responsive viewport audit: ${widths.length}/${widths.length} sizes passed (mobile, landscape, tablet and iPad). Category hint cases: ${categoryHintResults.length}/${categoryHintResults.length} passed.`);
 } finally {
   await browser.close();
 }
