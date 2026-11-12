@@ -305,7 +305,11 @@ async function removePreviousAvatarImage(url, userId) {
   const prefix = SUPABASE_URL + "/storage/v1/object/public/avatars/";
   if (typeof url !== "string" || !url.startsWith(prefix)) return;
   const path = decodeURIComponent(url.slice(prefix.length).split("?")[0] || "");
-  if (!new RegExp("^" + userId + "/avatar_" + userId + "_[a-z0-9-]{1,50}\\.(?:jpg|png|webp)$", "i").test(path)) return;
+  const ownedAvatarPath = new RegExp(
+    "^" + userId + "/(?:avatar_" + userId + "_[a-z0-9-]{1,50}|avatar_[a-z0-9-]{1,50})\\.(?:jpg|png|webp)$",
+    "i",
+  );
+  if (!ownedAvatarPath.test(path)) return;
   await removeObject("avatars", path);
 }
 
