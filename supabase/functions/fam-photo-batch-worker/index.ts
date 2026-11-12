@@ -7,6 +7,7 @@ const BASE=Deno.env.get("SUPABASE_URL")??"";
 const WORKER_TOKEN=Deno.env.get("FAM_AGENT_WORKER_TOKEN")??"";
 const FREE_ENDPOINT=Deno.env.get("FAM_FREE_VISION_ENDPOINT")??"";
 const FREE_VERIFIED=Deno.env.get("FAM_FREE_VISION_VERIFIED")==="1";
+const FREE_TOKEN=Deno.env.get("FAM_FREE_VISION_TOKEN")??"";
 function key(name) {
   const s=Deno.env.get(name)||"";
   try { const j=JSON.parse(s);if(typeof j?.default==="string")return j.default; }catch{}
@@ -74,7 +75,7 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 async function freeVisionReview(bytes,title,category) {
-  if(!FREE_VERIFIED||!FREE_ENDPOINT)return {decision:"pending",reason:"unconfigured"};
+  if(!FREE_VERIFIED||!FREE_ENDPOINT||FREE_TOKEN.length<16)return {decision:"pending",reason:"unconfigured"};
   let url;
   try {url=new URL(FREE_ENDPOINT);}catch{return {decision:"pending",reason:"invalid_endpoint"};}
   if(url.protocol!=="https:"||url.username||url.password||url.hash)
@@ -84,7 +85,7 @@ async function freeVisionReview(bytes,title,category) {
     const id=setTimeout(()=>controller.abort(),15000);
     try {
       const result=await fetch(url.toString(),{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",redirect:"error",headers:{"Content-Type":"application/json","Authorization":"Bearer "+FREE_TOKEN},
         body:JSON.stringify({policy_version:PHOTO_POLICY_VERSION,purpose:"school_listing_photo_collage",
           title:String(title||"").slice(0,80),category:String(category||"").slice(0,80),
           mime:"image/jpeg",image_base64:bytesToBase64(bytes)}),
@@ -132,7 +133,7 @@ async function processBatch(batch) {
         p_user_id:owner,p_hashes:hashes,p_policy_version:PHOTO_POLICY_VERSION
       });
       const approved=new Set(Array.isArray(prior)?prior:[]);
-      const prelim=planBatchReview(hashes,approved,FREE_VERIFIED&&FREE_ENDPOINT?1:0);
+      const prelim=planBatchReview(hashes,approved,FREE_VERIFIED&&FREE_ENDPOINT&&FREE_TOKEN.length>=16?1:0);
       if(prelim.action==="reject") {await finish(id,"rejected");return "rejected";}
       if(prelim.action==="pending_budget"){await finish(id,"pending_budget");return "pending_budget";}
       if(prelim.action==="review_collage_once"){
