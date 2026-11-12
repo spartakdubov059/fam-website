@@ -59,6 +59,18 @@ test("quota failures keep the listing image private and retry after text-only pu
   assert.match(migration, /status='active' and moderation_status='approved' and image_url is null/);
 });
 
+test("missing private source files stop retrying without hiding the approved listing text or replacing the old avatar", () => {
+  assert.match(worker, /function isMissingStorageObject\(response, data\)/);
+  assert.match(worker, /response\?\.status === 404/);
+  assert.match(worker, /new Error\("staged_media_missing"\)/);
+  assert.match(worker, /error\.message === "staged_media_missing"/);
+  assert.match(worker, /reason_code: "pending_image_missing"/);
+  assert.match(worker, /reason_code: "pending_avatar_missing"/);
+  assert.match(worker, /Объявление остаётся опубликованным без фото/);
+  assert.match(worker, /Предыдущий аватар остаётся в профиле/);
+  assert.match(migration, /elsif p_state in \('rejected','manual_review','failed'\)/);
+});
+
 test("normal photo moderation rejection never publishes the unreviewed staged image", () => {
   assert.match(worker, /if \(moderation\.action === "reject"\)/);
   assert.match(worker, /removeObject\("listing-images-pending", task\.image_path\)/);
