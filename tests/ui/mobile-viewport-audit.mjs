@@ -91,7 +91,7 @@ try {
         bodyWidth: document.body.scrollWidth,
         mainClientWidth: document.querySelector("main").clientWidth,
         mainScrollWidth: document.querySelector("main").scrollWidth,
-        columns: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length : 0,
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 0,
         header: rect(".header-inner"),
         main: rect("main"),
         categories: rect(".cat-tiles"),
