@@ -31,6 +31,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FAM">
   <script src="./pwa-register.js" defer></script>
+  <script src="./listing-gallery.js"></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
@@ -848,6 +849,11 @@
     .listing-detail-header h2 { min-width: 0; margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
     .listing-detail-close { flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text); font-size: 22px; line-height: 1; }
     .listing-detail-image { display: block; width: 100%; max-height: 46dvh; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 15px; background: #101018; }
+    .listing-detail-thumbs { display: flex; overflow-x: auto; gap: 8px; padding: 9px 2px 2px; scrollbar-width: thin; }
+    .listing-detail-thumb { flex: 0 0 62px; height: 54px; padding: 2px; border: 2px solid var(--border); border-radius: 9px; background: var(--surface); }
+    .listing-detail-thumb[aria-pressed="true"] { border-color: var(--lime); }
+    .listing-detail-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 5px; }
+
     .listing-detail-photo-placeholder { width: 100%; min-height: 150px; max-height: 34dvh; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 18px; border: 1px solid var(--border); border-radius: 15px; background: linear-gradient(145deg, #20232B, #111319); color: var(--muted); text-align: center; font-size: 12px; line-height: 1.45; }
     .listing-detail-photo-placeholder strong { color: var(--text); font-size: 14px; }
     .listing-detail-meta { margin: 14px 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -2407,8 +2413,11 @@ window.onunhandledrejection = function() {
       failed: "Файл фотографии больше недоступен для проверки. Текст объявления сохранён — чтобы добавить изображение, загрузите его повторно.",
       none: "К объявлению пока не добавлена фотография."
     };
-    const photoHTML = listing.image_url
-      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">'
+    const approvedPhotos = FAMGallery.photos(listing);
+    const photoHTML = approvedPhotos.length
+      ? '<img id="listingDetailMainPhoto" class="listing-detail-image" src="' + esc(approvedPhotos[0]) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">' +
+        (approvedPhotos.length > 1 ? '<div id="listingDetailThumbs" class="listing-detail-thumbs" role="group" aria-label="Фотографии объявления">' +
+          approvedPhotos.map((url, index) => '<button class="listing-detail-thumb" type="button" data-photo-index="' + index + '" aria-label="Фото ' + (index + 1) + ' из ' + approvedPhotos.length + '" aria-pressed="' + (index === 0 ? 'true' : 'false') + '"><img src="' + esc(url) + '" alt="" loading="lazy"></button>').join('') + '</div>' : '')
       : '<div class="listing-detail-photo-placeholder" role="status"><strong>' + (photoStatus === "pending" ? "Фото проверяется" : "Фотография пока недоступна") + '</strong><span>' + esc(photoMessages[photoStatus] || photoMessages.none) + '</span></div>';
     const description = String(listing.description || "").trim();
     const eventDate = listing.is_event && listing.event_date ? new Date(listing.event_date + "T00:00:00").toLocaleDateString("ru-RU") : "";
@@ -2420,6 +2429,18 @@ window.onunhandledrejection = function() {
       (meta ? '<div class="listing-detail-meta">' + esc(meta) + '</div>' : "") +
       '<h3 class="listing-detail-description-title">Описание</h3>' +
       '<p class="listing-detail-description">' + (description ? esc(description) : "Описание не добавлено.") + '</p>';
+    if (approvedPhotos.length > 1) {
+      const mainPhoto = $("listingDetailMainPhoto");
+      const thumbs = $("listingDetailThumbs");
+      thumbs.addEventListener("click", event => {
+        const button = event.target.closest("button[data-photo-index]");
+        if (!button || !thumbs.contains(button)) return;
+        const index = Number(button.dataset.photoIndex);
+        if (!Number.isInteger(index) || index < 0 || index >= approvedPhotos.length) return;
+        mainPhoto.src = approvedPhotos[index];
+        thumbs.querySelectorAll("button").forEach((item, pos) => item.setAttribute("aria-pressed", String(pos === index)));
+      });
+    }
     window.openModal("listingDetailsModal");
   }
   function listingCard(l, idx, ownerControls = false) {
