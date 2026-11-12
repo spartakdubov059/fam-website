@@ -19,6 +19,17 @@ for (const [name, value] of Object.entries({
 })) {
   assert.equal(typeof value, 'function', name + ' must be exported as a function');
 }
+// The migration adapters rely on client.unsafe and begin, not just the module exports.
+// Construct a local client without calling driver.ready() or executing SQL.
+const offlineDriver = new Driver('grpc://127.0.0.1:2136/local');
+const offlineSql = query(offlineDriver);
+assert.equal(typeof offlineSql, 'function', 'query(driver) must return a tagged template client');
+assert.equal(typeof offlineSql.unsafe, 'function', 'FAM adapters require client.unsafe(trustedSql)');
+assert.equal(typeof offlineSql.begin, 'function', 'FAM adapters require client.begin(transactionCallback)');
+const offlineStatement = offlineSql`SELECT $testValue;`;
+assert.equal(typeof offlineStatement.parameter, 'function', 'FAM adapters require .parameter()');
+assert.equal(typeof offlineStatement.timeout, 'function', 'FAM adapters require .timeout()');
+
 assert.equal(sharp.versions.sharp, '0.35.5', 'Installed native Sharp must match the pinned dependency');
 const testImage = await sharp({
   create: { width: 16, height: 9, channels: 3, background: '#0080ff' },
@@ -31,5 +42,5 @@ assert.equal(metadata.height, 9);
 assert.equal(metadata.exif, undefined);
 assert.equal(metadata.xmp, undefined);
 assert.equal(metadata.iptc, undefined);
-console.log('SDK_COMPAT_PASS: native Sharp/WebP and YDB/AWS exports import successfully.');
+console.log('SDK_COMPAT_PASS: pinned Sharp/WebP, YDB query-client methods, and AWS exports verified.');
 console.log('No cloud integration was attempted; deployment remains blocked.');
