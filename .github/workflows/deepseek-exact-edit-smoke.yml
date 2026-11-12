@@ -1,4 +1,4 @@
-name: FAM DeepSeek smoke test — exact edit agent
+name: FAM DeepSeek v2 smoke test — current exact edit agent
 on:
   push:
     branches: [ai/agent-reliable-edit-ops]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: fam-deepseek-exact-edit-smoke
+  group: fam-deepseek-exact-edit-smoke-v2
   cancel-in-progress: false
 jobs:
   smoke:
