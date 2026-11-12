@@ -597,6 +597,7 @@ Deno.serve(async (req: Request) => {
         category,
         price_text: priceText || "Бесплатно",
         image_url: publishedImageUrl,
+        photo_status: publishedImageUrl ? "approved" : "none",
         status,
         is_event: isEvent,
         school_id: profile.school_id,
