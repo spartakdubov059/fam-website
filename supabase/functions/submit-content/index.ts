@@ -1,3 +1,5 @@
+import { canSkipListingImageReview } from "./photo-review-policy.js";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 
 function readDefaultKey(variable: string): string {
@@ -482,12 +484,20 @@ Deno.serve(async (req: Request) => {
         return fail("Фото должно быть загружено в защищённое временное хранилище FAM.", 400, headers);
       }
 
+      // Only use the server-loaded profile (never a role supplied by the browser).
+      // Verified school admins and council members skip AI image review for listings,
+      // while the regular text moderation and all storage/path validation still apply.
+      const bypassPhotoAiReview = canSkipListingImageReview(profile, imageUrl);
+      if (bypassPhotoAiReview) {
+        console.info("trusted_listing_photo_ai_review_skipped", JSON.stringify({ role: profile.role }));
+      }
+
       const moderation = await moderate(
         title + "\n" + description + "\n" + priceText,
         authorization,
         origin,
         false,
-        imageUrl,
+        bypassPhotoAiReview ? null : imageUrl,
         { kind: "listing", sender_id: userId, school_id: profile.school_id },
       );
       if (!moderation) return fail("Сервис модерации недоступен. Объявление не опубликовано.", 503, headers);
@@ -513,6 +523,7 @@ Deno.serve(async (req: Request) => {
         "missing_api_key",
       ]);
       const shouldQueueImageReview = Boolean(imageUrl)
+        && !bypassPhotoAiReview
         && moderation.action === "pending"
         && (
           moderation.degraded === true
@@ -624,7 +635,10 @@ Deno.serve(async (req: Request) => {
         ok: true,
         status: moderation.action === "pending" ? "pending" : "approved",
         listing,
-        reason: moderation.reason ?? null,
+        photo_review_bypassed: bypassPhotoAiReview,
+        reason: bypassPhotoAiReview
+          ? "Фото опубликовано без ИИ-проверки изображения для подтверждённой роли. Текст объявления прошёл обычную проверку FAM."
+          : moderation.reason ?? null,
       }, 200, headers);
     }
 
