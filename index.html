@@ -4466,6 +4466,7 @@ window.onunhandledrejection = function() {
 
       closeModal('listingModal');
       $("listingForm").reset();
+      $("pricePreview").textContent = "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
       uploadStatus.innerHTML = '';
       $("aiHints").textContent = "Начните вводить название и описание — FAM подскажет категорию.";
       $("descriptionHelperPanel").classList.add("hidden");
