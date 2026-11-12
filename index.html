@@ -3429,15 +3429,19 @@ window.onunhandledrejection = function() {
         body: { kind: "avatar", image_url: signed.signedUrl }
       });
       if (error) throw error;
-      if (!submission?.ok || submission.status !== "approved" || !submission.avatar_url) {
-        throw new Error(submission?.reason || submission?.error || "Фото не прошло проверку FAM. Выберите другое изображение.");
+      if (!submission?.ok || !["approved", "pending"].includes(submission.status)) {
+        throw new Error(submission?.reason || submission?.error || "Не удалось сохранить фото для проверки.");
       }
 
-      uploadedAvatarPath = null; // The server removed staging and published the approved avatar.
-      if (profile) profile.avatar_url = submission.avatar_url;
-      updateAuthUI();
-      await renderProfile();
-      notice("Аватар проверен и обновлён.");
+      uploadedAvatarPath = null; // The server now owns the private staged file and queue task.
+      if (submission.status === "approved" && submission.avatar_url) {
+        if (profile) profile.avatar_url = submission.avatar_url;
+        updateAuthUI();
+        await renderProfile();
+        notice("Аватар проверен и обновлён.");
+      } else {
+        notice(submission.reason || "Фото сохранено приватно. Предыдущий аватар останется видимым до завершения проверки.");
+      }
     } catch (err) {
       if (uploadedAvatarPath) {
         try {
