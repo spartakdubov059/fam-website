@@ -869,7 +869,7 @@
               <div class="council-subpanel-content"><div id="councilAdminAudit" aria-live="polite"></div></div>
             </details>
           </div>
-          <details class="profile-inline-disclosure council-subpanel" open><summary>Идеи учеников</summary><div class="council-subpanel-content"><div class="idea-folders">
+          <details class="profile-inline-disclosure council-subpanel" open><summary>Идеи учеников</summary><div class="council-subpanel-content"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span id="ideaRefreshStatus" role="status" aria-live="polite" style="font-size:10px;color:var(--muted);">Идеи вашей школы</span><button id="refreshSchoolIdeasBtn" type="button" class="button button-secondary button-small">Обновить</button></div><div class="idea-folders">
             <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
             <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
             <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
@@ -2295,6 +2295,45 @@ window.onunhandledrejection = function() {
     content.innerHTML = html;
   }
 
+  async function loadSchoolIdeas() {
+    if (!user || !user.id) return false;
+    const isSchoolStaff = ["school_admin", "council_member"].includes(profile?.role);
+    const status = $("ideaRefreshStatus");
+    const button = $("refreshSchoolIdeasBtn");
+    if (isSchoolStaff && !profile?.school_id) {
+      if (status) status.textContent = "У аккаунта не указана школа.";
+      return false;
+    }
+    if (button) button.disabled = true;
+    if (status) status.textContent = "Загружаем идеи...";
+    try {
+      const query = isSchoolStaff
+        ? sb.from("ideas").select("*").eq("school_id", profile.school_id).order("created_at", { ascending: false }).limit(200)
+        : sb.from("ideas").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
+      const { data, error } = await query;
+      if (error) throw error;
+      ideas = Array.isArray(data) ? data : [];
+      renderIdeas();
+      if (isSchoolStaff) {
+        updateIdeaCounters();
+        renderIdeaFolderContent();
+      }
+      if (status) status.textContent = "Обновлено: " + new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+      return true;
+    } catch (error) {
+      console.error("Ошибка обновления идей школы:", error);
+      if (status) status.textContent = "Не удалось загрузить. Нажмите «Обновить» ещё раз.";
+      const folderContent = $("ideaFolderContent");
+      if (isSchoolStaff && folderContent) folderContent.textContent = "Не удалось загрузить идеи. Проверьте соединение и повторите обновление.";
+      return false;
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  const refreshSchoolIdeasButton = $("refreshSchoolIdeasBtn");
+  if (refreshSchoolIdeasButton) refreshSchoolIdeasButton.onclick = () => { void loadSchoolIdeas(); };
+
   async function batchDeleteIdeas(toDelete, successMessage, btnElement) {
     if (!user || !user.id || toDelete.length === 0) return;
     if (!confirm('🗑 ' + successMessage + ' (' + toDelete.length + ' шт.)?')) return;
@@ -3401,6 +3440,7 @@ window.onunhandledrejection = function() {
     renderIdeas();
     await loadMySuspensionNotice();
     await loadSchoolAdminAccess();
+    await loadSchoolIdeas();
 
     const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
     if (isCouncilMember) {
@@ -3675,21 +3715,6 @@ window.onunhandledrejection = function() {
     else startHeroTimer();
 
     if (name === 'profile') {
-      if (user) {
-        const ideasQuery = ["school_admin", "council_member"].includes(profile?.role)
-          ? sb.from("ideas").select("*").eq('school_id', profile.school_id).order("created_at", { ascending: false })
-          : sb.from("ideas").select("*").eq('user_id', user.id).order("created_at", { ascending: false });
-        ideasQuery.then(res => {
-          if (!res.error) {
-            ideas = res.data || [];
-            renderIdeas();
-            renderIdeaFolderContent();
-            updateIdeaCounters();
-          } else {
-            console.error("Ошибка загрузки идей в профиле:", res.error);
-          }
-        });
-      }
       renderProfile();
     }
     if (name === 'board') loadAll();
