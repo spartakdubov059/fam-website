@@ -62,9 +62,9 @@ begin
   insert into public.profiles (id, school_id, role, first_name, last_name, class_name)
   values (new.id, v_school_id, 'student', v_first_name, v_last_name, v_class_name)
   on conflict (id) do update set
-    school_id = coalesce(public.profiles.school_id, excluded.school_id),
-    first_name = coalesce(public.profiles.first_name, excluded.first_name),
-    last_name = coalesce(public.profiles.last_name, excluded.last_name),
+    school_id = coalesce(profiles.school_id, excluded.school_id),
+    first_name = coalesce(profiles.first_name, excluded.first_name),
+    last_name = coalesce(profiles.last_name, excluded.last_name),
     class_name = coalesce(public.profiles.class_name, excluded.class_name);
 
   return new;
@@ -322,7 +322,7 @@ begin
     l.status='hidden' and l.moderation_status='pending'
   ) or (
     l.status='active' and l.moderation_status='approved'
-    and c.last_reason_code='image_review_quota_exceeded'
+    and l.image_url is null
   );
 end;
 $function$;
