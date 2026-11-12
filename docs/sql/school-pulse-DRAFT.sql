@@ -1,16 +1,22 @@
--- REVIEW DRAFT. Run only in isolated PostgreSQL CI until approved for FAM production.
--- News and polls live by school, with no public vote-level access and no paid AI API.
+ -- New school-scoped announcements, open events and polls. No external AI or paid services.
+-- Tested in an isolated database before applying to FAM.
 create table if not exists public.fam_school_announcements (
   id uuid primary key default gen_random_uuid(),
   school_id text not null references public.schools(id),
   author_id uuid references auth.users(id) on delete set null,
   title text not null check (char_length(btrim(title)) between 4 and 90),
   body text not null check (char_length(btrim(body)) between 4 and 450),
-  kind text not null default 'news' check (kind in ('news','important')),
+  kind text not null default 'news' check (kind in ('news','important','open_event')),
+  event_starts_at timestamptz,
   published_at timestamptz not null default now(),
   expires_at timestamptz not null default (now()+interval '14 days'),
   created_at timestamptz not null default now(),
-  check (expires_at > published_at and expires_at <= published_at+interval '31 days')
+  check (expires_at > published_at and expires_at <= published_at+interval '93 days'),
+  check (
+    (kind = 'open_event' and event_starts_at is not null
+      and event_starts_at >= published_at and event_starts_at <= published_at + interval '90 days')
+    or (kind <> 'open_event' and event_starts_at is null)
+  )
 );
 create index if not exists fam_school_announcements_feed_idx on public.fam_school_announcements(school_id,published_at desc);
 
@@ -67,12 +73,28 @@ begin
   if who is null then return jsonb_build_object('announcements','[]'::jsonb,'polls','[]'::jsonb);end if;
   select p.school_id into school from public.profiles p where p.id=who and p.school_id is not null;
   if school is null then return jsonb_build_object('announcements','[]'::jsonb,'polls','[]'::jsonb);end if;
+  -- Mix official announcements with existing open-entry events, without adding
+  -- registrations, attendee limits, or exposing author identifiers.
   select coalesce(jsonb_agg(to_jsonb(n) order by n.published_at desc),'[]'::jsonb) into news
   from (
-    select a.id,a.title,a.body,a.kind,a.published_at
-    from public.fam_school_announcements a
-    where a.school_id=school and a.published_at<=now() and a.expires_at>now()
-    order by a.published_at desc limit 4
+    select feed.id,feed.title,feed.body,feed.kind,feed.published_at,
+           feed.event_starts_at,feed.event_date,feed.event_time
+    from (
+      select a.id,a.title,a.body,a.kind,a.published_at,a.event_starts_at,
+             null::date as event_date,null::time as event_time
+      from public.fam_school_announcements a
+      where a.school_id=school and a.published_at<=now() and a.expires_at>now()
+      union all
+      select l.id,l.title,left(l.description,450),'open_event'::text as kind,
+             l.created_at as published_at,null::timestamptz as event_starts_at,
+             l.event_date,l.event_time
+      from public.listings l
+      where l.school_id=school and l.status='active' and l.is_event=true
+        and coalesce(l.max_seats,0)=0
+        and (l.event_date is null or l.event_date>=current_date)
+    ) feed
+    order by case when feed.kind='open_event' then 0 else 1 end,
+             feed.published_at desc limit 6
   ) n;
   select coalesce(jsonb_agg(jsonb_build_object(
     'id',p.id,
@@ -128,7 +150,7 @@ end $$;
 revoke all on function public.fam_vote_school_poll(uuid,integer) from public,anon,authenticated;
 grant execute on function public.fam_vote_school_poll(uuid,integer) to authenticated;
 
-create or replace function public.fam_publish_school_announcement(p_title text,p_body text,p_kind text default 'news')
+create or replace function public.fam_publish_school_announcement(p_title text,p_body text,p_kind text default 'news',p_event_starts_at timestamptz default null)
 returns uuid
 language plpgsql security definer set search_path=''
 as $$
@@ -137,22 +159,29 @@ declare
   school text;
   new_id uuid;
 begin
-  select school_id into school from public.profiles where id=who and role='school_admin' and school_id is not null;
-  if school is null then raise exception 'school_admin_only';end if;
+  select school_id into school from public.profiles where id=who and role in ('school_admin','council_member') and school_id is not null;
+  if school is null then raise exception 'trusted_school_role_only';end if;
   p_title:=btrim(coalesce(p_title,''));p_body:=btrim(coalesce(p_body,''));
   if char_length(p_title) not between 4 and 90 or char_length(p_body) not between 4 and 450
-    or p_kind not in ('news','important')
+    or p_kind not in ('news','important','open_event')
+    or (p_kind='open_event' and (p_event_starts_at is null
+        or p_event_starts_at < now()+interval '10 minutes'
+        or p_event_starts_at > now()+interval '90 days'))
+    or (p_kind<>'open_event' and p_event_starts_at is not null)
     or not public.fam_pulse_text_safe(p_title) or not public.fam_pulse_text_safe(p_body) then
     raise exception 'invalid_announcement';end if;
   if (select count(*) from public.fam_school_announcements
     where school_id=school and published_at>=now()-interval '1 day')>=4 then
     raise exception 'daily_announcement_limit';end if;
-  insert into public.fam_school_announcements(school_id,author_id,title,body,kind)
-  values (school,who,p_title,p_body,p_kind) returning id into new_id;
+  insert into public.fam_school_announcements(school_id,author_id,title,body,kind,event_starts_at,expires_at)
+  values (school,who,p_title,p_body,p_kind,p_event_starts_at,
+    case when p_kind='open_event' then p_event_starts_at + interval '12 hours'
+         else now()+interval '14 days' end)
+  returning id into new_id;
   return new_id;
 end $$;
-revoke all on function public.fam_publish_school_announcement(text,text,text) from public,anon,authenticated;
-grant execute on function public.fam_publish_school_announcement(text,text,text) to authenticated;
+revoke all on function public.fam_publish_school_announcement(text,text,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.fam_publish_school_announcement(text,text,text,timestamptz) to authenticated;
 
 create or replace function public.fam_publish_school_poll(p_question text,p_options jsonb)
 returns uuid
