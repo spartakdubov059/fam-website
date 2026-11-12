@@ -3,7 +3,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
 
-const html = await readFile(resolve(process.cwd(), "index.html"), "utf8");
+const sourceHtml = await readFile(resolve(process.cwd(), "index.html"), "utf8");
+const priceFormatter = await readFile(resolve(process.cwd(), "price-format.js"), "utf8");
+const html = sourceHtml.replace('<script src="price-format.js"></script>', `<script>${priceFormatter}</script>`);
+assert.notEqual(html, sourceHtml, "price formatter must be included in the browser audit page");
 const listing = {
   id: "e65ad519-bcb1-4b6b-8514-5e1b2b82a1e9",
   user_id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b",
@@ -82,9 +85,21 @@ await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
 try {
   await page.setContent(html, { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(
+    await page.locator("#listingsGrid .l-card").first().locator(".l-price").textContent(),
+    "10 000 ₽",
+    "listing card must display the price in rubles"
+  );
 
   // Verify local category hints and the description editor using real form controls.
   await page.evaluate(() => window.openModal("listingModal"));
+  await page.locator("#lPrice").fill("1500");
+  assert.equal(
+    await page.locator("#pricePreview").textContent(),
+    "На сайте будет отображаться: 1 500 ₽",
+    "listing form must preview numeric prices in rubles"
+  );
+  await page.locator("#lPrice").fill("");
   assert.equal(await page.locator("#lTitle").getAttribute("maxlength"), "80", "title limit must match the server's 80-character limit");
   assert.ok(await page.locator('#lCat option[value="Творчество"]').count(), "creativity category must be available in the listing form");
 
