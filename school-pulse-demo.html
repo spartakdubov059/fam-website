@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#0F1014">
-  <title>FAM — Школьный пульс (демо)</title>
+  <title>FAM — Анонсы (демо)</title>
   <link rel="stylesheet" href="./school-pulse.css">
   <style>
     :root{--bg:#0F1014;--surface:#1A1C22;--text:#F5F6F8;--muted:#AEB3C0;--border:#2A2D36;--violet:#8B5CF6;--lime:#C8F542}
@@ -27,12 +27,12 @@
     <p class="demo-notice"><strong>Это демонстрация дизайна.</strong> Все новости, опросы и результаты вымышлены. Голоса не записываются и не передаются в базу данных.</p>
     <section id="schoolPulse" class="school-pulse hidden" aria-labelledby="pulseTitle">
       <div class="pulse-header"><div>
-        <span class="pulse-eyebrow">СВОИ. СВОЯ ШКОЛА.</span>
-        <h1 class="pulse-title" id="pulseTitle">Школьный пульс ✦</h1>
-        <p class="pulse-subtitle">Новости и голосования рядом</p>
+        <span class="pulse-eyebrow">FAM / СЕГОДНЯ</span>
+        <h1 class="pulse-title" id="pulseTitle">Анонсы <span class="pulse-heading-star" aria-hidden="true">✦</span></h1>
+        <p class="pulse-subtitle">События без записи, важное и опросы</p>
       </div><button type="button" class="pulse-refresh" id="pulseRefreshBtn">Обновить</button></div>
       <div class="pulse-grid" id="pulseGrid" aria-live="polite"></div>
-      <p class="pulse-meta" id="pulseStatus">Пример школьной ленты</p>
+      <p class="pulse-meta" id="pulseStatus">Демонстрация дизайна</p>
       <details id="pulseAdmin" class="pulse-admin hidden"><summary>Для администраторов</summary></details>
     </section>
   </div>
@@ -43,6 +43,7 @@
       let vote=null;
       const feed=()=>({
         announcements:[
+          {id:"sample-event",title:"Открытый школьный квиз",body:"Приходи с друзьями — будет команда, музыка и новые знакомства. Без записи и лимита мест.",kind:"open_event",event_starts_at:new Date(Date.now()+3*24*60*60*1000).toISOString(),published_at:"2026-11-13"},
           {id:"sample-news",title:"Неделя школьных проектов",body:"Выставка идей, мастер-классы и новые знакомства. Подробности скоро появятся в школьной афише.",kind:"news",published_at:"2026-11-13"},
           {id:"sample-important",title:"Предложи свою идею",body:"Хочешь изменить что-то в школе? Отправь предложение в «Почту идей» через профиль FAM.",kind:"important",published_at:"2026-11-13"}
         ],
