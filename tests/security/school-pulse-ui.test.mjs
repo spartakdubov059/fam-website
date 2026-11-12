@@ -43,3 +43,23 @@ test("server functions bind school and role from auth.uid and profile, not from 
  assert.match(sql,/who uuid := auth\.uid\(\)/);
  assert.match(sql,/where id=who and role in \('school_admin','council_member'\)/);
 });
+
+test("Open events behave as announcements with no bookings, attendee cap or public user information",()=>{
+ const markup=api.announcementCard({id:"any",kind:"open_event",title:"Открытый квиз",body:"Встречаемся вместе!",event_starts_at:"2099-05-03T16:00:00Z"});
+ assert.match(markup,/СОБЫТИЕ ДЛЯ ВСЕХ/);
+ assert.match(markup,/Без записи · Нет лимита мест/);
+ assert.doesNotMatch(markup,/data-action="handle-event"|event_registrations|max_seats/);
+ const hostile=api.announcementCard({kind:"open_event",title:"<svg onload=alert(1)>",body:"<script>run()</script>",event_starts_at:"2099-05-03T16:00:00Z"});
+ assert.ok(hostile.includes("&lt;script&gt;"));
+ assert.doesNotMatch(hostile,/<script>|<svg onload/);
+ assert.match(sql,/coalesce\(l\.max_seats,0\)=0/);
+ assert.match(sql,/l\.school_id=school and l\.status='active'/);
+});
+test("Announcements animations are responsive and optional for reduced motion",()=>{
+ assert.match(html,/>Анонсы <span class="pulse-heading-star"/);
+ assert.doesNotMatch(html,/>Школьный пульс/);
+ assert.match(css,/@keyframes pulseReveal/);
+ assert.match(css,/@keyframes pulseBarGrow/);
+ assert.match(css,/prefers-reduced-motion:reduce/);
+ assert.match(html,/name="event_starts_at"/);
+});
