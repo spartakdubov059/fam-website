@@ -22,9 +22,11 @@ test("worker never caches private messages, avatars, listings or API responses",
   assert.match(sw, /url\.origin !== self\.location\.origin/);
   assert.match(sw, /allowedPaths\.includes\(url\.pathname\)/);
   assert.doesNotMatch(sw, /cache\.addAll\(\["\.\/index\.html"/);
-  for (const secret of ["supabase.co", "chat", "auth", "listings-images", "avatars-pending"]) {
-    assert.ok(!sw.includes(secret), "worker must not explicitly cache " + secret);
-  }
+  const precacheMatch = sw.match(/const PUBLIC_ASSETS = (\[[^;]+\]);/);
+  assert.ok(precacheMatch, "explicit public asset allowlist must exist");
+  const precache = JSON.parse(precacheMatch[1]);
+  assert.deepEqual(precache, ["./price-format.js", "./icons/fam-icon.svg"]);
+  assert.ok(!precache.some(path => /supabase|chat|auth|listing|avatar|index\.html/i.test(path)));
 });
 test("registration uses HTTPS and a relative worker scope", () => {
   const registration = load("pwa-register.js");
