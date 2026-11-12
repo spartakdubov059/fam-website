@@ -11,7 +11,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://famru.netlify.app",
   "https://mellifluous-profiterole-48c13b.netlify.app"
 ]);
-function readKey(name) {
+function readKey(name: string) {
   const value = Deno.env.get(name) ?? "";
   try { const obj = JSON.parse(value); if (typeof obj?.default === "string") return obj.default; } catch {}
   return value;
@@ -24,7 +24,7 @@ const PUBLISHABLE_KEY = readKey("SUPABASE_PUBLISHABLE_KEYS")
   || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
 const LEGACY_SERVICE_JWT = SERVICE_KEY.startsWith("eyJ");
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const errors = {
+const errors: Record<string,string> = {
   invalid_pending_photo: "Файлы должны находиться в вашем защищённом хранилище.",
   duplicate_pending_path: "Одинаковый файл выбран несколько раз.",
   duplicate_file_content: "Вы выбрали две одинаковые фотографии.",
@@ -34,22 +34,22 @@ const errors = {
   invalid_image_signature: "Разрешены только настоящие JPG, PNG и WebP.",
   invalid_dimensions: "Неверное разрешение фотографии."
 };
-function response(body, status=200, origin=null) {
-  const headers = { "Content-Type":"application/json; charset=utf-8", "Vary":"Origin",
+function response(body: unknown, status=200, origin: string|null=null) {
+  const headers: Record<string,string> = { "Content-Type":"application/json; charset=utf-8", "Vary":"Origin",
     "Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods":"POST, OPTIONS" };
   if (origin && ALLOWED_ORIGINS.has(origin)) headers["Access-Control-Allow-Origin"] = origin;
   return new Response(JSON.stringify(body), {status, headers});
 }
-async function serviceGet(path) {
-  const headers = { "apikey": SERVICE_KEY };
+async function serviceGet(path: string) {
+  const headers: Record<string,string> = { "apikey": SERVICE_KEY };
   if (LEGACY_SERVICE_JWT) headers["Authorization"]="Bearer "+SERVICE_KEY;
   const res=await fetch(SUPABASE_URL+"/rest/v1/"+path,{headers});
   const json=await res.json().catch(()=>null);
   return {ok:res.ok, data:json};
 }
-async function serviceRpc(name, body) {
-  const headers={ "apikey":SERVICE_KEY, "Content-Type":"application/json" };
+async function serviceRpc(name: string, body: unknown) {
+  const headers: Record<string,string>={ "apikey":SERVICE_KEY, "Content-Type":"application/json" };
   if (LEGACY_SERVICE_JWT) headers["Authorization"]="Bearer "+SERVICE_KEY;
   const res=await fetch(SUPABASE_URL+"/rest/v1/rpc/"+name,{
     method:"POST",headers,body:JSON.stringify(body)
@@ -84,7 +84,7 @@ Deno.serve(async req=>{
       return response({ok:false,error:"photo_count_limit"},400,origin);
     const checked=validateSignedPhotoBatch(URLs,user.id,SUPABASE_URL);
     if (!checked.ok)
-      return response({ok:false,error:checked.error,reason:errors[checked.error]},400,origin);
+      return response({ok:false,error:checked.error,reason:errors[checked.error||'']},400,origin);
 
     // Verify the already-text-moderated listing belongs to this exact account.
     const result=await serviceGet("listings?select=id,user_id,status,moderation_status,image_url,photo_status"+
@@ -97,7 +97,7 @@ Deno.serve(async req=>{
     if (listing.photo_status && !["none","failed"].includes(listing.photo_status))
       return response({ok:false,error:"photo_batch_already_submitted"},409,origin);
 
-    const files=[];
+    const files: Array<{bytes:Uint8Array,mime:string}>=[];
     for (const url of URLs) {
       // Signed private URLs are fetched server-side; a browser-supplied collage is ignored.
       const res=await fetch(url,{redirect:"error"});
@@ -108,7 +108,7 @@ Deno.serve(async req=>{
       files.push({bytes,mime});
     }
     const content=await inspectPhotoBatch(files);
-    if (!content.ok) return response({ok:false,error:content.error,reason:errors[content.error]},400,origin);
+    if (!content.ok) return response({ok:false,error:content.error,reason:errors[content.error||'']},400,origin);
     // Only server-verified paths and hashes enter the private queue.
     const queued=await serviceRpc("fam_enqueue_photo_batch",{
       p_listing_id:listingId,
