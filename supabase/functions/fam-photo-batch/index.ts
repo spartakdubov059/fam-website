@@ -108,7 +108,7 @@ Deno.serve(async req=>{
       files.push({bytes,mime});
     }
     const content=await inspectPhotoBatch(files);
-    if (!content.ok) return response({ok:false,error:content.error,reason:errors[content.error||'']},400,origin);
+    if (!content.ok || !content.files) return response({ok:false,error:content.error,reason:errors[content.error||'']},400,origin);
     // Only server-verified paths and hashes enter the private queue.
     const queued=await serviceRpc("fam_enqueue_photo_batch",{
       p_listing_id:listingId,
