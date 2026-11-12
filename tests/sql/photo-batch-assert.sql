@@ -5,7 +5,7 @@ declare
   l uuid:='8b07e0b4-4fd3-4a95-9715-7cdac57d22b1';
   paths text[];
   hashes text[];
-  id uuid;
+  batch_id uuid;
   count_rows integer;
 begin
   if public.fam_claim_free_photo_review_slot() then raise exception 'Quota must default to zero'; end if;
@@ -25,12 +25,12 @@ begin
    a::text||'/listing_'||a::text||'_01234568.jpg'
   ];
   hashes:=array[repeat('a',64),repeat('b',64)];
-  select public.fam_enqueue_photo_batch(l,a,paths,hashes,'fam-school-photo-v1') into id;
-  if id is null then raise exception 'No batch ID'; end if;
+  select public.fam_enqueue_photo_batch(l,a,paths,hashes,'fam-school-photo-v1') into batch_id;
+  if batch_id is null then raise exception 'No batch ID'; end if;
   select count(*) into count_rows from public.listing_photos where listing_id=l and public_url is null and review_status='pending';
   if count_rows<>2 then raise exception 'Photos should remain hidden'; end if;
   if (select photo_status from public.listings where public.listings.id=l)<>'pending' then
     raise exception 'Listing pending photo state missing';end if;
-  if not exists(select 1 from private.fam_photo_review_batches where private.fam_photo_review_batches.id=id) then
+  if not exists(select 1 from private.fam_photo_review_batches where private.fam_photo_review_batches.id=batch_id) then
     raise exception 'Batch not queued'; end if;
 end $test$;
