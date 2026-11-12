@@ -18,6 +18,20 @@ const listing = {
   image_url: null,
   is_event: false
 };
+const approvedListing = {
+  id: "8b07e0b4-4fd3-4a95-9715-7cdac57d22b1",
+  user_id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b",
+  title: "Тестовое объявление с фото",
+  description: "Проверка показа изображения после успешной модерации.",
+  category: "Вещи",
+  price_text: "5 000 ₽",
+  created_at: "2026-11-12T11:00:00.000Z",
+  status: "active",
+  moderation_status: "approved",
+  photo_status: "approved",
+  image_url: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
+  is_event: false
+};
 
 const sdkMock = `
 window.supabase = {
@@ -30,7 +44,7 @@ window.supabase = {
         order: function () { return result; },
         limit: function () { return result; },
         then: function (resolve, reject) {
-          const data = table === "listings" ? [${JSON.stringify(listing)}] : [];
+          const data = table === "listings" ? [${JSON.stringify(listing)}, ${JSON.stringify(approvedListing)}] : [];
           return Promise.resolve({ data: data, error: null }).then(resolve, reject);
         }
       };
@@ -134,6 +148,18 @@ try {
     assert.match(pendingPhotoText, /Фото проверяется/);
     await page.locator('[data-action="close-listing-details"]').click();
 
+    const approvedCard = page.locator("#listingsGrid .l-card").nth(1);
+    await approvedCard.locator(".l-details-btn").click();
+    const approvedImage = await page.locator("#listingDetailsBody .listing-detail-image").evaluate(async img => {
+      await img.decode();
+      return { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+    });
+    assert.equal(approvedImage.complete, true, "approved photo must finish loading in details");
+    assert.ok(approvedImage.naturalWidth > 0 && approvedImage.naturalHeight > 0, "approved photo must have non-zero intrinsic dimensions");
+    const approvedDescription = await page.locator("#listingDetailsBody .listing-detail-description").textContent();
+    assert.equal(approvedDescription, approvedListing.description, "approved listing description must be rendered");
+    await page.locator('[data-action="close-listing-details"]').click();
+
     const inspectSection = async (tab, section, visibleSelector) => {
       await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
       await page.waitForTimeout(500);
@@ -208,6 +234,7 @@ try {
       authModalWidth: Math.round(authMetrics.width),
       listingFormWidth: Math.round(formMetrics.width),
       guestSections: "PASS",
+      approvedPhoto: "PASS",
       result: "PASS"
     }));
   }
