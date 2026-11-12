@@ -4,4 +4,4 @@ This branch contains a temporary, isolated coding fixture used to compare the cu
 
 The push-trigger file is intentionally touched after the benchmark workflow is merged into the default branch.
 
-Benchmark trigger: 2026-11-12 run.
+Benchmark trigger: 2026-11-12 rerun after JSON and empty-patch recovery fixes.
