@@ -28,9 +28,14 @@ test("avatar uploads are enqueued privately instead of being deleted on quota/pr
   assert.match(branch, /rpc\/enqueue_avatar_image_moderation_task/);
   assert.match(branch, /status: "pending"/);
   assert.match(branch, /предыдущий аватар продолжит отображаться/i);
-  assert.doesNotMatch(branch, /removePendingAvatarImage/);
+  const trustedBranch = branch.slice(0, branch.indexOf("// All other roles continue"));
+  const queuedBranch = branch.slice(branch.indexOf("// All other roles continue"));
+  assert.match(trustedBranch, /publishPendingAvatarImage\(imageUrl, userId, false\)/);
+  assert.match(trustedBranch, /removePendingAvatarImage\(imageUrl, userId\)/);
+  assert.match(trustedBranch, /removePreviousOwnAvatarImage\(profile\.avatar_url, userId\)/);
+  assert.doesNotMatch(queuedBranch, /removePendingAvatarImage/);
   assert.match(html, /\["approved", "pending"\]\.includes\(submission\.status\)/);
-  assert.match(html, /server now owns the private staged file and queue task/);
+  assert.match(html, /server has published the avatar or safely queued it/);
 });
 
 test("avatar moderation uses a durable private queue and swaps only the current request", () => {

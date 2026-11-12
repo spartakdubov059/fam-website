@@ -59,3 +59,27 @@ test("trusted uploads skip only image AI review; text moderation remains mandato
   assert.ok(submitContent.includes("&& !bypassPhotoAiReview"));
   assert.ok(submitContent.includes("photo_review_bypassed: bypassPhotoAiReview"));
 });
+
+const avatarBranch = submitContent.slice(
+  submitContent.indexOf('if (kind === "avatar") {'),
+  submitContent.indexOf("const quotaResult"),
+);
+
+test("trusted school roles publish avatars immediately without image review or queueing", () => {
+  assert.ok(avatarBranch.includes("if (canSkipListingImageReview(profile, imageUrl))"));
+  assert.ok(avatarBranch.includes("publishPendingAvatarImage(imageUrl, userId, false)"));
+  assert.ok(avatarBranch.includes('status: "approved"'));
+  assert.ok(avatarBranch.includes("avatar_review_bypassed: true"));
+  assert.ok(!avatarBranch.slice(
+    avatarBranch.indexOf("if (canSkipListingImageReview(profile, imageUrl))"),
+    avatarBranch.indexOf("// All other roles continue"),
+  ).includes("enqueue_avatar_image_moderation_task"));
+  assert.ok(avatarBranch.includes("role=in.(school_admin,council_member)"));
+  assert.ok(avatarBranch.includes("pending_avatar_request_id: null"));
+});
+
+test("ordinary avatar uploads still use the protected moderation queue", () => {
+  assert.ok(avatarBranch.includes("// All other roles continue through the protected private moderation queue."));
+  assert.ok(avatarBranch.includes('rpc/enqueue_avatar_image_moderation_task'));
+  assert.ok(avatarBranch.includes('status: "pending"'));
+});
