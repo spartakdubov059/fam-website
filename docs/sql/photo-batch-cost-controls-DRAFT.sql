@@ -200,7 +200,7 @@ declare result jsonb;
 begin
   with claimable as (
     select id from private.fam_photo_review_batches
-    where state in ('queued','pending_budget') and next_attempt_at <= now() and attempts < 8
+    where state in ('queued','pending_budget','processing') and next_attempt_at <= now() and attempts < 8
     order by created_at
     limit least(greatest(coalesce(p_limit,1),1),2)
     for update skip locked
