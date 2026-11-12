@@ -145,3 +145,47 @@ revoke all on function public.fam_record_approved_photo_hashes(uuid, text[], tex
   from public, anon, authenticated;
 grant execute on function public.fam_record_approved_photo_hashes(uuid, text[], text, text)
   to service_role;
+
+
+-- Transactional queue admission. Service-role only, with owner, path, hash and duplicate validation.
+create or replace function public.fam_enqueue_photo_batch(
+ p_listing_id uuid, p_owner_id uuid, p_pending_paths text[], p_input_hashes text[], p_policy_version text)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare batch_id uuid; n integer;
+begin
+  n := cardinality(p_pending_paths);
+  if n not between 2 and 5 or cardinality(p_input_hashes) <> n or
+     p_policy_version <> 'fam-school-photo-v1' then
+    raise exception 'invalid batch';
+  end if;
+  if (select count(distinct path) from unnest(p_pending_paths) path) <> n
+      or (select count(distinct content_hash) from unnest(p_input_hashes) content_hash) <> n
+      or exists (select 1 from unnest(p_input_hashes) h where h !~ '^[a-f0-9]{64}$')
+      or exists (select 1 from unnest(p_pending_paths) path
+           where path !~ ('^' || p_owner_id::text || '/listing_' || p_owner_id::text ||
+              '_[A-Za-z0-9_-]{8,80}\\.(jpg|jpeg|png|webp)$')) then
+    raise exception 'invalid photo source';
+  end if;
+  perform 1 from public.listings l
+  where l.id = p_listing_id and l.user_id = p_owner_id
+    and l.status = 'active'
+    and l.image_url is null
+    and coalesce(l.photo_status,'none') in ('none','failed')
+  for update;
+  if not found then raise exception 'listing not eligible'; end if;
+  insert into private.fam_photo_review_batches
+    (listing_id,owner_id,pending_paths,input_hashes,policy_version)
+  values (p_listing_id,p_owner_id,p_pending_paths,p_input_hashes,p_policy_version)
+  returning id into batch_id;
+  insert into public.listing_photos(listing_id,position,review_status)
+  select p_listing_id,(idx - 1)::smallint,'pending'
+  from generate_series(1,n) idx;
+  update public.listings set photo_status = 'pending' where id=p_listing_id;
+  return batch_id;
+end $$;
+revoke all on function public.fam_enqueue_photo_batch(uuid,uuid,text[],text[],text)
+  from public, anon, authenticated;
+grant execute on function public.fam_enqueue_photo_batch(uuid,uuid,text[],text[],text)
+  to service_role;
