@@ -27,7 +27,7 @@ test("avatar uploads are enqueued privately instead of being deleted on quota/pr
   const branch = submit.slice(start, end);
   assert.match(branch, /rpc\/enqueue_avatar_image_moderation_task/);
   assert.match(branch, /status: "pending"/);
-  assert.match(branch, /Предыдущий аватар продолжит отображаться/);
+  assert.match(branch, /предыдущий аватар продолжит отображаться/i);
   assert.doesNotMatch(branch, /removePendingAvatarImage/);
   assert.match(html, /\["approved", "pending"\]\.includes\(submission\.status\)/);
   assert.match(html, /server now owns the private staged file and queue task/);
@@ -81,8 +81,12 @@ test("a provider outage does not block a locally clean idea, while local risk st
   assert.match(reviewer, /if \(!apiKey\) return safeLocalFallback\(\)/);
   assert.match(reviewer, /action: "ok",\s*reason_code: "safe_local_fallback"/);
   assert.match(reviewer, /action: "pending",\s*reason_code: "local_policy_flag_requires_review"/);
-  assert.match(moderate, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
-  assert.doesNotMatch(moderate, /if \(!OPENAI_KEY\) \{\s*return jsonResponse\(\{\s*action: "pending"/);
+  const ideaStart = moderate.indexOf("if (isIdea) {");
+  const ideaEnd = moderate.indexOf("// For locally flagged text", ideaStart);
+  assert.ok(ideaStart >= 0 && ideaEnd > ideaStart);
+  const ideaPath = moderate.slice(ideaStart, ideaEnd);
+  assert.match(ideaPath, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
+  assert.doesNotMatch(ideaPath, /if \(!OPENAI_KEY\)/);
   assert.match(contentSafety, /serious_hate_or_threat/);
 });
 
