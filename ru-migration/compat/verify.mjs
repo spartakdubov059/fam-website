@@ -19,6 +19,7 @@ for (const [name, value] of Object.entries({
 })) {
   assert.equal(typeof value, 'function', name + ' must be exported as a function');
 }
+assert.equal(sharp.versions.sharp, '0.35.5', 'Installed native Sharp must match the pinned dependency');
 const testImage = await sharp({
   create: { width: 16, height: 9, channels: 3, background: '#0080ff' },
 }).jpeg().withMetadata({ density: 300 }).toBuffer();
