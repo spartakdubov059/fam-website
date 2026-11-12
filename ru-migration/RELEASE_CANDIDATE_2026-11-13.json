@@ -1,0 +1,34 @@
+{
+  "project": "FAM RU staging migration",
+  "archive": "FAM_RU_Migration_Starter_2026-11-13_220tests.zip",
+  "sha256": "993bbf697ba6b24e377653a32419458a600d985aeaab3e28ac09e9cd7be31524",
+  "bytes": 197950,
+  "included_files": 112,
+  "checked_at": "2026-11-13",
+  "local_tests": {
+    "passed": 220,
+    "failed": 0,
+    "command": "npm run check",
+    "native_sharp_installed_version": "0.34.1",
+    "native_sharp_required_version": "0.35.5"
+  },
+  "sdk_gate": "BLOCKED — @ydbjs/* and AWS SDK unavailable in current environment; exact native sharp version not installed",
+  "cloud_staging": "NOT DEPLOYED",
+  "production": "UNCHANGED",
+  "critical_file_sha256": {
+    "backend/package.json": "d76ef3a9b608e6b3ae5cd65b074413656f00bae824b9dda9a3c0d41bac1f58e4",
+    "backend/src/ydb-listings-repository.mjs": "e18e68b81973dd375aafd8e6facb9232828394b2e52dc02ec49b434a8e8822eb",
+    "backend/src/ydb-image-moderation-repository.mjs": "dcf07de10618f63c58ba38b99797eda00d72d73935b8e3d6b07ac035cd1bf725",
+    "backend/functions/listings/index.mjs": "057802cb52c74d75406a0fae148def3a72066c9e119c0df9e1ad9f667cb8a968",
+    "schema/01_tables.yql": "9401e6db90927cf62875f6e06dbc2e7c96063337947f52d94ab587eaa6ac97b7"
+  },
+  "release_blockers": [
+    "Verified SDK import/API compatibility on pinned package versions",
+    "Valid package lockfile for reproducible build",
+    "Real isolated YDB integration tests",
+    "Real isolated Object Storage integration tests",
+    "School-controlled cloud project and billing limit review",
+    "Actual auth, moderation and account-migration tests",
+    "Safe access policy/legal review before real students join"
+  ]
+}
