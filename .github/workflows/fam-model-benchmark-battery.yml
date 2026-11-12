@@ -1,0 +1,198 @@
+name: FAM local model benchmark battery
+on:
+  push:
+    branches: [ai/model-benchmark-battery-main]
+    paths: [".github/workflows/fam-model-benchmark-battery.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fam-model-benchmark-battery
+  cancel-in-progress: false
+jobs:
+  benchmark:
+    name: ${{ matrix.model_name }} — два задания FAM
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: deepseek
+            model_name: DeepSeek Coder V2 Lite
+          - model: qwen38
+            model_name: Qwen3.8 27B IQ2_XS
+    steps:
+      - name: Checkout isolated benchmark branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: "22"
+      - name: Run exact-edit helper and agent security unit tests
+        run: |
+          set -euo pipefail
+          node --test tests/security/local-model-edits.test.mjs
+          node --test tests/security/local-model-json.test.mjs tests/security/local-model-patch.test.mjs
+      - name: Download and verify the selected free model weights
+        env:
+          MODEL_KIND: ${{ matrix.model }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          if [[ "$MODEL_KIND" == "deepseek" ]]; then
+            MODEL="$RUNNER_TEMP/fam-model/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
+            curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              "https://huggingface.co/second-state/DeepSeek-Coder-V2-Lite-Instruct-GGUF/resolve/7d0d798/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf" \
+              --output "$MODEL"
+            EXPECTED_SHA="38bc76f3326b49b4d81d1027d092bf7ce5b4ed2de4136d1d2e7e6347c3ec8376"
+            MIN_SIZE=10000000000
+          else
+            MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
+            curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf" \
+              --output "$MODEL"
+            EXPECTED_SHA="eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23"
+            MIN_SIZE=8500000000
+          fi
+          SIZE="$(stat -c '%s' "$MODEL")"
+          SHA="$(sha256sum "$MODEL" | awk '{print $1}')"
+          test "$SIZE" -ge "$MIN_SIZE"
+          test "$SHA" = "$EXPECTED_SHA"
+          echo "Verified $MODEL_KIND weights: $SIZE bytes / $SHA"
+      - name: Build pinned llama.cpp with CPU-only support
+        env:
+          LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON \
+            -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_METAL=OFF -DGGML_OPENMP=ON
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+      - name: Configure local inference settings
+        env:
+          MODEL_KIND: ${{ matrix.model }}
+        run: |
+          if [[ "$MODEL_KIND" == "deepseek" ]]; then
+            {
+              echo "FAM_MODEL_ID=second-state/DeepSeek-Coder-V2-Lite-Instruct"
+              echo "FAM_MODEL_TEMPERATURE=0.1"
+              echo "FAM_MODEL_TOP_P=0.9"
+              echo "FAM_MODEL_TOP_K=40"
+            } >> "$GITHUB_ENV"
+            echo "MODEL_FILE=$RUNNER_TEMP/fam-model/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf" >> "$GITHUB_ENV"
+          else
+            {
+              echo "FAM_MODEL_ID=Qwen3.8-27B-IQ2_XS"
+              echo "FAM_MODEL_TEMPERATURE=0.1"
+              echo "FAM_MODEL_TOP_P=0.95"
+              echo "FAM_MODEL_TOP_K=40"
+            } >> "$GITHUB_ENV"
+            echo "MODEL_FILE=$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf" >> "$GITHUB_ENV"
+          fi
+          echo "FAM_MODEL_MAX_TOKENS=8000" >> "$GITHUB_ENV"
+      - name: Start the selected model on CPU
+        env:
+          MODEL_KIND: ${{ matrix.model }}
+        run: |
+          set -euo pipefail
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          if [[ "$MODEL_KIND" == "qwen38" ]]; then
+            "$SERVER" -m "$MODEL_FILE" --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+              --temp 0.1 --top-p 0.95 --top-k 40 --reasoning off > "$RUNNER_TEMP/fam-llama.log" 2>&1 &
+          else
+            "$SERVER" -m "$MODEL_FILE" --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+              --temp 0.1 --top-p 0.9 --top-k 40 > "$RUNNER_TEMP/fam-llama.log" 2>&1 &
+          fi
+          echo "$!" > "$RUNNER_TEMP/fam-llama.pid"
+          READY=false
+          for i in $(seq 1 180); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then READY=true; break; fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/fam-llama.pid")" 2>/dev/null; then tail -n 120 "$RUNNER_TEMP/fam-llama.log"; exit 1; fi
+            sleep 5
+          done
+          test "$READY" = true
+      - name: Run two isolated FAM bug-fix tasks and independent QA
+        env:
+          MODEL_KIND: ${{ matrix.model }}
+          TASK_TIME_AGO: >-
+            Исправь подтверждённый дефект функции timeAgo в index.html: некорректная дата сейчас может отображаться как Invalid Date, а числовая временная метка 0 считается пустым значением. Верни пустую подпись для null, undefined, пустой строки, невалидной даты, NaN и Infinity; числовой Unix timestamp 0 должен оставаться корректной датой. Сохрани существующие русские подписи для валидных дат. Измени только index.html и только функцию timeAgo. Регрессионные проверки находятся в tests/agent-benchmark/time-ago.test.mjs; этот файл только для чтения.
+          TASK_DESCRIPTION: >-
+            Исправь дефект normalizeDescriptionForEditor в index.html: редактор сворачивает обычные пробелы и табуляции, но оставляет повторяющиеся Unicode-пробелы (например, NBSP, narrow no-break space, thin space и ideographic space) внутри строки. Сворачивай любую последовательность горизонтальных Unicode-пробелов в один обычный пробел, сохраняя намеренные переводы строк, текущую пунктуацию и смысл текста. Измени только index.html и только функцию normalizeDescriptionForEditor. Регрессионные проверки находятся в tests/agent-benchmark/description-whitespace.test.mjs; этот файл только для чтения.
+        run: |
+          set -euo pipefail
+          CASE_ROOT="$RUNNER_TEMP/fam-benchmark-cases"
+          mkdir -p "$CASE_ROOT"
+          run_case() {
+            local case_id="$1"
+            local task="$2"
+            local test_path="$3"
+            local workspace="$RUNNER_TEMP/worktree-$case_id"
+            local out="$CASE_ROOT/$case_id"
+            mkdir -p "$out"
+            git worktree add --detach "$workspace" "$GITHUB_SHA" >/dev/null
+            local started ended qa
+            started="$(date +%s)"
+            if GITHUB_WORKSPACE="$workspace" RUNNER_TEMP="$out" FAM_MODEL_ID="$FAM_MODEL_ID" \
+              FAM_MODEL_TEMPERATURE="$FAM_MODEL_TEMPERATURE" FAM_MODEL_TOP_P="$FAM_MODEL_TOP_P" \
+              FAM_MODEL_TOP_K="$FAM_MODEL_TOP_K" FAM_MODEL_MAX_TOKENS="$FAM_MODEL_MAX_TOKENS" \
+              FAM_TASK="$task" node "$workspace/scripts/run-local-coder.mjs"; then
+              :
+            else
+              echo "generation_failed" > "$out/qa-status.txt"
+            fi
+            ended="$(date +%s)"
+            echo "$((ended-started))" > "$out/inference-seconds.txt"
+            qa="model_or_inference_failed"
+            local summary="$out/fam-agent/summary.json"
+            local patch="$out/fam-agent/fam-agent.patch"
+            if [[ -s "$summary" ]]; then
+              local has_patch
+              has_patch="$(node -e "const s=require(process.argv[1]);process.stdout.write(String(s.patch_available===true))" "$summary")"
+              if [[ "$has_patch" == "true" && -s "$patch" ]]; then
+                if node "$workspace/scripts/validate-local-agent-patch.mjs" "$patch" "$summary" \
+                  && git -C "$workspace" apply --check "$patch" \
+                  && git -C "$workspace" apply "$patch"; then
+                  if (cd "$workspace" && node --test "$test_path" \
+                    && node --test tests/moderation/*.test.mjs tests/security/*.test.mjs \
+                    && git diff --check); then
+                    qa="passed"
+                  else
+                    qa="tests_failed"
+                  fi
+                else
+                  qa="patch_rejected"
+                fi
+              else
+                qa="no_patch"
+              fi
+            fi
+            echo "$qa" > "$out/qa-status.txt"
+            echo "- $case_id: $qa, inference ${ended-started}s" >> "$GITHUB_STEP_SUMMARY"
+            git worktree remove --force "$workspace" >/dev/null 2>&1 || true
+            [[ "$qa" == "passed" ]]
+          }
+          status=0
+          run_case time-ago "$TASK_TIME_AGO" tests/agent-benchmark/time-ago.test.mjs || status=1
+          run_case description-whitespace "$TASK_DESCRIPTION" tests/agent-benchmark/description-whitespace.test.mjs || status=1
+          echo "## ${MODEL_KIND} benchmark results" >> "$GITHUB_STEP_SUMMARY"
+          test "$status" -eq 0
+      - name: Stop local model server
+        if: always()
+        run: |
+          if [[ -s "$RUNNER_TEMP/fam-llama.pid" ]]; then kill "$(cat "$RUNNER_TEMP/fam-llama.pid")" 2>/dev/null || true; fi
+      - name: Save model benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fam-model-benchmark-${{ matrix.model }}
+          path: |
+            ${{ runner.temp }}/fam-benchmark-cases
+            ${{ runner.temp }}/fam-llama.log
+          if-no-files-found: warn
+          retention-days: 5
