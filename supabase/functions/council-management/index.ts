@@ -380,12 +380,12 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
     grouped.flatMap(row => [row.actor_id, row.target_id])
       .filter((id): id is string => typeof id === "string" && UUID_RE.test(id)),
   ));
-  const profilesById = new Map<string, { id: string; email: string | null; role: string | null }>();
+  const profilesById = new Map<string, { id: string; email: string | null; role: string | null; first_name: string | null; last_name: string | null; class_name: string | null }>();
   for (let offset = 0; offset < profileIds.length; offset += 50) {
     const batch = profileIds.slice(offset, offset + 50);
     if (!batch.length) continue;
     const people = await adminRequest(
-      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,role,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&id=in.(" + batch.map(id => encodeURIComponent(id)).join(",") + ")",
     );
     if (!people.ok || !Array.isArray(people.data)) {
@@ -398,6 +398,9 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
           id: profile.id,
           email: typeof profile.email === "string" ? profile.email : null,
           role: typeof profile.role === "string" ? profile.role : null,
+          first_name: typeof profile.first_name === "string" ? profile.first_name : null,
+          last_name: typeof profile.last_name === "string" ? profile.last_name : null,
+          class_name: typeof profile.class_name === "string" ? profile.class_name : null,
         });
       }
     }
@@ -420,11 +423,17 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
       actor: actor ? {
         email: actor.email,
         role: actor.role,
+        first_name: actor.first_name,
+        last_name: actor.last_name,
+        class_name: actor.class_name,
         account_code: actor.id.slice(-6).toUpperCase(),
       } : null,
       target: target ? {
         email: target.email,
         role: target.role,
+        first_name: target.first_name,
+        last_name: target.last_name,
+        class_name: target.class_name,
         account_code: target.id.slice(-6).toUpperCase(),
       } : null,
       identity_available: !!actor,
