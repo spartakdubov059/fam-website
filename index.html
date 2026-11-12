@@ -814,6 +814,53 @@
       .bg-decor::before, .bg-decor::after, .logo-mark { animation: none !important; }
     }
 
+
+    /* FAM listing details and mobile-first layout */
+    .l-grid { width: 100%; min-width: 0; }
+    .l-card { min-width: 0; overflow: hidden; }
+    .l-description { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .l-details-btn { width: 100%; min-height: 40px; margin-top: 3px; padding: 8px 10px; display: inline-flex; justify-content: center; align-items: center; border: 1px solid var(--border); border-radius: 11px; background: rgba(255,255,255,.045); color: var(--text); font-size: 11px; font-weight: 800; }
+    .l-details-btn:hover { background: rgba(255,255,255,.09); border-color: #596174; }
+    .l-details-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .l-photo-state { display: inline-flex; align-self: flex-start; max-width: 100%; margin-top: 3px; padding: 4px 8px; border: 1px solid rgba(240,193,75,.26); border-radius: 8px; background: rgba(240,193,75,.09); color: #E8C66F; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+    .l-photo-state.is-review { border-color: rgba(126,166,255,.3); background: rgba(91,140,255,.09); color: #A9C4FF; }
+    .l-photo-state.is-rejected { border-color: rgba(255,107,107,.25); background: rgba(255,107,107,.08); color: #FF9B9B; }
+    .listing-details-modal { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); }
+    .listing-details-content { width: min(100%, 560px); max-width: 560px; max-height: min(88dvh, 820px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 20px; }
+    .listing-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .listing-detail-header h2 { min-width: 0; margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
+    .listing-detail-close { flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text); font-size: 22px; line-height: 1; }
+    .listing-detail-image { display: block; width: 100%; max-height: 46dvh; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 15px; background: #101018; }
+    .listing-detail-photo-placeholder { width: 100%; min-height: 150px; max-height: 34dvh; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 18px; border: 1px solid var(--border); border-radius: 15px; background: linear-gradient(145deg, #20232B, #111319); color: var(--muted); text-align: center; font-size: 12px; line-height: 1.45; }
+    .listing-detail-photo-placeholder strong { color: var(--text); font-size: 14px; }
+    .listing-detail-meta { margin: 14px 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+    .listing-detail-price { margin: 12px 0 0; font-size: 18px; font-weight: 900; overflow-wrap: anywhere; }
+    .listing-detail-description-title { margin: 18px 0 7px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .listing-detail-description { margin: 0; color: var(--text); font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 430px) {
+      .header-inner { padding-left: 12px; padding-right: 12px; }
+      main { padding-left: 12px; padding-right: 12px; }
+      .cat-tiles { gap: 8px; }
+      .foryou-row { gap: 8px; }
+      .foryou-row h2 { font-size: clamp(19px, 5.2vw, 23px); }
+      .pill-all { gap: 6px; padding: 9px 12px; font-size: 12px; white-space: nowrap; }
+      .l-grid { gap: 8px; }
+      .l-card { padding: 6px; }
+      .l-body { padding: 9px 3px 4px; gap: 5px; }
+      .l-title { font-size: 12px; }
+      .l-description { font-size: 10.5px; }
+      .listing-details-modal { align-items: flex-end; }
+      .listing-details-content { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); padding: 16px; border-radius: 22px; }
+      .listing-detail-header h2 { font-size: 18px; }
+      .listing-detail-image { max-height: 38dvh; }
+    }
+    @media (min-width: 560px) and (max-width: 899px) {
+      .l-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+      main { padding-left: 20px; padding-right: 20px; }
+    }
+    @media (min-width: 900px) { .l-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
+    @media (max-width: 359px) { .l-grid { grid-template-columns: minmax(0, 1fr); } }
+
   </style>
 </head>
 <body>
@@ -1155,12 +1202,23 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Фото объявления доступно по публичной ссылке. Загружайте только изображения предметов — без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM; если автоматическая проверка временно недоступна или не может принять уверенное решение, публикация остаётся на дополнительной проверке и не считается одобренной.</p>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото сначала сохраняется в закрытом хранилище. Если сервис проверки временно исчерпал лимит, объявление может показываться без фото, а снимок автоматически появится после успешной проверки. Непроверенные фото не публикуются.</p>
         <div id="uploadStatus"></div>
       </div>
       <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
+  </div>
+</div>
+
+
+<div class="modal listing-details-modal" id="listingDetailsModal" role="dialog" aria-modal="true" aria-labelledby="listingDetailsTitle">
+  <div class="modal-content listing-details-content">
+    <div class="listing-detail-header">
+      <h2 id="listingDetailsTitle">Объявление</h2>
+      <button type="button" class="listing-detail-close" data-action="close-listing-details" aria-label="Закрыть подробности объявления">×</button>
+    </div>
+    <div id="listingDetailsBody"></div>
   </div>
 </div>
 
@@ -2032,8 +2090,45 @@ window.onunhandledrejection = function() {
     ).join("");
   }
 
+  function listingPhotoStatusText(status) {
+    const labels = { pending: "Фото проверяется", manual_review: "Фото ждёт дополнительной проверки", rejected: "Фото не прошло проверку", failed: "Проверка фото не завершена" };
+    return labels[status] || "";
+  }
+
+  function openListingDetails(listingId) {
+    const listing = listings.find(row => row.id === listingId);
+    if (!listing) { notice("Объявление не найдено. Обновите страницу."); return; }
+    const photoStatus = listing.photo_status || (listing.image_url ? "approved" : "none");
+    const photoMessages = {
+      pending: "Фото сохранено в закрытом хранилище и будет показано здесь после успешной проверки.",
+      manual_review: "Фото ожидает дополнительной проверки. До её завершения оно остаётся закрытым.",
+      rejected: "Фото не прошло проверку и не будет опубликовано. Текст объявления сохранён.",
+      failed: "Не удалось завершить проверку фотографии. Текст объявления сохранён.",
+      none: "К объявлению пока не добавлена фотография."
+    };
+    const photoHTML = listing.image_url
+      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">';
+      : '<div class="listing-detail-photo-placeholder" role="status"><strong>' + (photoStatus === "pending" ? "Фото проверяется" : "Фотография пока недоступна") + '</strong><span>' + esc(photoMessages[photoStatus] || photoMessages.none) + '</span></div>';
+    const description = String(listing.description || "").trim();
+    const eventDate = listing.is_event && listing.event_date ? new Date(listing.event_date + "T00:00:00").toLocaleDateString("ru-RU") : "";
+    const eventTime = listing.is_event && listing.event_time ? String(listing.event_time).slice(0, 5) : "";
+    const meta = [listing.category || "", listing.created_at ? timeAgo(listing.created_at) : "", eventDate, eventTime].filter(Boolean).join(" · ");
+    $("listingDetailsTitle").textContent = listing.title || "Объявление";
+    $("listingDetailsBody").innerHTML = photoHTML +
+      '<p class="listing-detail-price">' + esc(listing.price_text || "Бесплатно") + '</p>' +
+      (meta ? '<div class="listing-detail-meta">' + esc(meta) + '</div>' : "") +
+      '<h3 class="listing-detail-description-title">Описание</h3>' +
+      '<p class="listing-detail-description">' + (description ? esc(description) : "Описание не добавлено.") + '</p>';
+    window.openModal("listingDetailsModal");
+  }
   function listingCard(l, idx, ownerControls = false) {
-    const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
+    const photoStatus = l.photo_status || (l.image_url ? "approved" : "none");
+    const photoLabel = listingPhotoStatusText(photoStatus);
+    const photoStateClass = photoStatus === "manual_review" ? "is-review" : (photoStatus === "rejected" || photoStatus === "failed" ? "is-rejected" : "");
+    const photoStateHTML = photoLabel ? '<div class="l-photo-state ' + photoStateClass + '">' + esc(photoLabel) + '</div>' : "";
+    const img = l.image_url ? '<img src="' + esc(l.image_url) + '" loading="lazy" alt="' + esc(l.title) + '" decoding="async">' : '<div class="card-placeholder"></div>';
+    const description = String(l.description || "").trim();
+    const descriptionHTML = description ? '<p class="l-description">' + esc(description) + '</p>' : "";
     const favClass = isFavorite(l.id) ? 'active' : '';
     let badge = l.moderation_status === "pending" ? "Проверяется ⏳"
       : l.moderation_status === "manual_review" ? "Проверка приостановлена"
@@ -2071,7 +2166,10 @@ window.onunhandledrejection = function() {
       <div class="l-body">
         <h3 class="l-title">${esc(l.title)}</h3>
         <div class="l-price">${esc(l.price_text || "Бесплатно")}</div>
+        ${descriptionHTML}
+        ${photoStateHTML}
         ${capacityHTML}
+        <button type="button" class="l-details-btn" data-action="open-listing-details" data-id="${esc(l.id)}" aria-label="Подробнее об объявлении ${esc(l.title)}">Подробнее</button>
         <div class="l-foot">
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
@@ -3875,6 +3973,8 @@ window.onunhandledrejection = function() {
     else if (action === 'open-auth') { e.preventDefault(); openModal('authModal'); }
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
+    else if (action === 'open-listing-details') { openListingDetails(btn.dataset.id); }
+    else if (action === 'close-listing-details') { closeModal('listingDetailsModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
     else if (action === 'mark-notification-read') { markNotificationRead(btn.dataset.id); }
     else if (action === 'dismiss-notification') { dismissNotification(btn.dataset.id); }
