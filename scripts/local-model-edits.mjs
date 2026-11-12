@@ -74,9 +74,11 @@ export function applyTextEdits(sourceByPath, edits, selectedPaths) {
     updated.set(path, source.slice(0, first) + replace + source.slice(first + find.length));
   }
 
-  const totalOutputBytes = [...updated.values()].reduce((sum, source) => sum + Buffer.byteLength(source), 0);
-  if (totalOutputBytes > 240000) {
-    throw new Error("Edited source exceeds the 240 KB output limit.");
+  const changedOutputBytes = [...updated.entries()].reduce((sum, [path, source]) => {
+    return source === sourceByPath.get(path) ? sum : sum + Buffer.byteLength(source);
+  }, 0);
+  if (changedOutputBytes > 1500000) {
+    throw new Error("Changed source exceeds the 1.5 MB output limit.");
   }
   return updated;
 }
