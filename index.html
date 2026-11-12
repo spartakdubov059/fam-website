@@ -2107,7 +2107,7 @@ window.onunhandledrejection = function() {
       none: "К объявлению пока не добавлена фотография."
     };
     const photoHTML = listing.image_url
-      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">';
+      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">'
       : '<div class="listing-detail-photo-placeholder" role="status"><strong>' + (photoStatus === "pending" ? "Фото проверяется" : "Фотография пока недоступна") + '</strong><span>' + esc(photoMessages[photoStatus] || photoMessages.none) + '</span></div>';
     const description = String(listing.description || "").trim();
     const eventDate = listing.is_event && listing.event_date ? new Date(listing.event_date + "T00:00:00").toLocaleDateString("ru-RU") : "";
