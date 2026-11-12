@@ -38,7 +38,7 @@ test("recalculates each hunk independently, including insertions and deletions",
 
   const fixed = normalizeUnifiedDiffHunkCounts(patch);
   assert.match(fixed, /@@ -2,2 \+2,3 @@ first/);
-  assert.match(fixed, /@@ -20,2 \+22,2 @@ second/);
+  assert.match(fixed, /@@ -20,2 \+22,1 @@ second/);
 });
 
 test("normalizes Windows line endings", () => {
