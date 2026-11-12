@@ -65,7 +65,7 @@ begin
     school_id = coalesce(profiles.school_id, excluded.school_id),
     first_name = coalesce(profiles.first_name, excluded.first_name),
     last_name = coalesce(profiles.last_name, excluded.last_name),
-    class_name = coalesce(public.profiles.class_name, excluded.class_name);
+    class_name = coalesce(profiles.class_name, excluded.class_name);
 
   return new;
 end;
@@ -404,5 +404,7 @@ revoke all on function public.finish_listing_image_moderation_task(uuid,text,tex
 grant execute on function public.enqueue_listing_image_moderation_task(uuid,text,text,text,text,text,text,boolean,date,time without time zone,text,integer) to service_role;
 grant execute on function public.claim_listing_image_moderation_tasks(integer,integer) to service_role;
 grant execute on function public.finish_listing_image_moderation_task(uuid,text,text,text,integer,text,boolean) to service_role;
+
+notify pgrst, 'reload schema';
 
 commit;
