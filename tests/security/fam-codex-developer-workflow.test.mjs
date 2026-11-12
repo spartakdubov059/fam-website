@@ -116,7 +116,7 @@ test("the local coder uses exact edit operations and Git-generated patches", () 
   assert.match(runner, /extractExplicitTargetPaths/);
   assert.match(runner, /applyTextEdits/);
   assert.match(runner, /"diff"/);
-  assert.match(runner, /apply --check --reverse/);
+  assert.match(runner, /"--check", "--reverse"/);
   assert.doesNotMatch(runner, /unified_diff:\s*\{\s*type:\s*"string"/);
   assert.match(prompt, /точные операции search\/replace/);
   assert.match(prompt, /runner сам внесёт точные изменения и сформирует patch через git diff/);
