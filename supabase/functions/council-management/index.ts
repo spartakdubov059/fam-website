@@ -239,7 +239,7 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,email,role,created_at,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
@@ -271,6 +271,9 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       id: row.id,
       email: maskEmail(row.email),
       role: row.role,
+      first_name: typeof row.first_name === "string" ? row.first_name : null,
+      last_name: typeof row.last_name === "string" ? row.last_name : null,
+      class_name: typeof row.class_name === "string" ? row.class_name : null,
       created_at: row.created_at,
     })),
     listings: (listings.data ?? []).map((row: any) => ({
