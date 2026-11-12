@@ -29,7 +29,9 @@ test("deleting your own school-admin listing skips password reauthentication", (
   const adminDeleteEnd = frontend.indexOf("\n  async function suspendCouncilAccount", adminDeleteStart);
   assert.ok(adminDeleteStart >= 0 && adminDeleteEnd > adminDeleteStart);
   const adminDelete = frontend.slice(adminDeleteStart, adminDeleteEnd);
-  assert.match(adminDelete, /skipReauth:\s*listing\?\.user_id\s*===\s*user\.id/);
+  assert.match(adminDelete, /skipReauth:\s*listing\?\.user_id\s*===\s*user\.id\s*\|\|\s*button\?\.dataset\?\.ownerId\s*===\s*user\.id/);
+  assert.match(frontend, /data-owner-id="\$\{esc\(l\.user_id\)\}"/);
+  assert.match(frontend, /data-owner-id="\$\{esc\(row\.user_id\)\}"/);
   assert.match(adminDelete, /confirm\(/);
 });
 
