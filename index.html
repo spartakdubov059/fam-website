@@ -1364,7 +1364,7 @@ window.onunhandledrejection = function() {
 
   const $ = id => document.getElementById(id);
   // Switch on only after school-scoped RLS and vote RPCs pass isolated + integration tests.
-  const SCHOOL_PULSE_ENABLED = false;
+  const SCHOOL_PULSE_ENABLED = true;
   const schoolPulse = SCHOOL_PULSE_ENABLED && window.FAMSchoolPulse
     ? window.FAMSchoolPulse.mount({
         sb,
