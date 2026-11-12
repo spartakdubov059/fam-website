@@ -18,7 +18,8 @@ export function extractExplicitTargetPaths(task, trackedPaths, isAllowed) {
   const requested = [];
   for (const pattern of patterns) {
     for (const match of task.matchAll(pattern)) {
-      if (TARGET_PATH.test(match[1])) requested.push(match[1]);
+      const candidate = match[1].replace(/[.,;:!?]+$/u, "");
+      if (TARGET_PATH.test(candidate)) requested.push(candidate);
     }
   }
 
@@ -40,7 +41,6 @@ export function applyTextEdits(sourceByPath, edits, selectedPaths) {
 
   const selected = new Set(selectedPaths || []);
   const updated = new Map(sourceByPath);
-  let totalOutputBytes = 0;
 
   for (let index = 0; index < edits.length; index += 1) {
     const edit = edits[index];
@@ -72,11 +72,11 @@ export function applyTextEdits(sourceByPath, edits, selectedPaths) {
     }
 
     updated.set(path, source.slice(0, first) + replace + source.slice(first + find.length));
-    totalOutputBytes += Buffer.byteLength(updated.get(path));
-    if (totalOutputBytes > 240000) {
-      throw new Error("Edited source exceeds the 240 KB output limit.");
-    }
   }
 
+  const totalOutputBytes = [...updated.values()].reduce((sum, source) => sum + Buffer.byteLength(source), 0);
+  if (totalOutputBytes > 240000) {
+    throw new Error("Edited source exceeds the 240 KB output limit.");
+  }
   return updated;
 }
