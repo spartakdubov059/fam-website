@@ -799,6 +799,19 @@
         </div>
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
+      <details class="profile-box profile-disclosure" id="profileStudentIdentityPanel">
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🪪</span><span><b>Мои данные</b><small>Имя, фамилия и класс для администрации школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <div class="profile-disclosure-body">
+          <p class="profile-section-copy">Эти данные помогут администратору вашей школы понимать, кто отправляет идеи и публикует объявления. Их увидят только администраторы вашей школы.</p>
+          <form id="profileStudentIdentityForm">
+            <div class="form-group"><label for="profileFirstName">Имя</label><input id="profileFirstName" class="form-control" maxlength="60" required autocomplete="given-name"></div>
+            <div class="form-group"><label for="profileLastName">Фамилия</label><input id="profileLastName" class="form-control" maxlength="60" required autocomplete="family-name"></div>
+            <div class="form-group"><label for="profileClassName">Класс (например, 8А)</label><input id="profileClassName" class="form-control" maxlength="8" pattern="[1-9][0-9]?[А-Яа-яЁёA-Za-z]?" placeholder="8А" required></div>
+            <button type="submit" class="button button-secondary" style="width:100%;">Сохранить данные</button>
+            <div id="profileStudentIdentityStatus" aria-live="polite" style="font-size:10px;color:var(--muted);margin-top:7px;"></div>
+          </form>
+        </div>
+      </details>
       
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden" open><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Рабочая панель Ученического совета</b><small>Заявки, идеи, ученики и объявления школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
@@ -960,6 +973,11 @@
     <form id="authForm">
       <div class="form-group hidden" id="schoolGroup"><label for="authSchool">Школа</label>
         <select id="authSchool" class="form-control"><option value="lyceum_3">Лицей № 3 — Сочи</option></select>
+      </div>
+      <div id="registerIdentityFields" class="hidden">
+        <div class="form-group"><label for="authFirstName">Имя</label><input id="authFirstName" class="form-control" maxlength="60" autocomplete="given-name" disabled></div>
+        <div class="form-group"><label for="authLastName">Фамилия</label><input id="authLastName" class="form-control" maxlength="60" autocomplete="family-name" disabled></div>
+        <div class="form-group"><label for="authClassName">Класс (например, 8А)</label><input id="authClassName" class="form-control" maxlength="8" pattern="[1-9][0-9]?[А-Яа-яЁёA-Za-z]?" placeholder="8А" disabled></div>
       </div>
       <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
       <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
@@ -3347,6 +3365,9 @@ window.onunhandledrejection = function() {
     updateAuthUI();
     if(!user) return;
     $("profEmail").textContent = user.email;
+    if ($("profileFirstName")) $("profileFirstName").value = profile?.first_name || "";
+    if ($("profileLastName")) $("profileLastName").value = profile?.last_name || "";
+    if ($("profileClassName")) $("profileClassName").value = profile?.class_name || "";
     if (profile?.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
@@ -3405,6 +3426,37 @@ window.onunhandledrejection = function() {
     }
   }
 
+  $("profileStudentIdentityForm").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!user || !profile) return;
+    const first_name = $("profileFirstName").value.trim();
+    const last_name = $("profileLastName").value.trim();
+    const class_name = $("profileClassName").value.trim().toUpperCase().replace(/\\s+/g, "");
+    const status = $("profileStudentIdentityStatus");
+    if (!first_name || !last_name || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/.test(class_name)) {
+      if (status) status.textContent = "Проверьте имя, фамилию и класс (например, 8А).";
+      return;
+    }
+    const button = e.target.querySelector('button[type="submit"]');
+    if (button) { button.disabled = true; button.textContent = "Сохраняем..."; }
+    if (status) status.textContent = "";
+    try {
+      const { data, error } = await sb.from("profiles")
+        .update({ first_name, last_name, class_name })
+        .eq("id", user.id)
+        .select("first_name,last_name,class_name")
+        .single();
+      if (error) throw error;
+      Object.assign(profile, data);
+      if (status) status.textContent = "Данные сохранены.";
+      notice("Данные профиля обновлены.");
+    } catch (error) {
+      if (status) status.textContent = error?.message || "Не удалось сохранить данные.";
+    } finally {
+      if (button) { button.disabled = false; button.textContent = "Сохранить данные"; }
+    }
+  };
+
   $("avatarInput").onchange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -3457,15 +3509,18 @@ window.onunhandledrejection = function() {
   };
 
   $("switchAuthBtn").onclick = () => {
-    if($("authTitle").textContent === "Вход") {
-      $("authTitle").textContent = "Регистрация";
-      $("schoolGroup").classList.remove("hidden");
-      $("switchAuthBtn").textContent = "У меня есть аккаунт";
-    } else {
-      $("authTitle").textContent = "Вход";
-      $("schoolGroup").classList.add("hidden");
-      $("switchAuthBtn").textContent = "Создать аккаунт";
+    const isRegistration = $("authTitle").textContent !== "Регистрация";
+    $("authTitle").textContent = isRegistration ? "Регистрация" : "Вход";
+    $("schoolGroup").classList.toggle("hidden", !isRegistration);
+    const identityFields = $("registerIdentityFields");
+    identityFields?.classList.toggle("hidden", !isRegistration);
+    for (const id of ["authFirstName","authLastName","authClassName"]) {
+      const field = $(id);
+      if (!field) continue;
+      field.disabled = !isRegistration;
+      field.required = isRegistration;
     }
+    $("switchAuthBtn").textContent = isRegistration ? "У меня есть аккаунт" : "Создать аккаунт";
   };
 
   $("authForm").onsubmit = async e => {
@@ -3481,7 +3536,19 @@ window.onunhandledrejection = function() {
       }
       let res;
       if (isReg) {
-        res = await sb.auth.signUp({ email, password: pass, options: { data: { school_id: school }, emailRedirectTo: "https://spartakdubov059.github.io/fam-website/" } });
+        const firstName = $("authFirstName").value.trim();
+        const lastName = $("authLastName").value.trim();
+        const className = $("authClassName").value.trim().toUpperCase().replace(/\\s+/g, "");
+        if (!firstName || !lastName || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/.test(className)) {
+          $("authMsg").textContent = "Укажите имя, фамилию и корректный класс, например 8А.";
+          return;
+        }
+        res = await sb.auth.signUp({ email, password: pass, options: { data: {
+          school_id: school,
+          first_name: firstName,
+          last_name: lastName,
+          class_name: className
+        }, emailRedirectTo: "https://spartakdubov059.github.io/fam-website/" } });
         if (res.error) throw res.error;
         if (!res.data.session) {
           closeModal('authModal');
@@ -3492,7 +3559,7 @@ window.onunhandledrejection = function() {
         res = await sb.auth.signInWithPassword({ email, password: pass });
         if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
-          .select("id,avatar_url,created_at,city,school_id,role")
+          .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name")
           .eq("id", res.data.user.id).maybeSingle();
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
@@ -3878,7 +3945,7 @@ window.onunhandledrejection = function() {
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles")
-      .select("id,avatar_url,created_at,city,school_id,role")
+      .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name")
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
