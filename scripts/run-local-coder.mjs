@@ -3,6 +3,7 @@ import { postJson } from "./local-model-http.mjs";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
+import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
@@ -32,34 +33,56 @@ function allowed(path) {
   return path === "index.html" || ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-function parseJson(content) {
-  if (typeof content !== "string") throw new Error("Local model returned a non-text response.");
-  const cleaned = content.trim().replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start < 0 || end <= start) throw new Error("Local model did not return valid JSON.");
-    return JSON.parse(cleaned.slice(start, end + 1));
-  }
-}
-
 async function askModel(messages, schema, maxTokens) {
-  const result = await postJson(API_URL, {
-    model: MODEL_ID,
-    messages,
-    temperature: 0.1,
-    top_p: 0.9,
-    max_tokens: maxTokens,
-    stream: false,
-    response_format: {
-      type: "json_schema",
-      json_schema: { name: schema.name, strict: true, schema: schema.schema },
-    },
-  }, { timeoutMs: 45 * 60 * 1000 });
-  const content = result?.choices?.[0]?.message?.content;
-  return parseJson(content);
+  let lastError;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const requestMessages = attempt === 0
+      ? messages
+      : [
+          ...messages,
+          {
+            role: "user",
+            content: "Повтори предыдущий ответ как один корректный JSON-объект. Не добавляй Markdown, пояснения или текст до/после JSON. Обязательно заполни все обязательные поля схемы.",
+          },
+        ];
+    const responseFormat = attempt === 0
+      ? {
+          type: "json_schema",
+          json_schema: { name: schema.name, strict: true, schema: schema.schema },
+        }
+      : { type: "json_object" };
+
+    try {
+      const result = await postJson(API_URL, {
+        model: MODEL_ID,
+        messages: requestMessages,
+        temperature: 0.1,
+        top_p: 0.9,
+        max_tokens: maxTokens,
+        stream: false,
+        response_format: responseFormat,
+      }, { timeoutMs: 45 * 60 * 1000 });
+
+      const choice = result?.choices?.[0];
+      const content = choice?.message?.content;
+      const parsed = parseJson(content);
+      return assertRequiredFields(parsed, schema.schema, schema.name);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        console.warn(
+          "Model response did not match the required JSON format; retrying once in JSON mode:",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+  }
+
+  throw new Error(
+    "Local model failed to return a schema-complete JSON object after one retry: " +
+    (lastError instanceof Error ? lastError.message : String(lastError)),
+  );
 }
 
 function collectSymbols(html) {
@@ -240,7 +263,7 @@ const patchSchema = {
   },
 };
 
-const result = await askModel([
+const patchMessages = [
   {
     role: "system",
     content: [
@@ -251,7 +274,7 @@ const result = await askModel([
       "Разрешены изменения только index.html, css/, js/, assets/, docs/ и tests/.",
       "Запрещено менять аутентификацию, роли, безопасность, модерационные решения, действия над аккаунтами, персональные данные, секреты, базу данных, SQL, RLS, миграции, Edge Functions, CI/CD и деплой.",
       "Если для решения нужно затронуть запрещённую область или данных недостаточно, верни пустой unified_diff, risk=high и requires_approval=true.",
-      "Для любой правки кода сайта добавь соответствующий регрессионный тест. Не изменяй тесты лишь для маскировки ошибки.",
+      "Для любой правки кода сайта сначала проверь существующие регрессионные тесты. Если тест уже покрывает дефект, не дублируй и не изменяй его. Добавляй новый тест только когда соответствующего теста нет. Не изменяй тесты ради маскировки ошибки.",
       "Верни finding_status: no_issue, needs_research, blocked или issue_found. Ставь issue_found только при воспроизводимом дефекте с доказательствами из переданных фрагментов.",
       "В evidence укажи точный путь и строку/фрагмент из переданных данных; если доказательства недостаточны, выбери needs_research и оставь diff пустым.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
@@ -270,7 +293,25 @@ const result = await askModel([
       source_context: excerpts,
     }),
   },
-], patchSchema, 7000);
+];
+
+let result = await askModel(patchMessages, patchSchema, 7000);
+if (result.finding_status === "issue_found" && !String(result.unified_diff || "").trim()) {
+  console.warn("Model confirmed a concrete issue but returned an empty diff; requesting one focused patch retry.");
+  result = await askModel([
+    ...patchMessages,
+    { role: "assistant", content: JSON.stringify(result) },
+    {
+      role: "user",
+      content: [
+        "Ты уже подтвердила конкретный воспроизводимый дефект и выбрала файлы. Предыдущий ответ не содержал unified_diff.",
+        "Не повторяй аудит и не отменяй найденную проблему. Подготовь минимальный применимый git unified diff для исправления.",
+        "Используй только уже выбранные файлы. Существующие регрессионные тесты уже переданы: используй их, но не изменяй и не дублируй.",
+        "Если исправление действительно невозможно, объясни конкретное техническое препятствие в summary и root_cause; не оставляй пустой diff без объяснения.",
+      ].join("\\n"),
+    },
+  ], patchSchema, 7000);
+}
 
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
 mkdirSync(outDir, { recursive: true });
