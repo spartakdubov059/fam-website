@@ -73,7 +73,7 @@ await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
 
 try {
   await page.setContent(html, { waitUntil: "domcontentloaded" });
-  await page.locator("#listingsGrid .l-card").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
 
   const widths = [
     { width: 360, height: 844, columns: 2 },
