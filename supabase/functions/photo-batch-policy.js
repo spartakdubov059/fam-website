@@ -21,7 +21,7 @@ export function pendingPhotoPath(signedUrl, userId, origin) {
     const filename = "listing_" + userId + "_";
     if (!rest.startsWith(filename)) return null;
     const suffix = rest.slice(filename.length);
-    if (!/^[a-zA-Z0-9_-]{8,80}\\.(?:jpe?g|png|webp)$/i.test(suffix)) return null;
+    if (!/^[a-zA-Z0-9_-]{8,80}\.(?:jpe?g|png|webp)$/i.test(suffix)) return null;
     return userId + "/" + rest;
   } catch { return null; }
 }
