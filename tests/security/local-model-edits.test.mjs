@@ -105,3 +105,19 @@ test("rejects empty and no-op edit payloads", () => {
     /does not change/,
   );
 });
+
+
+test("large untouched selected files do not count against changed output size", () => {
+  const largeSource = "x".repeat(300000);
+  const source = new Map([
+    ["index.html", largeSource],
+    ["docs/help.md", "Old heading\n"],
+  ]);
+  const updated = applyTextEdits(
+    source,
+    [{ path: "docs/help.md", find: "Old heading", replace: "New heading" }],
+    ["index.html", "docs/help.md"],
+  );
+  assert.equal(updated.get("index.html"), largeSource);
+  assert.equal(updated.get("docs/help.md"), "New heading\n");
+});
