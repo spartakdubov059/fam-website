@@ -8,7 +8,7 @@ const WORKER_TOKEN=Deno.env.get("FAM_AGENT_WORKER_TOKEN")??"";
 const FREE_ENDPOINT=Deno.env.get("FAM_FREE_VISION_ENDPOINT")??"";
 const FREE_VERIFIED=Deno.env.get("FAM_FREE_VISION_VERIFIED")==="1";
 const FREE_TOKEN=Deno.env.get("FAM_FREE_VISION_TOKEN")??"";
-function key(name) {
+function key(name: string) {
   const s=Deno.env.get(name)||"";
   try { const j=JSON.parse(s);if(typeof j?.default==="string")return j.default; }catch{}
   return s;
@@ -18,8 +18,8 @@ const SECRET=key("SUPABASE_SECRET_KEYS")||Deno.env.get("SUPABASE_SERVICE_ROLE_KE
 const LEGACY=SECRET.startsWith("eyJ");
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function json(body,status=200){return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json;charset=utf-8"}});}
-async function validToken(got) {
+function json(body: unknown,status=200){return new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json;charset=utf-8"}});}
+async function validToken(got: string) {
   if(!got||!WORKER_TOKEN)return false;
   const bytes=new TextEncoder();
   const [a,b]=await Promise.all([crypto.subtle.digest("SHA-256",bytes.encode(got)),crypto.subtle.digest("SHA-256",bytes.encode(WORKER_TOKEN))]);
@@ -27,24 +27,24 @@ async function validToken(got) {
   for(let i=0;i<left.length;i++)different |= left[i]^right[i];
   return different===0;
 }
-function serviceHeaders(mime="application/json") {
-  const h={"apikey":SECRET,"Content-Type":mime};
+function serviceHeaders(mime: string="application/json") {
+  const h: Record<string,string>={"apikey":SECRET,"Content-Type":mime};
   if(LEGACY)h["Authorization"]="Bearer "+SECRET;
   return h;
 }
-async function sqlRpc(name,params) {
+async function sqlRpc(name: string,params: unknown) {
   const r=await fetch(BASE+"/rest/v1/rpc/"+name,{method:"POST",headers:serviceHeaders(),body:JSON.stringify(params)});
   if(!r.ok)throw new Error("rpc_failed_"+name+"_"+r.status);
   return await r.json();
 }
-async function row(table,filter,select="*") {
+async function row(table: string,filter: string,select: string="*") {
   const r=await fetch(BASE+"/rest/v1/"+table+"?select="+encodeURIComponent(select)+"&"+filter+"&limit=1",{
     headers:serviceHeaders()
   });
   if(!r.ok)throw new Error("lookup_failed");
   const arr=await r.json();return Array.isArray(arr)?arr[0]||null:null;
 }
-async function stagedPhoto(path,owner) {
+async function stagedPhoto(path: string,owner: string) {
   if(typeof path!=="string"||!path.startsWith(owner+"/listing_"+owner+"_")||path.includes("..")||path.includes("%")||
      !/\.(?:jpg|jpeg|png|webp)$/i.test(path))throw new Error("invalid_private_path");
   const r=await fetch(BASE+"/storage/v1/object/listing-images-pending/"+path,{
@@ -54,13 +54,13 @@ async function stagedPhoto(path,owner) {
   const bytes=new Uint8Array(await r.arrayBuffer());
   return {bytes,mime:(r.headers.get("content-type")||"").split(";")[0].trim().toLowerCase()};
 }
-async function removeStorageObject(bucket,path) {
+async function removeStorageObject(bucket: string,path: string) {
   const r=await fetch(BASE+"/storage/v1/object/"+bucket,{
     method:"DELETE",headers:serviceHeaders(),body:JSON.stringify({prefixes:[path]})
   });
   return r.ok;
 }
-async function uploadApprovedPhoto(bytes,owner) {
+async function uploadApprovedPhoto(bytes: Uint8Array,owner: string) {
   const path="listing_"+owner+"_"+crypto.randomUUID()+".jpg";
   const r=await fetch(BASE+"/storage/v1/object/listings-images/"+path,{
     method:"POST",headers:{...serviceHeaders("image/jpeg"),"x-upsert":"false"},body:bytes
@@ -68,13 +68,13 @@ async function uploadApprovedPhoto(bytes,owner) {
   if(!r.ok)throw new Error("public_upload_failed");
   return {path,url:BASE+"/storage/v1/object/public/listings-images/"+path};
 }
-function bytesToBase64(bytes) {
+function bytesToBase64(bytes: Uint8Array) {
   let binary="";
   for(let offset=0;offset<bytes.length;offset+=8192)
     binary+=String.fromCharCode(...bytes.subarray(offset,offset+8192));
   return btoa(binary);
 }
-async function freeVisionReview(bytes,title,category) {
+async function freeVisionReview(bytes: Uint8Array,title: unknown,category: unknown) {
   if(!FREE_VERIFIED||!FREE_ENDPOINT||FREE_TOKEN.length<16)return {decision:"pending",reason:"unconfigured"};
   let url;
   try {url=new URL(FREE_ENDPOINT);}catch{return {decision:"pending",reason:"invalid_endpoint"};}
@@ -101,17 +101,17 @@ async function freeVisionReview(bytes,title,category) {
     }finally{clearTimeout(id);}
   }catch{return {decision:"pending",reason:"free_model_unavailable"};}
 }
-async function finish(id,state,urls=null) {
+async function finish(id: string,state: string,urls: string[]|null=null) {
   return await sqlRpc("fam_finish_photo_batch",{p_batch_id:id,p_state:state,p_public_urls:urls});
 }
-async function processBatch(batch) {
+async function processBatch(batch: Record<string,any>) {
   const id=batch?.id,owner=batch?.owner_id,listingId=batch?.listing_id;
   if(!UUID.test(String(id||""))||!UUID.test(String(owner||""))||!UUID.test(String(listingId||"")))
     return "invalid_job";
   const paths=batch.pending_paths,hashes=batch.input_hashes;
   if(!Array.isArray(paths)||paths.length<2||paths.length>5||!Array.isArray(hashes)||hashes.length!==paths.length)
     return "invalid_job";
-  let published=[];
+  let published: Array<{path:string,url:string}>=[];
   try {
     const listing=await row("listings","id=eq."+listingId+"&user_id=eq."+owner,"id,user_id,status,school_id,category,title,image_url,photo_status");
     const profile=await row("profiles","id=eq."+owner,"id,role,school_id");
@@ -119,10 +119,10 @@ async function processBatch(batch) {
        !listing.school_id||listing.school_id!==profile.school_id) {
       await finish(id,"rejected");return "rejected";
     }
-    const images=[];
+    const images: Array<{bytes:Uint8Array,mime:string}>=[];
     for(const path of paths)images.push(await stagedPhoto(path,owner));
     const inspected=await inspectPhotoBatch(images);
-    if(!inspected.ok||inspected.files.some((photo,i)=>photo.sha256!==hashes[i])){
+    if(!inspected.ok||!inspected.files||inspected.files.some((photo,i)=>photo.sha256!==hashes[i])){
       await finish(id,"rejected");return "rejected";
     }
 
@@ -153,7 +153,7 @@ async function processBatch(batch) {
       }
     }
     const assembled=await buildModerationCollage(images);
-    if(!assembled.ok){await finish(id,"manual_review");return "manual_review";}
+    if(!assembled.ok||!assembled.sanitized){await finish(id,"manual_review");return "manual_review";}
 
     // Reverify trust for privileged accounts in case roles changed mid-job.
     if(source==="trusted_bypass"){
