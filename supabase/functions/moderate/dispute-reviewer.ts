@@ -201,17 +201,27 @@ export async function reviewIdeaContent(
   apiKey: string,
   localFlag: string | null = null,
 ): Promise<DisputeReviewResult> {
-  const safeLocalFallback = (): DisputeReviewResult => localFlag
-    ? {
-      action: "pending",
-      reason_code: "local_policy_flag_requires_review",
-      reason: "Локальная проверка обнаружила отдельный риск. Идея сохранена для дополнительной проверки.",
+  const safeLocalFallback = (): DisputeReviewResult => {
+    if (localFlag === "serious_hate_or_threat") {
+      return {
+        action: "pending",
+        reason_code: "serious_hate_or_threat",
+        reason: "Локальная проверка обнаружила возможный признак ненависти, дискриминации или угрозы. Идея передана на дополнительную проверку.",
+      };
     }
-    : {
+    if (localFlag) {
+      return {
+        action: "reject",
+        reason_code: "unsafe_content",
+        reason: "Идея содержит тему, которую нельзя предлагать как школьное действие. Переформулируйте предложение в безопасном контексте.",
+      };
+    }
+    return {
       action: "ok",
       reason_code: "safe_local_fallback",
       reason: "Идея прошла базовые локальные проверки. Дополнительный ИИ-сервис временно недоступен.",
     };
+  };
 
   if (!apiKey) return safeLocalFallback();
 
@@ -339,7 +349,7 @@ export async function reviewIdeaContent(
     "threat_or_intimidation",
     "severe_targeted_harassment",
   ]);
-  if (decision === "manual_review" && highRiskCodes.has(String(reasonCode))) {
+  if (["manual_review", "reject"].includes(String(decision)) && highRiskCodes.has(String(reasonCode))) {
     return {
       action: "pending",
       reason_code: String(reasonCode),
