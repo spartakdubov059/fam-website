@@ -873,7 +873,36 @@
     @media (min-width: 900px) { .l-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
     @media (max-width: 359px) { .l-grid { grid-template-columns: minmax(0, 1fr); } }
 
-  </style>
+  
+/* FAM: photo-led carousel slides; existing photograph banners remain unchanged. */
+.hero-slide.hero-photo {
+  min-height: 220px; height: 240px; padding: 0;
+  display: flex; align-items: stretch; justify-content: flex-start;
+  border: 1px solid rgba(255,255,255,.12); isolation: isolate;
+  background-color: #15141b;
+  background-image: linear-gradient(90deg, rgba(10,9,17,.55),rgba(10,9,17,.20) 60%,transparent 100%), url("assets/fam-photo-sprite.avif");
+  background-repeat: no-repeat;
+  background-size: 100% 100%, 100% 500%;
+  background-position: center, center var(--photo-position,0%);
+}
+.hero-photo-copy { position: relative; z-index: 1; width: min(66%,540px); padding: 22px; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; box-sizing:border-box; }
+.hero-photo .hero-script, .hero-photo-heading { font-family: inherit; font-size: clamp(25px,3.9vw,44px); font-weight:900; letter-spacing:-.03em; line-height:1.06; color:#fff; margin:0; }
+.hero-photo .hero-script {transform:none;}
+.hero-photo .hero-script span {color:var(--lime);text-decoration:none;}
+.hero-photo-sub {font-size:clamp(11px,1.45vw,15px);color:#e9e5ed;line-height:1.35;margin:8px 0 12px;text-shadow:0 1px 6px #0008;}
+.hero-photo .hero-cta {background:var(--lime);color:#121319;border-radius:999px;padding:9px 14px;font-size:12px;box-shadow:0 4px 18px #0005;}
+.hero-photo .hero-cta:focus-visible {outline:3px solid #fff;outline-offset:3px;}
+.hero-photo-tag {padding:6px 10px;border:1px solid #ffffff60;border-radius:999px;font-size:11px;color:#fff;background:#15141b99;}
+.hero-slide.hero-event-photo {background-image:url("banner-6.jpg");background-size:cover;background-position:center;}
+@media(max-width:600px) {
+  .hero-slide.hero-photo {height:clamp(170px,48vw,230px);min-height:170px;}
+  .hero-photo-copy {width:71%;padding:12px 17px;}
+  .hero-photo .hero-script,.hero-photo-heading {font-size:clamp(22px,5.8vw,29px);}
+  .hero-photo-sub {font-size:11px;margin:6px 0 8px;}
+  .hero-photo .hero-cta {padding:7px 11px;font-size:11px;}
+}
+@media(max-width:380px) { .hero-photo-copy {width:77%;padding:10px 12px;} .hero-photo .hero-script,.hero-photo-heading{font-size:21px;} .hero-photo-sub{font-size:10px;} }
+</style>
 </head>
 <body>
   <noscript>
@@ -2309,14 +2338,23 @@ window.onunhandledrejection = function() {
   function renderHero() {
     const box = $("bannerCarousel");
     let html = [];
-    html.push(`<div class="hero-slide hero-brand">
-      <span class="hero-crown">👑</span>
-      <h1 class="hero-script">Найди <span>своих.</span></h1>
-      <p class="hero-sub">Объявления, идеи и помощь рядом</p>
-      <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
-      <span class="hero-spark">✦</span>
-      <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
+    const photoSlide = ({ index, title, description, action, cat, cta }) => {
+      const attrs = action ? ` data-action="${action}"${cat ? ` data-cat="${cat}"` : ''}` : '';
+      return `<div class="hero-slide hero-photo" style="--photo-position:${index * 25}%">
+        <div class="hero-photo-copy">
+          <h2 class="hero-photo-heading">${title}</h2>
+          <p class="hero-photo-sub">${description}</p>
+          ${action ? `<button type="button" class="hero-cta"${attrs}>${cta} ${ARROW}</button>` : `<span class="hero-photo-tag">Безопасность пользователей</span>`}
+        </div>
+      </div>`;
+    };
+    html.push(`<div class="hero-slide hero-photo hero-welcome" style="--photo-position:0%">
+      <div class="hero-photo-copy">
+        <h1 class="hero-script">Найди <span>своих.</span></h1>
+        <p class="hero-photo-sub">Объявления, идеи и помощь рядом</p>
+        <button type="button" class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
+        <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
+      </div>
     </div>`);
     const banners = [
       { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
@@ -2329,23 +2367,17 @@ window.onunhandledrejection = function() {
     banners.forEach(({ src, alt }) => {
       html.push(`<div class="hero-slide hero-img"><picture><source srcset="${src}.webp" type="image/webp"><img src="${src}.jpg" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></picture></div>`);
     });
-    const designed = [
-      { g: 'linear-gradient(140deg,#2A2E36,#191C22 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
-      { g: 'linear-gradient(140deg,#30343B,#1B1E24 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
-      { g: 'linear-gradient(140deg,#34383F,#1D2026 70%)', e: '🤖', t: 'Проверка публикаций', s: 'ИИ-фильтр спама и личных данных', action: null },
-      { g: 'linear-gradient(140deg,#292F38,#171B21 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
-    ];
-    designed.forEach(b => {
-      const attrs = b.action === 'cat' ? `data-action="cat" data-cat="${b.cat}"` : (b.action ? `data-action="${b.action}"` : '');
-      html.push(`<div class="hero-slide" style="background:${b.g}" ${attrs}><span class="db-emoji">${b.e}</span><div class="db-title">${b.t}</div><div class="db-sub">${b.s}</div></div>`);
-    });
+    html.push(photoSlide({ index:1, title:'Размести объявление', description:'Поделись тем, что больше не нужно', action:'open-listing', cta:'Разместить' }));
+    html.push(photoSlide({ index:2, title:'Вещи и услуги', description:'Находи нужное среди своих', action:'cat', cat:'Вещи', cta:'Смотреть вещи' }));
+    html.push(photoSlide({ index:3, title:'Проверка публикаций', description:'Помогаем беречь личные данные', action:null, cta:'' }));
+    html.push(photoSlide({ index:4, title:'Учёба рядом', description:'Помощь, знания и подготовка', action:'cat', cat:'Учёба', cta:'Перейти к учёбе' }));
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
         const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
         const meta = [ds, e.event_time || ''].filter(Boolean).join(' · ');
         const taken = getTaken(e.id), max = e.max_seats || 0;
         const info = max > 0 ? `👥 ${taken} из ${max}` : '👥 Без ограничений';
-        html.push(`<div class="hero-slide hero-img"><div class="hero-event">
+        html.push(`<div class="hero-slide hero-img hero-event-photo"><div class="hero-event">
           <span class="school-badge">🎭 Афиша</span>
           <div class="event-title">${esc(e.title)}</div>
           ${meta ? `<div class="event-meta">📅 ${esc(meta)} · ${info}</div>` : ''}
