@@ -3,7 +3,7 @@
 create table if not exists public.fam_school_announcements (
   id uuid primary key default gen_random_uuid(),
   school_id text not null references public.schools(id),
-  author_id uuid not null references auth.users(id) on delete restrict,
+  author_id uuid references auth.users(id) on delete set null,
   title text not null check (char_length(btrim(title)) between 4 and 90),
   body text not null check (char_length(btrim(body)) between 4 and 450),
   kind text not null default 'news' check (kind in ('news','important')),
@@ -17,7 +17,7 @@ create index if not exists fam_school_announcements_feed_idx on public.fam_schoo
 create table if not exists public.fam_school_polls (
   id uuid primary key default gen_random_uuid(),
   school_id text not null references public.schools(id),
-  author_id uuid not null references auth.users(id) on delete restrict,
+  author_id uuid references auth.users(id) on delete set null,
   question text not null check (char_length(btrim(question)) between 8 and 140),
   options jsonb not null check (jsonb_typeof(options)='array' and jsonb_array_length(options) between 2 and 4),
   closes_at timestamptz not null default (now()+interval '7 days'),
