@@ -64,7 +64,7 @@ export function buildAgentReport(input = {}) {
     requires_approval: !patchAvailable || risk !== "low" || input.requires_approval !== false,
     suggested_tests: stringList(input.tests ?? input.suggested_tests, 12, 300),
     verification_status: patchAvailable ? "pending" : "not_run_no_patch",
-    model: "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M",
+    model: text(input.model, 200) || "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M",
   };
 }
 

@@ -76,3 +76,12 @@ test("the Actions report escapes model-controlled Markdown and labels proposed t
   report.verification_status = "passed";
   assert.match(renderAgentReport(report), /успешно прошла отдельный QA job/);
 });
+
+test("agent reports record the model selected for a local comparison run", () => {
+  const report = buildAgentReport({
+    model: "Qwen3.5-9B-GGUF-Q4_K_M",
+    finding_status: "no_issue",
+    summary: "Benchmark report.",
+  });
+  assert.equal(report.model, "Qwen3.5-9B-GGUF-Q4_K_M");
+});
