@@ -702,6 +702,17 @@
 }
 
 
+    /* Keep the account controls easy to find on every screen size. */
+    #profileLoggedIn .profile-account-entry {
+      width: 100%;
+      min-height: 64px;
+      margin: 0 0 12px;
+      padding: 12px 14px;
+    }
+    #profileLoggedIn .profile-account-entry > span:nth-child(2) { min-width: 0; flex: 1; }
+    #profileLoggedIn .profile-account-entry b { font-size: 13px; line-height: 1.35; }
+    #profileLoggedIn .profile-account-entry small { font-size: 10px; }
+    #profileLoggedIn .profile-account-entry .profile-shortcut-arrow { font-size: 23px; }
     /* FAM mobile-first foundation: phones are the primary experience */
     :root {
       --tap-size: 44px;
@@ -912,6 +923,11 @@
         </div>
         <div class="profile-hero-note">Ваш аккаунт и действия в FAM</div>
       </div>
+      <button type="button" class="profile-shortcut profile-account-entry" data-action="profile-jump" data-target="profileAccountPanel" aria-controls="profileAccountPanel">
+        <span class="profile-shortcut-icon">⚙️</span>
+        <span><b>Управление аккаунтом</b><small>Настройки профиля, безопасность, удаление и выход</small></span>
+        <span class="profile-shortcut-arrow" aria-hidden="true">›</span>
+      </button>
       <details class="profile-box profile-disclosure" id="profileStudentIdentityPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🪪</span><span><b>Мои данные</b><small>Имя, фамилия и класс для администрации школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
@@ -1041,7 +1057,7 @@
       </details>
       
       <details class="profile-box profile-disclosure profile-account-disclosure" id="profileAccountPanel">
-        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">⚙️</span><span><b>Настройки и аккаунт</b><small>Безопасность профиля и выход</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
+        <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">⚙️</span><span><b>Управление аккаунтом</b><small>Настройки профиля, безопасность и выход</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
           <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Аватары проходят автоматическую проверку перед обновлением.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
           <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
