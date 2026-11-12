@@ -3,18 +3,21 @@ export function extractJsonObject(content) {
     throw new TypeError("Local model returned a non-text response.");
   }
 
-  const source = content.replace(/^\\uFEFF/, "").trim();
+  let source = content;
+  if (source.charCodeAt(0) === 0xfeff) source = source.slice(1);
+  source = source.trim();
+
   for (let start = source.indexOf("{"); start >= 0; start = source.indexOf("{", start + 1)) {
     let depth = 0;
     let inString = false;
     let escaped = false;
 
-    for (let index = start; index < source.length; index++) {
+    for (let index = start; index < source.length; index += 1) {
       const character = source[index];
 
       if (inString) {
         if (escaped) escaped = false;
-        else if (character === "\\\\") escaped = true;
+        else if (character.charCodeAt(0) === 92) escaped = true;
         else if (character === '"') inString = false;
         continue;
       }
