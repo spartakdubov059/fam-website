@@ -8,16 +8,17 @@ const COLS = 3;
 const ROWS = 2;
 const INSET = 12;
 
-export async function buildModerationCollage(files) {
+export async function buildModerationCollage(files: Array<{bytes: Uint8Array; mime: string}>) {
   const checked = await inspectPhotoBatch(files);
-  if (!checked.ok) return { ok: false, error: checked.error, photoHashes: [] };
-  if (checked.files.length > MAX_PHOTOS) return { ok: false, error: "photo_count_limit", photoHashes: [] };
+  if (!checked.ok || !checked.files) return { ok: false, error: checked.error, photoHashes: [] };
+  const sourceFiles = checked.files;
+  if (sourceFiles.length > MAX_PHOTOS) return { ok: false, error: "photo_count_limit", photoHashes: [] };
 
   // The original files, not browser-created previews, are the sole source.
   const collage = new Image(COLS * TILE, ROWS * TILE).fill(0x15151dff);
   const sanitized = [];
-  for (let index = 0; index < checked.files.length; index++) {
-    const file = checked.files[index];
+  for (let index = 0; index < sourceFiles.length; index++) {
+    const file = sourceFiles[index];
     let decoded;
     try {
       decoded = await Image.decode(file.bytes);
@@ -28,7 +29,7 @@ export async function buildModerationCollage(files) {
       return { ok: false, error: "dimension_mismatch", photoHashes: [] };
     }
     // Re-encoding removes EXIF, location metadata and embedded comments.
-    const safeBytes = await decoded.encodeJPEG({ quality: 84, metadata: {}, gainMap: false });
+    const safeBytes = await decoded.encodeJPEG({ quality: 84, metadata: {}, gainMap: false } as any);
     sanitized.push({ sha256: file.sha256, mime: "image/jpeg", bytes: safeBytes });
     decoded.contain(TILE - 2 * INSET, TILE - 2 * INSET);
     const column = index % COLS;
@@ -38,10 +39,10 @@ export async function buildModerationCollage(files) {
     collage.composite(decoded, { x, y });
   }
   // One server-generated JPEG for the complete batch, never five model calls.
-  const reviewBytes = await collage.encodeJPEG({ quality: 86, metadata: {}, gainMap: false });
+  const reviewBytes = await collage.encodeJPEG({ quality: 86, metadata: {}, gainMap: false } as any);
   return {
     ok: true, reviewBytes, contentType: "image/jpeg",
-    sanitized, photoHashes: checked.files.map(file => file.sha256),
-    rows: ROWS, columns: COLS, imageCount: checked.files.length
+    sanitized, photoHashes: sourceFiles.map(file => file.sha256),
+    rows: ROWS, columns: COLS, imageCount: sourceFiles.length
   };
 }
