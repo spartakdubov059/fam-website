@@ -3231,7 +3231,7 @@ window.onunhandledrejection = function() {
     });
   }
 
-  async function callCouncilManagement(action, targetId, extra = {}) {
+  async function callCouncilManagement(action, targetId, extra = {}, options = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
 
     const sensitiveActions = new Set([
@@ -3241,7 +3241,9 @@ window.onunhandledrejection = function() {
       "suspend_account",
       "lift_suspension"
     ]);
-    if (sensitiveActions.has(action)) {
+    const requiresReauthentication = sensitiveActions.has(action)
+      || (action === "delete_listing" && options.skipReauth !== true);
+    if (requiresReauthentication) {
       const confirmed = await confirmAdminReauthentication();
       if (!confirmed) throw new Error("Подтверждение действия отменено.");
     }
@@ -3297,7 +3299,7 @@ window.onunhandledrejection = function() {
     const previousText = button?.textContent || "";
     if (button) { button.disabled = true; button.textContent = "Удаляем..."; }
     try {
-      await callCouncilManagement("delete_listing", targetId);
+      await callCouncilManagement("delete_listing", targetId, {}, { skipReauth: listing?.user_id === user.id });
       listings = listings.filter(row => row.id !== targetId);
       notice("Объявление удалено.");
       await loadCouncilAdminTools();
