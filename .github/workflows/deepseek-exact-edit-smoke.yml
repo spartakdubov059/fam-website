@@ -85,6 +85,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          # Apply the saved patch to a pristine checkout, not to the generation workspace.
+          git reset --hard HEAD
           OUT="$RUNNER_TEMP/fam-exact-edit-smoke"
           SUMMARY="$OUT/fam-agent/summary.json"
           PATCH="$OUT/fam-agent/fam-agent.patch"
