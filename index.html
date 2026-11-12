@@ -4043,12 +4043,12 @@ window.onunhandledrejection = function() {
         throw new Error(submission?.reason || submission?.error || "Не удалось сохранить фото для проверки.");
       }
 
-      uploadedAvatarPath = null; // The server now owns the private staged file and queue task.
+      uploadedAvatarPath = null; // The server has published the avatar or safely queued it.
       if (submission.status === "approved" && submission.avatar_url) {
         if (profile) profile.avatar_url = submission.avatar_url;
         updateAuthUI();
         await renderProfile();
-        notice("Аватар проверен и обновлён.");
+        notice(submission.avatar_review_bypassed ? "Аватар обновлён." : "Аватар проверен и обновлён.");
       } else {
         notice(submission.reason || "Фото сохранено приватно. Предыдущий аватар останется видимым до завершения проверки.");
       }
