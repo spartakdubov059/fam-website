@@ -294,6 +294,15 @@
     .form-control:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); line-height: 1.4; }
     .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 700; text-decoration: underline; }
+    .description-helper-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+    .description-helper-caption { color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .description-helper-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.035); }
+    .description-helper-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+    .description-helper-head button { padding: 2px 4px; color: var(--muted); background: none; border: 0; font-size: 11px; }
+    .description-helper-note { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .description-helper-draft { margin: 0 0 10px; padding: 10px; border-radius: 9px; background: var(--bg); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 11px; line-height: 1.55; }
+    .description-helper-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .description-helper-buttons .button { flex: 1 1 130px; }
     .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
     .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -1185,9 +1194,28 @@
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
     <h2 id="listingTitle" style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
     <form id="listingForm">
-      <div id="aiHints" class="ai-hint">Начните вводить — ИИ подскажет категорию</div>
+      <div id="aiHints" class="ai-hint">Начните вводить — FAM подскажет категорию по тексту, без ИИ-запросов.</div>
       <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="100"></div>
-      <div class="form-group"><label for="lDesc">Описание</label><textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea></div>
+      <div class="form-group">
+        <label for="lDesc">Описание</label>
+        <textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea>
+        <div class="description-helper-actions">
+          <button type="button" class="button button-secondary button-small" data-action="open-description-helper">✦ Помочь с описанием</button>
+          <span class="description-helper-caption">Работает прямо в браузере: без нейросети, внешних запросов и расхода ИИ-лимитов.</span>
+        </div>
+        <div id="descriptionHelperPanel" class="description-helper-panel hidden" role="region" aria-label="Помощник составления описания" aria-live="polite">
+          <div class="description-helper-head">
+            <strong>Черновик описания</strong>
+            <button type="button" data-action="close-description-helper">Скрыть</button>
+          </div>
+          <p id="descriptionHelperNote" class="description-helper-note">Это шаблон, а не готовые факты. Заполните или удалите подсказки в квадратных скобках. Не указывайте домашний адрес, телефон и другие личные данные.</p>
+          <pre id="descriptionHelperDraft" class="description-helper-draft"></pre>
+          <div class="description-helper-buttons">
+            <button type="button" class="button button-secondary button-small" data-action="insert-description-draft" data-mode="append">Добавить к тексту</button>
+            <button type="button" class="button button-primary button-small" data-action="insert-description-draft" data-mode="replace">Заменить описание</button>
+          </div>
+        </div>
+      </div>
       <div class="form-group">
         <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
@@ -1417,27 +1445,157 @@ window.onunhandledrejection = function() {
     }
   }
 
-  function updateHints() {
-    const combined = ($("lTitle").value + " " + $("lDesc").value).toLowerCase();
-    const kw = {
-      "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "куплю"],
-      "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул"],
-      "Учёба": ["конспекты", "решебник", "учебник", "подготовка", "егэ"],
-      "Мероприятия": ["встреча", "концерт", "квиз", "фестиваль", "матч"]
-    };
-    let bestCat = null, max = 0;
-    for (const [cat, words] of Object.entries(kw)) {
-      const m = words.filter(k => combined.includes(k)).length;
-      if (m > max) { max = m; bestCat = cat; }
-    }
-    if (bestCat && $("lCat").value !== bestCat) {
-      $("aiHints").innerHTML = `<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="${bestCat}">ИИ советует: ${bestCat}</button>`;
-    } else {
-      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
-    }
+  // Local category hints: deterministic keyword matching only.
+  // This runs in the visitor's browser and never calls an AI model or external API.
+  const CATEGORY_HINT_KEYWORDS = Object.freeze({
+    "Вещи": [
+      "прод", "отдам", "куплю", "покуп", "обмен", "вещ", "одежд", "обув", "книг",
+      "телефон", "смартфон", "планшет", "компьютер", "ноутбук", "наушник", "игрушк",
+      "аксессуар", "рюкзак", "велосипед", "самокат", "шлем", "приставк", "консол",
+      "монитор", "клавиатур", "мыш", "куртк", "кроссовк", "ботинк", "футболк",
+      "плать", "сумк", "зарядк", "час", "косметич"
+    ],
+    "Услуги": [
+      "репетитор", "помощ", "помога", "услуг", "ремонт", "почин", "настрой", "установ",
+      "уборк", "выгул", "фотограф", "дизайн", "монтаж", "достав", "тренер", "трениров",
+      "стриж", "нян", "перевод", "обуч", "научу", "объясн", "сделаю", "съемк"
+    ],
+    "Учёба": [
+      "конспект", "решебник", "учебник", "подготов", "огэ", "егэ", "экзамен", "контрольн",
+      "урок", "домашн", "математ", "физик", "хим", "биолог", "русск", "английск",
+      "задач", "сочинен", "реферат", "доклад", "презентац", "учеб", "задан", "школ", "предмет"
+    ],
+    "Мероприятия": [
+      "встреч", "концерт", "квиз", "фестивал", "матч", "турнир", "мероприят", "экскурс",
+      "вечерин", "соревнован", "олимпиад", "собрани", "дискотек", "кинопоказ", "праздник",
+      "мастер класс"
+    ]
+  });
+
+  function normalizeCategoryText(value) {
+    return String(value || "")
+      .toLocaleLowerCase("ru-RU")
+      .replace(/ё/g, "е")
+      .replace(/[^a-zа-я0-9]+/g, " ")
+      .trim();
   }
+
+  function countCategoryKeywordMatches(value, keywords) {
+    const normalized = normalizeCategoryText(value);
+    if (!normalized) return 0;
+    const words = normalized.split(/\s+/);
+    return keywords.filter(keyword => {
+      if (keyword.includes(" ")) return normalized.includes(keyword);
+      return words.some(word => word.startsWith(keyword));
+    }).length;
+  }
+
+  function findSuggestedCategory() {
+    const title = $("lTitle").value;
+    const description = $("lDesc").value;
+    const categories = Object.entries(CATEGORY_HINT_KEYWORDS)
+      .filter(([category]) => category !== "Мероприятия" || $("evOption").style.display !== "none")
+      .map(([category, keywords]) => ({
+        category,
+        score: countCategoryKeywordMatches(title, keywords) * 2 +
+          countCategoryKeywordMatches(description, keywords)
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    if (!categories.length || categories[0].score === 0) return null;
+    if (categories[1] && categories[0].score === categories[1].score) return null;
+    return categories[0].category;
+  }
+
+  function updateHints() {
+    const hint = $("aiHints");
+    const bestCategory = findSuggestedCategory();
+    if (!bestCategory) {
+      hint.textContent = "Начните вводить — FAM подскажет категорию по названию и описанию.";
+      return;
+    }
+
+    if ($("lCat").value === bestCategory) {
+      hint.textContent = `Категория «${bestCategory}» подходит по вашему тексту.`;
+      return;
+    }
+
+    hint.innerHTML = `<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="${bestCategory}">FAM предлагает категорию: ${bestCategory}</button>`;
+  }
+
+  function makeDescriptionDraft() {
+    const title = $("lTitle").value.trim() || "[укажите название из заголовка]";
+    const category = $("lCat").value;
+    const price = $("lPrice").value.trim();
+    const priceLine = price ? `Цена: ${price}` : "Цена: [укажите стоимость или напишите «Бесплатно»]";
+    const templates = {
+      "Вещи": [
+        `Предлагаю: ${title}.`,
+        "Состояние: [укажите реальное состояние].",
+        "Особенности: [перечислите важные характеристики].",
+        "Комплектация: [напишите, что входит].",
+        priceLine,
+        "Передача: [укажите удобный и безопасный способ передачи]."
+      ],
+      "Услуги": [
+        `Предлагаю услугу: ${title}.`,
+        "Что входит: [опишите, что именно вы сделаете].",
+        "Для кого: [укажите, кому подойдёт услуга].",
+        "Сроки: [укажите, когда вы доступны].",
+        priceLine
+      ],
+      "Учёба": [
+        `Тема или предмет: ${title}.`,
+        "С чем помогу: [укажите конкретные темы или задания].",
+        "Уровень: [укажите класс или уровень подготовки].",
+        "Формат: [очно или онлайн].",
+        "Результат: [что именно получит ученик].",
+        priceLine
+      ],
+      "Мероприятия": [
+        `Мероприятие: ${title}.`,
+        "Что будет: [кратко опишите программу].",
+        "Дата и время: [укажите дату и время].",
+        "Место: [укажите публичную площадку, не домашний адрес].",
+        "Для кого: [укажите, кому подойдёт мероприятие].",
+        "Участие: [укажите условия и количество мест]."
+      ]
+    };
+    return (templates[category] || templates["Вещи"]).join("\n");
+  }
+
+  function renderDescriptionHelper() {
+    const draft = $("descriptionHelperDraft");
+    if (draft) draft.textContent = makeDescriptionDraft();
+  }
+
+  function openDescriptionHelper() {
+    renderDescriptionHelper();
+    $("descriptionHelperPanel").classList.remove("hidden");
+  }
+
+  function insertDescriptionDraft(mode) {
+    const textarea = $("lDesc");
+    const current = textarea.value.trim();
+    const draft = makeDescriptionDraft();
+    const next = mode === "replace" || !current ? draft : `${current}\n\n${draft}`;
+    if (next.length > 1000) {
+      $("descriptionHelperNote").textContent = "Черновик не помещается в оставшийся лимит описания. Сократите текущий текст или выберите «Заменить описание».";
+      return;
+    }
+    textarea.value = next;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    $("descriptionHelperPanel").classList.add("hidden");
+    textarea.focus();
+  }
+
   $("lTitle").addEventListener("input", debounce(updateHints, 300));
   $("lDesc").addEventListener("input", debounce(updateHints, 300));
+  $("lTitle").addEventListener("input", renderDescriptionHelper);
+  $("lCat").addEventListener("change", () => {
+    updateHints();
+    renderDescriptionHelper();
+  });
 
   function timeAgo(isoOrMs) {
     if (!isoOrMs) return '';
@@ -3995,12 +4153,18 @@ window.onunhandledrejection = function() {
     else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
       const category = btn.dataset.category;
-      if (["Вещи", "Услуги", "Учёба", "Мероприятия"].includes(category)) {
+      const allowed = ["Вещи", "Услуги", "Учёба"].includes(category) ||
+        (category === "Мероприятия" && $("evOption").style.display !== "none");
+      if (allowed) {
         $("lCat").value = category;
         $("eventFields").classList.toggle("hidden", category !== "Мероприятия");
         updateHints();
+        renderDescriptionHelper();
       }
     }
+    else if (action === 'open-description-helper') { openDescriptionHelper(); }
+    else if (action === 'close-description-helper') { $("descriptionHelperPanel").classList.add("hidden"); }
+    else if (action === 'insert-description-draft') { insertDescriptionDraft(btn.dataset.mode); }
     else if (action === 'reset-search') {
       curCat = "Все";
       document.querySelectorAll(".cat-tile").forEach(x => x.classList.remove('active'));
@@ -4172,7 +4336,8 @@ window.onunhandledrejection = function() {
       closeModal('listingModal');
       $("listingForm").reset();
       uploadStatus.innerHTML = '';
-      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
+      $("aiHints").textContent = "Начните вводить — FAM подскажет категорию по тексту, без ИИ-запросов.";
+      $("descriptionHelperPanel").classList.add("hidden");
 
       if (submission.status === "pending") {
         await loadAll();
