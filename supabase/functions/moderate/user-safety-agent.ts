@@ -69,9 +69,9 @@ export async function recordSafetySignal(args: {
   const isMessage = context.kind === "message";
   if (isMessage && (!context.receiver_id || !UUID_RE.test(context.receiver_id))) return false;
 
-  // A keyed HMAC keeps repeat grouping stable without exposing a guessable plain hash.
-  // The key is the server-only Supabase secret; it never reaches the browser or report UI.
-  // Raw participant IDs and message content are never written to the incident table.
+  // A keyed HMAC groups repeated incidents without exposing a guessable participant fingerprint.
+  // The key remains server-side. Exact account IDs are stored only in this RLS-locked table;
+  // short text excerpts are redacted before storage and exposed only to the same-school admin.
   const fingerprintSource = isMessage
     ? [context.school_id, "message", context.sender_id, context.receiver_id].join("|")
     : [context.school_id, context.kind, context.sender_id].join("|");
