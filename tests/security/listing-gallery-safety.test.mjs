@@ -26,5 +26,6 @@ test("frontend renders multiple approved photos without bypassing the existing s
  assert.match(html,/src="\.\/listing-gallery\.js"/);
  assert.match(html,/FAMGallery\.photos\(listing\)/);
  assert.match(html,/listing-detail-thumb/);
- assert.match(html,/const file = \$\("lImage"\)\.files\[0\]/);
+ assert.match(html,/const MULTI_PHOTO_UPLOAD_ENABLED = false/);
+ assert.match(html,/const file = uploadAsBatch \\? null : \\$\\("lImage"\\)\\.files\\[0\\]/);
 });
