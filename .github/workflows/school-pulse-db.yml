@@ -1,0 +1,42 @@
+name: FAM School Pulse PostgreSQL safety test
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docs/sql/school-pulse-DRAFT.sql'
+      - 'tests/sql/school-pulse-*'
+      - '.github/workflows/school-pulse-db.yml'
+permissions:
+  contents: read
+jobs:
+  school-pulse-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: school_pulse_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d school_pulse_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: school_pulse_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Build disposable school database
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-pulse-bootstrap.sql
+      - name: Verify schema parses on PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f docs/sql/school-pulse-DRAFT.sql
+      - name: Verify privacy, one vote and school isolation
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-pulse-assert.sql
