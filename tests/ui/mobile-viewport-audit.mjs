@@ -130,6 +130,70 @@ try {
     assert.match(pendingPhotoText, /Фото проверяется/);
     await page.locator('[data-action="close-listing-details"]').click();
 
+    const inspectSection = async (tab, section, visibleSelector) => {
+      await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
+      await page.waitForTimeout(500);
+      const state = await page.evaluate(({ sectionId, visibleId }) => {
+        const active = document.getElementById(sectionId);
+        const visible = document.querySelector(visibleId);
+        const box = active?.getBoundingClientRect();
+        return {
+          active: !!active && !active.classList.contains("hidden"),
+          visible: !!visible && getComputedStyle(visible).display !== "none",
+          documentWidth: document.documentElement.scrollWidth,
+          bodyWidth: document.body.scrollWidth,
+          mainWidth: document.querySelector("main").clientWidth,
+          mainScrollWidth: document.querySelector("main").scrollWidth,
+          section: box ? { left: box.left, right: box.right, width: box.width } : null
+        };
+      }, { sectionId: section, visibleId: visibleSelector });
+      assert.equal(state.active, true, `${tab} section is not active at ${size.width}px`);
+      assert.equal(state.visible, true, `${tab} guest content is not visible at ${size.width}px`);
+      assert.ok(state.documentWidth <= size.width + 1, `${tab} causes document overflow at ${size.width}px`);
+      assert.ok(state.bodyWidth <= size.width + 1, `${tab} causes body overflow at ${size.width}px`);
+      assert.ok(state.mainScrollWidth <= state.mainWidth + 1, `${tab} content overflows main at ${size.width}px`);
+      assert.ok(state.section && state.section.left >= -1 && state.section.right <= size.width + 1, `${tab} escapes viewport at ${size.width}px`);
+    };
+
+    await inspectSection("favorites", "favoritesSection", "#favoritesEmpty");
+    await inspectSection("profile", "profileSection", "#profileLoggedOut");
+    await inspectSection("messages", "messagesSection", "#dialogsGuest");
+
+    // Login and listing forms are checked without submitting or creating real records.
+    await page.locator('#dialogsGuest [data-action="open-auth"]').click();
+    const authMetrics = await page.locator("#authModal .modal-content").evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return { open: node.closest(".modal").classList.contains("open"), left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width };
+    });
+    assert.equal(authMetrics.open, true, `login modal did not open at ${size.width}px`);
+    assert.ok(authMetrics.left >= -1 && authMetrics.right <= size.width + 1, `login modal overflows horizontally at ${size.width}px`);
+    assert.ok(authMetrics.top >= -1 && authMetrics.bottom <= size.height + 1, `login modal exceeds viewport at ${size.width}px`);
+    await page.locator('[data-action="close-auth-modal"]').click();
+
+    await page.evaluate(() => window.openModal("listingModal"));
+    const formMetrics = await page.locator("#listingModal .modal-content").evaluate(node => {
+      const box = node.getBoundingClientRect();
+      const controls = [...node.querySelectorAll(".form-control")].map(el => {
+        const field = el.getBoundingClientRect();
+        return { left: field.left, right: field.right, width: field.width };
+      });
+      return {
+        open: node.closest(".modal").classList.contains("open"),
+        left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width,
+        controls
+      };
+    });
+    assert.equal(formMetrics.open, true, `listing form did not open at ${size.width}px`);
+    assert.ok(formMetrics.left >= -1 && formMetrics.right <= size.width + 1, `listing form overflows horizontally at ${size.width}px`);
+    assert.ok(formMetrics.top >= -1 && formMetrics.bottom <= size.height + 1, `listing form exceeds viewport at ${size.width}px`);
+    for (const control of formMetrics.controls) {
+      assert.ok(control.left >= formMetrics.left - 1 && control.right <= formMetrics.right + 1, `listing form field escapes its modal at ${size.width}px`);
+    }
+    await page.locator('[data-action="close-listing-modal"]').click();
+
+    await page.locator('.tab-btn[data-tab="board"]').click();
+    await page.waitForTimeout(500);
+
     console.log(JSON.stringify({
       width: size.width,
       height: size.height,
@@ -137,6 +201,9 @@ try {
       documentWidth: metrics.documentWidth,
       cardWidth: Math.round(metrics.card?.width || 0),
       detailsModalWidth: Math.round(modalMetrics.width),
+      authModalWidth: Math.round(authMetrics.width),
+      listingFormWidth: Math.round(formMetrics.width),
+      guestSections: "PASS",
       result: "PASS"
     }));
   }
