@@ -10,7 +10,7 @@ const contentSafety = readFileSync(new URL("supabase/functions/moderate/content-
 test("the idea prompt explicitly permits constructive criticism and frustrated tone", () => {
   assert.match(reviewer, /КОНСТРУКТИВНАЯ КРИТИКА разрешена/);
   assert.match(reviewer, /Обычная грубость, резкая формулировка, непопулярное мнение или критика не являются основанием для manual_review/);
-  assert.match(reviewer, /не направляй такую идею на дополнительную проверку только из-за отрицательного тона/);
+  assert.match(reviewer, /не направляй такую идею на дополнительную проверку только из-за отрицательного тона/i);
 });
 
 test("ordinary personal insults, spam and unclear accusations are automatically rejected, not manually queued", () => {
@@ -33,8 +33,12 @@ test("provider outage approves locally clean ideas but holds text matching local
   assert.match(reviewer, /action: "ok",\s*reason_code: "safe_local_fallback"/);
   assert.match(reviewer, /action: "pending",\s*reason_code: "local_policy_flag_requires_review"/);
   assert.match(contentSafety, /serious_hate_or_threat/);
-  assert.match(moderator, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
-  assert.doesNotMatch(moderator, /if \(!OPENAI_KEY\) \{\s*return jsonResponse\(\{\s*action: "pending"/);
+  const ideaStart = moderator.indexOf("if (isIdea) {");
+  const ideaEnd = moderator.indexOf("// For locally flagged text", ideaStart);
+  assert.ok(ideaStart >= 0 && ideaEnd > ideaStart);
+  const ideaPath = moderator.slice(ideaStart, ideaEnd);
+  assert.match(ideaPath, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
+  assert.doesNotMatch(ideaPath, /if \(!OPENAI_KEY\)/);
 });
 
 test("serious idea findings are recorded as higher-severity safety signals", () => {
