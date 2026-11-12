@@ -1,0 +1,76 @@
+/* School Pulse — FAM's news and poll rail, intentionally within the existing board. */
+.school-pulse{margin:26px 0 24px;position:relative}
+.pulse-header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:15px}
+.pulse-eyebrow{font-size:10px;letter-spacing:.14em;font-weight:800;color:var(--lime);text-transform:uppercase}
+.pulse-title{font-size:clamp(21px,4.5vw,29px);font-weight:900;margin:2px 0;letter-spacing:-.045em;color:var(--text)}
+.pulse-subtitle{font-size:12px;color:var(--muted);margin:0}
+.pulse-refresh{border:1px solid var(--border);border-radius:100px;padding:8px 14px;background:var(--surface);color:var(--text);font-size:11px;font-weight:700;white-space:nowrap}
+.pulse-refresh:hover{border-color:var(--violet)}
+.pulse-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.pulse-card{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(177,185,210,.16);border-radius:22px;background:linear-gradient(144deg,#22232d 0%,#171923 100%);padding:19px;min-width:0;box-shadow:0 8px 26px rgba(0,0,0,.08);transition:transform .25s ease,border-color .25s ease}
+.pulse-card:hover{transform:translateY(-2px);border-color:rgba(139,92,246,.5)}
+.pulse-card::after{content:"";position:absolute;z-index:-1;width:180px;height:180px;right:-75px;top:-110px;pointer-events:none;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.2),transparent 70%)}
+.pulse-card.is-important{background:linear-gradient(125deg,rgba(59,56,88,.85),#1b1c26 80%);border-color:rgba(200,245,66,.22)}
+.pulse-card.is-important::after{background:radial-gradient(circle,rgba(200,245,66,.12),transparent 70%)}
+.pulse-card-overline{display:flex;align-items:center;gap:8px;font-size:9px;font-weight:800;letter-spacing:.11em;color:var(--lime)}
+.pulse-symbol{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--lime);font-size:16px;background:rgba(200,245,66,.1)}
+.pulse-date{margin-left:auto;color:var(--muted);font-size:10px;letter-spacing:0;font-weight:500}
+.pulse-card h3{margin:14px 0 7px;font-size:17px;font-weight:800;line-height:1.25;letter-spacing:-.02em;overflow-wrap:anywhere}
+.pulse-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
+.pulse-options{display:flex;flex-direction:column;gap:7px;margin:14px 0}
+.pulse-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;border:1px solid rgba(190,194,208,.22);background:rgba(255,255,255,.03);border-radius:12px;color:var(--text);font-weight:650;font-size:12px;text-align:left}
+.pulse-option:not(:disabled):hover{border-color:var(--lime);background:rgba(200,245,66,.07)}
+.pulse-option:disabled{opacity:.7;cursor:default}
+.pulse-option.is-selected{border-color:var(--lime);color:var(--lime)}
+.pulse-poll-foot{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px}
+.pulse-result{display:flex;justify-content:space-between;position:relative;overflow:hidden;gap:10px;padding:11px 12px;border:1px solid rgba(190,194,208,.2);border-radius:11px;font-size:12px;font-weight:700}
+.pulse-result-fill{position:absolute;z-index:-1;top:0;bottom:0;left:0;background:linear-gradient(90deg,rgba(139,92,246,.33),rgba(200,245,66,.16))}
+.pulse-result.is-selected{border-color:var(--lime)}
+.pulse-empty{grid-column:1/-1;border:1px dashed var(--border);padding:18px;border-radius:15px;color:var(--muted);font-size:12px}
+.pulse-meta{margin:9px 0 12px;color:var(--muted);font-size:10px}
+.pulse-admin{margin-top:14px;border:1px solid var(--border);border-radius:16px;padding:13px;background:var(--surface)}
+.pulse-admin>summary{font-size:12px;cursor:pointer;font-weight:750}
+.pulse-admin-forms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;margin-top:15px}
+.pulse-admin form{display:flex;flex-direction:column;gap:9px}
+.pulse-admin form h4{font-size:12px;margin:0}
+.pulse-admin .form-control{font-size:12px}
+.pulse-admin label{font-size:11px;color:var(--muted)}
+@media(max-width:640px){.pulse-grid{grid-template-columns:1fr}.pulse-card{padding:16px}.pulse-admin-forms{grid-template-columns:1fr}.pulse-header{align-items:center}.pulse-refresh{padding:8px 10px}}
+@media(prefers-reduced-motion:reduce){.pulse-card{transition:none}.pulse-card:hover{transform:none}}
+
+/* Motion-led identity for "Анонсы": restrained, GPU-friendly, and accessible. */
+.school-pulse { padding-top: 2px; }
+.pulse-heading-star { display:inline-block;color:var(--lime);transform-origin:50% 60%;animation:pulseStarGlow 5s ease-in-out infinite; }
+.pulse-header{position:relative}
+.pulse-header::after{content:"";position:absolute;width:74px;height:2px;bottom:-8px;left:0;border-radius:3px;background:linear-gradient(90deg,var(--lime),var(--violet),transparent);transform-origin:left;animation:pulseLineIn 1.1s cubic-bezier(.2,.8,.2,1) both;}
+.pulse-card{transform:translateY(0);backface-visibility:hidden;animation:pulseReveal .65s cubic-bezier(.2,.82,.2,1) both;animation-delay:calc(var(--pulse-order,0)*75ms)}
+.pulse-card::before{content:"";position:absolute;z-index:-1;inset:-60% -45%;pointer-events:none;background:linear-gradient(115deg,transparent 43%,rgba(255,255,255,.055) 50%,transparent 57%);transform:translateX(-90%) rotate(-9deg);transition:transform .85s cubic-bezier(.16,1,.3,1)}
+.pulse-card:hover::before,.pulse-card:focus-within::before{transform:translateX(90%) rotate(-9deg)}
+.pulse-card.is-open-event{background:linear-gradient(128deg,#242837 0%,#181b27 63%,#161820 100%);border-color:rgba(200,245,66,.24)}
+.pulse-card.is-open-event::after{width:260px;height:260px;top:-150px;right:-115px;background:radial-gradient(circle,rgba(200,245,66,.17),rgba(139,92,246,.10) 40%,transparent 71%)}
+.pulse-card.is-open-event .pulse-symbol{font-size:16px;color:#101318;background:var(--lime);box-shadow:0 0 15px rgba(200,245,66,.15)}
+.pulse-open-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:16px;padding-top:13px;border-top:1px solid rgba(255,255,255,.09)}
+.pulse-open-label{display:inline-flex;align-items:center;gap:7px;color:var(--lime);font-size:10px;font-weight:750}
+.pulse-open-foot time{font-size:11px;font-weight:800;color:var(--text);background:rgba(255,255,255,.07);padding:5px 9px;border-radius:8px}
+.pulse-open-dot{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 0 rgba(200,245,66,.36);animation:pulseDotRing 2.4s ease-out infinite}
+.pulse-option,.pulse-refresh {transition:transform .24s cubic-bezier(.16,1,.3,1),background-color .24s ease,border-color .24s ease}
+.pulse-option:not(:disabled):active{transform:scale(.985)}
+.pulse-result-fill{transform-origin:left center;animation:pulseBarGrow .8s cubic-bezier(.18,.95,.28,1) both}
+.pulse-result>span{position:relative;z-index:1}
+.pulse-option:focus-visible,.pulse-refresh:focus-visible,.pulse-admin summary:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.pulse-empty{text-align:center;padding:25px 20px}
+.pulse-empty-star{display:block;font-size:27px;color:var(--violet);margin-bottom:8px}
+.pulse-admin{box-shadow:0 12px 36px rgba(0,0,0,.08)}
+.pulse-admin:open{animation:pulseReveal .32s ease both}
+.pulse-admin #pulseEventDateRow{display:flex;flex-direction:column;gap:7px}
+.pulse-admin #pulseEventDateRow.hidden{display:none}
+@keyframes pulseReveal{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pulseStarGlow{0%,100%{transform:rotate(-9deg) scale(1);filter:drop-shadow(0 0 0 rgba(200,245,66,0))}48%{transform:rotate(14deg) scale(1.12);filter:drop-shadow(0 0 7px rgba(200,245,66,.36))}}
+@keyframes pulseLineIn{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+@keyframes pulseBarGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pulseDotRing{0%{box-shadow:0 0 0 0 rgba(200,245,66,.32)}65%,100%{box-shadow:0 0 0 8px rgba(200,245,66,0)}}
+@media (prefers-reduced-motion:reduce) {
+  .pulse-card,.pulse-heading-star,.pulse-header::after,.pulse-open-dot,.pulse-result-fill,.pulse-admin:open{animation:none!important}
+  .pulse-card,.pulse-option,.pulse-refresh,.pulse-card::before{transition:none!important}
+  .pulse-card:hover{transform:none}
+}
