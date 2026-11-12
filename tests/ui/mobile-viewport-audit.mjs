@@ -83,27 +83,29 @@ try {
   await page.setContent(html, { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
 
-  // Verify local category hints and the description helper using real form controls.
+  // Verify local category hints and the description editor using real form controls.
   await page.evaluate(() => window.openModal("listingModal"));
+  assert.equal(await page.locator("#lTitle").getAttribute("maxlength"), "80", "title limit must match the server's 80-character limit");
+  assert.ok(await page.locator('#lCat option[value="Творчество"]').count(), "creativity category must be available in the listing form");
+
   const categoryHintResults = [];
   const checkHint = async ({ title, description = "", currentCategory = "Вещи", expectedCategory = null, shouldSelect = false }) => {
     await page.locator("#lCat").selectOption(currentCategory);
     await page.locator("#lTitle").fill(title);
     await page.locator("#lDesc").fill(description);
-    await page.waitForTimeout(360);
-    const hintButton = page.locator("#aiHints [data-action='select-hint-category']");
-    const count = await hintButton.count();
+    await page.waitForTimeout(300);
+    const hintButtons = page.locator("#aiHints [data-action='select-hint-category']");
+    const count = await hintButtons.count();
     const hintText = await page.locator("#aiHints").textContent();
 
     if (expectedCategory && expectedCategory === currentCategory) {
       assert.equal(count, 0, `already-selected category should not show a selection button for "${title}"`);
       assert.ok(hintText && hintText.includes(expectedCategory), `selected category confirmation missing for "${title}": ${hintText}`);
     } else if (expectedCategory) {
-      assert.equal(count, 1, `category suggestion missing for "${title}"`);
-      const label = await hintButton.textContent();
-      assert.ok(label && label.includes(expectedCategory), `wrong category suggestion for "${title}": ${label}`);
+      const selectedButton = hintButtons.filter({ hasText: expectedCategory });
+      assert.equal(await selectedButton.count(), 1, `category suggestion missing for "${title}"`);
       if (shouldSelect) {
-        await hintButton.click();
+        await selectedButton.click();
         assert.equal(await page.locator("#lCat").inputValue(), expectedCategory, "suggested category must be selectable");
       }
     } else {
@@ -116,49 +118,57 @@ try {
   await checkHint({ title: "Продам VR-шлем Meta Quest 3", currentCategory: "Услуги", expectedCategory: "Вещи", shouldSelect: true });
   await checkHint({ title: "Репетитор по английскому", currentCategory: "Вещи", expectedCategory: "Услуги", shouldSelect: true });
   await checkHint({ title: "Подготовка к ОГЭ по математике", currentCategory: "Вещи", expectedCategory: "Учёба", shouldSelect: true });
+  await checkHint({ title: "Нарисую логотип для школьного проекта", currentCategory: "Вещи", expectedCategory: "Творчество", shouldSelect: true });
   await page.locator("#evOption").evaluate(node => { node.style.display = "block"; });
   await checkHint({ title: "Квиз по робототехнике", currentCategory: "Вещи", expectedCategory: "Мероприятия", shouldSelect: true });
   await page.locator("#evOption").evaluate(node => { node.style.display = "none"; });
+  await checkHint({ title: "Квиз по робототехнике", currentCategory: "Вещи", expectedCategory: null });
   await checkHint({ title: "Конспект по физике", currentCategory: "Вещи", expectedCategory: "Учёба", shouldSelect: true });
   await checkHint({ title: "Люблю объяснять сложные темы", description: "Подготовка к контрольной по алгебре", currentCategory: "Вещи", expectedCategory: "Учёба" });
   await checkHint({ title: "Необычная идея для вечера", expectedCategory: null });
+  await checkHint({ title: "Продам картину ручной работы", currentCategory: "Творчество", expectedCategory: "Вещи" });
 
-  // Description drafts are local templates: they include placeholders rather than invented facts.
+  // The local editor formats an existing description and displays category-specific missing details.
+  // When no description exists, it creates an editable template with placeholders.
   await page.locator("#lCat").selectOption("Вещи");
   await page.locator("#lTitle").fill("VR-шлем Meta Quest 3");
   await page.locator("#lDesc").fill("");
   const helperFetchesBefore = await page.evaluate(() => window.__helperFetchCalls);
   await page.locator('[data-action="open-description-helper"]').click();
   assert.equal(await page.locator("#descriptionHelperPanel").isVisible(), true, "description helper panel must open");
-  let draft = await page.locator("#descriptionHelperDraft").textContent();
-  assert.ok(draft.includes("VR-шлем Meta Quest 3"), "draft must use the entered title");
-  assert.ok(draft.includes("Состояние: [укажите реальное состояние]"), "item draft must ask for real condition");
-  await page.locator('[data-action="insert-description-draft"][data-mode="append"]').click();
+  let draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("VR-шлем Meta Quest 3"), "template must use the entered title");
+  assert.ok(draft.includes("Состояние: [укажите реальное состояние]"), "item template must ask for real condition");
+  assert.ok((await page.locator("#descriptionHelperSuggestions").textContent()).includes("комплектацию"), "helper must show missing item details");
+  await page.locator('[data-action="apply-description-draft"]').click();
   let inserted = await page.locator("#lDesc").inputValue();
-  assert.ok(inserted.includes("VR-шлем Meta Quest 3") && inserted.includes("Комплектация:"), "item template must be inserted into description");
+  assert.ok(inserted.includes("VR-шлем Meta Quest 3") && inserted.includes("Комплектация:"), "editable item template must be applied to the description");
 
-  await page.locator("#lDesc").fill("Уже указал важную информацию.");
+  await page.locator("#lDesc").fill("   новый    VR-шлем ,   работает!!\n комплектация полная");
   await page.locator('[data-action="open-description-helper"]').click();
-  await page.locator('[data-action="insert-description-draft"][data-mode="append"]').click();
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.equal(draft, "Новый VR-шлем, работает!\nКомплектация полная.", "editor must fix spacing, punctuation and capitalization without inventing facts");
+  await page.locator('[data-action="apply-description-draft"]').click();
   inserted = await page.locator("#lDesc").inputValue();
-  assert.ok(inserted.startsWith("Уже указал важную информацию."), "append mode must preserve existing description");
-  assert.ok(inserted.includes("Состояние:"), "append mode must add the draft");
+  assert.equal(inserted, draft, "apply action must use the reviewed editable draft");
+  assert.ok((await page.locator("#descriptionHelperSuggestions").textContent()).includes("условия передачи"), "item helper should ask for relevant missing details");
 
-  await page.locator("#lDesc").fill("Старый текст, который заменяется.");
-  await page.locator('[data-action="open-description-helper"]').click();
-  await page.locator('[data-action="insert-description-draft"][data-mode="replace"]').click();
-  inserted = await page.locator("#lDesc").inputValue();
-  assert.ok(!inserted.includes("Старый текст"), "replace mode must replace the old description");
-
+  await page.locator("#lDesc").fill("");
   await page.locator("#lCat").selectOption("Учёба");
   await page.locator('[data-action="open-description-helper"]').click();
-  draft = await page.locator("#descriptionHelperDraft").textContent();
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
   assert.ok(draft.includes("Уровень:") && draft.includes("Формат:"), "study template must use study-specific prompts");
+
   await page.locator("#lCat").selectOption("Услуги");
-  draft = await page.locator("#descriptionHelperDraft").textContent();
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
   assert.ok(draft.includes("Что входит:"), "service template must update when category changes");
+
+  await page.locator("#lCat").selectOption("Творчество");
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("Что именно будет создано:"), "creativity template must be available");
+
   const helperFetchesAfter = await page.evaluate(() => window.__helperFetchCalls);
-  assert.equal(helperFetchesAfter, helperFetchesBefore, "category hints and description helper must not call any API");
+  assert.equal(helperFetchesAfter, helperFetchesBefore, "category hints and description editor must not call any API");
   await page.locator('[data-action="close-description-helper"]').click();
   await page.locator('[data-action="close-listing-modal"]').click();
 
