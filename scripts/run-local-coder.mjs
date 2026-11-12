@@ -168,6 +168,16 @@ const inventory = tracked
 const indexHtml = tracked.includes("index.html") ? readFileSync("index.html", "utf8") : "";
 const symbols = collectSymbols(indexHtml);
 
+// Pass source for exact file paths explicitly named in the task to the planning phase.
+// This prevents the planner from requesting files that are already present in the checkout.
+const taskReferencedPaths = tracked
+  .filter((path) => allowed(path) && task.includes(path))
+  .slice(0, 4);
+const taskReferencedSource = taskReferencedPaths.map((path) => ({
+  path,
+  content: sourceContext(path, [], task),
+}));
+
 const planSchema = {
   name: "fam_file_plan",
   schema: {
@@ -200,12 +210,14 @@ const plan = await askModel([
       "Кратко заполни problem_summary, root_cause и evidence. Не выдумывай строки кода или факты, которых нет в переданных данных.",
       "Для большого index.html укажи точные символы/строки поиска из списка symbols и keywords.",
       "Если задача не даёт основания для конкретного исправления, верни files=[] и объясни это.",
+       "Если пользователь прямо указал путь к файлу и его содержимое передано в task_referenced_source, сначала изучи это содержимое. Не запрашивай повторно уже переданные исходники и не считай файл недостаточным только по его размеру.",
+       "Сопоставь описанный в задаче воспроизводимый дефект с фактической реализацией в переданном исходнике.",
       "Верни только JSON по заданной схеме.",
     ].join("\n"),
   },
   {
     role: "user",
-    content: JSON.stringify({ task, inventory, symbols }),
+    content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
   },
 ], planSchema, 1800);
 
