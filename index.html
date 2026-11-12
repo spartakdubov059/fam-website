@@ -2907,14 +2907,20 @@ window.onunhandledrejection = function() {
         const roleNames = { student: "Ученик", school_admin: "Администратор", council_member: "Ученический совет" };
         const actor = report.actor;
         const target = report.target;
+        const identityLabel = person => {
+          if (!person) return "";
+          const fullName = [person.first_name, person.last_name].filter(value => typeof value === "string" && value.trim()).join(" ").trim();
+          const classText = typeof person.class_name === "string" && person.class_name ? " · " + esc(person.class_name) + " класс" : "";
+          return (fullName ? esc(fullName) : esc(person.email || "Имя не указано"))
+            + classText + " · " + esc(roleNames[person.role] || person.role || "роль не указана")
+            + " · аккаунт #" + esc(person.account_code);
+        };
         const actorText = actor
-          ? esc(actor.email || "Email не указан") + " · " + esc(roleNames[actor.role] || actor.role || "роль не указана") + " · аккаунт #" + esc(actor.account_code)
+          ? identityLabel(actor)
           : report.identity_was_recorded
             ? "Профиль автора не найден в этой школе"
             : "Автор не записывался в старых отчётах";
-        const targetText = target
-          ? esc(target.email || "Email не указан") + " · " + esc(roleNames[target.role] || target.role || "роль не указана") + " · аккаунт #" + esc(target.account_code)
-          : "";
+        const targetText = target ? identityLabel(target) : "";
         const originText = typeof report.source_origin === "string" ? esc(report.source_origin) : "домен не определён";
         const excerptText = typeof report.evidence_excerpt === "string" && report.evidence_excerpt
           ? esc(report.evidence_excerpt)
