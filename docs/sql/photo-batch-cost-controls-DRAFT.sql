@@ -189,3 +189,80 @@ revoke all on function public.fam_enqueue_photo_batch(uuid,uuid,text[],text[],te
   from public, anon, authenticated;
 grant execute on function public.fam_enqueue_photo_batch(uuid,uuid,text[],text[],text)
   to service_role;
+
+
+-- Claim batches with a row lock and lease-like next attempt time; service role only.
+create or replace function public.fam_claim_photo_batches(p_limit integer default 1)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare result jsonb;
+begin
+  with claimable as (
+    select id from private.fam_photo_review_batches
+    where state in ('queued','pending_budget') and next_attempt_at <= now() and attempts < 8
+    order by created_at
+    limit least(greatest(coalesce(p_limit,1),1),2)
+    for update skip locked
+  ), claimed as (
+    update private.fam_photo_review_batches task
+    set state='processing',attempts=attempts+1,updated_at=now(),
+        next_attempt_at=now()+interval '10 minutes'
+    from claimable where task.id=claimable.id returning task.*
+  )
+  select coalesce(jsonb_agg(to_jsonb(claimed)), '[]'::jsonb) into result from claimed;
+  return result;
+end $$;
+revoke all on function public.fam_claim_photo_batches(integer) from public,anon,authenticated;
+grant execute on function public.fam_claim_photo_batches(integer) to service_role;
+
+-- Atomic publishing transition. Hidden status is the default; only reviewed
+-- and service-published storage URLs can become public.
+create or replace function public.fam_finish_photo_batch(
+  p_batch_id uuid, p_state text, p_public_urls text[] default null)
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare job private.fam_photo_review_batches%rowtype;
+declare n integer; i integer;
+begin
+  select * into job from private.fam_photo_review_batches where id=p_batch_id for update;
+  if not found or job.state <> 'processing' then return false; end if;
+  if p_state not in ('approved','rejected','manual_review','pending_budget','failed') then
+    raise exception 'invalid transition';
+  end if;
+  if p_state='approved' then
+    n:=cardinality(job.pending_paths);
+    if cardinality(p_public_urls)<>n or
+      (select count(distinct url) from unnest(p_public_urls) url)<>n or
+      exists(select 1 from unnest(p_public_urls) url where
+        url not like 'https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/listing_'||job.owner_id::text||'_%') then
+      raise exception 'invalid approved photo urls';
+    end if;
+    for i in 1..n loop
+      update public.listing_photos
+      set review_status='approved',public_url=p_public_urls[i]
+      where listing_id=job.listing_id and position=(i-1);
+      if not found then raise exception 'missing photo slot'; end if;
+    end loop;
+    update public.listings
+    set image_url=p_public_urls[1],photo_status='approved'
+    where id=job.listing_id and user_id=job.owner_id;
+    if not found then raise exception 'missing listing'; end if;
+  else
+    update public.listing_photos
+    set review_status=case when p_state='pending_budget' then 'pending' else p_state end,
+        public_url=null
+    where listing_id=job.listing_id;
+    update public.listings
+    set photo_status=case when p_state='pending_budget' then 'pending' else p_state end
+    where id=job.listing_id;
+  end if;
+  update private.fam_photo_review_batches
+  set state=p_state,next_attempt_at=case when p_state='pending_budget' then
+     now()+interval '1 day' else now()+interval '100 years' end,updated_at=now()
+  where id=p_batch_id;
+  return true;
+end $$;
+revoke all on function public.fam_finish_photo_batch(uuid,text,text[]) from public,anon,authenticated;
+grant execute on function public.fam_finish_photo_batch(uuid,text,text[]) to service_role;
