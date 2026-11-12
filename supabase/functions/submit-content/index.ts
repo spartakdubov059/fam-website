@@ -553,12 +553,17 @@ Deno.serve(async (req: Request) => {
             + "&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
         );
         const pendingListing = Array.isArray(savedListing.data) ? savedListing.data[0] : null;
+        const imageQuotaExceeded = moderation.reason_code === "image_review_quota_exceeded"
+          || moderation.diagnostic_code === "image_review_quota_exceeded";
+        const photoReviewMessage = imageQuotaExceeded
+          ? "Объявление сохранено без фото: сервис автоматической проверки фотографий временно исчерпал квоту. Фото загружено и хранится приватно, но не будет показано до успешной проверки. FAM повторит проверку автоматически — повторно загружать фото или отправлять объявление не нужно."
+          : "Объявление сохранено без фото. Фото загружено в закрытое хранилище и будет автоматически проверяться повторно. До успешной проверки оно не отображается; повторно отправлять объявление не нужно.";
 
         return respond({
           ok: true,
           status: "pending",
           listing: pendingListing,
-          reason: "Объявление сохранено. Фото проверяется автоматически. Повторно отправлять объявление не нужно — оно появится после успешной проверки.",
+          reason: photoReviewMessage,
         }, 200, headers);
       }
 
