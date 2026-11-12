@@ -701,7 +701,120 @@
     "Bradley Hand", "Comic Sans MS", cursive;
 }
 
-</style>
+
+    /* FAM mobile-first foundation: phones are the primary experience */
+    :root {
+      --tap-size: 44px;
+      --mobile-gutter: 14px;
+    }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body { min-width: 320px; }
+    button, [role="button"], a, input, select, textarea { touch-action: manipulation; }
+    button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    @media (max-width: 767px) {
+      main {
+        padding: 10px var(--mobile-gutter) calc(104px + env(safe-area-inset-bottom, 0px));
+        width: 100%;
+      }
+      .header-inner { padding: 9px var(--mobile-gutter); min-height: 58px; gap: 10px; }
+      .logo { gap: 8px; min-width: 0; }
+      .logo-mark { width: 40px; height: 40px; border-radius: 13px; flex: 0 0 40px; }
+      .logo-title { font-size: 18px; }
+      .logo-slogan { font-size: 11px; }
+      .header-actions { gap: 7px; }
+      .icon-round, .header-avatar { width: 42px; height: 42px; flex: 0 0 42px; }
+      .hero-slide { min-height: 190px; border-radius: 22px; padding: 20px 18px; }
+      .hero-slide.hero-img { height: clamp(170px, 48vw, 230px); }
+      .hero-slide.hero-img img { border-radius: 20px; }
+      .hero-script { font-size: clamp(36px, 10vw, 48px); }
+      .hero-sub { font-size: 13px; max-width: 230px; }
+      .search-pill { min-height: 48px; margin: 12px 0; padding: 10px 15px; }
+      .search-pill input { min-width: 0; font-size: 16px; }
+      .cat-tiles { gap: 8px; margin-bottom: 16px; }
+      .cat-tile { min-height: 82px; padding: 10px 4px; border-radius: 15px; font-size: 10px; }
+      .cat-tile .tile-emoji { font-size: 26px; }
+      .foryou-row { align-items: center; flex-wrap: wrap; }
+      .foryou-row h2 { font-size: clamp(19px, 5.5vw, 23px); }
+      .pill-all { min-height: 42px; padding: 9px 13px; }
+      .l-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .l-card { border-radius: 14px; padding: 6px; }
+      .l-imgwrap { border-radius: 11px; }
+      .l-body { padding: 8px 3px 3px; }
+      .l-title { font-size: 13px; line-height: 1.35; }
+      .l-price { font-size: 14px; }
+      .l-time { font-size: 10px; }
+      .l-fav { width: 36px; height: 36px; }
+      .l-go { width: 38px; height: 38px; }
+      .tabbar {
+        width: calc(100% - 20px);
+        max-width: 480px;
+        bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        padding: 5px 8px;
+      }
+      .tab-btn { min-height: 54px; padding: 4px 3px; }
+      .tab-ico { width: 40px; height: 38px; }
+      .tab-label { font-size: 10px; }
+      .tab-plus { width: 50px; height: 50px; }
+      .modal {
+        align-items: flex-end;
+        padding: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .modal-content {
+        width: 100%;
+        max-width: none;
+        max-height: min(92dvh, 820px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-radius: 24px 24px 0 0;
+        padding: 22px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+      }
+      .form-control {
+        min-height: 46px;
+        padding: 12px 13px;
+        font-size: 16px;
+        border-radius: 13px;
+      }
+      textarea.form-control { min-height: 104px; }
+      .button { min-height: var(--tap-size); padding: 11px 15px; }
+      .button-small { min-height: 38px; padding: 8px 11px; }
+      .profile-box { padding: 14px; }
+      .profile-hero { padding: 14px; }
+      .profile-disclosure > summary { min-height: 54px; padding: 13px; }
+      .profile-disclosure-body { padding: 13px; }
+      #profileLoggedIn .profile-shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      #profileLoggedIn .profile-shortcut,
+      #profileLoggedIn .profile-shortcut:last-child { grid-column: auto; min-height: 68px; }
+      .idea-folders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .idea-folder { min-height: 44px; padding: 9px 10px; justify-content: center; }
+      #schoolIdeasInbox { min-width: 0; }
+      #ideaFolderContent, #myIdeasList { min-width: 0; overflow-wrap: anywhere; }
+      .notif-panel { top: calc(62px + env(safe-area-inset-top, 0px)); right: 10px; max-height: 70dvh; }
+      .footer { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+    }
+    @media (max-width: 380px) {
+      :root { --mobile-gutter: 11px; }
+      .header-inner { padding-left: 11px; padding-right: 11px; }
+      .logo-slogan { display: none; }
+      .cat-tile { min-height: 76px; }
+      .cat-tile .tile-emoji { font-size: 23px; }
+      .tab-label { font-size: 9px; }
+      #profileLoggedIn .profile-shortcuts { grid-template-columns: 1fr; }
+      #profileLoggedIn .profile-shortcut,
+      #profileLoggedIn .profile-shortcut:last-child { min-height: 58px; }
+    }
+    @media (min-width: 768px) {
+      :root { --mobile-gutter: 20px; }
+      main { padding-top: 18px; }
+      .modal { padding: 24px; align-items: center; }
+      .modal-content { max-height: min(88vh, 860px); border-radius: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bg-decor::before, .bg-decor::after, .logo-mark { animation: none !important; }
+    }
+
+  </style>
 </head>
 <body>
   <noscript>
