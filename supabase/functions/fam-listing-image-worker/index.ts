@@ -67,6 +67,15 @@ function safePendingPath(task) {
   return new RegExp("^" + userId + "/listing_" + userId + "_[a-z0-9-]{1,50}\\.(?:jpg|png|webp)$", "i").test(path);
 }
 
+function isMissingStorageObject(response, data) {
+  const details = [data?.message, data?.error, data?.code, data?.statusCode]
+    .filter(value => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  return response?.status === 404
+    || /object not found|no such key|object does not exist|object_missing/.test(details);
+}
+
 async function createSignedImageUrl(path) {
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
   const response = await fetch(
@@ -79,6 +88,7 @@ async function createSignedImageUrl(path) {
   );
   const data = await response.json().catch(() => null);
   if (!response.ok || typeof data?.signedURL !== "string") {
+    if (isMissingStorageObject(response, data)) throw new Error("staged_media_missing");
     throw new Error("pending_image_sign_failed");
   }
   if (data.signedURL.startsWith("http")) return data.signedURL;
@@ -119,7 +129,10 @@ async function callModeration(task, imageUrl) {
 
 async function fetchImageBytes(signedUrl) {
   const response = await fetch(signedUrl);
-  if (!response.ok) throw new Error("pending_image_download_failed");
+  if (!response.ok) {
+    if (response.status === 404) throw new Error("staged_media_missing");
+    throw new Error("pending_image_download_failed");
+  }
   const mime = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
   const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const extension = extensions[mime];
@@ -234,6 +247,7 @@ async function createSignedAvatarUrl(path) {
   );
   const data = await response.json().catch(() => null);
   if (!response.ok || typeof data?.signedURL !== "string") {
+    if (isMissingStorageObject(response, data)) throw new Error("staged_media_missing");
     throw new Error("pending_avatar_sign_failed");
   }
   if (data.signedURL.startsWith("http")) return data.signedURL;
@@ -395,6 +409,13 @@ async function processAvatarTask(task) {
     return "approved";
   } catch (error) {
     if (publishedPath) await removeObject("avatars", publishedPath);
+    if (error instanceof Error && error.message === "staged_media_missing") {
+      await finishAvatar(task, "failed", {
+        reason_code: "pending_avatar_missing",
+        reason: "Временный файл нового аватара больше не найден. Предыдущий аватар остаётся в профиле.",
+      });
+      return "failed";
+    }
     const fallback = {
       action: "pending",
       degraded: true,
@@ -471,6 +492,13 @@ async function processTask(task) {
     return "approved";
   } catch (error) {
     if (publishedPath) await removePublishedImageIfUnreferenced(publishedPath);
+    if (error instanceof Error && error.message === "staged_media_missing") {
+      await finish(task, "failed", {
+        reason_code: "pending_image_missing",
+        reason: "Временный файл фотографии больше не найден. Объявление остаётся опубликованным без фото.",
+      });
+      return "failed";
+    }
     const fallback = {
       action: "pending",
       degraded: true,
