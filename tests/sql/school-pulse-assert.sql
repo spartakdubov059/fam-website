@@ -22,7 +22,7 @@ declare
  id uuid;
  result jsonb;
 begin
-select p.id into id from public.fam_school_polls p where p.school_id='school_a';
+select (public.fam_pulse_feed()->'polls'->0->>'id')::uuid into id;
 if id is null then raise exception 'Admin poll missing';end if;
 if public.fam_vote_school_poll(id,0) is not true then raise exception 'Vote missing';end if;
 if public.fam_vote_school_poll(id,1) is not false then raise exception 'Double-vote possible';end if;
