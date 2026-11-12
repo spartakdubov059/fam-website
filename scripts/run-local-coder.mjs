@@ -438,6 +438,12 @@ if (editError) {
   };
 }
 
+// Keep the generation checkout pristine. The patch is an artifact only;
+// independent QA applies it to a clean checkout in a separate step/job.
+for (const [path, source] of originalSources) {
+  writeFileSync(resolve(path), source, "utf8");
+}
+
 const summary = buildAgentReport({
   model: MODEL_ID,
   finding_status: result.finding_status,
