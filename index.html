@@ -813,6 +813,30 @@
         </div>
       </details>
       
+      <div class="profile-box profile-main-section" id="profileIdeasPanel">
+        <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЧТА ШКОЛЫ</span><h3>Почта идей</h3><p class="profile-section-copy">Отправляйте предложения и следите за их статусом. После проверки они попадут в Совет вашей школы.</p></div><span class="profile-section-icon">✉️</span></div>
+        <form id="ideaForm">
+          <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
+          <div id="ideaThinkingArea"></div>
+          <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить идею</button>
+        </form>
+        <div id="schoolIdeasInbox" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <div class="profile-subsection-heading" style="margin-top:0;"><b>Входящие идеи школы</b><span class="profile-count" id="schoolIdeasInboxCount">0</span></div>
+          <p class="profile-section-copy" style="margin:0 0 10px;">Предложения учеников вашей школы. Видно только участникам Совета и администраторам.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span id="ideaRefreshStatus" role="status" aria-live="polite" style="font-size:10px;color:var(--muted);">Идеи вашей школы</span><button id="refreshSchoolIdeasBtn" type="button" class="button button-secondary button-small">Обновить</button></div>
+          <div class="idea-folders">
+            <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
+            <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
+            <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
+            <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
+          </div>
+          <div id="ideaFolderContent"></div>
+        </div>
+        <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
+        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
+        
+      </div>
+      
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden"><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Управление школой</b><small>Заявки, участники и настройки школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h3 style="font-size:12px; margin:0 0 8px;">Заявки на вступление и доступ</h3>
@@ -898,29 +922,6 @@
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🎟️</span><span><b>Заявки на мои мероприятия</b><small>Участники и статусы регистрации</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
       </details>
-      <div class="profile-box profile-main-section" id="profileIdeasPanel">
-        <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЧТА ШКОЛЫ</span><h3>Почта идей</h3><p class="profile-section-copy">Отправляйте предложения и следите за их статусом. После проверки они попадут в Совет вашей школы.</p></div><span class="profile-section-icon">✉️</span></div>
-        <form id="ideaForm">
-          <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
-          <div id="ideaThinkingArea"></div>
-          <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить идею</button>
-        </form>
-        <div id="schoolIdeasInbox" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-          <div class="profile-subsection-heading" style="margin-top:0;"><b>Входящие идеи школы</b><span class="profile-count" id="schoolIdeasInboxCount">0</span></div>
-          <p class="profile-section-copy" style="margin:0 0 10px;">Предложения учеников вашей школы. Видно только участникам Совета и администраторам.</p>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><span id="ideaRefreshStatus" role="status" aria-live="polite" style="font-size:10px;color:var(--muted);">Идеи вашей школы</span><button id="refreshSchoolIdeasBtn" type="button" class="button button-secondary button-small">Обновить</button></div>
-          <div class="idea-folders">
-            <button type="button" class="idea-folder active" data-folder="new">Новые <span class="folder-count" id="countNew">0</span></button>
-            <button type="button" class="idea-folder" data-folder="work">В работе <span class="folder-count" id="countWork">0</span></button>
-            <button type="button" class="idea-folder" data-folder="done">Выполнено <span class="folder-count" id="countDone">0</span></button>
-            <button type="button" class="idea-folder" data-folder="rejected">Отклонено <span class="folder-count" id="countRejected">0</span></button>
-          </div>
-          <div id="ideaFolderContent"></div>
-        </div>
-        <div class="profile-subsection-heading"><b>Мои идеи <span class="profile-count" id="myIdeasCount">0</span></b><button type="button" class="button button-danger button-small" id="clearMyIdeasBtn" style="display:none;" data-action="clear-my-ideas">Очистить</button></div>
-        <details id="myIdeasDisclosure" class="profile-inline-disclosure"><summary>Показать мои идеи <span class="profile-disclosure-arrow">⌄</span></summary><div id="myIdeasList"></div></details>
-        
-      </div>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body"><div class="l-grid profile-listings-grid" id="myListingsGrid" style="margin-top:0;"></div><div id="myListingsEmpty" class="hidden profile-empty-inline">У вас пока нет объявлений.</div></div>
