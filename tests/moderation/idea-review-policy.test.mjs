@@ -46,5 +46,7 @@ test("provider outage approves locally clean ideas but holds text matching local
 test("serious idea findings are recorded as higher-severity safety signals", () => {
   assert.match(moderator, /hate_or_discrimination"\) \{\s*await writeSafetySignal\(safetyContext, "hate_or_discrimination", "high"\)/);
   assert.match(moderator, /threat_or_intimidation"\) \{\s*await writeSafetySignal\(safetyContext, "threat_or_intimidation", "high"\)/);
+  assert.match(moderator, /ideaReview\.reason_code === "serious_hate_or_threat"/);
+  assert.match(moderator, /isThreat \? "threat_or_intimidation" : "hate_or_discrimination"/);
   assert.match(moderator, /severe_targeted_harassment/);
 });
