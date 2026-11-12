@@ -1941,7 +1941,7 @@ window.onunhandledrejection = function() {
         ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
           ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
           : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}" data-owner-id="${esc(l.user_id)}">Удалить объявление</button>`
             : ""}
       </div>
     </div>`;
@@ -2808,7 +2808,7 @@ window.onunhandledrejection = function() {
           ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
           ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
-          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить это объявление</button>
+          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}" data-owner-id="${esc(row.user_id)}">Удалить это объявление</button>
         </div>`;
       }).join("") : '<p class="council-account-muted">Объявлений школы пока нет.</p>';
 
@@ -3299,7 +3299,7 @@ window.onunhandledrejection = function() {
     const previousText = button?.textContent || "";
     if (button) { button.disabled = true; button.textContent = "Удаляем..."; }
     try {
-      await callCouncilManagement("delete_listing", targetId, {}, { skipReauth: listing?.user_id === user.id });
+      await callCouncilManagement("delete_listing", targetId, {}, { skipReauth: listing?.user_id === user.id || button?.dataset?.ownerId === user.id });
       listings = listings.filter(row => row.id !== targetId);
       notice("Объявление удалено.");
       await loadCouncilAdminTools();
@@ -3705,7 +3705,7 @@ window.onunhandledrejection = function() {
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn); }
     else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
-    else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'delete-school-listing') { manageSchoolListing(btn); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
