@@ -1,5 +1,6 @@
 const RETRYABLE_CODES = new Set([
   "image_review_rate_limited",
+  "image_review_quota_exceeded",
   "image_review_unavailable",
   "image_review_no_decision",
   "openai_rate_limited",
@@ -9,7 +10,6 @@ const RETRYABLE_CODES = new Set([
 ]);
 
 const NON_RETRYABLE_CODES = new Set([
-  "image_review_quota_exceeded",
   "image_review_key_rejected",
   "image_review_bad_request",
   "openai_key_rejected",
@@ -28,9 +28,9 @@ export function isRetryableModerationFailure(result = {}) {
 }
 
 export function retryDelaySeconds(attempt) {
-  const delays = [60, 180, 600, 1800, 3600];
+  const delays = [60, 180, 600, 1800, 3600, 21600];
   const index = Math.max(0, Math.min(delays.length - 1, Number(attempt) - 1 || 0));
   return delays[index];
 }
 
-export const MAX_IMAGE_MODERATION_ATTEMPTS = 10;
+// Retryable service failures are retried indefinitely with a six-hour ceiling.
