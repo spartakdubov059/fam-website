@@ -1,5 +1,5 @@
 
-import { isRetryableModerationFailure, retryDelaySeconds, MAX_IMAGE_MODERATION_ATTEMPTS } from "./retry-policy.js";
+import { isRetryableModerationFailure, retryDelaySeconds } from "./retry-policy.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const WORKER_TOKEN = Deno.env.get("FAM_AGENT_WORKER_TOKEN") ?? "";
@@ -191,6 +191,7 @@ async function finish(task, state, details = {}) {
     p_reason: details.reason || null,
     p_retry_seconds: details.retry_seconds || null,
     p_image_url: details.image_url || null,
+    p_publish_text_only: details.publish_text_only === true,
   });
   if (result !== true) throw new Error("moderation_queue_finish_not_applied");
 }
@@ -199,7 +200,7 @@ async function scheduleRetryOrManual(task, result) {
   const reasonCode = String(result.reason_code || result.diagnostic_code || "provider_unavailable").slice(0, 80);
   const reason = String(result.reason || "Проверка временно недоступна.").slice(0, 180);
   const retryable = isRetryableModerationFailure(result);
-  if (retryable && Number(task.attempts) < MAX_IMAGE_MODERATION_ATTEMPTS) {
+  if (retryable) {
     await finish(task, "retry", {
       reason_code: reasonCode,
       reason,
@@ -209,7 +210,7 @@ async function scheduleRetryOrManual(task, result) {
   }
   await finish(task, "manual_review", {
     reason_code: reasonCode,
-    reason: retryable ? "Автоматические попытки временно исчерпаны; требуется дополнительная проверка." : reason,
+    reason,
   });
   return "manual_review";
 }
@@ -235,18 +236,19 @@ async function processTask(task) {
       return "rejected";
     }
 
-    if (moderation.action === "pending" && moderation.reason_code === "image_review_quota_exceeded") {
-      // Image review quota is a provider-capacity issue, not evidence that the image is safe.
-      // Re-check the listing text without the image; if approved, publish text-only and discard
-      // the unreviewed image so users can continue using FAM without bypassing image safety.
+    if (moderation.action === "pending" && isRetryableModerationFailure(moderation)) {
+      // Provider outages and quota exhaustion must not block the text listing or destroy
+      // the uploaded photo. Verify text separately, publish text-only, and keep the image
+      // private in the queue until a future image-review attempt succeeds.
       const textOnly = await callModeration(task, null);
       if (textOnly.action === "ok") {
-        await finish(task, "approved", {
-          reason_code: "text_only_fallback_after_image_quota",
-          reason: "Текст прошёл проверку. Фото не опубликовано из-за временного лимита проверки изображений.",
+        await finish(task, "retry", {
+          reason_code: moderation.reason_code || moderation.diagnostic_code || "image_review_unavailable",
+          reason: "Объявление опубликовано без фото. Фото сохранено приватно и будет добавлено после успешной проверки.",
+          retry_seconds: retryDelaySeconds(task.attempts),
+          publish_text_only: true,
         });
-        await removeObject("listing-images-pending", task.image_path);
-        return "approved";
+        return "retry";
       }
       if (textOnly.action === "reject") {
         await finish(task, "rejected", {
