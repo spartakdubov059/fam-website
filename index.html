@@ -2375,22 +2375,27 @@ window.onunhandledrejection = function() {
   function renderHero() {
     const box = $("bannerCarousel");
     let html = [];
-    const photoSlide = ({ index, alt, action, cat }) => {
+    // Six selected FAM editorial photographs, formatted as original 16:9 banners.
+    // The six earlier banners remain in the carousel unchanged.
+    const photoSlide = ({ index, alt, action, cat, first = false }) => {
       const attrs = action ? ` data-action="${action}"${cat ? ` data-cat="${cat}"` : ''}` : '';
       return `<div class="hero-slide hero-img fam-photo-slide">
         <div class="fam-photo-panel">
-          <img src="assets/fam-photo-card-${index}.svg" width="1200" height="675" loading="lazy" decoding="async" alt="${esc(alt)}">
+          ${first ? '<h1 class="hero-script">Найди своих.</h1>' : ''}
+          <img src="assets/fam-editorial-${index}.svg" width="1200" height="675" loading="${first ? 'eager' : 'lazy'}" decoding="async" alt="${esc(alt)}">
           ${action ? `<button type="button" class="fam-photo-hit"${attrs} aria-label="${esc(alt)}"></button>` : ''}
         </div>
       </div>`;
     };
-    html.push(`<div class="hero-slide hero-img fam-photo-slide">
-      <div class="fam-photo-panel">
-        <h1 class="hero-script">Найди своих.</h1>
-        <img src="assets/fam-photo-card-1.svg" width="1200" height="675" loading="eager" decoding="async" alt="Найди своих. Свои люди и идеи — рядом.">
-        <button type="button" class="fam-photo-hit" data-action="scroll-listings" aria-label="Начать просмотр объявлений"></button>
-      </div>
-    </div>`);
+    const editorialPhotos = [
+      { index: 2, alt: 'Найди своих. Общение, идеи и помощь от ребят рядом.', action: 'scroll-listings', first: true },
+      { index: 1, alt: 'ФАМ ближе к media. Школьный медиацентр — снимаем, пишем, создаём.' },
+      { index: 3, alt: 'Вещи рядом. Покупай, продавай и обменивайся.', action: 'cat', cat: 'Вещи' },
+      { index: 4, alt: 'Творчество и идеи. Делись проектами, находи единомышленников.', action: 'cat', cat: 'Творчество' },
+      { index: 5, alt: 'События и активности. Афиша и мероприятия школы.' },
+      { index: 6, alt: 'Учёба без стресса. Конспекты, материалы и помощь по предметам.', action: 'cat', cat: 'Учёба' }
+    ];
+    editorialPhotos.forEach(photo => html.push(photoSlide(photo)));
     const banners = [
       { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
       { src: "banner-2", alt: "Баннер FAM о школьном медиацентре: снимаем, пишем и создаём." },
@@ -2402,10 +2407,6 @@ window.onunhandledrejection = function() {
     banners.forEach(({ src, alt }) => {
       html.push(`<div class="hero-slide hero-img"><picture><source srcset="${src}.webp" type="image/webp"><img src="${src}.jpg" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></picture></div>`);
     });
-    html.push(photoSlide({ index:2, alt:'Размести объявление. Поделись тем, что пригодится другим.', action:'open-listing' }));
-    html.push(photoSlide({ index:3, alt:'Вещи и услуги. Всё полезное — среди своих.', action:'cat', cat:'Вещи' }));
-    html.push(photoSlide({ index:4, alt:'ИИ-модерация. Помогаем сделать публикации безопаснее.', action:null }));
-    html.push(photoSlide({ index:5, alt:'Учёба рядом. Знания, проекты и помощь друг другу.', action:'cat', cat:'Учёба' }));
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
         const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
