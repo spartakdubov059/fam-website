@@ -140,6 +140,7 @@ async function removePendingAvatarImage(imageUrl: string, userId: string): Promi
 async function publishPendingAvatarImage(
   imageUrl: string,
   userId: string,
+  cleanupPending = true,
 ): Promise<{ url: string; path: string }> {
   const pendingPath = pendingAvatarImagePath(imageUrl, userId);
   if (!pendingPath) throw new Error("Не удалось подтвердить временный файл аватара.");
@@ -173,7 +174,7 @@ async function publishPendingAvatarImage(
     throw new Error("Не удалось сохранить проверенный аватар.");
   }
 
-  await removePendingAvatarImage(imageUrl, userId);
+  if (cleanupPending) await removePendingAvatarImage(imageUrl, userId);
   return {
     url: SUPABASE_URL + "/storage/v1/object/public/avatars/" + publicPath,
     path: publicPath,
@@ -422,6 +423,58 @@ Deno.serve(async (req: Request) => {
         return fail("Аватар должен быть загружен в защищённое временное хранилище FAM.", 400, headers);
       }
 
+      // Use only the freshly loaded database profile, never a role sent by the browser.
+      // Trusted school roles publish avatars immediately, without queueing AI image review.
+      if (canSkipListingImageReview(profile, imageUrl)) {
+        let published: { url: string; path: string };
+        try {
+          // Keep the staged object until the profile update succeeds, so a transient
+          // database error does not destroy the user's only copy of the new avatar.
+          published = await publishPendingAvatarImage(imageUrl, userId, false);
+        } catch (error) {
+          console.warn("trusted_avatar_publish_failed", error instanceof Error ? error.name : "unknown");
+          return fail(
+            error instanceof Error ? error.message : "Не удалось опубликовать аватар.",
+            503,
+            headers,
+          );
+        }
+
+        // Re-check the current role and school in the UPDATE predicate to fail closed
+        // if the trusted role was revoked while the file was being copied.
+        const updatedProfile = await adminRequest(
+          "profiles?id=eq." + encodeURIComponent(userId)
+            + "&school_id=eq." + encodeURIComponent(profile.school_id)
+            + "&role=in.(school_admin,council_member)",
+          "PATCH",
+          {
+            avatar_url: published.url,
+            pending_avatar_request_id: null,
+          },
+        );
+        if (!updatedProfile.ok || !Array.isArray(updatedProfile.data) || updatedProfile.data.length !== 1) {
+          await removePublishedAvatarImage(published.path);
+          console.warn("trusted_avatar_profile_update_failed", updatedProfile.status);
+          return fail(
+            "Не удалось подтвердить права для быстрой публикации аватара. Предыдущая фотография сохранена.",
+            updatedProfile.ok ? 403 : 503,
+            headers,
+          );
+        }
+
+        await removePendingAvatarImage(imageUrl, userId);
+        await removePreviousOwnAvatarImage(profile.avatar_url, userId);
+        console.info("trusted_school_role_avatar_ai_review_skipped", JSON.stringify({ role: profile.role }));
+        return respond({
+          ok: true,
+          status: "approved",
+          avatar_url: published.url,
+          avatar_review_bypassed: true,
+          reason: "Аватар обновлён для подтверждённой роли без ИИ-проверки изображения.",
+        }, 200, headers);
+      }
+
+      // All other roles continue through the protected private moderation queue.
       const queued = await adminRequest("rpc/enqueue_avatar_image_moderation_task", "POST", {
         p_user_id: userId,
         p_image_path: imagePath,
@@ -432,8 +485,6 @@ Deno.serve(async (req: Request) => {
         return fail("Не удалось сохранить фото в очередь защищённой проверки. Попробуйте ещё раз.", 503, headers);
       }
 
-      // The staged image stays private; the previous public avatar remains active
-      // until the background worker approves and atomically swaps the profile URL.
       return respond({
         ok: true,
         status: "pending",
