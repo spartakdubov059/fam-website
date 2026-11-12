@@ -415,51 +415,29 @@ Deno.serve(async (req: Request) => {
 
     if (kind === "avatar") {
       const imageUrl = typeof payload.image_url === "string" ? payload.image_url : "";
-      if (!pendingAvatarImagePath(imageUrl, userId)) {
+      const imagePath = pendingAvatarImagePath(imageUrl, userId);
+      if (!imagePath) {
         return fail("Аватар должен быть загружен в защищённое временное хранилище FAM.", 400, headers);
       }
 
-      const context = typeof profile.school_id === "string" && profile.school_id
-        ? { kind: "image" as const, sender_id: userId, school_id: profile.school_id }
-        : null;
-      const moderation = await moderate(
-        "Проверка аватара профиля",
-        authorization,
-        origin,
-        false,
-        imageUrl,
-        context,
-        "avatar",
-      );
-
-      if (moderation.action !== "ok" || moderation.degraded) {
-        await removePendingAvatarImage(imageUrl, userId);
-        return respond({
-          ok: false,
-          status: moderation.action === "reject" ? "rejected" : "pending",
-          reason: moderation.reason ?? "Аватар не прошёл проверку. Попробуйте другое изображение.",
-          reason_code: moderation.reason_code ?? null,
-        }, 200, headers);
+      const queued = await adminRequest("rpc/enqueue_avatar_image_moderation_task", "POST", {
+        p_user_id: userId,
+        p_image_path: imagePath,
+      });
+      const queueId = typeof queued.data?.queue_id === "string" ? queued.data.queue_id : "";
+      if (!queued.ok || !queueId) {
+        console.error("avatar_image_moderation_enqueue_failed", queued.status);
+        return fail("Не удалось сохранить фото в очередь защищённой проверки. Попробуйте ещё раз.", 503, headers);
       }
 
-      const published = await publishPendingAvatarImage(imageUrl, userId);
-      const profileUpdate = await adminRequest(
-        "profiles?id=eq." + encodeURIComponent(userId) + "&select=avatar_url",
-        "PATCH",
-        { avatar_url: published.url },
-      );
-      const updatedProfile = Array.isArray(profileUpdate.data) ? profileUpdate.data[0] : null;
-      if (!profileUpdate.ok || !updatedProfile) {
-        await removePublishedAvatarImage(published.path);
-        console.error("approved_avatar_profile_update_failed", profileUpdate.status);
-        return fail("Фото проверено, но профиль не удалось обновить. Попробуйте ещё раз.", 500, headers);
-      }
-
-      await removePreviousOwnAvatarImage(profile.avatar_url, userId);
+      // The staged image stays private; the previous public avatar remains active
+      // until the background worker approves and atomically swaps the profile URL.
       return respond({
         ok: true,
-        status: "approved",
-        avatar_url: updatedProfile.avatar_url,
+        status: "pending",
+        queue_id: queueId,
+        avatar_url: profile.avatar_url ?? null,
+        reason: "Фото сохранено. Оно останется приватным до проверки; предыдущий аватар продолжит отображаться.",
       }, 200, headers);
     }
 
