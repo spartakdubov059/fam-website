@@ -171,14 +171,14 @@ begin
   num:=jsonb_array_length(p_options);
   if char_length(p_question) not between 8 and 140 or num not between 2 and 4
     or not public.fam_pulse_text_safe(p_question) then raise exception 'invalid_poll';end if;
-  if exists(select 1 from jsonb_array_elements(p_options) opt
-      where jsonb_typeof(opt)<>'string'
-        or char_length(btrim(trim(both '"' from opt::text))) not between 2 and 70
-        or not public.fam_pulse_text_safe(opt #>> '{}')) then
+  if exists(select 1 from jsonb_array_elements(p_options) as opt(value)
+      where jsonb_typeof(opt.value)<>'string'
+        or char_length(btrim(trim(both '"' from opt.value::text))) not between 2 and 70
+        or not public.fam_pulse_text_safe(opt.value #>> '{}')) then
     raise exception 'invalid_option_text';end if;
   if (select count(*) from (
-       select lower(btrim(opt #>> '{}')) item from jsonb_array_elements(p_options) opt
-       group by lower(btrim(opt #>> '{}'))
+       select lower(btrim(opt.value #>> '{}')) item from jsonb_array_elements(p_options) as opt(value)
+       group by lower(btrim(opt.value #>> '{}'))
      ) distinct_items)<>num then
     raise exception 'duplicate_options';end if;
   if (select count(*) from public.fam_school_polls where school_id=school
