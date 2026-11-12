@@ -89,9 +89,7 @@ try {
     if (expectedCategory) {
       assert.equal(count, 1, `category suggestion missing for "${title}"`);
       const label = await hintButton.textContent();
-      assert.match(label, new RegExp(expectedCategory.replace(/[.*+?^${}()|[\]\\]/g, "\\  await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
-
-  const widths = [")));
+      assert.ok(label && label.includes(expectedCategory), `wrong category suggestion for "${title}": ${label}`);
       if (shouldSelect) {
         await hintButton.click();
         assert.equal(await page.locator("#lCat").inputValue(), expectedCategory, "suggested category must be selectable");
