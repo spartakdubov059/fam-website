@@ -1,0 +1,118 @@
+name: FAM Qwen3.8-27B free CPU coding test
+on:
+  push:
+    branches: [ai/qwen38-vs-deepseek-free-benchmark]
+    paths: [".github/workflows/qwen38-vs-deepseek-free-benchmark.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: fam-qwen38-free-cpu-test
+  cancel-in-progress: false
+jobs:
+  qwen38:
+    name: Qwen3.8-27B IQ2_XS — FAM coding task
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout isolated source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: "22"
+      - name: Test agent response and patch helpers
+        run: |
+          set -euo pipefail
+          node --test tests/security/local-model-json.test.mjs
+          node --test tests/security/local-model-patch.test.mjs
+      - name: Download and verify Qwen3.8 open weights
+        env:
+          MODEL_SHA256: eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf" --output "$MODEL"
+          SIZE="$(stat -c '%s' "$MODEL")"
+          SHA="$(sha256sum "$MODEL" | awk '{print $1}')"
+          test "$SIZE" -ge 8500000000
+          test "$SHA" = "$MODEL_SHA256"
+          echo "Qwen3.8 file verified: $SIZE bytes"
+          df -h "$RUNNER_TEMP"
+      - name: Build pinned llama.cpp with CPU support
+        env:
+          LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_METAL=OFF -DGGML_OPENMP=ON
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+      - name: Start Qwen3.8 locally on CPU
+        run: |
+          set -euo pipefail
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
+          "$SERVER" -m "$MODEL" --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --temp 0.1 --top-p 0.95 --top-k 40 --reasoning off > "$RUNNER_TEMP/fam-llama.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/fam-llama.pid"
+          READY=false
+          for i in $(seq 1 180); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then READY=true; break; fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/fam-llama.pid")" 2>/dev/null; then tail -n 100 "$RUNNER_TEMP/fam-llama.log"; exit 1; fi
+            sleep 5
+          done
+          test "$READY" = true
+      - name: Run the same FAM coding task
+        env:
+          FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
+          FAM_TASK: "Исправь воспроизводимый дефект функции normalizeSearchInput в tests/fixtures/qwen-model-benchmark.mjs. Сейчас она приводит строку к нижнему регистру и обрезает края, но оставляет повторные пробелы, табуляции и переводы строк внутри. Сверни любую последовательность Unicode whitespace в один обычный пробел, сохрани нижний регистр, trim и сигнатуру функции. Регрессионные тесты находятся в tests/fixtures/qwen-model-benchmark.test.mjs. Измени только tests/fixtures/qwen-model-benchmark.mjs, не меняй тест и остальные файлы. Подготовь минимальный patch с доказательством причины."
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/fam-candidate-benchmark"
+          mkdir -p "$OUT"
+          START="$(date +%s)"
+          GITHUB_WORKSPACE="$GITHUB_WORKSPACE" RUNNER_TEMP="$OUT" FAM_MODEL_ID="$FAM_MODEL_ID" FAM_TASK="$FAM_TASK" node scripts/run-local-coder.mjs
+          END="$(date +%s)"
+          echo "$((END-START))" > "$OUT/inference-seconds.txt"
+      - name: Validate the patch and run independent QA
+        if: always()
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/fam-candidate-benchmark"
+          SUMMARY="$OUT/fam-agent/summary.json"
+          PATCH="$OUT/fam-agent/fam-agent.patch"
+          QA="model_or_inference_failed"
+          if [[ -s "$SUMMARY" ]]; then
+            HAS_PATCH="$(node -e "const s=require(process.argv[1]);process.stdout.write(String(s.patch_available===true))" "$SUMMARY")"
+            if [[ "$HAS_PATCH" == true && -s "$PATCH" ]]; then
+              if node scripts/validate-local-agent-patch.mjs "$PATCH" "$SUMMARY" >/dev/null && git apply --check "$PATCH"; then
+                git apply "$PATCH"
+                if node --test tests/fixtures/qwen-model-benchmark.test.mjs && node --test tests/moderation/*.test.mjs tests/security/*.test.mjs && git diff --check; then QA="passed"; else QA="tests_failed"; fi
+              else
+                QA="patch_invalid_or_not_applicable"
+              fi
+            else
+              QA="no_patch"
+            fi
+          fi
+          echo "## Qwen3.8-27B IQ2_XS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Independent QA: $QA" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s "$SUMMARY" ]]; then cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"; fi
+          echo "Qwen3.8 independent QA: $QA"
+          test "$QA" = passed
+      - name: Stop model server
+        if: always()
+        run: |
+          if [[ -s "$RUNNER_TEMP/fam-llama.pid" ]]; then kill "$(cat "$RUNNER_TEMP/fam-llama.pid")" 2>/dev/null || true; fi
+      - name: Save model report and generated patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qwen38-27b-iq2-xs-fam-report
+          path: |
+            ${{ runner.temp }}/fam-candidate-benchmark
+          if-no-files-found: warn
+          retention-days: 3
