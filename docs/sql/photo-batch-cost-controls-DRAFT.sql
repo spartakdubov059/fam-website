@@ -165,7 +165,7 @@ begin
       or exists (select 1 from unnest(p_input_hashes) h where h !~ '^[a-f0-9]{64}$')
       or exists (select 1 from unnest(p_pending_paths) path
            where path !~ ('^' || p_owner_id::text || '/listing_' || p_owner_id::text ||
-              '_[A-Za-z0-9_-]{8,80}\\.(jpg|jpeg|png|webp)$')) then
+              '_[A-Za-z0-9_-]{8,80}[.](jpg|jpeg|png|webp)$')) then
     raise exception 'invalid photo source';
   end if;
   perform 1 from public.listings l
