@@ -84,14 +84,15 @@
       if(iteration!==epoch)return;
       if(error||!validFeed(data)){
         status.textContent="Не удалось обновить анонсы.";
-        grid.innerHTML='<div class="pulse-empty">Новости и опросы появятся после подключения школьного раздела.</div>';
+        grid.innerHTML='<div class="pulse-empty">Анонсы пока недоступны. Обновите ленту позже.</div>';
         return;
       }
       const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
       grid.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("")||
-        '<div class="pulse-empty">Школьных новостей пока нет. Загляните позже.</div>';
-      status.textContent="Новости только вашей школы";
+        '<div class="pulse-empty"><span class="pulse-empty-star">✦</span>Здесь появятся анонсы, события и опросы вашей школы.</div>';
+      grid.querySelectorAll(".pulse-card").forEach((card,index)=>card.style.setProperty("--pulse-order",String(Math.min(index,7))));
+      status.textContent="Видят участники вашей школы";
     }
     rootNode.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");
@@ -133,10 +134,28 @@
       event.preventDefault();
       const title=clamp(announcer.elements.namedItem("title")?.value.trim(),90);
       const body=clamp(announcer.elements.namedItem("body")?.value.trim(),450);
-      const kind=announcer.elements.namedItem("kind")?.value==="important"?"important":"news";
+      const selected=announcer.elements.namedItem("kind")?.value;
+      const kind=["news","important","open_event"].includes(selected)?selected:"news";
+      const rawEventTime=String(announcer.elements.namedItem("event_starts_at")?.value||"");
+      const parsedEventTime=kind==="open_event"?new Date(rawEventTime):null;
+      const eventIso=parsedEventTime&&Number.isFinite(parsedEventTime.getTime())?parsedEventTime.toISOString():null;
       if(title.length<4||body.length<4)return alertUser("Заполните заголовок и текст анонса.");
-      void createRpc(announcer,"fam_publish_school_announcement",{p_title:title,p_body:body,p_kind:kind});
+      if(kind==="open_event"&&(!eventIso||parsedEventTime.getTime()<=Date.now()+10*60*1000))
+        return alertUser("Укажите будущую дату и время события.");
+      void createRpc(announcer,"fam_publish_school_announcement",{
+        p_title:title,p_body:body,p_kind:kind,p_event_starts_at:eventIso
+      });
     });
+    const kindSelect=announcer?.elements.namedItem("kind");
+    const updateEventFields=()=>{
+      const block=document.getElementById("pulseEventDateRow");
+      const input=announcer?.elements.namedItem("event_starts_at");
+      const isEvent=kindSelect?.value==="open_event";
+      block?.classList.toggle("hidden",!isEvent);
+      if(input)input.required=isEvent;
+    };
+    kindSelect?.addEventListener("change",updateEventFields);
+    updateEventFields();
     poller?.addEventListener("submit",event=>{
       event.preventDefault();
       const question=clamp(poller.elements.namedItem("question")?.value.trim(),140);
