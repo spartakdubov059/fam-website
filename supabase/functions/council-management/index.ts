@@ -322,7 +322,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const retention = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Keep only recent, content-free safety metadata.
+  // Keep only recent, content-minimized safety metadata and sanitized excerpts.
   await adminRequest(
     "fam_safety_incidents?school_id=eq." + encodeURIComponent(schoolId)
     + "&created_at=lt." + encodeURIComponent(retention),
@@ -330,7 +330,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
   );
 
   const result = await adminRequest(
-    "fam_safety_incidents?select=pair_fingerprint,source_kind,category,severity,created_at"
+    "fam_safety_incidents?select=pair_fingerprint,source_kind,category,severity,created_at,actor_id,target_id,source_origin,evidence_excerpt"
     + "&school_id=eq." + encodeURIComponent(schoolId)
     + "&created_at=gte." + encodeURIComponent(cutoff)
     + "&reviewed_at=is.null&order=created_at.desc&limit=400",
@@ -352,6 +352,10 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
       severity: "medium",
       first_seen: row.created_at,
       last_seen: row.created_at,
+      actor_id: typeof row.actor_id === "string" ? row.actor_id : null,
+      target_id: typeof row.target_id === "string" ? row.target_id : null,
+      source_origin: typeof row.source_origin === "string" ? row.source_origin : null,
+      evidence_excerpt: typeof row.evidence_excerpt === "string" ? row.evidence_excerpt : null,
     };
     current.occurrences += 1;
     if (row.severity === "high") current.severity = "high";
@@ -363,10 +367,43 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
     groups.set(key, current);
   }
 
-  const reports = Array.from(groups.values())
+  const grouped = Array.from(groups.values())
     .sort((a, b) => String(b.last_seen).localeCompare(String(a.last_seen)))
-    .slice(0, 50)
-    .map(row => ({
+    .slice(0, 50);
+
+  // Resolve account identity only for the current administrator's school.
+  // This endpoint is already restricted to school_admin and all IDs are filtered by school_id.
+  const profileIds = Array.from(new Set(
+    grouped.flatMap(row => [row.actor_id, row.target_id])
+      .filter((id): id is string => typeof id === "string" && UUID_RE.test(id)),
+  ));
+  const profilesById = new Map<string, { id: string; email: string | null; role: string | null }>();
+  for (let offset = 0; offset < profileIds.length; offset += 50) {
+    const batch = profileIds.slice(offset, offset + 50);
+    if (!batch.length) continue;
+    const people = await adminRequest(
+      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(schoolId)
+      + "&id=in.(" + batch.map(id => encodeURIComponent(id)).join(",") + ")",
+    );
+    if (!people.ok || !Array.isArray(people.data)) {
+      console.error("fam_safety_report_identity_lookup_failed", people.status);
+      continue;
+    }
+    for (const profile of people.data) {
+      if (typeof profile?.id === "string") {
+        profilesById.set(profile.id, {
+          id: profile.id,
+          email: typeof profile.email === "string" ? profile.email : null,
+          role: typeof profile.role === "string" ? profile.role : null,
+        });
+      }
+    }
+  }
+
+  const reports = grouped.map(row => {
+    const actor = row.actor_id ? profilesById.get(row.actor_id) ?? null : null;
+    const target = row.target_id ? profilesById.get(row.target_id) ?? null : null;
+    return {
       fingerprint: row.fingerprint,
       source_kind: row.source_kind,
       category: row.category,
@@ -375,11 +412,24 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
       repeated: row.occurrences >= 3,
       first_seen: row.first_seen,
       last_seen: row.last_seen,
-    }));
+      source_origin: row.source_origin,
+      evidence_excerpt: row.evidence_excerpt,
+      actor: actor ? {
+        email: actor.email,
+        role: actor.role,
+        account_code: actor.id.slice(-6).toUpperCase(),
+      } : null,
+      target: target ? {
+        email: target.email,
+        role: target.role,
+        account_code: target.id.slice(-6).toUpperCase(),
+      } : null,
+      identity_available: !!actor,
+    };
+  });
 
   return { reports, period_days: 30 };
 }
-
 async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
   const [targets, ownRequests] = await Promise.all([
     adminRequest(
@@ -584,7 +634,6 @@ Deno.serve(async (req: Request) => {
 
     const sensitiveActions = new Set([
       "review_account_deletion",
-      "delete_listing",
       "delete_account",
       "revoke_role",
       "suspend_account",
