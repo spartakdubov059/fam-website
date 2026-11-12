@@ -22,7 +22,7 @@ test("ordinary personal insults, spam and unclear accusations are automatically 
 
 test("only serious hate, discrimination, threats and severe targeted harassment map to human review", () => {
   assert.match(reviewer, /const highRiskCodes = new Set\(\[\s*"hate_or_discrimination",\s*"threat_or_intimidation",\s*"severe_targeted_harassment"/);
-  assert.match(reviewer, /decision === "manual_review" && highRiskCodes\.has/);
+  assert.match(reviewer, /\["manual_review", "reject"\]\.includes\(String\(decision\)\) && highRiskCodes\.has/);
   assert.match(reviewer, /"hate_or_discrimination"/);
   assert.match(reviewer, /"threat_or_intimidation"/);
   assert.match(reviewer, /"severe_targeted_harassment"/);
@@ -31,7 +31,9 @@ test("only serious hate, discrimination, threats and severe targeted harassment 
 test("provider outage approves locally clean ideas but holds text matching local safety flags", () => {
   assert.match(reviewer, /if \(!apiKey\) return safeLocalFallback\(\)/);
   assert.match(reviewer, /action: "ok",\s*reason_code: "safe_local_fallback"/);
-  assert.match(reviewer, /action: "pending",\s*reason_code: "local_policy_flag_requires_review"/);
+  assert.match(reviewer, /localFlag === "serious_hate_or_threat"/);
+  assert.match(reviewer, /reason_code: "serious_hate_or_threat"/);
+  assert.match(reviewer, /reason_code: "unsafe_content"/);
   assert.match(contentSafety, /serious_hate_or_threat/);
   const ideaStart = moderator.indexOf("if (isIdea) {");
   const ideaEnd = moderator.indexOf("// For locally flagged text", ideaStart);
