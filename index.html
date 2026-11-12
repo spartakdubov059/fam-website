@@ -300,7 +300,8 @@
     .description-helper-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
     .description-helper-head button { padding: 2px 4px; color: var(--muted); background: none; border: 0; font-size: 11px; }
     .description-helper-note { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.45; }
-    .description-helper-draft { margin: 0 0 10px; padding: 10px; border-radius: 9px; background: var(--bg); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 11px; line-height: 1.55; }
+    .description-helper-draft { display: block; width: 100%; min-height: 116px; margin: 0 0 10px; padding: 10px; border-radius: 9px; background: var(--bg); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; line-height: 1.55; resize: vertical; }
+    .description-helper-checklist { margin: 0 0 10px; color: var(--muted); font-size: 10px; line-height: 1.5; }
     .description-helper-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
     .description-helper-buttons .button { flex: 1 1 130px; }
     .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -1194,32 +1195,32 @@
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
     <h2 id="listingTitle" style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
     <form id="listingForm">
-      <div id="aiHints" class="ai-hint">Начните вводить — FAM подскажет категорию по тексту, без ИИ-запросов.</div>
-      <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="100"></div>
+      <div id="aiHints" class="ai-hint">Начните вводить — FAM подскажет категорию по названию и описанию. Это локальная подсказка, без ИИ-запросов.</div>
+      <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="80"></div>
       <div class="form-group">
         <label for="lDesc">Описание</label>
         <textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea>
         <div class="description-helper-actions">
-          <button type="button" class="button button-secondary button-small" data-action="open-description-helper">✦ Помочь с описанием</button>
-          <span class="description-helper-caption">Работает прямо в браузере: без нейросети, внешних запросов и расхода ИИ-лимитов.</span>
+          <button type="button" class="button button-secondary button-small" data-action="open-description-helper">✦ Улучшить описание</button>
+          <span class="description-helper-caption">Редактор работает в браузере: исправляет оформление и подсказывает, чего не хватает. Без внешних запросов и расхода ИИ-лимитов.</span>
         </div>
-        <div id="descriptionHelperPanel" class="description-helper-panel hidden" role="region" aria-label="Помощник составления описания" aria-live="polite">
+        <div id="descriptionHelperPanel" class="description-helper-panel hidden" role="region" aria-label="Помощник описания" aria-live="polite">
           <div class="description-helper-head">
-            <strong>Черновик описания</strong>
+            <strong id="descriptionHelperTitle">Улучшенная версия</strong>
             <button type="button" data-action="close-description-helper">Скрыть</button>
           </div>
-          <p id="descriptionHelperNote" class="description-helper-note">Это шаблон, а не готовые факты. Заполните или удалите подсказки в квадратных скобках. Не указывайте домашний адрес, телефон и другие личные данные.</p>
-          <pre id="descriptionHelperDraft" class="description-helper-draft"></pre>
+          <p id="descriptionHelperNote" class="description-helper-note">Текст останется под вашим контролем. Редактор не добавляет неподтверждённые характеристики.</p>
+          <textarea id="descriptionHelperDraft" class="description-helper-draft" rows="5" maxlength="1000" aria-label="Черновик улучшенного описания"></textarea>
+          <div id="descriptionHelperSuggestions" class="description-helper-checklist"></div>
           <div class="description-helper-buttons">
-            <button type="button" class="button button-secondary button-small" data-action="insert-description-draft" data-mode="append">Добавить к тексту</button>
-            <button type="button" class="button button-primary button-small" data-action="insert-description-draft" data-mode="replace">Заменить описание</button>
+            <button type="button" class="button button-primary button-small" data-action="apply-description-draft">Применить текст</button>
           </div>
         </div>
       </div>
       <div class="form-group">
         <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
-          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
+          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
         </select>
       </div>
       <div id="eventFields" class="hidden" style="background:var(--bg); padding:10px; border-radius:12px; margin-bottom:12px;">
@@ -1236,7 +1237,7 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM и сначала сохраняется в закрытом хранилище. До успешной проверки фотография не считается одобренной и не публикуется. Если сервис временно исчерпал лимит, объявление может отображаться без фото; снимок будет добавлен автоматически после успешной проверки.</p>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото сначала сохраняется в закрытом хранилище и не показывается до успешной проверки. Если сервис проверки временно исчерпал квоту, объявление сохранится без фото, а FAM автоматически повторит проверку. Повторно отправлять объявление не нужно — статус фото будет виден в карточке.</p>
         <div id="uploadStatus"></div>
       </div>
       <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
@@ -1445,32 +1446,46 @@ window.onunhandledrejection = function() {
     }
   }
 
-  // Local category hints: deterministic keyword matching only.
-  // This runs in the visitor's browser and never calls an AI model or external API.
+  // Local category matching. All work happens in this browser; no text is sent to an AI service.
   const CATEGORY_HINT_KEYWORDS = Object.freeze({
     "Вещи": [
       "прод", "отдам", "куплю", "покуп", "обмен", "вещ", "одежд", "обув", "книг",
       "телефон", "смартфон", "планшет", "компьютер", "ноутбук", "наушник", "игрушк",
       "аксессуар", "рюкзак", "велосипед", "самокат", "шлем", "приставк", "консол",
       "монитор", "клавиатур", "мыш", "куртк", "кроссовк", "ботинк", "футболк",
-      "плать", "сумк", "зарядк", "час", "косметич"
+      "плать", "сумк", "зарядк", "час", "косметич", "картридж", "колонк", "гаджет"
     ],
     "Услуги": [
-      "репетитор", "помощ", "помога", "услуг", "ремонт", "почин", "настрой", "установ",
-      "уборк", "выгул", "фотограф", "дизайн", "монтаж", "достав", "тренер", "трениров",
-      "стриж", "нян", "перевод", "обуч", "научу", "сделаю", "съемк"
+      "репетитор", "помощ", "услуг", "ремонт", "почин", "настрой", "установ",
+      "уборк", "выгул", "тренер", "трениров", "нян", "перевод", "научу",
+      "достав", "соберу", "настрою", "починю", "обучу", "проведу занят"
+    ],
+    "Творчество": [
+      "творчеств", "нарис", "рисован", "рисунок", "иллюстрац", "логотип", "дизайн",
+      "макет", "арт", "фотограф", "фотосесс", "видеомонтаж", "анимац", "стикер",
+      "обложк", "портрет", "картин", "вяз", "хендмейд", "handmade", "брелок",
+      "украшен", "декор", "музык", "песн", "озвуч", "комикс", "3d"
     ],
     "Учёба": [
-      "конспект", "решебник", "учебник", "подготов", "огэ", "егэ", "экзамен", "контрольн",
-      "урок", "домашн", "задач", "сочинен", "реферат", "доклад", "презентац",
-      "учеб", "задан", "школ", "предмет"
+      "конспект", "решебник", "учебник", "подготов", "огэ", "егэ", "экзамен",
+      "контрольн", "урок", "домашн", "задач", "сочинен", "реферат", "доклад",
+      "презентац", "учеб", "задан", "школ", "предмет", "математ", "физик",
+      "хим", "биолог", "русск", "английск", "географ", "истор"
     ],
     "Мероприятия": [
-      "встреч", "концерт", "квиз", "фестивал", "матч", "турнир", "мероприят", "экскурс",
-      "вечерин", "соревнован", "олимпиад", "собрани", "дискотек", "кинопоказ", "праздник",
-      "мастер класс"
+      "встреч", "концерт", "квиз", "фестивал", "матч", "турнир", "мероприят",
+      "экскурс", "вечерин", "соревнован", "олимпиад", "собрани", "дискотек",
+      "кинопоказ", "праздник", "мастер класс", "конкурс"
     ]
   });
+
+  const CATEGORY_STRONG_INTENTS = [
+    { category: "Вещи", pattern: /(^| )(продам|куплю|отдам|обменяю)( |$)/ },
+    { category: "Услуги", pattern: /(^| )(репетитор|ремонт|починю|настрою|выгул|уборка|окажу услугу|окажу услуги)( |$)/ },
+    { category: "Творчество", pattern: /(^| )(нарисую|создам логотип|создам иллюстрацию|сделаю дизайн|сделаю обложку|свяжу|вяжу)( |$)/ },
+    { category: "Учёба", pattern: /(^| )(конспект|решебник|учебник|подготовка к огэ|подготовка к егэ|домашнее задание|контрольная)( |$)/ },
+    { category: "Мероприятия", pattern: /(^| )(квиз|фестиваль|концерт|турнир|встреча|матч|экскурсия)( |$)/ }
+  ];
 
   function normalizeCategoryText(value) {
     return String(value || "")
@@ -1490,108 +1505,209 @@ window.onunhandledrejection = function() {
     }).length;
   }
 
-  function findSuggestedCategory() {
-    const title = $("lTitle").value;
-    const description = $("lDesc").value;
-    const categories = Object.entries(CATEGORY_HINT_KEYWORDS)
+  function findSuggestedCategories() {
+    const title = normalizeCategoryText($("lTitle").value);
+    const description = normalizeCategoryText($("lDesc").value);
+    const candidates = Object.entries(CATEGORY_HINT_KEYWORDS)
       .filter(([category]) => category !== "Мероприятия" || $("evOption").style.display !== "none")
       .map(([category, keywords]) => ({
         category,
-        score: countCategoryKeywordMatches(title, keywords) * 2 +
+        score: countCategoryKeywordMatches(title, keywords) * 3 +
           countCategoryKeywordMatches(description, keywords)
-      }))
-      .sort((a, b) => b.score - a.score);
+      }));
 
-    if (!categories.length || categories[0].score === 0) return null;
-    if (categories[1] && categories[0].score === categories[1].score) return null;
-    return categories[0].category;
+    for (const intent of CATEGORY_STRONG_INTENTS) {
+      if (intent.pattern.test(title)) {
+        const candidate = candidates.find(item => item.category === intent.category);
+        if (candidate) candidate.score += 8;
+      }
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    if (!candidates.length || candidates[0].score === 0) return [];
+    return candidates.filter(item => item.score === candidates[0].score).slice(0, 3).map(item => item.category);
   }
 
   function updateHints() {
     const hint = $("aiHints");
-    const bestCategory = findSuggestedCategory();
-    if (!bestCategory) {
-      hint.textContent = "Начните вводить — FAM подскажет категорию по названию и описанию.";
+    const categories = findSuggestedCategories();
+    const selected = $("lCat").value;
+    if (!categories.length) {
+      hint.textContent = $("lTitle").value.trim() || $("lDesc").value.trim()
+        ? "Пока не могу уверенно определить категорию. Проверьте название и выберите её вручную."
+        : "Начните вводить название и описание — FAM подскажет подходящую категорию.";
       return;
     }
 
-    if ($("lCat").value === bestCategory) {
-      hint.textContent = `Категория «${bestCategory}» подходит по вашему тексту.`;
+    if (categories.length === 1 && selected === categories[0]) {
+      hint.textContent = "По тексту подходит категория «" + categories[0] + "».";
       return;
     }
 
-    hint.innerHTML = `<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="${bestCategory}">FAM предлагает категорию: ${bestCategory}</button>`;
+    const intro = categories.length > 1
+      ? "Похоже на несколько категорий. Выберите подходящую:"
+      : "Больше всего подходит категория:";
+    hint.innerHTML = "<span>" + intro + "</span> " + categories.map(category =>
+      '<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="' +
+      category + '"> ' + category + '</button>'
+    ).join(" ");
   }
 
-  function makeDescriptionDraft() {
-    const title = $("lTitle").value.trim() || "[укажите название из заголовка]";
-    const category = $("lCat").value;
+  function normalizeDescriptionForEditor(value) {
+    return String(value || "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map(line => {
+        let text = line
+          .replace(/[ \t]+/g, " ")
+          .replace(/\s+([,.;:!?])/g, "$1")
+          .replace(/([,;:!?])(?=\S)/g, "$1 ")
+          .replace(/([!?])\1+/g, "$1")
+          .trim();
+        if (!text) return "";
+        text = text.replace(/(^|[.!?]\s+)([a-zа-яё])/giu, (match, prefix, letter) =>
+          prefix + letter.toLocaleUpperCase("ru-RU"));
+        text = text.charAt(0).toLocaleUpperCase("ru-RU") + text.slice(1);
+        if (!/[.!?…]$/.test(text) && !/[:;]$/.test(text)) text += ".";
+        return text;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  function makeDescriptionTemplate() {
+    const title = $("lTitle").value.trim() || "[укажите название]";
     const price = $("lPrice").value.trim();
-    const priceLine = price ? `Цена: ${price}` : "Цена: [укажите стоимость или напишите «Бесплатно»]";
+    const priceLine = price ? "Цена: " + price : "Цена: [укажите стоимость или напишите «Бесплатно»]";
     const templates = {
       "Вещи": [
-        `Предлагаю: ${title}.`,
+        "Предмет: " + title + ".",
         "Состояние: [укажите реальное состояние].",
-        "Особенности: [перечислите важные характеристики].",
-        "Комплектация: [напишите, что входит].",
+        "Модель и характеристики: [уточните, что важно знать покупателю].",
+        "Комплектация: [перечислите, что входит].",
         priceLine,
-        "Передача: [укажите удобный и безопасный способ передачи]."
+        "Передача: [укажите безопасный способ передачи в общественном месте]."
       ],
       "Услуги": [
-        `Предлагаю услугу: ${title}.`,
-        "Что входит: [опишите, что именно вы сделаете].",
-        "Для кого: [укажите, кому подойдёт услуга].",
-        "Сроки: [укажите, когда вы доступны].",
+        "Услуга: " + title + ".",
+        "Что входит: [опишите конкретные действия].",
+        "Для кого: [укажите, кому подходит услуга].",
+        "Формат и время: [укажите онлайн/очно и доступное время].",
+        priceLine
+      ],
+      "Творчество": [
+        "Работа: " + title + ".",
+        "Что именно будет создано: [опишите результат].",
+        "Формат, размер или материалы: [уточните детали].",
+        "Сроки: [укажите реальный срок выполнения].",
         priceLine
       ],
       "Учёба": [
-        `Тема или предмет: ${title}.`,
+        "Предмет или тема: " + title + ".",
         "С чем помогу: [укажите конкретные темы или задания].",
         "Уровень: [укажите класс или уровень подготовки].",
         "Формат: [очно или онлайн].",
-        "Результат: [что именно получит ученик].",
+        "Расписание: [укажите удобное время].",
         priceLine
       ],
       "Мероприятия": [
-        `Мероприятие: ${title}.`,
-        "Что будет: [кратко опишите программу].",
+        "Мероприятие: " + title + ".",
+        "Программа: [кратко опишите, что будет происходить].",
         "Дата и время: [укажите дату и время].",
         "Место: [укажите публичную площадку, не домашний адрес].",
-        "Для кого: [укажите, кому подойдёт мероприятие].",
         "Участие: [укажите условия и количество мест]."
       ]
     };
-    return (templates[category] || templates["Вещи"]).join("\n");
+    return (templates[$("lCat").value] || templates["Вещи"]).join("\n");
+  }
+
+  function getMissingDescriptionSuggestions() {
+    const text = normalizeCategoryText($("lDesc").value);
+    const category = $("lCat").value;
+    const rules = {
+      "Вещи": [
+        ["состояние предмета", /состояни|новый|новая|новое|б у/],
+        ["модель и характеристики", /модел|характерист|размер|памят|объем|цвет/],
+        ["комплектацию", /комплект|короб|заряд|аксессуар/],
+        ["условия передачи", /передач|встреч|забрать|достав/]
+      ],
+      "Услуги": [
+        ["что входит в услугу", /включ|входит|делаю|провед|предостав|помога/],
+        ["кому подходит услуга", /кому|для кого|подойдет|подходит/],
+        ["формат и время", /онлайн|очно|время|распис|срок|дата/]
+      ],
+      "Творчество": [
+        ["какой результат будет создан", /созда|нарис|иллюстрац|логотип|дизайн|макет|работа/],
+        ["формат, размер или материалы", /формат|размер|материал|цвет|цифров|бумаж/],
+        ["сроки выполнения", /срок|дата|дней|недел|готов/]
+      ],
+      "Учёба": [
+        ["конкретные темы и предмет", /тем|предмет|математ|физик|хим|биолог|английск|русск|истор/],
+        ["класс или уровень", /класс|уров|подготов|начальн|средн|старш/],
+        ["формат занятий", /онлайн|очно|дистанц|встреч/],
+        ["расписание", /распис|время|дата|длительност/]
+      ],
+      "Мероприятия": [
+        ["программу мероприятия", /программ|будет|состо|участ/],
+        ["дату и время", /дата|числа|время|час|ноябр|декабр|январ/],
+        ["публичное место проведения", /место|площад|зал|школ|адрес/],
+        ["условия участия", /участ|бесплат|стоим|регистрац|мест/]
+      ]
+    };
+    const items = (rules[category] || []).filter(item => !item[1].test(text)).map(item => item[0]);
+    if (!$("lPrice").value.trim() && category !== "Мероприятия") items.push("стоимость или отметку «Бесплатно»");
+    return items;
   }
 
   function renderDescriptionHelper() {
-    const draft = $("descriptionHelperDraft");
-    if (draft) draft.textContent = makeDescriptionDraft();
+    const open = !$("descriptionHelperPanel").classList.contains("hidden");
+    const button = document.querySelector('[data-action="open-description-helper"]');
+    const hasDescription = Boolean($("lDesc").value.trim());
+    if (button) button.textContent = hasDescription ? "✦ Улучшить описание" : "✦ Составить описание";
+    if (!open) return;
+
+    $("descriptionHelperTitle").textContent = hasDescription ? "Улучшенная версия" : "Шаблон для заполнения";
+    $("descriptionHelperNote").textContent = hasDescription
+      ? "Исправлены только оформление, пробелы и заглавные буквы. Смысл и факты не меняются — проверьте результат перед применением."
+      : "Это заготовка с вопросами, а не готовые факты. Заполните или удалите подсказки в квадратных скобках. Не указывайте телефон, домашний адрес и личные данные.";
+    $("descriptionHelperDraft").value = hasDescription
+      ? normalizeDescriptionForEditor($("lDesc").value)
+      : makeDescriptionTemplate();
+
+    const suggestions = getMissingDescriptionSuggestions();
+    $("descriptionHelperSuggestions").textContent = suggestions.length
+      ? "Чтобы объявление было понятнее, можно уточнить: " + suggestions.join("; ") + "."
+      : "Основные детали указаны. Проверьте точность текста перед публикацией.";
   }
 
   function openDescriptionHelper() {
-    renderDescriptionHelper();
     $("descriptionHelperPanel").classList.remove("hidden");
+    renderDescriptionHelper();
   }
 
-  function insertDescriptionDraft(mode) {
-    const textarea = $("lDesc");
-    const current = textarea.value.trim();
-    const draft = makeDescriptionDraft();
-    const next = mode === "replace" || !current ? draft : `${current}\n\n${draft}`;
-    if (next.length > 1000) {
-      $("descriptionHelperNote").textContent = "Черновик не помещается в оставшийся лимит описания. Сократите текущий текст или выберите «Заменить описание».";
+  function applyDescriptionDraft() {
+    const textarea = $("descriptionHelperDraft");
+    const draft = textarea.value.trim();
+    if (!draft) {
+      $("descriptionHelperNote").textContent = "Черновик пуст. Добавьте текст или откройте шаблон.";
       return;
     }
-    textarea.value = next;
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    $("descriptionHelperPanel").classList.add("hidden");
-    textarea.focus();
+    if (draft.length > 1000) {
+      $("descriptionHelperNote").textContent = "Черновик длиннее лимита FAM в 1000 символов. Сократите его перед применением.";
+      return;
+    }
+    $("lDesc").value = draft;
+    $("lDesc").dispatchEvent(new Event("input", { bubbles: true }));
+    $("descriptionHelperNote").textContent = "Текст перенесён в описание. Проверьте его и заполните недостающие детали.";
+    updateHints();
+    renderDescriptionHelper();
+    $("lDesc").focus();
   }
 
-  $("lTitle").addEventListener("input", debounce(updateHints, 300));
-  $("lDesc").addEventListener("input", debounce(updateHints, 300));
+  $("lTitle").addEventListener("input", debounce(updateHints, 250));
+  $("lDesc").addEventListener("input", debounce(updateHints, 250));
   $("lTitle").addEventListener("input", renderDescriptionHelper);
+  $("lDesc").addEventListener("input", renderDescriptionHelper);
   $("lCat").addEventListener("change", () => {
     updateHints();
     renderDescriptionHelper();
@@ -2256,7 +2372,12 @@ window.onunhandledrejection = function() {
   }
 
   function listingPhotoStatusText(status) {
-    const labels = { pending: "Фото проверяется", manual_review: "Фото ждёт дополнительной проверки", rejected: "Фото не прошло проверку", failed: "Проверка фото не завершена" };
+    const labels = {
+      pending: "Фото скрыто до завершения проверки",
+      manual_review: "Фото ждёт дополнительной проверки",
+      rejected: "Фото не прошло проверку",
+      failed: "Фото нужно загрузить повторно"
+    };
     return labels[status] || "";
   }
 
@@ -2265,10 +2386,10 @@ window.onunhandledrejection = function() {
     if (!listing) { notice("Объявление не найдено. Обновите страницу."); return; }
     const photoStatus = listing.photo_status || (listing.image_url ? "approved" : "none");
     const photoMessages = {
-      pending: "Фото сохранено в закрытом хранилище и будет показано здесь после успешной проверки.",
+      pending: "Фото загружено и сохранено в закрытом хранилище, но пока не прошло проверку. Оно не будет показано до завершения проверки. Повторно загружать его не нужно.",
       manual_review: "Фото ожидает дополнительной проверки. До её завершения оно остаётся закрытым.",
       rejected: "Фото не прошло проверку и не будет опубликовано. Текст объявления сохранён.",
-      failed: "Не удалось завершить проверку фотографии. Текст объявления сохранён.",
+      failed: "Файл фотографии больше недоступен для проверки. Текст объявления сохранён — чтобы добавить изображение, загрузите его повторно.",
       none: "К объявлению пока не добавлена фотография."
     };
     const photoHTML = listing.image_url
@@ -4154,7 +4275,7 @@ window.onunhandledrejection = function() {
     else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
       const category = btn.dataset.category;
-      const allowed = ["Вещи", "Услуги", "Учёба"].includes(category) ||
+      const allowed = ["Вещи", "Услуги", "Творчество", "Учёба"].includes(category) ||
         (category === "Мероприятия" && $("evOption").style.display !== "none");
       if (allowed) {
         $("lCat").value = category;
@@ -4165,7 +4286,7 @@ window.onunhandledrejection = function() {
     }
     else if (action === 'open-description-helper') { openDescriptionHelper(); }
     else if (action === 'close-description-helper') { $("descriptionHelperPanel").classList.add("hidden"); }
-    else if (action === 'insert-description-draft') { insertDescriptionDraft(btn.dataset.mode); }
+    else if (action === 'apply-description-draft') { applyDescriptionDraft(); }
     else if (action === 'reset-search') {
       curCat = "Все";
       document.querySelectorAll(".cat-tile").forEach(x => x.classList.remove('active'));
@@ -4337,7 +4458,7 @@ window.onunhandledrejection = function() {
       closeModal('listingModal');
       $("listingForm").reset();
       uploadStatus.innerHTML = '';
-      $("aiHints").textContent = "Начните вводить — FAM подскажет категорию по тексту, без ИИ-запросов.";
+      $("aiHints").textContent = "Начните вводить название и описание — FAM подскажет категорию.";
       $("descriptionHelperPanel").classList.add("hidden");
 
       if (submission.status === "pending") {
