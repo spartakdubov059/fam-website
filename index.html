@@ -3441,7 +3441,7 @@ window.onunhandledrejection = function() {
     if (!user || !profile) return;
     const first_name = $("profileFirstName").value.trim();
     const last_name = $("profileLastName").value.trim();
-    const class_name = $("profileClassName").value.trim().toUpperCase().replace(/\\s+/g, "");
+    const class_name = $("profileClassName").value.trim().toUpperCase().replace(/\s+/g, "");
     const status = $("profileStudentIdentityStatus");
     if (!first_name || !last_name || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/.test(class_name)) {
       if (status) status.textContent = "Проверьте имя, фамилию и класс (например, 8А).";
@@ -3548,7 +3548,7 @@ window.onunhandledrejection = function() {
       if (isReg) {
         const firstName = $("authFirstName").value.trim();
         const lastName = $("authLastName").value.trim();
-        const className = $("authClassName").value.trim().toUpperCase().replace(/\\s+/g, "");
+        const className = $("authClassName").value.trim().toUpperCase().replace(/\s+/g, "");
         if (!firstName || !lastName || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/.test(className)) {
           $("authMsg").textContent = "Укажите имя, фамилию и корректный класс, например 8А.";
           return;
