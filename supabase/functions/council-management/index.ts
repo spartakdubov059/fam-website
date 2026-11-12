@@ -425,6 +425,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
         account_code: target.id.slice(-6).toUpperCase(),
       } : null,
       identity_available: !!actor,
+      identity_was_recorded: !!row.actor_id,
     };
   });
 
