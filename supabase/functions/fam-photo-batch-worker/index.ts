@@ -63,7 +63,7 @@ async function removeStorageObject(bucket: string,path: string) {
 async function uploadApprovedPhoto(bytes: Uint8Array,owner: string) {
   const path="listing_"+owner+"_"+crypto.randomUUID()+".jpg";
   const r=await fetch(BASE+"/storage/v1/object/listings-images/"+path,{
-    method:"POST",headers:{...serviceHeaders("image/jpeg"),"x-upsert":"false"},body:bytes
+    method:"POST",headers:{...serviceHeaders("image/jpeg"),"x-upsert":"false"},body:new Uint8Array(bytes).buffer
   });
   if(!r.ok)throw new Error("public_upload_failed");
   return {path,url:BASE+"/storage/v1/object/public/listings-images/"+path};
@@ -138,9 +138,10 @@ async function processBatch(batch: Record<string,any>) {
       if(prelim.action==="pending_budget"){await finish(id,"pending_budget");return "pending_budget";}
       if(prelim.action==="review_collage_once"){
         // The server independently creates a collage from all previously unreviewed ORIGINAL files.
-        const unknown=images.filter((_,i)=>prelim.reviewHashes.includes(hashes[i]));
+        const reviewHashes=prelim.reviewHashes as string[];
+        const unknown=images.filter((_,i)=>reviewHashes.includes(hashes[i]));
         const composite=await buildModerationCollage(unknown);
-        if(!composite.ok){await finish(id,"manual_review");return "manual_review";}
+        if(!composite.ok||!composite.reviewBytes){await finish(id,"manual_review");return "manual_review";}
         const permitted=await sqlRpc("fam_claim_free_photo_review_slot",{});
         if(permitted!==true){await finish(id,"pending_budget");return "pending_budget";}
         const decision=await freeVisionReview(composite.reviewBytes,listing.title,listing.category);
