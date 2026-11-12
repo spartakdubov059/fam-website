@@ -6,6 +6,8 @@ export type SafetyContext = {
   sender_id: string;
   receiver_id?: string | null;
   school_id: string;
+  source_origin?: string | null;
+  evidence_excerpt?: string | null;
 };
 
 export type SafetyCategory =
@@ -26,6 +28,30 @@ function toHex(bytes: Uint8Array): string {
 
 function isLegacyJwt(value: string): boolean {
   return value.startsWith("eyJ");
+}
+
+function safeOriginHost(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return null;
+    return parsed.hostname.toLowerCase().slice(0, 120);
+  } catch {
+    return null;
+  }
+}
+
+function safeEvidenceExcerpt(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, "[почта скрыта]")
+    .replace(/(?:https?:\\/\\/|www\\.)\\S+/gi, "[ссылка скрыта]")
+    .replace(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/g, "[номер скрыт]")
+    .replace(/[\\u0000-\\u001F\\u007F]/g, " ")
+    .replace(/\\s+/g, " ")
+    .trim()
+    .slice(0, 260);
+  return cleaned || null;
 }
 
 export async function recordSafetySignal(args: {
@@ -81,6 +107,12 @@ export async function recordSafetySignal(args: {
         source_kind: context.kind,
         category,
         severity,
+        actor_id: context.sender_id,
+        target_id: isMessage ? context.receiver_id ?? null : null,
+        source_origin: safeOriginHost(context.source_origin),
+        evidence_excerpt: context.kind === "image"
+          ? null
+          : safeEvidenceExcerpt(context.evidence_excerpt),
       }),
     });
     if (!response.ok) {
