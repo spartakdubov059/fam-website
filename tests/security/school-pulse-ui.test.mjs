@@ -41,5 +41,5 @@ test("School Pulse is added inside the existing board without duplicating event 
 });
 test("server functions bind school and role from auth.uid and profile, not from user input",()=>{
  assert.match(sql,/who uuid := auth\.uid\(\)/);
- assert.match(sql,/where id=who and role=\x27school_admin\x27/);
+ assert.match(sql,/where id=who and role in \('school_admin','council_member'\)/);
 });
