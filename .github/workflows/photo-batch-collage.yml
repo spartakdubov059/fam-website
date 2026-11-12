@@ -20,5 +20,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Check both protected batch Edge Functions
+        run: deno check supabase/functions/fam-photo-batch/index.ts supabase/functions/fam-photo-batch-worker/index.ts
       - name: Run real 5-photo collage and file-format tests
         run: deno test tests/ui/photo-collage-runtime.test.ts
