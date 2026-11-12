@@ -28,6 +28,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script src="price-format.js"></script>
   
   <style>
 :root {
@@ -845,6 +846,7 @@
     .listing-detail-photo-placeholder strong { color: var(--text); font-size: 14px; }
     .listing-detail-meta { margin: 14px 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
     .listing-detail-price { margin: 12px 0 0; font-size: 18px; font-weight: 900; overflow-wrap: anywhere; }
+    .price-preview { margin: 6px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
     .listing-detail-description-title { margin: 18px 0 7px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
     .listing-detail-description { margin: 0; color: var(--text); font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
     @media (max-width: 430px) {
@@ -1240,7 +1242,7 @@
         <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM и сначала сохраняется в закрытом хранилище. До успешной проверки фотография не считается одобренной и не показывается. Если сервис проверки временно исчерпал квоту, объявление сохранится без фото, а FAM автоматически повторит проверку. Повторно отправлять объявление не нужно — статус фото будет виден в карточке.</p>
         <div id="uploadStatus"></div>
       </div>
-      <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
+      <div class="form-group price-form-group"><label for="lPrice">Цена в рублях</label><input type="text" id="lPrice" class="form-control" inputmode="decimal" placeholder="Например, 1 500" maxlength="50" aria-describedby="pricePreview"><p id="pricePreview" class="price-preview">Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».</p></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
   </div>
@@ -1579,7 +1581,7 @@ window.onunhandledrejection = function() {
   function makeDescriptionTemplate() {
     const title = $("lTitle").value.trim() || "[укажите название]";
     const price = $("lPrice").value.trim();
-    const priceLine = price ? "Цена: " + price : "Цена: [укажите стоимость или напишите «Бесплатно»]";
+    const priceLine = price ? "Цена: " + FAMPrice.formatListingPrice(price) : "Цена: [укажите стоимость или напишите «Бесплатно»]";
     const templates = {
       "Вещи": [
         "Предмет: " + title + ".",
@@ -1713,7 +1715,13 @@ window.onunhandledrejection = function() {
     updateHints();
     renderDescriptionHelper();
   });
-  $("lPrice").addEventListener("input", renderDescriptionHelper);
+  $("lPrice").addEventListener("input", () => {
+    const rawPrice = $("lPrice").value.trim();
+    $("pricePreview").textContent = rawPrice
+      ? "На сайте будет отображаться: " + FAMPrice.formatListingPrice(rawPrice)
+      : "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
+    renderDescriptionHelper();
+  });
 
   function timeAgo(isoOrMs) {
     if (!isoOrMs) return '';
@@ -2402,7 +2410,7 @@ window.onunhandledrejection = function() {
     const meta = [listing.category || "", listing.created_at ? timeAgo(listing.created_at) : "", eventDate, eventTime].filter(Boolean).join(" · ");
     $("listingDetailsTitle").textContent = listing.title || "Объявление";
     $("listingDetailsBody").innerHTML = photoHTML +
-      '<p class="listing-detail-price">' + esc(listing.price_text || "Бесплатно") + '</p>' +
+      '<p class="listing-detail-price">' + esc(FAMPrice.formatListingPrice(listing.price_text || "Бесплатно")) + '</p>' +
       (meta ? '<div class="listing-detail-meta">' + esc(meta) + '</div>' : "") +
       '<h3 class="listing-detail-description-title">Описание</h3>' +
       '<p class="listing-detail-description">' + (description ? esc(description) : "Описание не добавлено.") + '</p>';
@@ -2452,7 +2460,7 @@ window.onunhandledrejection = function() {
       <div class="l-imgwrap">${img}<button class="l-fav ${favClass}" data-action="toggle-fav" data-id="${esc(l.id)}" aria-label="В избранное">♥</button><span class="l-badge">${badge}</span></div>
       <div class="l-body">
         <h3 class="l-title">${esc(l.title)}</h3>
-        <div class="l-price">${esc(l.price_text || "Бесплатно")}</div>
+        <div class="l-price">${esc(FAMPrice.formatListingPrice(l.price_text || "Бесплатно"))}</div>
         ${descriptionHTML}
         ${photoStateHTML}
         ${capacityHTML}
@@ -3374,7 +3382,7 @@ window.onunhandledrejection = function() {
           <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${moderationState} · ${esc(createdAt)}${esc(eventDate)}</div>
           ${description ? `<div class="council-listing-context">${esc(description)}</div>` : '<div class="council-listing-context">Описание не заполнено.</div>'}
           ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
-          ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
+          ${row.price_text ? `<div class="council-listing-price">${esc(FAMPrice.formatListingPrice(row.price_text))}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
           <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}" data-owner-id="${esc(row.user_id)}">Удалить это объявление</button>
         </div>`;
@@ -4440,7 +4448,7 @@ window.onunhandledrejection = function() {
           title: $("lTitle").value,
           description: $("lDesc").value,
           category: $("lCat").value,
-          price_text: $("lPrice").value || "Бесплатно",
+          price_text: FAMPrice.formatListingPrice($("lPrice").value),
           image_url: imageUrl,
           event_date: isEv ? ($("evDate").value || null) : null,
           event_time: isEv ? ($("evTime").value || null) : null,
