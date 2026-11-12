@@ -47,7 +47,7 @@ window.supabase = {
 `;
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 360, height: 844 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 360, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const pageErrors = [];
 page.on("pageerror", error => pageErrors.push(error.message));
 await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", route =>
@@ -63,9 +63,13 @@ try {
 
   const widths = [
     { width: 360, height: 844, columns: 2 },
+    { width: 360, height: 640, columns: 2 },
     { width: 375, height: 812, columns: 2 },
+    { width: 375, height: 667, columns: 2 },
     { width: 390, height: 844, columns: 2 },
     { width: 430, height: 932, columns: 2 },
+    { width: 667, height: 375, columns: 3 },
+    { width: 844, height: 390, columns: 3 },
     { width: 768, height: 1024, columns: 3 },
     { width: 820, height: 1180, columns: 3 },
     { width: 834, height: 1112, columns: 3 },
@@ -173,9 +177,9 @@ try {
     await page.evaluate(() => window.openModal("listingModal"));
     const formMetrics = await page.locator("#listingModal .modal-content").evaluate(node => {
       const box = node.getBoundingClientRect();
-      const controls = [...node.querySelectorAll(".form-control")].map(el => {
+      const controls = [...node.querySelectorAll(".form-control")].filter(el => el.getClientRects().length > 0).map(el => {
         const field = el.getBoundingClientRect();
-        return { left: field.left, right: field.right, width: field.width };
+        return { id: el.id, left: field.left, right: field.right, width: field.width };
       });
       return {
         open: node.closest(".modal").classList.contains("open"),
@@ -187,7 +191,7 @@ try {
     assert.ok(formMetrics.left >= -1 && formMetrics.right <= size.width + 1, `listing form overflows horizontally at ${size.width}px`);
     assert.ok(formMetrics.top >= -1 && formMetrics.bottom <= size.height + 1, `listing form exceeds viewport at ${size.width}px`);
     for (const control of formMetrics.controls) {
-      assert.ok(control.left >= formMetrics.left - 1 && control.right <= formMetrics.right + 1, `listing form field escapes its modal at ${size.width}px`);
+      assert.ok(control.left >= formMetrics.left - 1 && control.right <= formMetrics.right + 1, `listing form field ${control.id} escapes its modal at ${size.width}px: ${JSON.stringify(control)} modal=${JSON.stringify({left: formMetrics.left, right: formMetrics.right})}`);
     }
     await page.locator('[data-action="close-listing-modal"]').click();
 
@@ -209,7 +213,7 @@ try {
   }
 
   assert.deepEqual(pageErrors, [], "page must not throw JavaScript errors during viewport tests");
-  console.log("FAM responsive viewport audit: 10/10 sizes passed.");
+  console.log(`FAM responsive viewport audit: ${widths.length}/${widths.length} sizes passed (mobile, landscape, tablet and iPad).`);
 } finally {
   await browser.close();
 }
