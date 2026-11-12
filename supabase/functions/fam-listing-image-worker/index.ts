@@ -219,7 +219,7 @@ function safePendingAvatarPath(task) {
   const userId = String(task.user_id || "");
   const path = String(task.image_path || "");
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return false;
-  return new RegExp("^" + userId + "/avatar_" + userId + "_[a-z0-9-]{1,50}\\\\.(?:jpg|png|webp)$", "i").test(path);
+  return new RegExp("^" + userId + "/avatar_" + userId + "_[a-z0-9-]{1,50}\\.(?:jpg|png|webp)$", "i").test(path);
 }
 
 async function createSignedAvatarUrl(path) {
@@ -305,7 +305,7 @@ async function removePreviousAvatarImage(url, userId) {
   const prefix = SUPABASE_URL + "/storage/v1/object/public/avatars/";
   if (typeof url !== "string" || !url.startsWith(prefix)) return;
   const path = decodeURIComponent(url.slice(prefix.length).split("?")[0] || "");
-  if (!new RegExp("^" + userId + "/avatar_" + userId + "_[a-z0-9-]{1,50}\\\\.(?:jpg|png|webp)$", "i").test(path)) return;
+  if (!new RegExp("^" + userId + "/avatar_" + userId + "_[a-z0-9-]{1,50}\\.(?:jpg|png|webp)$", "i").test(path)) return;
   await removeObject("avatars", path);
 }
 
