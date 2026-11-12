@@ -1,5 +1,5 @@
 // FAM User Safety Agent.
-// It receives only structured moderation signals and never stores raw message text or user IDs.
+// It records structured safety signals, same-school account attribution and redacted short excerpts.
 
 export type SafetyContext = {
   kind: "message" | "idea" | "listing" | "image";
