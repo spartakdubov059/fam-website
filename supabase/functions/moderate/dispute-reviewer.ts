@@ -201,7 +201,7 @@ export async function reviewIdeaContent(
   apiKey: string,
   localFlag: string | null = null,
 ): Promise<DisputeReviewResult> {
-  const safeLocalFallback = (failureCode: string): DisputeReviewResult => localFlag
+  const safeLocalFallback = (): DisputeReviewResult => localFlag
     ? {
       action: "pending",
       reason_code: "local_policy_flag_requires_review",
@@ -213,7 +213,7 @@ export async function reviewIdeaContent(
       reason: "Идея прошла базовые локальные проверки. Дополнительный ИИ-сервис временно недоступен.",
     };
 
-  if (!apiKey) return safeLocalFallback("idea_moderation_unavailable");
+  if (!apiKey) return safeLocalFallback();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8_000);
@@ -283,14 +283,14 @@ export async function reviewIdeaContent(
   if (!response?.ok) {
     const status = response?.status ?? 0;
     console.warn("fam_idea_moderation_provider_error", status);
-    return safeLocalFallback(status === 429 ? "idea_moderation_rate_limited" : "idea_moderation_unavailable");
+    return safeLocalFallback();
   }
 
   const body = await response.json().catch(() => null);
   const message = body?.choices?.[0]?.message;
   const answer = message?.content;
   if (message?.refusal || typeof answer !== "string" || !answer.trim()) {
-    return safeLocalFallback("idea_moderation_no_decision");
+    return safeLocalFallback();
   }
 
   const parsed = parseJson(answer);
