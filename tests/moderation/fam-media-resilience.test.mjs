@@ -104,7 +104,7 @@ test("student identity fields are gathered at registration and editable in the u
 test("student identity is visible to school admins only through same-school admin queries", () => {
   assert.match(migration, /grant select \(first_name,last_name,class_name\) on public\.profiles to authenticated/i);
   assert.match(migration, /grant update \(first_name,last_name,class_name\) on public\.profiles to authenticated/i);
-  assert.match(moderate, /serious_hate_or_threat/);
+  assert.match(contentSafety, /serious_hate_or_threat/);
   const council = readFileSync(resolve(root, "supabase/functions/council-management/index.ts"), "utf8");
   assert.match(council, /profiles\?select=id,email,role,created_at,first_name,last_name,class_name&school_id=eq\./);
   assert.match(council, /profiles\?select=id,email,role,first_name,last_name,class_name&school_id=eq\./);
