@@ -20,7 +20,8 @@ const png = (w=128,h=128,tag=0) => {
   view.setUint32(16,w,false);view.setUint32(20,h,false);bytes[24]=8;bytes[25]=2;bytes[27]=tag;
   return bytes;
 };
-const jpg = new Uint8Array([0xff,0xd8,0xff,0xc0,0,11,8,0,100,0,200,3,1,0x11,0,0,0,0]);
+const jpg = new Uint8Array(28);
+jpg.set([0xff,0xd8,0xff,0xc0,0,11,8,0,100,0,200,3,1,0x11,0,0,0,0]);
 test("signed batch URLs are strictly same-owner, private, time-limited and capped at five",()=>{
  assert.equal(MAX_PHOTOS,5);
  assert.ok(pendingPhotoPath(signed("01234567"),uid,origin)?.startsWith(uid+"/listing_"));
