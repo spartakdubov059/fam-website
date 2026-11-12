@@ -73,14 +73,16 @@ test("constructive criticism is allowed and ordinary insults do not enter manual
   assert.match(reviewer, /ОТКЛОНЯЙ автоматически/);
   assert.match(reviewer, /НАПРАВЛЯЙ НА manual_review только реальные признаки ненависти или дискриминации/);
   assert.match(reviewer, /const highRiskCodes = new Set/);
-  assert.match(reviewer, /decision === "manual_review" && highRiskCodes\.has/);
+  assert.match(reviewer, /\["manual_review", "reject"\]\.includes\(String\(decision\)\) && highRiskCodes\.has/);
   assert.match(reviewer, /action: "reject",\s*reason_code: "unclear_or_personal_accusation"/);
 });
 
 test("a provider outage does not block a locally clean idea, while local risk stays held", () => {
   assert.match(reviewer, /if \(!apiKey\) return safeLocalFallback\(\)/);
   assert.match(reviewer, /action: "ok",\s*reason_code: "safe_local_fallback"/);
-  assert.match(reviewer, /action: "pending",\s*reason_code: "local_policy_flag_requires_review"/);
+  assert.match(reviewer, /localFlag === "serious_hate_or_threat"/);
+  assert.match(reviewer, /reason_code: "serious_hate_or_threat"/);
+  assert.match(reviewer, /reason_code: "unsafe_content"/);
   const ideaStart = moderate.indexOf("if (isIdea) {");
   const ideaEnd = moderate.indexOf("// For locally flagged text", ideaStart);
   assert.ok(ideaStart >= 0 && ideaEnd > ideaStart);
