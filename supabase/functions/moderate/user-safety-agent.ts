@@ -1,11 +1,13 @@
 // FAM User Safety Agent.
-// It receives only structured moderation signals and never stores raw message text or user IDs.
+// It records structured safety signals, same-school account attribution and redacted short excerpts.
 
 export type SafetyContext = {
   kind: "message" | "idea" | "listing" | "image";
   sender_id: string;
   receiver_id?: string | null;
   school_id: string;
+  source_origin?: string | null;
+  evidence_excerpt?: string | null;
 };
 
 export type SafetyCategory =
@@ -28,6 +30,30 @@ function isLegacyJwt(value: string): boolean {
   return value.startsWith("eyJ");
 }
 
+function safeOriginHost(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return null;
+    return parsed.hostname.toLowerCase().slice(0, 120);
+  } catch {
+    return null;
+  }
+}
+
+function safeEvidenceExcerpt(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[почта скрыта]")
+    .replace(/(?:https?:\/\/|www\.)\S+/gi, "[ссылка скрыта]")
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, "[номер скрыт]")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 260);
+  return cleaned || null;
+}
+
 export async function recordSafetySignal(args: {
   context: SafetyContext | null;
   category: SafetyCategory;
@@ -43,9 +69,9 @@ export async function recordSafetySignal(args: {
   const isMessage = context.kind === "message";
   if (isMessage && (!context.receiver_id || !UUID_RE.test(context.receiver_id))) return false;
 
-  // A keyed HMAC keeps repeat grouping stable without exposing a guessable plain hash.
-  // The key is the server-only Supabase secret; it never reaches the browser or report UI.
-  // Raw participant IDs and message content are never written to the incident table.
+  // A keyed HMAC groups repeated incidents without exposing a guessable participant fingerprint.
+  // The key remains server-side. Exact account IDs are stored only in this RLS-locked table;
+  // short text excerpts are redacted before storage and exposed only to the same-school admin.
   const fingerprintSource = isMessage
     ? [context.school_id, "message", context.sender_id, context.receiver_id].join("|")
     : [context.school_id, context.kind, context.sender_id].join("|");
@@ -81,6 +107,12 @@ export async function recordSafetySignal(args: {
         source_kind: context.kind,
         category,
         severity,
+        actor_id: context.sender_id,
+        target_id: isMessage ? context.receiver_id ?? null : null,
+        source_origin: safeOriginHost(context.source_origin),
+        evidence_excerpt: context.kind === "image"
+          ? null
+          : safeEvidenceExcerpt(context.evidence_excerpt),
       }),
     });
     if (!response.ok) {

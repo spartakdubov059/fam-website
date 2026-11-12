@@ -882,7 +882,7 @@
       <details id="userSafetyReports" class="profile-box profile-disclosure hidden">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🛡️</span><span><b>Отчёты безопасности</b><small>Сигналы о возможных нарушениях</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
-          <p class="profile-section-copy">Здесь отображаются обезличенные сигналы о возможной травле, угрозах, дискриминации и повторных нарушениях. Сигнал не доказывает нарушение: серьёзный случай проверяет ответственный взрослый школы.</p>
+          <p class="profile-section-copy">Здесь видны источник, время, категория, аккаунт автора и короткий очищенный фрагмент. Данные доступны только администратору этой школы. Старые записи могли сохраняться без имени автора; сигнал сам по себе не доказывает нарушение — его нужно проверить.</p>
           <button type="button" class="button button-secondary button-small" data-action="refresh-safety-reports">Обновить отчёты</button>
           <div id="userSafetyReportsSummary" class="profile-report-summary" aria-live="polite">Загрузка сводки…</div>
           <div id="userSafetyReportsList" aria-live="polite"><p style="font-size:11px;color:var(--muted);">Загрузка отчётов…</p></div>
@@ -1941,7 +1941,7 @@ window.onunhandledrejection = function() {
         ${ownerControls && user && l.user_id === user.id && profile?.role === "student"
           ? `<button type="button" class="profile-card-delete" data-action="delete-own-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
           : ownerControls && user && l.user_id === user.id && profile?.role === "school_admin"
-            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}">Удалить объявление</button>`
+            ? `<button type="button" class="profile-card-delete" data-action="delete-school-listing" data-id="${esc(l.id)}" data-owner-id="${esc(l.user_id)}">Удалить объявление</button>`
             : ""}
       </div>
     </div>`;
@@ -2808,7 +2808,7 @@ window.onunhandledrejection = function() {
           ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
           ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
-          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}">Удалить это объявление</button>
+          <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}" data-owner-id="${esc(row.user_id)}">Удалить это объявление</button>
         </div>`;
       }).join("") : '<p class="council-account-muted">Объявлений школы пока нет.</p>';
 
@@ -2880,17 +2880,36 @@ window.onunhandledrejection = function() {
         const severity = report.severity === "high" ? "status-rejected" : "status-work";
         const repeatText = report.repeated ? " · повторяется" : "";
         const rangeText = report.first_seen && report.last_seen
-          ? `${new Date(report.first_seen).toLocaleString("ru-RU")} — ${new Date(report.last_seen).toLocaleString("ru-RU")}`
+          ? new Date(report.first_seen).toLocaleString("ru-RU") + " — " + new Date(report.last_seen).toLocaleString("ru-RU")
           : "";
-        return `<div class="safety-report-card ${report.severity === "high" ? "is-high" : ""}">
-          <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
-            <b style="font-size:11px;">${esc(safetyCategoryLabel(report.category))}</b>
-            <span class="idea-status ${severity}">${report.severity === "high" ? "Повышенное внимание" : "Нужно проверить"}</span>
-          </div>
-          <div style="font-size:10px;color:var(--muted);margin:5px 0;">Источник: ${esc(safetySourceLabel(report.source_kind))} · эпизодов: ${Number(report.occurrences) || 1}${repeatText}</div>
-          <div style="font-size:9px;color:var(--muted);">${esc(rangeText)}</div>
-          <button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="acknowledge-safety-report" data-fingerprint="${esc(report.fingerprint)}" data-category="${esc(report.category)}" data-source-kind="${esc(report.source_kind)}">Отметить как рассмотренный</button>
-        </div>`;
+        const roleNames = { student: "Ученик", school_admin: "Администратор", council_member: "Ученический совет" };
+        const actor = report.actor;
+        const target = report.target;
+        const actorText = actor
+          ? esc(actor.email || "Email не указан") + " · " + esc(roleNames[actor.role] || actor.role || "роль не указана") + " · аккаунт #" + esc(actor.account_code)
+          : report.identity_was_recorded
+            ? "Профиль автора не найден в этой школе"
+            : "Автор не записывался в старых отчётах";
+        const targetText = target
+          ? esc(target.email || "Email не указан") + " · " + esc(roleNames[target.role] || target.role || "роль не указана") + " · аккаунт #" + esc(target.account_code)
+          : "";
+        const originText = typeof report.source_origin === "string" ? esc(report.source_origin) : "домен не определён";
+        const excerptText = typeof report.evidence_excerpt === "string" && report.evidence_excerpt
+          ? esc(report.evidence_excerpt)
+          : report.source_kind === "image" ? "Для фото сохраняется категория проверки; текстового фрагмента нет." : "Короткий фрагмент для старой записи недоступен.";
+        return '<div class="safety-report-card ' + (report.severity === "high" ? "is-high" : "") + '">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">' +
+            '<b style="font-size:11px;">' + esc(safetyCategoryLabel(report.category)) + '</b>' +
+            '<span class="idea-status ' + severity + '">' + (report.severity === "high" ? "Повышенное внимание" : "Нужно проверить") + '</span>' +
+          '</div>' +
+          '<div style="font-size:10px;color:var(--muted);margin:5px 0;">Канал: ' + esc(safetySourceLabel(report.source_kind)) + ' · эпизодов: ' + (Number(report.occurrences) || 1) + repeatText + '</div>' +
+          '<div style="font-size:10px;line-height:1.5;margin:6px 0;"><b>Кто отправил:</b> ' + actorText + '</div>' +
+          (report.source_kind === "message" ? '<div style="font-size:10px;line-height:1.5;margin:6px 0;"><b>Получатель:</b> ' + (targetText || "не определён") + '</div>' : "") +
+          '<div style="font-size:9px;color:var(--muted);margin:5px 0;">Источник сайта: ' + originText + '</div>' +
+          '<div style="font-size:9px;color:var(--muted);">' + esc(rangeText) + '</div>' +
+          '<div style="font-size:10px;line-height:1.5;margin-top:7px;padding:8px;border-radius:9px;background:rgba(255,255,255,.035);"><b>Фрагмент:</b> ' + excerptText + '</div>' +
+          '<button type="button" class="button button-secondary button-small" style="margin-top:8px;" data-action="acknowledge-safety-report" data-fingerprint="' + esc(report.fingerprint) + '" data-category="' + esc(report.category) + '" data-source-kind="' + esc(report.source_kind) + '">Отметить как рассмотренный</button>' +
+        '</div>';
       }).join("") : '<p style="font-size:11px;color:var(--muted);margin:0;">Новых сигналов нет. Если появится подозрение на травлю или угрозу, отчёт появится здесь.</p>';
     } catch (error) {
       if (summary) summary.textContent = "Сводка временно недоступна.";
@@ -3212,18 +3231,19 @@ window.onunhandledrejection = function() {
     });
   }
 
-  async function callCouncilManagement(action, targetId, extra = {}) {
+  async function callCouncilManagement(action, targetId, extra = {}, options = {}) {
     if (!user || profile?.role !== "school_admin") throw new Error("Действие доступно только администратору школы.");
 
     const sensitiveActions = new Set([
       "review_account_deletion",
-      "delete_listing",
       "delete_account",
       "revoke_role",
       "suspend_account",
       "lift_suspension"
     ]);
-    if (sensitiveActions.has(action)) {
+    const requiresReauthentication = sensitiveActions.has(action)
+      || (action === "delete_listing" && options.skipReauth !== true);
+    if (requiresReauthentication) {
       const confirmed = await confirmAdminReauthentication();
       if (!confirmed) throw new Error("Подтверждение действия отменено.");
     }
@@ -3279,7 +3299,7 @@ window.onunhandledrejection = function() {
     const previousText = button?.textContent || "";
     if (button) { button.disabled = true; button.textContent = "Удаляем..."; }
     try {
-      await callCouncilManagement("delete_listing", targetId);
+      await callCouncilManagement("delete_listing", targetId, {}, { skipReauth: listing?.user_id === user.id || button?.dataset?.ownerId === user.id });
       listings = listings.filter(row => row.id !== targetId);
       notice("Объявление удалено.");
       await loadCouncilAdminTools();
@@ -3685,7 +3705,7 @@ window.onunhandledrejection = function() {
     else if (action === 'revoke-council-role') { manageCouncilRole(btn.dataset.id); }
     else if (action === 'delete-council-account') { manageCouncilAccount(btn); }
     else if (action === 'moderate-school-listing') { manageSchoolListing(btn); }
-    else if (action === 'delete-school-listing') { manageSchoolListing(btn.dataset.id); }
+    else if (action === 'delete-school-listing') { manageSchoolListing(btn); }
     else if (action === 'suspend-council-account') { suspendCouncilAccount(btn); }
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }

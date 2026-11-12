@@ -254,6 +254,10 @@ serve(async (req: Request) => {
     const value = typeof payload?.text === "string" ? payload.text.trim() : "";
     const imageUrl = typeof payload?.image_url === "string" ? payload.image_url.trim() : "";
     const safetyContext = parseSafetyContext(payload?.context);
+    if (safetyContext) {
+      safetyContext.source_origin = req.headers.get("origin");
+      safetyContext.evidence_excerpt = imageUrl ? null : value;
+    }
     const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : "listing";
     const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : "listing-images-pending";
     const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : "listing_";
