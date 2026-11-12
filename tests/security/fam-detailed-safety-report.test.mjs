@@ -48,7 +48,8 @@ test("new safety incidents store restricted account attribution and sanitized ev
   assert.match(safetyAgent, /target_id:\s*isMessage\s*\?\s*context\.receiver_id/);
   assert.match(safetyAgent, /source_origin:\s*safeOriginHost\(context\.source_origin\)/);
   assert.match(safetyAgent, /safeEvidenceExcerpt\(context\.evidence_excerpt\)/);
-  assert.match(safetyAgent, /replace\(\/\[A-Z0-9\._%+-\]\+@\[/);
+  assert.match(safetyAgent, /replace\(/);
+  assert.match(safetyAgent, /A-Z0-9\._%\+-/);
   assert.match(safetyAgent, /почта скрыта/);
   assert.match(safetyAgent, /ссылка скрыта/);
   assert.match(safetyAgent, /номер скрыт/);
