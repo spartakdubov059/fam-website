@@ -1109,6 +1109,12 @@
   <section id="messagesSection" class="hidden">
     <div class="foryou-row"><h2>Сообщения 💬</h2></div>
     <div id="dialogsList"></div>
+    <div id="dialogsGuest" class="profile-box hidden" style="text-align:center;">
+      <div class="empty-icon">💬</div>
+      <h3 style="margin:0 0 8px; font-size:15px;">Войдите, чтобы читать сообщения</h3>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">После входа здесь появятся ваши диалоги.</p>
+      <button type="button" class="button button-primary" data-action="open-auth">Войти</button>
+    </div>
     <div id="chatView" class="hidden" style="margin-top:16px; background:var(--surface); padding:16px; border-radius:24px; border:1px solid var(--border);">
       <button class="button button-secondary button-small" data-action="chat-back" style="margin-bottom:10px;">← Назад</button>
       <h3 id="chatWith" style="font-size:14px; margin-bottom:10px;"></h3>
@@ -3928,8 +3934,14 @@ window.onunhandledrejection = function() {
 
     if (name !== 'messages') {
       stopChatSession(true);
-    } else {
+      $("dialogsGuest")?.classList.add("hidden");
+    } else if (user) {
+      $("dialogsGuest")?.classList.add("hidden");
       loadDialogsList();
+    } else {
+      $("dialogsList").innerHTML = "";
+      $("chatView").classList.add("hidden");
+      $("dialogsGuest")?.classList.remove("hidden");
     }
 
     if (name !== 'board') stopHeroTimer();
