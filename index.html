@@ -29,6 +29,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
   <script src="price-format.js"></script>
+  <script src="./school-pulse.js"></script>
+  <link rel="stylesheet" href="./school-pulse.css">
   
   <style>
 :root {
@@ -934,6 +936,37 @@
       <button class="cat-tile t-study" data-cat="Учёба"><span class="tile-emoji">🎓</span>Учёба</button>
       <button class="cat-tile t-events" data-cat="Мероприятия"><span class="tile-emoji">🎭</span>Афиша</button>
     </div>
+    <section id="schoolPulse" class="school-pulse hidden" aria-labelledby="pulseTitle">
+      <div class="pulse-header"><div>
+        <span class="pulse-eyebrow">СВОИ. СВОЯ ШКОЛА.</span>
+        <h2 class="pulse-title" id="pulseTitle">Школьный пульс ✦</h2>
+        <p class="pulse-subtitle">Новости и голосования рядом</p>
+      </div><button type="button" class="pulse-refresh" id="pulseRefreshBtn">Обновить</button></div>
+      <div class="pulse-grid" id="pulseGrid" aria-live="polite"></div>
+      <p class="pulse-meta" id="pulseStatus">Новости только вашей школы</p>
+      <details id="pulseAdmin" class="pulse-admin hidden">
+        <summary>＋ Опубликовать школьную новость или опрос</summary>
+        <p class="pulse-meta">Для подтверждённых администраторов. Без контактов, документов и личных данных учеников.</p>
+        <div class="pulse-admin-forms">
+          <form id="pulseAnnouncementForm"><h4>Новый анонс</h4>
+            <label for="pulseAnnouncementTitle">Заголовок</label>
+            <input id="pulseAnnouncementTitle" name="title" class="form-control" minlength="4" maxlength="90" required placeholder="Например, новости школьного проекта">
+            <label for="pulseAnnouncementText">Текст</label>
+            <textarea id="pulseAnnouncementText" name="body" class="form-control" rows="3" minlength="4" maxlength="450" required placeholder="Коротко расскажите, что нового"></textarea>
+            <label for="pulseAnnouncementKind">Тип</label>
+            <select id="pulseAnnouncementKind" name="kind" class="form-control"><option value="news">Новости</option><option value="important">Важное</option></select>
+            <button class="button button-primary button-small" type="submit">Опубликовать анонс</button>
+          </form>
+          <form id="pulsePollForm"><h4>Новый опрос</h4>
+            <label for="pulsePollQuestion">Вопрос</label>
+            <input id="pulsePollQuestion" name="question" class="form-control" minlength="8" maxlength="140" required placeholder="Что добавить в школьную жизнь?">
+            <label for="pulsePollOptions">Варианты ответа (по одному в строке, от 2 до 4)</label>
+            <textarea id="pulsePollOptions" name="options" class="form-control" rows="4" maxlength="300" required placeholder="Клуб настольных игр&#10;Мастер-классы&#10;Кинопоказ"></textarea>
+            <button class="button button-secondary button-small" type="submit">Опубликовать опрос</button>
+          </form>
+        </div>
+      </details>
+    </section>
     <div class="foryou-row">
       <h2>Для тебя <span class="spark">✨</span></h2>
       <button class="pill-all" data-action="reset-search">Все объявления <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
@@ -1321,6 +1354,15 @@ window.onunhandledrejection = function() {
   let tabTransitionTimer = null;
 
   const $ = id => document.getElementById(id);
+  // Switch on only after school-scoped RLS and vote RPCs pass isolated + integration tests.
+  const SCHOOL_PULSE_ENABLED = false;
+  const schoolPulse = SCHOOL_PULSE_ENABLED && window.FAMSchoolPulse
+    ? window.FAMSchoolPulse.mount({
+        sb,
+        getViewer: () => ({ id: user?.id, school_id: profile?.school_id, role: profile?.role }),
+        notify: msg => alert(msg)
+      })
+    : null;
   const SCHOOL_DISPLAY_NAMES = Object.freeze({
     "lyceum_3": "Лицей № 3",
     "gymnasium_4": "Гимназия № 4"
@@ -2272,6 +2314,7 @@ window.onunhandledrejection = function() {
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
+      if (schoolPulse) void schoolPulse.refresh();
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
     } catch (e) {
       console.error("Ошибка загрузки данных FAM");
