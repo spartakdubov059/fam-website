@@ -50,6 +50,9 @@ jobs:
       - name: Test local coder JSON handling
         run: node --test tests/security/local-model-json.test.mjs
 
+      - name: Test local coder patch handling
+        run: node --test tests/security/local-model-patch.test.mjs
+
       - name: Download and verify model weights
         env:
           MODEL_URL: ${{ matrix.model_url }}
@@ -215,7 +218,8 @@ jobs:
             echo "- Selected files: $SELECTED_FILES"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "qa_status=$QA_STATUS" >> "$GITHUB_OUTPUT"
-          if [[ "$QA_STATUS" == "failed" || "$QA_STATUS" == "model_or_inference_failed" ]]; then
+          if [[ "$QA_STATUS" != "passed" ]]; then
+            echo "::error::Coding benchmark requires a generated patch that passes all independent tests; QA status was $QA_STATUS."
             exit 1
           fi
 

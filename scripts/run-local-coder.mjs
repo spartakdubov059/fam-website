@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
+import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
@@ -167,6 +168,16 @@ const inventory = tracked
 const indexHtml = tracked.includes("index.html") ? readFileSync("index.html", "utf8") : "";
 const symbols = collectSymbols(indexHtml);
 
+// Pass source for exact file paths explicitly named in the task to the planning phase.
+// This prevents the planner from requesting files that are already present in the checkout.
+const taskReferencedPaths = tracked
+  .filter((path) => allowed(path) && task.includes(path))
+  .slice(0, 4);
+const taskReferencedSource = taskReferencedPaths.map((path) => ({
+  path,
+  content: sourceContext(path, [], task),
+}));
+
 const planSchema = {
   name: "fam_file_plan",
   schema: {
@@ -199,12 +210,14 @@ const plan = await askModel([
       "Кратко заполни problem_summary, root_cause и evidence. Не выдумывай строки кода или факты, которых нет в переданных данных.",
       "Для большого index.html укажи точные символы/строки поиска из списка symbols и keywords.",
       "Если задача не даёт основания для конкретного исправления, верни files=[] и объясни это.",
+       "Если пользователь прямо указал путь к файлу и его содержимое передано в task_referenced_source, сначала изучи это содержимое. Не запрашивай повторно уже переданные исходники и не считай файл недостаточным только по его размеру.",
+       "Сопоставь описанный в задаче воспроизводимый дефект с фактической реализацией в переданном исходнике.",
       "Верни только JSON по заданной схеме.",
     ].join("\n"),
   },
   {
     role: "user",
-    content: JSON.stringify({ task, inventory, symbols }),
+    content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
   },
 ], planSchema, 1800);
 
@@ -318,9 +331,88 @@ if (result.finding_status === "issue_found" && !String(result.unified_diff || ""
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
-const patch = String(result.unified_diff || "").trim();
+
+let patch = String(result.unified_diff || "").trim();
+let patchCheckError = "";
+
+if (patch) {
+  if (!patch.startsWith("diff --git ")) {
+    patchCheckError = "Patch is missing the required diff --git header.";
+  } else if (patch.length > 120000) {
+    patchCheckError = "Patch exceeds the 120 KB safety limit.";
+  } else {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        patch = normalizeUnifiedDiffHunkCounts(patch);
+        if (!patch.startsWith("diff --git ")) {
+          throw new Error("Patch is missing the required diff --git header.");
+        }
+        if (patch.length > 120000) throw new Error("Patch exceeds the 120 KB safety limit.");
+
+        const patchPath = join(outDir, "fam-agent.patch");
+        writeFileSync(patchPath, patch + "\n");
+        execFileSync("git", ["apply", "--check", patchPath], {
+          stdio: "pipe",
+          maxBuffer: 2 * 1024 * 1024,
+        });
+        patchCheckError = "";
+        break;
+      } catch (error) {
+        const stderr = error?.stderr ? String(error.stderr) : "";
+        const stdout = error?.stdout ? String(error.stdout) : "";
+        patchCheckError = [stderr, stdout, error instanceof Error ? error.message : String(error)]
+          .filter(Boolean).join("\n").slice(0, 5000);
+
+        if (attempt === 0) {
+          console.warn("Git rejected the model patch; requesting one focused repair:", patchCheckError);
+          result = await askModel([
+            ...patchMessages,
+            { role: "assistant", content: JSON.stringify({ ...result, unified_diff: patch }) },
+            {
+              role: "user",
+              content: [
+                "Проверка git apply --check отклонила твой предыдущий unified_diff.",
+                "Исправь только формат/контекст unified diff, сохранив исходный смысл изменения и выбранные файлы.",
+                "Не выдумывай новые изменения, не расширяй область правки и не меняй тесты.",
+                "Ошибка проверки:",
+                patchCheckError,
+                "Верни полный исправленный unified_diff, который применим к переданному исходному файлу.",
+              ].join("\n"),
+            },
+          ], patchSchema, 7000);
+          patch = String(result.unified_diff || "").trim();
+          if (!patch) {
+            patchCheckError = "Model returned an empty patch during the repair attempt.";
+            break;
+          }
+          if (!patch.startsWith("diff --git ")) {
+            patchCheckError = "Repaired patch is missing the required diff --git header.";
+            break;
+          }
+          if (patch.length > 120000) {
+            patchCheckError = "Repaired patch exceeds the 120 KB safety limit.";
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+if (patch && patchCheckError) {
+  console.warn("Patch was rejected safely and will not be applied:", patchCheckError);
+  result = {
+    ...result,
+    unified_diff: "",
+    risk: "high",
+    requires_approval: true,
+    summary: "Модель нашла проблему, но подготовленный патч не прошёл независимую проверку git apply --check. Изменение не будет применено. Причина: " + patchCheckError.slice(0, 900),
+  };
+  patch = "";
+}
+
 const summary = buildAgentReport({
-    model: MODEL_ID,
+  model: MODEL_ID,
   finding_status: result.finding_status,
   problem_summary: result.problem_summary,
   root_cause: result.root_cause,
@@ -329,8 +421,8 @@ const summary = buildAgentReport({
   proposed_change: result.proposed_change,
   selected_files: selected,
   unified_diff: patch,
-  risk: result.risk,
-  requires_approval: result.requires_approval,
+  risk: patch ? result.risk : "high",
+  requires_approval: patch ? result.requires_approval : true,
   tests: result.tests,
 });
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
@@ -342,17 +434,10 @@ if (!patch) {
   }
   process.exit(0);
 }
-if (!patch.startsWith("diff --git ")) {
-  throw new Error("Модель вернула patch без заголовков git diff.");
-}
-if (patch.length > 120000) throw new Error("Patch превышает лимит 120 КБ.");
+
 writeFileSync(join(outDir, "fam-agent.patch"), patch + "\n");
-execFileSync("git", ["apply", "--check", join(outDir, "fam-agent.patch")], {
-  stdio: "pipe",
-  maxBuffer: 2 * 1024 * 1024,
-});
 if (process.env.GITHUB_OUTPUT) {
   const { appendFileSync } = await import("node:fs");
   appendFileSync(process.env.GITHUB_OUTPUT, "has_patch=true\n");
 }
-console.log("Local FAM coding model prepared a patch. Full inference logs and source text are not printed.");
+console.log("Local FAM coding model prepared a git-verified patch. Full inference logs and source text are not printed.");
