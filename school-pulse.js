@@ -14,11 +14,25 @@
   }
   function announcementCard(item){
     const important=item?.kind==="important";
-    return '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+'">' +
-      '<div class="pulse-card-overline"><span class="pulse-symbol" aria-hidden="true">'+(important?'✦':'◈')+'</span>'+
-        '<span>'+(important?'ВАЖНОЕ':'АНОНС')+'</span><span class="pulse-date">'+escapeHtml(timeLabel(item?.published_at))+'</span></div>'+
+    const openEvent=item?.kind==="open_event";
+    const dateSource=item?.event_starts_at || item?.event_date;
+    const eventDay=dateSource ? new Date(
+      item?.event_date && !item?.event_starts_at ? item.event_date+"T12:00:00" : dateSource
+    ) : null;
+    const eventLabel=eventDay&&Number.isFinite(eventDay.getTime())
+      ? eventDay.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})
+      : "Скоро";
+    const rawTime=typeof item?.event_time==="string" ? item.event_time.slice(0,5) : "";
+    const eventTime=rawTime || (item?.event_starts_at
+      ? new Date(item.event_starts_at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) : "");
+    return '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+(openEvent?' is-open-event':'')+'">' +
+      '<div class="pulse-card-overline"><span class="pulse-symbol" aria-hidden="true">'+(openEvent?'↗':important?'✦':'◈')+'</span>'+
+        '<span>'+(openEvent?'СОБЫТИЕ ДЛЯ ВСЕХ':important?'ВАЖНОЕ':'АНОНС')+'</span>'+
+        '<span class="pulse-date">'+escapeHtml(openEvent?eventLabel:timeLabel(item?.published_at))+'</span></div>'+
       '<h3>'+escapeHtml(clamp(item?.title,90))+'</h3>'+
-      '<p>'+escapeHtml(clamp(item?.body,450))+'</p></article>';
+      '<p>'+escapeHtml(clamp(item?.body,450))+'</p>'+
+      (openEvent?'<div class="pulse-open-foot"><span class="pulse-open-label"><span class="pulse-open-dot" aria-hidden="true"></span>Без записи · Нет лимита мест</span>'+
+        (eventTime?'<time>'+escapeHtml(eventTime)+'</time>':'')+'</div>':'')+'</article>';
   }
   function pollCard(poll){
     const options=Array.isArray(poll?.options)?poll.options.slice(0,4):[];
@@ -64,16 +78,16 @@
         return;
       }
       rootNode.classList.remove("hidden");
-      admin.classList.toggle("hidden",viewer.role!=="school_admin");
-      status.textContent="Обновляем новости школы…";
+      admin.classList.toggle("hidden",!["school_admin","council_member"].includes(viewer.role));
+      status.textContent="Загружаем анонсы…";
       const {data,error}=await sb.rpc("fam_pulse_feed");
       if(iteration!==epoch)return;
       if(error||!validFeed(data)){
-        status.textContent="Лента школьных новостей пока недоступна.";
+        status.textContent="Не удалось обновить анонсы.";
         grid.innerHTML='<div class="pulse-empty">Новости и опросы появятся после подключения школьного раздела.</div>';
         return;
       }
-      const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,4);
+      const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
       grid.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("")||
         '<div class="pulse-empty">Школьных новостей пока нет. Загляните позже.</div>';
@@ -102,7 +116,7 @@
     async function createRpc(form,method,args){
       if(loading)return;
       const viewer=getViewer();
-      if(viewer?.role!=="school_admin")return alertUser("Публиковать может только подтверждённый администратор.");
+      if(!["school_admin","council_member"].includes(viewer?.role))return alertUser("Публикация доступна только подтверждённому Совету школы.");
       loading=true;
       const submit=form.querySelector('button[type="submit"]');
       if(submit)submit.disabled=true;
