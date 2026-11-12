@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FAM">
+<rect width="512" height="512" rx="112" fill="#0F1014"/>
+<circle cx="405" cy="112" r="44" fill="#C8F542"/>
+<path d="M100 160h312" stroke="#8B5CF6" stroke-width="10" stroke-linecap="round" opacity=".65"/>
+<text x="256" y="315" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="132" letter-spacing="-9" fill="#F5F6F8">FAM</text>
+<path d="M129 355h254" stroke="#8B5CF6" stroke-width="9" stroke-linecap="round"/>
+</svg>
