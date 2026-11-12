@@ -32,6 +32,7 @@
   <meta name="apple-mobile-web-app-title" content="FAM">
   <script src="./pwa-register.js" defer></script>
   <script src="./listing-gallery.js"></script>
+  <script src="./multi-photo-client.js"></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
@@ -849,6 +850,8 @@
     .listing-detail-header h2 { min-width: 0; margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
     .listing-detail-close { flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text); font-size: 22px; line-height: 1; }
     .listing-detail-image { display: block; width: 100%; max-height: 46dvh; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 15px; background: #101018; }
+    .multi-photo-preview { display:flex; gap:8px; overflow-x:auto; padding:8px 0; }
+    .multi-photo-preview img { width:72px; height:72px; border-radius:12px; object-fit:cover; border:1px solid var(--border); }
     .listing-detail-thumbs { display: flex; overflow-x: auto; gap: 8px; padding: 9px 2px 2px; scrollbar-width: thin; }
     .listing-detail-thumb { flex: 0 0 62px; height: 54px; padding: 2px; border: 2px solid var(--border); border-radius: 9px; background: var(--surface); }
     .listing-detail-thumb[aria-pressed="true"] { border-color: var(--lime); }
@@ -1251,6 +1254,7 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
+        <div id="multiPhotoPreview" class="multi-photo-preview hidden" aria-label="Выбранные фотографии"></div>
         <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM и сначала сохраняется в закрытом хранилище. До успешной проверки фотография не считается одобренной и не показывается. Если сервис проверки временно исчерпал квоту, объявление сохранится без фото, а FAM автоматически повторит проверку. Повторно отправлять объявление не нужно — статус фото будет виден в карточке.</p>
         <div id="uploadStatus"></div>
       </div>
@@ -4422,6 +4426,34 @@ window.onunhandledrejection = function() {
     $("seatsGroup").classList.toggle("hidden", this.value !== "limited");
   });
 
+  // Disabled until the private queue, approved-photo worker and free vision provider are verified.
+  const MULTI_PHOTO_UPLOAD_ENABLED = false;
+  if (MULTI_PHOTO_UPLOAD_ENABLED) {
+    $("lImage").multiple = true;
+    $("lImage").setAttribute("aria-label", "Выберите до пяти фотографий");
+    let localPreviewUrls = [];
+    $("lImage").addEventListener("change", () => {
+      localPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      localPreviewUrls = [];
+      const selected = [...$("lImage").files];
+      if (selected.length > FAMMultiPhotos.MAX_PHOTOS) {
+        $("lImage").value = "";
+        notice("Можно выбрать не больше пяти фотографий.");
+        return;
+      }
+      const preview = $("multiPhotoPreview");
+      preview.textContent = "";
+      preview.classList.toggle("hidden", selected.length === 0);
+      for (const file of selected) {
+        const image = document.createElement("img");
+        image.alt = "Выбранная фотография";
+        image.src = URL.createObjectURL(file);
+        localPreviewUrls.push(image.src);
+        preview.appendChild(image);
+      }
+    });
+  }
+
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
     // ═══ ЗАЩИТА ОТ ДВОЙНОЙ ОТПРАВКИ ═══
@@ -4440,7 +4472,9 @@ window.onunhandledrejection = function() {
       let type = document.querySelector('input[name="evType"]:checked')?.value || 'open';
       let imageUrl = null;
 
-      const file = $("lImage").files[0];
+      const uploadAsBatch = MULTI_PHOTO_UPLOAD_ENABLED && $("lImage").files.length > 1;
+      const batchFiles = uploadAsBatch ? [...$("lImage").files] : [];
+      const file = uploadAsBatch ? null : $("lImage").files[0];
       if (file) {
         const safeImage = await prepareImageForUpload(file, 5 * 1024 * 1024, 1600);
         const extension = getImageExtension(safeImage);
@@ -4488,6 +4522,21 @@ window.onunhandledrejection = function() {
       if (!submission?.ok) throw new Error(submission?.reason || submission?.error || "Объявление не прошло модерацию.");
 
       const data = submission.listing;
+      let batchQueued = false;
+      let batchQueueError = false;
+      if (uploadAsBatch && data?.id) {
+        try {
+          await FAMMultiPhotos.queue({
+            sb, listingId: data.id, userId: user.id, files: batchFiles,
+            prepareImageForUpload, getImageExtension, makeUniqueFileSuffix
+          });
+          data.photo_status = "pending";
+          batchQueued = true;
+        } catch (batchError) {
+          batchQueueError = true;
+          console.warn("photo_batch_queue_failed", batchError instanceof Error ? batchError.name : "unknown");
+        }
+      }
       uploadedImagePath = null; // The server now owns the staged file or the published listing image.
       if (data) listings.unshift(data);
 
@@ -4498,7 +4547,15 @@ window.onunhandledrejection = function() {
       $("aiHints").textContent = "Начните вводить название и описание — FAM подскажет категорию.";
       $("descriptionHelperPanel").classList.add("hidden");
 
-      if (submission.status === "pending") {
+      if (batchQueued) {
+        await loadAll();
+        renderProfile();
+        notice("Объявление опубликовано. Все фотографии останутся скрытыми до проверки.");
+      } else if (batchQueueError) {
+        await loadAll();
+        renderProfile();
+        notice("Объявление сохранено без фотографий: не удалось поставить снимки в очередь.");
+      } else if (submission.status === "pending") {
         await loadAll();
         renderProfile();
         alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
