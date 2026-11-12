@@ -321,6 +321,13 @@ serve(async (req: Request) => {
         await writeSafetySignal(safetyContext, "hate_or_discrimination", "high");
       } else if (ideaReview.reason_code === "threat_or_intimidation") {
         await writeSafetySignal(safetyContext, "threat_or_intimidation", "high");
+      } else if (ideaReview.reason_code === "serious_hate_or_threat") {
+        const isThreat = /(?:угроз[\\p{L}]*|убей|убить|расправ[\\p{L}]*)/iu.test(value);
+        await writeSafetySignal(
+          safetyContext,
+          isThreat ? "threat_or_intimidation" : "hate_or_discrimination",
+          "high",
+        );
       } else if (ideaReview.reason_code === "spam_or_advertising") {
         await writeSafetySignal(safetyContext, "spam_or_repeated_abuse", "medium");
       } else if (ideaReview.reason_code === "unsafe_content") {
