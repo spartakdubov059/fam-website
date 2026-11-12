@@ -2710,6 +2710,8 @@ window.onunhandledrejection = function() {
         const accountCode = String(row.id || "").slice(-6).toUpperCase();
         const accountListings = listingsByUser.get(row.id) || [];
         const registeredAt = row.created_at ? new Date(row.created_at).toLocaleDateString("ru-RU") : "дата неизвестна";
+        const studentName = [row.first_name, row.last_name].filter(value => typeof value === "string" && value.trim()).join(" ").trim();
+        const studentClass = typeof row.class_name === "string" ? row.class_name : "";
         const actions = [
           canRevoke ? `<button type="button" class="button button-secondary button-small" data-action="revoke-council-role" data-id="${esc(row.id)}">Снять полномочия</button>` : "",
           canDelete ? `<button type="button" class="button button-danger button-small" data-action="delete-council-account" data-id="${esc(row.id)}" data-account-code="${esc(accountCode)}">Удалить аккаунт</button>` : ""
@@ -2760,7 +2762,9 @@ window.onunhandledrejection = function() {
         return `<div class="idea-card council-account-card" style="margin-bottom:8px;">
           <div class="council-account-topline">
             <div>
-              <b class="council-account-title">${esc(row.email || "Аккаунт")}</b>
+              <b class="council-account-title">${esc(studentName || row.email || "Аккаунт")}</b>
+              ${studentClass ? `<div class="council-account-context">Класс: ${esc(studentClass)}</div>` : `<div class="council-account-context">Класс не указан</div>`}
+              ${studentName && row.email ? `<div class="council-account-muted">${esc(row.email)}</div>` : ""}
               <div class="council-account-code">Аккаунт #${esc(accountCode)} · регистрация: ${esc(registeredAt)}</div>
             </div>
             <span class="idea-status ${row.role === "school_admin" ? "status-done" : row.role === "council_member" ? "status-work" : "status-new"}">${esc(councilRoleName(row.role))}</span>
