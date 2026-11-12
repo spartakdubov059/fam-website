@@ -23,7 +23,8 @@ try{
       const feed=()=>({
         announcements:[
           {id:"p1",title:"Новости школьного медиацентра",body:"Скоро объявим результаты конкурса проектов.",kind:"news",published_at:"2026-11-13"},
-          {id:"p2",title:"Важное для участников",body:"Пожалуйста, следите за обновлениями внутри своей школы.",kind:"important",published_at:"2026-11-13"}
+          {id:"p2",title:"Важное для участников",body:"Пожалуйста, следите за обновлениями внутри своей школы.",kind:"important",published_at:"2026-11-13"},
+          {id:"p3",title:"Открытый школьный квиз",body:"Приходите все желающие.",kind:"open_event",event_starts_at:"2099-01-01T15:00:00Z",published_at:"2026-11-13"}
         ],
         polls:[{id,question:"Какую активность вы бы выбрали?",options:["Клуб проектов","Творческая мастерская","Школьный кинопоказ"],counts:null,total_votes:voted===null?0:1,my_vote:voted,closes_at:"2099-01-01"}]
       });
@@ -38,7 +39,9 @@ try{
       void window.pulse.refresh();
     },testId);
     await page.locator("#pulseGrid .pulse-card").first().waitFor();
-    assert.equal(await page.locator("#pulseGrid .pulse-card").count(),3,"card count");
+    assert.equal(await page.locator("#pulseGrid .pulse-card").count(),4,"card count");
+    assert.equal(await page.locator(".pulse-card.is-open-event").count(),1,"open event renders separately");
+    assert.match(await page.locator(".pulse-open-foot").innerText(),/Без записи/);
     const geometry=await page.evaluate(()=>({
       documentWidth:document.documentElement.scrollWidth,
       viewportWidth:window.innerWidth,
@@ -47,6 +50,7 @@ try{
     assert.ok(geometry.documentWidth <= geometry.viewportWidth+1,"Pulse overflow at "+width+"px: "+JSON.stringify(geometry));
     assert.equal(geometry.columns,width<=640?1:2,"grid columns at "+width);
     assert.equal(await page.locator("#pulseAdmin").isVisible(),false,"students must not see admin controls");
+    assert.equal(await page.locator(".pulse-option").count(),3,"poll choices work");
     await page.locator("[data-pulse-vote]").first().click();
     assert.equal(await page.locator("[data-pulse-vote]").first().isDisabled(),true);
     assert.equal(await page.locator(".pulse-result-fill").count(),0,"hide counts below five participants");
