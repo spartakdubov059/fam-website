@@ -62,31 +62,31 @@ jobs:
         id: model-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
         with:
-          path: ${{ runner.temp }}/fam-model/qwen2.5-coder-7b-q4_k_m.gguf
-          key: fam-qwen25-coder-7b-q4km-v1
+          path: ${{ runner.temp }}/fam-model/mellum2.1-12b-a2.5b-thinking-q4_k_m.gguf
+          key: fam-mellum21-12b-a2.5b-thinking-q4km-v1
 
       - name: Скачать бесплатную модель с лицензией Apache 2.0
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/fam-model"
-          MODEL="$RUNNER_TEMP/fam-model/qwen2.5-coder-7b-q4_k_m.gguf"
+          MODEL="$RUNNER_TEMP/fam-model/mellum2.1-12b-a2.5b-thinking-q4_k_m.gguf"
           if [[ ! -s "$MODEL" ]]; then
             curl --fail --location --retry 3 --retry-delay 3 \
-              "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf" \
+              "https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF/resolve/150a3d83b95bbe8a8b0cf803a06b7245af9f56fd/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf" \
               --output "$MODEL"
           fi
           verify_model() {
             [[ -s "$MODEL" ]] || return 1
             local actual_size actual_sha
             actual_size="$(stat -c '%s' "$MODEL")"
-            (( actual_size > 4000000000 )) || return 1
+            (( actual_size > 7500000000 )) || return 1
             actual_sha="$(sha256sum "$MODEL" | awk '{print $1}')"
-            [[ "$actual_sha" == "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c" ]]
+            [[ "$actual_sha" == "ecc4d5b8107fc219e23c494b2d107552137637b6c6002ee713e0ba8af7fa2755" ]]
           }
           if ! verify_model; then
             rm -f "$MODEL"
             curl --fail --location --retry 3 --retry-delay 5 --retry-all-errors \
-              "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf" \
+              "https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF/resolve/150a3d83b95bbe8a8b0cf803a06b7245af9f56fd/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf" \
               --output "$MODEL"
           fi
           if ! verify_model; then
@@ -96,7 +96,7 @@ jobs:
 
       - name: Собрать llama.cpp без GPU и стороннего API
         env:
-          LLAMA_CPP_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
+          LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
         run: |
           set -euo pipefail
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
@@ -125,10 +125,10 @@ jobs:
         id: agent
         run: |
           set -euo pipefail
-          MODEL="$RUNNER_TEMP/fam-model/qwen2.5-coder-7b-q4_k_m.gguf"
+          MODEL="$RUNNER_TEMP/fam-model/mellum2.1-12b-a2.5b-thinking-q4_k_m.gguf"
           SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
           "$SERVER" -m "$MODEL" \
-            --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+            --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --temp 0.6 --top-p 0.95 --top-k 20 \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           SERVER_PID=$!
           cleanup() {
@@ -336,7 +336,7 @@ jobs:
           {
             cat "$RUNNER_TEMP/fam-agent/verified-report.md"
             echo
-            echo "- Модель: Qwen2.5-Coder-7B-Instruct-GGUF, запущена локально на временном GitHub runner."
+            echo "- Модель: JetBrains Mellum2.1 Thinking (12B / 2,5B active), запущена локально на временном GitHub runner."
             echo "- Внешние платные API не использовались."
             echo "- Patch прошёл независимые тесты и проверку безопасности в отдельном job этого запуска."
             echo "- Supabase, миграции, права доступа и аккаунты не менялись."
