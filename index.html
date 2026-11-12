@@ -4468,6 +4468,9 @@ window.onunhandledrejection = function() {
         alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
       } else {
         renderListings();
+        if (submission.photo_review_bypassed === true) {
+          notice("Фото опубликовано без ИИ-проверки изображения для подтверждённой роли. Текст объявления прошёл обычную проверку FAM.");
+        }
       }
     } catch (error) {
       const uploadStatus = $("uploadStatus");
