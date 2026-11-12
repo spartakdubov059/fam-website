@@ -883,7 +883,7 @@
 .fam-photo-hit { position:absolute; inset:0; display:block; width:100%; height:100%; padding:0;
   border:0; border-radius:inherit; background:transparent; cursor:pointer; }
 .fam-photo-hit:focus-visible { outline:4px solid var(--lime); outline-offset:-4px; }
-.fam-banner-visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+.fam-photo-panel > h1.hero-script { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media (max-width:600px) { .fam-photo-panel { border-radius:20px; } }
 
@@ -2334,7 +2334,7 @@ window.onunhandledrejection = function() {
     };
     html.push(`<div class="hero-slide hero-img fam-photo-slide">
       <div class="fam-photo-panel">
-        <h1 class="fam-banner-visually-hidden">Найди своих.</h1>
+        <h1 class="hero-script">Найди своих.</h1>
         <img src="assets/fam-photo-card-1.svg" width="1200" height="675" loading="eager" decoding="async" alt="Найди своих. Свои люди и идеи — рядом.">
         <button type="button" class="fam-photo-hit" data-action="scroll-listings" aria-label="Начать просмотр объявлений"></button>
       </div>
