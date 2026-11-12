@@ -1,3 +1,5 @@
+import { canSkipListingImageReview } from "./photo-review-policy.js";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 
 function readDefaultKey(variable: string): string {
@@ -482,12 +484,20 @@ Deno.serve(async (req: Request) => {
         return fail("Фото должно быть загружено в защищённое временное хранилище FAM.", 400, headers);
       }
 
+      // Only use the server-loaded profile (never a role supplied by the browser).
+      // Verified school admins and council members skip AI image review for listings,
+      // while the regular text moderation and all storage/path validation still apply.
+      const bypassPhotoAiReview = canSkipListingImageReview(profile, imageUrl);
+      if (bypassPhotoAiReview) {
+        console.info("trusted_listing_photo_ai_review_skipped", JSON.stringify({ role: profile.role }));
+      }
+
       const moderation = await moderate(
         title + "\n" + description + "\n" + priceText,
         authorization,
         origin,
         false,
-        imageUrl,
+        bypassPhotoAiReview ? null : imageUrl,
         { kind: "listing", sender_id: userId, school_id: profile.school_id },
       );
       if (!moderation) return fail("Сервис модерации недоступен. Объявление не опубликовано.", 503, headers);
@@ -513,6 +523,7 @@ Deno.serve(async (req: Request) => {
         "missing_api_key",
       ]);
       const shouldQueueImageReview = Boolean(imageUrl)
+        && !bypassPhotoAiReview
         && moderation.action === "pending"
         && (
           moderation.degraded === true
@@ -553,12 +564,17 @@ Deno.serve(async (req: Request) => {
             + "&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
         );
         const pendingListing = Array.isArray(savedListing.data) ? savedListing.data[0] : null;
+        const imageQuotaExceeded = moderation.reason_code === "image_review_quota_exceeded"
+          || moderation.diagnostic_code === "image_review_quota_exceeded";
+        const photoReviewMessage = imageQuotaExceeded
+          ? "Объявление сохранено без фото: сервис автоматической проверки фотографий временно исчерпал квоту. Фото загружено и хранится приватно, но не будет показано до успешной проверки. FAM повторит проверку автоматически — повторно загружать фото или отправлять объявление не нужно."
+          : "Объявление сохранено без фото. Фото загружено в закрытое хранилище и будет автоматически проверяться повторно. До успешной проверки оно не отображается; повторно отправлять объявление не нужно.";
 
         return respond({
           ok: true,
           status: "pending",
           listing: pendingListing,
-          reason: "Объявление сохранено. Фото проверяется автоматически. Повторно отправлять объявление не нужно — оно появится после успешной проверки.",
+          reason: photoReviewMessage,
         }, 200, headers);
       }
 
@@ -597,6 +613,7 @@ Deno.serve(async (req: Request) => {
         category,
         price_text: priceText || "Бесплатно",
         image_url: publishedImageUrl,
+        photo_status: publishedImageUrl ? "approved" : "none",
         status,
         is_event: isEvent,
         school_id: profile.school_id,
@@ -618,7 +635,10 @@ Deno.serve(async (req: Request) => {
         ok: true,
         status: moderation.action === "pending" ? "pending" : "approved",
         listing,
-        reason: moderation.reason ?? null,
+        photo_review_bypassed: bypassPhotoAiReview,
+        reason: bypassPhotoAiReview
+          ? "Фото опубликовано без ИИ-проверки изображения для подтверждённой роли. Текст объявления прошёл обычную проверку FAM."
+          : moderation.reason ?? null,
       }, 200, headers);
     }
 

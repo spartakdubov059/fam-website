@@ -1,0 +1,31 @@
+name: FAM mobile and iPad viewport audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "tests/ui/**"
+      - ".github/workflows/mobile-viewport-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run FAM responsive browser audit
+        run: node tests/ui/mobile-viewport-audit.mjs
