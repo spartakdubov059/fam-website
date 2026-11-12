@@ -128,3 +128,10 @@ test("the main agent workflow tests the exact edit helper", () => {
   assert.match(workflow, /local-model-edits\.test\.mjs/);
   assert.match(workflow, /node --check scripts\/local-model-edits\.mjs/);
 });
+
+
+test("explicitly referenced unselected tests are supplied as read-only source context", () => {
+  assert.match(runner, /const readOnlyExcerpts = taskReferencedSource/);
+  assert.match(runner, /Контекст только для чтения/);
+  assert.match(runner, /Остальные файлы в source_context помечены как контекст только для чтения/);
+});
