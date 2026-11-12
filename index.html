@@ -1561,8 +1561,9 @@ window.onunhandledrejection = function() {
         let text = line
           .replace(/[ \t]+/g, " ")
           .replace(/\s+([,.;:!?])/g, "$1")
-          .replace(/([,;:!?])(?=\S)/g, "$1 ")
           .replace(/([!?])\1+/g, "$1")
+          .replace(/([,;:!?])(?=\S)/g, "$1 ")
+          .replace(/([!?])(?:\s*[!?])+/g, "$1")
           .trim();
         if (!text) return "";
         text = text.replace(/(^|[.!?]\s+)([a-zа-яё])/giu, (match, prefix, letter) =>
