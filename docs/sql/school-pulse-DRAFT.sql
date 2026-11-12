@@ -193,8 +193,8 @@ declare
   new_id uuid;
   num integer;
 begin
-  select school_id into school from public.profiles where id=who and role='school_admin' and school_id is not null;
-  if school is null then raise exception 'school_admin_only';end if;
+  select school_id into school from public.profiles where id=who and role in ('school_admin','council_member') and school_id is not null;
+  if school is null then raise exception 'trusted_school_role_only';end if;
   p_question:=btrim(coalesce(p_question,''));
   if p_options is null or jsonb_typeof(p_options)<>'array' then raise exception 'invalid_options';end if;
   num:=jsonb_array_length(p_options);
