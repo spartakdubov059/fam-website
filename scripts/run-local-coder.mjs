@@ -6,10 +6,8 @@ import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
 
-const MODEL_URL =
-  "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
-const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
+const MODEL_ID = (process.env.FAM_MODEL_ID || "JetBrains/Mellum2.1-12B-A2.5B-Thinking").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
@@ -58,8 +56,9 @@ async function askModel(messages, schema, maxTokens) {
       const result = await postJson(API_URL, {
         model: MODEL_ID,
         messages: requestMessages,
-        temperature: 0.1,
-        top_p: 0.9,
+        temperature: Number(process.env.FAM_MODEL_TEMPERATURE || "0.6"),
+        top_p: Number(process.env.FAM_MODEL_TOP_P || "0.95"),
+        top_k: Number(process.env.FAM_MODEL_TOP_K || "20"),
         max_tokens: maxTokens,
         stream: false,
         response_format: responseFormat,
@@ -219,7 +218,7 @@ const plan = await askModel([
     role: "user",
     content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
   },
-], planSchema, 1800);
+], planSchema, 4000);
 
 if (!Array.isArray(plan.files) || plan.files.length === 0) {
   const outDir = process.env.RUNNER_TEMP || "/tmp";
@@ -325,7 +324,7 @@ if (result.finding_status === "issue_found" && !String(result.unified_diff || ""
         "Если исправление действительно невозможно, объясни конкретное техническое препятствие в summary и root_cause; не оставляй пустой diff без объяснения.",
       ].join("\\n"),
     },
-  ], patchSchema, 7000);
+  ], patchSchema, 10000);
 }
 
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
@@ -379,7 +378,7 @@ if (patch) {
                 "Верни полный исправленный unified_diff, который применим к переданному исходному файлу.",
               ].join("\n"),
             },
-          ], patchSchema, 7000);
+          ], patchSchema, 10000);
           patch = String(result.unified_diff || "").trim();
           if (!patch) {
             patchCheckError = "Model returned an empty patch during the repair attempt.";
