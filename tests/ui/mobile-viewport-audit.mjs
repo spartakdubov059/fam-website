@@ -133,7 +133,7 @@ try {
     }
     assert.ok(metrics.detailsButtonHeight >= 40, `details button is too small at ${size.width}px`);
 
-    await page.locator(".l-details-btn").click();
+    await page.locator("#listingsGrid .l-card").first().locator(".l-details-btn").click();
     const modalMetrics = await page.locator("#listingDetailsModal").evaluate(node => {
       const box = node.querySelector(".listing-details-content").getBoundingClientRect();
       return { open: node.classList.contains("open"), left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width, height: box.height };
