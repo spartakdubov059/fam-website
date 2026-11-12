@@ -12,6 +12,7 @@ const LOCAL_REVIEW_RULES = [
   { code: "controlled_substances", pattern: /(?:^|[^\p{L}\p{N}])(?:наркот[\p{L}]*|мефедрон[\p{L}]*|спайс[\p{L}]*|закладк[\p{L}]*|героин[\p{L}]*|амфетамин[\p{L}]*|экстази[\p{L}]*|мдма|кокаин[\p{L}]*|снюс[\p{L}]*|насвай[\p{L}]*)(?=$|[^\p{L}\p{N}])/iu },
   { code: "nicotine_or_alcohol", pattern: /(?:^|[^\p{L}\p{N}])(?:сигарет[\p{L}]*|вейп[\p{L}]*|никотин[\p{L}]*|табак[\p{L}]*|кальян[\p{L}]*|алкогол[\p{L}]*|водк[\p{L}]*|пив[\p{L}]*|энергетик[\p{L}]*)(?=$|[^\p{L}\p{N}])/iu },
   { code: "restricted_or_adult_content", pattern: /(?:^|[^\p{L}\p{N}])(?:порно[\p{L}]*|интим[\p{L}]*|казино|ставк[\p{L}]*|оруж[\p{L}]*|пистолет[\p{L}]*|взрывчат[\p{L}]*|насили[\p{L}]*|травл[\p{L}]*|буллинг)(?=$|[^\p{L}\p{N}])/iu },
+  { code: "serious_hate_or_threat", pattern: /(?:ненавист[\p{L}]*|дискриминац[\p{L}]*|угроз[\p{L}]*|убей|убить|расправ[\p{L}]*|расист[\p{L}]*|нацист[\p{L}]*)/iu },
 ];
 
 function normalizeContactText(value) {
