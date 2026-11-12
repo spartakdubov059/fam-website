@@ -64,7 +64,7 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 360, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const pageErrors = [];
 page.on("pageerror", error => pageErrors.push(error.message));
-await page.evaluate(() => {
+await page.addInitScript(() => {
   window.__helperFetchCalls = 0;
   const originalFetch = window.fetch.bind(window);
   window.fetch = (...args) => {
