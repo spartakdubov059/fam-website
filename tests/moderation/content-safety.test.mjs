@@ -28,6 +28,8 @@ test("local idea checks flag sensitive topics without matching ordinary substrin
   assert.equal(findLocalPolicyFlag("Посадить траву на клумбе.") , null);
   assert.equal(findLocalPolicyFlag("Доклад по криптографии.") , null);
   assert.equal(findLocalPolicyFlag("Принести ножницы на урок труда.") , null);
+  assert.equal(findLocalPolicyFlag("В классе есть дискриминация по национальности.")?.code, "serious_hate_or_threat");
+  assert.equal(findLocalPolicyFlag("Поступали угрозы в адрес ученика.")?.code, "serious_hate_or_threat");
 });
 
 

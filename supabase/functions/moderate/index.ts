@@ -304,15 +304,8 @@ serve(async (req: Request) => {
     // Every new idea gets one contextual OpenAI review. It does not call the
     // separate Moderation endpoint, keeping the cost to one AI request per unique idea.
     if (isIdea) {
-      if (!OPENAI_KEY) {
-        return jsonResponse({
-          action: "pending",
-          degraded: true,
-          diagnostic_code: "idea_moderation_unavailable",
-          reason: "ИИ-проверка идей временно недоступна. Идея сохранена для дополнительной проверки Советом.",
-        }, 200, headers);
-      }
-
+      // reviewIdeaContent uses local checks as a safe fallback when the AI provider
+      // is temporarily unavailable; benign ideas do not enter the manual-review inbox.
       const ideaReview = await reviewIdeaContent(value, OPENAI_KEY, policyFlag?.code ?? null);
       console.info("idea_moderation_completed", JSON.stringify({
         action: ideaReview.action,
@@ -320,10 +313,14 @@ serve(async (req: Request) => {
         model: ideaReview.model ?? null,
       }));
 
-      if (ideaReview.reason_code === "targeted_harassment") {
-        await writeSafetySignal(safetyContext, "targeted_harassment", "medium");
+      if (ideaReview.reason_code === "targeted_harassment" || ideaReview.reason_code === "severe_targeted_harassment") {
+        await writeSafetySignal(safetyContext, "targeted_harassment", "high");
       } else if (ideaReview.reason_code === "negative_personal_call") {
         await writeSafetySignal(safetyContext, "negative_personal_call", "medium");
+      } else if (ideaReview.reason_code === "hate_or_discrimination") {
+        await writeSafetySignal(safetyContext, "hate_or_discrimination", "high");
+      } else if (ideaReview.reason_code === "threat_or_intimidation") {
+        await writeSafetySignal(safetyContext, "threat_or_intimidation", "high");
       } else if (ideaReview.reason_code === "spam_or_advertising") {
         await writeSafetySignal(safetyContext, "spam_or_repeated_abuse", "medium");
       } else if (ideaReview.reason_code === "unsafe_content") {

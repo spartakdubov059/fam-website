@@ -78,7 +78,7 @@ test("admin UI explains old anonymous records and safely displays source, identi
   assert.match(frontend, /Источник сайта:/);
   assert.match(frontend, /Фрагмент:/);
   assert.match(frontend, /esc\(report\.evidence_excerpt\)/);
-  assert.match(frontend, /esc\(actor\.email/);
+  assert.match(frontend, /esc\(person\.email/);
 });
 
 test("new fields remain protected by the existing private-access policy model", () => {
