@@ -33,7 +33,7 @@ test("School Pulse is added inside the existing board without duplicating event 
  assert.match(html,/id="pulseGrid"/);
  assert.match(html,/id="pulseAnnouncementForm"/);
  assert.match(html,/id="pulsePollForm"/);
- assert.match(html,/const SCHOOL_PULSE_ENABLED = false/);
+ assert.match(html,/const SCHOOL_PULSE_ENABLED = true/);
  assert.match(html,/if \(schoolPulse\) void schoolPulse\.refresh\(\)/);
  assert.match(html,/data-cat="Мероприятия"/);
  assert.match(css,/@media\(max-width:640px\)/);
