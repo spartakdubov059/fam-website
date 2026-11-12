@@ -1,0 +1,263 @@
+name: FAM Qwen model benchmark
+
+on:
+  push:
+    branches:
+      - test/qwen-model-benchmark
+    paths:
+      - docs/QWEN_MODEL_BENCHMARK.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: "${{ matrix.label }} — CPU coding test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - label: qwen25-coder-7b
+            model_id: Qwen2.5-Coder-7B-Instruct
+            model_file: qwen2.5-coder-7b-q4_k_m.gguf
+            model_url: https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+            model_sha256: 509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c
+            min_model_bytes: 4000000000
+          - label: qwen35-9b
+            model_id: Qwen3.5-9B-GGUF-Q4_K_M
+            model_file: qwen3.5-9b-q4_k_m.gguf
+            model_url: https://huggingface.co/SoAIHQ/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf
+            model_sha256: ef6f244d63abcba4f8d30b7cbd9369e9e798fc33cf21109889373f59af329c93
+            min_model_bytes: 5000000000
+
+    steps:
+      - name: Checkout FAM
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Download and verify model weights
+        env:
+          MODEL_URL: ${{ matrix.model_url }}
+          MODEL_SHA256: ${{ matrix.model_sha256 }}
+          MODEL_FILE: ${{ matrix.model_file }}
+          MIN_MODEL_BYTES: ${{ matrix.min_model_bytes }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          MODEL="$RUNNER_TEMP/fam-model/$MODEL_FILE"
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+            "$MODEL_URL" --output "$MODEL"
+          actual_size="$(stat -c '%s' "$MODEL")"
+          actual_sha="$(sha256sum "$MODEL" | awk '{print $1}')"
+          if (( actual_size < MIN_MODEL_BYTES )); then
+            echo "::error::Model file is unexpectedly small: $actual_size bytes"
+            exit 1
+          fi
+          if [[ "$actual_sha" != "$MODEL_SHA256" ]]; then
+            echo "::error::Model SHA-256 verification failed."
+            exit 1
+          fi
+          echo "Verified model size: $actual_size bytes"
+          echo "Verified model SHA-256: $actual_sha"
+
+      - name: Build llama.cpp with Qwen3.5 support
+        env:
+          LLAMA_CPP_COMMIT: 7fe450e19305b828c199d602c23a8337aaa1f03b
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_AVX2=ON \
+            -DGGML_FMA=ON \
+            -DGGML_CUDA=OFF \
+            -DGGML_VULKAN=OFF \
+            -DGGML_METAL=OFF \
+            -DGGML_OPENMP=ON
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+
+      - name: Start local model server
+        env:
+          MODEL_FILE: ${{ matrix.model_file }}
+          MODEL_ID: ${{ matrix.model_id }}
+        run: |
+          set -euo pipefail
+          MODEL="$RUNNER_TEMP/fam-model/$MODEL_FILE"
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          "$SERVER" -m "$MODEL" \
+            --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+            > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/fam-llama-server.pid"
+          READY=false
+          for attempt in $(seq 1 180); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then
+              READY=true
+              break
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/fam-llama-server.pid")" 2>/dev/null; then
+              echo "::error::llama-server stopped before becoming ready."
+              tail -n 100 "$RUNNER_TEMP/fam-llama-server.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          if [[ "$READY" != "true" ]]; then
+            echo "::error::llama-server did not become ready."
+            tail -n 100 "$RUNNER_TEMP/fam-llama-server.log"
+            exit 1
+          fi
+          echo "Local model server is ready."
+
+      - name: Run the same FAM coding task
+        env:
+          FAM_MODEL_ID: ${{ matrix.model_id }}
+          FAM_TASK: "Исправь воспроизводимый дефект функции normalizeSearchInput в tests/fixtures/qwen-model-benchmark.mjs. Сейчас она приводит строку к нижнему регистру и обрезает края, но оставляет повторные пробелы, табуляции и переводы строк внутри. Сверни любую последовательность Unicode whitespace в один обычный пробел, сохрани нижний регистр, trim и сигнатуру функции. Регрессионные тесты находятся в tests/fixtures/qwen-model-benchmark.test.mjs. Измени только tests/fixtures/qwen-model-benchmark.mjs, не меняй тест и остальные файлы. Подготовь минимальный patch с доказательством причины."
+        run: |
+          set -euo pipefail
+          OUTPUT_ROOT="$RUNNER_TEMP/fam-benchmark-output"
+          mkdir -p "$OUTPUT_ROOT"
+          START_TIME="$(date +%s)"
+          GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+          RUNNER_TEMP="$OUTPUT_ROOT" \
+          node scripts/run-local-coder.mjs
+          END_TIME="$(date +%s)"
+          echo "$((END_TIME - START_TIME))" > "$OUTPUT_ROOT/inference-seconds.txt"
+          if [[ ! -s "$OUTPUT_ROOT/fam-agent/summary.json" ]]; then
+            echo "::error::The model did not produce a structured report."
+            exit 1
+          fi
+
+      - name: Validate patch and run independent tests
+        id: qa
+        if: always()
+        env:
+          MODEL_LABEL: ${{ matrix.label }}
+        run: |
+          set -euo pipefail
+          OUTPUT_ROOT="$RUNNER_TEMP/fam-benchmark-output"
+          mkdir -p "$OUTPUT_ROOT"
+          SUMMARY="$OUTPUT_ROOT/fam-agent/summary.json"
+          PATCH="$OUTPUT_ROOT/fam-agent/fam-agent.patch"
+          QA_STATUS="not_run_no_patch"
+          PATCH_STATUS="false"
+          SELECTED_FILES="none"
+          if [[ ! -s "$SUMMARY" ]]; then
+            QA_STATUS="model_or_inference_failed"
+          else
+            PATCH_STATUS="$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available === true))" "$SUMMARY")"
+            SELECTED_FILES="$(node -e "const s=require(process.argv[1]); process.stdout.write((s.affected_files || []).join(',') || 'none')" "$SUMMARY")"
+            if [[ "$PATCH_STATUS" == "true" ]]; then
+              node scripts/validate-local-agent-patch.mjs "$PATCH" "$SUMMARY"
+              node --input-type=module - "$PATCH" <<'NODE'
+          import { readFileSync } from "node:fs";
+          const patch = readFileSync(process.argv[2], "utf8");
+          const paths = [...patch.matchAll(/^diff --git a\/(.+?) b\/(.+?)\s*$/gm)].map((m) => m[1]);
+          if (paths.length !== 1 || paths[0] !== "tests/fixtures/qwen-model-benchmark.mjs") {
+            throw new Error("Benchmark patch changed paths outside the one expected fixture: " + paths.join(", "));
+          }
+          NODE
+              git apply --check "$PATCH"
+              git apply "$PATCH"
+              if node --test tests/fixtures/qwen-model-benchmark.test.mjs && \
+                 node --test tests/moderation/*.test.mjs tests/security/*.test.mjs; then
+                QA_STATUS="passed"
+              else
+                QA_STATUS="failed"
+              fi
+            fi
+          fi
+          node --input-type=module - "$SUMMARY" "$OUTPUT_ROOT/benchmark-result.json" "$QA_STATUS" "$PATCH_STATUS" "$SELECTED_FILES" "$MODEL_LABEL" <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const [summaryPath, resultPath, qa, patchAvailable, selectedFiles, label] = process.argv.slice(2);
+          let modelReport = null;
+          try { modelReport = JSON.parse(readFileSync(summaryPath, "utf8")); } catch {}
+          let elapsed = null;
+          try { elapsed = Number(readFileSync(process.env.RUNNER_TEMP + "/fam-benchmark-output/inference-seconds.txt", "utf8").trim()); } catch {}
+          writeFileSync(resultPath, JSON.stringify({
+            label,
+            model: modelReport?.model ?? label,
+            outcome: modelReport?.outcome ?? "inference_failed",
+            finding_status: modelReport?.finding_status ?? "unknown",
+            patch_available: patchAvailable === "true",
+            qa_status: qa,
+            inference_seconds: Number.isFinite(elapsed) ? elapsed : null,
+            affected_files: selectedFiles,
+            summary: modelReport?.summary ?? "No model report was produced."
+          }, null, 2) + "\n");
+          NODE
+          {
+            echo "### $MODEL_LABEL"
+            echo "- Patch: $PATCH_STATUS"
+            echo "- Independent QA: $QA_STATUS"
+            echo "- Selected files: $SELECTED_FILES"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "qa_status=$QA_STATUS" >> "$GITHUB_OUTPUT"
+          if [[ "$QA_STATUS" == "failed" || "$QA_STATUS" == "model_or_inference_failed" ]]; then
+            exit 1
+          fi
+
+      - name: Stop local model server
+        if: always()
+        run: |
+          if [[ -s "$RUNNER_TEMP/fam-llama-server.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/fam-llama-server.pid")" 2>/dev/null || true
+          fi
+
+      - name: Save benchmark result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: qwen-benchmark-${{ matrix.label }}
+          path: |
+            ${{ runner.temp }}/fam-benchmark-output/benchmark-result.json
+            ${{ runner.temp }}/fam-benchmark-output/fam-agent/summary.json
+            ${{ runner.temp }}/fam-benchmark-output/fam-agent/fam-agent.patch
+          if-no-files-found: warn
+          retention-days: 3
+
+  comparison:
+    name: Compare model results
+    needs: benchmark
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          pattern: qwen-benchmark-*
+          path: benchmark-results
+          merge-multiple: false
+
+      - name: Write comparison summary
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
+          const root = "benchmark-results";
+          const lines = ["## FAM Qwen model comparison", "", "| Model | Result | Patch | QA | Time, sec |", "|---|---|---:|---|---:|"];
+          if (existsSync(root)) {
+            for (const dir of readdirSync(root)) {
+              const file = root + "/" + dir + "/benchmark-result.json";
+              if (!existsSync(file)) continue;
+              const r = JSON.parse(readFileSync(file, "utf8"));
+              lines.push("| " + r.model + " | " + r.outcome + " | " +
+                String(r.patch_available) + " | " + r.qa_status + " | " +
+                (r.inference_seconds ?? "n/a") + " |");
+              lines.push("", "**" + r.label + ":** " + r.summary);
+            }
+          }
+          lines.push("", "The benchmark uses identical code, task, context size, CPU runner class and independent tests. It does not modify production or merge model-generated patches.");
+          writeFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          NODE

@@ -7,6 +7,7 @@ import { buildAgentReport } from "./fam-agent-report.mjs";
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
+const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
@@ -46,7 +47,7 @@ function parseJson(content) {
 
 async function askModel(messages, schema, maxTokens) {
   const result = await postJson(API_URL, {
-    model: "Qwen2.5-Coder-7B-Instruct",
+    model: MODEL_ID,
     messages,
     temperature: 0.1,
     top_p: 0.9,
@@ -188,6 +189,7 @@ if (!Array.isArray(plan.files) || plan.files.length === 0) {
   mkdirSync(join(outDir, "fam-agent"), { recursive: true });
   writeFileSync(join(outDir, "fam-agent", "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
   const report = buildAgentReport({
+    model: MODEL_ID,
     finding_status: plan.finding_status,
     summary: plan.plan,
     problem_summary: plan.problem_summary,
@@ -275,6 +277,7 @@ mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
 const patch = String(result.unified_diff || "").trim();
 const summary = buildAgentReport({
+    model: MODEL_ID,
   finding_status: result.finding_status,
   problem_summary: result.problem_summary,
   root_cause: result.root_cause,
