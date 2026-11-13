@@ -36,7 +36,7 @@ test("profile shows the student's name with a neutral fallback and keeps email i
 
 test("chat titles use listing names and dialogs retain listing identity",()=>{
  assert.match(html,/Переписка по поводу «/);
- assert.match(html,/data-listing-id="\\$\\{esc\\(d\.listingId \\|\\| ""\\)\\}"/);
+ assert.ok(html.includes('data-listing-id="${esc(d.listingId || "")}"'));
 });
 
 test("announcements stay separate from listings and polls and disappear when empty",()=>{
