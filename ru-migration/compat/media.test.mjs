@@ -21,6 +21,6 @@ test('rejects invalid ownership, MIME, oversized and disguised image data before
   await assert.rejects(store.put({ userId: '../other', bytes: image, contentType: 'image/jpeg' }));
   await assert.rejects(store.put({ userId, bytes: image, contentType: 'text/plain' }));
   await assert.rejects(store.put({ userId, bytes: Buffer.concat([image, image]), contentType: 'image/jpeg' }));
-  await assert.rejects(store.put({ userId, bytes: Buffer.from('not an image'), contentType: 'image/jpeg' }));
+  await assert.rejects(store.put({ userId, bytes: Buffer.from('not an image'), contentType: 'image/jpeg' }), error => error.code === 'invalid_image');
   assert.equal(writes, 0);
 });

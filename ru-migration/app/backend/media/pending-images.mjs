@@ -17,10 +17,17 @@ export function createPendingImageStore({ sharp, putObject, bucket, maxBytes = 5
       if (typeof userId !== 'string' || !/^[0-9a-f-]{36}$/i.test(userId)) throw new TypeError('invalid user id');
       if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > maxBytes) throw new TypeError('invalid image size');
       if (!MIME_TO_FORMAT.has(String(contentType).toLowerCase())) throw new TypeError('unsupported image type');
-      const image = sharp(bytes, { limitInputPixels: maxPixels, failOn: 'error' });
-      const metadata = await image.metadata();
-      if (!MIME_TO_FORMAT.has(`image/${metadata.format === 'jpg' ? 'jpeg' : metadata.format}`)) throw new TypeError('image content does not match an allowed format');
-      const webp = await image.rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+      let webp;
+      try {
+        const image = sharp(bytes, { limitInputPixels: maxPixels, failOn: 'error' });
+        const metadata = await image.metadata();
+        if (!MIME_TO_FORMAT.has(`image/${metadata.format === 'jpg' ? 'jpeg' : metadata.format}`)) throw new Error('unsupported image format');
+        webp = await image.rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toBuffer();
+      } catch {
+        const error = new TypeError('invalid image content');
+        error.code = 'invalid_image';
+        throw error;
+      }
       const key = `pending/${userId}/${randomUUID()}.webp`;
       await putObject({ Bucket: bucket, Key: key, Body: webp, ContentType: 'image/webp', ServerSideEncryption: 'AES256' });
       return { key, contentType: 'image/webp', bytes: webp.length };
