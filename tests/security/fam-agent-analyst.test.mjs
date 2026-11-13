@@ -20,6 +20,8 @@ test("groups allowlisted signals by technical pattern and page area", () => {
 test("ignores unknown enums, malformed values, extra fields, and empty input without leaking text", () => {
   const result = analyzeTechnicalSignals([
     { event_code: "attacker text", page_area: "other", occurrences: 999, description: "private data" },
+    { event_code: "constructor", page_area: "other", occurrences: 999 },
+    { event_code: "toString", page_area: "other", occurrences: 999 },
     { event_code: "js_runtime", page_area: "unknown", occurrences: 4 },
     { event_code: "js_runtime", page_area: "auth", occurrences: -1 },
     { event_code: "js_runtime", page_area: "auth", occurrences: 1000001 },
