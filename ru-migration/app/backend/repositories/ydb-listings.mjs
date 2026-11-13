@@ -50,15 +50,14 @@ export function createYdbListingsRepository(sql) {
         const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
         const reviewer = reviewerRows?.[0]?.[0];
         if (!reviewer || !reviewer.active || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
-        const requestRows = await tx`SELECT issuer, subject, user_id, school_id, status FROM fam_school_role_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const requestRows = await tx`SELECT issuer, subject, user_id, school_id, requested_role, status FROM fam_school_role_requests WHERE request_id = ${requestId} LIMIT 1;`;
         const request = requestRows?.[0]?.[0];
         if (!request || request.school_id !== schoolId || request.user_id === reviewerId || request.status !== 'pending') return false;
         await tx`UPDATE fam_school_role_requests SET status = 'reviewing', review_started_by = ${reviewerId}, review_started_at = CurrentUtcTimestamp()
           WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId} AND status = 'pending';`;
         await tx`INSERT INTO fam_school_role_request_audit
           (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
-          SELECT ${randomUUID()}, request_id, school_id, ${reviewerId}, requested_role, 'review_started', 'reviewing', CurrentUtcTimestamp()
-          FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId};`;
+          VALUES (${randomUUID()}, ${requestId}, ${schoolId}, ${reviewerId}, ${request.requested_role}, 'review_started', 'reviewing', CurrentUtcTimestamp());`;
         const result = await tx`SELECT status, review_started_by FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
         const row = result?.[0]?.[0];
         return row?.status === 'reviewing' && row.review_started_by === reviewerId;
@@ -84,8 +83,7 @@ export function createYdbListingsRepository(sql) {
           WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId} AND school_id = ${schoolId} AND status = 'reviewing' AND review_started_by = ${reviewerId};`;
         await tx`INSERT INTO fam_school_role_request_audit
           (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
-          SELECT ${randomUUID()}, request_id, school_id, ${reviewerId}, requested_role, ${decision}, ${status}, CurrentUtcTimestamp()
-          FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId};`;
+          VALUES (${randomUUID()}, ${requestId}, ${schoolId}, ${reviewerId}, ${request.requested_role}, ${decision}, ${status}, CurrentUtcTimestamp());`;
         const confirmed = await tx`SELECT status FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
         return confirmed?.[0]?.[0]?.status === status;
       });
