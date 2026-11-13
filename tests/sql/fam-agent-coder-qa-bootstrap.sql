@@ -14,6 +14,7 @@ create table private.fam_agent_tasks (
   max_attempts integer not null default 2,
   available_at timestamptz not null default now(),
   claimed_by text,
+  claimed_at timestamptz,
   status text not null check (status in ('queued','claimed','in_progress','blocked','completed','failed','cancelled')),
   lease_expires_at timestamptz,
   result_summary text,
