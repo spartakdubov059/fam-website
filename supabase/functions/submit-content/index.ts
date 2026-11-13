@@ -268,6 +268,51 @@ async function publishPendingListingImage(
   };
 }
 
+function hasImageSignature(bytes: Uint8Array, mime: string): boolean {
+  if (mime === "image/jpeg") return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mime === "image/png") return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+    && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  if (mime === "image/webp") return bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF"
+    && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  return false;
+}
+
+async function publishPendingIdeaImage(
+  imageUrl: string,
+  userId: string,
+): Promise<string> {
+  const pendingPath = pendingListingImagePath(imageUrl, userId);
+  if (!pendingPath) throw new Error("Не удалось подтвердить временный файл фотографии.");
+  const source = await fetch(imageUrl);
+  if (!source.ok) throw new Error("Не удалось получить фотографию для проверки.");
+  const mime = (source.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  const extensions: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+  const extension = extensions[mime];
+  if (!extension) throw new Error("Допускаются только JPG, PNG или WebP.");
+  const statedLength = Number(source.headers.get("content-length") || 0);
+  if (statedLength > 2 * 1024 * 1024) throw new Error("Фото больше допустимого размера 2 МБ.");
+  const bytes = new Uint8Array(await source.arrayBuffer());
+  if (!bytes.length || bytes.length > 2 * 1024 * 1024) throw new Error("Фото больше допустимого размера 2 МБ.");
+  if (!hasImageSignature(bytes, mime)) throw new Error("Файл не соответствует формату фотографии. Выберите JPG, PNG или WebP.");
+  const path = userId + "/idea_" + crypto.randomUUID() + "." + extension;
+  const uploaded = await fetch(SUPABASE_URL + "/storage/v1/object/idea-images/" + path, {
+    method: "POST", headers: { ...storageHeaders(mime), "x-upsert": "false" }, body: bytes,
+  });
+  if (!uploaded.ok) throw new Error("Не удалось сохранить проверенное фото предложения.");
+  await removePendingListingImage(imageUrl, userId);
+  return path;
+}
+
+async function removePublishedIdeaImage(path: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}\/idea_[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path)) return;
+  try {
+    const response = await fetch(SUPABASE_URL + "/storage/v1/object/idea-images", {
+      method: "DELETE", headers: storageHeaders("application/json"), body: JSON.stringify({ prefixes: [path] }),
+    });
+    if (!response.ok) console.warn("unused_idea_image_cleanup_failed", response.status);
+  } catch { console.warn("unused_idea_image_cleanup_failed", "network_error"); }
+}
+
 async function removePublishedListingImage(path: string): Promise<void> {
   if (!/^listing_[0-9a-f-]{36}_[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path)) return;
   try {
@@ -698,20 +743,76 @@ Deno.serve(async (req: Request) => {
       if (text.length < 2 || text.length > 1000) return fail("Идея должна содержать от 2 до 1000 символов.", 400, headers);
       if (!profile.school_id) return fail("Укажите школу в профиле перед отправкой идеи.", 400, headers);
 
-      const moderation = await moderate(text, authorization, origin, true, null, {
-        kind: "idea",
+      const submittedImages = Array.isArray(payload.image_urls) ? payload.image_urls : [];
+      if (submittedImages.length > 3 || submittedImages.some((image) => typeof image !== "string")) {
+        return fail("Можно приложить не больше 3 фотографий.", 400, headers);
+      }
+      const imageUrls = [...new Set(submittedImages as string[])];
+      if (imageUrls.length !== submittedImages.length) return fail("Удалите повторяющиеся фотографии.", 400, headers);
+      const pendingPaths = imageUrls.map((imageUrl) => pendingListingImagePath(imageUrl, userId));
+      if (pendingPaths.some((path) => !path)) {
+        return fail("Фото должно быть загружено в защищённое временное хранилище FAM.", 400, headers);
+      }
+
+      const safetyContext = {
+        kind: "idea" as const,
         sender_id: userId,
         school_id: profile.school_id,
-      });
+      };
+      let moderation = await moderate(text, authorization, origin, true, null, safetyContext);
       if (!moderation) return fail("Сервис модерации недоступен. Идея не отправлена.", 503, headers);
       if (moderation.action === "reject") {
+        await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
         return respond({ ok: false, status: "rejected", reason: moderation.reason ?? "Текст не прошёл проверку.", reason_code: moderation.reason_code ?? null }, 200, headers);
+      }
+      if (imageUrls.length && moderation.action === "pending") {
+        await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+        return respond({
+          ok: false,
+          status: "pending",
+          reason: "Текст идеи ожидает проверки. Отправьте предложение без фото или попробуйте позже.",
+        }, 200, headers);
+      }
+
+      const textModeration = moderation;
+      let photoUnavailable = false;
+      for (const imageUrl of imageUrls) {
+        moderation = await moderate(text, authorization, origin, true, imageUrl, safetyContext);
+        if (moderation.action === "pending") {
+          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+          photoUnavailable = true;
+          moderation = textModeration;
+          break;
+        }
+        if (moderation.action !== "ok") {
+          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+          return respond({
+            ok: false,
+            status: moderation.action,
+            reason: moderation.action === "pending"
+              ? "Фото не удалось проверить. Идея не отправлена; попробуйте позже или отправьте её без фото."
+              : moderation.reason ?? "Фото не прошло проверку безопасности.",
+            reason_code: moderation.reason_code ?? null,
+          }, 200, headers);
+        }
+      }
+
+      const publishedImagePaths: string[] = [];
+      try {
+        for (const imageUrl of (photoUnavailable ? [] : imageUrls)) {
+          publishedImagePaths.push(await publishPendingIdeaImage(imageUrl, userId));
+        }
+      } catch (error) {
+        await Promise.all(publishedImagePaths.map((path) => removePublishedIdeaImage(path)));
+        await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+        return fail(error instanceof Error ? error.message : "Не удалось сохранить фотографии.", 503, headers);
       }
 
       const insertResult = await adminRequest("ideas?select=*", "POST", {
         user_id: userId,
         school_id: profile.school_id,
         text,
+        image_paths: publishedImagePaths,
         ai_status: moderation.action === "pending" ? "pending" : "approved",
         ai_summary: text.slice(0, 60),
         ai_reason: moderation.reason ?? null,
@@ -720,6 +821,7 @@ Deno.serve(async (req: Request) => {
       const idea = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
 
       if (!insertResult.ok || !idea) {
+        await Promise.all(publishedImagePaths.map((path) => removePublishedIdeaImage(path)));
         console.error("Idea insert failed:", insertResult.status);
         return fail("Не удалось сохранить идею.", 500, headers);
       }
@@ -727,10 +829,10 @@ Deno.serve(async (req: Request) => {
       return respond({
         ok: true,
         status: moderation.action,
-        degraded: moderation.degraded === true,
+        degraded: photoUnavailable || moderation.degraded === true,
         diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
-        reason: moderation.reason ?? null,
+        reason: photoUnavailable ? "Идея отправлена без фото: фотографию не удалось проверить." : (moderation.reason ?? null),
       }, 200, headers);
     }
 
@@ -744,6 +846,14 @@ Deno.serve(async (req: Request) => {
     );
     const recipient = Array.isArray(recipientResult.data) ? recipientResult.data[0] : null;
     if (!recipientResult.ok || !recipient) return fail("Получатель не найден.", 404, headers);
+
+    const listingId = typeof payload.listing_id === "string" ? payload.listing_id : null;
+    if (listingId) {
+      if (!UUID_RE.test(listingId)) return fail("Некорректное объявление для переписки.", 400, headers);
+      const listingResult = await adminRequest("listings?select=id,school_id&id=eq." + encodeURIComponent(listingId) + "&limit=1");
+      const listing = Array.isArray(listingResult.data) ? listingResult.data[0] : null;
+      if (!listing || listing.school_id !== profile.school_id) return fail("Объявление для переписки не найдено.", 404, headers);
+    }
 
     const moderation = await moderate(body, authorization, origin, false, null, {
       kind: "message",
@@ -767,6 +877,7 @@ Deno.serve(async (req: Request) => {
     const insertResult = await adminRequest("messages?select=*", "POST", {
       sender_id: userId,
       receiver_id: receiverId,
+      listing_id: listingId,
       body,
       is_read: false,
     });

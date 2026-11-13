@@ -63,6 +63,8 @@
     const rootNode=document.getElementById("schoolPulse");
     if(!rootNode)return null;
     const grid=document.getElementById("pulseGrid");
+    const carousel=document.getElementById("pulseAnnouncementCarousel");
+    const announcementTrack=document.getElementById("pulseAnnouncementTrack");
     const admin=document.getElementById("pulseAdmin");
     const announcer=document.getElementById("pulseAnnouncementForm");
     const poller=document.getElementById("pulsePollForm");
@@ -74,29 +76,40 @@
       const viewer=getViewer();
       if(!viewer?.id||!viewer?.school_id){
         rootNode.classList.add("hidden");
+        carousel?.classList.add("hidden");
         grid.textContent="";
+        if(announcementTrack)announcementTrack.textContent="";
         return;
       }
-      rootNode.classList.remove("hidden");
-      admin.classList.toggle("hidden",!["school_admin","council_member"].includes(viewer.role));
-      status.textContent="Загружаем анонсы…";
+      const isStaff=["school_admin","council_member"].includes(viewer.role);
+      admin.classList.toggle("hidden",!isStaff);
+      status.textContent="Загружаем опросы…";
       const {data,error}=await sb.rpc("fam_pulse_feed");
       if(iteration!==epoch)return;
       if(error||!validFeed(data)){
-        status.textContent="Не удалось обновить анонсы.";
-        grid.innerHTML='<div class="pulse-empty">Анонсы пока недоступны. Обновите ленту позже.</div>';
+        status.textContent="Не удалось обновить опросы.";
+        grid.innerHTML='<div class="pulse-empty">Опросы пока недоступны. Обновите позже.</div>';
+        carousel?.classList.add("hidden");
         return;
       }
       const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
-      grid.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("")||
-        '<div class="pulse-empty"><span class="pulse-empty-star">✦</span>Здесь появятся анонсы, события и опросы вашей школы.</div>';
+      if(announcementTrack)announcementTrack.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("");
+      carousel?.classList.toggle("hidden",news.length===0&&polls.length===0);
+      grid.innerHTML="";
       grid.querySelectorAll(".pulse-card").forEach((card,index)=>card.style.setProperty("--pulse-order",String(Math.min(index,7))));
-      status.textContent="Видят участники вашей школы";
+      rootNode.classList.toggle("hidden",!isStaff);
+      status.textContent="Опросы для участников вашей школы";
     }
-    rootNode.addEventListener("click",async event=>{
+    document.querySelectorAll("[data-pulse-scroll]").forEach(button=>button.addEventListener("click",()=>{
+      const direction=Number(button.getAttribute("data-pulse-scroll"));
+      const card=announcementTrack?.querySelector(".pulse-card");
+      if(!announcementTrack||!card||!Number.isFinite(direction))return;
+      announcementTrack.scrollBy({left:direction*(card.getBoundingClientRect().width+10),behavior:"smooth"});
+    }));
+    announcementTrack?.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");
-      if(!button||!rootNode.contains(button)||loading)return;
+      if(!button||!announcementTrack?.contains(button)||loading)return;
       const viewer=getViewer();
       if(!viewer?.id||!viewer?.school_id)return alertUser("Войдите в школьный аккаунт.");
       const id=button.getAttribute("data-pulse-vote");

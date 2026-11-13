@@ -6,10 +6,13 @@ const frontend = readFileSync(new URL("../../index.html", import.meta.url), "utf
 
 test("chat list identifies the conversation that owns unread messages", () => {
   assert.match(frontend, /const \[sentResult, receivedResult, unreadMessagesResult\] = await Promise\.all/);
-  assert.match(frontend, /\.select\("sender_id", \{ count: "exact" \}\)/);
+  assert.match(frontend, /\.select\("sender_id,listing_id", \{ count: "exact" \}\)/);
   assert.match(frontend, /const unreadByOther = new Map\(\)/);
-  assert.match(frontend, /unreadCount: unreadByOther\.get\(otherId\) \|\| 0/);
+  assert.match(frontend, /const key = message\.sender_id \+ "\|" \+ \(message\.listing_id \|\| ""\)/);
+  assert.match(frontend, /unreadCount: unreadByOther\.get\(key\) \|\| 0/);
   assert.match(frontend, /chat-unread-pill/);
+  assert.match(frontend, /Переписка по объявлению/);
+  assert.doesNotMatch(frontend, /Пользователь \$\{esc\(d\.otherId\.slice/);
 });
 
 test("chat history remains available when unread-detail metadata cannot be loaded", () => {
@@ -21,7 +24,7 @@ test("chat history remains available when unread-detail metadata cannot be loade
 });
 
 test("old unread conversations remain visible even outside the recent preview window", () => {
-  assert.match(frontend, /Preserve a conversation even when its unread message is older/);
+  assert.match(frontend, /Preserve a conversation when its unread message is older/);
   assert.match(frontend, /text: "Есть непрочитанные сообщения"/);
   assert.match(frontend, /unlistedUnreadCount/);
 });
