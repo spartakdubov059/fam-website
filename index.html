@@ -2691,11 +2691,15 @@ window.onunhandledrejection = function() {
 
     stopChatSession(true);
     showTab('messages');
+    const relatedListing = listingId ? listings.find(item => item.id === listingId) : null;
+    const chatSubject = relatedListing?.title
+      ? "Переписка по поводу «" + relatedListing.title + "»"
+      : (title || "Переписка в FAM");
     chatOpenTimeout = setTimeout(() => {
       chatOpenTimeout = null;
       if (currentTab !== 'messages' || !user || userId === user.id) return;
       curChat = { userId, listingId: listingId || null };
-      $("chatWith").textContent = title || "Переписка в FAM";
+      $("chatWith").textContent = chatSubject;
       $("dialogsList").classList.add("hidden");
       $("chatView").classList.remove("hidden");
       loadChatMessages(userId, listingId);
