@@ -62,7 +62,7 @@ test("moderation binds the verified submitter context to the origin and text bei
 });
 
 test("safety report endpoint resolves identities only inside the current school", () => {
-  assert.match(council, /profiles\\?select=id,role,first_name,last_name,class_name&school_id=eq\\./);
+  assert.match(council, /profiles\?select=id,role,first_name,last_name,class_name&school_id=eq\./);
   assert.match(council, /&id=in\.\(/);
   assert.match(council, /identity_was_recorded:\s*!!row\.actor_id/);
   assert.match(council, /source_origin:\s*row\.source_origin/);
