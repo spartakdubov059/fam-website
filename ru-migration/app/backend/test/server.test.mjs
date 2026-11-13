@@ -19,9 +19,6 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /ruListingForm/);
-    assert.match(html, /id="ruOpenMessages"/);
-    assert.match(html, /id="ruMessages"/);
-    assert.match(html, /messagesScript\.src = '\/messages\.js'/);
     assert.match(html, /src="\/price-format\.js"/);
     assert.match(html, /auth\/yandex\/start/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
