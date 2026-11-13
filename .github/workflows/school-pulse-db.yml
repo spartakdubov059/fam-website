@@ -1,15 +1,17 @@
-name: FAM School Pulse PostgreSQL safety test
+name: FAM PostgreSQL safety tests
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - 'docs/sql/school-pulse-DRAFT.sql'
       - 'tests/sql/school-pulse-*'
+      - 'supabase/migrations/*fam_agent_bounded_coder_retries.sql'
+      - 'tests/sql/fam-agent-coder-retry-*'
       - '.github/workflows/school-pulse-db.yml'
 permissions:
   contents: read
 jobs:
-  school-pulse-db:
+  postgres-safety:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -40,3 +42,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f docs/sql/school-pulse-DRAFT.sql
       - name: Verify privacy, one vote and school isolation
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-pulse-assert.sql
+      - name: Build disposable FAM coder queue fixture
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-coder-retry-bootstrap.sql
+      - name: Apply bounded retry migration to PostgreSQL 17 fixture
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113100000_fam_agent_bounded_coder_retries.sql
+      - name: Verify retry limit, cooldown, lease and RPC permissions
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-coder-retry-assert.sql
