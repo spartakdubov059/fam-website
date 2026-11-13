@@ -124,6 +124,35 @@ test("cloud monitor reports bad homepage markup and recent failed workflows", as
   assert.equal(report.recent_failures[0].url, "https://github.com/owner/repo/actions/runs/3");
 });
 
+test("cloud monitor reports main workflows still in progress after two hours", async () => {
+  const now = Date.parse("2026-11-13T05:00:00Z");
+  const report = await runFAMCloudMonitor({
+    fetchImpl: siteFetch({ runs: [{
+      id: 5,
+      workflow_id: 13,
+      name: "Stalled main check",
+      path: ".github/workflows/checks.yml",
+      head_branch: "main",
+      status: "in_progress",
+      conclusion: null,
+      created_at: "2026-11-13T02:20:00Z",
+      run_started_at: "2026-11-13T02:30:00Z",
+      html_url: "https://github.com/owner/repo/actions/runs/5",
+    }] }),
+    baseUrl: siteBase,
+    repository: "owner/repo",
+    token: "test-token",
+    now,
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.recent_failures, []);
+  assert.equal(report.stalled_runs.length, 1);
+  assert.equal(report.stalled_runs[0].started_at, "2026-11-13T02:30:00Z");
+  assert.match(renderFAMCloudMonitorReport(report), /Workflow в работе более 2 часов/);
+});
+
 test("monitor summary distinguishes its cadence and escapes workflow names", () => {
   const summary = renderFAMCloudMonitorReport({
     checked_at: "2026-11-11T05:00:00.000Z",
