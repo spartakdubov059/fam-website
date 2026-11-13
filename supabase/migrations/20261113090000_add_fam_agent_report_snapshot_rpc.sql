@@ -81,6 +81,7 @@ declare
   v_latest_site_error jsonb;
   v_failed_tasks_24h jsonb;
   v_site_error_events jsonb;
+  v_worker_http_6h jsonb;
 begin
   select pg_catalog.jsonb_build_object(
     'report_date', r.report_date,
@@ -213,6 +214,32 @@ begin
   order by t.updated_at desc
   limit 1;
 
+  -- pg_net keeps a bounded response history. Match only the worker's fixed JSON
+  -- success/error envelope; never expose response bodies, headers, or error text.
+  select pg_catalog.jsonb_build_object(
+    'window_hours', 6,
+    'observed_from', min(r.created) filter (
+      where r.content like '{"ok":true,"claimed"%'
+         or r.content like '{"ok":false,"error"%'
+    ),
+    'response_count', count(*) filter (
+      where r.content like '{"ok":true,"claimed"%'
+         or r.content like '{"ok":false,"error"%'
+    ),
+    'success_count', count(*) filter (
+      where r.status_code = 200 and r.content like '{"ok":true,"claimed"%'
+    ),
+    'http_error_count', count(*) filter (
+      where r.status_code >= 400 and r.content like '{"ok":false,"error"%'
+    ),
+    'reported_error_count', count(*) filter (
+      where r.content like '{"ok":false,"error"%'
+    )
+  )
+  into v_worker_http_6h
+  from net._http_response as r
+  where r.created >= pg_catalog.now() - interval '6 hours';
+
   return pg_catalog.jsonb_build_object(
     'generated_at', pg_catalog.now(),
     'report_date', (pg_catalog.now() at time zone 'UTC')::date,
@@ -222,6 +249,7 @@ begin
     'latest_system_health', v_latest_health,
     'latest_coder_task', v_latest_coder,
     'latest_site_error_check', v_latest_site_error,
+    'worker_http_6h', v_worker_http_6h,
     'failed_tasks_24h', v_failed_tasks_24h,
     'site_error_events_24h', v_site_error_events
   );
