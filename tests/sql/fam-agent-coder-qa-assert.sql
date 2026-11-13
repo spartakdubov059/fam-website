@@ -122,6 +122,10 @@ begin
     raise exception 'coder finish RPC did not write one event per task';
   end if;
 
+  -- The retry scenario intentionally leaves one delayed queued task; clear it before testing the single-active-task producer.
+  update private.fam_agent_tasks set status='completed'
+  where id='523e4567-e89b-42d3-a456-426614174000';
+
   insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
   values ('js_runtime','other',now()-interval '1 hour',3);
   perform private.enqueue_fam_agent_coder_task();
