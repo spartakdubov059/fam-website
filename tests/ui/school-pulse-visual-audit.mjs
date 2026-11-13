@@ -40,9 +40,9 @@ try{
         notify:()=>{}});
       void window.pulse.refresh();
     },testId);
-    await page.locator("#pulseGrid .pulse-card").first().waitFor();
-    assert.equal(await page.locator("#pulseGrid .pulse-card").count(),1,"only polls stay in the poll grid");
-    assert.equal(await page.locator("#pulseAnnouncementTrack .pulse-card").count(),3,"announcements render in their own carousel");
+    await page.locator("#pulseAnnouncementTrack .pulse-card").first().waitFor();
+    assert.equal(await page.locator("#pulseGrid .pulse-card").count(),0,"poll cards are moved into the top carousel");
+    assert.equal(await page.locator("#pulseAnnouncementTrack .pulse-card").count(),4,"announcements and polls render in the top carousel");
     assert.equal(await page.locator(".pulse-card.is-open-event").count(),1,"open event renders in the carousel");
     assert.match(await page.locator(".pulse-open-foot").innerText(),/Без записи/);
     assert.equal(await page.locator("#pulseAnnouncementCarousel").isVisible(),true,"announcement carousel is visible");
@@ -59,7 +59,7 @@ try{
       columns:getComputedStyle(document.getElementById("pulseGrid")).gridTemplateColumns.split(" ").length
     }));
     assert.ok(geometry.documentWidth <= geometry.viewportWidth+1,"Pulse overflow at "+width+"px: "+JSON.stringify(geometry));
-    assert.equal(geometry.columns,width<=640?1:2,"grid columns at "+width);
+    assert.equal(geometry.columns,width<=640?1:(width<667?2:3),"grid columns at "+width);
     assert.equal(await page.locator("#pulseAdmin").isVisible(),false,"students must not see admin controls");
     assert.equal(await page.locator(".pulse-option").count(),3,"poll choices work");
     await page.locator("[data-pulse-vote]").first().click();

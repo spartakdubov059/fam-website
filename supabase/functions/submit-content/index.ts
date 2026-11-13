@@ -774,8 +774,16 @@ Deno.serve(async (req: Request) => {
         }, 200, headers);
       }
 
+      const textModeration = moderation;
+      let photoUnavailable = false;
       for (const imageUrl of imageUrls) {
         moderation = await moderate(text, authorization, origin, true, imageUrl, safetyContext);
+        if (moderation.action === "pending") {
+          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+          photoUnavailable = true;
+          moderation = textModeration;
+          break;
+        }
         if (moderation.action !== "ok") {
           await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
           return respond({
@@ -791,7 +799,7 @@ Deno.serve(async (req: Request) => {
 
       const publishedImagePaths: string[] = [];
       try {
-        for (const imageUrl of imageUrls) {
+        for (const imageUrl of (photoUnavailable ? [] : imageUrls)) {
           publishedImagePaths.push(await publishPendingIdeaImage(imageUrl, userId));
         }
       } catch (error) {
@@ -821,10 +829,10 @@ Deno.serve(async (req: Request) => {
       return respond({
         ok: true,
         status: moderation.action,
-        degraded: moderation.degraded === true,
+        degraded: photoUnavailable || moderation.degraded === true,
         diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
-        reason: moderation.reason ?? null,
+        reason: photoUnavailable ? "Идея отправлена без фото: фотографию не удалось проверить." : (moderation.reason ?? null),
       }, 200, headers);
     }
 
@@ -838,6 +846,14 @@ Deno.serve(async (req: Request) => {
     );
     const recipient = Array.isArray(recipientResult.data) ? recipientResult.data[0] : null;
     if (!recipientResult.ok || !recipient) return fail("Получатель не найден.", 404, headers);
+
+    const listingId = typeof payload.listing_id === "string" ? payload.listing_id : null;
+    if (listingId) {
+      if (!UUID_RE.test(listingId)) return fail("Некорректное объявление для переписки.", 400, headers);
+      const listingResult = await adminRequest("listings?select=id,school_id&id=eq." + encodeURIComponent(listingId) + "&limit=1");
+      const listing = Array.isArray(listingResult.data) ? listingResult.data[0] : null;
+      if (!listing || listing.school_id !== profile.school_id) return fail("Объявление для переписки не найдено.", 404, headers);
+    }
 
     const moderation = await moderate(body, authorization, origin, false, null, {
       kind: "message",
@@ -861,6 +877,7 @@ Deno.serve(async (req: Request) => {
     const insertResult = await adminRequest("messages?select=*", "POST", {
       sender_id: userId,
       receiver_id: receiverId,
+      listing_id: listingId,
       body,
       is_read: false,
     });

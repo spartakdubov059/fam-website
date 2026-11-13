@@ -30,8 +30,13 @@ test("profile shows the student's name with a neutral fallback and keeps email i
  assert.match(html,/const displayName = \[profile\?\.first_name, profile\?\.last_name\]/);
  assert.match(html,/displayName \|\| "Участник FAM"/);
  assert.match(html,/id="accountEmail"/);
- assert.match(html,/\$\("accountEmail"\)\.textContent = user\.email/);
+ assert.match(html,/\$\("accountEmail"\)\.value = user\.email/);
  assert.doesNotMatch(html,/\$\("profEmail"\)\.textContent = user\.email/);
+});
+
+test("chat titles use listing names and dialogs retain listing identity",()=>{
+ assert.match(html,/Переписка по поводу «/);
+ assert.ok(html.includes('data-listing-id="${esc(d.listingId || "")}"'));
 });
 
 test("announcements stay separate from listings and polls and disappear when empty",()=>{
@@ -39,7 +44,7 @@ test("announcements stay separate from listings and polls and disappear when emp
  assert.match(html,/data-pulse-scroll="-1"/);
  assert.match(html,/data-pulse-scroll="1"/);
  assert.match(html,/scroll-snap-type:x mandatory/);
- assert.match(pulse,/announcementTrack\.innerHTML=news\.map\(announcementCard\)\.join/);
- assert.match(pulse,/carousel\?\.classList\.toggle\("hidden",news\.length===0\)/);
- assert.match(pulse,/grid\.innerHTML=polls\.map\(pollCard\)\.join/);
+ assert.match(pulse,/announcementTrack\.innerHTML=news\.map\(announcementCard\)\.concat\(polls\.map\(pollCard\)\)\.join/);
+ assert.match(pulse,/carousel\?\.classList\.toggle\("hidden",news\.length===0&&polls\.length===0\)/);
+ assert.match(pulse,/grid\.innerHTML=""/);
 });
