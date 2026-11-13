@@ -10,6 +10,10 @@ const testWorkflow = readFileSync(
   new URL("../../.github/workflows/moderation-regression.yml", import.meta.url),
   "utf8",
 );
+const approvalScript = readFileSync(
+  new URL("../../scripts/verify-agent-pr-owner-approval.mjs", import.meta.url),
+  "utf8",
+);
 const reportWorkflow = readFileSync(
   new URL("../../.github/workflows/fam-agent-daily-report.yml", import.meta.url),
   "utf8",
@@ -210,4 +214,18 @@ test("daily Reporter runs on main with read-only scopes and private persistence"
   assert.doesNotMatch(reportWorkflow, /upload-artifact|GITHUB_STEP_SUMMARY/);
   assert.match(reportWorkflow, /FAM_AGENT_BRIDGE_URL/);
   assert.ok(reportWorkflow.includes("node scripts/fam-agent-system-reporter.mjs"));
+});
+
+test("required regression check enforces current-head owner approval for agent PRs", () => {
+  assert.ok(testWorkflow.includes("pull_request_review:"));
+  assert.ok(testWorkflow.includes("types: [submitted, edited, dismissed]"));
+  assert.ok(testWorkflow.includes("pull-requests: read"));
+  assert.ok(testWorkflow.includes("name: Russian content safety tests"));
+  assert.ok(testWorkflow.includes("Checkout trusted approval verifier from the base commit"));
+  assert.ok(testWorkflow.includes("github.event.pull_request.base.sha"));
+  assert.ok(testWorkflow.includes("codex/fam-run-"));
+  assert.ok(approvalScript.includes("latest?.state === \"APPROVED\""));
+  assert.ok(approvalScript.includes("latest.commit_id.toLowerCase() === headSha.toLowerCase()"));
+  assert.ok(approvalScript.includes("pulls/"));
+  assert.ok(approvalScript.includes("spartakdubov059"));
 });
