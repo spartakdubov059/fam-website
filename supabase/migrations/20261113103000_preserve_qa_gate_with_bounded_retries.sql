@@ -158,6 +158,17 @@ begin
       end if;
       v_status := 'failed';
       v_summary := 'Сбой coder/QA/PR неизвестной причины; автоматический повтор не назначен.';
+    when 'model_timeout' then
+      if p_pr_url is not null or p_commit_sha is not null then
+        raise exception 'timed-out coder task cannot store PR metadata';
+      end if;
+      if v_has_retry then
+        v_status := 'queued';
+        v_summary := 'Подтверждён таймаут локального анализатора; назначена одна повторная попытка.';
+      else
+        v_status := 'failed';
+        v_summary := 'Локальный анализатор исчерпал разрешённое число попыток после таймаута.';
+      end if;
     when 'model_blocked' then
       if p_pr_url is not null or p_commit_sha is not null then
         raise exception 'blocked coder task cannot store PR metadata';
