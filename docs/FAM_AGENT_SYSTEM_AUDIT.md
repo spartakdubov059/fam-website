@@ -222,3 +222,11 @@
 | `fam-agent-coder-bridge` | 1 | Выключен | Узкий claim/finish bridge; до RPC проверяет `x-fam-agent-token`; production-запрос без токена ранее получил HTTP 401. |
 
 Значения секретов не читались и не включались в отчёт. Coder bridge не запускает модель, а worker не является генеративным агентом. Доступность функции и успешный плановый запуск сами по себе не доказывают полный агентный сценарий.
+
+
+## Подтверждённый лишний запуск модели в main
+
+- Актуальный workflow main срабатывает не только по ежедневному расписанию 15 3 * * *, но и при каждом push в наборе путей. До claim шага он скачивает Qwen weights и собирает llama.cpp, затем всегда запускает inference.
+- GitHub run [#43497233163](https://github.com/spartakdubov059/fam-website/actions/runs/43497233163) (push) и [#43362562139](https://github.com/spartakdubov059/fam-website/actions/runs/43362562139) (schedule) подтверждают успешные шаги download, build, queue check и inference. В обоих finish пропущен; verify и PR manager также пропущены — то есть модель потратила runner-время при отсутствии claimed coder-задачи.
+- Draft PR #65 переносит queue claim перед model download/build и ставит download, build и inference за условие run_model == 'true'. Его regression tests проверяют решение пропускать модель для пустой очереди; свежая CI-проверка после обновления документа прошла. Полный Qwen runtime на уже исправленном workflow повторно не запускался.
+- Следствие для текущей main: несмотря на бесплатность стандартных runners публичного репозитория, каждый такой запуск тратит время и вычисления без полезной coder-задачи. PR #65 исправляет эту растрату; пока PR не слит, оптимизация в production-ветке отсутствует.
