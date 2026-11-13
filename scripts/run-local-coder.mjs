@@ -5,10 +5,13 @@ import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { applyTextEdits, extractExplicitTargetPaths } from "./local-model-edits.mjs";
+import { resolveLocalModelApiUrl } from "./local-model-url.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
-const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
+const API_URL = resolveLocalModelApiUrl(
+  process.env.FAM_MODEL_API_URL || "http://127.0.0.1:8080/v1/chat/completions",
+);
 const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
