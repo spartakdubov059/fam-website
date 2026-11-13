@@ -126,6 +126,8 @@ export function createDailyReport({
   workflowStatus = "unavailable",
   pullRequests = [],
   pullRequestStatus = "unavailable",
+  agentJobStatus = "unavailable",
+  agentJobStatuses = null,
   production = { status: "unknown" },
   siteProbe = { status: "unknown", http_status: null },
   now = new Date(),
@@ -140,18 +142,22 @@ export function createDailyReport({
   const coderRun = latestWorkflow(/local ai developer/i);
   const runOutcome = (run) => !run ? "not_run_24h" :
     run.conclusion === "pending" ? run.status : run.conclusion;
+  const agentStatus = (key) => agentJobStatus === "available"
+    ? (agentJobStatuses?.[key] ?? "not_observed")
+    : agentJobStatus;
   const openPrs = sanitizePullRequests(pullRequests);
   const roles = [
     { role: "Orchestrator", status: validSnapshot && snapshot.daily_report ? "reported" : "not_reported" },
     { role: "Monitoring", status: (siteProbe.status === "reachable" ? "site_reachable" : safeLabel(siteProbe.status, 40)) +
       ";site_error_task:" + safeLabel(snapshot?.latest_site_error_check?.status ?? "unknown", 40) },
     { role: "Analyst", status: analyzeTechnicalSignals(validSnapshot ? snapshot.site_error_events_24h : []).status },
-    { role: "Coder", status: validSnapshot ? (snapshot.latest_coder_task?.status ?? "no_task") : "unavailable" },
-    { role: "QA", status: runOutcome(qaRun) },
-    { role: "Reviewer", status: coderRun ? "coder_workflow_seen_individual_result_unavailable" : "not_run_24h" },
-    { role: "Security Agent", status: coderRun ? "coder_workflow_seen_individual_result_unavailable" : "not_run_24h" },
-    { role: "Performance Agent", status: coderRun ? "coder_workflow_seen_individual_result_unavailable" : "not_run_24h" },
-    { role: "PR Manager", status: openPrs.length + "_open_prs" },
+    { role: "Coder", status: "queue:" + (validSnapshot ? safeLabel(snapshot.latest_coder_task?.status ?? "no_task", 40) : "unavailable") +
+      ";run:" + agentStatus("coder") },
+    { role: "QA", status: "patch:" + agentStatus("qa") + ";regression:" + runOutcome(qaRun) },
+    { role: "Reviewer", status: agentStatus("reviewer") },
+    { role: "Security Agent", status: agentStatus("security") },
+    { role: "Performance Agent", status: agentStatus("performance") },
+    { role: "PR Manager", status: agentStatus("pr_manager") + ";open_prs:" + openPrs.length },
     { role: "Deployment Monitor", status: safeLabel(production?.status ?? "unknown", 40) },
     { role: "Reporter", status: "ready_to_store" },
   ];
