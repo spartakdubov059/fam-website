@@ -427,7 +427,7 @@ jobs:
           REQUIRED_BUCKET=""
           for attempt in $(seq 1 90); do
             CHECKS_JSON="$(gh pr checks "$PR_URL" --required --json name,state,bucket 2>/dev/null || true)"
-            REQUIRED_BUCKET="$(jq -r '[.[] | select(.name == "Russian content safety tests")] | last | .bucket // empty' <<< "${CHECKS_JSON:-[]}")"
+            REQUIRED_BUCKET="$(jq -r --arg name "$REQUIRED_CHECK" '[.[] | select(.name == $name)] | last | .bucket // empty' <<< "${CHECKS_JSON:-[]}")"
             if [[ "$REQUIRED_BUCKET" == "pass" ]]; then
               break
             fi
