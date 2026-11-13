@@ -404,6 +404,24 @@ async function main() {
   }
 
   const now = new Date();
+  const recentWorkflows = summarizeWorkflowRuns(runData?.workflow_runs ?? [], now);
+  const latestCoderWorkflow = recentWorkflows
+    .filter((workflow) => /local ai developer/i.test(workflow.name))
+    .sort((a, b) => (b.latest?.created_at ?? "").localeCompare(a.latest?.created_at ?? ""))[0]?.latest;
+  let agentJobsStatus = !Array.isArray(runData?.workflow_runs)
+    ? "unavailable"
+    : latestCoderWorkflow ? "unavailable" : "not_run_24h";
+  let agentJobStatuses = null;
+  if (Number.isSafeInteger(latestCoderWorkflow?.run_id)) {
+    const jobsData = await githubGet(
+      base + "/actions/runs/" + latestCoderWorkflow.run_id + "/jobs?per_page=100",
+      token,
+    );
+    if (Array.isArray(jobsData?.jobs)) {
+      agentJobsStatus = "available";
+      agentJobStatuses = summarizeAgentJobStatuses(jobsData.jobs);
+    }
+  }
   const report = createDailyReport({
     snapshot: snapshotData.snapshot,
     snapshotStatus: snapshotData.status,
@@ -411,6 +429,8 @@ async function main() {
     workflowStatus: Array.isArray(runData?.workflow_runs) ? "available" : "unavailable",
     pullRequests: pullData,
     pullRequestStatus: Array.isArray(pullData) ? "available" : "unavailable",
+    agentJobStatus: agentJobsStatus,
+    agentJobStatuses,
     production,
     siteProbe,
     now,
