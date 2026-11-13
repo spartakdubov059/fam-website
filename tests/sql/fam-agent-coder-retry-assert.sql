@@ -83,9 +83,6 @@ end;
 $$;
 reset role;
 
-end;
-$$;
-
 insert into private.fam_agent_tasks (
   id,agent_key,task_type,title,description,priority,status,source,
   approval_required,payload,attempt_count,max_attempts,claimed_by,claimed_at,lease_expires_at
