@@ -59,4 +59,4 @@ grant usage, select on all sequences in schema private to service_role;
 -- Stand-in for pg_cron in the isolated PostgreSQL fixture. The production migration is otherwise applied verbatim.
 create schema cron;
 create function cron.schedule(text,text,text)
-returns bigint language sql immutable as $ select 1::bigint $;
+returns bigint language sql immutable as 'select 1::bigint';
