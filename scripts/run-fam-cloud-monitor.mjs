@@ -8,6 +8,12 @@ const DEFAULT_REPOSITORY = "spartakdubov059/fam-website";
 const MONITOR_WORKFLOW_PATH = ".github/workflows/fam-cloud-monitor.yml";
 const FAILURE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const STALE_RUN_MS = 2 * 60 * 60 * 1000;
+const PERFORMANCE_LIMITS = Object.freeze({
+  homepage_ms: 8_000,
+  html_bytes: 1_500_000,
+  resource_bytes: 20_000_000,
+  largest_resource_bytes: 8_000_000,
+});
 
 function safeText(value, limit = 240) {
   return String(value ?? "")
@@ -212,20 +218,34 @@ export async function runFAMCloudMonitor({
   let performanceMetrics = null;
   if (homepageResult) {
     const measured = await measurePagePerformance(homepageResult.body, base, fetchImpl, retryDelayMs);
-    performanceMetrics = { homepage_ms: homepageResult.elapsed_ms, html_bytes: homepageResult.body_bytes, ...measured };
+    const findings = [];
+    if (homepageResult.elapsed_ms > PERFORMANCE_LIMITS.homepage_ms) findings.push("ответ главной дольше 8 секунд");
+    if (homepageResult.body_bytes > PERFORMANCE_LIMITS.html_bytes) findings.push("HTML больше 1.5 MB");
+    if (measured.resource_bytes > PERFORMANCE_LIMITS.resource_bytes) findings.push("сумма известных размеров ресурсов больше 20 MB");
+    if (measured.largest_resource_bytes > PERFORMANCE_LIMITS.largest_resource_bytes) findings.push("ресурс больше 8 MB");
+    performanceMetrics = {
+      homepage_ms: homepageResult.elapsed_ms,
+      html_bytes: homepageResult.body_bytes,
+      ...measured,
+      findings,
+    };
     const resourceSummary = measured.resource_failures
       ? "Некоторые локальные ресурсы не загрузились: " + measured.resource_errors.join("; ")
       : "Все проверенные локальные ресурсы доступны.";
+    const performanceSummary = findings.length
+      ? "Превышены стартовые ориентиры: " + findings.join("; ") + "."
+      : "Стартовые ориентиры соблюдены.";
     checks.push({
       name: "Производительность: документ и локальные ресурсы",
-      ok: measured.resource_failures === 0,
+      ok: measured.resource_failures === 0 && findings.length === 0,
       detail: "HTML " + homepageResult.body_bytes + " байт за " + homepageResult.elapsed_ms + " мс; " +
         measured.local_resources_checked + "/" + measured.local_resources_total + " локальных ресурсов проверено, " +
         measured.resource_bytes + " байт по HEAD-заголовкам (" + measured.resource_sizes_known + "/" +
         measured.local_resources_checked + " размеров известно), крупнейший " + measured.largest_resource_bytes +
-        " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary +
+        " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary + " " + performanceSummary +
         (measured.resources_truncated ? " Остальные ресурсы не проверялись из-за лимита 12." : "") +
-        " Это сетевой замер с runner, не browser-render/mobile benchmark.",
+        " Пороги: главная 8 с, HTML 1.5 MB, известный объём ресурсов 20 MB, один ресурс 8 MB. " +
+        "Это начальные грубые ориентиры, не browser-render/mobile benchmark.",
     });
   } else {
     checks.push({
@@ -335,9 +355,15 @@ export function renderFAMCloudMonitorReport(report) {
       ? "- Документ: " + report.performance.html_bytes + " байт; ответ за " + report.performance.homepage_ms + " мс."
       : "- Замер документа недоступен.",
     report?.performance
+      ? report.performance.findings.length
+        ? "- Предупреждения: " + report.performance.findings.map((finding) => escapeMarkdown(finding, 120)).join("; ")
+        : "- Предупреждения по стартовым порогам: не выявлены."
+      : "- Предупреждения: метрики недоступны.",
+    report?.performance
       ? "- Локальные ресурсы: " + report.performance.local_resources_checked + "/" + report.performance.local_resources_total +
-        " проверено; " + report.performance.resource_bytes + " байт суммарно; крупнейший " +
-        report.performance.largest_resource_bytes + " байт; медленнейший " + report.performance.slowest_resource_ms + " мс."
+        " проверено; " + report.performance.resource_bytes + " байт по HEAD-заголовкам (" +
+        report.performance.resource_sizes_known + "/" + report.performance.local_resources_checked +
+        " размеров известно); крупнейший " + report.performance.largest_resource_bytes + " байт; медленнейший " + report.performance.slowest_resource_ms + " мс."
       : "- Ресурсы страницы не измерены.",
     "- Это периодический сетевой замер с GitHub runner; он не измеряет browser rendering, Core Web Vitals или мобильные устройства.",
     "",

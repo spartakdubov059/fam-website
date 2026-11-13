@@ -10,12 +10,12 @@ const homepage = "<!doctype html><title>FAM — Свои рядом</title><scri
 const robots = "User-agent: *\nAllow: /\nSitemap: https://example.invalid/fam-website/sitemap.xml\n";
 const sitemap = "<urlset><url><loc>https://example.invalid/fam-website/</loc></url></urlset>";
 
-function response(body, status = 200) {
+function response(body, status = 200, contentLength = null) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    headers: { get: (name) => name === "content-length" && typeof body === "string"
-      ? String(new TextEncoder().encode(body).byteLength)
+    headers: { get: (name) => name === "content-length"
+      ? (contentLength ?? (typeof body === "string" ? String(new TextEncoder().encode(body).byteLength) : null))
       : "text/plain" },
     text: async () => body,
     arrayBuffer: async () => new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body)).buffer,
@@ -223,6 +223,33 @@ test("cloud monitor fails when a same-origin page asset is unavailable", async (
   const performanceCheck = report.checks.find((check) => check.name.startsWith("Производительность"));
   assert.equal(performanceCheck.ok, false);
   assert.match(performanceCheck.detail, /HTTP 404/);
+});
+
+test("cloud monitor flags unusually large local resources", async () => {
+  const html = [
+    "<!doctype html><title>FAM — Свои рядом</title>",
+    "<script>const famReady = true;</script>",
+    '<img src="assets/large.svg">',
+  ].join("");
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) return response(robots);
+      if (parsed.pathname.endsWith("/sitemap.xml")) return response(sitemap);
+      if (parsed.pathname.endsWith("/assets/large.svg")) return response("", 200, "9000000");
+      return response(html);
+    },
+    baseUrl: siteBase,
+    repository: "owner/repo",
+    token: "test-token",
+    now: Date.parse("2026-11-13T05:00:00Z"),
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.performance.findings, ["ресурс больше 8 MB"]);
+  assert.match(report.checks.find((check) => check.name.startsWith("Производительность")).detail, /Пороги: главная 8 с/);
 });
 
 test("monitor summary distinguishes its cadence and escapes workflow names", () => {
