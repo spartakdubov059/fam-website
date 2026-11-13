@@ -46,7 +46,7 @@ export function createServer({ listingsApi = null } = {}) {
     const state = readiness();
     return sendJson(res, state.ready ? 200 : 503, state);
   }
-  if ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings') {
+  if (((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings') || (req.method === 'GET' && url.pathname === '/api/v1/me')) {
     if (!listingsApi) return sendJson(res, 503, { ok: false, error: 'backend_not_configured' });
     try {
       const result = await listingsApi(req);
