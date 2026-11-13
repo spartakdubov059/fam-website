@@ -94,11 +94,11 @@
       }
       const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
-      if(announcementTrack)announcementTrack.innerHTML=news.map(announcementCard).join("");
-      carousel?.classList.toggle("hidden",news.length===0);
-      grid.innerHTML=polls.map(pollCard).join("");
+      if(announcementTrack)announcementTrack.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("");
+      carousel?.classList.toggle("hidden",news.length===0&&polls.length===0);
+      grid.innerHTML="";
       grid.querySelectorAll(".pulse-card").forEach((card,index)=>card.style.setProperty("--pulse-order",String(Math.min(index,7))));
-      rootNode.classList.toggle("hidden",polls.length===0&&!isStaff);
+      rootNode.classList.toggle("hidden",!isStaff);
       status.textContent="Опросы для участников вашей школы";
     }
     document.querySelectorAll("[data-pulse-scroll]").forEach(button=>button.addEventListener("click",()=>{
@@ -107,7 +107,7 @@
       if(!announcementTrack||!card||!Number.isFinite(direction))return;
       announcementTrack.scrollBy({left:direction*(card.getBoundingClientRect().width+10),behavior:"smooth"});
     }));
-    rootNode.addEventListener("click",async event=>{
+    announcementTrack?.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");
       if(!button||!rootNode.contains(button)||loading)return;
       const viewer=getViewer();
