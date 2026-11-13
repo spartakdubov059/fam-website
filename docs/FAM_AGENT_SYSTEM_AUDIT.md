@@ -358,3 +358,10 @@
 - Это новый прямой пример лишнего model-run на текущей main; workflow в draft PR #65 переносит queue claim перед восстановлением модели/сборкой и пропускает inference при отсутствии задачи, но на main это пока не действует. Текущая production coder queue по-прежнему содержит только четыре задачи от 11 ноября (1 completed, 3 failed); свежая задача и сквозной production run не наблюдались.
 - Ежедневная legacy-таблица отчётов в Supabase всё ещё содержит 5 дат, последний отчёт — 13 ноября в 04:00 UTC. Следующий GitHub Reporter run запланирован на 14 ноября 04:15 UTC; нормализованный объединённый Reporter из PR #65 не развёрнут.
 - Run был push-triggered, однако GitHub-hosted job получил только contents: read; production, очередь и main не менялись этим аудитом. Успех job не означает успешного исправления, поскольку очередь не выдала coder-задачу и downstream QA/PR jobs пропустились.
+
+
+## Сверка развернутого Worker с исходниками PR — 14 ноября 2026, 02:23 МСК
+
+- Через Supabase `get_edge_function` прочитан текущий production source `fam-agent-worker` v17; значения секретов не запрашивались. В live-коде после `finish_fam_agent_task` счётчики обновляются только при `saved === true`, но при `saved === false` ошибка не выбрасывается, цикл продолжается и handler возвращает HTTP 200 с `ok: true`. Следовательно, успешный HTTP-ответ может не означать, что worker действительно сохранил завершение задачи.
+- Это не только статическая догадка: live source содержит именно указанную ветку; независимое чтение `origin/main` показывает тот же код. В PR #65 добавлен fail-closed guard `if (saved !== true) throw ...` и тест, проверяющий этот guard в `tests/security/fam-agent-worker.test.mjs`. На актуальном PR head Regression suite прошёл успешно.
+- Исправление не действует в production: функция остаётся v17, source в Supabase не обновлялся. Обновление функции относится к production deployment и здесь не выполнялось. После отдельного разрешения rollout важно проверить отрицательный runtime-сценарий (RPC ответил false → HTTP 500), поскольку текущая регрессия в PR проверяет исходный код, а не живой Supabase endpoint.
