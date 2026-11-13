@@ -80,7 +80,10 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         const updated = await repository.reviewSchoolRoleRequest(roleRequestMatch[1], actor.school_id, actor.id, input.decision, note);
         return updated ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
           : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      } catch (error) {
+        if (process.env.FAM_RU_DEBUG_YDB === '1') console.error('school_role_request_transition_failed', error?.name || 'unknown', error?.code || 'unknown', String(error?.message || '').slice(0, 300));
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
     }
     if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

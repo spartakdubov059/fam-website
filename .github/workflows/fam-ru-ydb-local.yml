@@ -49,6 +49,8 @@ jobs:
             sleep 2
           done
       - name: Exercise schema and repository with synthetic data
+        env:
+          FAM_RU_DEBUG_YDB: '1'
         run: node ru-migration/compat/integration-ydb.mjs
       - name: Remove disposable database
         if: always()
