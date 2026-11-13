@@ -112,6 +112,7 @@
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
+    .sr-only, .hero-slide.hero-img .hero-script { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
     .hero-script { font-family: 'Caveat', cursive, sans-serif; font-size: 52px; line-height: 1; font-weight: 700; color: #fff; transform: rotate(-2deg); }
@@ -2375,37 +2376,16 @@ window.onunhandledrejection = function() {
   function renderHero() {
     const box = $("bannerCarousel");
     let html = [];
-    // Six selected FAM editorial photographs, formatted as original 16:9 banners.
-    // The six earlier banners remain in the carousel unchanged.
-    const photoSlide = ({ index, alt, action, cat, first = false }) => {
-      const attrs = action ? ` data-action="${action}"${cat ? ` data-cat="${cat}"` : ''}` : '';
-      return `<div class="hero-slide hero-img fam-photo-slide">
-        <div class="fam-photo-panel">
-          ${first ? '<h1 class="hero-script">Найди своих.</h1>' : ''}
-          <img src="assets/fam-editorial-${index}.svg" width="1200" height="675" loading="${first ? 'eager' : 'lazy'}" decoding="async" alt="${esc(alt)}">
-          ${action ? `<button type="button" class="fam-photo-hit"${attrs} aria-label="${esc(alt)}"></button>` : ''}
-        </div>
-      </div>`;
-    };
-    const editorialPhotos = [
-      { index: 2, alt: 'Найди своих. Общение, идеи и помощь от ребят рядом.', action: 'scroll-listings', first: true },
-      { index: 1, alt: 'ФАМ ближе к media. Школьный медиацентр — снимаем, пишем, создаём.' },
-      { index: 3, alt: 'Вещи рядом. Покупай, продавай и обменивайся.', action: 'cat', cat: 'Вещи' },
-      { index: 4, alt: 'Творчество и идеи. Делись проектами, находи единомышленников.', action: 'cat', cat: 'Творчество' },
-      { index: 5, alt: 'События и активности. Афиша и мероприятия школы.' },
-      { index: 6, alt: 'Учёба без стресса. Конспекты, материалы и помощь по предметам.', action: 'cat', cat: 'Учёба' }
-    ];
-    editorialPhotos.forEach(photo => html.push(photoSlide(photo)));
     const banners = [
-      { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
-      { src: "banner-2", alt: "Баннер FAM о школьном медиацентре: снимаем, пишем и создаём." },
-      { src: "banner-3", alt: "Баннер FAM о походах, новых маршрутах и прогулках на природе." },
-      { src: "banner-4", alt: "Баннер FAM об учёбе, проектах и знаниях." },
-      { src: "banner-5", alt: "Баннер FAM о творчестве, идеях и вдохновляющих проектах." },
-      { src: "banner-6", alt: "Баннер FAM о концертах, квизах и встречах." }
+      { src: "banner-1", alt: "Найди своих на закате." },
+      { src: "banner-2", alt: "Школьная площадка FAM: анонсы и события." },
+      { src: "banner-3", alt: "Вещи и услуги: техника для учёбы." },
+      { src: "banner-4", alt: "Учёба и развитие за чашкой кофе." },
+      { src: "banner-5", alt: "Творчество и идеи: камера и вдохновение." },
+      { src: "banner-6", alt: "Ученический совет: команда волонтёров." }
     ];
-    banners.forEach(({ src, alt }) => {
-      html.push(`<div class="hero-slide hero-img"><picture><source srcset="${src}.webp" type="image/webp"><img src="${src}.jpg" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></picture></div>`);
+    banners.forEach(({ src, alt }, index) => {
+      html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
