@@ -13,6 +13,9 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   const repo = createYdbListingsRepository(sql);
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true, 'Тест', 'Ученик', '8А', 'Казань');`;
+  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
+    ('https://issuer.synthetic', 'subject-2', '11111111-1111-4111-8111-111111111111', 'synthetic-school', 'student', true),
+    ('https://issuer.synthetic', 'subject-3', '22222222-2222-4222-8222-222222222222', 'other-school', 'student', true);`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
@@ -47,7 +50,13 @@ try {
   assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
   assert.equal(ideaRows[0][0].ai_status, 'pending');
   assert.equal(ideaRows[0][0].admin_status, 'new');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, pending isolation, approved listing projection, favorites, pending idea and read on disposable local database');
+  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', body: 'Синтетическое одобренное сообщение' });
+  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
+  assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(messageRows[0][0].school_id, 'synthetic-school');
+  assert.equal(messageRows[0][0].is_read, false);
+  await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, listings, favorites, pending idea and same-school approved message on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

@@ -57,10 +57,14 @@ test('isolated server routes favorite API requests to the authenticated backend'
     const idea = await fetch(new URL('/api/v1/ideas', origin), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'synthetic' }) });
     assert.equal(idea.status, 200);
     assert.deepEqual(await idea.json(), { ok: true, favorited: false });
+    const message = await fetch(new URL('/api/v1/messages', origin), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'synthetic' }) });
+    assert.equal(message.status, 200);
+    assert.deepEqual(await message.json(), { ok: true, favorited: false });
   });
   assert.deepEqual(routed, [
     { method: 'PUT', url: `/api/v1/listings/11111111-1111-4111-8111-111111111111/favorite` },
     { method: 'GET', url: '/api/v1/favorites' },
     { method: 'POST', url: '/api/v1/ideas' },
+    { method: 'POST', url: '/api/v1/messages' },
   ]);
 });

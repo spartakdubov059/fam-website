@@ -36,6 +36,27 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async createMessage(record) {
+      if (!record || !record.sender_id || !record.receiver_id || !record.school_id
+          || typeof record.body !== 'string' || !record.body.trim() || record.body.length > 1000
+          || record.sender_id === record.receiver_id) throw new TypeError('invalid message');
+      const recipient = sql`SELECT user_id AS user_id FROM fam_user_profiles
+        WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
+      if (typeof recipient?.on === 'function') recipient.on('error', () => {});
+      const recipients = await recipient;
+      if (!(recipients?.[0] ?? []).length) {
+        const error = new Error('recipient unavailable');
+        error.code = 'recipient_unavailable';
+        throw error;
+      }
+      const id = randomUUID();
+      const statement = sql`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, body, is_read, created_at)
+        VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.body}, false, CurrentUtcTimestamp());`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      await statement;
+      return { id };
+    },
+
     async listFavoriteIds(userId) {
       if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
       const statement = sql`SELECT f.listing_id AS listing_id FROM fam_favorites AS f

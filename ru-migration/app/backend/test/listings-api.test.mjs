@@ -96,3 +96,31 @@ test('idea submission is authenticated and bound to the database profile', async
   assert.equal(saved.school_id, 'synthetic-school');
   assert.equal(saved.admin_status, 'new');
 });
+
+test('message API fails closed when moderation is unavailable', async () => {
+  let writes = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', role: 'student' }),
+    repository: { createMessage: async () => { writes++; return { id: 'unexpected' }; } } });
+  const request = req({ receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'Привет' });
+  request.url = '/api/v1/messages';
+  const response = await handler(request);
+  assert.equal(response.status, 503);
+  assert.equal(response.body.status, 'pending');
+  assert.equal(writes, 0);
+});
+
+test('message API uses the verified sender profile after an explicit approval', async () => {
+  let saved;
+  const senderId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-sender' }),
+    resolveActor: async () => ({ id: senderId, school_id: 'school-a', role: 'student' }),
+    review: async () => ({ action: 'ok' }),
+    repository: { createMessage: async record => { saved = record; return { id: 'synthetic-message' }; } } });
+  const request = req({ sender_id: 'forged-sender', receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'Привет' });
+  request.url = '/api/v1/messages';
+  const response = await handler(request);
+  assert.equal(response.status, 201);
+  assert.equal(saved.sender_id, senderId);
+  assert.equal(saved.school_id, 'school-a');
+});

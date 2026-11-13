@@ -1,0 +1,12 @@
+-- Message bodies are stored only after moderation approves them.
+-- Client access is mediated by authenticated server endpoints.
+CREATE TABLE fam_messages (
+  id Utf8 NOT NULL,
+  sender_id Utf8 NOT NULL,
+  receiver_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  body Utf8 NOT NULL,
+  is_read Bool NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (id)
+);

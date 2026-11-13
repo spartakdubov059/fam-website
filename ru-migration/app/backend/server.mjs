@@ -48,6 +48,7 @@ export function createServer({ listingsApi = null } = {}) {
   }
   if ((((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings')
       || (req.method === 'POST' && url.pathname === '/api/v1/ideas')
+      || (req.method === 'POST' && url.pathname === '/api/v1/messages')
       || (req.method === 'GET' && ['/api/v1/me', '/api/v1/favorites'].includes(url.pathname))
       || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/favorite$/i.test(url.pathname) && ['PUT', 'DELETE'].includes(req.method)))) {
     if (!listingsApi) return sendJson(res, 503, { ok: false, error: 'backend_not_configured' });

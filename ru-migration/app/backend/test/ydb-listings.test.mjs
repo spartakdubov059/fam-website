@@ -32,3 +32,28 @@ test('favorite repository binds user and listing ids and refuses to favorite a m
   assert.ok(calls[1].values.includes('synthetic-user'));
   assert.ok(calls[1].values.includes('listing-1'));
 });
+
+test('message repository verifies same-school active recipient before inserting bound content', async () => {
+  const calls = [];
+  const sql = (strings, ...values) => {
+    const query = { text: strings.join('?'), values };
+    calls.push(query);
+    if (query.text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
+    return Promise.resolve([[]]);
+  };
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-id', body: 'Привет' });
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  assert.ok(calls[0].values.includes('school-id'));
+  assert.ok(calls[0].values.includes('recipient-id'));
+  assert.ok(calls[1].values.includes('Привет'));
+
+  let inserts = 0;
+  const absent = createYdbListingsRepository((strings) => {
+    if (strings.join('').includes('FROM fam_user_profiles')) return Promise.resolve([[]]);
+    inserts++;
+    return Promise.resolve([[]]);
+  });
+  await assert.rejects(absent.createMessage({ sender_id: 'sender-id', receiver_id: 'outside-school', school_id: 'school-id', body: 'Привет' }), error => error.code === 'recipient_unavailable');
+  assert.equal(inserts, 0);
+});
