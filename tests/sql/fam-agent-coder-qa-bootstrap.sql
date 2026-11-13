@@ -3,6 +3,10 @@ create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin;
 create schema private;
+create schema cron;
+create function cron.schedule(text,text,text) returns bigint
+language sql
+as $$ select 1::bigint $$;
 
 create table private.fam_agent_tasks (
   id uuid primary key default gen_random_uuid(),
