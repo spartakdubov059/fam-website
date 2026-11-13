@@ -9,26 +9,19 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 30,
+      "passed": 39,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow on commit 2fe94564fb4e69e21b233aa0780076f200545208; includes authenticated profile endpoint and HTTP fail-closed tests"
+      "source": "GitHub Actions SDK compatibility workflow run 43440979712 on commit 36dad1af84608c0fd7e5e45b0b5f927d4a94f1f3; includes OIDC/profile, listing, favorite, idea, HTTP routing, privacy and media unit tests"
     },
     "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend unit tests; historical 220-test archive unavailable"
+    "reproduction": "PASS — current backend unit tests (39/39) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
   "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
   "production": "UNCHANGED",
-  "critical_file_sha256": {
-    "backend/package.json": "d76ef3a9b608e6b3ae5cd65b074413656f00bae824b9dda9a3c0d41bac1f58e4",
-    "backend/src/ydb-listings-repository.mjs": "e18e68b81973dd375aafd8e6facb9232828394b2e52dc02ec49b434a8e8822eb",
-    "backend/src/ydb-image-moderation-repository.mjs": "dcf07de10618f63c58ba38b99797eda00d72d73935b8e3d6b07ac035cd1bf725",
-    "backend/functions/listings/index.mjs": "057802cb52c74d75406a0fae148def3a72066c9e119c0df9e1ad9f667cb8a968",
-    "schema/01_tables.yql": "9401e6db90927cf62875f6e06dbc2e7c96063337947f52d94ab587eaa6ac97b7"
-  },
   "release_blockers": [
     "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
-    "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs not ported",
+    "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs are not fully ported",
     "Cloud YDB, object storage, auth and moderation integrations not tested; only disposable local YDB integration passed",
     "No free-only school-controlled cloud staging has been provisioned or budget-verified",
     "Actual auth, moderation, account-migration and safe access policy/legal review before real students join"
@@ -42,14 +35,14 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43437942918,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43437942918",
-    "ydb_run_id": 43437942949,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43437942949",
+    "sdk_run_id": 43440979712,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43440979712",
+    "ydb_run_id": 43440980069,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43440980069",
     "result": "success",
-    "tested_commit": "2fe94564fb4e69e21b233aa0780076f200545208"
+    "tested_commit": "36dad1af84608c0fd7e5e45b0b5f927d4a94f1f3"
   },
-  "local_ydb_integration": "PASS — disposable local YDB; synthetic profile with FAM display fields, OIDC subject lookup, pending/active listing visibility, safe public projection",
+  "local_ydb_integration": "PASS — disposable local YDB; synthetic profile lookup, pending listing invisibility, active public projection, favorite CRUD limited to active listings and pending idea storage",
   "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
   "pricing_evidence": [
     {
