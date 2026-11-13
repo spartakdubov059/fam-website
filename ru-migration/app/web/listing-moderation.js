@@ -32,15 +32,17 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-requests/review', options)
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, suspensions: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -55,11 +57,15 @@ export async function initializeListingModeration({ document = globalThis.docume
       const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
         && ['council_member', 'school_admin'].includes(request.requested_role)
         && ['pending', 'reviewing'].includes(request.status));
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0) {
+      const suspensions = suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions)
+        ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
+          && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
+          && typeof item.expires_at === 'string') : [];
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0) {
         status.textContent = 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}.`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}.`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -122,6 +128,14 @@ export async function initializeListingModeration({ document = globalThis.docume
           actions.append(actionButton(document, 'Отклонить', () => patch(path, { decision: 'reject' })));
         }
         card.append(actions); queue.append(card);
+      }
+      for (const suspension of suspensions) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', 'Временное ограничение аккаунта'));
+        card.append(node(document, 'p', '', `ID аккаунта: ${suspension.target_id}`));
+        card.append(node(document, 'p', '', `Причина: ${suspension.reason}`));
+        card.append(node(document, 'p', '', `Действует до: ${new Date(suspension.expires_at).toLocaleString('ru-RU')}`));
+        queue.append(card);
       }
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }

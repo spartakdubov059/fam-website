@@ -56,6 +56,24 @@ test('student profiles do not receive the school moderation queue', async () => 
   assert.equal(f.panel.hidden, true);
 });
 
+test('school admins see active suspensions returned by the same-school endpoint as text', async () => {
+  const f = fixture(); const calls = [];
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [{ target_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', target_role: 'student', reason: '<script>unsafe</script>', expires_at: '2099-01-01T00:00:00Z' }] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.ok(calls.some(call => call.url === '/api/v1/suspensions' && call.init.credentials === 'same-origin'));
+  const card = f.queue.children[0];
+  assert.equal(card.children[1].textContent, 'ID аккаунта: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  assert.equal(card.children[2].textContent, 'Причина: <script>unsafe</script>');
+  assert.equal(card.children[2].tagName, 'p');
+});
+
 test('staff can confirm or reject a pending event application using safe text rendering', async () => {
   const f = fixture();
   const eventId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
