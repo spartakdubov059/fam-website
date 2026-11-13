@@ -49,5 +49,16 @@
     "result": "success",
     "tested_commit": "005c3dc89ef8dc88b962c7963e246ccf235177a1"
   },
-  "local_ydb_integration": "PASS — disposable local YDB in GitHub Actions; both schemas, synthetic user profile and listing insert/read; no cloud connection"
+  "local_ydb_integration": "PASS — disposable local YDB in GitHub Actions; both schemas, synthetic user profile and listing insert/read; no cloud connection",
+  "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
+  "pricing_evidence": [
+    {
+      "topic": "Free tier has usage limits and billable overages",
+      "url": "https://yandex.cloud/ru/docs/billing/concepts/serverless-free-tier"
+    },
+    {
+      "topic": "Budget threshold does not stop further consumption",
+      "url": "https://yandex.cloud/ru/docs/billing/concepts/budget"
+    }
+  ]
 }
