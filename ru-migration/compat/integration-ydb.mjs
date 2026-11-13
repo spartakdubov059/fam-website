@@ -28,7 +28,7 @@ try {
   const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
       : req.headers.authorization === 'Bearer synthetic-registrant' ? 'subject-2'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
-          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1';
+          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1' });
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
     resolveActor,
