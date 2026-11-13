@@ -245,7 +245,8 @@ begin
     'success_count', count(*) filter (
       where r.status_code = 200
         and r.content like '{"ok":true,"claimed":%'
-        and r.content like '% ,"completed":%'
+        and r.content like '%,"completed":%'
+        and r.content like '%,"blocked":%}'
     ),
     'http_error_count', count(*) filter (
       where r.status_code >= 400 and r.content in (
