@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6052)
-Total output lines: 260
-
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
@@ -111,7 +108,55 @@ try {
   assert.equal((await repo.listActiveListings()).length, 1, 'approved API submission becomes visible through public projection');
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
   const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
-    description: 'Учебник', category: 'Учёба', price_text: '…1052 tokens truncated…FROM fam_messages WHERE id = ${message.id};`;
+    description: 'Учебник', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
+    event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' });
+  const sets = await sql`SELECT id, user_id, school_id, title, status FROM fam_listings WHERE id = ${listing.id};`;
+  assert.equal(sets[0].length, 1);
+  assert.equal(sets[0][0].title, title);
+  assert.equal(sets[0][0].user_id, 'synthetic-user');
+  assert.equal(sets[0][0].school_id, 'synthetic-school');
+  assert.equal(sets[0][0].status, 'pending');
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
+  const beforeDirectModeration = await repo.listActiveListings();
+  assert.equal(beforeDirectModeration.length, 1, 'only the separately API-approved item is public');
+  assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
+  assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
+  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
+  const publicListings = await repo.listActiveListings();
+  assert.equal(publicListings.length, 2);
+  const publicDirectListing = publicListings.find(row => row.id === listing.id);
+  assert.ok(publicDirectListing);
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
+    'a same-school member can contact the owner of an active listing');
+  assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
+    'listing owners cannot open a self-conversation');
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'other-school'), null,
+    'listing contact lookup cannot cross school boundaries');
+  assert.equal(publicDirectListing.title, title);
+  assert.equal(Object.hasOwn(publicDirectListing, 'user_id'), false);
+  assert.equal(Object.hasOwn(publicDirectListing, 'school_id'), false);
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), true);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
+  const idea = await repo.createIdea({ user_id: 'synthetic-user', school_id: 'synthetic-school',
+    text: 'Синтетическая идея книжного обмена', ai_status: 'pending', ai_summary: 'Синтетическая идея',
+    ai_reason: 'review_unavailable', admin_status: 'new' });
+  const ideaRows = await sql`SELECT user_id, school_id, text, ai_status, admin_status FROM fam_ideas WHERE id = ${idea.id};`;
+  assert.equal(ideaRows[0][0].user_id, 'synthetic-user');
+  assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
+  assert.equal(ideaRows[0][0].ai_status, 'pending');
+  assert.equal(ideaRows[0][0].admin_status, 'new');
+  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', body: 'Синтетическое одобренное сообщение' });
+  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
+  assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(messageRows[0][0].school_id, 'synthetic-school');
+  assert.equal(messageRows[0][0].is_read, false);
+  assert.deepEqual((await repo.listMessages('synthetic-user', 'synthetic-school')).map(row => row.id), [message.id]);
+  assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);
+  assert.equal(await repo.markMessageRead('synthetic-user', 'synthetic-school', message.id), false, 'sender cannot mark the recipient inbox as read');
+  assert.equal(await repo.markMessageRead('11111111-1111-4111-8111-111111111111', 'synthetic-school', message.id), true);
+  const readRows = await sql`SELECT is_read FROM fam_messages WHERE id = ${message.id};`;
   assert.equal(readRows[0][0].is_read, true);
   await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
 
