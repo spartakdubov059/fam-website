@@ -56,12 +56,14 @@ export function shouldRunModel({ manualTask = "", bridgeConfigured = false, task
   return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
 }
 
-export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true) {
+export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true, prMetadataValid = false) {
   if (!executionSucceeded) return "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
-    return qaSucceeded === true && prSucceeded === true ? "model_completed" : "model_failed";
+    if (qaSucceeded !== true) return "model_failed";
+    if (prMetadataValid !== true) return "model_failed";
+    return prSucceeded === true ? "model_completed" : "model_review";
   }
   return "model_no_patch";
 }
@@ -128,7 +130,8 @@ async function main() {
       summary,
       process.env.FAM_MODEL_STEP_OUTCOME === "success",
       process.env.FAM_QA_OUTCOME === "success",
-      process.env.FAM_PR_MANAGER_OUTCOME === "success" && prMetadataValid,
+      process.env.FAM_PR_MANAGER_OUTCOME === "success",
+      prMetadataValid,
     );
     const result = await bridgeRequest({
       url,
@@ -137,8 +140,8 @@ async function main() {
         action: "finish",
         task_id: taskId,
         result_code: code,
-        pr_url: code === "model_completed" ? prUrl : null,
-        commit_sha: code === "model_completed" ? commitSha : null,
+        pr_url: ["model_completed", "model_review"].includes(code) ? prUrl : null,
+        commit_sha: ["model_completed", "model_review"].includes(code) ? commitSha : null,
       },
     });
     if (result?.ok !== true || result?.saved !== true) {
