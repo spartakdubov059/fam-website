@@ -74,4 +74,4 @@ insert into net._http_response (id,status_code,content,created) values
   (1,200,'{"ok":true,"claimed":1,"completed":1,"blocked":0}',now()-interval '5 minutes'),
   (2,500,'{"ok":false,"error":"worker_execution_failed"}',now()-interval '3 minutes'),
   (3,200,'{"ok":true,"claimed":1,"completed":1,"blocked":0}',now()-interval '7 hours'),
-  (4,200,'{"ok":true,"message":"unrelated response"}',now()-interval '2 minutes');
+  (4,400,'{"ok":false,"error":"unrelated_failure"}',now()-interval '2 minutes');
