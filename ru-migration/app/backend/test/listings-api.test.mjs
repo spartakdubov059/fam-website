@@ -34,3 +34,17 @@ test('public listing read fails closed when the database is unavailable', async 
   assert.equal(response.status, 503);
   assert.equal(response.body.error, 'database_unavailable');
 });
+
+test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'admin' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });
+  const request = req({}, 'GET'); request.url = '/api/v1/me';
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.profile, { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' });
+});
+test('profile endpoint rejects missing authentication', async () => {
+  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: {} });
+  const request = req({}, 'GET'); request.url = '/api/v1/me';
+  assert.equal((await handler(request)).status, 401);
+});
