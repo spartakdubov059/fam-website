@@ -13,8 +13,6 @@ create table private.fam_agent_tasks (
   status text not null,
   lease_expires_at timestamptz,
   result_summary text,
-  pr_url text,
-  commit_sha text,
   finished_at timestamptz,
   updated_at timestamptz not null default now()
 );
