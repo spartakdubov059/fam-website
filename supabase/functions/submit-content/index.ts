@@ -829,7 +829,7 @@ Deno.serve(async (req: Request) => {
       return respond({
         ok: true,
         status: moderation.action,
-        degraded: moderation.degraded === true,
+        degraded: photoUnavailable || moderation.degraded === true,
         diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
         reason: photoUnavailable ? "Идея отправлена без фото: фотографию не удалось проверить." : (moderation.reason ?? null),
