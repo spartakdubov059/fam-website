@@ -338,8 +338,7 @@
     .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); line-height: 1.4; }
     .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 700; text-decoration: underline; }
     .description-helper-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
-    .description-helper-caption { color: var(--muted); font-size: 10px; line-height: 1.4; }
-    .description-helper-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.035); }
+        .description-helper-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.035); }
     .description-helper-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
     .description-helper-head button { padding: 2px 4px; color: var(--muted); background: none; border: 0; font-size: 11px; }
     .description-helper-note { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.45; }
@@ -1304,14 +1303,13 @@
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
     <h2 id="listingTitle" style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
     <form id="listingForm">
-      <div id="aiHints" class="ai-hint">Начните вводить — FAM подскажет категорию по названию и описанию. Это локальная подсказка, без ИИ-запросов.</div>
+      <div id="aiHints" class="ai-hint hidden"></div>
       <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="80"></div>
       <div class="form-group">
         <label for="lDesc">Описание</label>
         <textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea>
         <div class="description-helper-actions">
           <button type="button" class="button button-secondary button-small" data-action="open-description-helper">✦ Улучшить описание</button>
-          <span class="description-helper-caption">Редактор работает в браузере: исправляет оформление и подсказывает, чего не хватает. Без внешних запросов и расхода ИИ-лимитов.</span>
         </div>
         <div id="descriptionHelperPanel" class="description-helper-panel hidden" role="region" aria-label="Помощник описания" aria-live="polite">
           <div class="description-helper-head">
@@ -1346,10 +1344,10 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM и сначала сохраняется в закрытом хранилище. До успешной проверки фотография не считается одобренной и не показывается. Если сервис проверки временно исчерпал квоту, объявление сохранится без фото, а FAM автоматически повторит проверку. Повторно отправлять объявление не нужно — статус фото будет виден в карточке.</p>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Не загружайте лица, документы, школьные пропуска и контактные данные. Фото появится после проверки.</p>
         <div id="uploadStatus"></div>
       </div>
-      <div class="form-group price-form-group"><label for="lPrice">Цена в рублях</label><input type="text" id="lPrice" class="form-control" inputmode="decimal" placeholder="Например, 1 500" maxlength="50" aria-describedby="pricePreview"><p id="pricePreview" class="price-preview">Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».</p></div>
+      <div class="form-group price-form-group"><label for="lPrice">Цена в рублях</label><input type="text" id="lPrice" class="form-control" inputmode="decimal" placeholder="Например, 1 500" maxlength="50" aria-describedby="pricePreview"><p id="pricePreview" class="price-preview"></p></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
   </div>
@@ -1654,7 +1652,10 @@ window.onunhandledrejection = function() {
     if (!categories.length) {
       hint.textContent = $("lTitle").value.trim() || $("lDesc").value.trim()
         ? "Пока не могу уверенно определить категорию. Проверьте название и выберите её вручную."
-        : "Начните вводить название и описание — FAM подскажет подходящую категорию.";
+        : "";
+    const hasListingText = Boolean($("lTitle").value.trim() || $("lDesc").value.trim());
+    hint.classList.toggle("hidden", !hasListingText);
+    if (!hasListingText) return;
       return;
     }
 
@@ -1836,7 +1837,7 @@ window.onunhandledrejection = function() {
     const rawPrice = $("lPrice").value.trim();
     $("pricePreview").textContent = rawPrice
       ? "На сайте будет отображаться: " + FAMPrice.formatListingPrice(rawPrice)
-      : "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
+      : "";
     renderDescriptionHelper();
   });
 
@@ -4665,9 +4666,10 @@ window.onunhandledrejection = function() {
 
       closeModal('listingModal');
       $("listingForm").reset();
-      $("pricePreview").textContent = "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
+      $("pricePreview").textContent = "";
       uploadStatus.innerHTML = '';
-      $("aiHints").textContent = "Начните вводить название и описание — FAM подскажет категорию.";
+      $("aiHints").textContent = "";
+      $("aiHints").classList.add("hidden");
       $("descriptionHelperPanel").classList.add("hidden");
 
       if (submission.status === "pending") {
