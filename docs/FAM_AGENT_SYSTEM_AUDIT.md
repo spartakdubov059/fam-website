@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 21212)
+Total output lines: 264
+
 # Аудит агентной системы FAM
 
 Снимок: 13 ноября 2026, 09:05 UTC. Проверены репозиторий, GitHub Actions и живой Supabase проект `tfacqpljrvfpcrhdovbu`. В production выполнялись только чтение миграций, агрегированных статусов очереди, расписаний, последних запусков и советников безопасности/производительности.
@@ -101,28 +104,7 @@
 ## Ограничение запуска CI на PR от workflow — подтверждено по коду и документации GitHub, 13 ноября 2026
 
 - `prepare_review` создаёт ветку и draft PR через `GITHUB_TOKEN`, затем до 15 минут ждёт обязательный check `Russian content safety tests`. В этой же ветке у coder-модели нет allowlist-пути для изменения `.github/workflows/**` или `scripts/verify-agent-pr-owner-approval.mjs`; отдельный security-тест теперь проверяет этот запрет.
-- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автоматическое создание PR само по себе не доказывает запуск required CI. Пока такой запуск не разрешён, менеджер не получает зелёную проверку; bridge сохраняет созданные URL/SHA со статусом `review`, не отмечая задачу завершённой и не создавая дубликат.
-- Синтетический Qwen run `43371755985` доказал генерацию patch и независимый regression QA на чистом fixture, но не создание PR. Полный cloud-путь очередь → модель → PR → required CI остаётся недоказанным.
-- Для полностью автоматического запуска CI нужен отдельный проверенный механизм: например, минимально разрешённый GitHub App installation token для создания PR либо доверенный dispatcher/check-run поток. Первый требует ручной настройки App secret; второй расширяет permission set Actions. В этом изменении ни secrets, ни workflow permissions не расширялись. До выбора и проверки одного из механизмов PR остаётся draft, а ручное разрешение workflow-запуска — отдельная человеческая операция.
-- Источник правила GitHub: [GITHUB_TOKEN и запуск workflow](https://docs.github.com/en/actions/concepts/security/github_token). Production, queue, secrets и правила доступа не менялись.
-
-
-## Подготовлен короткоживущий GitHub App token для agent PR — 13 ноября 2026, 14:02 UTC
-
-- В draft PR #65 `prepare_review` теперь может получить installation token только для текущего репозитория через официальный `actions/create-github-app-token` v3.2.0, pinned SHA. Запрашиваются только `contents:write`, `pull-requests:write` и `checks:read`; токен короткоживущий и action отзывает его после job.
-- При наличии repository variable `FAM_GITHUB_APP_CLIENT_ID` и secret `FAM_GITHUB_APP_PRIVATE_KEY` token используется для push/создания draft PR. По документации GitHub это устраняет approval-required запуск PR workflow для событий от `GITHUB_TOKEN`; owner approval gate перед merge остаётся в обязательной проверке.
-- Без App variable/secret сохраняется прежний `GITHUB_TOKEN` fallback, и отчёт PR теперь явно указывает, что workflow может потребовать ручного разрешения. Никакие App, variables или secrets не создавались; автоматический запуск CI через App token ещё не проверен. Рабочее состояние системы остаётся условным до установки бесплатного App и безопасной проверки реального draft PR.
-- Regression test проверяет pinned action, repository scope, точные permissions и token selection. На head `b9a305d85fbf117ad4f8c7411d3181fcc844f8ae` прошли Russian content safety [#43438644549](https://github.com/spartakdubov059/fam-website/actions/runs/43438644549), coder QA PostgreSQL [#43438644477](https://github.com/spartakdubov059/fam-website/actions/runs/43438644477), Reporter PostgreSQL [#43438644893](https://github.com/spartakdubov059/fam-website/actions/runs/43438644893). Secrets, workflow write permissions, ruleset, Supabase и production не менялись.
-
-
-## Подготовка к настройке GitHub App — 13 ноября 2026
-
-В draft PR #65 добавлено optional использование short-lived, repository-scoped GitHub App token для запуска PR checks без approval-required режима `GITHUB_TOKEN`. Подготовлена инструкция [FAM GitHub App setup](FAM_AGENT_GITHUB_APP_SETUP.md) с минимальными правами и безопасной проверкой. App, variable и private-key secret пока не создавались; production и GitHub ruleset не менялись.
-
-
-## Уточнение merge-capability агента и нативной защиты — 13 ноября 2026, 14:10 UTC
-
-- Повторно прочитан активный ruleset ID 27066766: он требует PR и check `Russian content safety tests`, но `required_approving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
+- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автом…1212 tokens truncated…pproving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
 - GitHub Merge Pull Request API требует `Contents:write`. Текущий PR Manager и подготовленный App token получают `contents:write` для push branch, значит технически имеют merge API capability. Запрет `gh pr merge` в workflow доказывает только отсутствие этой команды в текущем коде, не серверную невозможность merge.
 - Owner approval required check блокирует coder PR, пока проверенный workflow исполняется из trusted base, но нативный ruleset не требует review; изменение gate workflow вне patch allowlist может ослабить check. Безопасное завершение требует нативно установить как минимум одно approving review, stale-review dismissal и отсутствие bypass. Владелец затем разрешил рационально усилить ruleset, однако доступный GitHub connector поддерживает только чтение rulesets и не предоставляет операцию изменения; App setup инструкция исправлена и предписывает не настраивать App до включения native review.
 - Merge API permission and required-review rule documentation: [GitHub Merge a pull request](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request), [available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
@@ -250,3 +232,15 @@
 - Патч-валидатор запрещает agent coder менять `.github/**` и `supabase/**`; tests также покрывают запрет этих путей. Поэтому coder не может ослабить требуемый status check или изменить production migrations через разрешённый patch.
 - Если PR #65 будет принят, требуемый ruleset status context будет серверно блокировать merge coder PR на `codex/fam-run-*` без одобрения. Сейчас это gate ещё не действует в main. PR Manager имеет write API permissions для создания PR/ветки, но правила ruleset не разрешают bypass; в самом workflow нет переходов ready/merge. Намеренный отрицательный вызов merge API не выполнялся, так как при ошибочной конфигурации он мог бы реально объединить PR.
 - Нативное требование review count остаётся 0 для остальных PR. Глобальное требование одного review затрагивает все PR и блокирует PR, созданные владельцем, от самоподтверждения; управление ruleset недоступно через подключённый GitHub интерфейс и локальные Git credentials отсутствуют. Здесь сохраняется ручное решение владельца для обычных PR.
+
+
+## Повторная hosted-проверка cooldown и live-снимок — 14 ноября 2026, около 00:27 МСК
+
+- В PR #65 добавлен семидневный cooldown producer по сигнатуре `task_key + event_code + page_area`; advisory transaction lock закрывает гонку одновременных producer запусков. PostgreSQL 17 сценарий проверяет первое создание задачи, блокировку повтора и повторное создание после истечения 7 дней.
+- Первые два hosted прогона выявили ошибки тестового fixture: отсутствовала заглушка `cron.schedule`, затем тест оставлял активные задачи для проверки producer. Fixture исправлен: он создаёт только локальную функцию-заглушку расписания и переводит предыдущие синтетические задачи в terminal state. Никакое реальное расписание не создаётся.
+- На PR head `c7c5e1d64b699713ecd1ddb86c52470e189425e5` успешно прошли moderation regression, Coder QA PostgreSQL integration и Reporter PostgreSQL integration: [Regression #43510676937](https://github.com/spartakdubov059/fam-website/actions/runs/43510676937), [Coder QA #43510676904](https://github.com/spartakdubov059/fam-website/actions/runs/43510676904), [Reporter #43510676919](https://github.com/spartakdubov059/fam-website/actions/runs/43510676919). PR #65 остаётся draft; эти проверки не применяют миграции к production.
+- Свежий production snapshot: Supabase `ACTIVE_HEALTHY`, PostgreSQL 17.11; 7 активных Edge Functions, включая `fam-agent-worker` v17 и `fam-agent-coder-bridge` v1. В Cron 8 активных записей; AI worker каждые 5 минут, site-error audit ежечасно, digest/report/system health ежедневно. Эти интервалы являются периодическим мониторингом, не непрерывным.
+- В live очереди `coder_patch_request` остаются 1 `completed` и 3 `failed`; `site_error_digest` — 79 completed, `daily_report_digest` — 4, `system_health_check` — 4, `queue_health_check` — 2. Читались только task type/status/count и расписания, без payload/описаний/секретов.
+- Production `finish_fam_agent_coder_task(uuid,text,text)` всё ещё содержит старую ветку, которая переводит `model_completed` в `completed` без подтверждённых QA/PR метаданных. В production ledger отсутствуют PR #65 QA completion/bounded retry и Reporter migrations. Полный облачный путь по-прежнему не включён и не доказан.
+- Повторно прочитан ruleset `FAM — защита main` (ID 27066766): он активен, требует PR и `Russian content safety tests`, запрещает удаление и force-push, bypass actors отсутствуют, но `required_approving_review_count=0`. Owner approval check из PR ещё не действует в main. Merge/deploy/production migration не выполнялись.
+- Локальный набор moderation/security на Node 24 имеет один существующий сбой совместимости теста `fam-agent-qa-rejection.test.mjs`: тест ищет старый TAP текст `# tests 1`, тогда как Node 24 выдаёт `ℹ tests 1`. На этом же head hosted Regression workflow прошёл полностью; SQL-регрессия отдельно прошла на hosted PostgreSQL 17.
