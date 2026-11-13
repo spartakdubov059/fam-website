@@ -68,16 +68,27 @@ jobs:
           node-version: "22"
 
       - name: Run pinned Lighthouse mobile audit
-        run: >-
-          npx --yes lighthouse@13.6.0
-          https://spartakdubov059.github.io/fam-website/
-          --form-factor=mobile
-          --throttling-method=simulate
-          --only-categories=performance
-          --output=json
-          --output-path="$RUNNER_TEMP/fam-lighthouse.json"
-          --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"
-          --quiet
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if npx --yes lighthouse@13.6.0 \
+              https://spartakdubov059.github.io/fam-website/ \
+              --form-factor=mobile \
+              --throttling-method=simulate \
+              --only-categories=performance \
+              --output=json \
+              --output-path="$RUNNER_TEMP/fam-lighthouse.json" \
+              --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu" \
+              --quiet; then
+              exit 0
+            fi
+            if [[ "$attempt" == "1" ]]; then
+              echo "::warning::Lighthouse could not launch Chrome; retrying once."
+              sleep 2
+            fi
+          done
+          exit 1
 
       - name: Publish normalized metrics and fail on poor lab thresholds
         run: node scripts/run-fam-lighthouse-report.mjs "$RUNNER_TEMP/fam-lighthouse.json"

@@ -270,6 +270,8 @@ test("mobile Lighthouse runs daily or on the isolated draft branch only", () => 
   assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
   assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
   assert.ok(mobileJob.includes("lighthouse@13.6.0"));
+  assert.ok(mobileJob.includes("for attempt in 1 2"));
+  assert.ok(mobileJob.includes("--headless=new --no-sandbox"));
   assert.ok(mobileJob.includes("permissions:\n      contents: read"));
   assert.equal(mobileJob.includes("github.event.schedule == '*/30 * * * *'"), false);
 });
