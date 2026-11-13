@@ -345,7 +345,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: read
-      actions: write
+      actions: read
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -425,21 +425,26 @@ jobs:
         run: |
           set -euo pipefail
           BRANCH_SHA="$(git rev-parse HEAD)"
-          gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
-          TEST_RUN_ID=""
-          for attempt in $(seq 1 60); do
-            TEST_RUN_ID="$(gh run list --workflow .github/workflows/moderation-regression.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,event --jq ".[] | select(.headSha == \"$BRANCH_SHA\" and .event == \"workflow_dispatch\") | .databaseId" | head -n 1)"
-            [[ -n "$TEST_RUN_ID" ]] && break
-            sleep 5
+          REQUIRED_CHECK="Russian content safety tests"
+          CHECK_CONCLUSION=""
+          for attempt in $(seq 1 90); do
+            CHECK_DATA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$BRANCH_SHA/check-runs?per_page=100")"
+            CHECK="$(jq -c --arg name "$REQUIRED_CHECK" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at // .created_at) | last // empty' <<< "$CHECK_DATA")"
+            if [[ -n "$CHECK" && "$CHECK" != "null" ]]; then
+              CHECK_STATUS="$(jq -r '.status // empty' <<< "$CHECK")"
+              CHECK_CONCLUSION="$(jq -r '.conclusion // empty' <<< "$CHECK")"
+              if [[ "$CHECK_STATUS" == "completed" ]]; then
+                if [[ "$CHECK_CONCLUSION" != "success" ]]; then
+                  echo "::error::Обязательная проверка PR не прошла: $CHECK_CONCLUSION"
+                  exit 1
+                fi
+                break
+              fi
+            fi
+            sleep 10
           done
-          if [[ -z "$TEST_RUN_ID" ]]; then
-            echo "::error::Не найден отдельный запуск регрессионных тестов для ветки агента."
-            exit 1
-          fi
-          gh run watch "$TEST_RUN_ID" --exit-status --interval 10
-          TEST_CONCLUSION="$(gh run view "$TEST_RUN_ID" --json conclusion --jq '.conclusion')"
-          if [[ "$TEST_CONCLUSION" != "success" ]]; then
-            echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
+          if [[ "$CHECK_CONCLUSION" != "success" ]]; then
+            echo "::error::Обязательная проверка PR не завершилась успешно за отведённое время."
             exit 1
           fi
           gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
