@@ -7,5 +7,10 @@ CREATE TABLE fam_user_profiles (
   school_id Utf8 NOT NULL,
   role Utf8 NOT NULL,
   active Bool NOT NULL,
+  first_name Utf8,
+  last_name Utf8,
+  class_name Utf8,
+  city Utf8,
+  avatar_url Utf8,
   PRIMARY KEY (issuer, subject)
 );
