@@ -14,7 +14,11 @@ export async function submitListing({ actor, input, repository, review }) {
   const title = input.title.trim();
   const description = input.description.trim();
   const price = input.price_text == null ? 'Бесплатно' : typeof input.price_text === 'string' ? input.price_text.trim() : null;
-  if (!title || title.length > 80 || !description || description.length > 1000 || price === null || price.length > 50 || input.image_url || input.imageUrl) {
+  const imageKey = typeof input.image_key === 'string' ? input.image_key : null;
+  const safeImageKey = imageKey && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(actor.id)
+    && new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(imageKey);
+  if (!title || title.length > 80 || !description || description.length > 1000 || price === null || price.length > 50
+      || input.image_url || input.imageUrl || (input.image_key != null && !safeImageKey)) {
     return { ok: false, code: 'invalid_listing' };
   }
   const isEvent = input.category === 'Мероприятия';
@@ -30,7 +34,7 @@ export async function submitListing({ actor, input, repository, review }) {
   // Unreviewed content is stored only as pending and remains invisible to public listing queries.
   if (!repository || typeof repository.createListing !== 'function') return { ok: false, code: 'database_unavailable' };
   try {
-    const listing = await repository.createListing({ user_id: actor.id, school_id: actor.school_id, title, description, category: input.category, price_text: price || 'Бесплатно', is_event: isEvent, event_date: eventDate, event_time: eventTime, event_type: eventType, max_seats: maxSeats, status: 'pending' });
+    const listing = await repository.createListing({ user_id: actor.id, school_id: actor.school_id, title, description, category: input.category, price_text: price || 'Бесплатно', is_event: isEvent, event_date: eventDate, event_time: eventTime, event_type: eventType, max_seats: maxSeats, image_key: imageKey, photo_status: imageKey ? 'pending' : 'none', status: 'pending' });
     if (!listing || typeof listing.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: 'pending', id: listing.id };
   } catch {

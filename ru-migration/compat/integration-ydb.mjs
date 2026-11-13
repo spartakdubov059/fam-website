@@ -133,7 +133,15 @@ try {
   const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
   assert.deepEqual(reviewResponse, { status: 200, body: { ok: true, status: 'rejected' } });
   assert.equal(await repo.getEventOccupancy(reviewEvent.id), 0, 'rejecting a pending request releases its reserved seat');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, listings, favorites, ideas, messages, event capacity/cancellation/review on disposable local database');
+  const photoListing = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое объявление с фото', description: 'Изображение остаётся закрытым до отдельного одобрения', category: 'Творчество',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp',
+    photo_status: 'pending', status: 'pending' });
+  assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', 'active'), false,
+    'listing with pending photo cannot become public');
+  assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
+    'pending photo listing remains absent from the public projection');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, listings, favorites, ideas, messages, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

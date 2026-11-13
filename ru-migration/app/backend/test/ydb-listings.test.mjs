@@ -6,11 +6,13 @@ test('listing insert binds user content as data and writes only pending status',
   const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; };
   const repo = createYdbListingsRepository(sql);
   const payload = "Книга'); DELETE FROM fam_listings; --";
-  const row = { user_id: 'u1', school_id: 's1', title: payload, description: 'text', category: 'Учёба', price_text: '100 ₽', is_event: false, event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' };
+  const row = { user_id: 'u1', school_id: 's1', title: payload, description: 'text', category: 'Учёба', price_text: '100 ₽', is_event: false, event_date: null, event_time: null, event_type: null, max_seats: 0, image_key: null, photo_status: 'none', status: 'pending' };
   const result = await repo.createListing(row);
   assert.match(result.id, /^[0-9a-f-]{36}$/);
   assert.equal(query.text.includes(payload), false);
   assert.ok(query.values.includes(payload));
+  assert.ok(query.values.includes(''));
+  assert.ok(query.values.includes('none'));
   await assert.rejects(repo.createListing({ ...row, status: 'active' }));
 });
 
@@ -95,15 +97,17 @@ test('listing moderation checks school and pending state in one transaction befo
   const operations = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); operations.push({ text, values });
-    return text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending' }]] : [[]];
+    return text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: '', photo_status: 'none' }]] : [[]];
   };
   const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
   const repo = createYdbListingsRepository(sql);
   assert.equal(await repo.moderateListing('listing-id', 'school-a', 'active'), true);
-  assert.match(operations[0].text, /SELECT school_id, status/);
+  assert.match(operations[0].text, /SELECT school_id, status, image_key, photo_status/);
   assert.match(operations[1].text, /SET status = \?/);
   assert.deepEqual(operations[1].values, ['active', 'listing-id']);
-  for (const row of [{ school_id: 'school-b', status: 'pending' }, { school_id: 'school-a', status: 'active' }, null]) {
+  const photoPending = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async (strings) => strings.join('').includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }]] : [[]]) }));
+  assert.equal(await photoPending.moderateListing('photo-listing', 'school-a', 'active'), false, 'photo listings stay pending before photo approval');
+  for (const row of [{ school_id: 'school-b', status: 'pending', image_key: '', photo_status: 'none' }, { school_id: 'school-a', status: 'active', image_key: '', photo_status: 'none' }, null]) {
     const blockedTx = async (strings) => strings.join('').includes('SELECT school_id') ? [[row].filter(Boolean)] : [[]];
     const blocked = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(blockedTx) }));
     assert.equal(await blocked.moderateListing('listing-id', 'school-a', 'rejected'), false);

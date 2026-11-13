@@ -11,10 +11,11 @@ export function createYdbListingsRepository(sql) {
       const id = randomUUID();
       const statement = sql`INSERT INTO fam_listings
         (id, user_id, school_id, title, description, category, price_text, is_event,
-         event_date, event_time, event_type, max_seats, status, created_at)
+         event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
         VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.title}, ${record.description},
           ${record.category}, ${record.price_text}, ${record.is_event}, ${record.event_date ?? ''},
           ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
+          ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
           ${record.status}, CurrentUtcTimestamp());`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
@@ -24,9 +25,10 @@ export function createYdbListingsRepository(sql) {
     async moderateListing(listingId, schoolId, decision) {
       if (!listingId || !schoolId || !['active', 'rejected'].includes(decision)) throw new TypeError('invalid listing decision');
       return sql.begin(async tx => {
-        const current = await tx`SELECT school_id, status FROM fam_listings WHERE id = ${listingId};`;
+        const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
         const row = current?.[0]?.[0];
         if (!row || row.school_id !== schoolId || row.status !== 'pending') return false;
+        if (decision === 'active' && row.image_key && row.photo_status !== 'approved') return false;
         await tx`UPDATE fam_listings SET status = ${decision} WHERE id = ${listingId};`;
         return true;
       });

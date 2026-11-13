@@ -21,6 +21,13 @@ test('uses authenticated actor identity and never marks a listing active', async
 });
 test('rejects image input and fails closed when storage fails', async () => {
   assert.equal((await submitListing({ actor, input: { ...input, image_url: 'https://example.com/x' }, review: approve })).code, 'invalid_listing');
+  assert.equal((await submitListing({ actor, input: { ...input, image_key: 'pending/someone-elses-photo.webp' }, review: approve })).code, 'invalid_listing');
+  const photoActor = { ...actor, id: '11111111-1111-4111-8111-111111111111' };
+  let photoRecord;
+  const photoInput = { ...input, image_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' };
+  await submitListing({ actor: photoActor, input: photoInput, review: approve, repository: { createListing: async value => { photoRecord = value; return { id: 'photo-listing' }; } } });
+  assert.equal(photoRecord.image_key, photoInput.image_key);
+  assert.equal(photoRecord.photo_status, 'pending');
   assert.equal((await submitListing({ actor, input, review: approve, repository: { createListing: async () => { throw Error('offline'); } } })).code, 'database_unavailable');
 });
 
