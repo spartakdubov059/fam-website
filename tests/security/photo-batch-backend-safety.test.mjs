@@ -1,0 +1,53 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+const root=resolve(dirname(fileURLToPath(import.meta.url)),"../..");
+const read=path=>readFileSync(resolve(root,path),"utf8");
+const admission=read("supabase/functions/fam-photo-batch/index.ts");
+const worker=read("supabase/functions/fam-photo-batch-worker/index.ts");
+const sql=read("docs/sql/photo-batch-cost-controls-DRAFT.sql");
+test("batch admission checks real Supabase Auth, owner, paths and bytes; never publishes media",()=>{
+ assert.match(admission,/auth\/v1\/user/);
+ assert.match(admission,/id=eq\.\"\+encodeURIComponent\(listingId\)/);
+ assert.match(admission,/validateSignedPhotoBatch\(URLs,user\.id,SUPABASE_URL\)/);
+ assert.match(admission,/inspectPhotoBatch\(files\)/);
+ assert.match(admission,/fam_enqueue_photo_batch/);
+ assert.doesNotMatch(admission,/uploadApprovedPhoto|listings-images\/\"\+|api\.openai\.com/);
+});
+test("worker uses free-only vision endpoint, no paid fallback, and rechecks trusted school roles",()=>{
+ assert.match(worker,/FAM_FREE_VISION_ENDPOINT/);
+ assert.match(worker,/FAM_FREE_VISION_VERIFIED/);
+ assert.match(worker,/fam_claim_free_photo_review_slot/);
+ assert.match(worker,/planBatchReview\(hashes,approved,/);
+ assert.match(worker,/buildModerationCollage\(unknown\)/);
+ assert.match(worker,/fam_finish_photo_batch/);
+ assert.match(worker,/fam_record_approved_photo_hashes/);
+ assert.match(worker,/refreshed\.school_id!==listing\.school_id/);
+ assert.match(worker,/fam_cached_approved_photo_hashes/);
+ assert.doesNotMatch(worker,/api\.openai\.com|gpt-5-mini|OPENAI_API_KEY|credit_card/);
+});
+test("draft database creates private queue with zero review calls enabled by default",()=>{
+ assert.match(sql,/daily_request_cap integer not null default 0/);
+ assert.match(sql,/free_provider_verified boolean not null default false/);
+ assert.match(sql,/where singleton = true and free_provider_verified = true/);
+ assert.match(sql,/on conflict \(review_day\)/);
+ assert.match(sql,/fam_photo_review_batches/);
+ assert.match(sql,/for update skip locked/);
+ assert.match(sql,/fam_finish_photo_batch/);
+ assert.match(sql,/fam_enqueue_photo_batch/);
+ assert.match(sql,/cardinality\(p_pending_paths\)/);
+ assert.match(sql,/approved_via in \('ai_review', 'human_review'\)/);
+ assert.match(sql,/policy_version = p_policy_version/);
+ assert.match(sql,/approved_at > now\(\) - interval '30 days'/);
+});
+test("clients cannot grant photo approval or read temporary paths from the new gallery table",()=>{
+ assert.match(sql,/alter table public\.listing_photos enable row level security/);
+ assert.match(sql,/grant select \(id, listing_id, position, review_status, public_url, created_at\)/);
+ assert.match(sql,/revoke all on public\.listing_photos from public, anon, authenticated/);
+ assert.match(sql,/public_only_after_approval/);
+ assert.match(sql,/revoke all on function public\.fam_claim_free_photo_review_slot\(\)/);
+ assert.match(sql,/to service_role/);
+ assert.doesNotMatch(sql,/grant (insert|update|delete) on public\.listing_photos to authenticated/i);
+});

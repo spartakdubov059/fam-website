@@ -1,0 +1,26 @@
+name: FAM photo batch collage runtime smoke test
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/functions/photo-batch-*'
+      - 'supabase/functions/fam-photo-batch/**'
+      - 'supabase/functions/fam-photo-batch-worker/**'
+      - 'tests/ui/photo-collage-runtime.test.ts'
+      - '.github/workflows/photo-batch-collage.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  collage-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check both protected batch Edge Functions
+        run: deno check supabase/functions/fam-photo-batch/index.ts supabase/functions/fam-photo-batch-worker/index.ts
+      - name: Run real 5-photo collage and file-format tests
+        run: deno test tests/ui/photo-collage-runtime.test.ts

@@ -1,0 +1,42 @@
+name: FAM photo batch SQL queue dry run
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docs/sql/photo-batch-cost-controls-DRAFT.sql'
+      - 'tests/sql/photo-batch-*'
+      - '.github/workflows/photo-batch-sql.yml'
+permissions:
+  contents: read
+jobs:
+  photo-batch-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: fam_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fam_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: fam_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Create isolated Supabase-compatible stub
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/photo-batch-bootstrap.sql
+      - name: Apply proposed schema to disposable DB only
+        run: psql -v ON_ERROR_STOP=1 -f docs/sql/photo-batch-cost-controls-DRAFT.sql
+      - name: Test quota, RLS, admission and hidden photos
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/photo-batch-assert.sql
