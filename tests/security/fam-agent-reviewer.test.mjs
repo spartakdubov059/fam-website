@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { buildIndependentReview, renderIndependentReview } from "../../scripts/fam-agent-reviewer.mjs";
 import { validateAgentPatch } from "../../scripts/validate-local-agent-patch.mjs";
 
@@ -59,4 +63,46 @@ test("reviewer rejects a patch without evidence", () => {
   });
   assert.equal(report.conclusion, "reject");
   assert.equal(report.checks.evidence_backed_finding, false);
+});
+
+test("CLI writes a review artifact and rejects a failed QA outcome", () => {
+  const directory = mkdtempSync(join(tmpdir(), "fam-agent-reviewer-"));
+  try {
+    const patchPath = join(directory, "patch.diff");
+    const summaryPath = join(directory, "summary.json");
+    const safetyPath = join(directory, "safety.json");
+    const basePath = join(directory, "base.sha");
+    const outputDir = join(directory, "review-output");
+    const reportPath = join(outputDir, "review.json");
+    const markdownPath = join(outputDir, "review.md");
+    const baseSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    writeFileSync(patchPath, patch);
+    writeFileSync(summaryPath, JSON.stringify(summary));
+    writeFileSync(safetyPath, JSON.stringify(safety));
+    writeFileSync(basePath, baseSha);
+
+    const cliPath = join(process.cwd(), "scripts/fam-agent-reviewer.mjs");
+    const passed = spawnSync(process.execPath, [
+      cliPath, patchPath, summaryPath, safetyPath, basePath, reportPath, markdownPath,
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, FAM_QA_STATUS: "passed" },
+    });
+    assert.equal(passed.status, 0, passed.stderr);
+    assert.equal(JSON.parse(readFileSync(reportPath, "utf8")).conclusion, "pass_for_draft_pr");
+    assert.match(readFileSync(markdownPath, "utf8"), /независимый статический Reviewer/);
+
+    const rejected = spawnSync(process.execPath, [
+      cliPath, patchPath, summaryPath, safetyPath, basePath, reportPath, markdownPath,
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, FAM_QA_STATUS: "failed" },
+    });
+    assert.equal(rejected.status, 1);
+    assert.equal(JSON.parse(readFileSync(reportPath, "utf8")).conclusion, "reject");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
