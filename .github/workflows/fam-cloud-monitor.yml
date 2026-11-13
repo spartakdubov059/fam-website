@@ -11,7 +11,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: fam-cloud-site-monitor-main
+  group: fam-cloud-site-monitor-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
