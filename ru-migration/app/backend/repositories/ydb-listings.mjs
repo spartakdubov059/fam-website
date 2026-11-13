@@ -16,10 +16,33 @@ export function createYdbListingsRepository(sql) {
           ${record.category}, ${record.price_text}, ${record.is_event}, ${record.event_date ?? ''},
           ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
           ${record.status}, CurrentUtcTimestamp());`;
-      // Query is both thenable and EventEmitter; errors still propagate via await.
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return { id };
+    },
+
+    async listActiveListings() {
+      const statement = sql`SELECT id, title, description, category, price_text, is_event,
+        event_date, event_time, event_type, max_seats, created_at
+        FROM fam_listings
+        WHERE status = 'active'
+        ORDER BY created_at DESC
+        LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const resultSets = await statement;
+      return (resultSets?.[0] ?? []).map(row => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        price_text: row.price_text,
+        is_event: row.is_event,
+        event_date: row.event_date || null,
+        event_time: row.event_time || null,
+        event_type: row.event_type || null,
+        max_seats: row.max_seats,
+        created_at: row.created_at,
+      }));
     },
   };
 }
