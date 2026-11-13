@@ -19,6 +19,7 @@ const snapshot = {
   latest_system_health: { status: "completed", updated_at: "2026-11-13T03:40:00Z" },
   latest_coder_task: { status: "failed", updated_at: "2026-11-13T03:15:00Z" },
   latest_site_error_check: { status: "completed", updated_at: "2026-11-13T05:30:00Z" },
+  worker_http_6h: { window_hours: 6, observed_from: "2026-11-13T00:00:00Z", response_count: 4, success_count: 3, http_error_count: 1, reported_error_count: 1 },
   failed_tasks_24h: [{ task_type: "coder_patch_request", count: 1 }],
   site_error_events_24h: [{ event_code: "js_runtime", page_area: "listings", occurrences: 4 }],
 };
@@ -111,13 +112,15 @@ test("daily report states missing sources and records only allowlisted Supabase 
   });
   assert.deepEqual(Object.keys(report.supabase).sort(), [
     "agent_statuses", "cron_jobs", "daily_report", "failed_tasks_24h", "generated_at", "latest_coder_task",
-    "latest_site_error_check", "latest_system_health", "report_date", "site_error_events_24h",
+    "latest_site_error_check", "latest_system_health", "report_date", "site_error_events_24h", "worker_http_6h",
   ]);
   assert.equal(report.workflows_24h.length, 2);
   assert.ok(report.role_statuses.some((role) => role.role === "QA" && role.status === "patch:success;regression:success"));
   assert.ok(report.role_statuses.some((role) => role.role === "Security Agent" && role.status === "success"));
   assert.equal(report.open_pull_requests[0].number, 8);
   assert.ok(report.role_statuses.some((role) => role.role === "Analyst" && role.status === "hypotheses_available"));
+  assert.ok(report.role_statuses.some((role) => role.role === "Monitoring" && /worker_http:3\/4_success;http_errors:1/.test(role.status)));
+  assert.deepEqual(report.supabase.worker_http_6h, snapshot.worker_http_6h);
   assert.ok(report.role_statuses.some((role) => role.role === "Performance Agent" && role.status === "failure"));
   assert.equal(JSON.stringify(report).includes("not included"), false);
   const markdown = renderDailyReport(report);
@@ -128,6 +131,8 @@ test("daily report states missing sources and records only allowlisted Supabase 
   assert.match(markdown, /Аналитические гипотезы по техническим сигналам/);
   assert.match(markdown, /без stack trace/);
   assert.match(markdown, /Публичный сайт: reachable \(HTTP 200\)/);
+  assert.match(markdown, /Ответы Edge Worker по pg_net \(окно до 6 ч\): 3\/4 успешных распознанных ответов; HTTP-ошибок: 1; ошибок, сообщённых Worker: 1/);
+  assert.match(markdown, /Самый ранний сохранённый ответ: 2026-11-13T00:00:00Z/);
   assert.match(markdown, /Проверка сайта выполняется один раз в сутки/);
 });
 
@@ -162,4 +167,6 @@ test("Reporter output fields match the Edge bridge and SQL persistence allowlist
   assert.match(declaration, /"role_statuses"/);
   assert.match(declaration, /"technical_analysis"/);
   assert.match(reportMigration, /'open_pull_requests','role_statuses','technical_analysis','production_deployment'/);
+  assert.match(reportMigration, /from net\._http_response as r/);
+  assert.match(reportMigration, /'reported_error_count'/);
 });
