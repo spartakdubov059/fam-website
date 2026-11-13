@@ -330,8 +330,8 @@ jobs:
 
 
   finish_task:
-    name: Зафиксировать результат coder после независимого QA
-    needs: [generate, verify]
+    name: Зафиксировать результат coder после QA и PR
+    needs: [generate, verify, prepare_review]
     if: always() && needs.generate.outputs.task_claimed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -352,13 +352,19 @@ jobs:
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.task_id }}
           FAM_MODEL_STEP_OUTCOME: ${{ needs.generate.outputs.model_outcome }}
           FAM_QA_OUTCOME: ${{ needs.verify.result }}
+          FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}
+          FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}
+          FAM_AGENT_COMMIT_SHA: ${{ needs.prepare_review.outputs.commit_sha }}
           FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
         run: node scripts/fam-agent-bridge.mjs finish
 
   prepare_review:
     name: Подготовить PR и проверить исправление без публикации
-    needs: [generate, verify, finish_task]
-    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && (needs.finish_task.result == 'success' || needs.generate.outputs.task_claimed != 'true')
+    needs: [generate, verify]
+    outputs:
+      pr_url: ${{ steps.pr.outputs.pr_url }}
+      commit_sha: ${{ steps.pr.outputs.commit_sha }}
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -430,6 +436,7 @@ jobs:
           PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
           echo "requires_approval=true" >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
         env:
