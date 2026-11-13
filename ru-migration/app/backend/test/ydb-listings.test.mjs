@@ -17,6 +17,49 @@ test('active suspension lookup is bounded to the actor school and ignores expire
   assert.doesNotMatch(query.text, /SELECT \*/);
   await assert.rejects(repo.getActiveAccountSuspension('', 'student-a'), TypeError);
 });
+test('school role request submission is bound to the database student profile and prevents duplicates', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'student-id', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT request_id, status FROM fam_school_role_requests')) return [[]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.createSchoolRoleRequest({ issuer: 'https://issuer.test', subject: 'student-sub', requested_role: 'school_admin' });
+  assert.equal(result.ok, true); assert.equal(result.status, 'pending');
+  const upsert = calls.find(call => call.text.includes('UPSERT INTO fam_school_role_requests'));
+  assert.ok(upsert.values.includes('student-id'));
+  assert.ok(upsert.values.includes('school-a'));
+  assert.ok(upsert.values.includes('school_admin'));
+  assert.equal(upsert.text.includes('https://issuer.test'), false);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_school_role_request_audit')));
+  await assert.rejects(repo.createSchoolRoleRequest({ issuer: 'x', subject: 'y', requested_role: 'owner' }), TypeError);
+});
+
+test('school role approval requires same-school review ownership and promotes only the applicant profile', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT issuer, subject, user_id, school_id, requested_role, status, review_started_by')) return [[{ issuer: 'https://issuer.test', subject: 'student-sub', user_id: 'student-id', school_id: 'school-a', requested_role: 'council_member', status: 'reviewing', review_started_by: 'admin-id' }]];
+    if (text.includes('SELECT user_id, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'student-id', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT status FROM fam_school_role_requests')) return [[{ status: 'approved' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.reviewSchoolRoleRequest('request-id', 'school-a', 'admin-id', 'approve', 'Проверено'), true);
+  const promote = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET role'));
+  assert.ok(promote.values.includes('council_member'));
+  assert.ok(promote.values.includes('student-id'));
+  assert.ok(promote.values.includes('school-a'));
+  assert.match(promote.text, /role = 'student' AND active = true/);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_school_role_request_audit')));
+  assert.equal(await repo.reviewSchoolRoleRequest('request-id', 'school-b', 'admin-id', 'approve'), false);
+  await assert.rejects(repo.reviewSchoolRoleRequest('id', 'school-a', 'admin-id', 'school_admin'), TypeError);
+});
 test('listing insert binds user content as data and writes only pending status', async () => {
   let query;
   const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; };

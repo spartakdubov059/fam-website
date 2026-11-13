@@ -33,6 +33,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     authenticatedProfile = true;
     form.hidden = false;
     status.textContent = 'Объявление и фото будут отправлены на проверку вашей школы.';
+    if (result.profile.role === 'student') await createSchoolRoleRequestForm(document, form, fetchImpl);
     ideaForm = createIdeaForm(document, form);
     if (login) login.hidden = true;
     if (logout) logout.hidden = false;
@@ -116,6 +117,52 @@ export async function initializeListingSubmission({ document = globalThis.docume
       } else status.textContent = 'Не удалось отправить объявление. Проверьте подключение и попробуйте снова.';
     } finally { if (submit) submit.disabled = false; }
   });
+}
+
+async function createSchoolRoleRequestForm(document, listingForm, fetchImpl) {
+  const shell = listingForm.parentElement;
+  if (!shell || typeof document.createElement !== 'function') return;
+  const section = document.createElement('section'); section.className = 'ru-moderation';
+  section.setAttribute('aria-label', 'Заявка на роль школьного Совета');
+  const heading = document.createElement('h2'); heading.textContent = 'Роль школьного Совета';
+  const note = document.createElement('p'); note.className = 'ru-note';
+  note.textContent = 'Заявку рассмотрит администратор вашей школы. Роль назначается только сервером после решения школы.';
+  const form = document.createElement('form'); form.className = 'ru-listing-form';
+  const label = document.createElement('label'); label.textContent = 'Что вы хотите запросить?';
+  const select = document.createElement('select'); select.name = 'requested_role'; select.required = true;
+  for (const [value, text] of [['Участник Ученического совета', 'Вступить в Ученический совет'], ['Администратор', 'Получить полномочия администратора']]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option);
+  }
+  label.append(select); const button = document.createElement('button'); button.type = 'submit'; button.className = 'ru-button'; button.textContent = 'Отправить заявку';
+  form.append(label, button); section.append(heading, note, form); shell.append(section);
+  async function refresh() {
+    try {
+      const response = await fetchImpl('/api/v1/role-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok) throw new Error('role_request_status_unavailable');
+      const request = result.request;
+      if (request && ['pending', 'reviewing'].includes(request.status)) {
+        note.textContent = request.status === 'reviewing' ? 'Администратор школы уже рассматривает вашу заявку.' : 'Заявка отправлена и ожидает решения администратора школы.';
+        form.hidden = true;
+      } else if (request?.status === 'approved') {
+        note.textContent = 'Школа одобрила запрос. Обновите страницу, чтобы увидеть новые возможности.'; form.hidden = true;
+      } else if (request?.status === 'rejected') {
+        note.textContent = 'Предыдущий запрос отклонён. При необходимости можно подать заявку ещё раз.'; form.hidden = false;
+      }
+    } catch { note.textContent = 'Не удалось загрузить статус заявки. Повторите попытку позже.'; form.hidden = true; }
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); button.disabled = true; note.textContent = 'Отправляем заявку…';
+    try {
+      const response = await fetchImpl('/api/v1/role-requests', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ requested_role: select.value }) });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok) throw new Error('role_request_failed');
+      await refresh();
+    } catch { note.textContent = 'Не удалось отправить заявку. Попробуйте позже.'; }
+    finally { button.disabled = false; }
+  });
+  await refresh();
 }
 
 function createIdeaForm(document, listingForm) {

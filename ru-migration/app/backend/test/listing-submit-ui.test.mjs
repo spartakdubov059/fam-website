@@ -103,6 +103,27 @@ test('authenticated students can submit a school idea through the moderated Russ
   assert.match(ideaForm.children[1].textContent, /ждёт проверки безопасности/);
 });
 
+test('student role request UI refreshes status and never sends a browser-selected school or identity', async () => {
+  const f = fixture(null); const calls = []; let submitted = false;
+  await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-id', role: 'student' } }) };
+    if (url === '/api/v1/role-requests' && init.method === 'POST') { submitted = true; return { ok: true, status: 202, json: async () => ({ ok: true, status: 'pending' }) }; }
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, request: submitted ? { status: 'pending' } : null }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren.find(item => item['aria-label'] === 'Заявка на роль школьного Совета');
+  assert.ok(section);
+  const form = section.children[2];
+  const select = form.children[0].children[0]; select.value = 'Участник Ученического совета';
+  await form.listeners.submit({ preventDefault() {} });
+  const submittedCall = calls.find(call => call.url === '/api/v1/role-requests' && call.init.method === 'POST');
+  assert.deepEqual(JSON.parse(submittedCall.init.body), { requested_role: 'Участник Ученического совета' });
+  assert.equal(form.hidden, true);
+  assert.match(section.children[1].textContent, /ожидает решения/);
+});
+
 test('authenticated unprovisioned Yandex users can request a school profile without receiving a role', async () => {
   const f = fixture(null);
   const calls = [];

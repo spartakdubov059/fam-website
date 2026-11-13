@@ -15,6 +15,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const eventReviewMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
     const profileRequestMatch = pathname.match(/^\/api\/v1\/profile-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const roleRequestMatch = pathname.match(/^\/api\/v1\/role-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     if (req.method === 'GET' && pathname === '/api/v1/schools') {
       return { status: 200, body: { ok: true, schools: schools.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string').map(({ id, name }) => ({ id, name })) } };
     }
@@ -25,6 +26,60 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try {
         const request = await repository.getSchoolProfileRequest(identity.issuer, identity.subject);
         return { status: 200, body: { ok: true, request } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/role-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (typeof repository?.getSchoolRoleRequest !== 'function') return { status: 503, body: { ok: false, error: 'role_request_unavailable' } };
+      try { return { status: 200, body: { ok: true, request: await repository.getSchoolRoleRequest(identity.issuer, identity.subject) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/role-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student' || !actor.school_id) return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      const requested_role = input?.requested_role === 'Участник Ученического совета' ? 'council_member'
+        : input?.requested_role === 'Администратор' ? 'school_admin' : null;
+      if (!requested_role) return { status: 400, body: { ok: false, error: 'invalid_requested_role' } };
+      if (typeof repository?.createSchoolRoleRequest !== 'function') return { status: 503, body: { ok: false, error: 'role_request_unavailable' } };
+      try {
+        const result = await repository.createSchoolRoleRequest({ issuer: identity.issuer, subject: identity.subject, requested_role });
+        return result?.ok ? { status: result.already_exists ? 200 : 202, body: result }
+          : { status: result?.code === 'student_profile_required' ? 403 : 503, body: { ok: false, error: result?.code || 'database_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/role-requests/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listPendingSchoolRoleRequests !== 'function') return { status: 503, body: { ok: false, error: 'role_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolRoleRequests(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && roleRequestMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      try {
+        if (input?.action === 'start_review') {
+          const started = await repository.startSchoolRoleRequestReview(roleRequestMatch[1], actor.school_id, actor.id);
+          return started ? { status: 200, body: { ok: true, status: 'reviewing' } } : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
+        }
+        if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+        const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
+        const updated = await repository.reviewSchoolRoleRequest(roleRequestMatch[1], actor.school_id, actor.id, input.decision, note);
+        return updated ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {

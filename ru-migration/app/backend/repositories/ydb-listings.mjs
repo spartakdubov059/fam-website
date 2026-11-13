@@ -5,6 +5,92 @@ import { randomUUID } from 'node:crypto';
 export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
+    async createSchoolRoleRequest({ issuer, subject, requested_role }) {
+      if (!issuer || !subject || !['council_member', 'school_admin'].includes(requested_role)) throw new TypeError('invalid school role request');
+      const requestId = randomUUID();
+      return sql.begin(async tx => {
+        const profiles = await tx`SELECT user_id, school_id, role, active FROM fam_user_profiles
+          WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const profile = profiles?.[0]?.[0];
+        if (!profile || !profile.active || profile.role !== 'student' || !profile.school_id) return { ok: false, code: 'student_profile_required' };
+        const requests = await tx`SELECT request_id, status FROM fam_school_role_requests
+          WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const prior = requests?.[0]?.[0];
+        if (prior && ['pending', 'reviewing'].includes(prior.status)) return { ok: true, status: prior.status, request_id: prior.request_id, already_exists: true };
+        await tx`UPSERT INTO fam_school_role_requests
+          (issuer, subject, request_id, user_id, school_id, requested_role, status, review_started_by, review_started_at, reviewed_by, reviewed_at, review_note, created_at)
+          VALUES (${issuer}, ${subject}, ${requestId}, ${profile.user_id}, ${profile.school_id}, ${requested_role}, 'pending', NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_school_role_request_audit
+          (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
+          VALUES (${randomUUID()}, ${requestId}, ${profile.school_id}, ${profile.user_id}, ${requested_role}, 'submitted', 'pending', CurrentUtcTimestamp());`;
+        return { ok: true, status: 'pending', request_id: requestId, already_exists: false };
+      });
+    },
+
+    async getSchoolRoleRequest(issuer, subject) {
+      if (!issuer || !subject) throw new TypeError('invalid role request identity');
+      const statement = sql`SELECT request_id, school_id, requested_role, status, created_at, review_started_at, reviewed_at, review_note
+        FROM fam_school_role_requests WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
+
+    async listPendingSchoolRoleRequests(schoolId) {
+      if (!schoolId) throw new TypeError('invalid role request school');
+      const statement = sql`SELECT request_id, requested_role, status, created_at, review_started_at, review_started_by
+        FROM fam_school_role_requests WHERE school_id = ${schoolId} AND status IN ('pending', 'reviewing')
+        ORDER BY created_at ASC LIMIT 50;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async startSchoolRoleRequestReview(requestId, schoolId, reviewerId) {
+      if (!requestId || !schoolId || !reviewerId) throw new TypeError('invalid role request review');
+      return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || !reviewer.active || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
+        const requestRows = await tx`SELECT issuer, subject, user_id, school_id, status FROM fam_school_role_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const request = requestRows?.[0]?.[0];
+        if (!request || request.school_id !== schoolId || request.user_id === reviewerId || request.status !== 'pending') return false;
+        await tx`UPDATE fam_school_role_requests SET status = 'reviewing', review_started_by = ${reviewerId}, review_started_at = CurrentUtcTimestamp()
+          WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId} AND status = 'pending';`;
+        await tx`INSERT INTO fam_school_role_request_audit
+          (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
+          SELECT ${randomUUID()}, request_id, school_id, ${reviewerId}, requested_role, 'review_started', 'reviewing', CurrentUtcTimestamp()
+          FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId};`;
+        const result = await tx`SELECT status, review_started_by FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
+        const row = result?.[0]?.[0];
+        return row?.status === 'reviewing' && row.review_started_by === reviewerId;
+      });
+    },
+
+    async reviewSchoolRoleRequest(requestId, schoolId, reviewerId, decision, note = '') {
+      if (!requestId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision) || typeof note !== 'string' || note.length > 240) throw new TypeError('invalid role request decision');
+      return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || !reviewer.active || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
+        const requestRows = await tx`SELECT issuer, subject, user_id, school_id, requested_role, status, review_started_by FROM fam_school_role_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const request = requestRows?.[0]?.[0];
+        if (!request || request.school_id !== schoolId || request.user_id === reviewerId || request.status !== 'reviewing' || request.review_started_by !== reviewerId) return false;
+        const applicantRows = await tx`SELECT user_id, school_id, role, active FROM fam_user_profiles WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
+        const applicant = applicantRows?.[0]?.[0];
+        if (!applicant || applicant.user_id !== request.user_id || applicant.school_id !== schoolId || !applicant.active || applicant.role !== 'student') return false;
+        const status = decision === 'approve' ? 'approved' : 'rejected';
+        if (decision === 'approve') await tx`UPDATE fam_user_profiles SET role = ${request.requested_role}
+          WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND user_id = ${request.user_id} AND school_id = ${schoolId} AND role = 'student' AND active = true;`;
+        await tx`UPDATE fam_school_role_requests SET status = ${status}, reviewed_by = ${reviewerId}, reviewed_at = CurrentUtcTimestamp(), review_note = ${note}
+          WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId} AND school_id = ${schoolId} AND status = 'reviewing' AND review_started_by = ${reviewerId};`;
+        await tx`INSERT INTO fam_school_role_request_audit
+          (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
+          SELECT ${randomUUID()}, request_id, school_id, ${reviewerId}, requested_role, ${decision}, ${status}, CurrentUtcTimestamp()
+          FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} AND request_id = ${requestId};`;
+        const confirmed = await tx`SELECT status FROM fam_school_role_requests WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
+        return confirmed?.[0]?.[0]?.status === status;
+      });
+    },
+
     async getActiveAccountSuspension(schoolId, userId) {
       if (!schoolId || !userId) throw new TypeError('invalid suspension lookup');
       const statement = sql`SELECT reason, duration_hours, expires_at

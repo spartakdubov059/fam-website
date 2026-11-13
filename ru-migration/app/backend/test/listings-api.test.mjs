@@ -22,6 +22,43 @@ test('school profile request status is private to the authenticated identity and
   assert.equal(result.body.request.status, 'pending');
   assert.deepEqual(Object.keys(result.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
 });
+test('role requests use a fixed allowlist, active student profile, and school-admin review scope', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let savedRole; let reviewSchool; let reviewAction;
+  let actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
+    resolveActor: async () => actor,
+    repository: {
+      createSchoolRoleRequest: async request => { savedRole = request.requested_role; return { ok: true, status: 'pending', request_id: id }; },
+      listPendingSchoolRoleRequests: async school => { reviewSchool = school; return [{ request_id: id, requested_role: 'council_member' }]; },
+      startSchoolRoleRequestReview: async (requestId, school, reviewer) => { reviewAction = [requestId, school, reviewer]; return true; },
+      reviewSchoolRoleRequest: async (requestId, school, reviewer, decision, note) => { reviewAction = [requestId, school, reviewer, decision, note]; return true; },
+    } });
+  const submit = req({ requested_role: 'Администратор', school_id: 'attacker-school', role: 'owner' }); submit.url = '/api/v1/role-requests';
+  assert.equal((await handler(submit)).status, 202);
+  assert.equal(savedRole, 'school_admin');
+  const invalid = req({ requested_role: 'owner' }); invalid.url = '/api/v1/role-requests';
+  assert.equal((await handler(invalid)).status, 400);
+  actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin', active: true };
+  const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
+  assert.equal((await handler(queue)).status, 200); assert.equal(reviewSchool, 'school-a');
+  const start = req({ action: 'start_review' }, 'PATCH'); start.url = `/api/v1/role-requests/${id}`;
+  assert.equal((await handler(start)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id']);
+  const approve = req({ decision: 'approve', review_note: 'Проверено школой' }, 'PATCH'); approve.url = `/api/v1/role-requests/${id}`;
+  assert.equal((await handler(approve)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id', 'approve', 'Проверено школой']);
+});
+
+test('role request submission and review fail closed for unprovisioned or non-admin profiles', async () => {
+  let writes = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
+    resolveActor: async () => null,
+    repository: { createSchoolRoleRequest: async () => { writes++; return { ok: true }; }, listPendingSchoolRoleRequests: async () => { writes++; return []; } } });
+  const submit = req({ requested_role: 'Участник Ученического совета' }); submit.url = '/api/v1/role-requests';
+  assert.equal((await handler(submit)).status, 403);
+  const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
+  assert.equal((await handler(queue)).status, 403);
+  assert.equal(writes, 0);
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

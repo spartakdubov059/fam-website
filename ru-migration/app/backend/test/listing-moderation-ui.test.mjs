@@ -67,6 +67,7 @@ test('staff can confirm or reject a pending event application using safe text re
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>Событие</b>', user_id: userId, status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     return { ok: true, json: async () => ({ ok: true }) };
   } });
   const card = f.queue.children[0];
@@ -91,6 +92,7 @@ test('only school admins see profile access requests and approve them as student
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, first_name: '<Аня>', last_name: 'Иванова', class_name: '8А' }] : [] }) };
+    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === `/api/v1/profile-requests/${requestId}`) { pending = false; return { ok: true, json: async () => ({ ok: true, status: 'approved' }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
   } });
@@ -102,4 +104,28 @@ test('only school admins see profile access requests and approve them as student
   const patch = calls.find(call => call.url === `/api/v1/profile-requests/${requestId}`);
   assert.equal(patch.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(patch.init.body), { decision: 'approve' });
+});
+
+test('school role request review is claimed before only its reviewer can decide', async () => {
+  const f = fixture(); const id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'; const calls = []; let state = 'pending';
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
+    if (url === `/api/v1/role-requests/${id}`) { state = init.body.includes('start_review') ? 'reviewing' : 'approved'; return { ok: true, json: async () => ({ ok: true }) }; }
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  let card = f.queue.children[0];
+  let actions = card.children.at(-1).children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Начать рассмотрение']);
+  await actions[0].listeners.click();
+  card = f.queue.children[0]; actions = card.children.at(-1).children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить роль', 'Отклонить']);
+  await actions[0].listeners.click();
+  const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
+  assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
+  assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
 });
