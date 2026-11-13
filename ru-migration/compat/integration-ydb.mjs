@@ -222,14 +222,27 @@ try {
     'account suspension leaves read access available');
   assert.equal((await repo.getActiveAccountSuspension('synthetic-school', 'synthetic-user'))?.reason,
     'Synthetic integration suspension');
+  const photoKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', photoKey);
   const photoListing = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическое объявление с фото', description: 'Изображение остаётся закрытым до отдельного одобрения', category: 'Творчество',
-    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: photoKey,
     photo_status: 'pending', status: 'pending' });
+  assert.equal(await repo.claimPendingImageDeletion('33333333-3333-4333-8333-333333333333', photoKey), null,
+    'an uploaded image cannot be discarded after it is atomically linked to a listing');
   assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', 'active'), false,
     'listing with pending photo cannot become public');
   assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
     'pending photo listing remains absent from the public projection');
+  const orphanKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', orphanKey);
+  await sql`UPDATE fam_pending_media SET created_at = CurrentUtcTimestamp() - Interval('P8D') WHERE object_key = ${orphanKey};`;
+  const expiredMediaClaims = await repo.claimExpiredPendingImages(10);
+  assert.deepEqual(expiredMediaClaims.map(item => item.object_key), [orphanKey],
+    'stale unlinked uploads are claimed while the image attached to a listing is preserved');
+  assert.equal(await repo.finishPendingImageCleanup(orphanKey, expiredMediaClaims[0].claim_token, true), true);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${orphanKey};`)?.[0]?.length ?? 0, 0,
+    'completed cleanup removes the private media registry row');
   const otherSchoolPending = await repo.createListing({ user_id: '22222222-2222-4222-8222-222222222222', school_id: 'other-school',
     title: 'Чужое школьное объявление', description: 'Не должно попасть в очередь', category: 'Учёба',
     price_text: 'Бесплатно', is_event: false, max_seats: 0, status: 'pending' });
@@ -238,7 +251,7 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, listings, favorites, ideas, messages, school-scoped photo/event queues, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media claim/link lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

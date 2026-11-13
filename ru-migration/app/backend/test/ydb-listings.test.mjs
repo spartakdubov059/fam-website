@@ -93,6 +93,58 @@ test('listing insert binds user content as data and writes only pending status',
   await assert.rejects(repo.createListing({ ...row, status: 'active' }));
 });
 
+test('photo listing creation atomically links only a fresh pending upload owned by the listing author', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, status FROM fam_pending_media')) return [[{ user_id: '11111111-1111-4111-8111-111111111111', status: 'pending' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  const result = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a',
+    title: 'Фото', description: 'Описание', category: 'Творчество', price_text: 'Бесплатно', is_event: false,
+    max_seats: 0, image_key: imageKey, photo_status: 'pending', status: 'pending' });
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  assert.ok(calls.findIndex(call => call.text.includes('SELECT user_id, status FROM fam_pending_media'))
+    < calls.findIndex(call => call.text.includes('INSERT INTO fam_listings')));
+  assert.ok(calls.find(call => call.text.includes("SET status = 'linked'")));
+
+  const rejected = createYdbListingsRepository(Object.assign(() => Promise.resolve([[]]), {
+    begin: callback => callback(async strings => strings.join('').includes('SELECT user_id, status FROM fam_pending_media')
+      ? [[{ user_id: 'someone-else', status: 'pending' }]] : [[]]),
+  }));
+  await assert.rejects(rejected.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a',
+    title: 'Фото', description: 'Описание', category: 'Творчество', price_text: 'Бесплатно', is_event: false,
+    max_seats: 0, image_key: imageKey, status: 'pending' }), error => error.code === 'pending_image_unavailable');
+});
+
+test('pending-media repository validates ownership keys and claims only expired unlinked uploads', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT object_key FROM fam_pending_media')) return [[{ object_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' }]];
+    if (text.includes('SELECT id FROM fam_listings WHERE image_key')) return [[]];
+    if (text.includes('SELECT object_key, claim_token FROM fam_pending_media')) return [[{ object_key: values[0], claim_token: values[1] }]];
+    if (text.includes('SELECT status FROM fam_pending_media')) return [[{ status: 'deleting' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  assert.equal(await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', key), true);
+  await assert.rejects(repo.registerPendingImage('invalid', key), TypeError);
+  const claims = await repo.claimExpiredPendingImages(5);
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0].object_key, key);
+  assert.match(calls.find(call => call.text.includes("status = 'pending' AND created_at" )).text, /Interval\('P7D'\)/);
+  assert.equal(await repo.finishPendingImageCleanup(key, claims[0].claim_token, false), true);
+  assert.ok(calls.some(call => call.text.includes("SET status = 'pending', claim_token = ''")));
+  assert.equal(await repo.finishPendingImageCleanup(key, claims[0].claim_token, true), true);
+  await assert.rejects(repo.claimExpiredPendingImages(101), TypeError);
+});
+
 test('favorite repository binds user and listing ids and refuses to favorite a missing listing', async () => {
   const calls = [];
   const sql = (strings, ...values) => {

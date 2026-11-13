@@ -9,6 +9,7 @@ import { createYdbListingsRepository } from './repositories/ydb-listings.mjs';
 import { createListingsApi } from './services/listings-api.mjs';
 import { createMediaApi } from './services/media-api.mjs';
 import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
+import { cleanupPendingMedia } from './services/cleanup-pending-media.mjs';
 
 export async function createRuntime(env = process.env) {
   const databaseUrl = env.FAM_RU_DATABASE_URL;
@@ -40,6 +41,7 @@ export async function createRuntime(env = process.env) {
   return {
     listingsApi,
     mediaApi,
+    cleanupPendingMedia: () => cleanupPendingMedia({ repository, pendingImages }),
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

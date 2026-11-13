@@ -52,13 +52,21 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (!actor || !UUID.test(actor.id)) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
-      if (typeof pendingImages?.delete !== 'function' || typeof repository?.listingUsesPhoto !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      if (typeof pendingImages?.delete !== 'function' || typeof repository?.claimPendingImageDeletion !== 'function'
+          || typeof repository?.finishPendingImageCleanup !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
       const key = `pending/${actor.id}/${pendingMatch[1]}.webp`;
+      let claimToken = null;
       try {
-        if (await repository.listingUsesPhoto(key)) return { status: 409, body: { ok: false, error: 'photo_already_linked' } };
+        claimToken = await repository.claimPendingImageDeletion(actor.id, key);
+        if (!claimToken) return { status: 409, body: { ok: false, error: 'photo_already_linked_or_unavailable' } };
         await pendingImages.delete(key);
+        if (!await repository.finishPendingImageCleanup(key, claimToken, true)) return { status: 503, body: { ok: false, error: 'media_unavailable' } };
         return { status: 200, body: { ok: true, deleted: true } };
-      } catch { return { status: 503, body: { ok: false, error: 'media_unavailable' } }; }
+      } catch {
+        // A failed object delete can be retried after releasing the short lease.
+        try { await repository.finishPendingImageCleanup(key, claimToken, false); } catch { /* lease expiry permits a later retry */ }
+        return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      }
     }
     if (req.method !== 'POST' || pathname !== '/api/v1/media/pending') {
       return { status: 404, body: { ok: false, error: 'not_found' } };
@@ -92,12 +100,19 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       return { status: 400, body: { ok: false, error: 'invalid_image' } };
     }
     if (bytes === 0) return { status: 400, body: { ok: false, error: 'empty_image' } };
+    if (typeof repository?.registerPendingImage !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
 
     try {
       const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType });
       const keyPattern = new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i');
       if (!result || typeof result.key !== 'string' || !keyPattern.test(result.key)
           || result.contentType !== 'image/webp' || !Number.isInteger(result.bytes) || result.bytes < 1 || result.bytes > MAX_IMAGE_BYTES) {
+        return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      }
+      try {
+        await repository.registerPendingImage(actor.id, result.key);
+      } catch {
+        try { await pendingImages.delete(result.key); } catch { /* no key is returned to the caller; cleanup can retry manually */ }
         return { status: 503, body: { ok: false, error: 'media_unavailable' } };
       }
       return { status: 201, body: { ok: true, image: { key: result.key, content_type: result.contentType, bytes: result.bytes } } };

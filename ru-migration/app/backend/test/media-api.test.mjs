@@ -16,6 +16,7 @@ test('pending media upload requires an authenticated database profile and binds 
   const api = createMediaApi({
     authenticate: async () => ({ subject: 'verified-subject' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', role: 'student' }),
+    repository: { registerPendingImage: async (userId, key) => { assert.equal(userId, '11111111-1111-4111-8111-111111111111'); assert.match(key, /^pending\//); } },
     pendingImages: { put: async input => { saved = input; return { key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 42 }; } },
   });
   const req = request();
@@ -61,6 +62,19 @@ test('pending media upload rejects storage keys that do not belong to the authen
   assert.equal((await api(request())).status, 503);
 });
 
+test('pending media upload removes the object and returns no key when YDB cannot register it', async () => {
+  const removed = [];
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }),
+    resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+    repository: { registerPendingImage: async () => { throw new Error('db offline'); } },
+    pendingImages: { put: async () => ({ key, contentType: 'image/webp', bytes: 10 }), delete: async objectKey => removed.push(objectKey) } });
+  const result = await api(request());
+  assert.equal(result.status, 503);
+  assert.deepEqual(result.body, { ok: false, error: 'media_unavailable' });
+  assert.deepEqual(removed, [key]);
+});
+
 test('pending photo preview is limited to moderators from the listing school', async () => {
   const listing = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' };
   let reads = 0;
@@ -100,7 +114,9 @@ test('failed listing submissions can delete only the caller own unlinked pending
   const objectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const removed = [];
   const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => ({ id: userId }),
-    repository: { listingUsesPhoto: async () => false }, pendingImages: { delete: async key => removed.push(key) } });
+    repository: { claimPendingImageDeletion: async (user, key) => user === userId && key === `pending/${userId}/${objectId}.webp` ? 'claim' : null,
+      finishPendingImageCleanup: async (key, token, deleted) => { assert.equal(token, 'claim'); assert.equal(deleted, true); return true; } },
+    pendingImages: { delete: async key => removed.push(key) } });
   const result = await api(request({ method: 'DELETE', path: `/api/v1/media/pending/${objectId}`, body: Buffer.alloc(0) }));
   assert.equal(result.status, 200);
   assert.deepEqual(removed, [`pending/${userId}/${objectId}.webp`]);
@@ -109,8 +125,20 @@ test('failed listing submissions can delete only the caller own unlinked pending
 test('pending image cleanup refuses to delete a photo already attached to a listing', async () => {
   let removed = 0;
   const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
-    repository: { listingUsesPhoto: async () => true }, pendingImages: { delete: async () => removed++ } });
+    repository: { claimPendingImageDeletion: async () => null, finishPendingImageCleanup: async () => true }, pendingImages: { delete: async () => removed++ } });
   const result = await api(request({ method: 'DELETE', path: '/api/v1/media/pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', body: Buffer.alloc(0) }));
   assert.equal(result.status, 409);
   assert.equal(removed, 0);
+});
+
+test('failed pending-image delete releases its database lease for a later retry', async () => {
+  const finalized = [];
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+    repository: { claimPendingImageDeletion: async () => 'claim-1', finishPendingImageCleanup: async (...args) => { finalized.push(args); return true; } },
+    pendingImages: { delete: async () => { throw new Error('offline'); } } });
+  const result = await api(request({ method: 'DELETE', path: '/api/v1/media/pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', body: Buffer.alloc(0) }));
+  assert.equal(result.status, 503);
+  assert.deepEqual(finalized, [[
+    'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', 'claim-1', false,
+  ]]);
 });

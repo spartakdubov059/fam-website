@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // The caller owns the connection and injects a @ydbjs/query tagged client.
 // Dynamic values are bound by the SDK, never concatenated into YQL.
 export function createYdbListingsRepository(sql) {
@@ -182,17 +184,107 @@ export function createYdbListingsRepository(sql) {
       if (!record || record.status !== 'pending' || !record.user_id || !record.school_id) throw new TypeError('invalid pending listing');
       if (!Number.isInteger(record.max_seats) || record.max_seats < 0 || record.max_seats > 500) throw new TypeError('invalid max_seats');
       const id = randomUUID();
-      const statement = sql`INSERT INTO fam_listings
-        (id, user_id, school_id, title, description, category, price_text, is_event,
-         event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
-        VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.title}, ${record.description},
-          ${record.category}, ${record.price_text}, ${record.is_event}, ${record.event_date ?? ''},
-          ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
-          ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
-          ${record.status}, CurrentUtcTimestamp());`;
+      const insertListing = tx => tx`INSERT INTO fam_listings
+          (id, user_id, school_id, title, description, category, price_text, is_event,
+           event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
+          VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.title}, ${record.description},
+            ${record.category}, ${record.price_text}, ${record.is_event}, ${record.event_date ?? ''},
+            ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
+            ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
+            ${record.status}, CurrentUtcTimestamp());`;
+      if (record.image_key) {
+        return sql.begin(async tx => {
+          const pending = await tx`SELECT user_id, status FROM fam_pending_media
+            WHERE object_key = ${record.image_key} AND created_at > CurrentUtcTimestamp() - Interval('P7D') LIMIT 1;`;
+          const upload = pending?.[0]?.[0];
+          if (!upload || upload.user_id !== record.user_id || upload.status !== 'pending') {
+            const error = new Error('pending image is unavailable'); error.code = 'pending_image_unavailable'; throw error;
+          }
+          await insertListing(tx);
+          await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${record.image_key}
+            AND user_id = ${record.user_id} AND status = 'pending';`;
+          return { id };
+        });
+      }
+      const statement = insertListing(sql);
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return { id };
+    },
+
+    async registerPendingImage(userId, objectKey) {
+      if (typeof userId !== 'string' || !UUID.test(userId) || typeof objectKey !== 'string'
+          || !new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(objectKey)) {
+        throw new TypeError('invalid pending image registration');
+      }
+      const statement = sql`INSERT INTO fam_pending_media (object_key, user_id, created_at, status, claim_token, claim_until)
+        VALUES (${objectKey}, ${userId}, CurrentUtcTimestamp(), 'pending', '', CurrentUtcTimestamp());`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      await statement;
+      return true;
+    },
+
+    async claimPendingImageDeletion(userId, objectKey) {
+      if (typeof userId !== 'string' || !UUID.test(userId) || typeof objectKey !== 'string'
+          || !new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(objectKey)) {
+        throw new TypeError('invalid pending image deletion request');
+      }
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${objectKey}
+          AND user_id = ${userId} LIMIT 1;`;
+        if (rows?.[0]?.[0]?.status !== 'pending') return null;
+        const linked = await tx`SELECT id FROM fam_listings WHERE image_key = ${objectKey} LIMIT 1;`;
+        if (linked?.[0]?.length) return null;
+        const token = randomUUID();
+        await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
+            claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+          WHERE object_key = ${objectKey} AND user_id = ${userId} AND status = 'pending';`;
+        const claimed = await tx`SELECT claim_token FROM fam_pending_media WHERE object_key = ${objectKey}
+          AND status = 'deleting' AND claim_token = ${token} LIMIT 1;`;
+        return claimed?.[0]?.[0]?.claim_token ?? null;
+      });
+    },
+
+    async claimExpiredPendingImages(limit = 50) {
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new TypeError('invalid pending media claim limit');
+      return sql.begin(async tx => {
+        const expired = await tx`SELECT object_key FROM fam_pending_media
+          WHERE (status = 'pending' AND created_at < CurrentUtcTimestamp() - Interval('P7D'))
+             OR (status = 'deleting' AND claim_until < CurrentUtcTimestamp())
+          ORDER BY created_at ASC LIMIT ${limit};`;
+        const claims = [];
+        for (const row of expired?.[0] ?? []) {
+          const objectKey = row.object_key;
+          const stillLinked = await tx`SELECT id FROM fam_listings WHERE image_key = ${objectKey} LIMIT 1;`;
+          if (stillLinked?.[0]?.length) {
+            await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '' WHERE object_key = ${objectKey};`;
+            continue;
+          }
+          const token = randomUUID();
+          await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
+              claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+            WHERE object_key = ${objectKey}
+              AND ((status = 'pending' AND created_at < CurrentUtcTimestamp() - Interval('P7D'))
+                OR (status = 'deleting' AND claim_until < CurrentUtcTimestamp()));`;
+          const claimed = await tx`SELECT object_key, claim_token FROM fam_pending_media
+            WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${token} LIMIT 1;`;
+          if (claimed?.[0]?.[0]) claims.push(claimed[0][0]);
+        }
+        return claims;
+      });
+    },
+
+    async finishPendingImageCleanup(objectKey, claimToken, deleted) {
+      if (!objectKey || !claimToken || typeof deleted !== 'boolean') throw new TypeError('invalid pending image cleanup result');
+      return sql.begin(async tx => {
+        const claimed = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${objectKey}
+          AND status = 'deleting' AND claim_token = ${claimToken} LIMIT 1;`;
+        if (!claimed?.[0]?.length) return false;
+        if (deleted) await tx`DELETE FROM fam_pending_media WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${claimToken};`;
+        else await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
+          WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${claimToken};`;
+        return true;
+      });
     },
 
     async moderateListing(listingId, schoolId, decision) {

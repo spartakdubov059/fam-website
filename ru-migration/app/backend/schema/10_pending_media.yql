@@ -1,0 +1,12 @@
+-- Private image uploads await a listing submission for at most seven days.
+-- The janitor claims stale rows before deleting objects, so a listing and a
+-- cleanup worker cannot both claim the same upload.
+CREATE TABLE fam_pending_media (
+  object_key Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  status Utf8 NOT NULL,
+  claim_token Utf8 NOT NULL,
+  claim_until Timestamp NOT NULL,
+  PRIMARY KEY (object_key)
+);
