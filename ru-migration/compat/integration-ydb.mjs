@@ -238,7 +238,7 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, school profile-request approval, listings, favorites, ideas, messages, school-scoped photo/event review queues, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, listings, favorites, ideas, messages, school-scoped photo/event queues, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
