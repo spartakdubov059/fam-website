@@ -74,6 +74,19 @@ test('school admins see active suspensions returned by the same-school endpoint 
   assert.equal(card.children[2].tagName, 'p');
 });
 
+test('school admins are told when suspension status could not be loaded instead of seeing a false empty result', async () => {
+  const f = fixture();
+  await initializeListingModeration({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/suspensions') return { ok: false, json: async () => ({ ok: false }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.match(f.status.textContent, /не удалось загрузить действующие ограничения/);
+});
+
 test('staff can confirm or reject a pending event application using safe text rendering', async () => {
   const f = fixture();
   const eventId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -129,6 +142,7 @@ test('school role request review is claimed before only its reviewer can decide'
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };

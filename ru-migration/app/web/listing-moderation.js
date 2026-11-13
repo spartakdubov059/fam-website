@@ -57,15 +57,18 @@ export async function initializeListingModeration({ document = globalThis.docume
       const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
         && ['council_member', 'school_admin'].includes(request.requested_role)
         && ['pending', 'reviewing'].includes(request.status));
-      const suspensions = suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions)
+      const suspensionsAvailable = me.profile.role !== 'school_admin'
+        || (suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions));
+      const suspensions = me.profile.role === 'school_admin' && suspensionsAvailable
         ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
           && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
           && typeof item.expires_at === 'string') : [];
       if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0) {
-        status.textContent = 'Очереди школьной проверки пусты.';
+        status.textContent = suspensionsAvailable ? 'Очереди школьной проверки пусты.'
+          : 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}.`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}.${suspensionsAvailable ? '' : ' Не удалось загрузить ограничения; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
