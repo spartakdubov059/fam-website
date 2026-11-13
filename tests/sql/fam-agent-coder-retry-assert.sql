@@ -207,3 +207,36 @@ begin
 end;
 $$;
 reset role;
+
+insert into private.fam_agent_tasks (
+  id,agent_key,task_type,title,description,priority,status,source,approval_required,
+  payload,attempt_count,max_attempts,claimed_by,claimed_at,lease_expires_at
+) values (
+  '10000000-0000-4000-8000-000000000011','technical','coder_patch_request',
+  'review state','synthetic QA gate fixture','normal','claimed','scheduled_audit',false,
+  '{}',1,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()+interval '1 hour'
+);
+
+set role service_role;
+do $$
+declare
+  v_saved boolean;
+  v_status text;
+  v_finished timestamptz;
+  v_event text;
+begin
+  v_saved := public.finish_fam_agent_coder_task(
+    '10000000-0000-4000-8000-000000000011',
+    'fam-agent-qwen-coder-v1','model_completed'
+  );
+  select status,finished_at into v_status,v_finished
+  from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000011';
+  select event_type into v_event
+  from private.fam_agent_task_events where task_id='10000000-0000-4000-8000-000000000011';
+  if v_saved is distinct from true or v_status <> 'review' or v_finished is not null or v_event <> 'review' then
+    raise exception 'legacy completion route bypassed the QA gate';
+  end if;
+end;
+$$;
+reset role;
+
