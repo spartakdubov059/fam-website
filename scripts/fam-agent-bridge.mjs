@@ -16,6 +16,8 @@ const EVENT_CODES = new Set([
   "database_request_failed", "auth_backend_failed",
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
+const EVENT_SUMMARIES = new Set(["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления"]);
+const UTC_HOUR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateClaimResponse(data) {
@@ -31,7 +33,10 @@ export function validateClaimResponse(data) {
     !EVENT_CODES.has(task.event_code) ||
     !PAGE_AREAS.has(task.page_area) ||
     !Number.isSafeInteger(task.occurrences) ||
-    task.occurrences < 0 || task.occurrences > 1000
+    task.occurrences < 0 || task.occurrences > 1000 ||
+    !EVENT_SUMMARIES.has(task.event_summary) ||
+    typeof task.observed_hour !== "string" || !UTC_HOUR_RE.test(task.observed_hour) ||
+    !Number.isSafeInteger(task.previous_attempts) || task.previous_attempts < 0 || task.previous_attempts > 20
   ) throw new Error("Bridge returned an invalid task.");
   return Object.freeze({
     id: task.id,
@@ -39,7 +44,10 @@ export function validateClaimResponse(data) {
     prompt: TASK_PROMPTS[task.task_key] +
       " Контекст: код события " + task.event_code +
       ", раздел " + task.page_area +
-      ", агрегированное число событий " + task.occurrences + ".",
+      ", агрегированное число событий " + task.occurrences +
+      ", описание события: " + task.event_summary +
+      ", последний час наблюдения UTC: " + task.observed_hour +
+      ", попыток по этому типу за 30 дней: " + task.previous_attempts + ".",
   });
 }
 

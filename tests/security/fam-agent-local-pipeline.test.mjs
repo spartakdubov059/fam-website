@@ -65,6 +65,9 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
               event_code: "js_runtime",
               page_area: "other",
               occurrences: 2,
+              event_summary: "Ошибка выполнения JavaScript",
+              observed_hour: "2026-11-14T12:00:00Z",
+              previous_attempts: 0,
             },
           });
         }

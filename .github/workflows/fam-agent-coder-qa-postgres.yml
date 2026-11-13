@@ -6,6 +6,7 @@ on:
       - "supabase/migrations/20261113095000_record_coder_completion_after_qa.sql"
       - "supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql"
       - "supabase/migrations/*fam_agent_coder_task_cooldown.sql"
+      - "supabase/migrations/*fam_agent_coder_context.sql"
       - "tests/sql/fam-agent-coder-qa-*"
       - ".github/workflows/fam-agent-coder-qa-postgres.yml"
   workflow_dispatch:
@@ -49,5 +50,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql
       - name: Apply producer cooldown migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113211712_fam_agent_coder_task_cooldown.sql
+      - name: Apply bounded coder context migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113221844_fam_agent_coder_context.sql
       - name: Verify completion, PR metadata and grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-coder-qa-assert.sql

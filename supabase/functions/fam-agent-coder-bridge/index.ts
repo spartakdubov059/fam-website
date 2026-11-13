@@ -135,7 +135,10 @@ Deno.serve(async (req: Request) => {
         !PAGE_AREAS.has(task.page_area) ||
         !Number.isInteger(task.occurrences) ||
         task.occurrences < 0 ||
-        task.occurrences > 1000
+        task.occurrences > 1000 ||
+        !["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления"].includes(task.event_summary) ||
+        typeof task.observed_hour !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(task.observed_hour) ||
+        !Number.isInteger(task.previous_attempts) || task.previous_attempts < 0 || task.previous_attempts > 20
       ) {
         return json({ ok: false, error: "invalid_task_shape" }, 502);
       }
@@ -147,6 +150,9 @@ Deno.serve(async (req: Request) => {
           event_code: task.event_code,
           page_area: task.page_area,
           occurrences: task.occurrences,
+          event_summary: task.event_summary,
+          observed_hour: task.observed_hour,
+          previous_attempts: task.previous_attempts,
         },
       });
     }

@@ -2,6 +2,8 @@ do $test$
 declare
   v_saved boolean;
   v_task private.fam_agent_tasks%rowtype;
+  v_claim record;
+  v_payload jsonb;
 begin
   if has_function_privilege('anon', 'public.finish_fam_agent_coder_task_with_pr(uuid,text,text,text,text)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.finish_fam_agent_coder_task_with_pr(uuid,text,text,text,text)', 'EXECUTE')
@@ -133,8 +135,21 @@ begin
       where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 1 then
     raise exception 'producer did not enqueue the threshold event';
   end if;
+  select payload into v_payload from private.fam_agent_tasks
+  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime' order by created_at desc limit 1;
+  if v_payload->>'event_summary' <> 'Ошибка выполнения JavaScript'
+     or v_payload->>'observed_hour' !~ '^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$'
+     or v_payload->>'previous_attempts' <> '0' then
+    raise exception 'producer did not persist bounded coder context';
+  end if;
+  select * into v_claim from public.claim_fam_agent_coder_tasks('fam-agent-qwen-coder-v1',1,7200);
+  if v_claim.event_summary <> 'Ошибка выполнения JavaScript'
+     or v_claim.observed_hour <> v_payload->>'observed_hour'
+     or v_claim.previous_attempts <> 0 then
+    raise exception 'claim RPC did not return bounded coder context';
+  end if;
   update private.fam_agent_tasks
-  set status='completed',finished_at=now()
+  set status='completed',finished_at=now(),claimed_by=null,claimed_at=null,lease_expires_at=null
   where task_type='coder_patch_request' and payload->>'event_code'='js_runtime';
   if coalesce(private.enqueue_fam_agent_coder_task()->>'reason','') <> 'matching_coder_task_cooldown' then
     raise exception 'producer did not suppress the repeated event within seven days';

@@ -23,10 +23,16 @@ test("accepts a single allowlisted aggregate task", () => {
       event_code: "js_runtime",
       page_area: "other",
       occurrences: 7,
+      event_summary: "Ошибка выполнения JavaScript",
+      observed_hour: "2026-11-14T12:00:00Z",
+      previous_attempts: 1,
     },
   });
   assert.equal(task.id, id);
   assert.match(task.prompt, /js_runtime/);
+  assert.match(task.prompt, /Ошибка выполнения JavaScript/);
+  assert.match(task.prompt, /2026-11-14T12:00:00Z/);
+  assert.match(task.prompt, /попыток по этому типу за 30 дней: 1/);
   assert.match(task.prompt, /index\.html/);
   assert.match(task.prompt, /window\.onerror/);
   assert.match(task.prompt, /window\.onunhandledrejection/);
@@ -130,6 +136,10 @@ const reportMigration = readFileSync(
   new URL("../../supabase/migrations/20261113220233_fam_agent_report_snapshot_rpc.sql", import.meta.url),
   "utf8",
 );
+const contextMigration = readFileSync(
+  new URL("../../supabase/migrations/20261113221844_fam_agent_coder_context.sql", import.meta.url),
+  "utf8",
+);
 const bridgeSource = readFileSync(
   new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url),
   "utf8",
@@ -145,25 +155,28 @@ test("model work decision skips empty/unconfigured queue and accepts claimed or 
 });
 
 test("SQL bridge functions are invoker-only and restricted to service_role", () => {
-  assert.match(migration, /security invoker/gi);
-  assert.match(migration, /set search_path = ''/gi);
-  assert.match(migration, /revoke all on function public\.claim_fam_agent_coder_tasks[^;]+from public,anon,authenticated/i);
-  assert.match(migration, /grant execute on function public\.claim_fam_agent_coder_tasks[^;]+to service_role/i);
+  assert.match(contextMigration, /security invoker/gi);
+  assert.match(contextMigration, /set search_path = ''/gi);
+  assert.match(contextMigration, /revoke all on function public\.claim_fam_agent_coder_tasks[^;]+from public,anon,authenticated/i);
+  assert.match(contextMigration, /grant execute on function public\.claim_fam_agent_coder_tasks[^;]+to service_role/i);
   assert.match(migration, /revoke all on function public\.finish_fam_agent_coder_task[^;]+from public,anon,authenticated/i);
   assert.match(migration, /grant execute on function public\.finish_fam_agent_coder_task[^;]+to service_role/i);
 });
 
 test("SQL claim returns only aggregate allowlisted fields", () => {
-  const returned = migration.match(/returns table \(([\s\S]*?)\)\nlanguage plpgsql/i)?.[1] ?? "";
+  const returned = contextMigration.match(/returns table \(([\s\S]*?)\)\nlanguage plpgsql/i)?.[1] ?? "";
   assert.match(returned, /id uuid/i);
   assert.match(returned, /task_key text/i);
   assert.match(returned, /event_code text/i);
   assert.match(returned, /page_area text/i);
   assert.match(returned, /occurrences integer/i);
+  assert.match(returned, /event_summary text/i);
+  assert.match(returned, /observed_hour text/i);
+  assert.match(returned, /previous_attempts integer/i);
   assert.doesNotMatch(returned, /title|description|payload|email|user_id/i);
-  assert.match(migration, /t\.approval_required = false/);
-  assert.match(migration, /t\.source in \('system', 'scheduled_audit'\)/);
-  assert.match(migration, /for update skip locked/i);
+  assert.match(contextMigration, /t\.approval_required = false/);
+  assert.match(contextMigration, /t\.source in \('system', 'scheduled_audit'\)/);
+  assert.match(contextMigration, /for update skip locked/i);
 });
 
 test("Edge Function exposes only fixed RPC names and rejects browser origins", () => {
@@ -177,6 +190,7 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /sameSecret/);
   assert.match(edgeSource, /!EVENT_CODES\.has\(task\.event_code\)/);
   assert.match(edgeSource, /!PAGE_AREAS\.has\(task\.page_area\)/);
+  assert.match(edgeSource, /task\.previous_attempts > 20/);
 });
 
 
@@ -212,6 +226,9 @@ test("rejects unrecognized telemetry enum values before building a model prompt"
       event_code: "js_runtime",
       page_area: "other",
       occurrences: 2,
+              event_summary: "Ошибка выполнения JavaScript",
+              observed_hour: "2026-11-14T12:00:00Z",
+              previous_attempts: 0,
     };
     task[field] = "untrusted arbitrary text";
     assert.throws(() => validateClaimResponse({ ok: true, task }));
