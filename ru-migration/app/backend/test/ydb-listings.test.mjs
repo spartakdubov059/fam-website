@@ -57,3 +57,18 @@ test('message repository verifies same-school active recipient before inserting 
   await assert.rejects(absent.createMessage({ sender_id: 'sender-id', receiver_id: 'outside-school', school_id: 'school-id', body: 'Привет' }), error => error.code === 'recipient_unavailable');
   assert.equal(inserts, 0);
 });
+
+test('message reads bind user and school and return only the bounded projection', async () => {
+  let query;
+  const sql = (strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ id: 'message-id', sender_id: 'user-id', receiver_id: 'other-id', body: 'private', school_id: 'school-id' }]]);
+  };
+  const repo = createYdbListingsRepository(sql);
+  const rows = await repo.listMessages('user-id', 'school-id');
+  assert.equal(query.values.includes('user-id'), true);
+  assert.equal(query.values.includes('school-id'), true);
+  assert.match(query.text, /sender_id = \?/);
+  assert.match(query.text, /receiver_id = \?/);
+  assert.equal(rows[0].body, 'private');
+});

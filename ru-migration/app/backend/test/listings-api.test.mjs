@@ -124,3 +124,23 @@ test('message API uses the verified sender profile after an explicit approval', 
   assert.equal(saved.sender_id, senderId);
   assert.equal(saved.school_id, 'school-a');
 });
+
+test('message read requires authentication and scopes data to the database profile', async () => {
+  let owner;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { listMessages: async (userId, schoolId) => { owner = [userId, schoolId]; return [{ id: 'owned-message' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/messages';
+  const response = await handler(request);
+  assert.deepEqual(owner, ['synthetic-user', 'synthetic-school']);
+  assert.deepEqual(response.body, { ok: true, messages: [{ id: 'owned-message' }] });
+});
+
+test('message read rejects missing identity before querying the database', async () => {
+  let reads = 0;
+  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null,
+    repository: { listMessages: async () => { reads++; return []; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/messages';
+  assert.equal((await handler(request)).status, 401);
+  assert.equal(reads, 0);
+});

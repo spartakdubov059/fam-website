@@ -57,6 +57,16 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async listMessages(userId, schoolId) {
+      if (!userId || !schoolId) throw new TypeError('invalid message owner');
+      const statement = sql`SELECT id, sender_id, receiver_id, body, is_read, created_at FROM fam_messages
+        WHERE school_id = ${schoolId} AND (sender_id = ${userId} OR receiver_id = ${userId})
+        ORDER BY created_at DESC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const sets = await statement;
+      return sets?.[0] ?? [];
+    },
+
     async listFavoriteIds(userId) {
       if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
       const statement = sql`SELECT f.listing_id AS listing_id FROM fam_favorites AS f
