@@ -214,35 +214,13 @@ begin
   order by t.updated_at desc
   limit 1;
 
-  -- pg_net keeps a bounded response history. Match the exact worker success
-  -- envelope and its fixed error codes; never expose response bodies, headers, or error text.
+  -- pg_net keeps a bounded response history. Match the worker success envelope
+  -- and fixed error codes; never expose response bodies, headers, or error text.
   select pg_catalog.jsonb_build_object(
     'window_hours', 6,
     'observed_from', min(r.created) filter (
-      where r.content ~ '^\{"ok":true,"claimed":[0-9]+,"completed":[0-9]+,"blocked":[0-9]+\}
-  into v_worker_http_6h
-  from net._http_response as r
-  where r.created >= pg_catalog.now() - interval '6 hours';
-
-  return pg_catalog.jsonb_build_object(
-    'generated_at', pg_catalog.now(),
-    'report_date', (pg_catalog.now() at time zone 'UTC')::date,
-    'daily_report', v_daily_report,
-    'agent_statuses', v_agent_statuses,
-    'cron_jobs', v_cron_jobs,
-    'latest_system_health', v_latest_health,
-    'latest_coder_task', v_latest_coder,
-    'latest_site_error_check', v_latest_site_error,
-    'worker_http_6h', v_worker_http_6h,
-    'failed_tasks_24h', v_failed_tasks_24h,
-    'site_error_events_24h', v_site_error_events
-  );
-end;
-$function$;
-
-revoke all on function public.get_fam_agent_report_snapshot() from public, anon, authenticated;
-grant execute on function public.get_fam_agent_report_snapshot() to service_role;
-
+      where (r.content like '{"ok":true,"claimed":%'
+         and r.content like '%,"completed":%,"blocked":%}')
          or r.content in (
            '{"ok":false,"error":"method_not_allowed"}',
            '{"ok":false,"error":"origin_not_allowed"}',
@@ -253,30 +231,8 @@ grant execute on function public.get_fam_agent_report_snapshot() to service_role
          )
     ),
     'response_count', count(*) filter (
-      where r.content ~ '^\{"ok":true,"claimed":[0-9]+,"completed":[0-9]+,"blocked":[0-9]+\}
-  into v_worker_http_6h
-  from net._http_response as r
-  where r.created >= pg_catalog.now() - interval '6 hours';
-
-  return pg_catalog.jsonb_build_object(
-    'generated_at', pg_catalog.now(),
-    'report_date', (pg_catalog.now() at time zone 'UTC')::date,
-    'daily_report', v_daily_report,
-    'agent_statuses', v_agent_statuses,
-    'cron_jobs', v_cron_jobs,
-    'latest_system_health', v_latest_health,
-    'latest_coder_task', v_latest_coder,
-    'latest_site_error_check', v_latest_site_error,
-    'worker_http_6h', v_worker_http_6h,
-    'failed_tasks_24h', v_failed_tasks_24h,
-    'site_error_events_24h', v_site_error_events
-  );
-end;
-$function$;
-
-revoke all on function public.get_fam_agent_report_snapshot() from public, anon, authenticated;
-grant execute on function public.get_fam_agent_report_snapshot() to service_role;
-
+      where (r.content like '{"ok":true,"claimed":%'
+         and r.content like '%,"completed":%,"blocked":%}')
          or r.content in (
            '{"ok":false,"error":"method_not_allowed"}',
            '{"ok":false,"error":"origin_not_allowed"}',
@@ -288,30 +244,8 @@ grant execute on function public.get_fam_agent_report_snapshot() to service_role
     ),
     'success_count', count(*) filter (
       where r.status_code = 200
-        and r.content ~ '^\{"ok":true,"claimed":[0-9]+,"completed":[0-9]+,"blocked":[0-9]+\}
-  into v_worker_http_6h
-  from net._http_response as r
-  where r.created >= pg_catalog.now() - interval '6 hours';
-
-  return pg_catalog.jsonb_build_object(
-    'generated_at', pg_catalog.now(),
-    'report_date', (pg_catalog.now() at time zone 'UTC')::date,
-    'daily_report', v_daily_report,
-    'agent_statuses', v_agent_statuses,
-    'cron_jobs', v_cron_jobs,
-    'latest_system_health', v_latest_health,
-    'latest_coder_task', v_latest_coder,
-    'latest_site_error_check', v_latest_site_error,
-    'worker_http_6h', v_worker_http_6h,
-    'failed_tasks_24h', v_failed_tasks_24h,
-    'site_error_events_24h', v_site_error_events
-  );
-end;
-$function$;
-
-revoke all on function public.get_fam_agent_report_snapshot() from public, anon, authenticated;
-grant execute on function public.get_fam_agent_report_snapshot() to service_role;
-
+        and r.content like '{"ok":true,"claimed":%'
+        and r.content like '% ,"completed":%'
     ),
     'http_error_count', count(*) filter (
       where r.status_code >= 400 and r.content in (
