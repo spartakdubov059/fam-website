@@ -9,12 +9,12 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 111,
+      "passed": 114,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow run 43504544271 on commit cabf8fbcf2c5309556d6f05940e93aa284db746f; includes profile onboarding API/UI and moderation tests"
+      "source": "GitHub Actions SDK compatibility workflow run 43506533484 on commit 43fa5bab42ab1435ae7cf0d86d96bf698847e0f8; includes school-scoped listing contact route and UI serving tests"
     },
-    "command": "npm test --prefix ru-migration/app/backend (GitHub Actions run 43504544271)",
-    "reproduction": "PASS — current backend unit tests (111/111) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
+    "command": "npm test --prefix ru-migration/app/backend (GitHub Actions run 43506533484)",
+    "reproduction": "PASS — current backend unit tests (114/114) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
   "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
@@ -26,25 +26,26 @@
     "Profile onboarding is synthetic-only; school catalog incomplete and pending request PII requires retention/cleanup policy",
     "No free-only school-controlled cloud staging has been provisioned or budget-verified",
     "Orphaned private image cleanup after browser/network loss is not implemented",
-    "Full auth, moderation, account-migration and safe access policy/legal review before real students join"
+    "Full auth, moderation, account-migration and safe access policy/legal review before real students join",
+    "Message submission remains fail closed until a reviewed moderation provider is configured and verified"
   ],
   "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
   "sdk_compatibility_check": {
     "node": "22.15.0",
-    "command": "GitHub Actions run 43501186442: npm ci, backend test suite, and npm run check",
-    "result": "PASS in CI; not run in current local workspace",
+    "command": "GitHub Actions run 43506533484: npm ci, backend tests (114/114), and pinned YDB/AWS SDK + Sharp checks",
+    "result": "PASS in CI on commit 43fa5bab42ab1435ae7cf0d86d96bf698847e0f8; local environment lacks npm",
     "sharp": "0.35.5",
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43504544271,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43504544271",
-    "ydb_run_id": 43504544263,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43504544263",
+    "sdk_run_id": 43506533484,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43506533484",
+    "ydb_run_id": 43506533608,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43506533608",
     "result": "success",
-    "tested_commit": "cabf8fbcf2c5309556d6f05940e93aa284db746f"
+    "tested_commit": "43fa5bab42ab1435ae7cf0d86d96bf698847e0f8"
   },
-  "local_ydb_integration": "PASS — disposable local YDB; synthetic profiles and school profile-request approval/rejection, listings, favorites, ideas, messages, school-scoped photo/event queues, photo visibility, event capacity/cancellation/review",
+  "local_ydb_integration": "PASS — disposable local YDB; synthetic profiles and school profile-request approval/rejection, listings, favorites, ideas, same-school messages, cross-school message/listing restrictions, school-scoped photo/event queues, photo visibility, event capacity/cancellation/review",
   "idea_submission_ui": "PASS — CI test covers authenticated UI submission to moderated API and pending status feedback",
   "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
   "media_upload_api": "PASS — authenticated JPEG/PNG/WebP uploads are limited to 5 MiB, normalized to WebP, attached to pending listings, reviewed by school staff, and served only after approval; orphan cleanup after browser/network loss remains incomplete",

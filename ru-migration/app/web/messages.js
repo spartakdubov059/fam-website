@@ -80,7 +80,7 @@ export async function initializeMessages({ document = globalThis.document, fetch
       bubble.dataset.own = String(message.sender_id === currentUser);
       list.append(bubble);
       if (message.receiver_id === currentUser && message.is_read !== true) {
-        void fetchImpl(`/api/v1/messages/${message.id}/read`, { method: 'PATCH', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+        void fetchImpl(`/api/v1/messages/${message.id}/read`, { method: 'PATCH', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } }).catch(() => {});
       }
     }
     if (!conversation.length) list.append(node(document, 'p', 'ru-messages-status', 'История пуста. Напишите первое сообщение.'));
