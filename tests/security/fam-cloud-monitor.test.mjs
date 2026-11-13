@@ -348,10 +348,10 @@ test("mobile Lighthouse runs daily or on a manual request only", () => {
 });
 test("post-deployment smoke runs only after successful GitHub Pages deployments", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-cloud-monitor.yml", import.meta.url), "utf8");
-  const monitorJob = workflow.split("  monitor:\\n")[1]?.split("\\n  mobile-performance:")[0] ?? "";
-  const mobileJob = workflow.split("  mobile-performance:\\n")[1] ?? "";
+  const monitorJob = workflow.split("  monitor:\n")[1]?.split("\n  mobile-performance:")[0] ?? "";
+  const mobileJob = workflow.split("  mobile-performance:\n")[1] ?? "";
 
-  assert.ok(workflow.includes("\\n  deployment_status:\\n"));
+  assert.ok(workflow.includes("\n  deployment_status:\n"));
   assert.ok(monitorJob.includes("github.event_name == 'deployment_status'"));
   assert.ok(monitorJob.includes("github.event.deployment_status.state == 'success'"));
   assert.ok(monitorJob.includes("github.event.deployment.environment == 'github-pages'"));
