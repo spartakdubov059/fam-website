@@ -54,6 +54,7 @@ export function summarizeWorkflowRuns(runs, now = new Date()) {
         created_at: new Date(createdAt).toISOString(),
         html_url: safeGithubUrl(run.html_url),
         run_number: Number.isSafeInteger(run.run_number) ? run.run_number : null,
+        run_id: Number.isSafeInteger(run.id) ? run.id : null,
         created_ms: createdAt,
       };
     }
