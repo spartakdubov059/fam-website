@@ -26,11 +26,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install locked dependencies
+      - name: Install locked compatibility dependencies
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
-      - name: Install and test isolated FAM RU backend\n        run: npm ci --prefix ru-migration/app/backend --no-audit --no-fund && npm test --prefix ru-migration/app/backend\n      - name: Test actual native image processing and SDK exports
+      - name: Install and test isolated FAM RU backend
+        run: npm ci --prefix ru-migration/app/backend --no-audit --no-fund && npm test --prefix ru-migration/app/backend
+      - name: Test actual native image processing and SDK exports
         run: npm run --prefix ru-migration/compat check
-      - name: Save dependency lockfile for review
+      - name: Save compatibility lockfile for review
         if: success()
         uses: actions/upload-artifact@v4
         with:
