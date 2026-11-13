@@ -59,7 +59,7 @@ try{
       columns:getComputedStyle(document.getElementById("pulseGrid")).gridTemplateColumns.split(" ").length
     }));
     assert.ok(geometry.documentWidth <= geometry.viewportWidth+1,"Pulse overflow at "+width+"px: "+JSON.stringify(geometry));
-    assert.equal(geometry.columns,width<=640?1:2,"grid columns at "+width);
+    assert.equal(geometry.columns,width<=640?1:(width<667?2:3),"grid columns at "+width);
     assert.equal(await page.locator("#pulseAdmin").isVisible(),false,"students must not see admin controls");
     assert.equal(await page.locator(".pulse-option").count(),3,"poll choices work");
     await page.locator("[data-pulse-vote]").first().click();
