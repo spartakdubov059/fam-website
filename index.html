@@ -1342,8 +1342,13 @@
       <div class="form-group">
         <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
-          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
+          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option><option value="__announcement" data-staff-only="true">Анонс</option><option value="__poll" data-staff-only="true">Опрос</option>
         </select>
+      </div>
+      <div id="pulseCreateFields" class="hidden" style="background:var(--bg);padding:12px;border-radius:12px;margin-bottom:12px">
+        <div id="pulseCreateKindWrap" class="form-group"><label for="pulseCreateKind">Тип анонса</label><select id="pulseCreateKind" class="form-control"><option value="news">Анонс</option><option value="important">Важное</option><option value="open_event">Мероприятие</option></select></div>
+        <div id="pulseCreateEventWrap" class="form-group hidden"><label for="pulseCreateEventAt">Дата и время</label><input id="pulseCreateEventAt" type="datetime-local" class="form-control"></div>
+        <div id="pulseCreatePollWrap" class="hidden"><label for="pulseCreateOptions">Варианты ответа (по одному в строке, 2–4)</label><textarea id="pulseCreateOptions" class="form-control" rows="4" maxlength="300" placeholder="Вариант 1&#10;Вариант 2"></textarea></div>
       </div>
       <div id="eventFields" class="hidden" style="background:var(--bg); padding:10px; border-radius:12px; margin-bottom:12px;">
         <div class="form-group"><label for="evDate">Дата</label><input type="date" id="evDate" class="form-control"></div>
@@ -4678,6 +4683,11 @@ window.onunhandledrejection = function() {
     $("seatsGroup").classList.toggle("hidden", this.value !== "limited");
   });
 
+  const pulseCategoryOptions=[...$("lCat").options].filter(o=>o.dataset.staffOnly==="true");
+  const syncPulseCreate=()=>{const cat=$("lCat").value,isAnnouncement=cat==="__announcement",isPoll=cat==="__poll";$("pulseCreateFields").classList.toggle("hidden",!isAnnouncement&&!isPoll);$("pulseCreateKindWrap").classList.toggle("hidden",!isAnnouncement);$("pulseCreatePollWrap").classList.toggle("hidden",!isPoll);$("pulseCreateEventWrap").classList.toggle("hidden",!isAnnouncement||$("pulseCreateKind").value!=="open_event");};
+  const syncPulseRole=()=>pulseCategoryOptions.forEach(o=>o.hidden=!(["school_admin","council_member"].includes(profile?.role)));
+  $("lCat").addEventListener("change",syncPulseCreate);$("pulseCreateKind").addEventListener("change",syncPulseCreate);syncPulseCreate();syncPulseRole();
+
   $("listingForm").onsubmit = async e => {
     e.preventDefault();
     // ═══ ЗАЩИТА ОТ ДВОЙНОЙ ОТПРАВКИ ═══
@@ -4690,6 +4700,25 @@ window.onunhandledrejection = function() {
     try {
       const uploadStatus = $("uploadStatus");
 
+      const specialKind=$("lCat").value;
+      if(specialKind==="__announcement"||specialKind==="__poll"){
+        if(!["school_admin","council_member"].includes(profile?.role))throw new Error("Публикация доступна только Совету школы и администратору.");
+        const title=$("lTitle").value.trim(),body=$("lDesc").value.trim();
+        if(specialKind==="__announcement"){
+          const kind=$("pulseCreateKind").value,raw=$("pulseCreateEventAt").value,dt=kind==="open_event"&&raw?new Date(raw):null;
+          if(title.length<4||body.length<4)throw new Error("Заполните заголовок и текст анонса.");
+          if(kind==="open_event"&&(!dt||!Number.isFinite(dt.getTime())||dt.getTime()<=Date.now()+600000))throw new Error("Укажите будущую дату и время мероприятия.");
+          const {data,error}=await sb.rpc("fam_publish_school_announcement",{p_title:title,p_body:body,p_kind:kind,p_event_starts_at:dt?dt.toISOString():null});
+          if(error||!data)throw new Error("Не удалось опубликовать анонс.");
+        }else{
+          const opts=$("pulseCreateOptions").value.split("\n").map(x=>x.trim()).filter(Boolean);
+          if(title.length<8||opts.length<2||opts.length>4||opts.some(x=>x.length>70)||new Set(opts.map(x=>x.toLowerCase())).size!==opts.length)throw new Error("Укажите вопрос и 2–4 разных варианта ответа (до 70 символов).");
+          const {data,error}=await sb.rpc("fam_publish_school_poll",{p_question:title,p_options:opts});
+          if(error||!data)throw new Error("Не удалось опубликовать опрос.");
+        }
+        closeModal("listingModal");$("listingForm").reset();$("pulseCreateFields").classList.add("hidden");
+        if(schoolPulse)await schoolPulse.refresh();alert("Опубликовано.");return;
+      }
       btn.textContent = "Загрузка фото и серверная проверка...";
 
       let isEv = $("lCat").value === "Мероприятия";
