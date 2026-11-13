@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { hasCurrentOwnerApproval } from "../../scripts/verify-agent-pr-owner-approval.mjs";
 
+const workflow = readFileSync(
+  new URL("../../.github/workflows/moderation-regression.yml", import.meta.url),
+  "utf8",
+);
 const head = "c6c50f9e7a8d1f6619d2feee73a5105ecf64cb52";
 const baseReview = {
   id: 12,
@@ -10,6 +15,18 @@ const baseReview = {
   commit_id: head,
   submitted_at: "2026-11-13T10:00:00Z",
 };
+
+test("owner approval gate is wired into the required safety check for automated PRs", () => {
+  assert.match(workflow, /pull_request_review:\s*\n\s*types:\s*\[submitted, edited, dismissed\]/);
+  assert.match(workflow, /name: Russian content safety tests/);
+  assert.match(workflow, /pull-requests: read/);
+  assert.match(workflow, /Checkout trusted approval verifier from the base commit/);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /if: github\.event\.pull_request\.base\.ref == 'main' && startsWith\(github\.event\.pull_request\.head\.ref, 'codex\/fam-run-'\)/);
+  assert.match(workflow, /PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(workflow, /node "\$TRUSTED_BASE_DIR\/scripts\/verify-agent-pr-owner-approval\.mjs"/);
+});
 
 test("accepts owner approval for current head", () => {
   assert.equal(hasCurrentOwnerApproval([baseReview], head), true);
