@@ -294,6 +294,21 @@
     .idea-folder.active { background: var(--gradient-violet); color: white; border-color: transparent; }
     .idea-folder .folder-count { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,0.16); font-size: 10px; font-weight: 800; }
     .idea-card { background: var(--bg); padding: 12px; border-radius: 14px; margin-bottom: 8px; border: 1px solid var(--border); }
+    .idea-images { display:flex; gap:8px; overflow-x:auto; padding:4px 0 2px; margin-top:8px; -webkit-overflow-scrolling:touch; }
+    .idea-images img { width:112px; height:84px; flex:0 0 112px; object-fit:cover; border-radius:10px; border:1px solid var(--border); }
+    .idea-attachment-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 8px; }
+    .idea-attachment-note { color:var(--muted); font-size:10px; }
+    .pulse-announcement-carousel { margin:0 0 18px; padding:14px; border:1px solid var(--border); border-radius:20px; background:linear-gradient(135deg,rgba(139,92,246,.09),rgba(200,245,66,.035)); }
+    .pulse-carousel-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .pulse-carousel-head h2 { font-size:15px; margin:0; }
+    .pulse-carousel-controls { display:flex; gap:6px; }
+    .pulse-carousel-controls button { width:34px; height:34px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:18px; cursor:pointer; }
+    .pulse-announcement-track { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
+    .pulse-announcement-track .pulse-card { flex:0 0 min(330px,86vw); min-height:160px; scroll-snap-align:start; padding:14px; }
+    .pulse-announcement-track .pulse-card h3 { font-size:14px; margin:9px 0 5px; }
+    .pulse-announcement-track .pulse-card p { font-size:11px; }
+    @media(max-width:600px) { .pulse-announcement-carousel { padding:12px; margin-bottom:14px; } .pulse-carousel-controls button { width:40px; height:40px; } .pulse-carousel-controls { display:none; } .pulse-announcement-track { scrollbar-width:none; } .pulse-announcement-track::-webkit-scrollbar { display:none; } }
+    @media(prefers-reduced-motion:reduce) { .pulse-announcement-track { scroll-behavior:auto; } }
     .safety-report-card { background: var(--bg); border: 1px solid var(--border); border-radius: 13px; padding: 10px; margin-bottom: 8px; }
     .safety-report-card.is-high { border-color: rgba(255,107,107,.45); }
     @media (max-width: 390px) { .l-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .l-card { padding: 7px; } }
@@ -979,11 +994,15 @@
       <button class="cat-tile t-study" data-cat="Учёба"><span class="tile-emoji">🎓</span>Учёба</button>
       <button class="cat-tile t-events" data-cat="Мероприятия"><span class="tile-emoji">🎭</span>Афиша</button>
     </div>
+    <section id="pulseAnnouncementCarousel" class="pulse-announcement-carousel hidden" aria-labelledby="pulseCarouselTitle">
+      <div class="pulse-carousel-head"><h2 id="pulseCarouselTitle">Анонсы и мероприятия</h2><div class="pulse-carousel-controls"><button type="button" data-pulse-scroll="-1" aria-label="Предыдущие анонсы">‹</button><button type="button" data-pulse-scroll="1" aria-label="Следующие анонсы">›</button></div></div>
+      <div id="pulseAnnouncementTrack" class="pulse-announcement-track" aria-label="Лента анонсов и мероприятий"></div>
+    </section>
     <section id="schoolPulse" class="school-pulse hidden" aria-labelledby="pulseTitle">
       <div class="pulse-header"><div>
         <span class="pulse-eyebrow">FAM / СЕГОДНЯ</span>
-        <h2 class="pulse-title" id="pulseTitle">Анонсы <span class="pulse-heading-star" aria-hidden="true">✦</span></h2>
-        <p class="pulse-subtitle">События без записи, важное и опросы</p>
+        <h2 class="pulse-title" id="pulseTitle">Школьные опросы <span class="pulse-heading-star" aria-hidden="true">✦</span></h2>
+        <p class="pulse-subtitle">Опросы участников школы</p>
       </div><button type="button" class="pulse-refresh" id="pulseRefreshBtn">Обновить</button></div>
       <div class="pulse-grid" id="pulseGrid" aria-live="polite"></div>
       <p class="pulse-meta" id="pulseStatus">Видят участники вашей школы</p>
@@ -1120,6 +1139,8 @@
         <div class="profile-section-heading"><div><span class="profile-eyebrow">ПОЧТА ШКОЛЫ</span><h3>Почта идей</h3><p class="profile-section-copy">Отправляйте предложения и следите за их статусом. После проверки они попадут в Совет вашей школы.</p></div><span class="profile-section-icon">✉️</span></div>
         <form id="ideaForm">
           <textarea id="ideaText" class="form-control" rows="2" placeholder="Что можно улучшить?" required maxlength="500" aria-label="Текст идеи" style="margin-bottom:8px; font-size:12px;"></textarea>
+          <div class="idea-attachment-row"><label class="button button-secondary button-small" for="ideaImagesInput">📷 Добавить фото</label><input id="ideaImagesInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><span class="idea-attachment-note">До 3 фото, JPG/PNG/WebP, до 2 МБ каждое</span></div>
+          <div id="ideaImagesPreview" class="idea-images" aria-live="polite"></div><div id="ideaUploadStatus" class="idea-attachment-note" role="status" aria-live="polite"></div>
           <div id="ideaThinkingArea"></div>
           <button type="submit" class="button button-primary" id="ideaSubmitBtn" style="width:100%; font-size:12px;">Отправить идею</button>
         </form>
@@ -1189,6 +1210,7 @@
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">⚙️</span><span><b>Управление аккаунтом</b><small>Настройки профиля, безопасность и выход</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
           <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Аватары проходят автоматическую проверку перед обновлением.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
+          <p class="profile-section-copy" style="margin:10px 0 0;">Электронная почта аккаунта: <b id="accountEmail"></b></p>
           <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
             <details class="profile-help profile-delete-help"><summary>Удалить мой аккаунт навсегда</summary><div class="profile-help-body">
               <p>Для защиты от случайного удаления войдите повторно, укажите текущий пароль и подтвердите действие точной фразой. У последнего администратора школы сначала должен появиться другой администратор.</p>
@@ -1391,6 +1413,7 @@ window.onunhandledrejection = function() {
 
   let user = null, profile = null;
   let listings = [], regs = [], occupancy = [], ideas = [], favorites = [];
+  let selectedIdeaImages = [];
   let curCat = "Все", curChat = null, carTimer = null, chatInterval = null;
   let currentIdeaFolder = 'new';
   let currentTab = 'board';
@@ -2321,7 +2344,7 @@ window.onunhandledrejection = function() {
     if (user) {
       $("authBtn").classList.add("hidden"); $("headerAvatar").classList.remove("hidden");
       if (profile?.avatar_url) $("headerAvatar").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
-      else $("headerAvatar").textContent = user.email[0].toUpperCase();
+      else $("headerAvatar").textContent = (profile?.first_name?.trim()?.[0] || "F").toLocaleUpperCase("ru-RU");
       $("profileLoggedOut").classList.add("hidden"); $("profileLoggedIn").classList.remove("hidden");
     } else {
       $("authBtn").classList.remove("hidden"); $("headerAvatar").classList.add("hidden");
@@ -2362,6 +2385,7 @@ window.onunhandledrejection = function() {
       if (user && user.id) {
         regs = (!results[2].error && results[2].data) || [];
         ideas = (!results[3].error && results[3].data) || [];
+        void hydrateIdeaImages(ideas);
         favorites = (!results[4].error && results[4].data) || [];
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
@@ -2826,8 +2850,28 @@ window.onunhandledrejection = function() {
       return `<div class="idea-card" style="${cls === 'status-new' ? 'border-color: rgba(240,193,75,0.3);' : ''}">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:flex-start;gap:10px;">
           <b style="font-size:12px;">${esc(i.text)}</b><span class="idea-status ${cls}">${st}</span>
-        </div>${waitMsg}</div>`;
+        </div>${renderIdeaImages(i)}${waitMsg}</div>`;
     }).join("") : '<p style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Вы еще не предлагали идей.</p>';
+  }
+
+  async function hydrateIdeaImages(rows) {
+    for (const idea of rows || []) {
+      if (!Array.isArray(idea.image_paths) || !idea.image_paths.length || idea._ideaImagesHydrated) continue;
+      idea._ideaImagesHydrated = true;
+      const paths = idea.image_paths.filter(path => typeof path === "string" && /^[0-9a-f-]{36}\/idea_[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(path)).slice(0, 3);
+      if (!paths.length) continue;
+      const { data, error } = await sb.storage.from("idea-images").createSignedUrls(paths, 3600);
+      idea.display_image_urls = !error && Array.isArray(data)
+        ? data.map(item => item?.signedUrl).filter(url => typeof url === "string" && url.startsWith(SUPABASE_URL + "/storage/v1/object/sign/idea-images/"))
+        : [];
+    }
+    if (rows?.length) { renderIdeas(); renderIdeaFolderContent(); }
+  }
+
+  function renderIdeaImages(idea) {
+    const urls = Array.isArray(idea.display_image_urls) ? idea.display_image_urls.slice(0, 3) : [];
+    const safe = urls.filter(value => typeof value === "string" && value.startsWith(SUPABASE_URL + "/storage/v1/object/sign/idea-images/"));
+    return safe.length ? '<div class="idea-images">' + safe.map((url, index) => '<img src="' + esc(url) + '" alt="Фото предложения ' + (index + 1) + '" loading="lazy">').join("") + '</div>' : "";
   }
 
   function updateIdeaCounters() {
@@ -2887,7 +2931,7 @@ window.onunhandledrejection = function() {
       } else if (currentIdeaFolder === 'work') {
         buttons = `<div style="display:flex;gap:6px;margin-top:8px;"><button class="button button-success button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="done">Готово</button><button class="button button-danger button-small" data-action="update-idea" data-id="${esc(i.id)}" data-status="rejected">Отклонить</button></div>`;
       }
-      return `<div class="idea-card"><div style="font-size:12px;margin-bottom:4px;">${esc(i.text)}</div>${buttons}</div>`;
+      return `<div class="idea-card"><div style="font-size:12px;margin-bottom:4px;">${esc(i.text)}</div>${renderIdeaImages(i)}${buttons}</div>`;
     }).join("");
     content.innerHTML = html;
   }
@@ -2967,23 +3011,45 @@ window.onunhandledrejection = function() {
     let btn = $("ideaSubmitBtn");
     if (btn.disabled) return;
     btn.disabled = true;
+    $("ideaUploadStatus").textContent = "";
     showAIThinking('ideaThinkingArea', 'Проверяем по правилам');
+    const stagedIdeaPaths = [];
 
     try {
+      const signedImages = [];
+      for (const file of selectedIdeaImages) {
+        const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" })[file.type];
+        if (!extension) throw new Error("Поддерживаются только JPG, PNG и WebP.");
+        const suffix = makeUniqueFileSuffix().toLowerCase();
+        const path = user.id + "/listing_" + user.id + "_" + suffix + "." + extension;
+        const { error: uploadError } = await sb.storage.from("listing-images-pending").upload(path, file, {
+          contentType: file.type, cacheControl: "60", upsert: false
+        });
+        if (uploadError) throw new Error("Не удалось загрузить фото. Проверьте соединение и попробуйте ещё раз.");
+        stagedIdeaPaths.push(path);
+        const { data: signed, error: signedError } = await sb.storage.from("listing-images-pending").createSignedUrl(path, 600);
+        if (signedError || !signed?.signedUrl) throw new Error("Не удалось подготовить фото к проверке.");
+        signedImages.push(signed.signedUrl);
+      }
       const { data: submission, error } = await sb.functions.invoke("submit-content", {
-        body: { kind: "idea", text: txt }
+        body: { kind: "idea", text: txt, image_urls: signedImages }
       });
       hideAIThinking('ideaThinkingArea');
       if (error) throw error;
 
       if (!submission?.ok) {
+        if (stagedIdeaPaths.length) await sb.storage.from("listing-images-pending").remove(stagedIdeaPaths);
         return notice("🤖 " + (submission?.reason || submission?.error || "Идея не прошла проверку."));
       }
 
       const data = submission.idea;
-      if (data) ideas.unshift(data);
+      if (data) { ideas.unshift(data); await hydrateIdeaImages([data]); }
 
       $("ideaText").value = "";
+      selectedIdeaImages = [];
+      $("ideaImagesInput").value = "";
+      $("ideaImagesPreview").textContent = "";
+      $("ideaUploadStatus").textContent = "";
       notice(submission.degraded
         ? "⚠️ " + (submission.reason || "Проверка временно недоступна. Идея не отправлена.")
         : submission.status === "pending"
@@ -2991,12 +3057,60 @@ window.onunhandledrejection = function() {
           : "Идея прошла автоматическую проверку и отправлена Совету!");
       renderIdeas(); renderIdeaFolderContent(); updateIdeaCounters();
     } catch(err) {
+      if (stagedIdeaPaths.length) await sb.storage.from("listing-images-pending").remove(stagedIdeaPaths).catch(() => {});
       hideAIThinking('ideaThinkingArea');
       notice("Ошибка: " + await functionErrorText(err, "Не удалось отправить идею."));
     } finally {
       btn.disabled = false;
     }
   };
+
+  async function ideaImageSignatureMatches(file) {
+    const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    if (file.type === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    if (file.type === "image/png") return [0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((byte,index) => bytes[index] === byte);
+    if (file.type === "image/webp") return String.fromCharCode(...bytes.slice(0,4)) === "RIFF" && String.fromCharCode(...bytes.slice(8,12)) === "WEBP";
+    return false;
+  }
+
+  $("ideaImagesInput").addEventListener("change", async event => {
+    const files = Array.from(event.target.files || []);
+    const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (files.length > 3) {
+      event.target.value = "";
+      selectedIdeaImages = [];
+      $("ideaImagesPreview").textContent = "";
+      $("ideaUploadStatus").textContent = "Можно выбрать не больше 3 фотографий.";
+      return;
+    }
+    const invalid = files.find(file => !allowed.has(file.type));
+    if (invalid) {
+      event.target.value = "";
+      selectedIdeaImages = [];
+      $("ideaImagesPreview").textContent = "";
+      $("ideaUploadStatus").textContent = "Этот формат не поддерживается. Выберите JPG, PNG или WebP.";
+      return;
+    }
+    const signatureResults = await Promise.all(files.map(ideaImageSignatureMatches));
+    if (signatureResults.some(valid => !valid)) {
+      event.target.value = "";
+      selectedIdeaImages = [];
+      $("ideaImagesPreview").textContent = "";
+      $("ideaUploadStatus").textContent = "Файл не похож на фотографию. Выберите настоящее изображение JPG, PNG или WebP.";
+      return;
+    }
+    const oversized = files.find(file => file.size > 2 * 1024 * 1024);
+    if (oversized) {
+      event.target.value = "";
+      selectedIdeaImages = [];
+      $("ideaImagesPreview").textContent = "";
+      $("ideaUploadStatus").textContent = "Каждое фото должно быть не больше 2 МБ.";
+      return;
+    }
+    selectedIdeaImages = files;
+    $("ideaUploadStatus").textContent = files.length ? "Выбрано фотографий: " + files.length : "";
+    $("ideaImagesPreview").innerHTML = files.map(file => '<img src="' + URL.createObjectURL(file) + '" alt="Предпросмотр фото предложения">').join("");
+  });
 
   function showSchoolAdminAccessStatus(label, detail, tone = "new", stage = "none", meta = "") {
     const accessStatus = $("schoolAdminAccessStatus");
@@ -4010,7 +4124,9 @@ window.onunhandledrejection = function() {
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
-    $("profEmail").textContent = user.email;
+    $("accountEmail").textContent = user.email || "Не указана";
+    const displayName = [profile?.first_name, profile?.last_name].filter(value => typeof value === "string" && value.trim()).map(value => value.trim()).join(" ");
+    $("profEmail").textContent = displayName || "Участник FAM";
     if ($("profileFirstName")) $("profileFirstName").value = profile?.first_name || "";
     if ($("profileLastName")) $("profileLastName").value = profile?.last_name || "";
     if ($("profileClassName")) $("profileClassName").value = profile?.class_name || "";
@@ -4018,8 +4134,9 @@ window.onunhandledrejection = function() {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
     } else {
-      $("avatarPreview").textContent = user.email[0].toUpperCase();
-      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = user.email[0].toUpperCase();
+      const avatarInitial = (profile?.first_name?.trim()?.[0] || displayName?.[0] || "F").toLocaleUpperCase("ru-RU");
+      $("avatarPreview").textContent = avatarInitial;
+      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = avatarInitial;
     }
     const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
     $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
