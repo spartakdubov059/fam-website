@@ -5,6 +5,7 @@ on:
     - cron: "*/30 * * * *"
     - cron: "7 3 * * *"
   workflow_dispatch:
+  deployment_status:
   pull_request:
     paths:
       - ".github/workflows/fam-cloud-monitor.yml"
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   monitor:
     name: Read-only site and CI smoke checks
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *') || (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'github-pages')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
