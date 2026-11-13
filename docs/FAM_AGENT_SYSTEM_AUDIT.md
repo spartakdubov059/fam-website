@@ -171,3 +171,37 @@
 - Bridge не получил задачу из очереди; шаг финализации пропущен. Модель выпустила `no_issue` и пустой patch, поэтому независимый QA и PR jobs были пропущены. Этот запуск **не** доказывает реальный цикл production queue → Qwen → QA → PR.
 - Артефакт показал, что резервный audit prompt не передавал исходник `index.html`; вывод модели о составе checkout не подтверждён содержимым файлов. В этом PR резервный prompt теперь явно включает `index.html` в model context; новый unit test фиксирует выбор разрешённого файла и лимит четырёх путей.
 - На head `fea483eb4a22bcb951796684b359e80a5059e680` после исправления Regression suite прошёл **275/275**; Coder QA PostgreSQL, Reporter PostgreSQL, owner approval verifier и обязательный статус проверки завершились успешно. PR остаётся draft; production, Supabase и очередь не менялись.
+
+
+## Матрица сценариев и критериев — 13 ноября 2026, 20:43 UTC
+
+### Сквозные сценарии
+
+| Сценарий | Текущий статус | Доказательство и предел проверки |
+|---|---|---|
+| Мониторинг | Частично подтверждён | Production: hourly error-audit и worker Cron активны; `fam_site_error_counts` пуст за последние 24 часа. Живой искусственный event не отправлялся, поскольку production оставлен read-only. |
+| Анализ и назначение | Проверено на коде/тестах, не на свежем live event | Producer создаёт coder task только для ограниченных event/page значений при пороге не менее 3; актуальных событий для такого задания сейчас нет. |
+| Qwen patch | Проверено только изолированно | Синтетический Qwen2.5-Coder-7B smoke сформировал реальный exact-edit patch; production queue не участвовала. |
+| QA | Проверено изолированно | Основной workflow запускает кандидатские и доверенные регрессии на отдельном runner; отдельный failing-patch сценарий ранее был отклонён. Свежие moderation regression CI и PostgreSQL 17 integrations на `a016174` прошли. |
+| Reviewer | Ограниченно проверено | Отдельный статический Reviewer артефакт сверяет SHA, evidence, validator и QA. Это не независимая ИИ-модель и не проверка семантической корректности. |
+| Создание PR | Код и текущий draft подтверждены, автоматическая цепочка не подтверждена | PR #65 существует, но его коммиты внесены в текущую работу; синтетический Qwen run не создавал PR из очереди. PR Manager workflow требует QA и оставляет новые PR в draft. |
+| Защита main | Не доказана на серверном уровне | Активный ruleset требует PR и check, но `required_approving_review_count=0`. Owner verifier в workflow ограничен веткой `codex/fam-run-*`; правила самого workflow потенциально изменяемы PR. Merge не выполнялся. |
+| Защита production | Частично подтверждена статически | Coder allowlist исключает `supabase/**` и `.github/**`; workflow не запускает production migration/deploy. Отдельный runtime негативный тест прямого вызова production DB/deploy не выполнялся. |
+| Восстановление очереди | Проверено в изолированном PostgreSQL CI, не в production | PR migration тестирует только повтор подтверждённого `model_timeout` с задержкой и пределом попыток; неизвестный `model_failed` остаётся terminal. Migration не применена. |
+| Единый Reporter | Проверен код и PostgreSQL fixture; production версия остаётся legacy | В production сохранено 5 legacy-отчётов по 13 ноября; новая схема Reporter из PR не применена. |
+
+### Текущий облачный снимок
+
+- Supabase `ACTIVE_HEALTHY`, PostgreSQL 17.11, организация на бесплатном плане. Репозиторий публичный; обычные стандартные hosted runners для публичных репозиториев бесплатны ([GitHub Docs](https://docs.github.com/en/actions/concepts/billing-and-usage)).
+- Шесть FAM Cron активны: worker каждые 5 минут, site-error audit каждый час, остальные ежедневно. За последние 7 дней в агрегате обнаружено 998 успешных запусков и ноль неуспешных среди этих заданий. Это подтверждает расписание и worker execution, не корректность каждого бизнес-результата.
+- В production нет агрегированных site error events за последние 24 часа. Producer выполнялся успешно, но новых coder-задач сейчас нет; четыре coder-задачи в истории — одна completed и три failed.
+- Production migration ledger заканчивается `20261112231634`. Миграции PR #65 не применены; действующая completion RPC всё ещё может пометить `model_completed` как `completed` до QA. Это блокирует безопасное включение полного production queue → Qwen → QA → PR контура до отдельного review и разрешённого rollout.
+- Security Advisor (20:37 UTC) показывает четыре RLS/no-policy предупреждения, `pg_net` в `public`, анонимный доступ к telemetry RPC, четыре authenticated SECURITY DEFINER школьных RPC и выключенную leaked-password protection. Прочитанные RPC включают auth/school/role проверки и пустой `search_path`; telemetry принимает allowlist и ограничивает агрегат 1000 на event/page/hour. Эти данные требуют отдельного review и не являются основанием менять Auth/RLS/grants автоматически.
+- Production, queue, cron, функции, секреты, Auth/RLS и пользовательские данные в этой сверке не изменялись.
+
+### Итог по критериям завершения
+
+- **Подтверждено:** роли и границы статических QA/Security/Performance модулей задокументированы; очередной worker/cron работает без локального компьютера; публичная модель и пустая очередь экономят повторную загрузку; synthetic patch, QA rejection и PostgreSQL интеграции имеют изолированные проверки; приватный Reporter code/schema имеет PostgreSQL fixture.
+- **Частично подтверждено:** producer → очередь, worker → claim/finish, Qwen → patch, QA → reject/pass, Reviewer → отдельный отчёт, PR Manager → draft PR существуют как отдельные проверяемые компоненты, но не объединены в наблюдённый live run.
+- **Не подтверждено/не завершено:** сквозной production queue → Qwen → QA → draft PR, владелец как неизменяемый серверный merge gate, защищённое production deployment и post-deploy QA, Reporter с полными статусами ролей уже в production, Auth leaked-password protection.
+- Merge, deployment, миграции, настройки Supabase, секреты и пользовательские данные не менялись. PR #65 остаётся draft.
