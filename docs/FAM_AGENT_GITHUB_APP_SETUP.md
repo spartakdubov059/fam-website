@@ -18,7 +18,7 @@ Workflow запрашивает installation token только для `fam-webs
 
 ## Обязательная защита main
 
-Перед настройкой App в активном ruleset `FAM — защита main` должно быть выставлено минимум 1 approving review, dismiss stale approvals on new commits и отсутствие bypass actors. На read-only снимке 13 ноября 2026 в 14:10 UTC ruleset требовал 0 approvals, хотя PR и Russian content safety check были обязательными. Поэтому workflow owner-gate — дополнительная защита для веток `codex/fam-run-*`, но не замена нативному запрету merge без review; также не защищает от изменений самого gate-workflow вне coder allowlist.
+Перед настройкой App в активном ruleset `FAM — защита main` должно быть выставлено минимум 1 approving review, dismiss stale approvals on new commits и отсутствие bypass actors. На read-only снимке 13 ноября 2026 в 14:10 UTC `required_approving_review_count=0`, хотя PR и Russian content safety check были обязательными. Поэтому workflow owner-gate — дополнительная защита для веток `codex/fam-run-*`, но не замена нативному запрету merge без review; также не защищает от изменений самого gate-workflow вне coder allowlist.
 
 Эту настройку в GitHub не менял. Не устанавливай App token для FAM Agent, пока нативное правило одобрения не включено и не проверено.
 
