@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createYdbListingsRepository } from '../repositories/ydb-listings.mjs';
+test('active suspension lookup is bounded to the actor school and ignores expired records', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ reason: 'synthetic policy violation', duration_hours: 24, expires_at: '2099-01-01T00:00:00Z' }]]);
+  });
+  const suspension = await repo.getActiveAccountSuspension('school-a', 'student-a');
+  assert.equal(suspension.reason, 'synthetic policy violation');
+  assert.ok(query.values.includes('school-a'));
+  assert.ok(query.values.includes('student-a'));
+  assert.match(query.text, /status = 'active'/);
+  assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
+  assert.match(query.text, /LIMIT 1/);
+  assert.doesNotMatch(query.text, /SELECT \*/);
+  await assert.rejects(repo.getActiveAccountSuspension('', 'student-a'), TypeError);
+});
 test('listing insert binds user content as data and writes only pending status', async () => {
   let query;
   const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; };
