@@ -251,10 +251,12 @@ Deno.serve(async (req: Request) => {
         p_summary: summary,
       });
 
-      if (saved === true) {
-        if (status === "completed") completed++;
-        else blocked++;
+      if (saved !== true) {
+        throw new Error("task_finish_not_saved");
       }
+
+      if (status === "completed") completed++;
+      else blocked++;
     }
 
     return json({ ok: true, claimed: tasks.length, completed, blocked });
