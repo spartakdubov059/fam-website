@@ -33,6 +33,7 @@ begin
   insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
   values ('223e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
           'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  update private.fam_agent_tasks set attempt_count=2 where id='223e4567-e89b-42d3-a456-426614174000';
   v_saved := public.finish_fam_agent_coder_task_with_pr(
     '223e4567-e89b-42d3-a456-426614174000',
     'fam-agent-qwen-coder-v1','model_failed',null,null
@@ -69,6 +70,21 @@ begin
   end;
 
   insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('523e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  v_saved := public.finish_fam_agent_coder_task_with_pr(
+    '523e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1','model_failed',null,null
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='523e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true or v_task.status <> 'queued'
+     or v_task.available_at < now()+interval '29 minutes'
+     or v_task.available_at > now()+interval '31 minutes' then
+    raise exception 'transient coder failure did not receive one delayed retry';
+  end if;
+
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
   values ('423e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
           'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
   v_saved := public.finish_fam_agent_coder_task(
@@ -82,7 +98,7 @@ begin
     raise exception 'legacy finish route improperly completed a patch before QA/PR checks';
   end if;
 
-  if (select count(*) from private.fam_agent_task_events) <> 4 then
+  if (select count(*) from private.fam_agent_task_events) <> 5 then
     raise exception 'coder finish RPC did not write one event per task';
   end if;
 end
