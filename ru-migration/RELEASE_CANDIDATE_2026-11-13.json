@@ -9,12 +9,12 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 46,
+      "passed": 71,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow run 43441998358 on commit a64a8ba58d7e764e83ba0489699f2dc5741b293b; includes OIDC, listing, favorites, ideas, same-school messages, HTTP routes, privacy and media unit tests"
+      "source": "GitHub Actions SDK compatibility workflow run 43458424147 on commit 33274f6097a1ed63ce0962bb2f8bd7d9e14486bf; includes OIDC, listings, favorites, ideas, same-school messages, event registrations, public-board auth/event-signup/cancellation flows, HTTP routes, privacy and media unit tests"
     },
     "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend unit tests (46/46) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
+    "reproduction": "PASS — current backend unit tests (71/71) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
   "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
@@ -35,14 +35,15 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43441998358,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43441998358",
-    "ydb_run_id": 43441998468,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43441998468",
+    "sdk_run_id": 43458424147,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43458424147",
+    "ydb_run_id": 43458424327,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43458424327",
     "result": "success",
-    "tested_commit": "a64a8ba58d7e764e83ba0489699f2dc5741b293b"
+    "tested_commit": "33274f6097a1ed63ce0962bb2f8bd7d9e14486bf"
   },
-  "local_ydb_integration": "PASS — disposable local YDB; synthetic profile lookup, pending listing invisibility, active public projection, favorite CRUD limited to active listings, pending idea storage, approved same-school message, and rejection of cross-school recipient",
+  "local_ydb_integration": "PASS — disposable local YDB; synthetic profile lookup, pending listing invisibility, active public projection, favorite CRUD limited to active listings, pending idea storage, approved same-school message, rejection of cross-school recipient, bounded event registration under concurrent requests, participant cancellation, and school-scoped event review",
+  "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
   "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
   "pricing_evidence": [
     {
