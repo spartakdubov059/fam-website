@@ -130,7 +130,9 @@ Deno.serve(async (req: Request) => {
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(task.id) ||
         !["audit_frontend_runtime", "audit_client_resilience", "audit_accessibility"].includes(task.task_key) ||
         typeof task.event_code !== "string" ||
+        !EVENT_CODES.has(task.event_code) ||
         typeof task.page_area !== "string" ||
+        !PAGE_AREAS.has(task.page_area) ||
         !Number.isInteger(task.occurrences) ||
         task.occurrences < 0 ||
         task.occurrences > 1000
