@@ -6,8 +6,8 @@
 
 ## Подтверждено сейчас
 
-- Последняя полная проверка до добавления авторизации: **58/58 backend-тестов** и SDK/Sharp gate прошли на Node 22 ([run](https://github.com/spartakdubov059/fam-website/actions/runs/43447803027)).
-- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43446546716): успешно на одноразовой YDB в GitHub runner, включая отправку объявления через API, отклонение попытки модерации от ученика, одобрение администратором той же школы и публичное чтение только после одобрения.
+- Последняя полная проверка: **63/63 backend-тестов**, YDB/AWS SDK и Sharp 0.35.5 прошли на Node 22 ([SDK/тесты](https://github.com/spartakdubov059/fam-website/actions/runs/43454552356)).
+- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43454552347): успешно на одноразовой YDB в GitHub runner, включая отправку объявления через API, отклонение попытки модерации от ученика, одобрение администратором той же школы и публичное чтение только после одобрения.
 - Гостевая доска получает только публичный список из российского API, не отправляет cookies и вставляет текст объявлений безопасным DOM API. До настройки backend остальные пользовательские операции остаются отключены.
 - YDB зависимости backend зафиксированы точными версиями и lockfile.
 
