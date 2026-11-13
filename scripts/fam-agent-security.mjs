@@ -57,10 +57,10 @@ export function buildSecurityReport(patch) {
       findings.push({ severity: "blocker", code: "active_or_dynamic_execution", path });
       continue;
     }
-    if ((path === "index.html" || path.startsWith("js/") || path.startsWith("css/")) &&
-        REVIEW_PATTERNS.some(({ pattern }) => pattern.test(text))) {
-      const code = REVIEW_PATTERNS.find(({ pattern }) => pattern.test(text))?.name || "sensitive_runtime_change";
-      findings.push({ severity: "review", code, path });
+    if (path === "index.html" || path.startsWith("js/") || path.startsWith("css/")) {
+      for (const { name, pattern } of REVIEW_PATTERNS) {
+        if (pattern.test(text)) findings.push({ severity: "review", code: name, path });
+      }
     }
   }
 
