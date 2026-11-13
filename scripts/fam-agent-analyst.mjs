@@ -49,7 +49,7 @@ export function analyzeTechnicalSignals(signals) {
   const groups = new Map();
   for (const signal of Array.isArray(signals) ? signals.slice(0, 100) : []) {
     if (!signal || typeof signal !== "object" || Array.isArray(signal)) continue;
-    const rule = SIGNAL_RULES[signal.event_code];
+    const rule = Object.hasOwn(SIGNAL_RULES, signal.event_code) ? SIGNAL_RULES[signal.event_code] : null;
     if (!rule || !ALLOWED_AREAS.has(signal.page_area)) continue;
     if (!Number.isSafeInteger(signal.occurrences) || signal.occurrences < 1 || signal.occurrences > 1000000) continue;
     const key = rule.group + ":" + signal.page_area;
