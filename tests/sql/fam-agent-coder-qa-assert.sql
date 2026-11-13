@@ -49,7 +49,7 @@ begin
   insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
   values ('223e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
           'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
-  update private.fam_agent_tasks set attempt_count=2 where id='223e4567-e89b-42d3-a456-426614174000';
+  update private.fam_agent_tasks set attempt_count=0 where id='223e4567-e89b-42d3-a456-426614174000';
   v_saved := public.finish_fam_agent_coder_task_with_pr(
     '223e4567-e89b-42d3-a456-426614174000',
     'fam-agent-qwen-coder-v1','model_failed',null,null
@@ -94,7 +94,7 @@ begin
           'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
   v_saved := public.finish_fam_agent_coder_task_with_pr(
     '523e4567-e89b-42d3-a456-426614174000',
-    'fam-agent-qwen-coder-v1','model_failed',null,null
+    'fam-agent-qwen-coder-v1','model_timeout',null,null
   );
   select * into v_task from private.fam_agent_tasks
   where id='523e4567-e89b-42d3-a456-426614174000';
