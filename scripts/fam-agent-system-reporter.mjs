@@ -4,7 +4,7 @@ import { analyzeTechnicalSignals } from "./fam-agent-analyst.mjs";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const API_ROOT = "https://api.github.com";
 const PUBLIC_SITE_URL = "https://spartakdubov059.github.io/fam-website/";
-const SNAPSHOT_KEYS = ["generated_at", "report_date", "daily_report", "agent_statuses", "cron_jobs", "latest_system_health", "latest_coder_task", "latest_site_error_check", "failed_tasks_24h", "site_error_events_24h"];
+const SNAPSHOT_KEYS = ["generated_at", "report_date", "daily_report", "agent_statuses", "cron_jobs", "latest_system_health", "latest_coder_task", "latest_site_error_check", "worker_http_6h", "failed_tasks_24h", "site_error_events_24h"];
 
 function safeLabel(value, maxLength = 100) {
   return String(value ?? "unknown")
@@ -147,7 +147,11 @@ export function createDailyReport({
   const roles = [
     { role: "Orchestrator", status: validSnapshot && snapshot.daily_report ? "reported" : "not_reported" },
     { role: "Monitoring", status: (siteProbe.status === "reachable" ? "site_reachable" : safeLabel(siteProbe.status, 40)) +
-      ";site_error_task:" + safeLabel(snapshot?.latest_site_error_check?.status ?? "unknown", 40) },
+      ";site_error_task:" + safeLabel(snapshot?.latest_site_error_check?.status ?? "unknown", 40) +
+      ";worker_http:" + (validSnapshot
+        ? count(snapshot.worker_http_6h?.success_count) + "/" + count(snapshot.worker_http_6h?.response_count) +
+          "_success;http_errors:" + count(snapshot.worker_http_6h?.http_error_count)
+        : "not_observed") },
     { role: "Analyst", status: analyzeTechnicalSignals(validSnapshot ? snapshot.site_error_events_24h : []).status },
     { role: "Coder", status: "queue:" + (validSnapshot ? safeLabel(snapshot.latest_coder_task?.status ?? "no_task", 40) : "unavailable") +
       ";run:" + agentStatus("coder") },
@@ -178,6 +182,7 @@ export function createDailyReport({
       latest_system_health: snapshot.latest_system_health,
       latest_coder_task: snapshot.latest_coder_task,
       latest_site_error_check: snapshot.latest_site_error_check,
+      worker_http_6h: snapshot.worker_http_6h,
       failed_tasks_24h: snapshot.failed_tasks_24h,
       site_error_events_24h: snapshot.site_error_events_24h,
     } : null,
@@ -196,7 +201,8 @@ export function createDailyReport({
     },
     limitations: [
       "Проверка сайта выполняется один раз в сутки и не является непрерывным мониторингом.",
-      "Состояние Edge Functions отражено только через последний system health task; версии функций напрямую не запрашивались.",
+      "Окно pg_net ограничено шестью часами и показывает только распознанные JSON-ответы Worker; транспортные ошибки без ответа не привязываются к конкретной функции.",
+      "Состояние Edge Functions отражено через HTTP-ответы Worker и последний system health task; версия функции не попадает в ежедневный отчёт.",
       "Проверены не более 100 последних запусков Actions и 50 открытых PR.",
       "Технический Analyst группирует только разрешённые коды событий; выводы являются гипотезами, а не подтверждённой первопричиной.",
     ],
@@ -254,6 +260,18 @@ export function renderDailyReport(report) {
     lines.push("- Последняя проверка ошибок сайта: " +
       (snapshot.latest_site_error_check?.status ?? "нет данных") + " (" +
       (snapshot.latest_site_error_check?.updated_at ?? "время неизвестно") + ").");
+    const workerHttp = snapshot.worker_http_6h;
+    if (workerHttp && typeof workerHttp === "object") {
+      lines.push("- Ответы Edge Worker по pg_net (окно до " + count(workerHttp.window_hours) + " ч): " +
+        count(workerHttp.success_count) + "/" + count(workerHttp.response_count) +
+        " успешных распознанных ответов; HTTP-ошибок: " + count(workerHttp.http_error_count) +
+        "; ошибок, сообщённых Worker: " + count(workerHttp.reported_error_count) + ".");
+      if (typeof workerHttp.observed_from === "string") {
+        lines.push("  Самый ранний сохранённый ответ: " + safeLabel(workerHttp.observed_from, 40) + ".");
+      }
+    } else {
+      lines.push("- Ответы Edge Worker по pg_net: нет данных.");
+    }
     lines.push("", "| Агент | В очереди | В работе | Заблокировано | Готово за сутки | Ошибки за сутки |",
       "|---|---:|---:|---:|---:|---:|");
     for (const agent of snapshot.agent_statuses ?? []) {
