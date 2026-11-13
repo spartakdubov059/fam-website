@@ -12,4 +12,4 @@ CREATE TABLE fam_profile_requests (
   reviewed_by Utf8 NOT NULL,
   created_at Timestamp NOT NULL,
   PRIMARY KEY (issuer, subject)
-);
+) WITH (TTL = Interval("P30D") ON created_at);
