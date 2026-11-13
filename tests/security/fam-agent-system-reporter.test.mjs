@@ -116,7 +116,7 @@ test("Reporter output fields match the Edge bridge and SQL persistence allowlist
   const report = createDailyReport({ now });
   const declaration = edgeBridgeSource.match(/const REPORT_FIELDS = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
   const edgeFields = [...declaration.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
-  assert.deepEqual(edgeFields, Object.keys(report).sort());
+  assert.deepEqual(edgeFields, Object.keys({ ...report, markdown: renderDailyReport(report) }).sort());
   assert.match(declaration, /"role_statuses"/);
   assert.match(reportMigration, /'open_pull_requests','role_statuses','production_deployment'/);
 });
