@@ -1,4 +1,5 @@
 import { analyzeCronRunHealth } from "./cron-health.mjs";
+import { finishTaskAndCount } from "./finish-task.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const WORKER_TOKEN = Deno.env.get("FAM_AGENT_WORKER_TOKEN") ?? "";
@@ -244,18 +245,14 @@ Deno.serve(async (req: Request) => {
           (details ? "Категории: " + details + ". " : "") +
           "Собраны только агрегированные коды ошибок и разделы; личные данные не собирались.";
       }
-      const saved = await rpc("finish_fam_agent_task", {
-        p_task_id: task.id,
-        p_worker_id: WORKER_ID,
-        p_status: status,
-        p_summary: summary,
+      const savedStatus = await finishTaskAndCount(rpc, {
+        taskId: task.id,
+        workerId: WORKER_ID,
+        status,
+        summary,
       });
 
-      if (saved !== true) {
-        throw new Error("task_finish_not_saved");
-      }
-
-      if (status === "completed") completed++;
+      if (savedStatus === "completed") completed++;
       else blocked++;
     }
 
