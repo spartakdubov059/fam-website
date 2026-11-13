@@ -20,6 +20,14 @@ create table private.fam_agent_tasks (
   updated_at timestamptz not null default now()
 );
 
+create table private.fam_site_error_counts (
+  hour_bucket timestamptz not null,
+  event_code text not null,
+  page_area text not null,
+  event_count integer not null check (event_count between 1 and 1000),
+  primary key (hour_bucket, event_code, page_area)
+);
+
 create table cron.job (
   jobid bigint primary key,
   jobname text not null,
@@ -35,6 +43,10 @@ create table cron.job_run_details (
 
 insert into private.fam_agent_daily_reports (report_date, summary, metrics)
 values (current_date - 1, 'previous daily report', '{"completed":2}'::jsonb);
+
+insert into private.fam_site_error_counts (hour_bucket, event_code, page_area, event_count) values
+  (date_trunc('hour', now()), 'js_runtime', 'listings', 4),
+  (date_trunc('hour', now()), 'listings_load_failed', 'listings', 2);
 
 insert into private.fam_agent_tasks (agent_key, task_type, status, updated_at) values
   ('technical', 'coder_patch_request', 'failed', now()),
