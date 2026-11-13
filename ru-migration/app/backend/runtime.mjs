@@ -3,6 +3,7 @@ import { query } from '@ydbjs/query';
 import { MetadataCredentialsProvider } from '@ydbjs/auth/metadata';
 import { createOidcBearerAuthenticator } from './auth/oidc-bearer.mjs';
 import { createDatabaseActorResolver } from './auth/database-actor.mjs';
+import { createSuspensionWriteGuard } from './auth/suspension-write-guard.mjs';
 import { createYandexIdAuth } from './auth/yandex-id.mjs';
 import { createYdbListingsRepository } from './repositories/ydb-listings.mjs';
 import { createListingsApi } from './services/listings-api.mjs';
@@ -33,8 +34,9 @@ export async function createRuntime(env = process.env) {
   const sql = query(driver);
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
-  const listingsApi = createListingsApi({ authenticate, resolveActor, repository });
-  const mediaApi = createMediaApi({ authenticate, resolveActor, pendingImages, repository });
+  const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
+  const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository }));
+  const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
   return {
     listingsApi,
     mediaApi,
