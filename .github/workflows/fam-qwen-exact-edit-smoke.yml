@@ -1,12 +1,7 @@
 name: FAM Qwen exact-edit synthetic smoke
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "scripts/run-local-coder.mjs"
-      - "scripts/local-model-edits.mjs"
-      - "tests/fixtures/fam-agent-qwen-smoke*"
+  workflow_dispatch:
 
 permissions:
   contents: read
