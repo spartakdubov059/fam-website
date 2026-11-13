@@ -1,4 +1,4 @@
-Warning: truncated output (original token count: 21212)
+Warning: truncated output (original token count: 21213)
 Total output lines: 264
 
 # Аудит агентной системы FAM
@@ -104,7 +104,7 @@ Total output lines: 264
 ## Ограничение запуска CI на PR от workflow — подтверждено по коду и документации GitHub, 13 ноября 2026
 
 - `prepare_review` создаёт ветку и draft PR через `GITHUB_TOKEN`, затем до 15 минут ждёт обязательный check `Russian content safety tests`. В этой же ветке у coder-модели нет allowlist-пути для изменения `.github/workflows/**` или `scripts/verify-agent-pr-owner-approval.mjs`; отдельный security-тест теперь проверяет этот запрет.
-- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автом…1212 tokens truncated…pproving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
+- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автом…1213 tokens truncated…oving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
 - GitHub Merge Pull Request API требует `Contents:write`. Текущий PR Manager и подготовленный App token получают `contents:write` для push branch, значит технически имеют merge API capability. Запрет `gh pr merge` в workflow доказывает только отсутствие этой команды в текущем коде, не серверную невозможность merge.
 - Owner approval required check блокирует coder PR, пока проверенный workflow исполняется из trusted base, но нативный ruleset не требует review; изменение gate workflow вне patch allowlist может ослабить check. Безопасное завершение требует нативно установить как минимум одно approving review, stale-review dismissal и отсутствие bypass. Владелец затем разрешил рационально усилить ruleset, однако доступный GitHub connector поддерживает только чтение rulesets и не предоставляет операцию изменения; App setup инструкция исправлена и предписывает не настраивать App до включения native review.
 - Merge API permission and required-review rule documentation: [GitHub Merge a pull request](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request), [available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
@@ -243,4 +243,4 @@ Total output lines: 264
 - В live очереди `coder_patch_request` остаются 1 `completed` и 3 `failed`; `site_error_digest` — 79 completed, `daily_report_digest` — 4, `system_health_check` — 4, `queue_health_check` — 2. Читались только task type/status/count и расписания, без payload/описаний/секретов.
 - Production `finish_fam_agent_coder_task(uuid,text,text)` всё ещё содержит старую ветку, которая переводит `model_completed` в `completed` без подтверждённых QA/PR метаданных. В production ledger отсутствуют PR #65 QA completion/bounded retry и Reporter migrations. Полный облачный путь по-прежнему не включён и не доказан.
 - Повторно прочитан ruleset `FAM — защита main` (ID 27066766): он активен, требует PR и `Russian content safety tests`, запрещает удаление и force-push, bypass actors отсутствуют, но `required_approving_review_count=0`. Owner approval check из PR ещё не действует в main. Merge/deploy/production migration не выполнялись.
-- Локальный набор moderation/security на Node 24 имеет один существующий сбой совместимости теста `fam-agent-qa-rejection.test.mjs`: тест ищет старый TAP текст `# tests 1`, тогда как Node 24 выдаёт `ℹ tests 1`. На этом же head hosted Regression workflow прошёл полностью; SQL-регрессия отдельно прошла на hosted PostgreSQL 17.
+- Первоначальный локальный запуск обнаружил несовместимость negative-control теста с TAP-форматом Node 24 (`ℹ tests 1` вместо `# tests 1`). Проверка обновлена для обоих форматов, после чего полный локальный набор moderation/security прошёл 276/276. SQL-регрессия отдельно прошла на hosted PostgreSQL 17.

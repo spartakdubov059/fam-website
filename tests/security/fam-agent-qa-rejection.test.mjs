@@ -55,8 +55,8 @@ test("independent QA rejects an applied patch with a failing regression test", (
       "independent regression QA must reject the deliberately broken patch; output: " +
         (qa.stdout + qa.stderr).slice(0, 2000),
     );
-    assert.match(qa.stdout + qa.stderr, /# tests 1/);
-    assert.match(qa.stdout + qa.stderr, /# fail 1/);
+    assert.match(qa.stdout + qa.stderr, /(?:#|ℹ) tests 1/);
+    assert.match(qa.stdout + qa.stderr, /(?:#|ℹ) fail 1/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
