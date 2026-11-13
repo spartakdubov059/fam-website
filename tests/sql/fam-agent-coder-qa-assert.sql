@@ -124,7 +124,7 @@ begin
 
   -- The retry scenario intentionally leaves one delayed queued task; clear it before testing the single-active-task producer.
   update private.fam_agent_tasks set status='completed'
-  where id='523e4567-e89b-42d3-a456-426614174000';
+  where task_type='coder_patch_request' and status in ('queued','claimed','in_progress');
 
   insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
   values ('js_runtime','other',now()-interval '1 hour',3);
