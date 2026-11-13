@@ -114,7 +114,7 @@ test("all coder-editable paths trigger required CI and PR manager waits with rea
   assert.doesNotMatch(workflow, /actions: write/);
 });
 
-test("all changes require owner approval before merge and production publication", () => {
+test("agent PRs stay draft and the workflow does not request ready or merge transitions", () => {
   assert.match(validator, /CRITICAL_CHANGE_PATTERNS/);
   assert.match(validator, /export function requiresManualApproval/);
   const createCommands = workflow.split("\n").filter((line) => line.includes("gh pr create"));
