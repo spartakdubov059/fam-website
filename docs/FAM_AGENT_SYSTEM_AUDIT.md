@@ -45,3 +45,12 @@
 3. Просмотреть PR #74: PostgreSQL 17 integration CI и текущие проверки прошли; bounded retry migration не применялась.
 4. Владелец должен отдельно решить обязательное одобрение; ruleset допускает 0 reviews, а инструменты не дают изменять ruleset.
 5. Разобрать advisories `pg_net`, публичный `report_fam_site_error` и Auth; не менять production/Auth/RLS/grants без отдельного решения. Не объединять PR и не выкатывать production.
+
+
+## Дополнение 13 ноября 2026, 10:12 UTC
+
+- Новый read-only снимок production: очередь содержит 82 задачи — 79 `completed`, 3 `failed`. Четыре `coder_patch_request`: одна завершена, три failed; все четыре имеют `attempt_count=1`, `max_attempts=2`, `source=scheduled_audit`, `approval_required=false`. Все шесть расписаний `fam-agent-*` активны, последние зарегистрированные запуски успешны; Worker с периодом 5 минут последний раз завершился успешно в 10:10 UTC. Снимок не менял данные.
+- В PR #65 очередь теперь фиксирует результат patch только после QA, создания draft PR и прохождения обязательного PR check. При успехе сохраняются ограниченные `pr_url` и 40-символьный `commit_sha`; при неуспешном QA/PR результат не считается completed. Для старого bridge-контракта patch переходит в отдельный статус `review`, а не в `completed`. Отсутствие patch остаётся отдельным завершённым результатом анализа.
+- Добавлены PostgreSQL 17 интеграционные проверки для grant scope, QA/PR metadata, no-patch, failed, review и задержанного ограниченного retry. CI на текущем head `920444b799f09d2d95c30448edef6a578904953f`: Russian content safety tests [#43407325674](https://github.com/spartakdubov059/fam-website/actions/runs/43407325674) и coder queue PostgreSQL integration [#43407325645](https://github.com/spartakdubov059/fam-website/actions/runs/43407325645) прошли; Reporter PostgreSQL integration [#43407325578](https://github.com/spartakdubov059/fam-website/actions/runs/43407325578) прошёл.
+- PR #74 bounded retry теперь также оставляет legacy `model_completed` в статусе `review`; его PostgreSQL integration прошла. Миграция PR #65 версии `20261113103000` повторно задаёт безопасное поведение после retry-миграции #74 версии `20261113100000` при совместном rollout.
+- Это пока черновые PR. В production остаются Worker v17 и coder bridge v1; новые SQL-миграции и Edge Function не применялись. GitHub ruleset всё ещё допускает 0 approving reviews, поэтому server-side owner-approval gate не настроен. PR сам по себе не изменяет production.
