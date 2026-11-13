@@ -60,3 +60,39 @@ grant usage, select on all sequences in schema private to service_role;
 create schema cron;
 create function cron.schedule(text,text,text)
 returns bigint language sql immutable as 'select 1::bigint';
+
+-- Simulate recent terminal transient failures that predate the bounded retry migration.
+insert into private.fam_agent_tasks (
+  id,agent_key,task_type,title,description,priority,status,source,approval_required,
+  payload,result_summary,attempt_count,max_attempts,created_at,updated_at,finished_at
+) values
+  ('10000000-0000-4000-8000-000000000001','technical','coder_patch_request','old transient A','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_frontend_runtime","event_code":"js_runtime","page_area":"other","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000002','technical','coder_patch_request','old transient duplicate','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_frontend_runtime","event_code":"js_runtime","page_area":"other","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '2 days',pg_catalog.now()-interval '2 days',pg_catalog.now()-interval '2 days'),
+  ('10000000-0000-4000-8000-000000000003','technical','coder_patch_request','old transient B','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_accessibility","event_code":"js_runtime","page_area":"other","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000004','technical','coder_patch_request','active duplicate candidate','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_client_resilience","event_code":"listings_load_failed","page_area":"listings","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000005','technical','coder_patch_request','active duplicate','synthetic fixture','normal','queued','scheduled_audit',false,
+   '{"task_key":"audit_client_resilience","event_code":"listings_load_failed","page_area":"listings","occurrences":4}',
+   null,0,2,pg_catalog.now(),pg_catalog.now(),null),
+  ('10000000-0000-4000-8000-000000000006','technical','coder_patch_request','exhausted failure','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_frontend_runtime","event_code":"unhandled_rejection","page_area":"database","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',2,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000007','technical','coder_patch_request','manual failure','synthetic fixture','normal','failed','manual',false,
+   '{"task_key":"audit_accessibility","event_code":"unhandled_rejection","page_area":"auth","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000008','technical','coder_patch_request','approval failure','synthetic fixture','normal','failed','scheduled_audit',true,
+   '{"task_key":"audit_accessibility","event_code":"unhandled_rejection","page_area":"notifications","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000009','technical','coder_patch_request','other failure','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_accessibility","event_code":"unhandled_rejection","page_area":"notifications","occurrences":4}',
+   'Другая ошибка.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
+  ('10000000-0000-4000-8000-000000000010','technical','coder_patch_request','old stale failure','synthetic fixture','normal','failed','scheduled_audit',false,
+   '{"task_key":"audit_accessibility","event_code":"unhandled_rejection","page_area":"auth","occurrences":4}',
+   'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '8 days',pg_catalog.now()-interval '8 days',pg_catalog.now()-interval '8 days');
