@@ -56,7 +56,9 @@ test("Open events behave as announcements with no bookings, attendee cap or publ
  assert.match(sql,/l\.school_id=school and l\.status='active'/);
 });
 test("Announcements animations are responsive and optional for reduced motion",()=>{
- assert.match(html,/>Анонсы <span class="pulse-heading-star"/);
+ assert.match(html,/id="pulseCarouselTitle">Анонсы и мероприятия/);
+ assert.match(html,/id="pulseAnnouncementTrack" class="pulse-announcement-track"/);
+ assert.match(html,/>Школьные опросы <span class="pulse-heading-star"/);
  assert.doesNotMatch(html,/>Школьный пульс/);
  assert.match(css,/@keyframes pulseReveal/);
  assert.match(css,/@keyframes pulseBarGrow/);
