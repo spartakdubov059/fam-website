@@ -1,6 +1,6 @@
--- Operator-managed suspension records. Keep the database actor's school scope in
--- the primary key so lookups stay bounded to one school and one account.
--- Administrative issue/lift UI and audit history are a separate porting step.
+-- Suspension records retain each issue/lift event. The target-first key lets
+-- active-status reads remain bounded to one account while preserving history.
+-- Administrative issue/lift API and UI are a separate porting step.
 CREATE TABLE fam_account_suspensions (
   school_id Utf8 NOT NULL,
   target_id Utf8 NOT NULL,
@@ -14,5 +14,5 @@ CREATE TABLE fam_account_suspensions (
   expires_at Timestamp NOT NULL,
   lifted_by Utf8,
   lifted_at Timestamp,
-  PRIMARY KEY (school_id, target_id)
+  PRIMARY KEY (target_id, suspension_id)
 );
