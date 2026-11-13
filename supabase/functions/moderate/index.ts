@@ -334,12 +334,15 @@ serve(async (req: Request) => {
         await writeSafetySignal(safetyContext, "unclear_safety_signal", "high");
       }
 
-      return cacheAndRespond(cacheKey, {
-        action: ideaReview.action,
-        reason_code: ideaReview.reason_code,
-        reason: ideaReview.reason,
-        provider: "openai_idea_moderator",
-      }, headers);
+      if (ideaReview.action !== "ok" || !imageUrl) {
+        return cacheAndRespond(cacheKey, {
+          action: ideaReview.action,
+          reason_code: ideaReview.reason_code,
+          reason: ideaReview.reason,
+          provider: "openai_idea_moderator",
+        }, headers);
+      }
+      // A clean idea with a photo continues through the shared visual image checks below.
     }
 
     // For locally flagged text, ask the OpenAI contextual agent first. This avoids
