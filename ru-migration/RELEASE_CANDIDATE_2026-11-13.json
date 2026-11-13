@@ -9,12 +9,12 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 102,
+      "passed": 111,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow run 43501186442 on commit 229a6a32fdbed8d653c75e8ba4018f15346aef15; includes listing and idea submission UI, school-scoped listing/photo/event review queues, Yandex auth mock tests, media, database and server tests"
+      "source": "GitHub Actions SDK compatibility workflow run 43504544271 on commit cabf8fbcf2c5309556d6f05940e93aa284db746f; includes profile onboarding API/UI and moderation tests"
     },
-    "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend unit tests (102/102) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
+    "command": "npm test --prefix ru-migration/app/backend (GitHub Actions run 43504544271)",
+    "reproduction": "PASS — current backend unit tests (111/111) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
   "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
@@ -23,9 +23,9 @@
     "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
     "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs are not fully ported",
     "Cloud YDB, object storage, auth and moderation integrations not tested; only disposable local YDB integration passed",
+    "Profile onboarding is synthetic-only; school catalog incomplete and pending request PII requires retention/cleanup policy",
     "No free-only school-controlled cloud staging has been provisioned or budget-verified",
     "Orphaned private image cleanup after browser/network loss is not implemented",
-    "Yandex OAuth is unconfigured and unknown identities have no safe school-profile onboarding flow",
     "Full auth, moderation, account-migration and safe access policy/legal review before real students join"
   ],
   "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
@@ -37,14 +37,14 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43501186442,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43501186442",
-    "ydb_run_id": 43501186446,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43501186446",
+    "sdk_run_id": 43504544271,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43504544271",
+    "ydb_run_id": 43504544263,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43504544263",
     "result": "success",
-    "tested_commit": "229a6a32fdbed8d653c75e8ba4018f15346aef15"
+    "tested_commit": "cabf8fbcf2c5309556d6f05940e93aa284db746f"
   },
-  "local_ydb_integration": "PASS — disposable local YDB; synthetic profiles, listings, favorites, pending ideas, same-school messages, photo review, event capacity/cancellation, and school-scoped event review queues",
+  "local_ydb_integration": "PASS — disposable local YDB; synthetic profiles and school profile-request approval/rejection, listings, favorites, ideas, messages, school-scoped photo/event queues, photo visibility, event capacity/cancellation/review",
   "idea_submission_ui": "PASS — CI test covers authenticated UI submission to moderated API and pending status feedback",
   "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
   "media_upload_api": "PASS — authenticated JPEG/PNG/WebP uploads are limited to 5 MiB, normalized to WebP, attached to pending listings, reviewed by school staff, and served only after approval; orphan cleanup after browser/network loss remains incomplete",
