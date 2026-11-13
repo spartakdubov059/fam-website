@@ -10,16 +10,26 @@ export async function submitListing({ actor, input, repository, review }) {
   if (!input || typeof input !== 'object' || typeof input.title !== 'string' || typeof input.description !== 'string' || !CATEGORIES.has(input.category)) {
     return { ok: false, code: 'invalid_listing' };
   }
+  if (typeof actor.school_id !== 'string' || !actor.school_id.trim()) return { ok: false, code: 'school_required' };
   const title = input.title.trim();
   const description = input.description.trim();
-  if (!title || title.length > 200 || !description || description.length > 8000 || input.image_url || input.imageUrl) {
+  const price = input.price_text == null ? 'Бесплатно' : typeof input.price_text === 'string' ? input.price_text.trim() : null;
+  if (!title || title.length > 80 || !description || description.length > 1000 || price === null || price.length > 50 || input.image_url || input.imageUrl) {
     return { ok: false, code: 'invalid_listing' };
   }
-  const decision = await reviewText(`${title}\n${description}`, { review });
+  const isEvent = input.category === 'Мероприятия';
+  if (isEvent && !['school_admin', 'council_member'].includes(actor.role)) return { ok: false, code: 'forbidden' };
+  const eventType = isEvent ? (input.event_type ?? 'open') : null;
+  const maxSeats = isEvent && eventType === 'limited' ? Number(input.max_seats) : 0;
+  if (isEvent && (!['open', 'request', 'limited'].includes(eventType) || (eventType === 'limited' && (!Number.isInteger(maxSeats) || maxSeats < 1 || maxSeats > 500)))) return { ok: false, code: 'invalid_listing' };
+  const eventDate = isEvent && typeof input.event_date === 'string' ? input.event_date : null;
+  const eventTime = isEvent && typeof input.event_time === 'string' ? input.event_time : null;
+  if ((eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) || (eventTime && !/^\d{2}:\d{2}$/.test(eventTime))) return { ok: false, code: 'invalid_listing' };
+  const decision = await reviewText([title, description, price].join('\n'), { review });
   if (decision.action !== 'ok') return { ok: false, code: decision.reason_code || 'review_pending', status: decision.action };
   if (!repository || typeof repository.createListing !== 'function') return { ok: false, code: 'database_unavailable' };
   try {
-    const listing = await repository.createListing({ user_id: actor.id, title, description, category: input.category, status: 'pending' });
+    const listing = await repository.createListing({ user_id: actor.id, school_id: actor.school_id, title, description, category: input.category, price_text: price || 'Бесплатно', is_event: isEvent, event_date: eventDate, event_time: eventTime, event_type: eventType, max_seats: maxSeats, status: 'pending' });
     if (!listing || typeof listing.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: 'pending', id: listing.id };
   } catch {
