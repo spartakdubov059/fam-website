@@ -2,6 +2,16 @@
 -- Keep the old bridge contract safe during staged deployment: it may only move a
 -- generated patch to review, never mark that patch completed without QA evidence.
 alter table private.fam_agent_tasks
+  drop constraint fam_agent_tasks_status_check,
+  add constraint fam_agent_tasks_status_check
+    check (status in ('queued','claimed','in_progress','review','blocked','completed','failed','cancelled'));
+
+alter table private.fam_agent_task_events
+  drop constraint fam_agent_task_events_event_type_check,
+  add constraint fam_agent_task_events_event_type_check
+    check (event_type in ('created','claimed','started','progress','review','blocked','completed','failed','cancelled','retry_scheduled'));
+
+alter table private.fam_agent_tasks
   add column pr_url text,
   add column commit_sha text,
   add constraint fam_agent_tasks_pr_metadata_pair_check
