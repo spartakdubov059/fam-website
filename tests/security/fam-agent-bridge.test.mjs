@@ -58,8 +58,10 @@ test("maps model results to fixed result codes only", () => {
   const patch = { finding_status: "issue_found", patch_available: true };
   assert.equal(chooseResultCode(patch, true, true), "model_completed");
   assert.equal(chooseResultCode(patch, true, false), "model_failed");
-  assert.equal(chooseResultCode(patch, true, true, false), "model_failed");
-  assert.equal(chooseResultCode(patch, true, true, true), "model_completed");
+  assert.equal(chooseResultCode(patch, true, false, true, true), "model_failed");
+  assert.equal(chooseResultCode(patch, true, true, false, true), "model_review");
+  assert.equal(chooseResultCode(patch, true, true, true, true), "model_completed");
+  assert.equal(chooseResultCode(patch, true, true, false, false), "model_failed");
   assert.equal(chooseResultCode({ finding_status: "no_issue", patch_available: false }, true, false), "model_no_patch");
   assert.equal(chooseResultCode({ finding_status: "no_issue", patch_available: false }), "model_no_patch");
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
@@ -167,7 +169,8 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /request_too_large/);
   assert.match(edgeSource, /claim_fam_agent_coder_tasks/);
   assert.match(edgeSource, /finish_fam_agent_coder_task_with_pr/);
-  assert.match(edgeSource, /body\.result_code === "model_completed" && body\.pr_url !== null && body\.commit_sha !== null/);
+  assert.match(edgeSource, /model_review/);
+  assert.match(edgeSource, /model_completed.*model_review/);
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
   assert.match(edgeSource, /!EVENT_CODES\.has\(task\.event_code\)/);
