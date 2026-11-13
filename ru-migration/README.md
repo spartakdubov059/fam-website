@@ -6,10 +6,10 @@
 
 ## Подтверждено сейчас
 
-- Локальные backend-тесты: **24/24 успешно** на Node 22.15.0.
-- GitHub Actions [SDK compatibility](https://github.com/spartakdubov059/fam-website/actions/runs/43435833186): успешно; проверены зафиксированные YDB/AWS SDK и Sharp 0.35.5, включая WebP-конвертацию.
-- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43435602592): успешно; одноразовая YDB в GitHub runner приняла обе схемы и синтетические записи профиля/объявления, проверены чтение и параметризованные запросы.
-- YDB сценарий не подключался к облаку, SDK-тест не делал deployment.
+- Backend CI: **26/26 тестов успешно** на GitHub Actions (Node 22); локально ранее воспроизведены 24 unit-теста на Node 22.15.0.
+- GitHub Actions [SDK compatibility](https://github.com/spartakdubov059/fam-website/actions/runs/43436229571): успешно; проверены зафиксированные YDB/AWS SDK и Sharp 0.35.5, включая WebP-конвертацию.
+- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43436229599): успешно; одноразовая YDB в GitHub runner приняла обе схемы и синтетические записи профиля/объявления, проверены чтение и параметризованные запросы.
+- Smoke test HTTP-сервера подтверждает локальную раздачу FAM RU shell/форматтера и закрытые ответы `503` до настройки российского backend. YDB сценарий не подключался к облаку, SDK-тест не делал deployment.
 - YDB зависимости backend зафиксированы точными версиями и lockfile.
 
 ## Что уже реализовано в изолированном коде
