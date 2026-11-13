@@ -1,6 +1,7 @@
 do $test$
 declare
   v_snapshot jsonb;
+  v_technical jsonb;
   v_saved jsonb;
   v_stored jsonb;
   v_rejected boolean;
@@ -31,11 +32,14 @@ begin
   end if;
 
   v_snapshot := public.get_fam_agent_report_snapshot();
+  select item into v_technical
+  from jsonb_array_elements(v_snapshot -> 'agent_statuses') as item
+  where item ->> 'agent_key' = 'technical';
   if v_snapshot ->> 'report_date' <> to_char(current_date, 'YYYY-MM-DD')
      or v_snapshot #>> '{latest_coder_task,status}' <> 'failed'
      or v_snapshot #>> '{latest_system_health,status}' is not null
      or v_snapshot #>> '{cron_jobs,0,last_run_status}' <> 'succeeded'
-     or v_snapshot #>> '{agent_statuses,1,failed_24h}' <> '1'
+     or v_technical ->> 'failed_24h' <> '1'
      or v_snapshot #>> '{failed_tasks_24h,0,task_type}' <> 'coder_patch_request'
      or v_snapshot #>> '{daily_report,metrics,completed}' <> '2' then
     raise exception 'snapshot did not return the expected aggregate fields: %', v_snapshot;
