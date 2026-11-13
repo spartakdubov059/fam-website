@@ -3,6 +3,7 @@ import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
+import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -11,6 +12,10 @@ try {
   const client = query(driver);
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   const repo = createYdbListingsRepository(sql);
+  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true);`;
+  const resolveActor = createDatabaseActorResolver(sql);
+  assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' });
+  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
   const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
     description: 'Учебник', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
@@ -21,7 +26,7 @@ try {
   assert.equal(sets[0][0].user_id, 'synthetic-user');
   assert.equal(sets[0][0].school_id, 'synthetic-school');
   assert.equal(sets[0][0].status, 'pending');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: schema, insert and read on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, schema, insert and read on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
