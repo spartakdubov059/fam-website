@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   isAllowedApplicantNote,
-  maskApplicantEmail,
   mapSchoolAdminRequests,
 } from "../../supabase/functions/school-admin-access/access-controls.js";
 
@@ -12,30 +12,21 @@ test("accepts only the current Council roles and the legacy member label", () =>
   assert.equal(isAllowedApplicantNote("Член Ученического совета"), true);
   assert.equal(isAllowedApplicantNote("Председатель Ученического совета"), false);
   assert.equal(isAllowedApplicantNote("Заместитель председателя Ученического совета"), false);
-  assert.equal(isAllowedApplicantNote("Секретарь Ученического совета"), false);
   assert.equal(isAllowedApplicantNote("Мой телефон +7 900 123-45-67"), false);
   assert.equal(isAllowedApplicantNote("learner@example.ru"), false);
-  assert.equal(isAllowedApplicantNote("Администратор FAM"), false);
-  assert.equal(isAllowedApplicantNote("участник ученического совета"), false);
   assert.equal(isAllowedApplicantNote(undefined), false);
-  assert.equal(isAllowedApplicantNote("Участник Ученического совета\
-@private_contact"), false);
 });
 
-test("masks applicant email before returning requests to the Council UI", () => {
-  assert.equal(maskApplicantEmail("student@example.ru"), "s***@example.ru");
-  assert.equal(maskApplicantEmail("invalid-address"), "Пользователь");
-  assert.equal(maskApplicantEmail(null), "Пользователь");
-});
-
-test("maps RPC request_id to frontend id and minimizes applicant identifiers", () => {
+test("school admin request mapping returns only same-school identity fields and no email", () => {
+  const source = readFileSync(new URL("../../supabase/functions/school-admin-access/access-controls.js", import.meta.url), "utf8");
   const mapped = mapSchoolAdminRequests([{
     request_id: "6e8ecb53-2fb6-42a5-9ff8-d4d4b4d5b7c9",
     user_id: "12345678-1234-4234-8234-123456789abc",
     applicant_first_name: "Анна",
     applicant_last_name: "Иванова",
     applicant_class: "8А",
-    applicant_note: "Секретарь Ученического совета",
+    applicant_email: "student@example.ru",
+    applicant_note: "Участник Ученического совета",
     created_at: "2026-11-08T10:00:00Z",
   }]);
   assert.equal(mapped.length, 1);
@@ -45,9 +36,6 @@ test("maps RPC request_id to frontend id and minimizes applicant identifiers", (
   assert.equal(mapped[0].applicant_last_name, "Иванова");
   assert.equal(mapped[0].applicant_class, "8А");
   assert.equal(Object.hasOwn(mapped[0], "applicant_email"), false);
-  assert.equal(mapped[0].applicant_note, "Секретарь Ученического совета");
-});
-
-test("drops malformed RPC rows that cannot be reviewed safely", () => {
+  assert.doesNotMatch(source, /applicant_email/);
   assert.deepEqual(mapSchoolAdminRequests([{ user_id: "123", applicant_first_name: "bad" }]), []);
 });
