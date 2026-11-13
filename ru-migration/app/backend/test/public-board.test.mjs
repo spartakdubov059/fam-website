@@ -59,6 +59,7 @@ test('event card reads only the user own registrations and supports reservation 
     ] }) };
     if (url === '/api/v1/event-registrations') return { ok: true, status: 200, json: async () => ({ ok: true, registrations: [] }) };
     if (url === '/api/v1/favorites') return { ok: true, status: 200, json: async () => ({ ok: true, favorite_ids: [] }) };
+    if (url === '/api/v1/me/listings') return { ok: false, status: 401, json: async () => ({}) };
     if (url === `/api/v1/listings/${eventId}/registrations`) return { ok: true, status: 201, json: async () => ({ ok: true, registration: { event_id: eventId, user_id: 'synthetic-user', status: 'confirmed' } }) };
     if (url === `/api/v1/listings/${eventId}/registrations/me`) return { ok: true, status: 200, json: async () => ({ ok: true, status: 'cancelled' }) };
     throw new Error(`unexpected request ${url}`);
@@ -70,13 +71,13 @@ test('event card reads only the user own registrations and supports reservation 
   assert.equal(register.textContent, 'Записаться');
   assert.equal(cancel.hidden, true);
   await register.listeners.click();
-  assert.equal(calls[3].options.method, 'POST');
-  assert.equal(calls[3].options.body, undefined);
-  assert.equal(calls[3].options.credentials, 'same-origin');
+  assert.equal(calls.at(-1).options.method, 'POST');
+  assert.equal(calls.at(-1).options.body, undefined);
+  assert.equal(calls.at(-1).options.credentials, 'same-origin');
   assert.equal(register.textContent, 'Вы записаны');
   assert.equal(cancel.hidden, false);
   await cancel.listeners.click();
-  assert.equal(calls[4].options.method, 'DELETE');
+  assert.equal(calls.at(-1).options.method, 'DELETE');
   assert.equal(register.textContent, 'Записаться');
   assert.equal(cancel.hidden, true);
 });
@@ -114,8 +115,8 @@ test('guest favorite action sends the user to Yandex login without a write', asy
   let writes = 0;
   await loadPublicBoard({ root, document: fakeDocument, location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: 'Учебник', description: '', category: 'Учёба' }] }) };
-    if (url === '/api/v1/favorites') return { ok: false, status: 401, json: async () => ({}) };
-    writes++;
+    if (url === '/api/v1/favorites' || url === '/api/v1/me/listings') return { ok: false, status: 401, json: async () => ({}) };
+    if (options?.method === 'PUT' || options?.method === 'DELETE') writes++;
     return { ok: true, json: async () => ({ ok: true }) };
   } });
   const card = root.children[0].children[0];
@@ -123,6 +124,36 @@ test('guest favorite action sends the user to Yandex login without a write', asy
   await button.listeners.click();
   assert.equal(loginUrl, '/auth/yandex/start');
   assert.equal(writes, 0);
+});
+
+test('only the authenticated owner sees the own-listing delete action, and confirmed deletion refreshes the card state', async () => {
+  const root = new FakeNode('section');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const calls = [];
+  let allowed = false;
+  await loadPublicBoard({ root, document: fakeDocument, confirmImpl: () => allowed, fetchImpl: async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id, title: 'Моя книга', description: 'Описание', category: 'Учёба', price_text: 'Бесплатно' },
+    ] }) };
+    if (url === '/api/v1/favorites') return { ok: true, json: async () => ({ ok: true, favorite_ids: [] }) };
+    if (url === '/api/v1/me/listings') return { ok: true, json: async () => ({ ok: true, listing_ids: [id] }) };
+    if (url === `/api/v1/listings/${id}` && options.method === 'DELETE') return { ok: true, json: async () => ({ ok: true, deleted: true, image_cleanup: 'not_needed' }) };
+    throw new Error(`unexpected request ${url}`);
+  } });
+  const card = root.children[0].children[0];
+  const actions = card.children.find(node => node.className === 'ru-own-listing-actions');
+  assert.ok(actions);
+  const button = actions.children[0];
+  await button.listeners.click();
+  assert.equal(calls.some(call => call.options.method === 'DELETE'), false, 'cancelled confirmation does not write');
+  allowed = true;
+  await button.listeners.click();
+  const deletion = calls.find(call => call.options.method === 'DELETE');
+  assert.equal(deletion.url, `/api/v1/listings/${id}`);
+  assert.equal(deletion.options.credentials, 'same-origin');
+  assert.equal(card.hidden, true);
+  assert.equal(actions.children[1].textContent, 'Объявление удалено.');
 });
 
 test('guest event action redirects to Yandex login and unavailable event APIs disable registration', async () => {

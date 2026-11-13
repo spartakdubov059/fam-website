@@ -4,11 +4,12 @@ import { submitMessage } from './submit-message.mjs';
 import { requestSchoolProfile } from './request-school-profile.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
 
-export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG }) {
+export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG, pendingImages = null }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
+    const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
     const eventRegistrationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations$/i);
@@ -279,6 +280,36 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
           : result.code === 'recipient_unavailable' ? 404 : 400;
         return { status, body: result };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/listings') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [] } };
+      if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
+      try { return { status: 200, body: { ok: true, listing_ids: await repository.listOwnActiveListingIds(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && ownListingMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student') return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      if (typeof repository?.deleteOwnListing !== 'function') return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
+      try {
+        const deleted = await repository.deleteOwnListing(actor.id, ownListingMatch[1]);
+        if (!deleted) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function'
+            && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);

@@ -31,10 +31,12 @@ try {
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
           : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1' });
+  const deletedMediaKeys = [];
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
     resolveActor,
     repository: repo,
+    pendingImages: { delete: async key => { deletedMediaKeys.push(key); } },
   }));
   const apiRequest = (method, url, token, body = {}) => {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
@@ -139,6 +141,27 @@ try {
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
+
+  const deletionPhotoKey = 'pending/11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', deletionPhotoKey);
+  const deletable = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
+    title: 'Своё синтетическое объявление', description: 'Проверка удаления владельцем', category: 'Учёба',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletionPhotoKey, photo_status: 'approved', status: 'pending' });
+  assert.equal(await repo.moderateListing(deletable.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.setFavorite('synthetic-user', deletable.id, true), true);
+  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/me/listings', 'synthetic-registrant'))).body.listing_ids, [deletable.id],
+    'private own-listing projection only returns the authenticated student’s active ids');
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-student', null))).status, 404,
+    'a different student cannot remove someone else’s listing');
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-admin', null))).status, 403,
+    'school staff cannot use the ordinary-student self-delete route');
+  const ownDelete = await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-registrant', null));
+  assert.deepEqual(ownDelete, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.deepEqual(deletedMediaKeys, [deletionPhotoKey]);
+  assert.equal((await repo.listActiveListings()).some(row => row.id === deletable.id), false);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletionPhotoKey};`)?.[0]?.length ?? 0, 0,
+    'deleted listing cleanup removes its media registry entry after the object store confirms deletion');
   const idea = await repo.createIdea({ user_id: 'synthetic-user', school_id: 'synthetic-school',
     text: 'Синтетическая идея книжного обмена', ai_status: 'pending', ai_summary: 'Синтетическая идея',
     ai_reason: 'review_unavailable', admin_status: 'new' });
@@ -251,7 +274,7 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media claim/link lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, own-listing delete and cleanup, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media claim/link lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

@@ -69,6 +69,10 @@ body {
 .ru-moderation-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }
 .ru-favorite-actions { display: grid; justify-items: start; gap: 0.25rem; margin-top: 0.5rem; }
 .ru-favorite-status { margin: 0; font-size: 0.9rem; }
+.ru-own-listing-actions { display: grid; justify-items: start; gap: 0.25rem; margin-top: 0.5rem; }
+.ru-own-listing-delete { padding: 0.45rem 0.7rem; border: 1px solid rgba(255, 107, 107, .45); border-radius: 0.55rem; background: rgba(255, 107, 107, .08); color: #ffb3b3; font-weight: 700; }
+.ru-own-listing-delete:disabled { opacity: .6; cursor: wait; }
+.ru-own-listing-status { margin: 0; font-size: 0.9rem; }
 .ru-contact-form { display: grid; gap: 0.5rem; margin-top: 1rem; }
 .ru-contact-form textarea { width: 100%; min-height: 5rem; padding: 0.65rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; font: inherit; resize: vertical; }
 .ru-contact-submit, .ru-message-send { width: fit-content; min-height: 40px; padding: 0.6rem 0.9rem; border: 0; border-radius: 0.55rem; background: #e7e9ee; color: #101116; font: inherit; font-weight: 700; cursor: pointer; }

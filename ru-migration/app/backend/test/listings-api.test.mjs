@@ -273,6 +273,49 @@ test('favorite writes use only the authenticated actor and return 404 for non-ac
   assert.equal((await handler(missing)).status, 404);
 });
 
+test('ordinary students can delete only their own listing and media cleanup stays server-side', async () => {
+  const listingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const userId = '11111111-1111-4111-8111-111111111111';
+  let actor = { id: userId, role: 'student', school_id: 'school-a' };
+  const calls = [];
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: actor.id }),
+    resolveActor: async () => actor,
+    pendingImages: { delete: async key => { calls.push(['delete-image', key]); } },
+    repository: {
+      listOwnActiveListingIds: async id => id === userId ? [listingId] : [],
+      deleteOwnListing: async (id, target) => {
+        calls.push(['delete-listing', id, target]);
+        return id === userId && target === listingId ? { id: target, media_cleanup: { object_key: 'pending/user/image.webp', claim_token: 'claim-1' } } : null;
+      },
+      finishPendingImageCleanup: async (...args) => { calls.push(['finish-cleanup', ...args]); return true; },
+    } });
+  const own = req({}, 'GET'); own.url = '/api/v1/me/listings';
+  assert.deepEqual((await handler(own)).body.listing_ids, [listingId]);
+  const remove = req({}, 'DELETE'); remove.url = `/api/v1/listings/${listingId}`;
+  assert.deepEqual(await handler(remove), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.deepEqual(calls, [
+    ['delete-listing', userId, listingId],
+    ['delete-image', 'pending/user/image.webp'],
+    ['finish-cleanup', 'pending/user/image.webp', 'claim-1', true],
+  ]);
+  actor = { id: '22222222-2222-4222-8222-222222222222', role: 'student', school_id: 'school-a' };
+  assert.equal((await handler(remove)).status, 404);
+  actor = { id: '33333333-3333-4333-8333-333333333333', role: 'school_admin', school_id: 'school-a' };
+  assert.equal((await handler(remove)).status, 403);
+});
+
+test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
+  let actor = { id: 'staff-id', role: 'school_admin' };
+  let queries = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
+    repository: { listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [] } });
+  assert.equal(queries, 0);
+  actor = null;
+  assert.equal((await handler(request)).status, 403);
+});
+
 test('favorites fail closed when the database adapter is unavailable', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });

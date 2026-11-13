@@ -36,7 +36,7 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
-  const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository }));
+  const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
   return {
     listingsApi,

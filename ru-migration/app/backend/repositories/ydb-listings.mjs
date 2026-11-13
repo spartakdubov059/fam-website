@@ -423,6 +423,46 @@ export function createYdbListingsRepository(sql) {
       return true;
     },
 
+    async listOwnActiveListingIds(userId) {
+      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid listing owner');
+      const statement = sql`SELECT id FROM fam_listings WHERE user_id = ${userId} AND status = 'active'
+        ORDER BY created_at DESC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return ((await statement)?.[0] ?? []).map(row => row.id);
+    },
+
+    async deleteOwnListing(userId, listingId) {
+      if (typeof userId !== 'string' || !userId || typeof listingId !== 'string' || !UUID.test(listingId)) {
+        throw new TypeError('invalid own listing deletion');
+      }
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT user_id, is_event, image_key FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
+        const listing = rows?.[0]?.[0];
+        if (!listing || listing.user_id !== userId) return null;
+
+        if (listing.is_event) {
+          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
+          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
+        }
+        await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
+
+        let mediaCleanup = null;
+        if (listing.image_key) {
+          const mediaRows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${listing.image_key} LIMIT 1;`;
+          if (mediaRows?.[0]?.[0]) {
+            const claimToken = randomUUID();
+            await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
+                claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
+              WHERE object_key = ${listing.image_key};`;
+            mediaCleanup = { object_key: listing.image_key, claim_token: claimToken };
+          }
+        }
+
+        await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND user_id = ${userId};`;
+        return { id: listingId, media_cleanup: mediaCleanup };
+      });
+    },
+
     async listActiveListings() {
       const statement = sql`SELECT id, title, description, category, price_text, is_event,
         event_date, event_time, event_type, max_seats, created_at, image_key, photo_status

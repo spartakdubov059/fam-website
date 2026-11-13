@@ -145,6 +145,33 @@ test('pending-media repository validates ownership keys and claims only expired 
   await assert.rejects(repo.claimExpiredPendingImages(101), TypeError);
 });
 
+test('own listing deletion is owner-bound and removes dependents in one transaction', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, is_event, image_key FROM fam_listings')) {
+      return [[{ user_id: '11111111-1111-4111-8111-111111111111', is_event: true,
+        image_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' }]];
+    }
+    if (text.includes('SELECT status FROM fam_pending_media')) return [[{ status: 'linked' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const result = await repo.deleteOwnListing('11111111-1111-4111-8111-111111111111', id);
+  assert.equal(result.id, id);
+  assert.equal(result.media_cleanup.object_key, 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp');
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_event_registrations')));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_event_occupancy')));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_favorites')));
+  assert.ok(calls.some(call => call.text.includes("SET status = 'deleting'")));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_listings')));
+  assert.ok(calls.find(call => call.text.includes('DELETE FROM fam_listings')).values.includes('11111111-1111-4111-8111-111111111111'));
+  assert.equal(await repo.deleteOwnListing('22222222-2222-4222-8222-222222222222', id), null);
+  await assert.rejects(repo.deleteOwnListing('student-id', 'not-a-uuid'), TypeError);
+});
+
 test('favorite repository binds user and listing ids and refuses to favorite a missing listing', async () => {
   const calls = [];
   const sql = (strings, ...values) => {

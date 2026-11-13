@@ -39,6 +39,54 @@ async function loadMyFavorites(fetchImpl) {
   } catch { return { state: 'unavailable', ids: new Set() }; }
 }
 
+async function loadMyActiveListingIds(fetchImpl) {
+  try {
+    const response = await fetchImpl('/api/v1/me/listings', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    if (!response.ok) return new Set();
+    const result = await response.json();
+    return result?.ok && Array.isArray(result.listing_ids)
+      ? new Set(result.listing_ids.filter(id => typeof id === 'string' && UUID.test(id))) : new Set();
+  } catch { return new Set(); }
+}
+
+function addOwnListingDeleteControl({ card, listing, document, fetchImpl, ownListingIds, confirmImpl }) {
+  if (!UUID.test(listing.id) || !ownListingIds.has(listing.id)) return;
+  const actions = element(document, 'div', 'ru-own-listing-actions');
+  const button = element(document, 'button', 'ru-own-listing-delete', 'Удалить своё объявление');
+  button.type = 'button';
+  const status = element(document, 'p', 'ru-own-listing-status', '');
+  status.setAttribute('role', 'status');
+  let busy = false;
+  button.addEventListener('click', async () => {
+    if (busy) return;
+    if (typeof confirmImpl !== 'function') { status.textContent = 'Удаление недоступно в этом браузере.'; return; }
+    if (!confirmImpl(`Удалить объявление «${listing.title || 'Без названия'}»? Его нельзя будет восстановить.`)) return;
+    busy = true; button.disabled = true; status.textContent = '';
+    try {
+      const response = await fetchImpl(`/api/v1/listings/${listing.id}`, {
+        method: 'DELETE', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
+      });
+      const result = await response.json().catch(() => null);
+      if (response.status === 401) status.textContent = 'Сеанс завершён. Войдите, чтобы удалить объявление.';
+      else if (response.status === 403) status.textContent = 'Удаление доступно только владельцу обычного аккаунта.';
+      else if (!response.ok || result?.deleted !== true) status.textContent = 'Не удалось удалить объявление. Обновите страницу и попробуйте ещё раз.';
+      else {
+        ownListingIds.delete(listing.id);
+        status.textContent = result.image_cleanup === 'queued' ? 'Объявление удалено; фото будет очищено позже.' : 'Объявление удалено.';
+        button.textContent = 'Удалено';
+        card.hidden = true;
+      }
+    } catch {
+      status.textContent = 'Нет связи с сервером. Объявление не удалено.';
+    } finally {
+      busy = false;
+      if (ownListingIds.has(listing.id)) button.disabled = false;
+    }
+  });
+  actions.append(button, status);
+  card.append(actions);
+}
+
 function addFavoriteControl({ card, listing, document, fetchImpl, favorites, location }) {
   if (!UUID.test(listing.id)) return;
   const actions = element(document, 'div', 'ru-favorite-actions');
@@ -229,7 +277,7 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
   card.append(actions, status);
 }
 
-export async function loadPublicBoard({ root, document = globalThis.document, fetchImpl = globalThis.fetch, location = document?.defaultView?.location ?? globalThis.location }) {
+export async function loadPublicBoard({ root, document = globalThis.document, fetchImpl = globalThis.fetch, location = document?.defaultView?.location ?? globalThis.location, confirmImpl = globalThis.confirm?.bind(globalThis) }) {
   if (!root || !document || typeof fetchImpl !== 'function') throw new TypeError('public board dependencies are required');
   if (document.getElementById && !document.getElementById('ruOpenMessages')) {
     const open = element(document, 'button', 'ru-button', 'Личные сообщения');
@@ -267,6 +315,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       return;
     }
     const favorites = await loadMyFavorites(fetchImpl);
+    const ownListingIds = await loadMyActiveListingIds(fetchImpl);
     const fragment = document.createDocumentFragment();
     for (const listing of result.listings) {
       if (!listing || typeof listing.id !== 'string' || typeof listing.title !== 'string'
@@ -285,6 +334,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       }
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
+      addOwnListingDeleteControl({ card, listing, document, fetchImpl, ownListingIds, confirmImpl });
       addFavoriteControl({ card, listing, document, fetchImpl, favorites, location });
       addListingContactForm({ card, listing, document, fetchImpl, favorites, location });
       if (listing.is_event === true) {
