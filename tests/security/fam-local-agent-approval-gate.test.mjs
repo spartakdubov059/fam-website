@@ -17,6 +17,18 @@ test("local AI developer can prepare a PR and wait for the required independent 
   assert.match(workflow, /gh pr comment/);
 });
 
+test("automated PR creation can use a repository-scoped App token without broadening permissions", () => {
+  assert.match(workflow, /uses: actions\/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1/);
+  assert.match(workflow, /client-id: \$\{\{ vars\.FAM_GITHUB_APP_CLIENT_ID \}\}/);
+  assert.match(workflow, /private-key: \$\{\{ secrets\.FAM_GITHUB_APP_PRIVATE_KEY \}\}/);
+  assert.match(workflow, /repositories: \$\{\{ github\.event\.repository\.name \}\}/);
+  assert.match(workflow, /permission-contents: write/);
+  assert.match(workflow, /permission-pull-requests: write/);
+  assert.match(workflow, /permission-checks: read/);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \|\| github\.token \}\}/);
+  assert.match(workflow, /FAM_PR_TOKEN_MODE/);
+});
+
 test("local AI developer cannot merge PRs or publish production", () => {
   assert.doesNotMatch(workflow, /gh pr merge\b/);
   assert.doesNotMatch(workflow, /pages\/builds/);

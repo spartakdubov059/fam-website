@@ -389,10 +389,24 @@ jobs:
         with:
           name: fam-agent-independent-review
           path: ${{ runner.temp }}/fam-agent-review
+      - name: Создать короткоживущий токен GitHub App с правами только на этот репозиторий
+        id: app-token
+        if: vars.FAM_GITHUB_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.FAM_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FAM_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: read
+
       - name: Создать PR; публикация всегда требует решения владельца
         id: pr
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          FAM_PR_TOKEN_MODE: ${{ steps.app-token.outputs.token != '' && 'github-app' || 'github-token' }}
         run: |
           set -euo pipefail
           node scripts/render-fam-agent-report.mjs \
@@ -430,6 +444,12 @@ jobs:
             echo "- Patch прошёл независимые тесты и проверку безопасности в отдельном job этого запуска."
             echo "- Supabase, миграции, права доступа и аккаунты не менялись."
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            if [[ "$FAM_PR_TOKEN_MODE" == "github-app" ]]; then
+              echo "- CI trigger: scoped GitHub App token; PR workflow runs can start without manual workflow approval."
+              echo "- The owner approval gate remains required before merging."
+            else
+              echo "- CI trigger: GITHUB_TOKEN; GitHub may require manual approval before PR workflow runs start."
+            fi
             echo "- Production этим workflow не изменяется."
             echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
