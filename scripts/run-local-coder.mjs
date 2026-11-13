@@ -6,6 +6,7 @@ import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { applyTextEdits, extractExplicitTargetPaths } from "./local-model-edits.mjs";
 import { resolveLocalModelApiUrl } from "./local-model-url.mjs";
+import { DEFAULT_AUDIT_TASK, getTaskReferencedPaths } from "./local-coder-task.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
@@ -15,11 +16,7 @@ const API_URL = resolveLocalModelApiUrl(
 const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
-const DEFAULT_AUDIT_TASK = [
-  "Проведи аккуратный аудит исходников FAM и найди не более одной конкретной, воспроизводимой и низкорисковой ошибки интерфейса или клиентского поведения.",
-  "Если исправление очевидно, измени только минимально необходимые файлы сайта и добавь регрессионный тест.",
-  "Не создавай косметических изменений без практической причины. Если достоверного исправления нет, верни пустой patch и объясни почему.",
-].join(" ");
+
 
 const STOP_WORDS = new Set([
   "чтобы", "который", "которая", "которые", "после", "перед", "нужно", "сделать",
@@ -187,9 +184,7 @@ const symbols = collectSymbols(indexHtml);
 
 // Pass source for exact file paths explicitly named in the task to the planning phase.
 // This prevents the planner from requesting files that are already present in the checkout.
-const taskReferencedPaths = tracked
-  .filter((path) => allowed(path) && task.includes(path))
-  .slice(0, 4);
+const taskReferencedPaths = getTaskReferencedPaths(tracked, task, allowed);
 const taskReferencedSource = taskReferencedPaths.map((path) => ({
   path,
   content: sourceContext(path, [], task),
