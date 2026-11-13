@@ -57,3 +57,8 @@ test("worker accepts POST only and rejects browser-origin requests", () => {
   assert.match(worker, /req\.method !== "POST"/);
   assert.match(worker, /req\.headers\.get\("origin"\)/);
 });
+
+test("worker reports failure if the task result was not saved", () => {
+  assert.match(worker, /if \(saved !== true\) \{\s*throw new Error\("task_finish_not_saved"\);\s*\}/);
+  assert.match(worker, /if \(status === "completed"\) completed\+\+;\s*else blocked\+\+;/);
+});
