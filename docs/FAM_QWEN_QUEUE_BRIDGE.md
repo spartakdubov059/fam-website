@@ -76,14 +76,14 @@ Edge Function вызывает только две фиксированные RP
 
 Если секреты не заданы или очередь пуста, текущий плановый аудит продолжает работать как раньше. Ручная задача владельца имеет приоритет над очередью.
 
-## Проверки и оставшиеся доказательства
+## Проверки: подтверждённое и оставшееся
 
-- unit tests на allowlist task keys, payload keys, enum-коды, числовые границы, UUID, invalid result codes и oversized request;
-- SQL tests: нельзя claim-ить задачи с approval_required=true, неправильным agent/task type, неизвестными payload keys, истёкшими попытками или уже действующей арендой;
-- тест, что RPC не возвращают title/description/payload и не дают EXECUTE anon/authenticated;
-- Edge Function smoke test с неверным и верным токеном;
-- GitHub Actions run без секретов (старый режим) и с очередью: live claim события имеются, однако отдельный сквозной production run с доказанным inference → trusted QA → draft PR отсутствует;
-- подтверждение, что независимый QA job по-прежнему запускается отдельно и никакое авто-merge/production deploy не добавлено.
+- **Unit-контракт bridge:** allowlist task keys, UUID, числовые пределы, фиксированные result codes, отсутствие свободного payload и обработка ошибок покрыты `tests/security/fam-agent-bridge.test.mjs`; свежий Regression workflow прошёл на PR head `6a6085d`.
+- **SQL permissions и queue:** claim/finish restrictions и QA-aware lifecycle проходят PostgreSQL 17 integration fixture в [Coder QA run #43511906576](https://github.com/spartakdubov059/fam-website/actions/runs/43511906576). Fixture не подключается к production.
+- **Edge authentication:** production запрос к bridge без внутреннего токена ранее получил HTTP 401; live history показывает, что queue claim вызывался coder worker. Значения токенов не читались.
+- **Синтетический Qwen patch:** отдельный старый smoke run `#43371755985` сформировал patch на fixture и прошёл независимую regression QA; он не работал с production queue и не создавал PR из неё.
+- **Остаётся не доказано:** свежий сквозной production run от реального queue claim через Qwen, trusted QA, PR creation и сохранение PR URL/SHA в production queue.
+- **Остаётся не включено:** QA-aware completion migration из PR #65 и серверное owner approval для main. Не выполнять production migration или менять правила доступа в рамках этой проверки.
 
 ## Границы текущего состояния и следующий безопасный этап
 
