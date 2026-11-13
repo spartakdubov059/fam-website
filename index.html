@@ -113,14 +113,29 @@
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
     @keyframes famBannerDrift {
-      from { transform: scale(1) translate3d(-0.25%, 0, 0); }
-      to { transform: scale(1.045) translate3d(0.25%, -0.35%, 0); }
+      0% { transform: scale(1.015) translate3d(-1.2%, 0.4%, 0); filter: saturate(1); }
+      50% { transform: scale(1.075) translate3d(1.1%, -0.6%, 0); filter: saturate(1.12); }
+      100% { transform: scale(1.035) translate3d(-0.5%, 0.8%, 0); filter: saturate(1.04); }
     }
     .hero-slide.hero-img:not(.hero-event-photo) > img {
-      animation: famBannerDrift 9s ease-in-out infinite alternate;
+      animation: famBannerDrift 7s ease-in-out infinite;
       will-change: transform;
     }
-    .hero-slide.hero-img:nth-child(even):not(.hero-event-photo) > img { animation-direction: alternate-reverse; }
+    .hero-slide.hero-img:not(.hero-event-photo)::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(112deg, transparent 28%, rgba(255,255,255,0.04) 39%, rgba(255,255,255,0.38) 49%, rgba(200,245,66,0.16) 53%, transparent 64%);
+      transform: translateX(-115%);
+      animation: famBannerLightSweep 6.5s ease-in-out infinite;
+    }
+    @keyframes famBannerLightSweep {
+      0%, 18% { transform: translateX(-115%); }
+      72%, 100% { transform: translateX(115%); }
+    }
+    .hero-slide.hero-img:nth-child(even):not(.hero-event-photo)::after { animation-delay: -3.25s; }
     .sr-only, .hero-slide.hero-img .hero-script { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
@@ -898,6 +913,10 @@
 .fam-photo-panel > h1.hero-script { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media (max-width:600px) { .fam-photo-panel { border-radius:20px; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide.hero-img:not(.hero-event-photo) > img,
+  .hero-slide.hero-img:not(.hero-event-photo)::after { animation: none !important; }
+}
 
 </style>
 </head>
