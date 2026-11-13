@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { hasCurrentOwnerApproval } from "../../scripts/verify-agent-pr-owner-approval.mjs";
+import { isAllowedAgentPath } from "../../scripts/validate-local-agent-patch.mjs";
 
 const workflow = readFileSync(
   new URL("../../.github/workflows/moderation-regression.yml", import.meta.url),
@@ -26,6 +27,15 @@ test("owner approval gate is wired into the required safety check for automated 
   assert.match(workflow, /if: github\.event\.pull_request\.base\.ref == 'main' && startsWith\(github\.event\.pull_request\.head\.ref, 'codex\/fam-run-'\)/);
   assert.match(workflow, /PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(workflow, /node "\$TRUSTED_BASE_DIR\/scripts\/verify-agent-pr-owner-approval\.mjs"/);
+});
+
+test("automated patches cannot change the owner gate or its trusted verifier", () => {
+  for (const path of [
+    ".github/workflows/moderation-regression.yml",
+    "scripts/verify-agent-pr-owner-approval.mjs",
+  ]) {
+    assert.equal(isAllowedAgentPath(path), false, path);
+  }
 });
 
 test("accepts owner approval for current head", () => {
