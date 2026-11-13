@@ -2,7 +2,14 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const LIMITS = Object.freeze({ lcp_ms: 4_000, cls: 0.25, tbt_ms: 600 });
+const LIMITS = Object.freeze({
+  lcp_good_ms: 2_500,
+  lcp_poor_ms: 4_000,
+  cls_good: 0.1,
+  cls_poor: 0.25,
+  tbt_good_ms: 200,
+  tbt_poor_ms: 600,
+});
 
 function metric(report, auditId) {
   const value = report?.audits?.[auditId]?.numericValue;
@@ -21,11 +28,21 @@ export function summarizeFAMMobileLighthouse(report) {
     cls: Number(metric(report, "cumulative-layout-shift").toFixed(3)),
     tbt_ms: Math.round(metric(report, "total-blocking-time")),
     total_byte_weight_bytes: Math.round(metric(report, "total-byte-weight")),
+    warnings: [],
     findings: [],
   };
-  if (result.lcp_ms > LIMITS.lcp_ms) result.findings.push("LCP выше 4 секунд (плохая lab-категория Lighthouse).");
-  if (result.cls > LIMITS.cls) result.findings.push("CLS выше 0.25 (плохая lab-категория Lighthouse).");
-  if (result.tbt_ms > LIMITS.tbt_ms) result.findings.push("TBT выше 600 мс (плохая mobile-категория Lighthouse).");
+  if (result.lcp_ms > LIMITS.lcp_good_ms && result.lcp_ms <= LIMITS.lcp_poor_ms) {
+    result.warnings.push("LCP выше 2.5 секунд — не достигает цели «хорошо».");
+  }
+  if (result.cls > LIMITS.cls_good && result.cls <= LIMITS.cls_poor) {
+    result.warnings.push("CLS выше 0.1 — не достигает цели «хорошо».");
+  }
+  if (result.tbt_ms > LIMITS.tbt_good_ms && result.tbt_ms <= LIMITS.tbt_poor_ms) {
+    result.warnings.push("TBT выше 200 мс — промежуточный уровень.");
+  }
+  if (result.lcp_ms > LIMITS.lcp_poor_ms) result.findings.push("LCP выше 4 секунд (плохая lab-категория Lighthouse).");
+  if (result.cls > LIMITS.cls_poor) result.findings.push("CLS выше 0.25 (плохая lab-категория Lighthouse).");
+  if (result.tbt_ms > LIMITS.tbt_poor_ms) result.findings.push("TBT выше 600 мс (плохая mobile-категория Lighthouse).");
   return result;
 }
 
@@ -40,6 +57,7 @@ export function renderFAMMobileLighthouseSummary(result) {
     "- Общий объём загруженных байтов по Lighthouse: " + result.total_byte_weight_bytes,
     "- Условия: mobile emulation на GitHub-hosted runner; один lab run, не полевые данные и не p75 реальных пользователей.",
     "",
+    ...(result.warnings.length ? ["### Требуют внимания", "", ...result.warnings.map((item) => "- " + item), ""] : []),
     ...(result.findings.length ? ["### Превышения", "", ...result.findings.map((item) => "- " + item)] : ["Пороговые превышения не обнаружены."]),
     "",
   ];

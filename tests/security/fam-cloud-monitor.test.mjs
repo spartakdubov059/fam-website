@@ -259,7 +259,7 @@ test("cloud monitor flags unusually large local resources", async () => {
 
 test("mobile Lighthouse runs daily or on the isolated draft branch only", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-cloud-monitor.yml", import.meta.url), "utf8");
-  const mobileJob = workflow.split("  mobile-performance:\\n")[1];
+  const mobileJob = workflow.split("  mobile-performance:\n")[1];
 
   assert.ok(workflow.includes('cron: "*/30 * * * *"'));
   assert.ok(workflow.includes('cron: "7 3 * * *"'));
@@ -267,7 +267,7 @@ test("mobile Lighthouse runs daily or on the isolated draft branch only", () => 
   assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
   assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
   assert.ok(mobileJob.includes("lighthouse@13.6.0"));
-  assert.ok(mobileJob.includes("permissions:\\n      contents: read"));
+  assert.ok(mobileJob.includes("permissions:\n      contents: read"));
   assert.equal(mobileJob.includes("github.event.schedule == '*/30 * * * *'"), false);
 });
 test("mobile Lighthouse report uses lab metric thresholds and labels its scope", () => {
@@ -288,6 +288,21 @@ test("mobile Lighthouse report uses lab metric thresholds and labels its scope",
   ]);
   assert.match(renderFAMMobileLighthouseSummary(result), /не INP/);
   assert.match(renderFAMMobileLighthouseSummary(result), /не полевые данные/);
+});
+
+test("mobile Lighthouse report distinguishes moderate values from poor findings", () => {
+  const result = summarizeFAMMobileLighthouse({
+    categories: { performance: { score: 0.62 } },
+    audits: {
+      "largest-contentful-paint": { numericValue: 3000 },
+      "cumulative-layout-shift": { numericValue: 0.18 },
+      "total-blocking-time": { numericValue: 400 },
+      "total-byte-weight": { numericValue: 250000 },
+    },
+  });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.warnings.length, 3);
+  assert.match(renderFAMMobileLighthouseSummary(result), /Требуют внимания/);
 });
 
 test("mobile Lighthouse report accepts values within thresholds and rejects incomplete data", () => {
