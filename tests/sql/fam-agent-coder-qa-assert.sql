@@ -31,6 +31,22 @@ begin
   end if;
 
   insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('723e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  v_saved := public.finish_fam_agent_coder_task_with_pr(
+    '723e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1','model_review',
+    'https://github.com/spartakdubov059/fam-website/pull/76',
+    '1123456789abcdef0123456789abcdef01234567'
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='723e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true or v_task.status <> 'review'
+     or v_task.pr_url is null or v_task.commit_sha is null then
+    raise exception 'draft PR with a failed required check was not preserved for review';
+  end if;
+
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
   values ('223e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
           'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
   update private.fam_agent_tasks set attempt_count=2 where id='223e4567-e89b-42d3-a456-426614174000';
@@ -102,7 +118,7 @@ begin
     raise exception 'legacy finish route improperly completed a patch before QA/PR checks';
   end if;
 
-  if (select count(*) from private.fam_agent_task_events) <> 5 then
+  if (select count(*) from private.fam_agent_task_events) <> 6 then
     raise exception 'coder finish RPC did not write one event per task';
   end if;
 end
