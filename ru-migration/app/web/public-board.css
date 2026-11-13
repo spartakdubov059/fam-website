@@ -1,0 +1,38 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0f1014;
+  color: #f5f6f8;
+  font-family: system-ui, sans-serif;
+}
+
+.ru-shell { max-width: 1000px; margin: auto; padding: 32px 20px; }
+.ru-shell h1 { margin: 0 0 8px; }
+.ru-note { color: #b8bbc7; line-height: 1.55; }
+.ru-listings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+.ru-listing-card {
+  padding: 20px;
+  border: 1px solid #30323a;
+  border-radius: 18px;
+  background: #191b22;
+  overflow-wrap: anywhere;
+}
+.ru-listing-category, .ru-listing-event { color: #b8bbc7; font-size: 13px; }
+.ru-listing-title { margin: 8px 0; font-size: 20px; }
+.ru-listing-description { white-space: pre-wrap; line-height: 1.5; }
+.ru-listing-price { font-weight: 700; }
+.ru-board-status { color: #d2d3dc; }
+.ru-board-retry {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #e7e9ee;
+  color: #101116;
+  font-weight: 700;
+  cursor: pointer;
+}

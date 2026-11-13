@@ -26,6 +26,15 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.equal(formatter.status, 200);
     assert.match(formatter.headers.get('content-type'), /javascript/);
     assert.match(await formatter.text(), /formatListingPrice/);
+
+    const publicBoard = await fetch(new URL('/public-board.js', origin));
+    assert.equal(publicBoard.status, 200);
+    assert.match(publicBoard.headers.get('content-type'), /javascript/);
+    assert.match(await publicBoard.text(), /api\/v1\/listings/);
+
+    const boardStyles = await fetch(new URL('/public-board.css', origin));
+    assert.equal(boardStyles.status, 200);
+    assert.match(boardStyles.headers.get('content-type'), /text\/css/);
   });
 });
 
