@@ -18,6 +18,10 @@ on:
       - 'supabase/**'
       - 'tests/**'
       - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'assets/**'
+      - 'docs/**'
       - '.github/workflows/**'
 
 permissions:
