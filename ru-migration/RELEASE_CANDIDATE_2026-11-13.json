@@ -7,11 +7,15 @@
   "checked_at": "2026-11-13",
   "local_tests": {
     "historical_report_claimed_passed": 220,
-    "failed": 0,
-    "command": "npm run check",
-    "reproduction": "BLOCKED — full archive not available"
+    "reproduced_in_current_workspace": false,
+    "current_backend_tests": {
+      "passed": 24,
+      "failed": 0
+    },
+    "command": "npm test --prefix ru-migration/app/backend",
+    "reproduction": "PASS — current backend unit tests; historical 220-test archive unavailable"
   },
-  "sdk_gate": "PASS — locally verified against pinned dependencies; GitHub Actions run succeeded",
+  "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
   "production": "UNCHANGED",
   "critical_file_sha256": {
@@ -23,14 +27,12 @@
   },
   "release_blockers": [
     "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
-    "Full source transfer to isolated GitHub directory/branch",
-    "Real isolated YDB integration tests",
-    "Real isolated Object Storage integration tests",
-    "School-controlled cloud project and billing limit review before any staging",
-    "Actual auth, moderation and account-migration tests",
-    "Safe access policy/legal review before real students join"
+    "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs not ported",
+    "Cloud YDB, object storage, auth and moderation integrations not tested; only disposable local YDB integration passed",
+    "No free-only school-controlled cloud staging has been provisioned or budget-verified",
+    "Actual auth, moderation, account-migration and safe access policy/legal review before real students join"
   ],
-  "archive_status": "UNAVAILABLE in the current workspace; historical integrity/test claims not independently reproduced",
+  "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
   "local_sdk_check": {
     "node": "22.15.0",
     "command": "npm ci && npm run check",
@@ -39,9 +41,11 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "run_id": 43365405581,
-    "url": "https://github.com/spartakdubov059/fam-website/actions/runs/43365405581",
-    "result": "success",
-    "commit": "46ec897861a2c0dee5aeebdfe3c193fad4c2edcd"
-  }
+    "sdk_run_id": 43435833186,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43435833186",
+    "ydb_run_id": 43435602592,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43435602592",
+    "result": "success"
+  },
+  "local_ydb_integration": "PASS — disposable local YDB in GitHub Actions; both schemas, synthetic user profile and listing insert/read; no cloud connection"
 }
