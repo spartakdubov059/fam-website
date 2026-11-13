@@ -184,7 +184,7 @@ test("draft PR creation depends on the independent Reviewer artifact after QA", 
   assert.match(workflow, /name: fam-agent-independent-review/);
   assert.match(workflow, /Скачать независимый Reviewer отчёт/);
   assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/review\.md"/);
-  assert.match(workflow, /prepare_review:[\\s\\S]*?needs: \\[generate, verify\\]/);
+  assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify\]/);
   assert.match(workflow, /needs\.verify\.result == 'success'/);
 });
 
