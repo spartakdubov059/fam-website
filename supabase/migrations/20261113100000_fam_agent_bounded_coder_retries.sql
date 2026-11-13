@@ -1,5 +1,16 @@
 -- Retry a transient local coder failure at most once and deduplicate repeated
--- producer signals. This migration changes queue control metadata only.
+-- producer signals. Keep generated patches in review until the QA-aware bridge
+-- records verified PR metadata.
+
+alter table private.fam_agent_tasks
+  drop constraint fam_agent_tasks_status_check,
+  add constraint fam_agent_tasks_status_check
+    check (status in ('queued','claimed','in_progress','review','blocked','completed','failed','cancelled'));
+
+alter table private.fam_agent_task_events
+  drop constraint fam_agent_task_events_event_type_check,
+  add constraint fam_agent_task_events_event_type_check
+    check (event_type in ('created','claimed','started','progress','review','blocked','completed','failed','cancelled','retry_scheduled'));
 
 create or replace function public.finish_fam_agent_coder_task(
   p_task_id uuid,
@@ -41,8 +52,8 @@ begin
 
   case p_result_code
     when 'model_completed' then
-      v_status := 'completed';
-      v_summary := 'Локальная модель подготовила результат; он ожидает независимой проверки.';
+      v_status := 'review';
+      v_summary := 'Локальная модель подготовила patch; требуется независимый QA и PR.';
     when 'model_no_patch' then
       v_status := 'completed';
       v_summary := 'Локальная модель не предложила подтверждённое исправление.';
