@@ -1,0 +1,169 @@
+name: FAM Qwen exact-edit synthetic smoke
+
+on:
+  push:
+    branches: [ai/agent-reliable-edit-ops]
+    paths:
+      - ".github/workflows/fam-qwen-exact-edit-smoke.yml"
+      - "scripts/run-local-coder.mjs"
+      - "scripts/local-model-edits.mjs"
+      - "tests/fixtures/fam-agent-qwen-smoke*"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/fam-qwen-exact-edit-smoke.yml"
+      - "scripts/run-local-coder.mjs"
+      - "scripts/local-model-edits.mjs"
+      - "tests/fixtures/fam-agent-qwen-smoke*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-qwen-exact-edit-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Qwen creates one synthetic exact edit
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the synthetic fixture without write credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Confirm the synthetic regression fails before the agent runs
+        run: |
+          set +e
+          node --test tests/fixtures/fam-agent-qwen-smoke.test.mjs >/tmp/fam-qwen-smoke-before.log 2>&1
+          status=$?
+          set -e
+          if [[ "$status" == "0" ]]; then
+            echo "::error::The synthetic fixture must fail before the model edit."
+            exit 1
+          fi
+          echo "The isolated regression fails before repair, as expected."
+
+      - name: Restore verified free Qwen weights from cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/fam-model/qwen2.5-coder-7b-q4_k_m.gguf
+          key: fam-qwen25-coder-7b-q4km-v1
+
+      - name: Download and verify Qwen2.5-Coder-7B-Instruct
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          MODEL="$RUNNER_TEMP/fam-model/qwen2.5-coder-7b-q4_k_m.gguf"
+          if [[ ! -s "$MODEL" ]]; then
+            curl --fail --location --retry 3 --retry-delay 3 \
+              "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf" \
+              --output "$MODEL"
+          fi
+          SIZE="$(stat -c '%s' "$MODEL")"
+          HASH="$(sha256sum "$MODEL" | awk '{print $1}')"
+          if (( SIZE < 4000000000 )) || [[ "$HASH" != "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c" ]]; then
+            echo "::error::Qwen weight size or SHA-256 check failed."
+            exit 1
+          fi
+
+      - name: Build pinned llama.cpp CPU server
+        env:
+          LLAMA_CPP_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON \
+            -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_METAL=OFF -DGGML_OPENMP=ON
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+
+      - name: Generate the exact edit locally with Qwen
+        env:
+          FAM_TASK: "Исправь вычисление налога: в tests/fixtures/fam-agent-qwen-smoke.mjs taxRate является долей, поэтому для amount=100 и taxRate=0.08 функция должна вернуть 108. Измени только tests/fixtures/fam-agent-qwen-smoke.mjs и не меняй другие файлы."
+          FAM_MODEL_ID: Qwen2.5-Coder-7B-Instruct
+        run: |
+          set -euo pipefail
+          MODEL="$RUNNER_TEMP/fam-model/qwen2.5-coder-7b-q4_k_m.gguf"
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          "$SERVER" -m "$MODEL" --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+            >"$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          READY=false
+          for attempt in $(seq 1 180); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then READY=true; break; fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "::error::The local Qwen server stopped before becoming ready."
+              tail -n 80 "$RUNNER_TEMP/fam-llama-server.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          if [[ "$READY" != "true" ]]; then echo "::error::Qwen did not become ready."; exit 1; fi
+          mkdir -p "$RUNNER_TEMP/fam-agent"
+          git rev-parse HEAD > "$RUNNER_TEMP/fam-agent/base.sha"
+          node scripts/run-local-coder.mjs
+          node -e "const s=require(process.argv[1]); if (!s.patch_available) process.exit(1)" "$RUNNER_TEMP/fam-agent/summary.json"
+          test -s "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          git diff --exit-code
+
+      - name: Upload the synthetic patch for isolated QA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: fam-qwen-exact-edit-smoke
+          path: ${{ runner.temp }}/fam-agent/
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    name: Independent QA of the synthetic Qwen patch
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout a clean synthetic fixture without model or secrets
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js for independent QA
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Download the generated patch
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-qwen-exact-edit-smoke
+          path: ${{ runner.temp }}/fam-agent
+
+      - name: Verify base revision, one allowed file and applicable patch
+        run: |
+          set -euo pipefail
+          test "$(cat "$RUNNER_TEMP/fam-agent/base.sha")" = "$(git rev-parse HEAD)"
+          git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          node scripts/validate-local-agent-patch.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent/summary.json" > "$RUNNER_TEMP/fam-agent/safety.json"
+          git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          CHANGED="$(git diff --name-only)"
+          test "$CHANGED" = "tests/fixtures/fam-agent-qwen-smoke.mjs"
+          git diff --check
+
+      - name: Run the synthetic regression after the patch
+        run: node --test tests/fixtures/fam-agent-qwen-smoke.test.mjs
