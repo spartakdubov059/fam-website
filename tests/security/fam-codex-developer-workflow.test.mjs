@@ -54,6 +54,12 @@ test("local FAM coding agent has scheduled and owner-only manual triggers", () =
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
 });
 
+test("successful coder output is packaged before the generation step exits", () => {
+  const agentStep = workflow.split("id: agent")[1]?.split("\\n      - name:")[0] ?? "";
+  assert.match(agentStep, /if \\[\\[ "\\$status" != "0" \\]\\]; then[\\s\\S]*?exit "\\$status"[\\s\\S]*?fi[\\s\\S]*?cp "\\$RUNNER_TEMP\\/fam-agent-base\\.sha" "\\$RUNNER_TEMP\\/fam-agent\\/base\\.sha"/);
+  assert.match(agentStep, /git apply --check "\\$RUNNER_TEMP\\/fam-agent\\/fam-agent\\.patch"/);
+});
+
 test("the queue is checked before model download and compilation, and empty runs skip them", () => {
   const queueIndex = workflow.indexOf("Получить одно безопасное задание из очереди");
   const downloadIndex = workflow.indexOf("Скачать бесплатную модель");
