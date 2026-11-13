@@ -3,7 +3,15 @@ name: FAM cloud site monitor
 on:
   schedule:
     - cron: "*/30 * * * *"
+    - cron: "7 3 * * *"
   workflow_dispatch:
+  push:
+    branches: ["codex/fam-cloud-monitor-*"]
+    paths:
+      - ".github/workflows/fam-cloud-monitor.yml"
+      - "scripts/run-fam-lighthouse-report.mjs"
+      - "scripts/run-fam-cloud-monitor.mjs"
+      - "tests/security/fam-cloud-monitor.test.mjs"
 
 permissions:
   contents: read
@@ -16,6 +24,7 @@ concurrency:
 jobs:
   monitor:
     name: Read-only site and CI smoke checks
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -38,3 +47,37 @@ jobs:
 
       - name: Check production pages and recent main workflows
         run: node scripts/run-fam-cloud-monitor.mjs
+
+  mobile-performance:
+    name: Mobile Lighthouse lab audit
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * *') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/fam-cloud-monitor-'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout monitor code without write credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Run pinned Lighthouse mobile audit
+        run: >-
+          npx --yes lighthouse@13.6.0
+          https://spartakdubov059.github.io/fam-website/
+          --form-factor=mobile
+          --throttling-method=simulate
+          --only-categories=performance
+          --output=json
+          --output-path="$RUNNER_TEMP/fam-lighthouse.json"
+          --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"
+          --quiet
+
+      - name: Publish normalized metrics and fail on poor lab thresholds
+        run: node scripts/run-fam-lighthouse-report.mjs "$RUNNER_TEMP/fam-lighthouse.json"

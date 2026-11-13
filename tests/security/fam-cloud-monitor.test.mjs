@@ -1,9 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   renderFAMCloudMonitorReport,
   runFAMCloudMonitor,
 } from "../../scripts/run-fam-cloud-monitor.mjs";
+import {
+  renderFAMMobileLighthouseSummary,
+  summarizeFAMMobileLighthouse,
+} from "../../scripts/run-fam-lighthouse-report.mjs";
 
 const siteBase = "https://example.invalid/fam-website/";
 const homepage = "<!doctype html><title>FAM — Свои рядом</title><script>const famReady = true;</script>";
@@ -250,6 +255,54 @@ test("cloud monitor flags unusually large local resources", async () => {
   assert.equal(report.ok, false);
   assert.deepEqual(report.performance.findings, ["ресурс больше 8 MB"]);
   assert.match(report.checks.find((check) => check.name.startsWith("Производительность")).detail, /Пороги: главная 8 с/);
+});
+
+test("mobile Lighthouse runs daily or on the isolated draft branch only", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/fam-cloud-monitor.yml", import.meta.url), "utf8");
+  const mobileJob = workflow.split("  mobile-performance:\\n")[1];
+
+  assert.ok(workflow.includes('cron: "*/30 * * * *"'));
+  assert.ok(workflow.includes('cron: "7 3 * * *"'));
+  assert.ok(workflow.includes('branches: ["codex/fam-cloud-monitor-*"]'));
+  assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
+  assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
+  assert.ok(mobileJob.includes("lighthouse@13.6.0"));
+  assert.ok(mobileJob.includes("permissions:\\n      contents: read"));
+  assert.equal(mobileJob.includes("github.event.schedule == '*/30 * * * *'"), false);
+});
+test("mobile Lighthouse report uses lab metric thresholds and labels its scope", () => {
+  const result = summarizeFAMMobileLighthouse({
+    categories: { performance: { score: 0.73 } },
+    audits: {
+      "largest-contentful-paint": { numericValue: 4100 },
+      "cumulative-layout-shift": { numericValue: 0.26 },
+      "total-blocking-time": { numericValue: 610 },
+      "total-byte-weight": { numericValue: 456789 },
+    },
+  });
+
+  assert.deepEqual(result.findings, [
+    "LCP выше 4 секунд (плохая lab-категория Lighthouse).",
+    "CLS выше 0.25 (плохая lab-категория Lighthouse).",
+    "TBT выше 600 мс (плохая mobile-категория Lighthouse).",
+  ]);
+  assert.match(renderFAMMobileLighthouseSummary(result), /не INP/);
+  assert.match(renderFAMMobileLighthouseSummary(result), /не полевые данные/);
+});
+
+test("mobile Lighthouse report accepts values within thresholds and rejects incomplete data", () => {
+  const report = {
+    categories: { performance: { score: 0.91 } },
+    audits: {
+      "largest-contentful-paint": { numericValue: 2400 },
+      "cumulative-layout-shift": { numericValue: 0.08 },
+      "total-blocking-time": { numericValue: 190 },
+      "total-byte-weight": { numericValue: 200000 },
+    },
+  };
+  assert.deepEqual(summarizeFAMMobileLighthouse(report).findings, []);
+  assert.throws(() => summarizeFAMMobileLighthouse({ categories: { performance: { score: 1 } }, audits: {} }),
+    /missing_lighthouse_metric/);
 });
 
 test("monitor summary distinguishes its cadence and escapes workflow names", () => {
