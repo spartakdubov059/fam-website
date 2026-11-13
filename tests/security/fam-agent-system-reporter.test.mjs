@@ -24,6 +24,14 @@ const reportWorkflow = readFileSync(
   new URL("../../.github/workflows/fam-agent-daily-report.yml", import.meta.url),
   "utf8",
 );
+const edgeBridgeSource = readFileSync(
+  new URL("../../supabase/functions/fam-agent-coder-bridge/index.ts", import.meta.url),
+  "utf8",
+);
+const reportMigration = readFileSync(
+  new URL("../../supabase/migrations/20261113090000_add_fam_agent_report_snapshot_rpc.sql", import.meta.url),
+  "utf8",
+);
 
 test("workflow runs are bounded to the last 24 hours and summarized by outcome", () => {
   const runs = summarizeWorkflowRuns([
@@ -102,4 +110,13 @@ test("report workflow reads sources but does not publish private report contents
   const reporterSource = readFileSync(new URL("../../scripts/fam-agent-system-reporter.mjs", import.meta.url), "utf8");
   assert.match(reporterSource, /action: "save_report"/);
   assert.doesNotMatch(reporterSource, /GITHUB_STEP_SUMMARY|upload-artifact/);
+});
+
+test("Reporter output fields match the Edge bridge and SQL persistence allowlists", () => {
+  const report = createDailyReport({ now });
+  const declaration = edgeBridgeSource.match(/const REPORT_FIELDS = new Set\(\[([\\s\\S]*?)\]\);/)?.[1] ?? "";
+  const edgeFields = [...declaration.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+  assert.deepEqual(edgeFields, Object.keys(report).sort());
+  assert.match(declaration, /"role_statuses"/);
+  assert.match(reportMigration, /'open_pull_requests','role_statuses','production_deployment'/);
 });
