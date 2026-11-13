@@ -40,7 +40,7 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.match(sessionCookie, /SameSite=Lax/);
   assert.equal(sessionCookie.includes('temporary-yandex-access-token'), false);
   const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } });
-  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789' });
+  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789', authenticated_at: 1_800_000_000 });
   assert.deepEqual(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://fam.example' } }), identity);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://attacker.example' } }), null);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie) } }), null, 'unsafe cookie requests require an Origin header');

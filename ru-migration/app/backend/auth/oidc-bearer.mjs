@@ -44,7 +44,8 @@ export function createOidcBearerAuthenticator({ issuer, audience, jwksUri, fetch
       const signed = `${parts[0]}.${parts[1]}`;
       if (!verifySignature('RSA-SHA256', Buffer.from(signed), publicKey, Buffer.from(parts[2], 'base64url'))) return null;
       // Do not return role/email claims. Callers must load authorization from the database.
-      return Object.freeze({ subject: claims.sub, issuer: claims.iss });
+      return Object.freeze({ subject: claims.sub, issuer: claims.iss,
+        authenticated_at: Number.isInteger(claims.auth_time) && claims.auth_time >= 0 && claims.auth_time <= now + 5 ? claims.auth_time : null });
     } catch {
       return null;
     }

@@ -14,9 +14,12 @@ function token(claims, alg = 'RS256') {
 function request(jwt) { return new Request('https://app.example.test/api', { headers: { authorization: `Bearer ${jwt}` } }); }
 test('accepts a valid issuer/audience token and returns identity without role claims', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
-  const claims = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000, role: 'school_admin' };
-  assert.deepEqual(await auth(request(token(claims))), { subject: 'synthetic-subject', issuer });
+  const claims = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000, auth_time: 2_000_000_000, role: 'school_admin' };
+  assert.deepEqual(await auth(request(token(claims))), { subject: 'synthetic-subject', issuer, authenticated_at: 2_000_000_000 });
   assert.equal((await auth(request(token(claims))).then(x => x)).role, undefined);
+  const withoutAuthTime = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000 };
+  const unauthenticatedTimeIdentity = await auth(request(token(withoutAuthTime)));
+  assert.equal(unauthenticatedTimeIdentity.authenticated_at, null);
 });
 test('rejects expired, wrong audience and non-RS256 tokens', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });

@@ -130,8 +130,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
   async function authenticate(req) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers?.origin !== callback.origin) return null;
     const session = decodeSigned(getCookie(req, SESSION_COOKIE), secret, nowSeconds());
-    if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string') return null;
-    return { issuer: YANDEX_ISSUER, subject: session.sub };
+    if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string'
+        || !Number.isInteger(session.iat) || session.iat > nowSeconds()) return null;
+    return { issuer: YANDEX_ISSUER, subject: session.sub, authenticated_at: session.iat };
   }
 
   return Object.freeze({ handle, authenticate });
