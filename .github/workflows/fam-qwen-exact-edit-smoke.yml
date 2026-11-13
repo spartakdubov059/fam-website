@@ -1,13 +1,6 @@
 name: FAM Qwen exact-edit synthetic smoke
 
 on:
-  push:
-    branches: [ai/agent-reliable-edit-ops]
-    paths:
-      - ".github/workflows/fam-qwen-exact-edit-smoke.yml"
-      - "scripts/run-local-coder.mjs"
-      - "scripts/local-model-edits.mjs"
-      - "tests/fixtures/fam-agent-qwen-smoke*"
   pull_request:
     branches: [main]
     paths:
