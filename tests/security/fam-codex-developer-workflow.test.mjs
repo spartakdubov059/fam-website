@@ -135,3 +135,14 @@ test("explicitly referenced unselected tests are supplied as read-only source co
   assert.match(runner, /Контекст только для чтения/);
   assert.match(runner, /Остальные файлы в source_context помечены как контекст только для чтения/);
 });
+
+test("draft PR creation depends on the independent Reviewer artifact after QA", () => {
+  assert.match(workflow, /Подготовить независимый статический Reviewer отчёт/);
+  assert.match(workflow, /FAM_QA_STATUS: passed/);
+  assert.match(workflow, /node scripts\/fam-agent-reviewer\.mjs/);
+  assert.match(workflow, /name: fam-agent-independent-review/);
+  assert.match(workflow, /Скачать независимый Reviewer отчёт/);
+  assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/review\.md"/);
+  assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify\]/);
+  assert.match(workflow, /needs\.verify\.result == 'success'/);
+});
