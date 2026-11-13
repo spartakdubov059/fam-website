@@ -6,13 +6,12 @@
   "included_files": 112,
   "checked_at": "2026-11-13",
   "local_tests": {
-    "passed": 220,
+    "historical_report_claimed_passed": 220,
     "failed": 0,
     "command": "npm run check",
-    "native_sharp_installed_version": "0.34.1",
-    "native_sharp_required_version": "0.35.5"
+    "reproduction": "BLOCKED — full archive not available"
   },
-  "sdk_gate": "BLOCKED — @ydbjs/* and AWS SDK unavailable in current environment; exact native sharp version not installed",
+  "sdk_gate": "PASS — locally verified against pinned dependencies; GitHub Actions run succeeded",
   "cloud_staging": "NOT DEPLOYED",
   "production": "UNCHANGED",
   "critical_file_sha256": {
@@ -23,12 +22,26 @@
     "schema/01_tables.yql": "9401e6db90927cf62875f6e06dbc2e7c96063337947f52d94ab587eaa6ac97b7"
   },
   "release_blockers": [
-    "Verified SDK import/API compatibility on pinned package versions",
-    "Valid package lockfile for reproducible build",
+    "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
+    "Full source transfer to isolated GitHub directory/branch",
     "Real isolated YDB integration tests",
     "Real isolated Object Storage integration tests",
-    "School-controlled cloud project and billing limit review",
+    "School-controlled cloud project and billing limit review before any staging",
     "Actual auth, moderation and account-migration tests",
     "Safe access policy/legal review before real students join"
-  ]
+  ],
+  "archive_status": "UNAVAILABLE in the current workspace; historical integrity/test claims not independently reproduced",
+  "local_sdk_check": {
+    "node": "22.15.0",
+    "command": "npm ci && npm run check",
+    "result": "PASS",
+    "sharp": "0.35.5",
+    "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
+  },
+  "github_actions": {
+    "run_id": 43365405581,
+    "url": "https://github.com/spartakdubov059/fam-website/actions/runs/43365405581",
+    "result": "success",
+    "commit": "46ec897861a2c0dee5aeebdfe3c193fad4c2edcd"
+  }
 }
