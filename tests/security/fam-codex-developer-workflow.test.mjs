@@ -229,3 +229,8 @@ test("required regression check enforces current-head owner approval for agent P
   assert.ok(approvalScript.includes("pulls/"));
   assert.ok(approvalScript.includes("spartakdubov059"));
 });
+
+test("required regression workflow pins official actions to reviewed commits", () => {
+  assert.ok(testWorkflow.includes("actions/checkout@11d5960a326750d5838078e36cf38b85af677262"));
+  assert.ok(testWorkflow.includes("actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f"));
+});
