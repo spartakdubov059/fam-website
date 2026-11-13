@@ -52,6 +52,10 @@ export async function readTaskSummary(filePath) {
   }
 }
 
+export function shouldRunModel({ manualTask = "", bridgeConfigured = false, taskClaimed = false } = {}) {
+  return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
+}
+
 export function chooseResultCode(summary, executionSucceeded = true) {
   if (!executionSucceeded) return "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
@@ -89,24 +93,24 @@ async function main() {
     if (manualTask) {
       if (manualTask.length > 3000) throw new Error("Manual task exceeds 3000 characters.");
       if (envFile) appendFileSync(envFile, "FAM_TASK=" + manualTask.replace(/\r?\n/g, " ") + "\n");
-      if (output) appendFileSync(output, "claimed=false\nrun_model=true\n");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask }) + "\n");
       return;
     }
     if (!url || !token) {
-      if (output) appendFileSync(output, "claimed=false\nrun_model=false\n");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: false }) + "\n");
       console.log("Bridge credentials are absent; skipping model work because no task can be claimed.");
       return;
     }
     const data = await bridgeRequest({ url, token, body: { action: "claim" } });
     const task = validateClaimResponse(data);
     if (!task) {
-      if (output) appendFileSync(output, "claimed=false\nrun_model=false\n");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: false }) + "\n");
       console.log("No queued coder task; skipping model download and inference.");
       return;
     }
     if (envFile) appendFileSync(envFile,
       "FAM_TASK=" + task.prompt + "\nFAM_CODER_TASK_ID=" + task.id + "\n");
-    if (output) appendFileSync(output, "claimed=true\nrun_model=true\n");
+    if (output) appendFileSync(output, "claimed=true\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: true }) + "\n");
     console.log("Claimed one allowlisted technical task; task contents are aggregate-only.");
     return;
   }
