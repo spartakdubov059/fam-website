@@ -163,19 +163,18 @@ test("explicitly referenced unselected tests are supplied as read-only source co
   assert.match(runner, /Остальные файлы в source_context помечены как контекст только для чтения/);
 });
 
-test("claimed queue tasks are completed only after independent QA", () => {
+test("queued coder tasks complete only after QA and PR checks", () => {
   const generateJob = workflow.split("\n  verify:")[0] ?? "";
   assert.doesNotMatch(generateJob, /fam-agent-bridge\.mjs finish/);
   assert.ok(workflow.includes("task_id: ${{ steps.coder-queue.outputs.task_id }}"));
-  assert.ok(workflow.includes("finish_task:\n    name: Зафиксировать результат coder после независимого QA\n    needs: [generate, verify]"));
+  assert.ok(workflow.includes("finish_task:\n    name: Зафиксировать результат coder после QA и PR\n    needs: [generate, verify, prepare_review]"));
   assert.ok(workflow.includes("FAM_QA_OUTCOME: ${{ needs.verify.result }}"));
-  assert.ok(workflow.includes("run: node scripts/fam-agent-bridge.mjs finish"));
-  assert.ok(workflow.includes("needs: [generate, verify, prepare_review]"));
   assert.ok(workflow.includes("FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}"));
   assert.ok(workflow.includes("FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}"));
   assert.ok(workflow.includes("FAM_AGENT_COMMIT_SHA: ${{ needs.prepare_review.outputs.commit_sha }}"));
-  assert.ok(workflow.includes("outputs:\\n      pr_url: ${{ steps.pr.outputs.pr_url }}"));
-  assert.ok(workflow.includes("echo \"commit_sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\""));
+  assert.ok(workflow.includes("outputs:\n      pr_url: ${{ steps.pr.outputs.pr_url }}"));
+  assert.match(workflow, /commit_sha=\$\(git rev-parse HEAD\)/);
+  assert.ok(workflow.includes("run: node scripts/fam-agent-bridge.mjs finish"));
 });
 
 test("draft PR creation depends on the independent Reviewer artifact after QA", () => {
@@ -185,7 +184,7 @@ test("draft PR creation depends on the independent Reviewer artifact after QA", 
   assert.match(workflow, /name: fam-agent-independent-review/);
   assert.match(workflow, /Скачать независимый Reviewer отчёт/);
   assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/review\.md"/);
-  assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify, finish_task\]/);
+  assert.match(workflow, /prepare_review:[\\s\\S]*?needs: \\[generate, verify\\]/);
   assert.match(workflow, /needs\.verify\.result == 'success'/);
 });
 
