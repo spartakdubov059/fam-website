@@ -6,7 +6,7 @@ test("default audit explicitly loads index.html into model context", () => {
   const tracked = ["index.html", "docs/README.md", "scripts/run-local-coder.mjs"];
   const allowed = (path) => path === "index.html" || path.startsWith("docs/");
 
-  assert.match(DEFAULT_AUDIT_TASK, /index\\.html/);
+  assert.match(DEFAULT_AUDIT_TASK, /index\.html/);
   assert.deepEqual(getTaskReferencedPaths(tracked, DEFAULT_AUDIT_TASK, allowed), ["index.html"]);
 });
 
