@@ -168,30 +168,30 @@ export function createYdbListingsRepository(sql) {
 
     async registerForEvent(eventId, userId) {
       if (!eventId || !userId) throw new TypeError('invalid event registration');
-      return sql.begin(async tx => {
+      const outcome = await sql.begin(async tx => {
         const listingResult = await tx`SELECT user_id, school_id, is_event, status, event_type, max_seats
           FROM fam_listings WHERE id = ${eventId} LIMIT 1;`;
         const event = listingResult?.[0]?.[0];
         if (!event || event.is_event !== true || event.status !== 'active'
             || !['open', 'request', 'limited'].includes(event.event_type)) {
-          const error = new Error('event unavailable'); error.code = 'event_unavailable'; throw error;
+          return { failure: 'event_unavailable' };
         }
         if (event.user_id === userId) {
-          const error = new Error('organizer cannot register'); error.code = 'organizer_registration'; throw error;
+          return { failure: 'organizer_registration' };
         }
 
         const currentResult = await tx`SELECT status FROM fam_event_registrations
           WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
         const current = currentResult?.[0]?.[0];
         if (current && ['pending', 'confirmed'].includes(current.status)) {
-          const error = new Error('already registered'); error.code = 'already_registered'; throw error;
+          return { failure: 'already_registered' };
         }
 
         const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
         const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
         const limit = event.event_type === 'limited' ? Number(event.max_seats ?? 0) : 0;
         if (limit > 0 && taken >= limit) {
-          const error = new Error('no seats available'); error.code = 'no_seats_available'; throw error;
+          return { failure: 'no_seats_available' };
         }
 
         const status = event.event_type === 'request' ? 'pending' : 'confirmed';
@@ -201,8 +201,20 @@ export function createYdbListingsRepository(sql) {
         }
         await tx`UPSERT INTO fam_event_registrations (event_id, user_id, school_id, status, created_at)
           VALUES (${eventId}, ${userId}, ${event.school_id}, ${status}, CurrentUtcTimestamp());`;
-        return { event_id: eventId, user_id: userId, status };
+        return { registration: { event_id: eventId, user_id: userId, status } };
       });
+      if (outcome?.failure) {
+        const messages = {
+          event_unavailable: 'event unavailable',
+          organizer_registration: 'organizer cannot register',
+          already_registered: 'already registered',
+          no_seats_available: 'no seats available',
+        };
+        const error = new Error(messages[outcome.failure] || 'event registration rejected');
+        error.code = outcome.failure;
+        throw error;
+      }
+      return outcome.registration;
     },
 
     async cancelEventRegistration(eventId, userId) {

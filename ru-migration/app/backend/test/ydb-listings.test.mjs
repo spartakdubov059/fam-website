@@ -110,3 +110,37 @@ test('listing moderation checks school and pending state in one transaction befo
   }
   await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'pending'), TypeError);
 });
+
+test('event registration reserves a seat and stores only the database actor identity in one transaction', async () => {
+  const operations = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); operations.push({ text, values });
+    if (text.includes('FROM fam_listings')) return [[{ user_id: 'organizer', school_id: 'school-a', is_event: true, status: 'active', event_type: 'limited', max_seats: 1 }]];
+    if (text.includes('FROM fam_event_registrations')) return [[]];
+    if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 0 }]];
+    return [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.deepEqual(await repo.registerForEvent('event-id', 'verified-user'), { event_id: 'event-id', user_id: 'verified-user', status: 'confirmed' });
+  assert.ok(operations.some(operation => operation.text.includes('UPSERT INTO fam_event_occupancy')));
+  const registration = operations.find(operation => operation.text.includes('UPSERT INTO fam_event_registrations'));
+  assert.ok(registration.values.includes('verified-user'));
+  assert.equal(registration.text.includes('forged-user'), false);
+});
+
+test('event capacity and organizer rejection are returned after the YDB transaction instead of aborting it', async () => {
+  const makeRepo = ({ owner = 'organizer', taken = 1, existing = [] } = {}) => {
+    const tx = async strings => {
+      const text = strings.join('');
+      if (text.includes('FROM fam_listings')) return [[{ user_id: owner, school_id: 'school-a', is_event: true, status: 'active', event_type: 'limited', max_seats: 1 }]];
+      if (text.includes('FROM fam_event_registrations')) return [existing];
+      if (text.includes('FROM fam_event_occupancy')) return [[{ taken }]];
+      return [[]];
+    };
+    return createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(tx) }));
+  };
+  await assert.rejects(makeRepo().registerForEvent('event-id', 'student'), error => error.code === 'no_seats_available');
+  await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student'), error => error.code === 'organizer_registration');
+  await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student'), error => error.code === 'already_registered');
+});
