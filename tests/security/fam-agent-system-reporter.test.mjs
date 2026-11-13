@@ -114,7 +114,7 @@ test("report workflow reads sources but does not publish private report contents
 
 test("Reporter output fields match the Edge bridge and SQL persistence allowlists", () => {
   const report = createDailyReport({ now });
-  const declaration = edgeBridgeSource.match(/const REPORT_FIELDS = new Set\(\[([\\s\\S]*?)\]\);/)?.[1] ?? "";
+  const declaration = edgeBridgeSource.match(/const REPORT_FIELDS = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
   const edgeFields = [...declaration.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
   assert.deepEqual(edgeFields, Object.keys(report).sort());
   assert.match(declaration, /"role_statuses"/);
