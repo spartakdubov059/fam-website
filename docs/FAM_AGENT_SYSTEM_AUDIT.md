@@ -205,3 +205,20 @@
 - **Частично подтверждено:** producer → очередь, worker → claim/finish, Qwen → patch, QA → reject/pass, Reviewer → отдельный отчёт, PR Manager → draft PR существуют как отдельные проверяемые компоненты, но не объединены в наблюдённый live run.
 - **Не подтверждено/не завершено:** сквозной production queue → Qwen → QA → draft PR, владелец как неизменяемый серверный merge gate, защищённое production deployment и post-deploy QA, Reporter с полными статусами ролей уже в production, Auth leaked-password protection.
 - Merge, deployment, миграции, настройки Supabase, секреты и пользовательские данные не менялись. PR #65 остаётся draft.
+
+
+## Текущая инвентаризация Edge Functions — 13 ноября 2026, 20:44 UTC
+
+Актуальные версии и проверки доступа в production:
+
+| Function | Версия | JWT gateway | Назначение/защита |
+|---|---:|---|---|
+| `moderate` | 53 | Выключен | Внутренний маршрут moderation; до обработки проверяет `x-fam-internal-key`. CORS/origin не является единственной защитой. |
+| `submit-content` | 31 | Включён | Клиентский проверенный маршрут отправки контента. |
+| `school-admin-access` | 21 | Включён | Операции школы/администратора. |
+| `council-management` | 25 | Включён | Операции совета и moderation workflow. |
+| `fam-agent-worker` | 17 | Выключен | До RPC проверяет `x-fam-agent-token` через constant-time compare; production-запрос без токена ранее получил HTTP 401. |
+| `fam-listing-image-worker` | 6 | Выключен | Внутренний image queue worker; до обработки проверяет тот же выделенный worker token. |
+| `fam-agent-coder-bridge` | 1 | Выключен | Узкий claim/finish bridge; до RPC проверяет `x-fam-agent-token`; production-запрос без токена ранее получил HTTP 401. |
+
+Значения секретов не читались и не включались в отчёт. Coder bridge не запускает модель, а worker не является генеративным агентом. Доступность функции и успешный плановый запуск сами по себе не доказывают полный агентный сценарий.
