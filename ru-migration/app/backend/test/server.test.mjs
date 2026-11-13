@@ -114,6 +114,18 @@ test('isolated server routes private image uploads only to the configured media 
   });
 });
 
+test('isolated server sends photo bytes with verified image headers instead of JSON serialization', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await withServer({ mediaApi: async () => ({ status: 200, body: Buffer.from([0x52, 0x49, 0x46, 0x46]),
+    headers: { 'content-type': 'image/webp', 'cache-control': 'private, no-store' } }) }, async origin => {
+    const response = await fetch(new URL(`/api/v1/listings/${id}/photo`, origin));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0x52, 0x49, 0x46, 0x46]);
+  });
+});
+
 test('isolated server routes school listing moderation to the backend', async () => {
   await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, method: request.method } }) }, async origin => {
     const id = '11111111-1111-4111-8111-111111111111';

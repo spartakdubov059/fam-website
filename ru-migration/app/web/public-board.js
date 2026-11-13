@@ -154,6 +154,15 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       const card = element(document, 'article', 'ru-listing-card');
       card.append(element(document, 'p', 'ru-listing-category', listing.category));
       card.append(element(document, 'h2', 'ru-listing-title', listing.title));
+      if (listing.photo_url === `/api/v1/listings/${listing.id}/photo`) {
+        const photo = document.createElement('img');
+        photo.className = 'ru-listing-photo';
+        photo.src = listing.photo_url;
+        photo.alt = `Фото: ${listing.title}`;
+        photo.loading = 'lazy';
+        photo.referrerPolicy = 'no-referrer';
+        card.append(photo);
+      }
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
       if (listing.is_event === true) {

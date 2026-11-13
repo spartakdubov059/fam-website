@@ -40,6 +40,15 @@ function sendJson(res, status, value) {
   res.end(body);
 }
 
+function sendMediaResult(res, result) {
+  if (Buffer.isBuffer(result.body) || result.body instanceof Uint8Array) {
+    const body = Buffer.from(result.body);
+    res.writeHead(result.status, { ...result.headers, 'content-length': body.length, 'x-content-type-options': 'nosniff' });
+    return res.end(body);
+  }
+  return sendJson(res, result.status, result.body);
+}
+
 export function createServer({ listingsApi = null, authApi = null, mediaApi = null } = {}) {
   return http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
@@ -60,11 +69,12 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
     const state = readiness();
     return sendJson(res, state.ready ? 200 : 503, state);
   }
-  if (req.method === 'POST' && url.pathname === '/api/v1/media/pending') {
+  if ((req.method === 'POST' && url.pathname === '/api/v1/media/pending')
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/photo$/i.test(url.pathname) && ['GET', 'PATCH'].includes(req.method))) {
     if (!mediaApi) return sendJson(res, 503, { ok: false, error: 'media_unavailable' });
     try {
       const result = await mediaApi(req);
-      return sendJson(res, result.status, result.body);
+      return sendMediaResult(res, result);
     } catch {
       return sendJson(res, 503, { ok: false, error: 'media_unavailable' });
     }

@@ -60,3 +60,37 @@ test('pending media upload rejects storage keys that do not belong to the authen
     pendingImages: { put: async () => ({ key: 'pending/22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 10 }) } });
   assert.equal((await api(request())).status, 503);
 });
+
+test('pending photo preview is limited to moderators from the listing school', async () => {
+  const listing = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' };
+  let reads = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ role: 'council_member', school_id: 'school-b' }),
+    repository: { getListingPhoto: async () => listing }, pendingImages: { get: async () => { reads++; return Buffer.from('image'); } } });
+  assert.equal((await api(request({ method: 'GET', path: `/api/v1/listings/${listing.id}/photo` }))).status, 403);
+  assert.equal(reads, 0);
+});
+
+test('only approved photos on active listings are public and rejected photos remain unavailable', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const listing = { school_id: 'school-a', status: 'active', image_key: 'pending/key.webp', photo_status: 'approved' };
+  const api = createMediaApi({ authenticate: async () => null, resolveActor: async () => null,
+    repository: { getListingPhoto: async () => listing }, pendingImages: { get: async () => Buffer.from('webp') } });
+  const publicPhoto = await api(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }));
+  assert.equal(publicPhoto.status, 200);
+  assert.equal(publicPhoto.headers['content-type'], 'image/webp');
+  listing.photo_status = 'rejected';
+  assert.equal((await api(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }))).status, 404);
+});
+
+test('photo approval requires a moderator from the owning school', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let updates = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ role: 'school_admin', school_id: 'school-b' }),
+    repository: { getListingPhoto: async () => ({ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }),
+      moderateListingPhoto: async () => { updates++; return true; } }, pendingImages: null });
+  const result = await api(request({ method: 'PATCH', path: `/api/v1/listings/${id}/photo`, body: Buffer.from('{"decision":"approve"}'), contentType: 'application/json' }));
+  assert.equal(result.status, 404);
+  assert.equal(updates, 0);
+});

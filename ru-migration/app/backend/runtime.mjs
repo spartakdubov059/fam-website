@@ -34,7 +34,7 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const listingsApi = createListingsApi({ authenticate, resolveActor, repository });
-  const mediaApi = createMediaApi({ authenticate, resolveActor, pendingImages });
+  const mediaApi = createMediaApi({ authenticate, resolveActor, pendingImages, repository });
   return {
     listingsApi,
     mediaApi,

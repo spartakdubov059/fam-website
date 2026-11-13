@@ -56,3 +56,4 @@ body {
   font-weight: 700;
   cursor: pointer;
 }
+.ru-listing-photo { display: block; max-width: 100%; max-height: 28rem; object-fit: contain; border-radius: 0.75rem; }

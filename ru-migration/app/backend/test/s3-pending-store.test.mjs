@@ -19,3 +19,17 @@ test('S3 adapter fails closed without explicit credentials or with unsafe remote
   assert.throws(() => createS3PendingImageStore({}), /not configured/);
   assert.throws(() => createS3PendingImageStore({ ...env, FAM_RU_S3_ENDPOINT: 'http://storage.example.invalid' }), /HTTPS/);
 });
+
+test('S3 photo reads validate scoped keys and byte content before returning bytes', async () => {
+  let request;
+  const store = createS3PendingImageStore(env, { get: async input => {
+    request = input;
+    return { ContentType: 'image/webp', ContentLength: 4, Body: { transformToByteArray: async () => Uint8Array.from([1, 2, 3, 4]) } };
+  } });
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  assert.deepEqual([...await store.get(key)], [1, 2, 3, 4]);
+  assert.equal(request.Bucket, 'private-test');
+  assert.equal(request.Key, key);
+  await assert.rejects(store.get('pending/../../private.webp'), /invalid private image key/);
+  await store.close();
+});

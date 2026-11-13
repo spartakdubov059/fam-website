@@ -34,6 +34,25 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async getListingPhoto(listingId) {
+      if (!listingId) throw new TypeError('invalid listing id');
+      const statement = sql`SELECT school_id, status, image_key, photo_status
+        FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
+
+    async moderateListingPhoto(listingId, schoolId, decision) {
+      if (!listingId || !schoolId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
+      return sql.begin(async tx => {
+        const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
+        const row = current?.[0]?.[0];
+        if (!row || row.school_id !== schoolId || row.status !== 'pending' || !row.image_key || row.photo_status !== 'pending') return false;
+        await tx`UPDATE fam_listings SET photo_status = ${decision} WHERE id = ${listingId};`;
+        return true;
+      });
+    },
+
     async createIdea(record) {
       if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
           || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {
@@ -125,7 +144,7 @@ export function createYdbListingsRepository(sql) {
 
     async listActiveListings() {
       const statement = sql`SELECT id, title, description, category, price_text, is_event,
-        event_date, event_time, event_type, max_seats, created_at
+        event_date, event_time, event_type, max_seats, created_at, image_key, photo_status
         FROM fam_listings
         WHERE status = 'active'
         ORDER BY created_at DESC
@@ -144,6 +163,7 @@ export function createYdbListingsRepository(sql) {
         event_type: row.event_type || null,
         max_seats: row.max_seats,
         created_at: row.created_at,
+        photo_url: row.image_key && row.photo_status === 'approved' ? `/api/v1/listings/${row.id}/photo` : null,
       }));
     },
 
