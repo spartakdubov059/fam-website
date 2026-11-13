@@ -1,0 +1,7 @@
+{
+  "name": "fam-ru-isolated-backend",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.15.0 <23" },
+  "scripts": { "start": "node server.mjs" }
+}
