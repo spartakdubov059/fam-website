@@ -40,3 +40,23 @@ test('unconfigured isolated server fails closed for health and user API routes',
     assert.equal((await api.json()).error, 'backend_not_configured');
   });
 });
+
+test('isolated server routes favorite API requests to the authenticated backend', async () => {
+  const routed = [];
+  await withServer({ listingsApi: async request => {
+    routed.push({ method: request.method, url: request.url });
+    return { status: 200, body: { ok: true, favorited: request.method === 'PUT' } };
+  } }, async origin => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const put = await fetch(new URL(`/api/v1/listings/${id}/favorite`, origin), { method: 'PUT' });
+    assert.equal(put.status, 200);
+    assert.deepEqual(await put.json(), { ok: true, favorited: true });
+    const list = await fetch(new URL('/api/v1/favorites', origin));
+    assert.equal(list.status, 200);
+    assert.deepEqual(await list.json(), { ok: true, favorited: false });
+  });
+  assert.deepEqual(routed, [
+    { method: 'PUT', url: `/api/v1/listings/11111111-1111-4111-8111-111111111111/favorite` },
+    { method: 'GET', url: '/api/v1/favorites' },
+  ]);
+});
