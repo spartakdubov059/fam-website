@@ -218,6 +218,26 @@ test("report bridge is read-only for snapshots and allows only bounded private r
   assert.ok(edgeSource.includes(String.raw`/^\d{4}-\d{2}-\d{2}$/`));
 });
 
+test("rejects unsafe event summaries, invalid timestamps and out-of-range prior attempts", () => {
+  const task = {
+    id,
+    task_key: "audit_frontend_runtime",
+    event_code: "js_runtime",
+    page_area: "other",
+    occurrences: 2,
+    event_summary: "Ошибка выполнения JavaScript",
+    observed_hour: "2026-11-14T12:00:00Z",
+    previous_attempts: 0,
+  };
+  for (const [field, value] of [
+    ["event_summary", "<script>alert(1)</script>"],
+    ["observed_hour", "not-a-date"],
+    ["previous_attempts", 21],
+  ]) {
+    assert.throws(() => validateClaimResponse({ ok: true, task: { ...task, [field]: value } }));
+  }
+});
+
 test("rejects unrecognized telemetry enum values before building a model prompt", () => {
   for (const field of ["event_code", "page_area"]) {
     const task = {
@@ -226,9 +246,9 @@ test("rejects unrecognized telemetry enum values before building a model prompt"
       event_code: "js_runtime",
       page_area: "other",
       occurrences: 2,
-              event_summary: "Ошибка выполнения JavaScript",
-              observed_hour: "2026-11-14T12:00:00Z",
-              previous_attempts: 0,
+      event_summary: "Ошибка выполнения JavaScript",
+      observed_hour: "2026-11-14T12:00:00Z",
+      previous_attempts: 0,
     };
     task[field] = "untrusted arbitrary text";
     assert.throws(() => validateClaimResponse({ ok: true, task }));
