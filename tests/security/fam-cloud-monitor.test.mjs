@@ -432,7 +432,7 @@ test("monitor summary distinguishes its cadence and escapes workflow names", () 
 test("monitor workflow checks pull request code with read-only permissions", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-cloud-monitor.yml", import.meta.url), "utf8");
   assert.ok(workflow.includes("  pull_request:\n"));
-  assert.ok(workflow.includes("ref: ${{ github.event.pull_request.head.sha || github.sha }}"));
+  assert.ok(workflow.includes("ref: ${{ github.ref }}"));
   assert.ok(workflow.includes("persist-credentials: false"));
   assert.ok(workflow.includes("permissions:\n  contents: read\n  actions: read"));
   assert.equal(workflow.includes("contents: write"), false);
