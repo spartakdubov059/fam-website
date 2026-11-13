@@ -109,13 +109,15 @@ async function measurePagePerformance(html, baseUrl, fetchImpl, retryDelayMs) {
     try {
       const started = performance.now();
       const response = await fetchWithRetry(fetchImpl, url, {
+        method: "HEAD",
         headers: { "User-Agent": "FAM-cloud-monitor" },
         signal: AbortSignal.timeout(15_000),
       }, retryDelayMs);
       if (response.status !== 200) throw new Error("HTTP " + response.status);
       const finalUrl = response.url ? new URL(response.url) : new URL(url);
       if (finalUrl.origin !== new URL(baseUrl).origin) throw new Error("Unexpected cross-origin redirect.");
-      const bytes = (await response.arrayBuffer()).byteLength;
+      const contentLength = response.headers?.get?.("content-length") ?? "";
+      const bytes = /^\d+$/.test(contentLength) ? Number(contentLength) : null;
       return { ok: true, bytes, elapsed_ms: Math.round(performance.now() - started) };
     } catch (error) {
       return { ok: false, error: safeText(error?.message || "Resource request failed.", 120) };
@@ -124,13 +126,16 @@ async function measurePagePerformance(html, baseUrl, fetchImpl, retryDelayMs) {
 
   const successful = results.filter((item) => item.ok);
   const failures = results.filter((item) => !item.ok);
-  const resourceBytes = successful.reduce((sum, item) => sum + item.bytes, 0);
-  const largestResourceBytes = successful.reduce((largest, item) => Math.max(largest, item.bytes), 0);
+  const knownSizes = successful.filter((item) => Number.isSafeInteger(item.bytes));
+  const resourceBytes = knownSizes.reduce((sum, item) => sum + item.bytes, 0);
+  const largestResourceBytes = knownSizes.reduce((largest, item) => Math.max(largest, item.bytes), 0);
   return {
     local_resources_total: extracted.total,
     local_resources_checked: extracted.urls.length,
     resources_truncated: Math.max(0, extracted.total - extracted.urls.length),
     resource_bytes: resourceBytes,
+    resource_sizes_known: knownSizes.length,
+    resource_sizes_unknown: successful.length - knownSizes.length,
     largest_resource_bytes: largestResourceBytes,
     resource_failures: failures.length,
     slowest_resource_ms: successful.reduce((largest, item) => Math.max(largest, item.elapsed_ms), 0),
@@ -216,7 +221,8 @@ export async function runFAMCloudMonitor({
       ok: measured.resource_failures === 0,
       detail: "HTML " + homepageResult.body_bytes + " байт за " + homepageResult.elapsed_ms + " мс; " +
         measured.local_resources_checked + "/" + measured.local_resources_total + " локальных ресурсов проверено, " +
-        measured.resource_bytes + " байт суммарно, крупнейший " + measured.largest_resource_bytes +
+        measured.resource_bytes + " байт по HEAD-заголовкам (" + measured.resource_sizes_known + "/" +
+        measured.local_resources_checked + " размеров известно), крупнейший " + measured.largest_resource_bytes +
         " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary +
         (measured.resources_truncated ? " Остальные ресурсы не проверялись из-за лимита 12." : "") +
         " Это сетевой замер с runner, не browser-render/mobile benchmark.",

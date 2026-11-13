@@ -14,7 +14,9 @@ function response(body, status = 200) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    headers: { get: () => "text/plain" },
+    headers: { get: (name) => name === "content-length" && typeof body === "string"
+      ? String(new TextEncoder().encode(body).byteLength)
+      : "text/plain" },
     text: async () => body,
     arrayBuffer: async () => new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body)).buffer,
     json: async () => body,
@@ -165,9 +167,9 @@ test("cloud monitor measures same-origin page assets and ignores external resour
   ].join("");
   const requests = [];
   const report = await runFAMCloudMonitor({
-    fetchImpl: async (url) => {
+    fetchImpl: async (url, options) => {
       const parsed = new URL(url);
-      requests.push(parsed.href);
+      requests.push({ url: parsed.href, method: options?.method ?? "GET" });
       if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
       if (parsed.pathname.endsWith("/robots.txt")) return response(robots);
       if (parsed.pathname.endsWith("/sitemap.xml")) return response(sitemap);
@@ -188,7 +190,9 @@ test("cloud monitor measures same-origin page assets and ignores external resour
   assert.equal(report.performance.local_resources_checked, 3);
   assert.equal(report.performance.resource_bytes, 13);
   assert.equal(report.performance.largest_resource_bytes, 6);
-  assert.equal(requests.some((url) => url.includes("third-party.invalid")), false);
+  assert.equal(requests.some((request) => request.url.includes("third-party.invalid")), false);
+  assert.equal(requests.filter((request) => /\/(js|css|assets)\//.test(new URL(request.url).pathname))
+    .every((request) => request.method === "HEAD"), true);
   assert.match(renderFAMCloudMonitorReport(report), /browser rendering, Core Web Vitals/);
   assert.match(report.checks.find((check) => check.name.startsWith("Производительность")).detail, /мс/);
 });
