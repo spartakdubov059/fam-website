@@ -92,7 +92,13 @@ export function createServer({ listingsApi = null } = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  createServer().listen(port, host, () => {
+  const runtime = await (await import('./runtime.mjs')).createRuntime();
+  createServer({ listingsApi: runtime?.listingsApi }).listen(port, host, () => {
     console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
   });
+  if (runtime) {
+    const shutdown = async () => { await runtime.close(); process.exit(0); };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+  }
 }
