@@ -5,6 +5,7 @@ create role service_role nologin;
 
 create schema private;
 create schema cron;
+create schema net;
 
 create table private.fam_agent_daily_reports (
   report_date date primary key,
@@ -41,6 +42,15 @@ create table cron.job_run_details (
   start_time timestamptz not null
 );
 
+create table net._http_response (
+  id bigint primary key,
+  status_code integer,
+  content text,
+  created timestamptz not null,
+  timed_out boolean not null default false,
+  error_msg text
+);
+
 insert into private.fam_agent_daily_reports (report_date, summary, metrics)
 values (current_date - 1, 'previous daily report', '{"completed":2}'::jsonb);
 
@@ -58,3 +68,10 @@ values (1, 'fam-agent-worker-every-5-minutes', '*/5 * * * *', true);
 
 insert into cron.job_run_details (jobid, status, start_time)
 values (1, 'succeeded', now());
+
+
+insert into net._http_response (id,status_code,content,created) values
+  (1,200,'{"ok":true,"claimed":1,"completed":1,"blocked":0}',now()-interval '5 minutes'),
+  (2,500,'{"ok":false,"error":"worker_execution_failed"}',now()-interval '3 minutes'),
+  (3,200,'{"ok":true,"claimed":1,"completed":1,"blocked":0}',now()-interval '7 hours'),
+  (4,200,'{"ok":true,"message":"unrelated response"}',now()-interval '2 minutes');
