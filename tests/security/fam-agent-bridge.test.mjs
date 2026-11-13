@@ -117,6 +117,13 @@ const edgeSource = readFileSync(
   "utf8",
 );
 
+test("model work starts only for a claimed queue task or a manual request", () => {
+  assert.match(bridge, /Bridge credentials are absent; skipping model work/);
+  assert.match(bridge, /No queued coder task; skipping model download and inference/);
+  assert.match(bridge, /run_model=false/);
+  assert.match(bridge, /run_model=true/);
+});
+
 test("SQL bridge functions are invoker-only and restricted to service_role", () => {
   assert.match(migration, /security invoker/gi);
   assert.match(migration, /set search_path = ''/gi);
