@@ -197,7 +197,10 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   await run("git", ["apply", ineffectivePatchPath], { cwd: badQa });
   await assert.rejects(() => run(process.execPath, [regressionPath], { cwd: badQa }));
 
-  const safety = buildSecurityReport(patch);
+  const safety = {
+    ...buildSecurityReport(patch),
+    requires_approval: validateAgentPatch(patch, summary).requires_approval,
+  };
   const performance = buildPerformanceReport(patch);
   assert.equal(safety.conclusion, "no_static_finding");
   assert.equal(safety.manual_approval_required, true);
