@@ -5,6 +5,14 @@ import { randomUUID } from 'node:crypto';
 export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
+    async getActiveAccountSuspension(schoolId, userId) {
+      if (!schoolId || !userId) throw new TypeError('invalid suspension lookup');
+      const statement = sql`SELECT reason, duration_hours, expires_at
+        FROM fam_account_suspensions WHERE school_id = ${schoolId} AND target_id = ${userId}
+          AND status = 'active' AND expires_at > CurrentUtcTimestamp() LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
     async createSchoolProfileRequest(record) {
       if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
         throw new TypeError('invalid school profile request');
