@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1167.0",
-    "@ydbjs/auth": "^6.3.1",
-    "@ydbjs/core": "^6.3.1",
-    "@ydbjs/query": "^6.3.0",
+    "@ydbjs/auth": "6.3.1",
+    "@ydbjs/core": "6.3.1",
+    "@ydbjs/query": "6.3.0",
     "sharp": "0.35.5"
   }
 }
