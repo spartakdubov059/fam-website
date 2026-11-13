@@ -270,6 +270,12 @@ test("mobile Lighthouse runs daily or on a manual request only", () => {
   assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
   assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
   assert.ok(mobileJob.includes("lighthouse@13.6.0"));
+  assert.ok(mobileJob.includes("--output=json"));
+  assert.ok(mobileJob.includes("--output=html"));
+  assert.ok(mobileJob.includes("actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"));
+  assert.ok(mobileJob.includes("retention-days: 3"));
+  assert.ok(mobileJob.includes("fam-lighthouse.report.html"));
+  assert.ok(mobileJob.includes("fam-lighthouse.report.json"));
   assert.ok(mobileJob.includes("for attempt in 1 2"));
   assert.ok(mobileJob.includes("--headless=new --no-sandbox"));
   assert.ok(mobileJob.includes("permissions:\n      contents: read"));
