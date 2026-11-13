@@ -2221,13 +2221,15 @@ window.onunhandledrejection = function() {
     }
   });
 
-  async function markChatSeen(otherId) {
+  async function markChatSeen(otherId, listingId = null) {
     if (!user?.id || !otherId) return false;
-    const { error } = await sb.from("messages")
+    let query = sb.from("messages")
       .update({ is_read: true })
       .eq("receiver_id", user.id)
-      .eq("sender_id", otherId)
-      .or("is_read.eq.false,is_read.is.null");
+      .eq("sender_id", otherId);
+    if (listingId) query = query.eq("listing_id", listingId);
+    else query = query.is("listing_id", null);
+    const { error } = await query.or("is_read.eq.false,is_read.is.null");
     if (error) {
       console.warn("chat_mark_read_failed", error.message || "unknown");
       return false;
@@ -2738,7 +2740,7 @@ window.onunhandledrejection = function() {
       c.scrollTop = c.scrollHeight;
 
       if (currentTab === 'messages' && !$("chatView").classList.contains("hidden") && curChat?.userId === otherId && curChat?.listingId === (listingId || null)) {
-        await markChatSeen(otherId);
+        await markChatSeen(otherId, listingId);
         await updateChatBadge();
         await refreshNotificationFeed();
       }
@@ -3801,7 +3803,7 @@ window.onunhandledrejection = function() {
         <div style="font-size:10px;font-weight:700;margin:8px 0 5px;">Ваши обращения</div>
         ${ownRequests.map(row => `
           <div style="font-size:10px;padding:7px 0;border-top:1px solid var(--border);">
-            <b>${esc(row.target_email_masked || "Аккаунт")}</b>
+            <b>Моё обращение</b>
             <span style="color:var(--muted);"> · ${esc(deletionStatusLabel(row.status))}</span>
             <div style="color:var(--muted);margin-top:3px;">${row.created_at ? esc(new Date(row.created_at).toLocaleString("ru-RU")) : ""}</div>
             ${row.review_note ? `<div style="margin-top:3px;">${esc(row.review_note)}</div>` : ""}
