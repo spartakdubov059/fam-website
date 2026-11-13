@@ -237,7 +237,7 @@ export function createYdbListingsRepository(sql) {
         if (linked?.[0]?.length) return null;
         const token = randomUUID();
         await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
-            claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+            claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
           WHERE object_key = ${objectKey} AND user_id = ${userId} AND status = 'pending';`;
         const claimed = await tx`SELECT claim_token FROM fam_pending_media WHERE object_key = ${objectKey}
           AND status = 'deleting' AND claim_token = ${token} LIMIT 1;`;
@@ -262,7 +262,7 @@ export function createYdbListingsRepository(sql) {
           }
           const token = randomUUID();
           await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
-              claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+              claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
             WHERE object_key = ${objectKey}
               AND ((status = 'pending' AND created_at < CurrentUtcTimestamp() - Interval('P7D'))
                 OR (status = 'deleting' AND claim_until < CurrentUtcTimestamp()));`;
