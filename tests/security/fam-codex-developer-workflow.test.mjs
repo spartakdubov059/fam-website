@@ -106,9 +106,10 @@ test("all coder-editable paths trigger required CI and PR manager waits with rea
   for (const path of ["'css/**'", "'js/**'", "'assets/**'", "'docs/**'"]) {
     assert.ok(pullRequestPaths.includes(path), `missing PR CI path: ${path}`);
   }
-  assert.match(workflow, /gh api "repos\/\$GITHUB_REPOSITORY\/commits\/\$BRANCH_SHA\/check-runs\?per_page=100"/);
-  assert.match(workflow, /REQUIRED_CHECK="Russian content safety tests"/);
-  assert.match(workflow, /CHECK_CONCLUSION/);
+  assert.match(workflow, /gh pr checks "\$PR_URL" --required --json name,state,bucket/);
+  assert.match(workflow, /REQUIRED_BUCKET/);
+  assert.match(workflow, /Russian content safety tests/);
+  assert.doesNotMatch(workflow, /commits\/\$BRANCH_SHA\/check-runs/);
   assert.doesNotMatch(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml/);
   assert.doesNotMatch(workflow, /actions: write/);
 });
