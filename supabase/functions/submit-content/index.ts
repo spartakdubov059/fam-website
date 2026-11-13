@@ -839,6 +839,14 @@ Deno.serve(async (req: Request) => {
     const recipient = Array.isArray(recipientResult.data) ? recipientResult.data[0] : null;
     if (!recipientResult.ok || !recipient) return fail("Получатель не найден.", 404, headers);
 
+    const listingId = typeof payload.listing_id === "string" ? payload.listing_id : null;
+    if (listingId) {
+      if (!UUID_RE.test(listingId)) return fail("Некорректное объявление для переписки.", 400, headers);
+      const listingResult = await adminRequest("listings?select=id,school_id,status&id=eq." + encodeURIComponent(listingId) + "&limit=1");
+      const listing = Array.isArray(listingResult.data) ? listingResult.data[0] : null;
+      if (!listing || listing.school_id !== profile.school_id) return fail("Объявление для переписки не найдено.", 404, headers);
+    }
+
     const moderation = await moderate(body, authorization, origin, false, null, {
       kind: "message",
       sender_id: userId,
@@ -861,6 +869,7 @@ Deno.serve(async (req: Request) => {
     const insertResult = await adminRequest("messages?select=*", "POST", {
       sender_id: userId,
       receiver_id: receiverId,
+      listing_id: listingId,
       body,
       is_read: false,
     });
