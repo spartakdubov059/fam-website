@@ -38,6 +38,11 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(listingSubmit.headers.get('content-type'), /javascript/);
     assert.match(await listingSubmit.text(), /api\/v1\/media\/pending/);
 
+    const moderation = await fetch(new URL('/listing-moderation.js', origin));
+    assert.equal(moderation.status, 200);
+    assert.match(moderation.headers.get('content-type'), /javascript/);
+    assert.match(await moderation.text(), /api\/v1\/listings\/moderation/);
+
     const boardStyles = await fetch(new URL('/public-board.css', origin));
     assert.equal(boardStyles.status, 200);
     assert.match(boardStyles.headers.get('content-type'), /text\/css/);
@@ -139,6 +144,14 @@ test('isolated server routes school listing moderation to the backend', async ()
     });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, method: 'PATCH' });
+  });
+});
+
+test('isolated server routes the private moderation queue to the listings API', async () => {
+  await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, route: request.url } }) }, async origin => {
+    const response = await fetch(new URL('/api/v1/listings/moderation', origin));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, route: '/api/v1/listings/moderation' });
   });
 });
 

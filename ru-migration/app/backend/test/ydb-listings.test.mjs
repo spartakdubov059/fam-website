@@ -48,6 +48,20 @@ test('pending photo cleanup query binds the object key before deletion eligibili
   assert.match(query.text, /FROM fam_listings WHERE image_key = \?/);
 });
 
+test('moderation queue is school-scoped and returns no storage key', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ id: 'listing-id', title: 'Синтетика', description: 'Описание', category: 'Учёба', school_id: 'school-a', image_key: 'private/key', photo_status: 'pending', status: 'pending' }]]);
+  });
+  const rows = await repo.listPendingListings('school-a');
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /school_id = \?/);
+  assert.match(query.text, /status = 'pending'/);
+  assert.equal(rows[0].photo_url, '/api/v1/listings/listing-id/photo');
+  assert.equal(Object.hasOwn(rows[0], 'image_key'), false);
+});
+
 test('message repository verifies same-school active recipient before inserting bound content', async () => {
   const calls = [];
   const sql = (strings, ...values) => {

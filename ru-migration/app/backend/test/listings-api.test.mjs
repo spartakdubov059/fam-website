@@ -38,6 +38,26 @@ test('public listing read fails closed when the database is unavailable', async 
   assert.equal(response.body.error, 'database_unavailable');
 });
 
+test('pending moderation queue is restricted to the authenticated school staff profile', async () => {
+  let schoolScope;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
+    resolveActor: async () => ({ id: 'staff-id', school_id: 'school-a', role: 'school_admin' }),
+    repository: { listPendingListings: async schoolId => { schoolScope = schoolId; return [{ id: 'pending-id', photo_status: 'pending' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/listings/moderation';
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.equal(schoolScope, 'school-a');
+  assert.deepEqual(response.body.listings, [{ id: 'pending-id', photo_status: 'pending' }]);
+
+  let reads = 0;
+  const student = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
+    resolveActor: async () => ({ id: 'student-id', school_id: 'school-a', role: 'student' }),
+    repository: { listPendingListings: async () => { reads++; return []; } } });
+  const denied = req({}, 'GET'); denied.url = '/api/v1/listings/moderation';
+  assert.equal((await student(denied)).status, 403);
+  assert.equal(reads, 0);
+});
+
 test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'admin' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });

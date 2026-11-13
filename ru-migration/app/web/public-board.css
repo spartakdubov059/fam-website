@@ -63,3 +63,7 @@ body {
 .ru-listing-form input, .ru-listing-form textarea, .ru-listing-form select { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #aaa5bb; border-radius: 0.5rem; font: inherit; }
 .ru-listing-form textarea { min-height: 7rem; resize: vertical; }
 .ru-button { width: fit-content; padding: 0.7rem 1rem; border: 0; border-radius: 0.55rem; background: #542db5; color: #fff; font: inherit; cursor: pointer; }
+.ru-moderation { max-width: 56rem; margin: 2rem auto; }
+.ru-moderation-card { display: grid; gap: 0.55rem; margin: 1rem 0; padding: 1rem; border: 1px solid #d9d6e8; border-radius: 0.85rem; background: #fff; }
+.ru-moderation-card h3, .ru-moderation-card p { margin: 0; overflow-wrap: anywhere; }
+.ru-moderation-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }

@@ -1273,7 +1273,7 @@ window.onunhandledrejection = function() {
 
 (function(){
   if (typeof supabase === 'undefined') {
-    document.body.innerHTML = '<main class="ru-shell"><h1>FAM RU</h1><p class="ru-note">Российская копия работает отдельно от основного FAM. Объявления и фотографии хранятся через российский backend.</p><a class="ru-auth-link" href="/auth/yandex/start">Войти через Яндекс ID</a><button id="ruLogout" class="ru-button" type="button" hidden>Выйти</button><p id="ruSubmitStatus" class="ru-note" role="status" aria-live="polite">Войдите через Яндекс ID, чтобы подать объявление.</p><form id="ruListingForm" class="ru-listing-form" hidden><label>Название<input name="title" maxlength="80" required></label><label>Описание<textarea name="description" maxlength="1000" required></textarea></label><label>Категория<select name="category" required><option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия">Мероприятия</option></select></label><label>Цена в рублях<input name="price_text" maxlength="50" placeholder="Бесплатно"></label><label>Фото (необязательно)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="ru-note">Не загружайте лица, документы, пропуска и контактные данные. Фото останется закрытым до проверки модератором школы.</p><button class="ru-button" type="submit">Отправить на проверку</button></form><section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section></main>';
+    document.body.innerHTML = '<main class="ru-shell"><h1>FAM RU</h1><p class="ru-note">Российская копия работает отдельно от основного FAM. Объявления и фотографии хранятся через российский backend.</p><a class="ru-auth-link" href="/auth/yandex/start">Войти через Яндекс ID</a><button id="ruLogout" class="ru-button" type="button" hidden>Выйти</button><p id="ruSubmitStatus" class="ru-note" role="status" aria-live="polite">Войдите через Яндекс ID, чтобы подать объявление.</p><form id="ruListingForm" class="ru-listing-form" hidden><label>Название<input name="title" maxlength="80" required></label><label>Описание<textarea name="description" maxlength="1000" required></textarea></label><label>Категория<select name="category" required><option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия">Мероприятия</option></select></label><label>Цена в рублях<input name="price_text" maxlength="50" placeholder="Бесплатно"></label><label>Фото (необязательно)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><p class="ru-note">Не загружайте лица, документы, пропуска и контактные данные. Фото останется закрытым до проверки модератором школы.</p><button class="ru-button" type="submit">Отправить на проверку</button></form><section id="ruModeration" class="ru-moderation" hidden aria-label="Очередь школьной модерации"><h2>Проверка объявлений и фото</h2><p id="ruModerationStatus" class="ru-note" role="status" aria-live="polite"></p><div id="ruModerationQueue"></div></section><section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section></main>';
     const boardStyles = document.createElement('link');
     boardStyles.rel = 'stylesheet';
     boardStyles.href = '/public-board.css';
@@ -1286,6 +1286,10 @@ window.onunhandledrejection = function() {
     submitScript.type = 'module';
     submitScript.src = '/listing-submit.js';
     document.body.append(submitScript);
+    const moderationScript = document.createElement('script');
+    moderationScript.type = 'module';
+    moderationScript.src = '/listing-moderation.js';
+    document.body.append(moderationScript);
     return;
   }
 

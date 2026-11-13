@@ -174,6 +174,33 @@ export function createYdbListingsRepository(sql) {
       }));
     },
 
+    async listPendingListings(schoolId) {
+      if (!schoolId) throw new TypeError('invalid school id');
+      const statement = sql`SELECT id, title, description, category, price_text, is_event,
+        event_date, event_time, event_type, max_seats, created_at, image_key, photo_status
+        FROM fam_listings
+        WHERE school_id = ${schoolId} AND status = 'pending'
+        ORDER BY created_at ASC
+        LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const resultSets = await statement;
+      return (resultSets?.[0] ?? []).map(row => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        price_text: row.price_text,
+        is_event: row.is_event,
+        event_date: row.event_date || null,
+        event_time: row.event_time || null,
+        event_type: row.event_type || null,
+        max_seats: row.max_seats,
+        created_at: row.created_at,
+        photo_status: row.photo_status || 'none',
+        photo_url: row.image_key ? `/api/v1/listings/${row.id}/photo` : null,
+      }));
+    },
+
     async getEventOccupancy(eventId) {
       if (!eventId) throw new TypeError('invalid event id');
       const statement = sql`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
