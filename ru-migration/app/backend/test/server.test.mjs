@@ -18,7 +18,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const page = await fetch(origin);
     assert.equal(page.status, 200);
     const html = await page.text();
-    assert.match(html, /FAM RU — подготовка/);
+    assert.match(html, /ruListingForm/);
     assert.match(html, /src="\/price-format\.js"/);
     assert.match(html, /auth\/yandex\/start/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
@@ -32,6 +32,11 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.equal(publicBoard.status, 200);
     assert.match(publicBoard.headers.get('content-type'), /javascript/);
     assert.match(await publicBoard.text(), /api\/v1\/listings/);
+
+    const listingSubmit = await fetch(new URL('/listing-submit.js', origin));
+    assert.equal(listingSubmit.status, 200);
+    assert.match(listingSubmit.headers.get('content-type'), /javascript/);
+    assert.match(await listingSubmit.text(), /api\/v1\/media\/pending/);
 
     const boardStyles = await fetch(new URL('/public-board.css', origin));
     assert.equal(boardStyles.status, 200);

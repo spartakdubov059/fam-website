@@ -42,6 +42,13 @@ export function createYdbListingsRepository(sql) {
       return (await statement)?.[0]?.[0] ?? null;
     },
 
+    async listingUsesPhoto(imageKey) {
+      if (!imageKey) throw new TypeError('invalid photo key');
+      const statement = sql`SELECT id FROM fam_listings WHERE image_key = ${imageKey} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return Boolean((await statement)?.[0]?.[0]?.id);
+    },
+
     async moderateListingPhoto(listingId, schoolId, decision) {
       if (!listingId || !schoolId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
       return sql.begin(async tx => {

@@ -35,6 +35,19 @@ test('favorite repository binds user and listing ids and refuses to favorite a m
   assert.ok(calls[1].values.includes('listing-1'));
 });
 
+test('pending photo cleanup query binds the object key before deletion eligibility is decided', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ id: 'linked-listing' }]]);
+  });
+  const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  assert.equal(await repo.listingUsesPhoto(imageKey), true);
+  assert.equal(query.text.includes(imageKey), false);
+  assert.ok(query.values.includes(imageKey));
+  assert.match(query.text, /FROM fam_listings WHERE image_key = \?/);
+});
+
 test('message repository verifies same-school active recipient before inserting bound content', async () => {
   const calls = [];
   const sql = (strings, ...values) => {

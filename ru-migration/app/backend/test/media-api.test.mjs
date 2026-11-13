@@ -94,3 +94,23 @@ test('photo approval requires a moderator from the owning school', async () => {
   assert.equal(result.status, 404);
   assert.equal(updates, 0);
 });
+
+test('failed listing submissions can delete only the caller own unlinked pending image', async () => {
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const objectId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const removed = [];
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => ({ id: userId }),
+    repository: { listingUsesPhoto: async () => false }, pendingImages: { delete: async key => removed.push(key) } });
+  const result = await api(request({ method: 'DELETE', path: `/api/v1/media/pending/${objectId}`, body: Buffer.alloc(0) }));
+  assert.equal(result.status, 200);
+  assert.deepEqual(removed, [`pending/${userId}/${objectId}.webp`]);
+});
+
+test('pending image cleanup refuses to delete a photo already attached to a listing', async () => {
+  let removed = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+    repository: { listingUsesPhoto: async () => true }, pendingImages: { delete: async () => removed++ } });
+  const result = await api(request({ method: 'DELETE', path: '/api/v1/media/pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', body: Buffer.alloc(0) }));
+  assert.equal(result.status, 409);
+  assert.equal(removed, 0);
+});

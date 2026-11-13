@@ -33,3 +33,13 @@ test('S3 photo reads validate scoped keys and byte content before returning byte
   await assert.rejects(store.get('pending/../../private.webp'), /invalid private image key/);
   await store.close();
 });
+
+test('S3 pending image deletion accepts only scoped image keys', async () => {
+  let request;
+  const store = createS3PendingImageStore(env, { remove: async input => { request = input; } });
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  assert.equal(await store.delete(key), true);
+  assert.deepEqual(request, { Bucket: 'private-test', Key: key });
+  await assert.rejects(store.delete('pending/../../private.webp'), /invalid private image key/);
+  await store.close();
+});

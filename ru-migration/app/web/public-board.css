@@ -57,3 +57,9 @@ body {
   cursor: pointer;
 }
 .ru-listing-photo { display: block; max-width: 100%; max-height: 28rem; object-fit: contain; border-radius: 0.75rem; }
+.ru-listing-form { display: grid; gap: 0.8rem; max-width: 42rem; margin: 1.5rem auto; padding: 1.25rem; border: 1px solid #d9d6e8; border-radius: 1rem; background: #fff; }
+.ru-listing-form[hidden], .ru-button[hidden] { display: none; }
+.ru-listing-form label { display: grid; gap: 0.35rem; font-weight: 600; }
+.ru-listing-form input, .ru-listing-form textarea, .ru-listing-form select { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #aaa5bb; border-radius: 0.5rem; font: inherit; }
+.ru-listing-form textarea { min-height: 7rem; resize: vertical; }
+.ru-button { width: fit-content; padding: 0.7rem 1rem; border: 0; border-radius: 0.55rem; background: #542db5; color: #fff; font: inherit; cursor: pointer; }

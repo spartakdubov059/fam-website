@@ -46,6 +46,20 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         return changed ? { status: 200, body: { ok: true, photo_status: decision } } : { status: 409, body: { ok: false, error: 'photo_review_conflict' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    const pendingMatch = pathname.match(/^\/api\/v1\/media\/pending\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'DELETE' && pendingMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !UUID.test(actor.id)) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof pendingImages?.delete !== 'function' || typeof repository?.listingUsesPhoto !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      const key = `pending/${actor.id}/${pendingMatch[1]}.webp`;
+      try {
+        if (await repository.listingUsesPhoto(key)) return { status: 409, body: { ok: false, error: 'photo_already_linked' } };
+        await pendingImages.delete(key);
+        return { status: 200, body: { ok: true, deleted: true } };
+      } catch { return { status: 503, body: { ok: false, error: 'media_unavailable' } }; }
+    }
     if (req.method !== 'POST' || pathname !== '/api/v1/media/pending') {
       return { status: 404, body: { ok: false, error: 'not_found' } };
     }

@@ -1,8 +1,8 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 import { createPendingImageStore } from './pending-images.mjs';
 
-export function createS3PendingImageStore(env = process.env, { send, get } = {}) {
+export function createS3PendingImageStore(env = process.env, { send, get, remove } = {}) {
   const endpoint = env.FAM_RU_S3_ENDPOINT;
   const bucket = env.FAM_RU_S3_BUCKET;
   const accessKeyId = env.FAM_RU_S3_ACCESS_KEY_ID;
@@ -15,6 +15,7 @@ export function createS3PendingImageStore(env = process.env, { send, get } = {})
   const client = new S3Client({ endpoint: parsed.origin, region, forcePathStyle: true, credentials: { accessKeyId, secretAccessKey } });
   const putObject = send || ((input) => client.send(new PutObjectCommand(input)));
   const getObject = get || ((input) => client.send(new GetObjectCommand(input)));
+  const deleteObject = remove || ((input) => client.send(new DeleteObjectCommand(input)));
   const store = createPendingImageStore({ sharp, bucket, putObject });
   return Object.freeze({
     ...store,
@@ -26,6 +27,12 @@ export function createS3PendingImageStore(env = process.env, { send, get } = {})
       const bytes = Buffer.from(await result.Body.transformToByteArray());
       if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error('invalid private image object');
       return bytes;
+    },
+    async delete(key) {
+      const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+      if (typeof key !== 'string' || !new RegExp(`^pending/${uuid}/${uuid}\\.webp$`, 'i').test(key)) throw new TypeError('invalid private image key');
+      await deleteObject({ Bucket: bucket, Key: key });
+      return true;
     },
     close: () => client.destroy(),
   });
