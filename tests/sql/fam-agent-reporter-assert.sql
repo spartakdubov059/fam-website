@@ -52,6 +52,7 @@ begin
      or v_snapshot #>> '{worker_http_6h,reported_error_count}' <> '1'
      or v_snapshot #>> '{worker_http_6h,observed_from}' is null
      or v_snapshot::text like '%worker_execution_failed%'
+     or v_snapshot::text like '%unrelated_failure%'
      or v_technical ->> 'failed_24h' <> '1'
      or v_snapshot #>> '{failed_tasks_24h,0,task_type}' <> 'coder_patch_request'
      or v_snapshot #>> '{daily_report,metrics,completed}' <> '2' then
