@@ -5,6 +5,7 @@ import {
   createDailyReport,
   renderDailyReport,
   sanitizePullRequests,
+  summarizeAgentJobStatuses,
   summarizeWorkflowRuns,
 } from "../../scripts/fam-agent-system-reporter.mjs";
 
@@ -60,14 +61,47 @@ test("PR report strips titles and accepts only trusted GitHub URLs", () => {
   assert.equal(JSON.stringify(pulls).includes("private student data"), false);
 });
 
+test("patch-specific GitHub jobs expose only bounded role outcomes", () => {
+  const statuses = summarizeAgentJobStatuses([
+    {
+      name: "Локальная модель готовит исправление",
+      steps: [{ name: "Запустить локальную модель и подготовить patch", status: "completed", conclusion: "success" }],
+    },
+    {
+      name: "Независимая проверка без модели и секретов",
+      status: "completed",
+      conclusion: "failure",
+      steps: [
+        { name: "Подготовить независимый статический Reviewer отчёт", status: "completed", conclusion: "success" },
+        { name: "Запустить отдельный статический Security Agent", status: "completed", conclusion: "failure" },
+        { name: "Запустить отдельный статический Performance Agent", status: "completed", conclusion: "skipped" },
+      ],
+    },
+    { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "skipped" },
+    { name: "Untrusted job name with private text", conclusion: "failure" },
+  ]);
+  assert.deepEqual(statuses, {
+    coder: "success",
+    qa: "failure",
+    reviewer: "success",
+    security: "failure",
+    performance: "skipped",
+    pr_manager: "skipped",
+  });
+  assert.equal(JSON.stringify(statuses).includes("Untrusted"), false);
+  assert.equal(summarizeAgentJobStatuses(null), null);
+});
+
 test("daily report states missing sources and records only allowlisted Supabase fields", () => {
   const report = createDailyReport({
     snapshot, snapshotStatus: "available",
     workflowRuns: [
       { name: "Moderation regression tests", status: "completed", conclusion: "success", created_at: "2026-11-13T05:00:00Z" },
-      { name: "FAM local AI developer", status: "completed", conclusion: "success", created_at: "2026-11-13T05:30:00Z" },
+      { id: 77, name: "FAM local AI developer", status: "completed", conclusion: "success", created_at: "2026-11-13T05:30:00Z" },
     ],
     workflowStatus: "available",
+    agentJobStatus: "available",
+    agentJobStatuses: { coder: "success", qa: "success", reviewer: "success", security: "success", performance: "failure", pr_manager: "skipped" },
     pullRequests: [{ number: 8, state: "open", title: "not included", draft: true, html_url: "https://github.com/a/b/pull/8" }],
     pullRequestStatus: "available",
     production: { status: "success", created_at: "2026-11-13T04:00:00Z", html_url: "https://github.com/a/b/deployments/1" },
@@ -79,10 +113,11 @@ test("daily report states missing sources and records only allowlisted Supabase 
     "latest_site_error_check", "latest_system_health", "report_date", "site_error_events_24h",
   ]);
   assert.equal(report.workflows_24h.length, 2);
-  assert.ok(report.role_statuses.some((role) => role.role === "QA" && role.status === "success"));
-  assert.ok(report.role_statuses.some((role) => role.role === "Security Agent" && role.status === "coder_workflow_seen_individual_result_unavailable"));
+  assert.ok(report.role_statuses.some((role) => role.role === "QA" && role.status === "patch:success;regression:success"));
+  assert.ok(report.role_statuses.some((role) => role.role === "Security Agent" && role.status === "success"));
   assert.equal(report.open_pull_requests[0].number, 8);
   assert.ok(report.role_statuses.some((role) => role.role === "Analyst" && role.status === "hypotheses_available"));
+  assert.ok(report.role_statuses.some((role) => role.role === "Performance Agent" && role.status === "failure"));
   assert.equal(JSON.stringify(report).includes("not included"), false);
   const markdown = renderDailyReport(report);
   assert.match(markdown, /ошибки 0/);
@@ -96,7 +131,7 @@ test("daily report states missing sources and records only allowlisted Supabase 
 });
 
 test("unavailable Supabase data never renders as a healthy or empty source", () => {
-  const report = createDailyReport({ snapshotStatus: "unavailable", workflowStatus: "available", pullRequestStatus: "available", now });
+  const report = createDailyReport({ snapshotStatus: "unavailable", workflowStatus: "available", pullRequestStatus: "available", agentJobStatus: "not_run_24h", now });
   const markdown = renderDailyReport(report);
   assert.equal(report.supabase, null);
   assert.match(markdown, /Supabase: unavailable/);
