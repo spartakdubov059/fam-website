@@ -1,4 +1,5 @@
 
+import { canSkipTrustedSchoolPhotoReview } from "./photo-review-policy.js";
 import { isRetryableModerationFailure, retryDelaySeconds } from "./retry-policy.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -47,6 +48,29 @@ function adminHeaders(contentType = null) {
   if (LEGACY_SECRET_IS_JWT) headers.Authorization = "Bearer " + SUPABASE_SECRET_KEY;
   if (contentType) headers["Content-Type"] = contentType;
   return headers;
+}
+
+// Always reload the current role from Supabase. Missing data, a changed school,
+// or a failed lookup falls back to normal image AI moderation.
+async function shouldBypassPhotoAiReviewForTrustedRole(task) {
+  if (!task?.user_id || !task?.school_id) return false;
+  try {
+    const response = await fetch(
+      SUPABASE_URL + "/rest/v1/profiles?select=role,school_id&id=eq."
+        + encodeURIComponent(task.user_id) + "&limit=1",
+      { headers: adminHeaders() },
+    );
+    if (!response.ok) {
+      console.warn("fam_trusted_photo_role_lookup_failed", response.status);
+      return false;
+    }
+    const rows = await response.json().catch(() => null);
+    const profile = Array.isArray(rows) ? rows[0] : null;
+    return canSkipTrustedSchoolPhotoReview(profile, task);
+  } catch {
+    console.warn("fam_trusted_photo_role_lookup_failed", "network_error");
+    return false;
+  }
 }
 
 async function rpc(name, body) {
@@ -371,7 +395,13 @@ async function processAvatarTask(task) {
   let publishedPath = null;
   try {
     const signedUrl = await createSignedAvatarUrl(task.image_path);
-    const moderation = await callAvatarModeration(task, signedUrl);
+    const trustedRoleBypass = await shouldBypassPhotoAiReviewForTrustedRole(task);
+    if (trustedRoleBypass) {
+      console.info("trusted_school_role_avatar_image_review_skipped");
+    }
+    const moderation = trustedRoleBypass
+      ? { action: "ok" }
+      : await callAvatarModeration(task, signedUrl);
 
     if (moderation.action === "reject") {
       await finishAvatar(task, "rejected", {
@@ -441,7 +471,15 @@ async function processTask(task) {
   let publishedPath = null;
   try {
     signedUrl = await createSignedImageUrl(task.image_path);
-    const moderation = await callModeration(task, signedUrl);
+    const trustedRoleBypass = await shouldBypassPhotoAiReviewForTrustedRole(task);
+    if (trustedRoleBypass) {
+      console.info("trusted_school_role_listing_image_review_skipped");
+    }
+    // Even for trusted roles, re-check listing text normally. Only the image
+    // is excluded from AI image review; publication still requires text action=ok.
+    const moderation = trustedRoleBypass
+      ? await callModeration(task, null)
+      : await callModeration(task, signedUrl);
 
     if (moderation.action === "reject") {
       await finish(task, "rejected", {
@@ -452,7 +490,7 @@ async function processTask(task) {
       return "rejected";
     }
 
-    if (moderation.action === "pending" && isRetryableModerationFailure(moderation)) {
+    if (!trustedRoleBypass && moderation.action === "pending" && isRetryableModerationFailure(moderation)) {
       // Provider outages and quota exhaustion must not block the text listing or destroy
       // the uploaded photo. Verify text separately, publish text-only, and keep the image
       // private in the queue until a future image-review attempt succeeds.

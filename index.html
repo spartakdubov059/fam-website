@@ -28,6 +28,9 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script src="price-format.js"></script>
+  <script src="./school-pulse.js"></script>
+  <link rel="stylesheet" href="./school-pulse.css">
   
   <style>
 :root {
@@ -294,6 +297,16 @@
     .form-control:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,92,246,0.15); }
     .ai-hint { font-size: 11px; color: var(--muted); margin-bottom: 10px; padding: 10px; border-radius: 12px; border: 1px solid rgba(139,92,246,0.25); background: rgba(139,92,246,0.06); line-height: 1.4; }
     .ai-hint a { color: var(--accent); cursor: pointer; font-weight: 700; text-decoration: underline; }
+    .description-helper-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+    .description-helper-caption { color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .description-helper-panel { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.035); }
+    .description-helper-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+    .description-helper-head button { padding: 2px 4px; color: var(--muted); background: none; border: 0; font-size: 11px; }
+    .description-helper-note { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .description-helper-draft { display: block; width: 100%; min-height: 116px; margin: 0 0 10px; padding: 10px; border-radius: 9px; background: var(--bg); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; line-height: 1.55; resize: vertical; }
+    .description-helper-checklist { margin: 0 0 10px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .description-helper-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .description-helper-buttons .button { flex: 1 1 130px; }
     .avatar-upload { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
     .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-violet); display: grid; place-items: center; font-size: 24px; font-weight: 800; color: white; overflow: hidden; flex-shrink: 0; }
     .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -814,7 +827,69 @@
       .bg-decor::before, .bg-decor::after, .logo-mark { animation: none !important; }
     }
 
-  </style>
+
+    /* FAM listing details and mobile-first layout */
+    .l-grid { width: 100%; min-width: 0; }
+    .l-card { min-width: 0; overflow: hidden; }
+    .l-description { margin: 2px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .l-details-btn { width: 100%; min-height: 40px; margin-top: 3px; padding: 8px 10px; display: inline-flex; justify-content: center; align-items: center; border: 1px solid var(--border); border-radius: 11px; background: rgba(255,255,255,.045); color: var(--text); font-size: 11px; font-weight: 800; }
+    .l-details-btn:hover { background: rgba(255,255,255,.09); border-color: #596174; }
+    .l-details-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .l-photo-state { display: inline-flex; align-self: flex-start; max-width: 100%; margin-top: 3px; padding: 4px 8px; border: 1px solid rgba(240,193,75,.26); border-radius: 8px; background: rgba(240,193,75,.09); color: #E8C66F; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+    .l-photo-state.is-review { border-color: rgba(126,166,255,.3); background: rgba(91,140,255,.09); color: #A9C4FF; }
+    .l-photo-state.is-rejected { border-color: rgba(255,107,107,.25); background: rgba(255,107,107,.08); color: #FF9B9B; }
+    .listing-details-modal { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); }
+    .listing-details-content { width: min(100%, 560px); max-width: 560px; max-height: min(88dvh, 820px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 20px; }
+    .listing-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .listing-detail-header h2 { min-width: 0; margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }
+    .listing-detail-close { flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: var(--text); font-size: 22px; line-height: 1; }
+    .listing-detail-image { display: block; width: 100%; max-height: 46dvh; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 15px; background: #101018; }
+    .listing-detail-photo-placeholder { width: 100%; min-height: 150px; max-height: 34dvh; aspect-ratio: 4 / 3; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 18px; border: 1px solid var(--border); border-radius: 15px; background: linear-gradient(145deg, #20232B, #111319); color: var(--muted); text-align: center; font-size: 12px; line-height: 1.45; }
+    .listing-detail-photo-placeholder strong { color: var(--text); font-size: 14px; }
+    .listing-detail-meta { margin: 14px 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+    .listing-detail-price { margin: 12px 0 0; font-size: 18px; font-weight: 900; overflow-wrap: anywhere; }
+    .price-preview { margin: 6px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .listing-detail-description-title { margin: 18px 0 7px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .listing-detail-description { margin: 0; color: var(--text); font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 430px) {
+      .header-inner { padding-left: 12px; padding-right: 12px; }
+      main { padding-left: 12px; padding-right: 12px; }
+      .cat-tiles { gap: 8px; }
+      .foryou-row { gap: 8px; }
+      .foryou-row h2 { font-size: clamp(19px, 5.2vw, 23px); }
+      .pill-all { gap: 6px; padding: 9px 12px; font-size: 12px; white-space: nowrap; }
+      .l-grid { gap: 8px; }
+      .l-card { padding: 6px; }
+      .l-body { padding: 9px 3px 4px; gap: 5px; }
+      .l-title { font-size: 12px; }
+      .l-description { font-size: 10.5px; }
+      .listing-details-modal { align-items: flex-end; }
+      .listing-details-content { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px); padding: 16px; border-radius: 22px; }
+      .listing-detail-header h2 { font-size: 18px; }
+      .listing-detail-image { max-height: 38dvh; }
+    }
+    @media (min-width: 560px) and (max-width: 899px) {
+      .l-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+      main { padding-left: 20px; padding-right: 20px; }
+    }
+    @media (min-width: 900px) { .l-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
+    @media (max-width: 359px) { .l-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  
+/* FAM: all photo banners use identical original 16:9 centered presentation. */
+.fam-photo-panel {
+  position: relative; height: 100%; max-width: 100%; aspect-ratio: 16 / 9;
+  overflow: hidden; border-radius: 28px; flex: 0 1 auto;
+}
+.fam-photo-panel img { display:block; width:100%; height:100%; object-fit:contain; border-radius:inherit; }
+.fam-photo-hit { position:absolute; inset:0; display:block; width:100%; height:100%; padding:0;
+  border:0; border-radius:inherit; background:transparent; cursor:pointer; }
+.fam-photo-hit:focus-visible { outline:4px solid var(--lime); outline-offset:-4px; }
+.fam-photo-panel > h1.hero-script { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media (max-width:600px) { .fam-photo-panel { border-radius:20px; } }
+
+</style>
 </head>
 <body>
   <noscript>
@@ -875,6 +950,46 @@
       <button class="cat-tile t-study" data-cat="Учёба"><span class="tile-emoji">🎓</span>Учёба</button>
       <button class="cat-tile t-events" data-cat="Мероприятия"><span class="tile-emoji">🎭</span>Афиша</button>
     </div>
+    <section id="schoolPulse" class="school-pulse hidden" aria-labelledby="pulseTitle">
+      <div class="pulse-header"><div>
+        <span class="pulse-eyebrow">FAM / СЕГОДНЯ</span>
+        <h2 class="pulse-title" id="pulseTitle">Анонсы <span class="pulse-heading-star" aria-hidden="true">✦</span></h2>
+        <p class="pulse-subtitle">События без записи, важное и опросы</p>
+      </div><button type="button" class="pulse-refresh" id="pulseRefreshBtn">Обновить</button></div>
+      <div class="pulse-grid" id="pulseGrid" aria-live="polite"></div>
+      <p class="pulse-meta" id="pulseStatus">Видят участники вашей школы</p>
+      <details id="pulseAdmin" class="pulse-admin hidden">
+        <summary>＋ Новый анонс или опрос</summary>
+        <p class="pulse-meta">Для подтверждённого Совета школы. Без адресов, телефонов, ссылок и личных данных учеников.</p>
+        <div class="pulse-admin-forms">
+          <form id="pulseAnnouncementForm"><h4>Новый анонс</h4>
+            <label for="pulseAnnouncementTitle">Заголовок</label>
+            <input id="pulseAnnouncementTitle" name="title" class="form-control" minlength="4" maxlength="90" required placeholder="Например, новости школьного проекта">
+            <label for="pulseAnnouncementText">Текст</label>
+            <textarea id="pulseAnnouncementText" name="body" class="form-control" rows="3" minlength="4" maxlength="450" required placeholder="Коротко расскажите, что нового"></textarea>
+            <label for="pulseAnnouncementKind">Тип</label>
+            <select id="pulseAnnouncementKind" name="kind" class="form-control">
+              <option value="news">Обычный анонс</option>
+              <option value="important">Важное</option>
+              <option value="open_event">Событие для всех — без лимита мест</option>
+            </select>
+            <div class="hidden" id="pulseEventDateRow">
+              <label for="pulseEventDate">Когда состоится</label>
+              <input id="pulseEventDate" type="datetime-local" name="event_starts_at" class="form-control">
+              <p class="pulse-meta">Видно всем участникам школы. Без регистрации и подсчёта мест.</p>
+            </div>
+            <button class="button button-primary button-small" type="submit">Опубликовать анонс</button>
+          </form>
+          <form id="pulsePollForm"><h4>Новый опрос</h4>
+            <label for="pulsePollQuestion">Вопрос</label>
+            <input id="pulsePollQuestion" name="question" class="form-control" minlength="8" maxlength="140" required placeholder="Что добавить в школьную жизнь?">
+            <label for="pulsePollOptions">Варианты ответа (по одному в строке, от 2 до 4)</label>
+            <textarea id="pulsePollOptions" name="options" class="form-control" rows="4" maxlength="300" required placeholder="Клуб настольных игр&#10;Мастер-классы&#10;Кинопоказ"></textarea>
+            <button class="button button-secondary button-small" type="submit">Опубликовать опрос</button>
+          </form>
+        </div>
+      </details>
+    </section>
     <div class="foryou-row">
       <h2>Для тебя <span class="spark">✨</span></h2>
       <button class="pill-all" data-action="reset-search">Все объявления <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
@@ -1062,6 +1177,12 @@
   <section id="messagesSection" class="hidden">
     <div class="foryou-row"><h2>Сообщения 💬</h2></div>
     <div id="dialogsList"></div>
+    <div id="dialogsGuest" class="profile-box hidden" style="text-align:center;">
+      <div class="empty-icon">💬</div>
+      <h3 style="margin:0 0 8px; font-size:15px;">Войдите, чтобы читать сообщения</h3>
+      <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">После входа здесь появятся ваши диалоги.</p>
+      <button type="button" class="button button-primary" data-action="open-auth">Войти</button>
+    </div>
     <div id="chatView" class="hidden" style="margin-top:16px; background:var(--surface); padding:16px; border-radius:24px; border:1px solid var(--border);">
       <button class="button button-secondary button-small" data-action="chat-back" style="margin-bottom:10px;">← Назад</button>
       <h3 id="chatWith" style="font-size:14px; margin-bottom:10px;"></h3>
@@ -1132,13 +1253,32 @@
     <button data-action="close-listing-modal" style="float:right; background:none; border:none; color:white; font-size:20px;" aria-label="Закрыть">×</button>
     <h2 id="listingTitle" style="margin-top:0; font-size:20px; font-weight:900;">Новое объявление</h2>
     <form id="listingForm">
-      <div id="aiHints" class="ai-hint">Начните вводить — ИИ подскажет категорию</div>
-      <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="100"></div>
-      <div class="form-group"><label for="lDesc">Описание</label><textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea></div>
+      <div id="aiHints" class="ai-hint">Начните вводить — FAM подскажет категорию по названию и описанию. Это локальная подсказка, без ИИ-запросов.</div>
+      <div class="form-group"><label for="lTitle">Заголовок</label><input type="text" id="lTitle" class="form-control" required maxlength="80"></div>
+      <div class="form-group">
+        <label for="lDesc">Описание</label>
+        <textarea id="lDesc" class="form-control" rows="3" required maxlength="1000"></textarea>
+        <div class="description-helper-actions">
+          <button type="button" class="button button-secondary button-small" data-action="open-description-helper">✦ Улучшить описание</button>
+          <span class="description-helper-caption">Редактор работает в браузере: исправляет оформление и подсказывает, чего не хватает. Без внешних запросов и расхода ИИ-лимитов.</span>
+        </div>
+        <div id="descriptionHelperPanel" class="description-helper-panel hidden" role="region" aria-label="Помощник описания" aria-live="polite">
+          <div class="description-helper-head">
+            <strong id="descriptionHelperTitle">Улучшенная версия</strong>
+            <button type="button" data-action="close-description-helper">Скрыть</button>
+          </div>
+          <p id="descriptionHelperNote" class="description-helper-note">Текст останется под вашим контролем. Редактор не добавляет неподтверждённые характеристики.</p>
+          <textarea id="descriptionHelperDraft" class="description-helper-draft" rows="5" maxlength="1000" aria-label="Черновик улучшенного описания"></textarea>
+          <div id="descriptionHelperSuggestions" class="description-helper-checklist"></div>
+          <div class="description-helper-buttons">
+            <button type="button" class="button button-primary button-small" data-action="apply-description-draft">Применить текст</button>
+          </div>
+        </div>
+      </div>
       <div class="form-group">
         <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
-          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
+          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option>
         </select>
       </div>
       <div id="eventFields" class="hidden" style="background:var(--bg); padding:10px; border-radius:12px; margin-bottom:12px;">
@@ -1155,12 +1295,23 @@
       <div class="form-group">
         <label for="lImage">Фото</label>
         <input type="file" id="lImage" class="form-control" accept="image/jpeg,image/png,image/webp">
-        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Фото объявления доступно по публичной ссылке. Загружайте только изображения предметов — без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM; если автоматическая проверка временно недоступна или не может принять уверенное решение, публикация остаётся на дополнительной проверке и не считается одобренной.</p>
+        <p style="font-size:10px; line-height:1.45; color:var(--muted); margin:6px 0;">Загружайте фотографии предметов без лиц, документов, школьных пропусков и контактных данных. Фото проходит проверку FAM и сначала сохраняется в закрытом хранилище. До успешной проверки фотография не считается одобренной и не показывается. Если сервис проверки временно исчерпал квоту, объявление сохранится без фото, а FAM автоматически повторит проверку. Повторно отправлять объявление не нужно — статус фото будет виден в карточке.</p>
         <div id="uploadStatus"></div>
       </div>
-      <div class="form-group"><label for="lPrice">Цена</label><input type="text" id="lPrice" class="form-control" placeholder="Бесплатно" maxlength="50"></div>
+      <div class="form-group price-form-group"><label for="lPrice">Цена в рублях</label><input type="text" id="lPrice" class="form-control" inputmode="decimal" placeholder="Например, 1 500" maxlength="50" aria-describedby="pricePreview"><p id="pricePreview" class="price-preview">Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».</p></div>
       <button type="submit" class="button button-primary" style="width:100%;">Опубликовать</button>
     </form>
+  </div>
+</div>
+
+
+<div class="modal listing-details-modal" id="listingDetailsModal" role="dialog" aria-modal="true" aria-labelledby="listingDetailsTitle">
+  <div class="modal-content listing-details-content">
+    <div class="listing-detail-header">
+      <h2 id="listingDetailsTitle">Объявление</h2>
+      <button type="button" class="listing-detail-close" data-action="close-listing-details" aria-label="Закрыть подробности объявления">×</button>
+    </div>
+    <div id="listingDetailsBody"></div>
   </div>
 </div>
 
@@ -1226,6 +1377,15 @@ window.onunhandledrejection = function() {
   let tabTransitionTimer = null;
 
   const $ = id => document.getElementById(id);
+  // Switch on only after school-scoped RLS and vote RPCs pass isolated + integration tests.
+  const SCHOOL_PULSE_ENABLED = true;
+  const schoolPulse = SCHOOL_PULSE_ENABLED && window.FAMSchoolPulse
+    ? window.FAMSchoolPulse.mount({
+        sb,
+        getViewer: () => ({ id: user?.id, school_id: profile?.school_id, role: profile?.role }),
+        notify: msg => alert(msg)
+      })
+    : null;
   const SCHOOL_DISPLAY_NAMES = Object.freeze({
     "lyceum_3": "Лицей № 3",
     "gymnasium_4": "Гимназия № 4"
@@ -1353,27 +1513,280 @@ window.onunhandledrejection = function() {
     }
   }
 
-  function updateHints() {
-    const combined = ($("lTitle").value + " " + $("lDesc").value).toLowerCase();
-    const kw = {
-      "Вещи": ["продам", "отдам", "одежда", "книги", "телефон", "игрушки", "куплю"],
-      "Услуги": ["репетитор", "помощь", "ремонт", "уборка", "выгул"],
-      "Учёба": ["конспекты", "решебник", "учебник", "подготовка", "егэ"],
-      "Мероприятия": ["встреча", "концерт", "квиз", "фестиваль", "матч"]
-    };
-    let bestCat = null, max = 0;
-    for (const [cat, words] of Object.entries(kw)) {
-      const m = words.filter(k => combined.includes(k)).length;
-      if (m > max) { max = m; bestCat = cat; }
-    }
-    if (bestCat && $("lCat").value !== bestCat) {
-      $("aiHints").innerHTML = `<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="${bestCat}">ИИ советует: ${bestCat}</button>`;
-    } else {
-      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
-    }
+  // Local category matching. All work happens in this browser; no text is sent to an AI service.
+  const CATEGORY_HINT_KEYWORDS = Object.freeze({
+    "Вещи": [
+      "прод", "отдам", "куплю", "покуп", "обмен", "вещ", "одежд", "обув", "книг",
+      "телефон", "смартфон", "планшет", "компьютер", "ноутбук", "наушник", "игрушк",
+      "аксессуар", "рюкзак", "велосипед", "самокат", "шлем", "приставк", "консол",
+      "монитор", "клавиатур", "мыш", "куртк", "кроссовк", "ботинк", "футболк",
+      "плать", "сумк", "зарядк", "час", "косметич", "картридж", "колонк", "гаджет"
+    ],
+    "Услуги": [
+      "репетитор", "помощ", "услуг", "ремонт", "почин", "настрой", "установ",
+      "уборк", "выгул", "тренер", "трениров", "нян", "перевод", "научу",
+      "достав", "соберу", "настрою", "починю", "обучу", "проведу занят"
+    ],
+    "Творчество": [
+      "творчеств", "нарис", "рисован", "рисунок", "иллюстрац", "логотип", "дизайн",
+      "макет", "арт", "фотограф", "фотосесс", "видеомонтаж", "анимац", "стикер",
+      "обложк", "портрет", "картин", "вяз", "хендмейд", "handmade", "брелок",
+      "украшен", "декор", "музык", "песн", "озвуч", "комикс", "3d"
+    ],
+    "Учёба": [
+      "конспект", "решебник", "учебник", "подготов", "огэ", "егэ", "экзамен",
+      "контрольн", "урок", "домашн", "задач", "сочинен", "реферат", "доклад",
+      "презентац", "учеб", "задан", "школ", "предмет", "математ", "физик",
+      "хим", "биолог", "русск", "английск", "географ", "истор"
+    ],
+    "Мероприятия": [
+      "встреч", "концерт", "квиз", "фестивал", "матч", "турнир", "мероприят",
+      "экскурс", "вечерин", "соревнован", "олимпиад", "собрани", "дискотек",
+      "кинопоказ", "праздник", "мастер класс", "конкурс"
+    ]
+  });
+
+  const CATEGORY_STRONG_INTENTS = [
+    { category: "Вещи", pattern: /(^| )(продам|куплю|отдам|обменяю)( |$)/ },
+    { category: "Услуги", pattern: /(^| )(репетитор|ремонт|починю|настрою|выгул|уборка|окажу услугу|окажу услуги)( |$)/ },
+    { category: "Творчество", pattern: /(^| )(нарисую|создам логотип|создам иллюстрацию|сделаю дизайн|сделаю обложку|свяжу|вяжу)( |$)/ },
+    { category: "Учёба", pattern: /(^| )(конспект|решебник|учебник|подготовка к огэ|подготовка к егэ|домашнее задание|контрольная)( |$)/ },
+    { category: "Мероприятия", pattern: /(^| )(квиз|фестиваль|концерт|турнир|встреча|матч|экскурсия)( |$)/ }
+  ];
+
+  function normalizeCategoryText(value) {
+    return String(value || "")
+      .toLocaleLowerCase("ru-RU")
+      .replace(/ё/g, "е")
+      .replace(/[^a-zа-я0-9]+/g, " ")
+      .trim();
   }
-  $("lTitle").addEventListener("input", debounce(updateHints, 300));
-  $("lDesc").addEventListener("input", debounce(updateHints, 300));
+
+  function countCategoryKeywordMatches(value, keywords) {
+    const normalized = normalizeCategoryText(value);
+    if (!normalized) return 0;
+    const words = normalized.split(/\s+/);
+    return keywords.filter(keyword => {
+      if (keyword.includes(" ")) return normalized.includes(keyword);
+      return words.some(word => word.startsWith(keyword));
+    }).length;
+  }
+
+  function findSuggestedCategories() {
+    const title = normalizeCategoryText($("lTitle").value);
+    const description = normalizeCategoryText($("lDesc").value);
+    const candidates = Object.entries(CATEGORY_HINT_KEYWORDS)
+      .filter(([category]) => category !== "Мероприятия" || $("evOption").style.display !== "none")
+      .map(([category, keywords]) => ({
+        category,
+        score: countCategoryKeywordMatches(title, keywords) * 3 +
+          countCategoryKeywordMatches(description, keywords)
+      }));
+
+    for (const intent of CATEGORY_STRONG_INTENTS) {
+      if (intent.pattern.test(title)) {
+        const candidate = candidates.find(item => item.category === intent.category);
+        if (candidate) candidate.score += 8;
+      }
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    if (!candidates.length || candidates[0].score === 0) return [];
+    return candidates.filter(item => item.score === candidates[0].score).slice(0, 3).map(item => item.category);
+  }
+
+  function updateHints() {
+    const hint = $("aiHints");
+    const categories = findSuggestedCategories();
+    const selected = $("lCat").value;
+    if (!categories.length) {
+      hint.textContent = $("lTitle").value.trim() || $("lDesc").value.trim()
+        ? "Пока не могу уверенно определить категорию. Проверьте название и выберите её вручную."
+        : "Начните вводить название и описание — FAM подскажет подходящую категорию.";
+      return;
+    }
+
+    if (categories.length === 1 && selected === categories[0]) {
+      hint.textContent = "По тексту подходит категория «" + categories[0] + "».";
+      return;
+    }
+
+    const intro = categories.length > 1
+      ? "Похоже на несколько категорий. Выберите подходящую:"
+      : "Больше всего подходит категория:";
+    hint.innerHTML = "<span>" + intro + "</span> " + categories.map(category =>
+      '<button type="button" class="ai-hint-suggest" data-action="select-hint-category" data-category="' +
+      category + '"> ' + category + '</button>'
+    ).join(" ");
+  }
+
+  function normalizeDescriptionForEditor(value) {
+    return String(value || "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map(line => {
+        let text = line
+          .replace(/[ \t]+/g, " ")
+          .replace(/\s+([,.;:!?])/g, "$1")
+          .replace(/([!?])\1+/g, "$1")
+          .replace(/([,;:!?])(?=\S)/g, "$1 ")
+          .replace(/([!?])(?:\s*[!?])+/g, "$1")
+          .trim();
+        if (!text) return "";
+        text = text.replace(/(^|[.!?]\s+)([a-zа-яё])/giu, (match, prefix, letter) =>
+          prefix + letter.toLocaleUpperCase("ru-RU"));
+        text = text.charAt(0).toLocaleUpperCase("ru-RU") + text.slice(1);
+        if (!/[.!?…]$/.test(text) && !/[:;]$/.test(text)) text += ".";
+        return text;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  function makeDescriptionTemplate() {
+    const title = $("lTitle").value.trim() || "[укажите название]";
+    const price = $("lPrice").value.trim();
+    const priceLine = price ? "Цена: " + FAMPrice.formatListingPrice(price) : "Цена: [укажите стоимость или напишите «Бесплатно»]";
+    const templates = {
+      "Вещи": [
+        "Предмет: " + title + ".",
+        "Состояние: [укажите реальное состояние].",
+        "Модель и характеристики: [уточните, что важно знать покупателю].",
+        "Комплектация: [перечислите, что входит].",
+        priceLine,
+        "Передача: [укажите безопасный способ передачи в общественном месте]."
+      ],
+      "Услуги": [
+        "Услуга: " + title + ".",
+        "Что входит: [опишите конкретные действия].",
+        "Для кого: [укажите, кому подходит услуга].",
+        "Формат и время: [укажите онлайн/очно и доступное время].",
+        priceLine
+      ],
+      "Творчество": [
+        "Работа: " + title + ".",
+        "Что именно будет создано: [опишите результат].",
+        "Формат, размер или материалы: [уточните детали].",
+        "Сроки: [укажите реальный срок выполнения].",
+        priceLine
+      ],
+      "Учёба": [
+        "Предмет или тема: " + title + ".",
+        "С чем помогу: [укажите конкретные темы или задания].",
+        "Уровень: [укажите класс или уровень подготовки].",
+        "Формат: [очно или онлайн].",
+        "Расписание: [укажите удобное время].",
+        priceLine
+      ],
+      "Мероприятия": [
+        "Мероприятие: " + title + ".",
+        "Программа: [кратко опишите, что будет происходить].",
+        "Дата и время: [укажите дату и время].",
+        "Место: [укажите публичную площадку, не домашний адрес].",
+        "Участие: [укажите условия и количество мест]."
+      ]
+    };
+    return (templates[$("lCat").value] || templates["Вещи"]).join("\n");
+  }
+
+  function getMissingDescriptionSuggestions() {
+    const text = normalizeCategoryText($("lDesc").value);
+    const category = $("lCat").value;
+    const rules = {
+      "Вещи": [
+        ["состояние предмета", /состояни|новый|новая|новое|б у/],
+        ["модель и характеристики", /модел|характерист|размер|памят|объем|цвет/],
+        ["комплектацию", /комплект|короб|заряд|аксессуар/],
+        ["условия передачи", /передач|встреч|забрать|достав/]
+      ],
+      "Услуги": [
+        ["что входит в услугу", /включ|входит|делаю|провед|предостав|помога/],
+        ["кому подходит услуга", /кому|для кого|подойдет|подходит/],
+        ["формат и время", /онлайн|очно|время|распис|срок|дата/]
+      ],
+      "Творчество": [
+        ["какой результат будет создан", /созда|нарис|иллюстрац|логотип|дизайн|макет|работа/],
+        ["формат, размер или материалы", /формат|размер|материал|цвет|цифров|бумаж/],
+        ["сроки выполнения", /срок|дата|дней|недел|готов/]
+      ],
+      "Учёба": [
+        ["конкретные темы и предмет", /тем|предмет|математ|физик|хим|биолог|английск|русск|истор/],
+        ["класс или уровень", /класс|уров|подготов|начальн|средн|старш/],
+        ["формат занятий", /онлайн|очно|дистанц|встреч/],
+        ["расписание", /распис|время|дата|длительност/]
+      ],
+      "Мероприятия": [
+        ["программу мероприятия", /программ|будет|состо|участ/],
+        ["дату и время", /дата|числа|время|час|ноябр|декабр|январ/],
+        ["публичное место проведения", /место|площад|зал|школ|адрес/],
+        ["условия участия", /участ|бесплат|стоим|регистрац|мест/]
+      ]
+    };
+    const items = (rules[category] || []).filter(item => !item[1].test(text)).map(item => item[0]);
+    if (!$("lPrice").value.trim() && category !== "Мероприятия") items.push("стоимость или отметку «Бесплатно»");
+    return items;
+  }
+
+  function renderDescriptionHelper() {
+    const open = !$("descriptionHelperPanel").classList.contains("hidden");
+    const button = document.querySelector('[data-action="open-description-helper"]');
+    const hasDescription = Boolean($("lDesc").value.trim());
+    if (button) button.textContent = hasDescription ? "✦ Улучшить описание" : "✦ Составить описание";
+    if (!open) return;
+
+    $("descriptionHelperTitle").textContent = hasDescription ? "Улучшенная версия" : "Шаблон для заполнения";
+    $("descriptionHelperNote").textContent = hasDescription
+      ? "Исправлены только оформление, пробелы и заглавные буквы. Смысл и факты не меняются — проверьте результат перед применением."
+      : "Это заготовка с вопросами, а не готовые факты. Заполните или удалите подсказки в квадратных скобках. Не указывайте телефон, домашний адрес и личные данные.";
+    $("descriptionHelperDraft").value = hasDescription
+      ? normalizeDescriptionForEditor($("lDesc").value)
+      : makeDescriptionTemplate();
+
+    const suggestions = getMissingDescriptionSuggestions();
+    $("descriptionHelperSuggestions").textContent = suggestions.length
+      ? "Чтобы объявление было понятнее, можно уточнить: " + suggestions.join("; ") + "."
+      : "Основные детали указаны. Проверьте точность текста перед публикацией.";
+  }
+
+  function openDescriptionHelper() {
+    $("descriptionHelperPanel").classList.remove("hidden");
+    renderDescriptionHelper();
+  }
+
+  function applyDescriptionDraft() {
+    const textarea = $("descriptionHelperDraft");
+    const draft = textarea.value.trim();
+    if (!draft) {
+      $("descriptionHelperNote").textContent = "Черновик пуст. Добавьте текст или откройте шаблон.";
+      return;
+    }
+    if (draft.length > 1000) {
+      $("descriptionHelperNote").textContent = "Черновик длиннее лимита FAM в 1000 символов. Сократите его перед применением.";
+      return;
+    }
+    $("lDesc").value = draft;
+    $("lDesc").dispatchEvent(new Event("input", { bubbles: true }));
+    $("descriptionHelperNote").textContent = "Текст перенесён в описание. Проверьте его и заполните недостающие детали.";
+    updateHints();
+    renderDescriptionHelper();
+    $("lDesc").focus();
+  }
+
+  $("lTitle").addEventListener("input", debounce(updateHints, 250));
+  $("lDesc").addEventListener("input", debounce(updateHints, 250));
+  $("lTitle").addEventListener("input", renderDescriptionHelper);
+  $("lDesc").addEventListener("input", renderDescriptionHelper);
+  $("lCat").addEventListener("change", () => {
+    updateHints();
+    renderDescriptionHelper();
+  });
+  $("lPrice").addEventListener("input", () => {
+    const rawPrice = $("lPrice").value.trim();
+    $("pricePreview").textContent = rawPrice
+      ? "На сайте будет отображаться: " + FAMPrice.formatListingPrice(rawPrice)
+      : "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
+    renderDescriptionHelper();
+  });
 
   function timeAgo(isoOrMs) {
     if (!isoOrMs) return '';
@@ -1924,6 +2337,7 @@ window.onunhandledrejection = function() {
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
+      if (schoolPulse) void schoolPulse.refresh();
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
     } catch (e) {
       console.error("Ошибка загрузки данных FAM");
@@ -1961,15 +2375,27 @@ window.onunhandledrejection = function() {
   function renderHero() {
     const box = $("bannerCarousel");
     let html = [];
-    html.push(`<div class="hero-slide hero-brand">
-      <span class="hero-crown">👑</span>
-      <h1 class="hero-script">Найди <span>своих.</span></h1>
-      <p class="hero-sub">Объявления, идеи и помощь рядом</p>
-      <button class="hero-cta" data-action="scroll-listings">Начать ${ARROW}</button>
-      <span class="hero-spark">✦</span>
-      <span class="hero-graffiti">FAM.</span>
-      <span class="ai-live"><i></i>ИИ-проверка перед публикацией</span>
-    </div>`);
+    // Six selected FAM editorial photographs, formatted as original 16:9 banners.
+    // The six earlier banners remain in the carousel unchanged.
+    const photoSlide = ({ index, alt, action, cat, first = false }) => {
+      const attrs = action ? ` data-action="${action}"${cat ? ` data-cat="${cat}"` : ''}` : '';
+      return `<div class="hero-slide hero-img fam-photo-slide">
+        <div class="fam-photo-panel">
+          ${first ? '<h1 class="hero-script">Найди своих.</h1>' : ''}
+          <img src="assets/fam-editorial-${index}.svg" width="1200" height="675" loading="${first ? 'eager' : 'lazy'}" decoding="async" alt="${esc(alt)}">
+          ${action ? `<button type="button" class="fam-photo-hit"${attrs} aria-label="${esc(alt)}"></button>` : ''}
+        </div>
+      </div>`;
+    };
+    const editorialPhotos = [
+      { index: 2, alt: 'Найди своих. Общение, идеи и помощь от ребят рядом.', action: 'scroll-listings', first: true },
+      { index: 1, alt: 'ФАМ ближе к media. Школьный медиацентр — снимаем, пишем, создаём.' },
+      { index: 3, alt: 'Вещи рядом. Покупай, продавай и обменивайся.', action: 'cat', cat: 'Вещи' },
+      { index: 4, alt: 'Творчество и идеи. Делись проектами, находи единомышленников.', action: 'cat', cat: 'Творчество' },
+      { index: 5, alt: 'События и активности. Афиша и мероприятия школы.' },
+      { index: 6, alt: 'Учёба без стресса. Конспекты, материалы и помощь по предметам.', action: 'cat', cat: 'Учёба' }
+    ];
+    editorialPhotos.forEach(photo => html.push(photoSlide(photo)));
     const banners = [
       { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
       { src: "banner-2", alt: "Баннер FAM о школьном медиацентре: снимаем, пишем и создаём." },
@@ -1981,23 +2407,13 @@ window.onunhandledrejection = function() {
     banners.forEach(({ src, alt }) => {
       html.push(`<div class="hero-slide hero-img"><picture><source srcset="${src}.webp" type="image/webp"><img src="${src}.jpg" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></picture></div>`);
     });
-    const designed = [
-      { g: 'linear-gradient(140deg,#2A2E36,#191C22 70%)', e: '🎁', t: 'Размести объявление', s: 'бесплатно', action: 'open-listing' },
-      { g: 'linear-gradient(140deg,#30343B,#1B1E24 70%)', e: '🛍️', t: 'Вещи и услуги', s: 'всё рядом', action: 'cat', cat: 'Вещи' },
-      { g: 'linear-gradient(140deg,#34383F,#1D2026 70%)', e: '🤖', t: 'Проверка публикаций', s: 'ИИ-фильтр спама и личных данных', action: null },
-      { g: 'linear-gradient(140deg,#292F38,#171B21 70%)', e: '🎓', t: 'Учёба', s: 'помощь и подготовка', action: 'cat', cat: 'Учёба' }
-    ];
-    designed.forEach(b => {
-      const attrs = b.action === 'cat' ? `data-action="cat" data-cat="${b.cat}"` : (b.action ? `data-action="${b.action}"` : '');
-      html.push(`<div class="hero-slide" style="background:${b.g}" ${attrs}><span class="db-emoji">${b.e}</span><div class="db-title">${b.t}</div><div class="db-sub">${b.s}</div></div>`);
-    });
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
         const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
         const meta = [ds, e.event_time || ''].filter(Boolean).join(' · ');
         const taken = getTaken(e.id), max = e.max_seats || 0;
         const info = max > 0 ? `👥 ${taken} из ${max}` : '👥 Без ограничений';
-        html.push(`<div class="hero-slide hero-img"><div class="hero-event">
+        html.push(`<div class="hero-slide hero-img hero-event-photo"><div class="hero-event">
           <span class="school-badge">🎭 Афиша</span>
           <div class="event-title">${esc(e.title)}</div>
           ${meta ? `<div class="event-meta">📅 ${esc(meta)} · ${info}</div>` : ''}
@@ -2032,8 +2448,50 @@ window.onunhandledrejection = function() {
     ).join("");
   }
 
+  function listingPhotoStatusText(status) {
+    const labels = {
+      pending: "Фото скрыто до завершения проверки",
+      manual_review: "Фото ждёт дополнительной проверки",
+      rejected: "Фото не прошло проверку",
+      failed: "Фото нужно загрузить повторно"
+    };
+    return labels[status] || "";
+  }
+
+  function openListingDetails(listingId) {
+    const listing = listings.find(row => row.id === listingId);
+    if (!listing) { notice("Объявление не найдено. Обновите страницу."); return; }
+    const photoStatus = listing.photo_status || (listing.image_url ? "approved" : "none");
+    const photoMessages = {
+      pending: "Фото загружено и сохранено в закрытом хранилище, но пока не прошло проверку. Оно не будет показано до завершения проверки. Повторно загружать его не нужно.",
+      manual_review: "Фото ожидает дополнительной проверки. До её завершения оно остаётся закрытым.",
+      rejected: "Фото не прошло проверку и не будет опубликовано. Текст объявления сохранён.",
+      failed: "Файл фотографии больше недоступен для проверки. Текст объявления сохранён — чтобы добавить изображение, загрузите его повторно.",
+      none: "К объявлению пока не добавлена фотография."
+    };
+    const photoHTML = listing.image_url
+      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">'
+      : '<div class="listing-detail-photo-placeholder" role="status"><strong>' + (photoStatus === "pending" ? "Фото проверяется" : "Фотография пока недоступна") + '</strong><span>' + esc(photoMessages[photoStatus] || photoMessages.none) + '</span></div>';
+    const description = String(listing.description || "").trim();
+    const eventDate = listing.is_event && listing.event_date ? new Date(listing.event_date + "T00:00:00").toLocaleDateString("ru-RU") : "";
+    const eventTime = listing.is_event && listing.event_time ? String(listing.event_time).slice(0, 5) : "";
+    const meta = [listing.category || "", listing.created_at ? timeAgo(listing.created_at) : "", eventDate, eventTime].filter(Boolean).join(" · ");
+    $("listingDetailsTitle").textContent = listing.title || "Объявление";
+    $("listingDetailsBody").innerHTML = photoHTML +
+      '<p class="listing-detail-price">' + esc(FAMPrice.formatListingPrice(listing.price_text || "Бесплатно")) + '</p>' +
+      (meta ? '<div class="listing-detail-meta">' + esc(meta) + '</div>' : "") +
+      '<h3 class="listing-detail-description-title">Описание</h3>' +
+      '<p class="listing-detail-description">' + (description ? esc(description) : "Описание не добавлено.") + '</p>';
+    window.openModal("listingDetailsModal");
+  }
   function listingCard(l, idx, ownerControls = false) {
-    const img = l.image_url ? `<img src="${esc(l.image_url)}" loading="lazy" alt="${esc(l.title)}">` : '<div class="card-placeholder"></div>';
+    const photoStatus = l.photo_status || (l.image_url ? "approved" : "none");
+    const photoLabel = listingPhotoStatusText(photoStatus);
+    const photoStateClass = photoStatus === "manual_review" ? "is-review" : (photoStatus === "rejected" || photoStatus === "failed" ? "is-rejected" : "");
+    const photoStateHTML = photoLabel ? '<div class="l-photo-state ' + photoStateClass + '">' + esc(photoLabel) + '</div>' : "";
+    const img = l.image_url ? '<img src="' + esc(l.image_url) + '" loading="lazy" alt="' + esc(l.title) + '" decoding="async">' : '<div class="card-placeholder"></div>';
+    const description = String(l.description || "").trim();
+    const descriptionHTML = description ? '<p class="l-description">' + esc(description) + '</p>' : "";
     const favClass = isFavorite(l.id) ? 'active' : '';
     let badge = l.moderation_status === "pending" ? "Проверяется ⏳"
       : l.moderation_status === "manual_review" ? "Проверка приостановлена"
@@ -2070,8 +2528,11 @@ window.onunhandledrejection = function() {
       <div class="l-imgwrap">${img}<button class="l-fav ${favClass}" data-action="toggle-fav" data-id="${esc(l.id)}" aria-label="В избранное">♥</button><span class="l-badge">${badge}</span></div>
       <div class="l-body">
         <h3 class="l-title">${esc(l.title)}</h3>
-        <div class="l-price">${esc(l.price_text || "Бесплатно")}</div>
+        <div class="l-price">${esc(FAMPrice.formatListingPrice(l.price_text || "Бесплатно"))}</div>
+        ${descriptionHTML}
+        ${photoStateHTML}
         ${capacityHTML}
+        <button type="button" class="l-details-btn" data-action="open-listing-details" data-id="${esc(l.id)}" aria-label="Подробнее об объявлении ${esc(l.title)}">Подробнее</button>
         <div class="l-foot">
           <div class="l-seller"><span class="l-ava">${l.is_event ? '🎭' : '📦'}</span><span class="l-time">${timeAgo(l.created_at)}</span></div>
           ${actionHTML}
@@ -2989,7 +3450,7 @@ window.onunhandledrejection = function() {
           <div class="council-listing-meta">Объявление #${esc(listingCode)} · ${esc(row.category || "Объявление")} · ${row.status === "active" ? "Опубликовано" : "Скрыто"} · ${moderationState} · ${esc(createdAt)}${esc(eventDate)}</div>
           ${description ? `<div class="council-listing-context">${esc(description)}</div>` : '<div class="council-listing-context">Описание не заполнено.</div>'}
           ${row.city ? `<div class="council-listing-meta">Город: ${esc(row.city)}</div>` : ""}
-          ${row.price_text ? `<div class="council-listing-price">${esc(row.price_text)}</div>` : ""}
+          ${row.price_text ? `<div class="council-listing-price">${esc(FAMPrice.formatListingPrice(row.price_text))}</div>` : ""}
           <div class="council-listing-author">Автор: ${esc(row.user_id === user.id ? "вы" : "аккаунт #" + authorCode)}${author?.email ? " · " + esc(author.email) : ""}</div>
           <button type="button" class="button button-danger button-small" data-action="moderate-school-listing" data-id="${esc(row.id)}" data-owner-id="${esc(row.user_id)}">Удалить это объявление</button>
         </div>`;
@@ -3658,12 +4119,12 @@ window.onunhandledrejection = function() {
         throw new Error(submission?.reason || submission?.error || "Не удалось сохранить фото для проверки.");
       }
 
-      uploadedAvatarPath = null; // The server now owns the private staged file and queue task.
+      uploadedAvatarPath = null; // The server has published the avatar or safely queued it.
       if (submission.status === "approved" && submission.avatar_url) {
         if (profile) profile.avatar_url = submission.avatar_url;
         updateAuthUI();
         await renderProfile();
-        notice("Аватар проверен и обновлён.");
+        notice(submission.avatar_review_bypassed ? "Аватар обновлён." : "Аватар проверен и обновлён.");
       } else {
         notice(submission.reason || "Фото сохранено приватно. Предыдущий аватар останется видимым до завершения проверки.");
       }
@@ -3830,8 +4291,14 @@ window.onunhandledrejection = function() {
 
     if (name !== 'messages') {
       stopChatSession(true);
-    } else {
+      $("dialogsGuest")?.classList.add("hidden");
+    } else if (user) {
+      $("dialogsGuest")?.classList.add("hidden");
       loadDialogsList();
+    } else {
+      $("dialogsList").innerHTML = "";
+      $("chatView").classList.add("hidden");
+      $("dialogsGuest")?.classList.remove("hidden");
     }
 
     if (name !== 'board') stopHeroTimer();
@@ -3875,6 +4342,8 @@ window.onunhandledrejection = function() {
     else if (action === 'open-auth') { e.preventDefault(); openModal('authModal'); }
     else if (action === 'close-auth-modal') { closeModal('authModal'); }
     else if (action === 'close-listing-modal') { closeModal('listingModal'); }
+    else if (action === 'open-listing-details') { openListingDetails(btn.dataset.id); }
+    else if (action === 'close-listing-details') { closeModal('listingDetailsModal'); }
     else if (action === 'close-notif') { closeNotifPanel(); }
     else if (action === 'mark-notification-read') { markNotificationRead(btn.dataset.id); }
     else if (action === 'dismiss-notification') { dismissNotification(btn.dataset.id); }
@@ -3883,12 +4352,18 @@ window.onunhandledrejection = function() {
     else if (action === 'open-notification-chat') { window.startChat(btn.dataset.userId, 'Новый диалог'); closeNotifPanel(); }
     else if (action === 'select-hint-category') {
       const category = btn.dataset.category;
-      if (["Вещи", "Услуги", "Учёба", "Мероприятия"].includes(category)) {
+      const allowed = ["Вещи", "Услуги", "Творчество", "Учёба"].includes(category) ||
+        (category === "Мероприятия" && $("evOption").style.display !== "none");
+      if (allowed) {
         $("lCat").value = category;
         $("eventFields").classList.toggle("hidden", category !== "Мероприятия");
         updateHints();
+        renderDescriptionHelper();
       }
     }
+    else if (action === 'open-description-helper') { openDescriptionHelper(); }
+    else if (action === 'close-description-helper') { $("descriptionHelperPanel").classList.add("hidden"); }
+    else if (action === 'apply-description-draft') { applyDescriptionDraft(); }
     else if (action === 'reset-search') {
       curCat = "Все";
       document.querySelectorAll(".cat-tile").forEach(x => x.classList.remove('active'));
@@ -4041,7 +4516,7 @@ window.onunhandledrejection = function() {
           title: $("lTitle").value,
           description: $("lDesc").value,
           category: $("lCat").value,
-          price_text: $("lPrice").value || "Бесплатно",
+          price_text: FAMPrice.formatListingPrice($("lPrice").value),
           image_url: imageUrl,
           event_date: isEv ? ($("evDate").value || null) : null,
           event_time: isEv ? ($("evTime").value || null) : null,
@@ -4059,8 +4534,10 @@ window.onunhandledrejection = function() {
 
       closeModal('listingModal');
       $("listingForm").reset();
+      $("pricePreview").textContent = "Введите сумму — FAM автоматически добавит ₽. Для бесплатного объявления укажите «Бесплатно».";
       uploadStatus.innerHTML = '';
-      $("aiHints").textContent = "Начните вводить — ИИ подскажет категорию";
+      $("aiHints").textContent = "Начните вводить название и описание — FAM подскажет категорию.";
+      $("descriptionHelperPanel").classList.add("hidden");
 
       if (submission.status === "pending") {
         await loadAll();
@@ -4068,6 +4545,9 @@ window.onunhandledrejection = function() {
         alert(submission.reason || "✅ Объявление сохранено. Фото проверяется автоматически — повторно отправлять его не нужно.");
       } else {
         renderListings();
+        if (submission.photo_review_bypassed === true) {
+          notice("Фото опубликовано без ИИ-проверки изображения для подтверждённой роли. Текст объявления прошёл обычную проверку FAM.");
+        }
       }
     } catch (error) {
       const uploadStatus = $("uploadStatus");
