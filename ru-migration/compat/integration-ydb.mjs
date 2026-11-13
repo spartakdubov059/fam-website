@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
@@ -7,7 +8,8 @@ import { createYdbListingsRepository } from '../app/backend/repositories/ydb-lis
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 try {
   await driver.ready();
-  const sql = query(driver);
+  const client = query(driver);
+  const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   const repo = createYdbListingsRepository(sql);
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
   const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
@@ -20,6 +22,9 @@ try {
   assert.equal(sets[0][0].school_id, 'synthetic-school');
   assert.equal(sets[0][0].status, 'pending');
   console.log('YDB_LOCAL_INTEGRATION_PASS: schema, insert and read on disposable local database');
+} catch (error) {
+  console.error(inspect(error, { depth: null }));
+  process.exitCode = 1;
 } finally {
   await driver.close();
 }
