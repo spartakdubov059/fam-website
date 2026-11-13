@@ -1,4 +1,5 @@
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { execFileSync } from "node:child_process";
 import { validateAgentPatch } from "./validate-local-agent-patch.mjs";
 
@@ -98,6 +99,8 @@ if (process.argv[1] && import.meta.url === new URL("file://" + process.argv[1]).
     qaStatus: process.env.FAM_QA_STATUS || "",
   });
   const markdown = renderIndependentReview(report);
+  mkdirSync(dirname(reportPath), { recursive: true });
+  mkdirSync(dirname(markdownPath), { recursive: true });
   writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n", "utf8");
   writeFileSync(markdownPath, markdown, "utf8");
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown, "utf8");
