@@ -44,12 +44,15 @@ begin
       v_status := 'completed';
       v_summary := 'Локальная модель завершила анализ и не предложила подтверждённое исправление.';
     when 'model_failed' then
+      v_status := 'failed';
+      v_summary := 'Сбой coder/QA/PR неизвестной причины; автоматический повтор не назначен.';
+    when 'model_timeout' then
       if v_has_retry then
         v_status := 'queued';
-        v_summary := 'Временная ошибка coder/QA/PR; назначена одна повторная попытка.';
+        v_summary := 'Подтверждён таймаут локального анализатора; назначена одна повторная попытка.';
       else
         v_status := 'failed';
-        v_summary := 'Coder/QA/PR завершились с ошибкой после разрешённых попыток.';
+        v_summary := 'Локальный анализатор исчерпал разрешённое число попыток после таймаута.';
       end if;
     when 'model_blocked' then
       v_status := 'blocked';
