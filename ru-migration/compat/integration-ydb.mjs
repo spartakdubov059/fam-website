@@ -11,6 +11,7 @@ try {
   await driver.ready();
   const client = query(driver);
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
+  sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true, 'Тест', 'Ученик', '8А', 'Казань');`;
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
