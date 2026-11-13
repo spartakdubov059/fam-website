@@ -5,6 +5,12 @@ on:
     - cron: "*/30 * * * *"
     - cron: "7 3 * * *"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/fam-cloud-monitor.yml"
+      - "scripts/run-fam-cloud-monitor.mjs"
+      - "scripts/run-fam-lighthouse-report.mjs"
+      - "tests/security/fam-cloud-monitor.test.mjs"
 
 permissions:
   contents: read
