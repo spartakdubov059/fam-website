@@ -14,5 +14,6 @@ export function createS3PendingImageStore(env = process.env, { send } = {}) {
   if (parsed.protocol !== 'https:' && !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) throw new Error('S3 endpoint must use HTTPS');
   const client = new S3Client({ endpoint: parsed.origin, region, forcePathStyle: true, credentials: { accessKeyId, secretAccessKey } });
   const putObject = send || ((input) => client.send(new PutObjectCommand(input)));
-  return createPendingImageStore({ sharp, bucket, putObject });
+  const store = createPendingImageStore({ sharp, bucket, putObject });
+  return Object.freeze({ ...store, close: () => client.destroy() });
 }

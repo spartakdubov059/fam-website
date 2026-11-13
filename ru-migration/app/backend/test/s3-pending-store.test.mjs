@@ -13,6 +13,7 @@ test('S3 adapter passes transformed image to the configured private bucket', asy
   assert.equal(request.ServerSideEncryption, 'AES256');
   assert.equal((await sharp(request.Body).metadata()).format, 'webp');
   assert.match(result.key, /^pending\//);
+  await store.close();
 });
 test('S3 adapter fails closed without explicit credentials or with unsafe remote HTTP', () => {
   assert.throws(() => createS3PendingImageStore({}), /not configured/);

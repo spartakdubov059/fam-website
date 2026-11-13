@@ -101,6 +101,19 @@ test('isolated server routes favorite API requests to the authenticated backend'
   ]);
 });
 
+test('isolated server routes private image uploads only to the configured media handler', async () => {
+  await withServer({ mediaApi: async request => ({ status: 201, body: { ok: true, method: request.method, type: request.headers['content-type'] } }) }, async origin => {
+    const response = await fetch(new URL('/api/v1/media/pending', origin), { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'synthetic-image' });
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), { ok: true, method: 'POST', type: 'image/png' });
+  });
+  await withServer({}, async origin => {
+    const response = await fetch(new URL('/api/v1/media/pending', origin), { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'synthetic-image' });
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false, error: 'media_unavailable' });
+  });
+});
+
 test('isolated server routes school listing moderation to the backend', async () => {
   await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, method: request.method } }) }, async origin => {
     const id = '11111111-1111-4111-8111-111111111111';

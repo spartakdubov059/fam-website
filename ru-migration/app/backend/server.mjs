@@ -40,7 +40,7 @@ function sendJson(res, status, value) {
   res.end(body);
 }
 
-export function createServer({ listingsApi = null, authApi = null } = {}) {
+export function createServer({ listingsApi = null, authApi = null, mediaApi = null } = {}) {
   return http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (['/auth/yandex/start', '/auth/yandex/callback', '/auth/yandex/logout'].includes(url.pathname)) {
@@ -59,6 +59,15 @@ export function createServer({ listingsApi = null, authApi = null } = {}) {
   if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname === '/api/v1/status')) {
     const state = readiness();
     return sendJson(res, state.ready ? 200 : 503, state);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/v1/media/pending') {
+    if (!mediaApi) return sendJson(res, 503, { ok: false, error: 'media_unavailable' });
+    try {
+      const result = await mediaApi(req);
+      return sendJson(res, result.status, result.body);
+    } catch {
+      return sendJson(res, 503, { ok: false, error: 'media_unavailable' });
+    }
   }
   if ((((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings')
       || (req.method === 'POST' && url.pathname === '/api/v1/ideas')
@@ -120,7 +129,7 @@ export function createServer({ listingsApi = null, authApi = null } = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runtime = await (await import('./runtime.mjs')).createRuntime();
-  createServer({ listingsApi: runtime?.listingsApi, authApi: runtime?.authApi }).listen(port, host, () => {
+  createServer({ listingsApi: runtime?.listingsApi, authApi: runtime?.authApi, mediaApi: runtime?.mediaApi }).listen(port, host, () => {
     console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
   });
   if (runtime) {

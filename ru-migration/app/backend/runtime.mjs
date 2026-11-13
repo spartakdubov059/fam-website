@@ -6,6 +6,8 @@ import { createDatabaseActorResolver } from './auth/database-actor.mjs';
 import { createYandexIdAuth } from './auth/yandex-id.mjs';
 import { createYdbListingsRepository } from './repositories/ydb-listings.mjs';
 import { createListingsApi } from './services/listings-api.mjs';
+import { createMediaApi } from './services/media-api.mjs';
+import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
 
 export async function createRuntime(env = process.env) {
   const databaseUrl = env.FAM_RU_DATABASE_URL;
@@ -21,6 +23,9 @@ export async function createRuntime(env = process.env) {
     sessionSecret: env.FAM_RU_SESSION_SECRET,
   }) : null;
   const authenticate = yandexAuth?.authenticate || createOidcBearerAuthenticator({ issuer, audience, jwksUri });
+  const mediaConfigured = Boolean(env.FAM_RU_S3_ENDPOINT && env.FAM_RU_S3_BUCKET
+    && env.FAM_RU_S3_ACCESS_KEY_ID && env.FAM_RU_S3_SECRET_ACCESS_KEY);
+  const pendingImages = mediaConfigured ? createS3PendingImageStore(env) : null;
   const metadataEndpoint = env.FAM_RU_YDB_METADATA_URL;
   const credentialsProvider = new MetadataCredentialsProvider(metadataEndpoint ? { endpoint: metadataEndpoint, flavor: 'Google' } : {});
   const driver = new Driver(databaseUrl, { credentialsProvider });
@@ -29,5 +34,11 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const listingsApi = createListingsApi({ authenticate, resolveActor, repository });
-  return { listingsApi, authApi: yandexAuth?.handle || null, close: () => driver.close() };
+  const mediaApi = createMediaApi({ authenticate, resolveActor, pendingImages });
+  return {
+    listingsApi,
+    mediaApi,
+    authApi: yandexAuth?.handle || null,
+    close: async () => { pendingImages?.close?.(); await driver.close(); },
+  };
 }
