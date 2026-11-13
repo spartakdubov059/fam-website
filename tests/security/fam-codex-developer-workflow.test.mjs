@@ -101,10 +101,16 @@ test("independent verification runs without model or write credentials", () => {
   assert.match(workflow, /node --check scripts\/validate-local-agent-patch\.mjs/);
 });
 
-test("the test workflow can be explicitly dispatched for a token-created PR branch", () => {
-  assert.match(testWorkflow, /workflow_dispatch:/);
-  assert.match(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml --ref "\$BRANCH"/);
-  assert.match(workflow, /gh run watch "\$TEST_RUN_ID" --exit-status --interval 10/);
+test("all coder-editable paths trigger required CI and PR manager waits with read-only workflow permissions", () => {
+  const pullRequestPaths = testWorkflow.split("  pull_request:")[1]?.split("\npermissions:")[0] ?? "";
+  for (const path of ["'css/**'", "'js/**'", "'assets/**'", "'docs/**'"]) {
+    assert.ok(pullRequestPaths.includes(path), `missing PR CI path: ${path}`);
+  }
+  assert.match(workflow, /gh api "repos\/\$GITHUB_REPOSITORY\/commits\/\$BRANCH_SHA\/check-runs\?per_page=100"/);
+  assert.match(workflow, /REQUIRED_CHECK="Russian content safety tests"/);
+  assert.match(workflow, /CHECK_CONCLUSION/);
+  assert.doesNotMatch(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml/);
+  assert.doesNotMatch(workflow, /actions: write/);
 });
 
 test("all changes require owner approval before merge and production publication", () => {
