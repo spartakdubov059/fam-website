@@ -127,7 +127,7 @@ const edgeSource = readFileSync(
   "utf8",
 );
 const reportMigration = readFileSync(
-  new URL("../../supabase/migrations/20261113215335_fam_agent_report_snapshot_rpc.sql", import.meta.url),
+  new URL("../../supabase/migrations/20261113220233_fam_agent_report_snapshot_rpc.sql", import.meta.url),
   "utf8",
 );
 const bridgeSource = readFileSync(
