@@ -3,17 +3,22 @@ import assert from 'node:assert/strict';
 import { initializeListingSubmission } from '../../web/listing-submit.js';
 
 function fixture(file = { type: 'image/png', size: 100, name: 'synthetic.png' }) {
+  const shellChildren = [];
   const listeners = {};
   const form = { hidden: true, elements: { photo: { files: file ? [file] : [] } },
     addEventListener: (name, fn) => { listeners[name] = fn; },
-    querySelector: () => ({ disabled: false }), reset: () => { form.wasReset = true; } };
+    querySelector: () => ({ disabled: false }), reset: () => { form.wasReset = true; }, parentElement: { append: child => shellChildren.push(child) } };
   const status = { textContent: '' };
   const login = { hidden: false };
   const logout = { hidden: true, addEventListener: (name, fn) => { logout.handler = fn; } };
   const document = { getElementById: id => ({ ruListingForm: form, ruSubmitStatus: status, ruLogout: logout })[id],
-    querySelector: () => login };
+    querySelector: () => login,
+    createElement: tag => ({ tagName: tag, children: [], listeners: {}, append(...nodes) { this.children.push(...nodes); },
+      addEventListener(name, handler) { this.listeners[name] = handler; }, setAttribute(name, value) { this[name] = value; },
+      querySelector(selector) { return selector.includes('button') ? { disabled: false } : this.children.find(child => child.role === 'status'); },
+      reset() { this.wasReset = true; } }) };
   class FormDataMock { get(name) { return ({ title: 'Книга', description: 'Синтетическое описание', category: 'Учёба', price_text: '' })[name]; } }
-  return { document, form, status, login, logout, listeners, FormDataCtor: FormDataMock };
+  return { document, form, status, login, logout, listeners, shellChildren, FormDataCtor: FormDataMock };
 }
 
 test('listing form authenticates first, then uploads a private photo and submits its key to the Russian API', async () => {
@@ -75,4 +80,25 @@ test('listing form does not make authenticated calls for a guest and validates i
   await invalid.listeners.submit({ preventDefault() {} });
   assert.deepEqual(routes, ['/api/v1/me']);
   assert.match(invalid.status.textContent, /JPEG, PNG или WebP/);
+});
+
+test('authenticated students can submit a school idea through the moderated Russian API', async () => {
+  const f = fixture(null);
+  const calls = [];
+  await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-a' } }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren[0];
+  const ideaForm = section.children[2];
+  ideaForm.elements = { idea: { value: 'Открыть школьный книжный обмен' } };
+  let prevented = false;
+  await ideaForm.listeners.submit({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/ideas']);
+  assert.equal(JSON.parse(calls[1].init.body).text, 'Открыть школьный книжный обмен');
+  assert.equal(ideaForm.wasReset, true);
+  assert.match(ideaForm.children[1].textContent, /ждёт проверки безопасности/);
 });

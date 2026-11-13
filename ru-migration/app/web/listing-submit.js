@@ -15,6 +15,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
   const logout = document.getElementById('ruLogout');
   if (!form || !status) return;
 
+  let ideaForm;
   try {
     const response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
     if (!response.ok) return;
@@ -22,6 +23,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     if (!result?.ok || !result.profile?.id) return;
     form.hidden = false;
     status.textContent = 'Объявление и фото будут отправлены на проверку вашей школы.';
+    ideaForm = createIdeaForm(document, form);
     if (login) login.hidden = true;
     if (logout) logout.hidden = false;
   } catch { return; }
@@ -34,6 +36,34 @@ export async function initializeListingSubmission({ document = globalThis.docume
       else status.textContent = 'Не удалось завершить сеанс. Попробуйте ещё раз.';
     } catch { status.textContent = 'Не удалось завершить сеанс. Проверьте подключение.'; }
     finally { logout.disabled = false; }
+  });
+
+  if (ideaForm) ideaForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = ideaForm.querySelector('button[type="submit"]');
+    const text = String(ideaForm.elements.idea?.value || '').trim();
+    if (submit) submit.disabled = true;
+    const ideaStatus = ideaForm.querySelector('[role="status"]');
+    ideaStatus.textContent = 'Передаём предложение на проверку…';
+    try {
+      const response = await fetchImpl('/api/v1/ideas', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ text }),
+      });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok) {
+        ideaStatus.textContent = result?.error === 'rejected'
+          ? 'Предложение не принято. Уберите личные данные и попробуйте снова.'
+          : 'Не удалось отправить предложение. Проверьте текст и подключение.';
+        return;
+      }
+      ideaForm.reset();
+      ideaStatus.textContent = result.status === 'pending'
+        ? 'Предложение сохранено и ждёт проверки безопасности.'
+        : 'Предложение отправлено школьной команде.';
+    } catch {
+      ideaStatus.textContent = 'Не удалось отправить предложение. Проверьте подключение и попробуйте позже.';
+    } finally { if (submit) submit.disabled = false; }
   });
 
   form.addEventListener('submit', async event => {
@@ -84,6 +114,28 @@ export async function initializeListingSubmission({ document = globalThis.docume
       } else status.textContent = 'Не удалось отправить объявление. Проверьте подключение и попробуйте снова.';
     } finally { if (submit) submit.disabled = false; }
   });
+}
+
+function createIdeaForm(document, listingForm) {
+  if (document.getElementById('ruIdeaForm')) return document.getElementById('ruIdeaForm');
+  const shell = listingForm.parentElement;
+  if (!shell || typeof document.createElement !== 'function') return null;
+  const section = document.createElement('section');
+  section.className = 'ru-moderation';
+  section.setAttribute('aria-label', 'Предложить школьную идею');
+  const heading = document.createElement('h2'); heading.textContent = 'Предложить идею';
+  const note = document.createElement('p'); note.className = 'ru-note';
+  note.textContent = 'Опишите идею для школы. Не указывайте имена, телефоны, адреса и другие личные данные.';
+  const form = document.createElement('form'); form.id = 'ruIdeaForm'; form.className = 'ru-listing-form';
+  const label = document.createElement('label'); label.textContent = 'Предложение';
+  const input = document.createElement('textarea'); input.name = 'idea'; input.maxLength = 1000; input.required = true;
+  label.append(input);
+  const status = document.createElement('p'); status.className = 'ru-note'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+  const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit'; submit.textContent = 'Отправить идею';
+  form.append(label, status, submit);
+  section.append(heading, note, form);
+  shell.append(section);
+  return form;
 }
 
 if (globalThis.document) void initializeListingSubmission();
