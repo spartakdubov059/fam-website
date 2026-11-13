@@ -6,6 +6,7 @@ on:
     paths:
       - "ru-migration/compat/**"
       - "ru-migration/app/backend/**"
+      - "ru-migration/app/web/**"
       - ".github/workflows/fam-ru-sdk-compat.yml"
   workflow_dispatch:
 
