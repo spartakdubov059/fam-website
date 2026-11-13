@@ -18,7 +18,8 @@ test("accepts only the current Council roles and the legacy member label", () =>
   assert.equal(isAllowedApplicantNote("Администратор FAM"), false);
   assert.equal(isAllowedApplicantNote("участник ученического совета"), false);
   assert.equal(isAllowedApplicantNote(undefined), false);
-  assert.equal(isAllowedApplicantNote("Участник Ученического совета\\n@private_contact"), false);
+  assert.equal(isAllowedApplicantNote("Участник Ученического совета\
+@private_contact"), false);
 });
 
 test("masks applicant email before returning requests to the Council UI", () => {
@@ -31,17 +32,22 @@ test("maps RPC request_id to frontend id and minimizes applicant identifiers", (
   const mapped = mapSchoolAdminRequests([{
     request_id: "6e8ecb53-2fb6-42a5-9ff8-d4d4b4d5b7c9",
     user_id: "12345678-1234-4234-8234-123456789abc",
-    applicant_email: "student@example.ru",
+    applicant_first_name: "Анна",
+    applicant_last_name: "Иванова",
+    applicant_class: "8А",
     applicant_note: "Секретарь Ученического совета",
     created_at: "2026-11-08T10:00:00Z",
   }]);
   assert.equal(mapped.length, 1);
   assert.equal(mapped[0].id, "6e8ecb53-2fb6-42a5-9ff8-d4d4b4d5b7c9");
   assert.equal(mapped[0].user_id, "789ABC");
-  assert.equal(mapped[0].applicant_email, "s***@example.ru");
+  assert.equal(mapped[0].applicant_first_name, "Анна");
+  assert.equal(mapped[0].applicant_last_name, "Иванова");
+  assert.equal(mapped[0].applicant_class, "8А");
+  assert.equal(Object.hasOwn(mapped[0], "applicant_email"), false);
   assert.equal(mapped[0].applicant_note, "Секретарь Ученического совета");
 });
 
 test("drops malformed RPC rows that cannot be reviewed safely", () => {
-  assert.deepEqual(mapSchoolAdminRequests([{ user_id: "123", applicant_email: "bad" }]), []);
+  assert.deepEqual(mapSchoolAdminRequests([{ user_id: "123", applicant_first_name: "bad" }]), []);
 });
