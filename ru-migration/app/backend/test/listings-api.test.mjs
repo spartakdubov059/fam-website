@@ -59,6 +59,19 @@ test('role request submission and review fail closed for unprovisioned or non-ad
   assert.equal((await handler(queue)).status, 403);
   assert.equal(writes, 0);
 });
+
+test('active suspensions are visible only to the authenticated school administrator and remain school-scoped', async () => {
+  let requestedSchool; let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
+    resolveActor: async () => actor,
+    repository: { listActiveAccountSuspensions: async schoolId => { requestedSchool = schoolId; return [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/suspensions';
+  const response = await handler(request);
+  assert.equal(response.status, 200); assert.equal(requestedSchool, 'school-a');
+  assert.deepEqual(response.body.suspensions, [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]);
+  actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(request)).status, 403);
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

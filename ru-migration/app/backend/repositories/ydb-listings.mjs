@@ -115,6 +115,15 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0]?.[0] ?? null;
     },
+
+    async listActiveAccountSuspensions(schoolId) {
+      if (!schoolId) throw new TypeError('invalid suspension school');
+      const statement = sql`SELECT target_id, target_role, duration_hours, reason, created_at, expires_at
+        FROM fam_account_suspensions WHERE school_id = ${schoolId} AND status = 'active'
+          AND expires_at > CurrentUtcTimestamp() ORDER BY expires_at ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
     async createSchoolProfileRequest(record) {
       if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
         throw new TypeError('invalid school profile request');

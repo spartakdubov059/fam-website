@@ -17,6 +17,17 @@ test('active suspension lookup is bounded to the actor school and ignores expire
   assert.doesNotMatch(query.text, /SELECT \*/);
   await assert.rejects(repo.getActiveAccountSuspension('', 'student-a'), TypeError);
 });
+
+test('active suspension list is school-bound, time-filtered, and bounded', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => { query = { text: strings.join('?'), values }; return Promise.resolve([[{ target_id: 'student-a' }]]); });
+  const rows = await repo.listActiveAccountSuspensions('school-a');
+  assert.deepEqual(rows, [{ target_id: 'student-a' }]);
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /school_id = \?/);
+  assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
+  assert.match(query.text, /LIMIT 100/);
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
