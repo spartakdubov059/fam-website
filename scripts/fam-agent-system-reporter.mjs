@@ -71,8 +71,6 @@ export function summarizeWorkflowRuns(runs, now = new Date()) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-const VALID_ACTION_STATUSES = new Set(["queued", "in_progress", "success", "failure", "cancelled", "skipped", "not_observed"]);
-
 function actionStatus(item) {
   if (!item || typeof item !== "object") return "not_observed";
   if (item.status === "queued" || item.status === "in_progress") return item.status;
@@ -126,7 +124,7 @@ export function createDailyReport({
   workflowStatus = "unavailable",
   pullRequests = [],
   pullRequestStatus = "unavailable",
-  agentJobStatus = "unavailable",
+  agentJobStatus = "not_run_24h",
   agentJobStatuses = null,
   production = { status: "unknown" },
   siteProbe = { status: "unknown", http_status: null },
