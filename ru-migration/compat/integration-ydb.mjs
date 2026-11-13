@@ -15,6 +15,7 @@ try {
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true, 'Тест', 'Ученик', '8А', 'Казань');`;
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
     ('https://issuer.synthetic', 'subject-2', '11111111-1111-4111-8111-111111111111', 'synthetic-school', 'student', true),
+    ('https://issuer.synthetic', 'subject-admin', '33333333-3333-4333-8333-333333333333', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-3', '22222222-2222-4222-8222-222222222222', 'other-school', 'student', true);`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
@@ -31,7 +32,8 @@ try {
   assert.equal(sets[0][0].status, 'pending');
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
   assert.deepEqual(await repo.listActiveListings(), [], 'pending content must not appear publicly');
-  await sql`UPDATE fam_listings SET status = 'active' WHERE id = ${listing.id};`;
+  assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
+  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
   const publicListings = await repo.listActiveListings();
   assert.equal(publicListings.length, 1);
   assert.equal(publicListings[0].id, listing.id);

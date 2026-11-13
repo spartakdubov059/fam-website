@@ -6,6 +6,26 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    if (req.method === 'PATCH' && moderationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (!['school_admin', 'council_member'].includes(actor.role)) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 64 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const status = input?.decision === 'approve' ? 'active' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!status) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      try {
+        const updated = await repository.moderateListing(moderationMatch[1], actor.school_id, status);
+        return updated ? { status: 200, body: { ok: true, status } } : { status: 404, body: { ok: false, error: 'listing_not_found' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'PATCH' && readMessageMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

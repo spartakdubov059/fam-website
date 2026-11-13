@@ -72,3 +72,14 @@ test('isolated server routes favorite API requests to the authenticated backend'
     { method: 'GET', url: '/api/v1/messages' },
   ]);
 });
+
+test('isolated server routes school listing moderation to the backend', async () => {
+  await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, method: request.method } }) }, async origin => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    const response = await fetch(new URL(`/api/v1/listings/${id}/moderation`, origin), {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'approve' }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, method: 'PATCH' });
+  });
+});

@@ -21,6 +21,17 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async moderateListing(listingId, schoolId, decision) {
+      if (!listingId || !schoolId || !['active', 'rejected'].includes(decision)) throw new TypeError('invalid listing decision');
+      return sql.begin(async tx => {
+        const current = await tx`SELECT school_id, status FROM fam_listings WHERE id = ${listingId};`;
+        const row = current?.[0]?.[0];
+        if (!row || row.school_id !== schoolId || row.status !== 'pending') return false;
+        await tx`UPDATE fam_listings SET status = ${decision} WHERE id = ${listingId};`;
+        return true;
+      });
+    },
+
     async createIdea(record) {
       if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
           || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {

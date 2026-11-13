@@ -51,6 +51,7 @@ export function createServer({ listingsApi = null } = {}) {
       || (req.method === 'POST' && url.pathname === '/api/v1/messages')
       || (req.method === 'GET' && ['/api/v1/me', '/api/v1/favorites', '/api/v1/messages'].includes(url.pathname))
       || (req.method === 'PATCH' && /^\/api\/v1\/messages\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/read$/i.test(url.pathname))
+      || (req.method === 'PATCH' && /^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/moderation$/i.test(url.pathname))
       || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/favorite$/i.test(url.pathname) && ['PUT', 'DELETE'].includes(req.method)))) {
     if (!listingsApi) return sendJson(res, 503, { ok: false, error: 'backend_not_configured' });
     try {

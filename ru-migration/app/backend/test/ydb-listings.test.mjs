@@ -90,3 +90,23 @@ test('mark-read checks recipient and school before updating the message', async 
   assert.equal(await absent.markMessageRead('other-user', 'school-id', 'message-id'), false);
   assert.equal(writes, 1);
 });
+
+test('listing moderation checks school and pending state in one transaction before changing status', async () => {
+  const operations = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); operations.push({ text, values });
+    return text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending' }]] : [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.moderateListing('listing-id', 'school-a', 'active'), true);
+  assert.match(operations[0].text, /SELECT school_id, status/);
+  assert.match(operations[1].text, /SET status = \?/);
+  assert.deepEqual(operations[1].values, ['active', 'listing-id']);
+  for (const row of [{ school_id: 'school-b', status: 'pending' }, { school_id: 'school-a', status: 'active' }, null]) {
+    const blockedTx = async (strings) => strings.join('').includes('SELECT school_id') ? [[row].filter(Boolean)] : [[]];
+    const blocked = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(blockedTx) }));
+    assert.equal(await blocked.moderateListing('listing-id', 'school-a', 'rejected'), false);
+  }
+  await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'pending'), TypeError);
+});

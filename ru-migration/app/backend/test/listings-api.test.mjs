@@ -155,3 +155,30 @@ test('only the authenticated recipient can mark a message read', async () => {
   assert.deepEqual(args, ['synthetic-user', 'synthetic-school', '11111111-1111-4111-8111-111111111111']);
   assert.equal(response.body.is_read, true);
 });
+
+test('listing moderation trusts database role and school scope, not token claims or request fields', async () => {
+  let call;
+  const id = '11111111-1111-4111-8111-111111111111';
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
+    resolveActor: async () => ({ id: 'admin-id', school_id: 'school-a', role: 'school_admin' }),
+    repository: { moderateListing: async (...args) => { call = args; return true; } } });
+  const request = req({ decision: 'approve', school_id: 'school-b', status: 'active' }, 'PATCH');
+  request.url = `/api/v1/listings/${id}/moderation`;
+  const response = await handler(request);
+  assert.deepEqual(call, [id, 'school-a', 'active']);
+  assert.deepEqual(response, { status: 200, body: { ok: true, status: 'active' } });
+});
+
+test('listing moderation rejects student role and invalid decisions before repository access', async () => {
+  let writes = 0;
+  const base = { authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
+    repository: { moderateListing: async () => { writes++; return true; } } };
+  const id = '11111111-1111-4111-8111-111111111111';
+  const student = createListingsApi({ ...base, resolveActor: async () => ({ id: 'student', school_id: 'school-a', role: 'student' }) });
+  const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${id}/moderation`;
+  assert.equal((await student(request)).status, 403);
+  const admin = createListingsApi({ ...base, resolveActor: async () => ({ id: 'admin', school_id: 'school-a', role: 'school_admin' }) });
+  const invalid = req({ decision: 'active' }, 'PATCH'); invalid.url = `/api/v1/listings/${id}/moderation`;
+  assert.equal((await admin(invalid)).status, 400);
+  assert.equal(writes, 0);
+});
