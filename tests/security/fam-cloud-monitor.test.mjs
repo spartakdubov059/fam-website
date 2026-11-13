@@ -260,13 +260,13 @@ test("cloud monitor flags unusually large local resources", async () => {
   assert.match(report.checks.find((check) => check.name.startsWith("Производительность")).detail, /Пороги: главная 8 с/);
 });
 
-test("mobile Lighthouse runs daily or on the isolated draft branch only", () => {
+test("mobile Lighthouse runs daily or on a manual request only", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-cloud-monitor.yml", import.meta.url), "utf8");
   const mobileJob = workflow.split("  mobile-performance:\n")[1];
 
   assert.ok(workflow.includes('cron: "*/30 * * * *"'));
   assert.ok(workflow.includes('cron: "7 3 * * *"'));
-  assert.ok(workflow.includes('branches: ["codex/fam-cloud-monitor-*"]'));
+  assert.equal(workflow.includes("  push:"), false);
   assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
   assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
   assert.ok(mobileJob.includes("lighthouse@13.6.0"));
@@ -274,6 +274,7 @@ test("mobile Lighthouse runs daily or on the isolated draft branch only", () => 
   assert.ok(mobileJob.includes("--headless=new --no-sandbox"));
   assert.ok(mobileJob.includes("permissions:\n      contents: read"));
   assert.equal(mobileJob.includes("github.event.schedule == '*/30 * * * *'"), false);
+  assert.equal(mobileJob.includes("github.event_name == 'push'"), false);
 });
 test("mobile Lighthouse report uses lab metric thresholds and labels its scope", () => {
   const result = summarizeFAMMobileLighthouse({

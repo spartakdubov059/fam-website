@@ -5,13 +5,6 @@ on:
     - cron: "*/30 * * * *"
     - cron: "7 3 * * *"
   workflow_dispatch:
-  push:
-    branches: ["codex/fam-cloud-monitor-*"]
-    paths:
-      - ".github/workflows/fam-cloud-monitor.yml"
-      - "scripts/run-fam-lighthouse-report.mjs"
-      - "scripts/run-fam-cloud-monitor.mjs"
-      - "tests/security/fam-cloud-monitor.test.mjs"
 
 permissions:
   contents: read
@@ -24,7 +17,7 @@ concurrency:
 jobs:
   monitor:
     name: Read-only site and CI smoke checks
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -50,7 +43,7 @@ jobs:
 
   mobile-performance:
     name: Mobile Lighthouse lab audit
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * *') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/fam-cloud-monitor-'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
