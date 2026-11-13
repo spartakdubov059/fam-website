@@ -9,6 +9,7 @@ import {
   chooseResultCode,
   readTaskSummary,
   bridgeRequest,
+  shouldRunModel,
 } from "../../scripts/fam-agent-bridge.mjs";
 
 const id = "123e4567-e89b-42d3-a456-426614174000";
@@ -121,11 +122,13 @@ const bridgeSource = readFileSync(
   "utf8",
 );
 
-test("model work starts only for a claimed queue task or a manual request", () => {
-  assert.match(bridgeSource, /Bridge credentials are absent; skipping model work/);
+test("model work decision skips empty/unconfigured queue and accepts claimed or manual work", () => {
+  assert.equal(shouldRunModel(), false);
+  assert.equal(shouldRunModel({ bridgeConfigured: false }), false);
+  assert.equal(shouldRunModel({ bridgeConfigured: true, taskClaimed: false }), false);
+  assert.equal(shouldRunModel({ manualTask: "audit a safe issue" }), true);
+  assert.equal(shouldRunModel({ bridgeConfigured: true, taskClaimed: true }), true);
   assert.match(bridgeSource, /No queued coder task; skipping model download and inference/);
-  assert.match(bridgeSource, /run_model=false/);
-  assert.match(bridgeSource, /run_model=true/);
 });
 
 test("SQL bridge functions are invoker-only and restricted to service_role", () => {
