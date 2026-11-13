@@ -112,7 +112,11 @@ revoke all on function private.enqueue_fam_agent_coder_task() from public,anon,a
 grant execute on function private.enqueue_fam_agent_coder_task() to postgres,service_role;
 
 
-create or replace function public.claim_fam_agent_coder_tasks(
+-- PostgreSQL cannot replace a TABLE-returning function with a different OUT row type.
+-- The RPC signature is unchanged, so drop and recreate it atomically in this migration.
+drop function if exists public.claim_fam_agent_coder_tasks(text,integer,integer);
+
+create function public.claim_fam_agent_coder_tasks(
   p_worker_id text,
   p_limit integer default 1,
   p_lease_seconds integer default 7200
