@@ -123,11 +123,12 @@ test('isolated server routes the event registration API only to its configured b
       ['GET', `/api/v1/listings/${id}/occupancy`],
       ['GET', '/api/v1/event-registrations'],
       ['POST', `/api/v1/listings/${id}/registrations`],
+      ['GET', `/api/v1/listings/${id}/registrations`],
       ['DELETE', `/api/v1/listings/${id}/registrations/me`],
       ['PATCH', `/api/v1/listings/${id}/registrations/22222222-2222-4222-8222-222222222222`],
     ]) {
       const response = await fetch(new URL(pathname, origin), { method, headers: { 'content-type': 'application/json' }, body: ['POST', 'PATCH'].includes(method) ? '{}' : undefined });
-      assert.equal(response.status, 200);
+      assert.equal(response.status, 200, `${method} ${pathname}: ${await response.clone().text()}`);
       assert.deepEqual(await response.json(), { ok: true, method });
     }
   });
@@ -135,6 +136,7 @@ test('isolated server routes the event registration API only to its configured b
     'GET /api/v1/listings/11111111-1111-4111-8111-111111111111/occupancy',
     'GET /api/v1/event-registrations',
     'POST /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations',
+    'GET /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations',
     'DELETE /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations/me',
     'PATCH /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations/22222222-2222-4222-8222-222222222222',
   ]);

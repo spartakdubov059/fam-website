@@ -111,6 +111,20 @@ test('listing moderation checks school and pending state in one transaction befo
   await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'pending'), TypeError);
 });
 
+test('event applicant query binds event and school and exposes only profile display fields', async () => {
+  let query;
+  const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; return [[{ user_id: 'u1', first_name: 'Аня', class_name: '8А', status: 'pending' }]]; };
+  const repo = createYdbListingsRepository(sql);
+  const rows = await repo.listEventApplicants('event-1', 'school-a');
+  assert.equal(rows[0].user_id, 'u1');
+  assert.ok(query.values.includes('event-1'));
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /r\.school_id = \?/);
+  assert.match(query.text, /l\.status = 'active'/);
+  assert.doesNotMatch(query.text, /email|phone|address/i);
+  await assert.rejects(repo.listEventApplicants('event-1', ''), TypeError);
+});
+
 test('event registration reserves a seat and stores only the database actor identity in one transaction', async () => {
   const operations = [];
   const tx = async (strings, ...values) => {

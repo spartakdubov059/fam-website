@@ -46,6 +46,22 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         return { status: 503, body: { ok: false, error: 'database_unavailable' } };
       }
     }
+    if (req.method === 'GET' && eventRegistrationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (!['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) {
+        return { status: 403, body: { ok: false, error: 'forbidden' } };
+      }
+      if (typeof repository.listEventApplicants !== 'function') {
+        return { status: 503, body: { ok: false, error: 'applicant_read_unavailable' } };
+      }
+      try {
+        const applicants = await repository.listEventApplicants(eventRegistrationMatch[1], actor.school_id);
+        return { status: 200, body: { ok: true, applicants } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'DELETE' && eventCancellationMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

@@ -204,6 +204,23 @@ test('event registration is bound to the authenticated profile and capacity erro
   assert.equal(fullResponse.body.error, 'no_seats_available');
 });
 
+test('event applicant names are visible only to same-school council roles', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  let scope;
+  const repository = { listEventApplicants: async (...args) => { scope = args; return [{ first_name: 'Тест', class_name: '8А', status: 'pending' }]; } };
+  const student = createListingsApi({ authenticate: async () => ({ subject: 's' }),
+    resolveActor: async () => ({ id: 'student', role: 'student', school_id: 'school-a' }), repository });
+  const studentRequest = req({}, 'GET'); studentRequest.url = `/api/v1/listings/${id}/registrations`;
+  assert.equal((await student(studentRequest)).status, 403);
+  assert.equal(scope, undefined);
+  const council = createListingsApi({ authenticate: async () => ({ subject: 's', school_id: 'forged' }),
+    resolveActor: async () => ({ id: 'council', role: 'council_member', school_id: 'school-a' }), repository });
+  const councilRequest = req({}, 'GET'); councilRequest.url = `/api/v1/listings/${id}/registrations`;
+  const response = await council(councilRequest);
+  assert.deepEqual(scope, [id, 'school-a']);
+  assert.deepEqual(response.body, { ok: true, applicants: [{ first_name: 'Тест', class_name: '8А', status: 'pending' }] });
+});
+
 test('event registration review requires council role and delegates event-owner scoping to the repository', async () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
   const userId = '22222222-2222-4222-8222-222222222222';
