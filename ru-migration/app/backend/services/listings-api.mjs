@@ -2,7 +2,17 @@ import { submitListing } from './submit-listing.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review }) {
   return async function handle(req) {
-    if (req.method === 'GET') {
+    const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    if (req.method === 'GET' && pathname === '/api/v1/me') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      return { status: 200, body: { ok: true, profile: actor } };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/listings') {
       if (typeof repository.listActiveListings !== 'function') {
         return { status: 503, body: { ok: false, error: 'listing_read_unavailable' } };
       }
