@@ -113,3 +113,8 @@
 - При наличии repository variable `FAM_GITHUB_APP_CLIENT_ID` и secret `FAM_GITHUB_APP_PRIVATE_KEY` token используется для push/создания draft PR. По документации GitHub это устраняет approval-required запуск PR workflow для событий от `GITHUB_TOKEN`; owner approval gate перед merge остаётся в обязательной проверке.
 - Без App variable/secret сохраняется прежний `GITHUB_TOKEN` fallback, и отчёт PR теперь явно указывает, что workflow может потребовать ручного разрешения. Никакие App, variables или secrets не создавались; автоматический запуск CI через App token ещё не проверен. Рабочее состояние системы остаётся условным до установки бесплатного App и безопасной проверки реального draft PR.
 - Regression test проверяет pinned action, repository scope, точные permissions и token selection. На head `b9a305d85fbf117ad4f8c7411d3181fcc844f8ae` прошли Russian content safety [#43438644549](https://github.com/spartakdubov059/fam-website/actions/runs/43438644549), coder QA PostgreSQL [#43438644477](https://github.com/spartakdubov059/fam-website/actions/runs/43438644477), Reporter PostgreSQL [#43438644893](https://github.com/spartakdubov059/fam-website/actions/runs/43438644893). Secrets, workflow write permissions, ruleset, Supabase и production не менялись.
+
+
+## Подготовка к настройке GitHub App — 13 ноября 2026
+
+В draft PR #65 добавлено optional использование short-lived, repository-scoped GitHub App token для запуска PR checks без approval-required режима `GITHUB_TOKEN`. Подготовлена инструкция [FAM GitHub App setup](FAM_AGENT_GITHUB_APP_SETUP.md) с минимальными правами и безопасной проверкой. App, variable и private-key secret пока не создавались; production и GitHub ruleset не менялись.
