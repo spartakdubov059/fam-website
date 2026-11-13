@@ -156,13 +156,8 @@ begin
       if p_pr_url is not null or p_commit_sha is not null then
         raise exception 'failed coder task cannot store PR metadata';
       end if;
-      if v_has_retry then
-        v_status := 'queued';
-        v_summary := 'Временная ошибка coder/QA/PR; назначена одна повторная попытка.';
-      else
-        v_status := 'failed';
-        v_summary := 'Coder/QA/PR завершились с ошибкой после разрешённых попыток.';
-      end if;
+      v_status := 'failed';
+      v_summary := 'Сбой coder/QA/PR неизвестной причины; автоматический повтор не назначен.';
     when 'model_blocked' then
       if p_pr_url is not null or p_commit_sha is not null then
         raise exception 'blocked coder task cannot store PR metadata';
