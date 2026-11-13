@@ -91,7 +91,7 @@ test("CLI writes a review artifact and rejects a failed QA outcome", () => {
     });
     assert.equal(passed.status, 0, passed.stderr);
     assert.equal(JSON.parse(readFileSync(reportPath, "utf8")).conclusion, "pass_for_draft_pr");
-    assert.match(readFileSync(markdownPath, "utf8"), /независимый статический Reviewer/);
+    assert.match(readFileSync(markdownPath, "utf8"), /автоматический Reviewer/);
 
     const rejected = spawnSync(process.execPath, [
       cliPath, patchPath, summaryPath, safetyPath, basePath, reportPath, markdownPath,
