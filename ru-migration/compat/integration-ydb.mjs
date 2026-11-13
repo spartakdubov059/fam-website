@@ -5,6 +5,7 @@ import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
+import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
@@ -24,14 +25,15 @@ try {
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
-  const listingsApi = createListingsApi({
-    authenticate: async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
+  const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
       : req.headers.authorization === 'Bearer synthetic-registrant' ? 'subject-2'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
-          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1' }),
+          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1';
+  const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
+    authenticate,
     resolveActor,
     repository: repo,
-  });
+  }));
   const apiRequest = (method, url, token, body = {}) => {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
@@ -175,6 +177,20 @@ try {
   const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
   assert.deepEqual(reviewResponse, { status: 200, body: { ok: true, status: 'rejected' } });
   assert.equal(await repo.getEventOccupancy(reviewEvent.id), 0, 'rejecting a pending request releases its reserved seat');
+  await sql`UPSERT INTO fam_account_suspensions
+    (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
+    VALUES ('synthetic-school', 'synthetic-user', 'synthetic-suspension', 'student', 24,
+      'Synthetic integration suspension', 'active', 'synthetic-admin', CurrentUtcTimestamp(),
+      CurrentUtcTimestamp() + Interval('PT24H'));`;
+  const suspendedWrite = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-user', {
+    title: 'Не должно сохраниться', description: 'Synthetic suspension guard', category: 'Учёба',
+  }));
+  assert.equal(suspendedWrite.status, 403, 'active account suspension blocks authenticated writes');
+  assert.equal(suspendedWrite.body.error, 'account_suspended');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/listings', 'synthetic-user'))).status, 200,
+    'account suspension leaves read access available');
+  assert.equal((await repo.getActiveAccountSuspension('synthetic-school', 'synthetic-user'))?.reason,
+    'Synthetic integration suspension');
   const photoListing = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическое объявление с фото', description: 'Изображение остаётся закрытым до отдельного одобрения', category: 'Творчество',
     price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp',
