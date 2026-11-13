@@ -17,6 +17,24 @@ test('active suspension lookup is bounded to the actor school and ignores expire
   assert.doesNotMatch(query.text, /SELECT \*/);
   await assert.rejects(repo.getActiveAccountSuspension('', 'student-a'), TypeError);
 });
+test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, active FROM fam_user_profiles')) return [[{ user_id: 'synthetic-user', active: true }]];
+    if (text.includes('SELECT user_id AS id, school_id')) return [[{ id: 'synthetic-user', school_id: 'school-a', role: 'student', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', { first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.equal(result.first_name, 'Аня');
+  const update = calls.find(call => call.text.includes('UPDATE fam_user_profiles'));
+  assert.ok(update.values.includes('Аня')); assert.ok(update.values.includes('Иванова')); assert.ok(update.values.includes('8А'));
+  assert.ok(update.values.includes('https://issuer.test')); assert.ok(update.values.includes('student-sub'));
+  assert.match(update.text, /user_id = \? AND active = true/);
+  await assert.rejects(repo.updateOwnProfileIdentity('issuer', 'subject', { first_name: 'x', last_name: 'y' }), TypeError);
+});
 test('school role request submission is bound to the database student profile and prevents duplicates', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

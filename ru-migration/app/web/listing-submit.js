@@ -33,6 +33,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     authenticatedProfile = true;
     form.hidden = false;
     status.textContent = 'Объявление и фото будут отправлены на проверку вашей школы.';
+    createProfileIdentityForm(document, form, result.profile, fetchImpl);
     if (result.profile.role === 'student') await createSchoolRoleRequestForm(document, form, fetchImpl);
     ideaForm = createIdeaForm(document, form);
     if (login) login.hidden = true;
@@ -116,6 +117,42 @@ export async function initializeListingSubmission({ document = globalThis.docume
         } catch { status.textContent = 'Не удалось отправить объявление. Временное фото осталось закрытым.'; }
       } else status.textContent = 'Не удалось отправить объявление. Проверьте подключение и попробуйте снова.';
     } finally { if (submit) submit.disabled = false; }
+  });
+}
+
+function createProfileIdentityForm(document, listingForm, profile, fetchImpl) {
+  const shell = listingForm.parentElement;
+  if (!shell || typeof document.createElement !== 'function') return;
+  const section = document.createElement('section'); section.className = 'ru-moderation';
+  section.setAttribute('aria-label', 'Мои данные');
+  const heading = document.createElement('h2'); heading.textContent = 'Мои данные';
+  const note = document.createElement('p'); note.className = 'ru-note';
+  note.textContent = 'Имя, фамилия и класс видны администраторам вашей школы.';
+  const form = document.createElement('form'); form.className = 'ru-listing-form';
+  const fields = {};
+  for (const [name, title, maxLength, pattern] of [
+    ['first_name', 'Имя', 60, null], ['last_name', 'Фамилия', 60, null], ['class_name', 'Класс, например 8А', 4, '[1-9][0-9]?[А-ЯЁA-Zа-яёa-z]?'],
+  ]) {
+    const label = document.createElement('label'); label.textContent = title;
+    const input = document.createElement('input'); input.name = name; input.maxLength = maxLength; input.required = true;
+    input.value = typeof profile?.[name] === 'string' ? profile[name] : '';
+    if (pattern) input.pattern = pattern;
+    fields[name] = input; label.append(input); form.append(label);
+  }
+  const button = document.createElement('button'); button.type = 'submit'; button.className = 'ru-button'; button.textContent = 'Сохранить данные';
+  form.append(button); section.append(heading, note, form); shell.append(section);
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); button.disabled = true; note.textContent = 'Сохраняем данные…';
+    const payload = Object.fromEntries(Object.entries(fields).map(([name, input]) => [name, input.value]));
+    try {
+      const response = await fetchImpl('/api/v1/me', { method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(payload) });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok || !result.profile) throw new Error(result?.error || 'profile_update_failed');
+      Object.assign(profile, result.profile);
+      note.textContent = 'Данные профиля сохранены.';
+    } catch { note.textContent = 'Не удалось сохранить данные. Проверьте имя, фамилию и класс.'; }
+    finally { button.disabled = false; }
   });
 }
 

@@ -220,6 +220,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
   } }, async origin => {
     for (const [method, pathname] of [
       ['GET', '/api/v1/schools'],
+      ['PATCH', '/api/v1/me'],
       ['POST', '/api/v1/profile-requests'],
       ['GET', '/api/v1/profile-requests/review'],
       ['PATCH', `/api/v1/profile-requests/${id}`],
@@ -234,7 +235,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
     }
   });
   assert.deepEqual(routed, [
-    'GET /api/v1/schools', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', `PATCH /api/v1/profile-requests/${id}`,
+    'GET /api/v1/schools', 'PATCH /api/v1/me', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', `PATCH /api/v1/profile-requests/${id}`,
     'POST /api/v1/role-requests', 'GET /api/v1/role-requests', 'GET /api/v1/role-requests/review', `PATCH /api/v1/role-requests/${id}`,
   ]);
 });

@@ -5,6 +5,22 @@ import { randomUUID } from 'node:crypto';
 export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
+    async updateOwnProfileIdentity(issuer, subject, fields) {
+      if (!issuer || !subject || !fields || typeof fields.first_name !== 'string' || typeof fields.last_name !== 'string' || typeof fields.class_name !== 'string') {
+        throw new TypeError('invalid profile identity update');
+      }
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT user_id, active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (!current?.active || !current.user_id) return null;
+        await tx`UPDATE fam_user_profiles SET first_name = ${fields.first_name}, last_name = ${fields.last_name}, class_name = ${fields.class_name}
+          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${current.user_id} AND active = true;`;
+        const updated = await tx`SELECT user_id AS id, school_id, role, first_name, last_name, class_name, city, avatar_url
+          FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        return updated?.[0]?.[0] ?? null;
+      });
+    },
+
     async createSchoolRoleRequest({ issuer, subject, requested_role }) {
       if (!issuer || !subject || !['council_member', 'school_admin'].includes(requested_role)) throw new TypeError('invalid school role request');
       const requestId = randomUUID();

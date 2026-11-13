@@ -84,6 +84,14 @@ try {
     { status: 200, body: { ok: true, status: 'approved' } });
   const elevatedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-student' });
   assert.equal(elevatedActor.role, 'council_member', 'only the same-school administrator decision grants the role');
+  const profileEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-role-student', {
+    first_name: 'Советник', last_name: 'Тестовый', class_name: '9Б', role: 'school_admin', school_id: 'other-school', user_id: 'forged-user',
+  }));
+  assert.equal(profileEdit.status, 200);
+  assert.deepEqual({ role: profileEdit.body.profile.role, school_id: profileEdit.body.profile.school_id,
+    first_name: profileEdit.body.profile.first_name, last_name: profileEdit.body.profile.last_name, class_name: profileEdit.body.profile.class_name }, {
+    role: 'council_member', school_id: 'synthetic-school', first_name: 'Советник', last_name: 'Тестовый', class_name: '9Б',
+  });
   const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
   assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');

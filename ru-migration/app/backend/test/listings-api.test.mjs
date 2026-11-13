@@ -228,6 +228,26 @@ test('profile endpoint rejects missing authentication', async () => {
   const request = req({}, 'GET'); request.url = '/api/v1/me';
   assert.equal((await handler(request)).status, 401);
 });
+test('profile identity update binds to the authenticated subject and ignores role or school fields', async () => {
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
+    repository: { updateOwnProfileIdentity: async (issuer, subject, fields) => { saved = { issuer, subject, ...fields }; return { id: 'own-id', role: 'student', school_id: 'school-a', ...fields }; } } });
+  const request = req({ first_name: '  Аня ', last_name: 'Иванова', class_name: ' 8а ', role: 'school_admin', school_id: 'other-school', user_id: 'other-id' }, 'PATCH');
+  request.url = '/api/v1/me';
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(saved, { issuer: 'https://issuer.example', subject: 'own-subject', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.equal(response.body.profile.role, 'student');
+});
+
+test('profile identity update rejects invalid values before touching the repository', async () => {
+  let writes = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
+    repository: { updateOwnProfileIdentity: async () => { writes++; return {}; } } });
+  const request = req({ first_name: '<script>', last_name: 'Иванова', class_name: '0А' }, 'PATCH'); request.url = '/api/v1/me';
+  assert.equal((await handler(request)).status, 400);
+  assert.equal(writes, 0);
+});
 
 test('favorites are scoped to the authenticated database actor', async () => {
   let listedFor;

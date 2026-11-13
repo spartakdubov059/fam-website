@@ -307,6 +307,25 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         return { status: 200, body: { ok: true, listing_id: favoriteMatch[1], favorited: req.method === 'PUT' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'PATCH' && pathname === '/api/v1/me') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const first_name = typeof input?.first_name === 'string' ? input.first_name.trim() : '';
+      const last_name = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
+      const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '') : '';
+      const validName = value => value.length >= 1 && value.length <= 60 && !/[<>\u0000-\u001f]/u.test(value);
+      if (!validName(first_name) || !validName(last_name) || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/u.test(class_name)) {
+        return { status: 400, body: { ok: false, error: 'invalid_profile_identity' } };
+      }
+      if (typeof repository?.updateOwnProfileIdentity !== 'function') return { status: 503, body: { ok: false, error: 'profile_update_unavailable' } };
+      try {
+        const profile = await repository.updateOwnProfileIdentity(identity.issuer, identity.subject, { first_name, last_name, class_name });
+        return profile ? { status: 200, body: { ok: true, profile } } : { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/me') {
       let identity;
       try { identity = await authenticate(req); } catch { identity = null; }

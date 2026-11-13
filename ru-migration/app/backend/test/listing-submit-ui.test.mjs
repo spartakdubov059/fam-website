@@ -91,7 +91,7 @@ test('authenticated students can submit a school idea through the moderated Russ
     if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
     throw new Error(`unexpected route ${url}`);
   } });
-  const section = f.shellChildren[0];
+  const section = f.shellChildren.find(item => item['aria-label'] === 'Предложить школьную идею');
   const ideaForm = section.children[2];
   ideaForm.elements = { idea: { value: 'Открыть школьный книжный обмен' } };
   let prevented = false;
@@ -122,6 +122,28 @@ test('student role request UI refreshes status and never sends a browser-selecte
   assert.deepEqual(JSON.parse(submittedCall.init.body), { requested_role: 'Участник Ученического совета' });
   assert.equal(form.hidden, true);
   assert.match(section.children[1].textContent, /ожидает решения/);
+});
+
+test('profile settings update only the visible identity fields through the authenticated self route', async () => {
+  const f = fixture(null); const calls = [];
+  await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me' && init.method !== 'PATCH') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-id', role: 'student', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' } }) };
+    if (url === '/api/v1/me' && init.method === 'PATCH') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-id', role: 'student', first_name: 'Анна', last_name: 'Иванова', class_name: '8Б' } }) };
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, request: null }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren.find(item => item['aria-label'] === 'Мои данные');
+  assert.ok(section);
+  const form = section.children[2];
+  form.children[0].children[0].value = 'Анна';
+  form.children[1].children[0].value = 'Иванова';
+  form.children[2].children[0].value = '8Б';
+  await form.listeners.submit({ preventDefault() {} });
+  const patch = calls.find(call => call.url === '/api/v1/me' && call.init.method === 'PATCH');
+  assert.deepEqual(JSON.parse(patch.init.body), { first_name: 'Анна', last_name: 'Иванова', class_name: '8Б' });
+  assert.match(section.children[1].textContent, /сохранены/);
 });
 
 test('authenticated unprovisioned Yandex users can request a school profile without receiving a role', async () => {
