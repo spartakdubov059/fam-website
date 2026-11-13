@@ -20,11 +20,15 @@ const SUPABASE_SECRET_KEY =
   "";
 const LEGACY_SECRET_IS_JWT = SUPABASE_SECRET_KEY.startsWith("eyJ");
 const WORKER_ID = "fam-agent-qwen-coder-v1";
-const MAX_BODY_BYTES = 2048;
+const MAX_BODY_BYTES = 65536;
 const EVENT_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
   "listings_load_failed", "notifications_load_failed",
   "database_request_failed", "auth_backend_failed",
+]);
+const REPORT_FIELDS = new Set([
+  "report_date", "generated_at", "sources", "supabase", "workflows_24h",
+  "open_pull_requests", "production_deployment", "public_site", "limitations", "markdown",
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 
@@ -158,6 +162,33 @@ Deno.serve(async (req: Request) => {
         p_result_code: body.result_code,
       });
       return json({ ok: true, saved: saved === true });
+    }
+
+    if (body.action === "report" && Object.keys(body).length === 1) {
+      const snapshot = await rpc("get_fam_agent_report_snapshot", {});
+      if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+        return json({ ok: false, error: "invalid_report_snapshot" }, 502);
+      }
+      return json({ ok: true, report: snapshot });
+    }
+
+    if (body.action === "save_report" && Object.keys(body).length === 3) {
+      const reportDateValid = typeof body.report_date === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(body.report_date);
+      const reportKeys = body.report && typeof body.report === "object" && !Array.isArray(body.report)
+        ? Object.keys(body.report)
+        : [];
+      const reportValid = reportKeys.length === REPORT_FIELDS.size &&
+        reportKeys.every((key) => REPORT_FIELDS.has(key)) &&
+        body.report.report_date === body.report_date &&
+        typeof body.report.markdown === "string" &&
+        new TextEncoder().encode(JSON.stringify(body.report)).byteLength <= 65536;
+      if (!reportDateValid || !reportValid) return json({ ok: false, error: "invalid_report" }, 400);
+      const saved = await rpc("save_fam_agent_system_report", {
+        p_report_date: body.report_date,
+        p_report: body.report,
+      });
+      return json({ ok: true, saved: saved?.ok === true && saved.report_date === body.report_date });
     }
 
     return json({ ok: false, error: "invalid_action" }, 400);

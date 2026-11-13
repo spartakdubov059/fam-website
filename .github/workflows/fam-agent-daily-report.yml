@@ -1,0 +1,47 @@
+name: FAM daily agent system report
+
+on:
+  schedule:
+    - cron: "15 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+  pull-requests: read
+
+concurrency:
+  group: fam-agent-daily-system-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Build Russian daily system report
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      pull-requests: read
+    steps:
+      - name: Checkout trusted main source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Collect status and store report privately
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+        run: node scripts/fam-agent-system-reporter.mjs

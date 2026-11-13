@@ -10,6 +10,10 @@ const testWorkflow = readFileSync(
   new URL("../../.github/workflows/moderation-regression.yml", import.meta.url),
   "utf8",
 );
+const reportWorkflow = readFileSync(
+  new URL("../../.github/workflows/fam-agent-daily-report.yml", import.meta.url),
+  "utf8",
+);
 const prompt = readFileSync(
   new URL("../../.github/prompts/fam-codex-developer.md", import.meta.url),
   "utf8",
@@ -167,4 +171,16 @@ test("separate Security and Performance reports gate independent QA and reach th
   assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/performance\.md"/);
   assert.match(workflow, /node --check scripts\/fam-agent-security\.mjs/);
   assert.match(workflow, /node --check scripts\/fam-agent-performance\.mjs/);
+});
+
+test("daily Reporter runs on main with read-only scopes and private persistence", () => {
+  assert.ok(reportWorkflow.includes('cron: "15 4 * * *"'));
+  assert.ok(reportWorkflow.includes("if: github.ref == 'refs/heads/main'"));
+  assert.match(reportWorkflow, /actions: read/);
+  assert.match(reportWorkflow, /deployments: read/);
+  assert.match(reportWorkflow, /pull-requests: read/);
+  assert.doesNotMatch(reportWorkflow, /(?:contents|actions|deployments|pull-requests): write/);
+  assert.doesNotMatch(reportWorkflow, /upload-artifact|GITHUB_STEP_SUMMARY/);
+  assert.match(reportWorkflow, /FAM_AGENT_BRIDGE_URL/);
+  assert.ok(reportWorkflow.includes("node scripts/fam-agent-system-reporter.mjs"));
 });

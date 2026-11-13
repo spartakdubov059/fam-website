@@ -117,6 +117,10 @@ const edgeSource = readFileSync(
   new URL("../../supabase/functions/fam-agent-coder-bridge/index.ts", import.meta.url),
   "utf8",
 );
+const reportMigration = readFileSync(
+  new URL("../../supabase/migrations/20261113090000_add_fam_agent_report_snapshot_rpc.sql", import.meta.url),
+  "utf8",
+);
 const bridgeSource = readFileSync(
   new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url),
   "utf8",
@@ -160,6 +164,31 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /finish_fam_agent_coder_task/);
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
+});
+
+
+test("report bridge is read-only for snapshots and allows only bounded private report storage", () => {
+  assert.ok(reportMigration.includes("security definer"));
+  assert.ok(reportMigration.includes("set search_path = ''"));
+  assert.ok(reportMigration.includes("revoke all on function public.get_fam_agent_report_snapshot() from public, anon, authenticated"));
+  assert.ok(reportMigration.includes("grant execute on function public.get_fam_agent_report_snapshot() to service_role"));
+  assert.ok(reportMigration.includes("grant execute on function public.save_fam_agent_system_report(date, jsonb) to service_role"));
+  assert.ok(reportMigration.includes("pg_catalog.pg_column_size(p_report) > 65536"));
+  assert.ok(reportMigration.includes("p_report ->> 'report_date' is distinct from"));
+  assert.ok(reportMigration.includes("'public_site','limitations','markdown'"));
+  assert.ok(reportMigration.includes("'queue_health_check','daily_report_digest'"));
+  assert.ok(reportMigration.includes("'failed_tasks_24h', v_failed_tasks_24h"));
+  assert.ok(reportMigration.includes("not (p_report ?& array["));
+  assert.ok(reportMigration.includes("cron.job_run_details"));
+  assert.ok(reportMigration.includes("private.fam_agent_tasks"));
+  const snapshotFunction = reportMigration.split("create or replace function public.get_fam_agent_report_snapshot()")[1] ?? "";
+  assert.doesNotMatch(snapshotFunction, /payload|description|result_summary|email|user_id/i);
+  assert.ok(edgeSource.includes('body.action === "report"'));
+  assert.ok(edgeSource.includes('body.action === "save_report"'));
+  assert.ok(edgeSource.includes("save_fam_agent_system_report"));
+  assert.ok(edgeSource.includes("const REPORT_FIELDS = new Set"));
+  assert.ok(edgeSource.includes("MAX_BODY_BYTES = 65536"));
+  assert.ok(edgeSource.includes(String.raw`/^\d{4}-\d{2}-\d{2}$/`));
 });
 
 test("rejects unrecognized telemetry enum values before building a model prompt", () => {
