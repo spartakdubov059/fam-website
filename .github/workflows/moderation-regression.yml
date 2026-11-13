@@ -28,18 +28,18 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   moderation-tests:
-    name: Russian content safety tests
+    name: Regression suite
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
@@ -65,6 +65,17 @@ jobs:
           NODE
           node --check /tmp/fam-inline-scripts.js
 
+  owner-approval:
+    name: Verify agent PR owner approval
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Set up Node.js for the trusted verifier
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: 22
       - name: Checkout trusted approval verifier from the base commit
         if: github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'codex/fam-run-')
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -84,3 +95,20 @@ jobs:
           APPROVAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           TRUSTED_BASE_DIR: trusted-base-${{ github.run_id }}
         run: node "$TRUSTED_BASE_DIR/scripts/verify-agent-pr-owner-approval.mjs"
+
+  required-safety-check:
+    name: Russian content safety tests
+    needs: [moderation-tests, owner-approval]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require regression and isolated approval verification to succeed
+        env:
+          REGRESSION_RESULT: ${{ needs.moderation-tests.result }}
+          APPROVAL_RESULT: ${{ needs.owner-approval.result }}
+        run: |
+          if [[ "$REGRESSION_RESULT" != "success" || "$APPROVAL_RESULT" != "success" ]]; then
+            echo "::error::Regression or owner approval verification did not succeed."
+            exit 1
+          fi
