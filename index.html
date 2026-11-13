@@ -112,6 +112,15 @@
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
+    @keyframes famBannerDrift {
+      from { transform: scale(1) translate3d(-0.25%, 0, 0); }
+      to { transform: scale(1.045) translate3d(0.25%, -0.35%, 0); }
+    }
+    .hero-slide.hero-img:not(.hero-event-photo) > img {
+      animation: famBannerDrift 9s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+    .hero-slide.hero-img:nth-child(even):not(.hero-event-photo) > img { animation-direction: alternate-reverse; }
     .sr-only, .hero-slide.hero-img .hero-script { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
