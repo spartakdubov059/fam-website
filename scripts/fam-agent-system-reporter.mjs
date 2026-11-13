@@ -1,8 +1,10 @@
 
+import { analyzeTechnicalSignals } from "./fam-agent-analyst.mjs";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const API_ROOT = "https://api.github.com";
 const PUBLIC_SITE_URL = "https://spartakdubov059.github.io/fam-website/";
-const SNAPSHOT_KEYS = ["generated_at", "report_date", "daily_report", "agent_statuses", "cron_jobs", "latest_system_health", "latest_coder_task", "latest_site_error_check", "failed_tasks_24h"];
+const SNAPSHOT_KEYS = ["generated_at", "report_date", "daily_report", "agent_statuses", "cron_jobs", "latest_system_health", "latest_coder_task", "latest_site_error_check", "failed_tasks_24h", "site_error_events_24h"];
 
 function safeLabel(value, maxLength = 100) {
   return String(value ?? "unknown")
@@ -110,7 +112,7 @@ export function createDailyReport({
     { role: "Orchestrator", status: validSnapshot && snapshot.daily_report ? "reported" : "not_reported" },
     { role: "Monitoring", status: (siteProbe.status === "reachable" ? "site_reachable" : safeLabel(siteProbe.status, 40)) +
       ";site_error_task:" + safeLabel(snapshot?.latest_site_error_check?.status ?? "unknown", 40) },
-    { role: "Analyst", status: "not_separately_instrumented" },
+    { role: "Analyst", status: analyzeTechnicalSignals(validSnapshot ? snapshot.site_error_events_24h : []).status },
     { role: "Coder", status: validSnapshot ? (snapshot.latest_coder_task?.status ?? "no_task") : "unavailable" },
     { role: "QA", status: runOutcome(qaRun) },
     { role: "Reviewer", status: coderRun ? "coder_workflow_seen_individual_result_unavailable" : "not_run_24h" },
@@ -140,7 +142,9 @@ export function createDailyReport({
       latest_coder_task: snapshot.latest_coder_task,
       latest_site_error_check: snapshot.latest_site_error_check,
       failed_tasks_24h: snapshot.failed_tasks_24h,
+      site_error_events_24h: snapshot.site_error_events_24h,
     } : null,
+    technical_analysis: analyzeTechnicalSignals(validSnapshot ? snapshot.site_error_events_24h : []),
     workflows_24h: workflows24h,
     open_pull_requests: openPrs,
     role_statuses: roles,
@@ -157,6 +161,7 @@ export function createDailyReport({
       "Проверка сайта выполняется один раз в сутки и не является непрерывным мониторингом.",
       "Состояние Edge Functions отражено только через последний system health task; версии функций напрямую не запрашивались.",
       "Проверены не более 100 последних запусков Actions и 50 открытых PR.",
+      "Технический Analyst группирует только разрешённые коды событий; выводы являются гипотезами, а не подтверждённой первопричиной.",
     ],
   };
 }
@@ -182,6 +187,19 @@ export function renderDailyReport(report) {
     "|---|---|");
   for (const role of report.role_statuses) {
     lines.push("| " + safeLabel(role.role, 40) + " | " + safeLabel(role.status, 80) + " |");
+  }
+  lines.push("", "## Аналитические гипотезы по техническим сигналам", "");
+  if (report.technical_analysis.status === "no_allowlisted_signals") {
+    lines.push("Нет допустимых агрегированных сигналов за период.");
+  } else {
+    lines.push("Это гипотезы по кодам событий; точная причина без stack trace или дополнительных данных не устанавливается.");
+    for (const finding of report.technical_analysis.findings) {
+      lines.push("- " + safeLabel(finding.title, 80) + " (" + safeLabel(finding.page_area, 30) +
+        "): " + count(finding.occurrences) + " событий, коды " +
+        finding.event_codes.map((code) => safeLabel(code, 40)).join(", ") +
+        ". Гипотеза: " + safeLabel(finding.hypothesis, 220) +
+        " Проверить: " + safeLabel(finding.recommended_check, 220) + ".");
+    }
   }
   lines.push("", "## Supabase и очередь", "");
   if (!snapshot) {
