@@ -66,8 +66,8 @@ test("daily report states missing sources and records only allowlisted Supabase 
     now,
   });
   assert.deepEqual(Object.keys(report.supabase).sort(), [
-    "agent_statuses", "cron_jobs", "daily_report", "generated_at", "latest_coder_task",
-    "latest_site_error_check", "latest_system_health", "report_date", "failed_tasks_24h",
+    "agent_statuses", "cron_jobs", "daily_report", "failed_tasks_24h", "generated_at", "latest_coder_task",
+    "latest_site_error_check", "latest_system_health", "report_date",
   ]);
   assert.equal(report.workflows_24h.length, 2);
   assert.ok(report.role_statuses.some((role) => role.role === "QA" && role.status === "success"));
