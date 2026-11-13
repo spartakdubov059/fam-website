@@ -8,6 +8,7 @@ class FakeNode {
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(name, value) { this.attributes[name] = value; }
+  getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
 }
 const fakeDocument = {
@@ -19,7 +20,7 @@ test('guest board requests only the public endpoint and writes listing data as t
   const root = new FakeNode('section');
   let options;
   await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, init) => {
-    options = { url, init };
+    if (url === '/api/v1/listings') options = { url, init };
     return { ok: true, json: async () => ({ ok: true, listings: [{ id: 'listing-1', title: '<script>alert(1)</script>', description: 'Синтетическое описание', category: 'Учёба', price_text: 'Бесплатно', is_event: false }] }) };
   } });
   assert.equal(options.url, '/api/v1/listings');
@@ -57,6 +58,7 @@ test('event card reads only the user own registrations and supports reservation 
       { id: eventId, title: 'Синтетический концерт', description: 'Проверка записи', category: 'Афиша', price_text: 'Бесплатно', is_event: true, event_type: 'limited', max_seats: 12, event_date: '2099-05-01', event_time: '12:00' },
     ] }) };
     if (url === '/api/v1/event-registrations') return { ok: true, status: 200, json: async () => ({ ok: true, registrations: [] }) };
+    if (url === '/api/v1/favorites') return { ok: true, status: 200, json: async () => ({ ok: true, favorite_ids: [] }) };
     if (url === `/api/v1/listings/${eventId}/registrations`) return { ok: true, status: 201, json: async () => ({ ok: true, registration: { event_id: eventId, user_id: 'synthetic-user', status: 'confirmed' } }) };
     if (url === `/api/v1/listings/${eventId}/registrations/me`) return { ok: true, status: 200, json: async () => ({ ok: true, status: 'cancelled' }) };
     throw new Error(`unexpected request ${url}`);
@@ -68,15 +70,59 @@ test('event card reads only the user own registrations and supports reservation 
   assert.equal(register.textContent, 'Записаться');
   assert.equal(cancel.hidden, true);
   await register.listeners.click();
-  assert.equal(calls[2].options.method, 'POST');
-  assert.equal(calls[2].options.body, undefined);
-  assert.equal(calls[2].options.credentials, 'same-origin');
+  assert.equal(calls[3].options.method, 'POST');
+  assert.equal(calls[3].options.body, undefined);
+  assert.equal(calls[3].options.credentials, 'same-origin');
   assert.equal(register.textContent, 'Вы записаны');
   assert.equal(cancel.hidden, false);
   await cancel.listeners.click();
-  assert.equal(calls[3].options.method, 'DELETE');
+  assert.equal(calls[4].options.method, 'DELETE');
   assert.equal(register.textContent, 'Записаться');
   assert.equal(cancel.hidden, true);
+});
+
+test('authenticated board users can toggle favorites through their own Russian API route', async () => {
+  const root = new FakeNode('section');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const calls = [];
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id, title: 'Учебник', description: 'Описание', category: 'Учёба', is_event: false },
+    ] }) };
+    if (url === '/api/v1/favorites') return { ok: true, json: async () => ({ ok: true, favorite_ids: [id] }) };
+    return { ok: true, json: async () => ({ ok: true, favorited: options.method === 'PUT' }) };
+  } });
+  const card = root.children[0].children[0];
+  const actions = card.children.find(node => node.className === 'ru-favorite-actions');
+  const [toggle] = actions.children;
+  assert.equal(toggle.textContent, 'Убрать из избранного');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  await toggle.listeners.click();
+  assert.equal(calls.at(-1).options.method, 'DELETE');
+  assert.equal(toggle.textContent, 'В избранное');
+  await toggle.listeners.click();
+  assert.equal(calls.at(-1).options.method, 'PUT');
+  assert.equal(toggle.textContent, 'Убрать из избранного');
+  assert.equal(calls.at(-1).options.credentials, 'same-origin');
+});
+
+test('guest favorite action sends the user to Yandex login without a write', async () => {
+  const root = new FakeNode('section');
+  const id = '11111111-1111-4111-8111-111111111111';
+  let loginUrl;
+  let writes = 0;
+  await loadPublicBoard({ root, document: fakeDocument, location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: 'Учебник', description: '', category: 'Учёба' }] }) };
+    if (url === '/api/v1/favorites') return { ok: false, status: 401, json: async () => ({}) };
+    writes++;
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  const card = root.children[0].children[0];
+  const button = card.children.find(node => node.className === 'ru-favorite-actions').children[0];
+  await button.listeners.click();
+  assert.equal(loginUrl, '/auth/yandex/start');
+  assert.equal(writes, 0);
 });
 
 test('guest event action redirects to Yandex login and unavailable event APIs disable registration', async () => {

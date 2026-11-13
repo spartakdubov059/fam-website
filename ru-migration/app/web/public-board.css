@@ -67,3 +67,5 @@ body {
 .ru-moderation-card { display: grid; gap: 0.55rem; margin: 1rem 0; padding: 1rem; border: 1px solid #d9d6e8; border-radius: 0.85rem; background: #fff; }
 .ru-moderation-card h3, .ru-moderation-card p { margin: 0; overflow-wrap: anywhere; }
 .ru-moderation-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }
+.ru-favorite-actions { display: grid; justify-items: start; gap: 0.25rem; margin-top: 0.5rem; }
+.ru-favorite-status { margin: 0; font-size: 0.9rem; }

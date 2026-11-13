@@ -25,6 +25,59 @@ async function loadMyEventRegistrations(fetchImpl) {
   }
 }
 
+async function loadMyFavorites(fetchImpl) {
+  try {
+    const response = await fetchImpl('/api/v1/favorites', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    if (response.status === 401) return { state: 'guest', ids: new Set() };
+    if (!response.ok) return { state: 'unavailable', ids: new Set() };
+    const result = await response.json();
+    if (!result?.ok || !Array.isArray(result.favorite_ids)) return { state: 'unavailable', ids: new Set() };
+    return { state: 'authenticated', ids: new Set(result.favorite_ids.filter(id => typeof id === 'string' && UUID.test(id))) };
+  } catch { return { state: 'unavailable', ids: new Set() }; }
+}
+
+function addFavoriteControl({ card, listing, document, fetchImpl, favorites, location }) {
+  if (!UUID.test(listing.id)) return;
+  const actions = element(document, 'div', 'ru-favorite-actions');
+  const button = element(document, 'button', 'ru-favorite-toggle', '');
+  button.type = 'button';
+  const status = element(document, 'p', 'ru-favorite-status', '');
+  status.setAttribute('role', 'status');
+  let busy = false;
+  const update = () => {
+    button.disabled = busy || favorites.state === 'unavailable';
+    button.textContent = favorites.state === 'unavailable' ? 'Избранное недоступно'
+      : favorites.ids.has(listing.id) ? 'Убрать из избранного'
+        : favorites.state === 'guest' ? 'Войти и добавить в избранное' : 'В избранное';
+    button.setAttribute('aria-pressed', String(favorites.ids.has(listing.id)));
+  };
+  button.addEventListener('click', async () => {
+    if (busy || favorites.state === 'unavailable') return;
+    if (favorites.state === 'guest') { location?.assign?.('/auth/yandex/start'); return; }
+    busy = true; status.textContent = ''; update();
+    const favorited = !favorites.ids.has(listing.id);
+    try {
+      const response = await fetchImpl(`/api/v1/listings/${listing.id}/favorite`, {
+        method: favorited ? 'PUT' : 'DELETE', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
+      });
+      const result = await response.json().catch(() => null);
+      if (response.status === 401) {
+        favorites.state = 'guest';
+        status.textContent = 'Сеанс завершён. Войдите, чтобы изменить избранное.';
+      } else if (!response.ok || result?.favorited !== favorited) {
+        status.textContent = 'Не удалось обновить избранное. Попробуйте позже.';
+      } else {
+        if (favorited) favorites.ids.add(listing.id); else favorites.ids.delete(listing.id);
+        status.textContent = favorited ? 'Добавлено в избранное.' : 'Удалено из избранного.';
+      }
+    } catch { status.textContent = 'Нет связи с сервером. Попробуйте ещё раз.'; }
+    finally { busy = false; update(); }
+  });
+  update();
+  actions.append(button, status);
+  card.append(actions);
+}
+
 function formatEventTime(listing) {
   const parts = [];
   if (typeof listing.event_date === 'string' && listing.event_date) parts.push(listing.event_date);
@@ -147,6 +200,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       root.replaceChildren(element(document, 'p', 'ru-board-status', 'Пока нет опубликованных объявлений. Новые объявления появятся после проверки администрацией школы.'));
       return;
     }
+    const favorites = await loadMyFavorites(fetchImpl);
     const fragment = document.createDocumentFragment();
     for (const listing of result.listings) {
       if (!listing || typeof listing.id !== 'string' || typeof listing.title !== 'string'
@@ -165,6 +219,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       }
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
+      addFavoriteControl({ card, listing, document, fetchImpl, favorites, location });
       if (listing.is_event === true) {
         card.append(element(document, 'p', 'ru-listing-event', 'Мероприятие'));
         addEventRegistrationControls({ card, listing, document, fetchImpl, session, location });
