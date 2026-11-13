@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { buildIndependentReview } from "../../scripts/fam-agent-reviewer.mjs";
 import { buildSecurityReport } from "../../scripts/fam-agent-security.mjs";
@@ -15,16 +16,18 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const taskId = "123e4567-e89b-42d3-a456-426614174000";
 const syntheticPrUrl = "https://github.com/spartakdubov059/fam-website/pull/123";
 const syntheticCommitSha = "a".repeat(40);
+const executeFile = promisify(execFile);
 
-function run(command, args, options = {}) {
-  return execFileSync(command, args, {
+async function run(command, args, options = {}) {
+  const result = await executeFile(command, args, {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 1024 * 1024,
     ...options,
   });
+  return result.stdout;
 }
 
-function git(cwd, ...args) {
+async function git(cwd, ...args) {
   return run("git", args, { cwd });
 }
 
@@ -125,12 +128,12 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   writeFileSync(join(fixture, "index.html"), "<!doctype html>\n<title>FAM fixture broken</title>\n");
   writeFileSync(join(fixture, "tests", "fixtures", "fam-agent-pipeline-regression.test.mjs"),
     readFileSync(new URL("../fixtures/fam-agent-pipeline-regression.test.mjs", import.meta.url), "utf8"));
-  git(fixture, "init", "--quiet");
-  git(fixture, "config", "user.name", "FAM synthetic test");
-  git(fixture, "config", "user.email", "fam-synthetic@example.invalid");
-  git(fixture, "add", ".");
-  git(fixture, "commit", "--quiet", "-m", "synthetic base");
-  const baseSha = git(fixture, "rev-parse", "HEAD").trim();
+  await git(fixture, "init", "--quiet");
+  await git(fixture, "config", "user.name", "FAM synthetic test");
+  await git(fixture, "config", "user.email", "fam-synthetic@example.invalid");
+  await git(fixture, "add", ".");
+  await git(fixture, "commit", "--quiet", "-m", "synthetic base");
+  const baseSha = (await git(fixture, "rev-parse", "HEAD")).trim();
 
   const env = {
     ...process.env,
@@ -139,7 +142,7 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
     GITHUB_ENV: githubEnv,
     GITHUB_OUTPUT: githubOutput,
   };
-  run(process.execPath, [join(repoRoot, "scripts", "fam-agent-bridge.mjs"), "claim"], {
+  await run(process.execPath, [join(repoRoot, "scripts", "fam-agent-bridge.mjs"), "claim"], {
     cwd: fixture,
     env,
   });
@@ -151,7 +154,7 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   const task = taskEnvironment.match(/^FAM_TASK=(.*)$/m)?.[1];
   assert.ok(task, "The claimed allowlisted task must be passed to the coder runner.");
 
-  run(process.execPath, [join(repoRoot, "scripts", "run-local-coder.mjs")], {
+  await run(process.execPath, [join(repoRoot, "scripts", "run-local-coder.mjs")], {
     cwd: fixture,
     env: {
       ...env,
@@ -176,14 +179,14 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   });
 
   const qa = join(work, "trusted-qa");
-  git(work, "clone", "--quiet", fixture, qa);
+  await git(work, "clone", "--quiet", fixture, qa);
   const regressionPath = "tests/fixtures/fam-agent-pipeline-regression.test.mjs";
-  assert.throws(() => run(process.execPath, ["--test", regressionPath], { cwd: qa }));
-  run("git", ["apply", patchPath], { cwd: qa });
-  run(process.execPath, ["--test", regressionPath], { cwd: qa });
+  await assert.rejects(() => run(process.execPath, ["--test", regressionPath], { cwd: qa }));
+  await run("git", ["apply", patchPath], { cwd: qa });
+  await run(process.execPath, ["--test", regressionPath], { cwd: qa });
 
   const badQa = join(work, "bad-qa");
-  git(work, "clone", "--quiet", fixture, badQa);
+  await git(work, "clone", "--quiet", fixture, badQa);
   const ineffectivePatch = patch.replace(
     "+<title>FAM fixture fixed</title>",
     "+<title>FAM fixture still broken</title>",
@@ -191,8 +194,8 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   assert.notEqual(ineffectivePatch, patch, "The negative control must alter the generated patch.");
   const ineffectivePatchPath = join(work, "ineffective.patch");
   writeFileSync(ineffectivePatchPath, ineffectivePatch);
-  run("git", ["apply", ineffectivePatchPath], { cwd: badQa });
-  assert.throws(() => run(process.execPath, ["--test", regressionPath], { cwd: badQa }));
+  await run("git", ["apply", ineffectivePatchPath], { cwd: badQa });
+  await assert.rejects(() => run(process.execPath, ["--test", regressionPath], { cwd: badQa }));
 
   const safety = buildSecurityReport(patch);
   const performance = buildPerformanceReport(patch);
@@ -204,13 +207,13 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
     summary,
     safety,
     baseSha,
-    currentSha: git(qa, "rev-parse", "HEAD").trim(),
+    currentSha: (await git(qa, "rev-parse", "HEAD")).trim(),
     qaStatus: "passed",
   });
   assert.equal(review.conclusion, "pass_for_draft_pr");
   assert.equal(review.semantic_correctness, "not_independently_assessed");
 
-  run(process.execPath, [join(repoRoot, "scripts", "fam-agent-bridge.mjs"), "finish"], {
+  await run(process.execPath, [join(repoRoot, "scripts", "fam-agent-bridge.mjs"), "finish"], {
     cwd: fixture,
     env: {
       ...env,
