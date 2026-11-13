@@ -72,6 +72,72 @@ function validateHomepage(html) {
   });
 }
 
+function localAssetCandidates(html, baseUrl, limit = 12) {
+  const candidates = [];
+  const assetTag = /<(script|img)\b([^>]*)>/gi;
+  for (const match of html.matchAll(assetTag)) {
+    const src = match[2].match(/\bsrc\s*=\s*(["'])(.*?)\1/i);
+    if (src?.[2]) candidates.push(src[2]);
+  }
+  const linkTag = /<link\b([^>]*)>/gi;
+  for (const match of html.matchAll(linkTag)) {
+    const attrs = match[1];
+    const rel = attrs.match(/\brel\s*=\s*(["'])(.*?)\1/i)?.[2]?.toLowerCase() ?? "";
+    const as = attrs.match(/\bas\s*=\s*(["'])(.*?)\1/i)?.[2]?.toLowerCase() ?? "";
+    if (!rel.split(/\s+/).some((item) => item === "stylesheet" || (item === "preload" && ["style", "script", "image"].includes(as)))) continue;
+    const href = attrs.match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
+    if (href) candidates.push(href);
+  }
+
+  const base = new URL(baseUrl);
+  const urls = [];
+  for (const value of candidates) {
+    try {
+      const url = new URL(value, base);
+      if (url.protocol !== "https:" || url.origin !== base.origin || !url.pathname.startsWith(base.pathname)) continue;
+      if (!urls.includes(url.href)) urls.push(url.href);
+    } catch {
+      // Ignore malformed and non-HTTP asset references.
+    }
+  }
+  return { urls: urls.slice(0, limit), total: urls.length };
+}
+
+async function measurePagePerformance(html, baseUrl, fetchImpl, retryDelayMs) {
+  const extracted = localAssetCandidates(html, baseUrl);
+  const results = await Promise.all(extracted.urls.map(async (url) => {
+    try {
+      const started = performance.now();
+      const response = await fetchWithRetry(fetchImpl, url, {
+        headers: { "User-Agent": "FAM-cloud-monitor" },
+        signal: AbortSignal.timeout(15_000),
+      }, retryDelayMs);
+      if (response.status !== 200) throw new Error("HTTP " + response.status);
+      const finalUrl = response.url ? new URL(response.url) : new URL(url);
+      if (finalUrl.origin !== new URL(baseUrl).origin) throw new Error("Unexpected cross-origin redirect.");
+      const bytes = (await response.arrayBuffer()).byteLength;
+      return { ok: true, bytes, elapsed_ms: Math.round(performance.now() - started) };
+    } catch (error) {
+      return { ok: false, error: safeText(error?.message || "Resource request failed.", 120) };
+    }
+  }));
+
+  const successful = results.filter((item) => item.ok);
+  const failures = results.filter((item) => !item.ok);
+  const resourceBytes = successful.reduce((sum, item) => sum + item.bytes, 0);
+  const largestResourceBytes = successful.reduce((largest, item) => Math.max(largest, item.bytes), 0);
+  return {
+    local_resources_total: extracted.total,
+    local_resources_checked: extracted.urls.length,
+    resources_truncated: Math.max(0, extracted.total - extracted.urls.length),
+    resource_bytes: resourceBytes,
+    largest_resource_bytes: largestResourceBytes,
+    resource_failures: failures.length,
+    slowest_resource_ms: successful.reduce((largest, item) => Math.max(largest, item.elapsed_ms), 0),
+    resource_errors: failures.slice(0, 4).map((item) => item.error),
+  };
+}
+
 function mostRecentRuns(runs, sinceMs) {
   const latest = new Map();
   for (const run of runs) {
@@ -119,6 +185,7 @@ export async function runFAMCloudMonitor({
   async function checkPage(name, path, validate) {
     const url = new URL(path, base).href;
     try {
+      const started = performance.now();
       const response = await fetchWithRetry(fetchImpl, url, {
         headers: { "User-Agent": "FAM-cloud-monitor" },
         signal: AbortSignal.timeout(15_000),
@@ -126,13 +193,41 @@ export async function runFAMCloudMonitor({
       const body = await response.text();
       if (response.status !== 200) throw new Error("HTTP " + response.status);
       if (validate) validate(body);
-      checks.push({ name, ok: true, detail: "HTTP 200", url });
+      const elapsedMs = Math.round(performance.now() - started);
+      const bodyBytes = Buffer.byteLength(body, "utf8");
+      checks.push({ name, ok: true, detail: "HTTP 200 · " + elapsedMs + " ms · " + bodyBytes + " decoded bytes", url });
+      return { body, elapsed_ms: elapsedMs, body_bytes: bodyBytes };
     } catch (error) {
       checks.push({ name, ok: false, detail: safeText(error?.message || "Request failed."), url });
+      return null;
     }
   }
 
-  await checkPage("Главная и синтаксис встроенного JS", "", validateHomepage);
+  const homepageResult = await checkPage("Главная и синтаксис встроенного JS", "", validateHomepage);
+  let performanceMetrics = null;
+  if (homepageResult) {
+    const measured = await measurePagePerformance(homepageResult.body, base, fetchImpl, retryDelayMs);
+    performanceMetrics = { homepage_ms: homepageResult.elapsed_ms, html_bytes: homepageResult.body_bytes, ...measured };
+    const resourceSummary = measured.resource_failures
+      ? "Некоторые локальные ресурсы не загрузились: " + measured.resource_errors.join("; ")
+      : "Все проверенные локальные ресурсы доступны.";
+    checks.push({
+      name: "Производительность: документ и локальные ресурсы",
+      ok: measured.resource_failures === 0,
+      detail: "HTML " + homepageResult.body_bytes + " байт за " + homepageResult.elapsed_ms + " мс; " +
+        measured.local_resources_checked + "/" + measured.local_resources_total + " локальных ресурсов проверено, " +
+        measured.resource_bytes + " байт суммарно, крупнейший " + measured.largest_resource_bytes +
+        " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary +
+        (measured.resources_truncated ? " Остальные ресурсы не проверялись из-за лимита 12." : "") +
+        " Это сетевой замер с runner, не browser-render/mobile benchmark.",
+    });
+  } else {
+    checks.push({
+      name: "Производительность: документ и локальные ресурсы",
+      ok: false,
+      detail: "Метрики недоступны: главная страница не прошла проверку.",
+    });
+  }
   await checkPage("robots.txt", "robots.txt", (body) => {
     if (!/^User-agent:\s*\*/im.test(body) || !body.includes(new URL("sitemap.xml", base).href)) {
       throw new Error("robots.txt is missing the allow rule or sitemap link.");
@@ -202,6 +297,7 @@ export async function runFAMCloudMonitor({
     checks,
     recent_failures: recentFailures,
     stalled_runs: stalledRuns,
+    performance: performanceMetrics,
   };
 }
 
@@ -226,6 +322,18 @@ export function renderFAMCloudMonitorReport(report) {
     "| Проверка | Статус | Детали |",
     "| --- | --- | --- |",
     ...rows,
+    "",
+    "## Замеры производительности страницы",
+    "",
+    report?.performance
+      ? "- Документ: " + report.performance.html_bytes + " байт; ответ за " + report.performance.homepage_ms + " мс."
+      : "- Замер документа недоступен.",
+    report?.performance
+      ? "- Локальные ресурсы: " + report.performance.local_resources_checked + "/" + report.performance.local_resources_total +
+        " проверено; " + report.performance.resource_bytes + " байт суммарно; крупнейший " +
+        report.performance.largest_resource_bytes + " байт; медленнейший " + report.performance.slowest_resource_ms + " мс."
+      : "- Ресурсы страницы не измерены.",
+    "- Это периодический сетевой замер с GitHub runner; он не измеряет browser rendering, Core Web Vitals или мобильные устройства.",
     "",
     "## Ошибки workflow за последние 24 часа",
     "",

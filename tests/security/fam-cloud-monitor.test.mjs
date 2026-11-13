@@ -16,6 +16,7 @@ function response(body, status = 200) {
     ok: status >= 200 && status < 300,
     headers: { get: () => "text/plain" },
     text: async () => body,
+    arrayBuffer: async () => new TextEncoder().encode(typeof body === "string" ? body : JSON.stringify(body)).buffer,
     json: async () => body,
   };
 }
@@ -76,7 +77,7 @@ test("cloud monitor checks production pages and ignores stale GitHub failures", 
   });
 
   assert.equal(report.ok, true);
-  assert.equal(report.checks.length, 4);
+  assert.equal(report.checks.length, 5);
   assert.deepEqual(report.recent_failures, []);
 });
 
@@ -151,6 +152,73 @@ test("cloud monitor reports main workflows still in progress after two hours", a
   assert.equal(report.stalled_runs.length, 1);
   assert.equal(report.stalled_runs[0].started_at, "2026-11-13T02:30:00Z");
   assert.match(renderFAMCloudMonitorReport(report), /Workflow в работе более 2 часов/);
+});
+
+test("cloud monitor measures same-origin page assets and ignores external resources", async () => {
+  const html = [
+    "<!doctype html><title>FAM — Свои рядом</title>",
+    "<script>const famReady = true;</script>",
+    '<script src="js/app.js"></script>',
+    '<link rel="stylesheet" href="css/site.css">',
+    '<img src="assets/logo.svg">',
+    '<img src="https://third-party.invalid/pixel.png">',
+  ].join("");
+  const requests = [];
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      requests.push(parsed.href);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) return response(robots);
+      if (parsed.pathname.endsWith("/sitemap.xml")) return response(sitemap);
+      if (parsed.pathname.endsWith("/js/app.js")) return response("script");
+      if (parsed.pathname.endsWith("/css/site.css")) return response("css");
+      if (parsed.pathname.endsWith("/assets/logo.svg")) return response("logo");
+      return response(html);
+    },
+    baseUrl: siteBase,
+    repository: "owner/repo",
+    token: "test-token",
+    now: Date.parse("2026-11-13T05:00:00Z"),
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.performance.local_resources_total, 3);
+  assert.equal(report.performance.local_resources_checked, 3);
+  assert.equal(report.performance.resource_bytes, 13);
+  assert.equal(report.performance.largest_resource_bytes, 6);
+  assert.equal(requests.some((url) => url.includes("third-party.invalid")), false);
+  assert.match(renderFAMCloudMonitorReport(report), /browser rendering, Core Web Vitals/);
+  assert.match(report.checks.find((check) => check.name.startsWith("Производительность")).detail, /мс/);
+});
+
+test("cloud monitor fails when a same-origin page asset is unavailable", async () => {
+  const html = [
+    "<!doctype html><title>FAM — Свои рядом</title>",
+    "<script>const famReady = true;</script>",
+    '<script src="js/missing.js"></script>',
+  ].join("");
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) return response(robots);
+      if (parsed.pathname.endsWith("/sitemap.xml")) return response(sitemap);
+      if (parsed.pathname.endsWith("/js/missing.js")) return response("not found", 404);
+      return response(html);
+    },
+    baseUrl: siteBase,
+    repository: "owner/repo",
+    token: "test-token",
+    now: Date.parse("2026-11-13T05:00:00Z"),
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, false);
+  const performanceCheck = report.checks.find((check) => check.name.startsWith("Производительность"));
+  assert.equal(performanceCheck.ok, false);
+  assert.match(performanceCheck.detail, /HTTP 404/);
 });
 
 test("monitor summary distinguishes its cadence and escapes workflow names", () => {
