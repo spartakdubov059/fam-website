@@ -367,7 +367,6 @@ jobs:
         id: pr
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUIRES_APPROVAL: ${{ needs.verify.outputs.requires_approval }}
         run: |
           set -euo pipefail
           node scripts/render-fam-agent-report.mjs \
@@ -408,13 +407,8 @@ jobs:
             echo "- Production этим workflow не изменяется."
             echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
-          if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
-            PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
-            echo "requires_approval=true" >> "$GITHUB_OUTPUT"
-          else
-            PR_URL="$(gh pr create --base main --head "$BRANCH" --title "Исправление FAM после тестов — ожидает разрешения" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
-            echo "requires_approval=false" >> "$GITHUB_OUTPUT"
-          fi
+          PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
+          echo "requires_approval=true" >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
