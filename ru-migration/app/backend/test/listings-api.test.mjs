@@ -38,7 +38,7 @@ test('contacting a listing derives the recipient on the server and sends only re
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
     resolveActor: async () => ({ id: sender, school_id: 'school-a', role: 'student' }),
-    review: async text => ({ action: text === 'hello' ? 'ok' : 'pending', reason_code: 'review_pending' }),
+    review: async ({ text }) => ({ action: text === 'hello' ? 'ok' : 'pending', reason_code: 'review_pending' }),
     repository: {
       getListingContactRecipient: async (id, actorId, schoolId) => id === listingId && actorId === sender && schoolId === 'school-a' ? recipient : null,
       createMessage: async record => { saved = record; return { id: '44444444-4444-4444-8444-444444444444' }; },

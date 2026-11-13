@@ -1,5 +1,8 @@
+import { initializeMessages } from './messages.js';
+
 const MAX_PUBLIC_LISTINGS = 100;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+let messagesInitialized = false;
 
 function element(document, tag, className, text) {
   const node = document.createElement(tag);
@@ -228,6 +231,29 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
 
 export async function loadPublicBoard({ root, document = globalThis.document, fetchImpl = globalThis.fetch, location = document?.defaultView?.location ?? globalThis.location }) {
   if (!root || !document || typeof fetchImpl !== 'function') throw new TypeError('public board dependencies are required');
+  if (document.getElementById && !document.getElementById('ruOpenMessages')) {
+    const open = element(document, 'button', 'ru-button', 'Личные сообщения');
+    open.id = 'ruOpenMessages'; open.type = 'button'; open.setAttribute('aria-expanded', 'false');
+    const panel = element(document, 'section', 'ru-messages', '');
+    panel.id = 'ruMessages'; panel.hidden = true; panel.setAttribute('aria-label', 'Личные сообщения');
+    const heading = element(document, 'h2', '', 'Личные сообщения');
+    const status = element(document, 'p', 'ru-messages-status', 'Войдите, чтобы открыть переписку.');
+    status.id = 'ruMessagesStatus'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const back = element(document, 'button', 'ru-button', 'К списку диалогов');
+    back.id = 'ruMessagesBack'; back.type = 'button'; back.hidden = true;
+    const list = element(document, 'div', 'ru-message-list', ''); list.id = 'ruMessageList';
+    const form = document.createElement('form'); form.id = 'ruMessageForm'; form.className = 'ru-message-form'; form.hidden = true;
+    const input = document.createElement('input'); input.name = 'body'; input.maxLength = 1000; input.required = true;
+    input.autocomplete = 'off'; input.placeholder = 'Написать ответ'; input.setAttribute('aria-label', 'Текст ответа');
+    const send = element(document, 'button', 'ru-message-send', 'Отправить'); send.type = 'submit';
+    form.append(input, send); panel.append(heading, status, back, list, form);
+    root.parentNode?.insertBefore(open, root);
+    root.parentNode?.insertBefore(panel, root.nextSibling);
+  }
+  if (document.getElementById && !messagesInitialized) {
+    messagesInitialized = true;
+    void initializeMessages({ document, fetchImpl, location });
+  }
   root.replaceChildren(element(document, 'p', 'ru-board-status', 'Загружаем объявления…'));
   try {
     const response = await fetchImpl('/api/v1/listings', { method: 'GET', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });

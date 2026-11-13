@@ -38,6 +38,11 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(listingSubmit.headers.get('content-type'), /javascript/);
     assert.match(await listingSubmit.text(), /api\/v1\/media\/pending/);
 
+    const messages = await fetch(new URL('/messages.js', origin));
+    assert.equal(messages.status, 200);
+    assert.match(messages.headers.get('content-type'), /javascript/);
+    assert.match(await messages.text(), /api\/v1\/messages/);
+
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
     assert.equal(moderation.status, 200);
     assert.match(moderation.headers.get('content-type'), /javascript/);
@@ -144,6 +149,19 @@ test('isolated server routes school listing moderation to the backend', async ()
     });
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, method: 'PATCH' });
+  });
+});
+
+test('isolated server routes listing contact messages to the configured backend', async () => {
+  let received;
+  await withServer({ listingsApi: async request => { received = { method: request.method, url: request.url, body: await new Promise(resolve => {
+    let value = ''; request.setEncoding('utf8'); request.on('data', chunk => { value += chunk; }); request.on('end', () => resolve(value));
+  }) }; return { status: 201, body: { ok: true } }; } }, async origin => {
+    const response = await fetch(new URL('/api/v1/listings/11111111-1111-4111-8111-111111111111/contact', origin), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'hello' }),
+    });
+    assert.equal(response.status, 201);
+    assert.deepEqual(received, { method: 'POST', url: '/api/v1/listings/11111111-1111-4111-8111-111111111111/contact', body: '{"body":"hello"}' });
   });
 });
 
