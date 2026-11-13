@@ -7,6 +7,7 @@ const SITE_BASE_URL = "https://spartakdubov059.github.io/fam-website/";
 const DEFAULT_REPOSITORY = "spartakdubov059/fam-website";
 const MONITOR_WORKFLOW_PATH = ".github/workflows/fam-cloud-monitor.yml";
 const FAILURE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const STALE_RUN_MS = 2 * 60 * 60 * 1000;
 
 function safeText(value, limit = 240) {
   return String(value ?? "")
@@ -84,6 +85,14 @@ function mostRecentRuns(runs, sinceMs) {
   return [...latest.values()].map(({ run }) => run);
 }
 
+function staleInProgressRuns(runs, staleBeforeMs) {
+  return runs.filter((run) => {
+    if (run?.head_branch !== "main" || run?.path === MONITOR_WORKFLOW_PATH || run?.status !== "in_progress") return false;
+    const startedAt = Date.parse(run?.run_started_at ?? run?.created_at ?? "");
+    return Number.isFinite(startedAt) && startedAt < staleBeforeMs;
+  });
+}
+
 function validatedRunUrl(value, repository) {
   try {
     const url = new URL(value);
@@ -136,6 +145,7 @@ export async function runFAMCloudMonitor({
   });
 
   let recentRuns = [];
+  let staleRuns = [];
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) || !token) {
     checks.push({ name: "Недавние GitHub Actions на main", ok: false, detail: "Read-only GitHub access is not configured." });
   } else {
@@ -153,13 +163,19 @@ export async function runFAMCloudMonitor({
       const result = await response.json();
       if (!Array.isArray(result?.workflow_runs)) throw new Error("GitHub Actions returned an invalid run list.");
       recentRuns = mostRecentRuns(result.workflow_runs, now - FAILURE_WINDOW_MS);
+      staleRuns = staleInProgressRuns(result.workflow_runs, now - STALE_RUN_MS);
       const failures = recentRuns.filter((run) => run.conclusion === "failure");
       checks.push({
         name: "Недавние GitHub Actions на main",
-        ok: failures.length === 0,
-        detail: failures.length === 0
-          ? "Последние найденные запуски workflow за 24 часа не завершились ошибкой."
-          : "Есть workflow с последним запуском в ошибке: " + failures.map((run) => safeText(run.name, 100)).join(", "),
+        ok: failures.length === 0 && staleRuns.length === 0,
+        detail: [
+          failures.length
+            ? "Завершились ошибкой: " + failures.map((run) => safeText(run.name, 100)).join(", ")
+            : "Ошибок в завершённых запусках за 24 часа нет.",
+          staleRuns.length
+            ? "Работают дольше 2 часов: " + staleRuns.map((run) => safeText(run.name, 100)).join(", ")
+            : "Зависших запусков старше 2 часов нет.",
+        ].join(" "),
       });
     } catch (error) {
       checks.push({ name: "Недавние GitHub Actions на main", ok: false, detail: safeText(error?.message || "GitHub API request failed.") });
@@ -173,6 +189,11 @@ export async function runFAMCloudMonitor({
       created_at: safeText(run.created_at || "", 40),
       url: validatedRunUrl(run.html_url, repository),
     }));
+  const stalledRuns = staleRuns.map((run) => ({
+    name: safeText(run.name || "Workflow", 100),
+    started_at: safeText(run.run_started_at || run.created_at || "", 40),
+    url: validatedRunUrl(run.html_url, repository),
+  }));
 
   return {
     checked_at: new Date(now).toISOString(),
@@ -180,6 +201,7 @@ export async function runFAMCloudMonitor({
     ok: checks.every((check) => check.ok),
     checks,
     recent_failures: recentFailures,
+    stalled_runs: stalledRuns,
   };
 }
 
@@ -207,7 +229,17 @@ export function renderFAMCloudMonitorReport(report) {
     "",
     "## Ошибки workflow за последние 24 часа",
     "",
-    ...(failures.length ? failures : ["Ошибок в последних запусках на main не обнаружено."]),
+    ...(failures.length ? failures : ["Ошибок в последних завершённых запусках на main не обнаружено."]),
+    "",
+    "## Workflow в работе более 2 часов",
+    "",
+    ...((report?.stalled_runs || []).length
+      ? report.stalled_runs.map((run) => {
+          const name = escapeMarkdown(run.name, 100);
+          const started = escapeMarkdown(run.started_at, 40);
+          return run.url ? "- [" + name + "](" + run.url + ") — с " + started : "- " + name + " — с " + started;
+        })
+      : ["Таких запусков не обнаружено."]),
     "",
   ].join("\n");
 }
