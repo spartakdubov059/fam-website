@@ -68,7 +68,21 @@ begin
     if sqlerrm = 'completed task without verified PR metadata was accepted' then raise; end if;
   end;
 
-  if (select count(*) from private.fam_agent_task_events) <> 3 then
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('423e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  v_saved := public.finish_fam_agent_coder_task(
+    '423e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1','model_completed'
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='423e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true or v_task.status <> 'review'
+     or v_task.finished_at is not null or v_task.pr_url is not null then
+    raise exception 'legacy finish route improperly completed a patch before QA/PR checks';
+  end if;
+
+  if (select count(*) from private.fam_agent_task_events) <> 4 then
     raise exception 'coder finish RPC did not write one event per task';
   end if;
 end
