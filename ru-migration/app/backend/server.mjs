@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(here, '../web');
@@ -39,11 +39,21 @@ function sendJson(res, status, value) {
   res.end(body);
 }
 
-const server = http.createServer(async (req, res) => {
+export function createServer({ listingsApi = null } = {}) {
+  return http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname === '/api/v1/status')) {
     const state = readiness();
     return sendJson(res, state.ready ? 200 : 503, state);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/v1/listings') {
+    if (!listingsApi) return sendJson(res, 503, { ok: false, error: 'backend_not_configured' });
+    try {
+      const result = await listingsApi(req);
+      return sendJson(res, result.status, result.body);
+    } catch {
+      return sendJson(res, 503, { ok: false, error: 'request_failed' });
+    }
   }
   if (url.pathname.startsWith('/api/')) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -78,8 +88,11 @@ const server = http.createServer(async (req, res) => {
   } catch {
     return sendJson(res, 404, { error: 'not_found' });
   }
-});
+  });
+}
 
-server.listen(port, host, () => {
-  console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  createServer().listen(port, host, () => {
+    console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
+  });
+}
