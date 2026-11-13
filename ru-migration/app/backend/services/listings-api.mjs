@@ -1,7 +1,20 @@
 import { submitListing } from './submit-listing.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review }) {
-  return async function handle(req, res) {
+  return async function handle(req) {
+    if (req.method === 'GET') {
+      if (typeof repository.listActiveListings !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_read_unavailable' } };
+      }
+      try {
+        const listings = await repository.listActiveListings();
+        return { status: 200, body: { ok: true, listings } };
+      } catch {
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
+    }
+    if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
+
     let identity;
     try { identity = await authenticate(req); } catch { identity = null; }
     if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
