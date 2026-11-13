@@ -1,5 +1,60 @@
+do $
+declare
+  v_count integer;
+  v_status text;
+begin
+  select count(*) into v_count
+  from private.fam_agent_tasks
+  where id in (
+    '10000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000003'
+  ) and status='queued' and attempt_count=1 and max_attempts=2
+    and available_at between pg_catalog.now()+interval '29 minutes'
+                         and pg_catalog.now()+interval '31 minutes'
+    and finished_at is null and claimed_by is null and lease_expires_at is null;
+  if v_count <> 2 then raise exception 'recent unique transient failures were not requeued exactly once'; end if;
+
+  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000002';
+  if v_status <> 'failed' then raise exception 'older duplicate signature was also requeued'; end if;
+  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000004';
+  if v_status <> 'failed' then raise exception 'failure with an active duplicate was requeued'; end if;
+  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000005';
+  if v_status <> 'queued' then raise exception 'active duplicate fixture was modified'; end if;
+
+  select count(*) into v_count
+  from private.fam_agent_task_events
+  where event_type='retry_scheduled'
+    and actor='fam-agent-retry-migration-v1'
+    and task_id in (
+      '10000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000003'
+    );
+  if v_count <> 2 then raise exception 'backfill retry events were not recorded'; end if;
+
+  select count(*) into v_count
+  from private.fam_agent_tasks
+  where id in (
+    '10000000-0000-4000-8000-000000000006',
+    '10000000-0000-4000-8000-000000000007',
+    '10000000-0000-4000-8000-000000000008',
+    '10000000-0000-4000-8000-000000000009',
+    '10000000-0000-4000-8000-000000000010'
+  ) and status='failed';
+  if v_count <> 5 then raise exception 'exhausted, manual, approval, unknown-summary, or stale failures were modified'; end if;
+
+  -- Clear the synthetic queue fixture so the subsequent producer/claim test is isolated.
+  update private.fam_agent_tasks
+  set status='completed',finished_at=pg_catalog.now(),updated_at=pg_catalog.now()
+  where id in (
+    '10000000-0000-4000-8000-000000000001',
+    '10000000-0000-4000-8000-000000000003',
+    '10000000-0000-4000-8000-000000000005'
+  );
+end;
+$;
+
 insert into private.fam_site_error_counts(hour_bucket,event_code,page_area,event_count)
-values (pg_catalog.now(),'js_runtime','other',4);
+values (pg_catalog.now(),'unhandled_rejection','auth',4);
 
 set role service_role;
 do $$
@@ -29,7 +84,7 @@ begin
   if v_result->>'task_created' <> 'true' then raise exception 'task was not reconsidered after cooldown'; end if;
   v_retry_id := (v_result->>'task_id')::uuid;
   select count(*) into v_count from private.fam_agent_tasks
-  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime' and payload->>'page_area'='other';
+  where task_type='coder_patch_request' and payload->>'event_code'='unhandled_rejection' and payload->>'page_area'='auth';
   if v_count <> 2 then raise exception 'unexpected number of producer tasks: %', v_count; end if;
 
   -- Exercise the existing production claim RPC, then the bounded failure path.
