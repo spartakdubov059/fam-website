@@ -14,7 +14,7 @@ create schema private;
 grant usage on schema private to service_role;
 
 create table private.fam_agent_tasks (
-  id uuid primary key,
+  id uuid primary key default gen_random_uuid(),
   agent_key text not null,
   task_type text not null,
   title text not null,
