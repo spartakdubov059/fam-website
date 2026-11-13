@@ -152,6 +152,15 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async getListingContactRecipient(listingId, senderId, schoolId) {
+      if (!listingId || !senderId || !schoolId) throw new TypeError('invalid listing contact');
+      const statement = sql`SELECT user_id AS user_id FROM fam_listings
+        WHERE id = ${listingId} AND school_id = ${schoolId} AND status = 'active'
+          AND user_id != ${senderId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0]?.user_id ?? null;
+    },
+
     async listMessages(userId, schoolId) {
       if (!userId || !schoolId) throw new TypeError('invalid message owner');
       const statement = sql`SELECT id, sender_id, receiver_id, body, is_read, created_at FROM fam_messages

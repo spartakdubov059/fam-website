@@ -78,6 +78,46 @@ function addFavoriteControl({ card, listing, document, fetchImpl, favorites, loc
   card.append(actions);
 }
 
+function addListingContactForm({ card, listing, document, fetchImpl, favorites, location }) {
+  if (!UUID.test(listing.id)) return;
+  const form = document.createElement('form');
+  form.className = 'ru-contact-form';
+  const input = document.createElement('textarea');
+  input.name = 'body'; input.maxLength = 1000; input.required = true;
+  input.placeholder = 'Сообщение автору'; input.setAttribute('aria-label', 'Сообщение автору объявления');
+  const submit = element(document, 'button', 'ru-contact-submit', 'Написать автору');
+  submit.type = 'submit';
+  const status = element(document, 'p', 'ru-contact-status', '');
+  status.setAttribute('role', 'status');
+  let busy = false;
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const body = input.value.trim();
+    if (busy || !body || body.length > 1000) return;
+    if (favorites.state === 'guest') { location?.assign?.('/auth/yandex/start'); return; }
+    if (favorites.state !== 'authenticated') { status.textContent = 'Отправка сейчас недоступна.'; return; }
+    busy = true; submit.disabled = true; status.textContent = '';
+    try {
+      const response = await fetchImpl(`/api/v1/listings/${listing.id}/contact`, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ body }),
+      });
+      const result = await response.json().catch(() => null);
+      if (response.status === 401) {
+        favorites.state = 'guest'; status.textContent = 'Сеанс завершён. Войдите, чтобы написать.';
+      } else if (response.status === 503 && result?.status === 'pending') {
+        status.textContent = 'Сообщение не отправлено: проверка безопасности временно недоступна.';
+      } else if (!response.ok || !result?.ok) {
+        status.textContent = response.status === 404 ? 'Объявление или его автор больше недоступны.' : 'Не удалось отправить сообщение. Проверьте текст и попробуйте позже.';
+      } else {
+        input.value = ''; status.textContent = 'Сообщение отправлено после проверки. Ответ появится во вкладке «Чат».';
+      }
+    } catch { status.textContent = 'Нет связи с сервером. Попробуйте ещё раз.'; }
+    finally { busy = false; submit.disabled = false; }
+  });
+  form.append(input, submit, status); card.append(form);
+}
+
 function formatEventTime(listing) {
   const parts = [];
   if (typeof listing.event_date === 'string' && listing.event_date) parts.push(listing.event_date);
@@ -220,6 +260,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
       addFavoriteControl({ card, listing, document, fetchImpl, favorites, location });
+      addListingContactForm({ card, listing, document, fetchImpl, favorites, location });
       if (listing.is_event === true) {
         card.append(element(document, 'p', 'ru-listing-event', 'Мероприятие'));
         addEventRegistrationControls({ card, listing, document, fetchImpl, session, location });

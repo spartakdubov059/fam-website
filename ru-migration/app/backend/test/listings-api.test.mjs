@@ -30,6 +30,40 @@ test('public listing read needs no student identity and returns only repository-
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { ok: true, listings: [safeRow] });
 });
+
+test('contacting a listing derives the recipient on the server and sends only reviewed text', async () => {
+  const sender = '11111111-1111-4111-8111-111111111111';
+  const recipient = '22222222-2222-4222-8222-222222222222';
+  const listingId = '33333333-3333-4333-8333-333333333333';
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ id: sender, school_id: 'school-a', role: 'student' }),
+    review: async text => ({ action: text === 'hello' ? 'ok' : 'pending', reason_code: 'review_pending' }),
+    repository: {
+      getListingContactRecipient: async (id, actorId, schoolId) => id === listingId && actorId === sender && schoolId === 'school-a' ? recipient : null,
+      createMessage: async record => { saved = record; return { id: '44444444-4444-4444-8444-444444444444' }; },
+    } });
+  const request = req({ body: 'hello', receiver_id: '55555555-5555-4555-8555-555555555555' });
+  request.url = `/api/v1/listings/${listingId}/contact`;
+  const response = await handler(request);
+  assert.equal(response.status, 201);
+  assert.equal(saved.sender_id, sender);
+  assert.equal(saved.receiver_id, recipient);
+  assert.equal(saved.school_id, 'school-a');
+  assert.equal(saved.body, 'hello');
+});
+
+test('listing contact rejects unavailable or cross-school listing without storing a message', async () => {
+  let writes = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' }),
+    repository: { getListingContactRecipient: async () => null, createMessage: async () => { writes++; } } });
+  const request = req({ body: 'hello' });
+  request.url = '/api/v1/listings/33333333-3333-4333-8333-333333333333/contact';
+  const response = await handler(request);
+  assert.equal(response.status, 404);
+  assert.equal(writes, 0);
+});
 test('public listing read fails closed when the database is unavailable', async () => {
   const handler = createListingsApi({ repository: { listActiveListings: async () => { throw new Error('offline'); } } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings';

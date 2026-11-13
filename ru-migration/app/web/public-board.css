@@ -69,3 +69,14 @@ body {
 .ru-moderation-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }
 .ru-favorite-actions { display: grid; justify-items: start; gap: 0.25rem; margin-top: 0.5rem; }
 .ru-favorite-status { margin: 0; font-size: 0.9rem; }
+.ru-contact-form { display: grid; gap: 0.5rem; margin-top: 1rem; }
+.ru-contact-form textarea { width: 100%; min-height: 5rem; padding: 0.65rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; font: inherit; resize: vertical; }
+.ru-contact-submit, .ru-message-send { width: fit-content; min-height: 40px; padding: 0.6rem 0.9rem; border: 0; border-radius: 0.55rem; background: #e7e9ee; color: #101116; font: inherit; font-weight: 700; cursor: pointer; }
+.ru-contact-status, .ru-messages-status { margin: 0; color: #b8bbc7; font-size: 0.9rem; }
+.ru-messages { margin: 1.5rem 0; padding: 1rem; border: 1px solid #30323a; border-radius: 1rem; background: #191b22; }
+.ru-message-list { display: grid; gap: 0.6rem; max-height: 45vh; overflow: auto; margin: 0.8rem 0; }
+.ru-message-dialog { width: 100%; padding: 0.75rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; text-align: left; cursor: pointer; }
+.ru-message-bubble { max-width: 85%; padding: 0.65rem 0.8rem; border-radius: 0.8rem; background: #111218; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ru-message-bubble[data-own="true"] { justify-self: end; background: #373044; }
+.ru-message-form { display: flex; gap: 0.5rem; }
+.ru-message-form input { flex: 1; min-width: 0; padding: 0.65rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; font: inherit; }

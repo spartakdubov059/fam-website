@@ -8,6 +8,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
     const eventRegistrationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations$/i);
@@ -194,6 +195,27 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
       try { return { status: 200, body: { ok: true, messages: await repository.listMessages(actor.id, actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && listingContactMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (typeof repository?.getListingContactRecipient !== 'function') return { status: 503, body: { ok: false, error: 'contact_unavailable' } };
+      try {
+        const receiver_id = await repository.getListingContactRecipient(listingContactMatch[1], actor.id, actor.school_id);
+        if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id }, repository, review });
+        const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
+          : result.code === 'recipient_unavailable' ? 404 : 400;
+        return { status, body: result };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);
     if (req.method === 'GET' && pathname === '/api/v1/favorites') {

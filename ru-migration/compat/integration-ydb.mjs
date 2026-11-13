@@ -93,6 +93,12 @@ try {
   assert.equal(publicListings.length, 2);
   const publicDirectListing = publicListings.find(row => row.id === listing.id);
   assert.ok(publicDirectListing);
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
+    'a same-school member can contact the owner of an active listing');
+  assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
+    'listing owners cannot open a self-conversation');
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'other-school'), null,
+    'listing contact lookup cannot cross school boundaries');
   assert.equal(publicDirectListing.title, title);
   assert.equal(Object.hasOwn(publicDirectListing, 'user_id'), false);
   assert.equal(Object.hasOwn(publicDirectListing, 'school_id'), false);
