@@ -74,7 +74,7 @@ test("INTEGRATOR escapes untrusted file paths before writing GitHub issue", () =
   });
   const report = formatIntegrationPlan(p);
   assert.ok(!report.includes("<script>"));
-  assert.match(report, /&#60;script&#62;/);
+  assert.match(report, /&lt;script&gt;/);
 });
 
 test("RECRUITER stops suggesting a specialist after it has been hired", () => {
