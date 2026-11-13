@@ -38,6 +38,10 @@ const reportRenderer = readFileSync(
   new URL("../../scripts/render-fam-agent-report.mjs", import.meta.url),
   "utf8",
 );
+const qwenSmokeWorkflow = readFileSync(
+  new URL("../../.github/workflows/fam-qwen-exact-edit-smoke.yml", import.meta.url),
+  "utf8",
+);
 
 test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -136,6 +140,15 @@ test("agent PRs stay draft and the workflow does not request ready or merge tran
   assert.match(prompt, /Никогда не объединяй PR/);
   assert.match(prompt, /необратимые операции/);
   assert.match(prompt, /RLS/);
+});
+
+test("the expensive synthetic Qwen model smoke runs only by explicit manual dispatch", () => {
+  const triggers = qwenSmokeWorkflow.split("\npermissions:")[0];
+  assert.match(triggers, /^on:\n\s+workflow_dispatch:\s*$/m);
+  assert.doesNotMatch(triggers, /^\s+(?:push|pull_request|schedule):/m);
+  assert.match(qwenSmokeWorkflow, /timeout-minutes: 90/);
+  assert.match(qwenSmokeWorkflow, /permissions:\n\s+contents: read/);
+  assert.doesNotMatch(qwenSmokeWorkflow, /contents:\s*write|pull-requests:\s*write/);
 });
 
 test("workflow does not run database migrations or modify production Supabase", () => {
