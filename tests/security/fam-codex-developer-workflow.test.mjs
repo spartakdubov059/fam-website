@@ -164,12 +164,13 @@ test("explicitly referenced unselected tests are supplied as read-only source co
 });
 
 test("claimed queue tasks are completed only after independent QA", () => {
-  const generateJob = workflow.split("\\n  verify:")[0] ?? "";
-  assert.doesNotMatch(generateJob, /fam-agent-bridge\\.mjs finish/);
+  const generateJob = workflow.split("\n  verify:")[0] ?? "";
+  assert.doesNotMatch(generateJob, /fam-agent-bridge\.mjs finish/);
   assert.ok(workflow.includes("task_id: ${{ steps.coder-queue.outputs.task_id }}"));
-  assert.ok(workflow.includes("finish_task:\\n    name: Зафиксировать результат coder после независимого QA\\n    needs: [generate, verify]"));
+  assert.ok(workflow.includes("finish_task:\n    name: Зафиксировать результат coder после независимого QA\n    needs: [generate, verify]"));
   assert.ok(workflow.includes("FAM_QA_OUTCOME: ${{ needs.verify.result }}"));
   assert.ok(workflow.includes("run: node scripts/fam-agent-bridge.mjs finish"));
+  assert.ok(workflow.includes("needs: [generate, verify, finish_task]"));
 });
 
 test("draft PR creation depends on the independent Reviewer artifact after QA", () => {
