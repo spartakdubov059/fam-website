@@ -25,7 +25,7 @@ create table private.fam_agent_tasks (
   approval_required boolean not null,
   payload jsonb not null check (jsonb_typeof(payload) = 'object'),
   result_summary text,
-  attempt_count integer not null check (attempt_count >= 0),
+  attempt_count integer not null default 0 check (attempt_count >= 0),
   max_attempts integer not null check (max_attempts between 1 and 5),
   available_at timestamptz not null default now(),
   claimed_by text,
