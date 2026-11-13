@@ -9,9 +9,9 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 28,
+      "passed": 30,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow on commit b666978f019ef64c7abde66ce27b8f356d3df535; includes HTTP shell/fail-closed route checks and listing visibility API tests"
+      "source": "GitHub Actions SDK compatibility workflow on commit 2fe94564fb4e69e21b233aa0780076f200545208; includes authenticated profile endpoint and HTTP fail-closed tests"
     },
     "command": "npm test --prefix ru-migration/app/backend",
     "reproduction": "PASS — current backend unit tests; historical 220-test archive unavailable"
@@ -42,14 +42,14 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43436976299,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43436976299",
-    "ydb_run_id": 43436976371,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43436976371",
+    "sdk_run_id": 43437942918,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43437942918",
+    "ydb_run_id": 43437942949,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43437942949",
     "result": "success",
-    "tested_commit": "b666978f019ef64c7abde66ce27b8f356d3df535"
+    "tested_commit": "2fe94564fb4e69e21b233aa0780076f200545208"
   },
-  "local_ydb_integration": "PASS — disposable local YDB in GitHub Actions; synthetic profile lookup, pending listing invisibility, active listing public projection without user/school IDs, insert/read",
+  "local_ydb_integration": "PASS — disposable local YDB; synthetic profile with FAM display fields, OIDC subject lookup, pending/active listing visibility, safe public projection",
   "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
   "pricing_evidence": [
     {
