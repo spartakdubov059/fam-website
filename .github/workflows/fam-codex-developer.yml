@@ -21,6 +21,7 @@ on:
       - "scripts/validate-local-agent-patch.mjs"
       - "scripts/fam-agent-report.mjs"
       - "scripts/render-fam-agent-report.mjs"
+      - "scripts/fam-agent-reviewer.mjs"
       - "tests/security/fam-local-agent.test.mjs"
   workflow_dispatch:
     inputs:
@@ -287,6 +288,26 @@ jobs:
           NODE
           node --check /tmp/fam-inline-scripts.js
 
+      - name: Подготовить независимый статический Reviewer отчёт
+        env:
+          FAM_QA_STATUS: passed
+        run: |
+          node scripts/fam-agent-reviewer.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent/summary.json" \
+            "$RUNNER_TEMP/fam-agent/safety.json" \
+            "$RUNNER_TEMP/fam-agent/base.sha" \
+            "$RUNNER_TEMP/fam-agent-review/review.json" \
+            "$RUNNER_TEMP/fam-agent-review/review.md"
+
+      - name: Сохранить независимый Reviewer отчёт
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: fam-agent-independent-review
+          path: ${{ runner.temp }}/fam-agent-review/
+          if-no-files-found: error
+          retention-days: 3
+
   prepare_review:
     name: Подготовить PR и проверить исправление без публикации
     needs: [generate, verify]
@@ -311,6 +332,11 @@ jobs:
           name: fam-local-agent-result
           path: ${{ runner.temp }}/fam-agent
 
+      - name: Скачать независимый Reviewer отчёт
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-agent-independent-review
+          path: ${{ runner.temp }}/fam-agent-review
       - name: Создать PR; публикация всегда требует решения владельца
         id: pr
         env:
@@ -340,6 +366,8 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
           {
+            cat "$RUNNER_TEMP/fam-agent-review/review.md"
+            echo
             cat "$RUNNER_TEMP/fam-agent/verified-report.md"
             echo
             echo "- Модель: Qwen2.5-Coder-7B-Instruct-GGUF, запущена локально на временном GitHub runner."
