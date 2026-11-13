@@ -2377,12 +2377,18 @@ window.onunhandledrejection = function() {
     const box = $("bannerCarousel");
     let html = [];
     const banners = [
-      { src: "banner-1", alt: "Найди своих на закате." },
-      { src: "banner-2", alt: "Школьная площадка FAM: анонсы и события." },
-      { src: "banner-3", alt: "Вещи и услуги: техника для учёбы." },
-      { src: "banner-4", alt: "Учёба и развитие за чашкой кофе." },
-      { src: "banner-5", alt: "Творчество и идеи: камера и вдохновение." },
-      { src: "banner-6", alt: "Ученический совет: команда волонтёров." }
+      { src: "banner-1", alt: "Баннер FAM: ФАМ ближе, чем кажется; друзья вместе проводят время." },
+      { src: "banner-2", alt: "Баннер FAM о школьном медиацентре: снимаем, пишем и создаём." },
+      { src: "banner-3", alt: "Баннер FAM о походах, новых маршрутах и прогулках на природе." },
+      { src: "banner-4", alt: "Баннер FAM об учёбе, проектах и знаниях." },
+      { src: "banner-5", alt: "Баннер FAM о творчестве, идеях и вдохновляющих проектах." },
+      { src: "banner-6", alt: "Баннер FAM о концертах, квизах и встречах." },
+      { src: "banner-clean-1", alt: "Найди своих на закате." },
+      { src: "banner-clean-2", alt: "Школьная площадка FAM: анонсы и события." },
+      { src: "banner-clean-3", alt: "Вещи и услуги: техника для учёбы." },
+      { src: "banner-clean-4", alt: "Учёба и развитие за чашкой кофе." },
+      { src: "banner-clean-5", alt: "Творчество и идеи: камера и вдохновение." },
+      { src: "banner-clean-6", alt: "Ученический совет: команда волонтёров." }
     ];
     banners.forEach(({ src, alt }, index) => {
       html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
