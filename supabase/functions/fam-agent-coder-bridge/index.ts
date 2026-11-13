@@ -28,7 +28,7 @@ const EVENT_CODES = new Set([
 ]);
 const REPORT_FIELDS = new Set([
   "report_date", "generated_at", "sources", "supabase", "workflows_24h",
-  "open_pull_requests", "production_deployment", "public_site", "limitations", "markdown",
+  "open_pull_requests", "role_statuses", "production_deployment", "public_site", "limitations", "markdown",
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 
