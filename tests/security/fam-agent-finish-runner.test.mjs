@@ -56,6 +56,7 @@ async function runFreshFinish(selectedSteps, outcomes = {}) {
     "secrets.FAM_AGENT_WORKER_TOKEN": "synthetic-local-token",
     "needs.generate.outputs.task_id": taskId,
     "needs.generate.outputs.model_outcome": "success",
+    "needs.generate.outputs.model_failure_reason": "",
     "needs.verify.result": "success",
     "needs.trusted_qa.result": "success",
     "needs.prepare_review.result": "success",
