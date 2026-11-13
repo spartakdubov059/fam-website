@@ -1,4 +1,4 @@
-do $
+do $$
 declare
   v_count integer;
   v_status text;
@@ -51,7 +51,7 @@ begin
     '10000000-0000-4000-8000-000000000005'
   );
 end;
-$;
+$$;
 
 insert into private.fam_site_error_counts(hour_bucket,event_code,page_area,event_count)
 values (pg_catalog.now(),'unhandled_rejection','auth',4);
