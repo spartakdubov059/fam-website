@@ -42,7 +42,7 @@ test('school moderators review same-school pending photos and publish only after
   const decision = calls.find(call => call.url === `/api/v1/listings/${id}/photo`);
   assert.equal(decision.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
-  assert.equal(f.status.textContent, 'Новых объявлений для проверки нет.');
+  assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
 });
 
 test('student profiles do not receive the school moderation queue', async () => {
@@ -77,4 +77,28 @@ test('staff can confirm or reject a pending event application using safe text re
   const decision = calls.find(call => call.url === `/api/v1/listings/${eventId}/registrations/${userId}`);
   assert.equal(decision.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(decision.init.body), { decision: 'reject' });
+});
+
+test('only school admins see profile access requests and approve them as students', async () => {
+  const f = fixture();
+  const requestId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const calls = [];
+  let pending = true;
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, first_name: '<Аня>', last_name: 'Иванова', class_name: '8А' }] : [] }) };
+    if (url === `/api/v1/profile-requests/${requestId}`) { pending = false; return { ok: true, json: async () => ({ ok: true, status: 'approved' }) }; }
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  const card = f.queue.children[0];
+  assert.equal(card.children[0].textContent, '<Аня> Иванова');
+  const actions = card.children.at(-1).children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить ученика', 'Отклонить заявку']);
+  await actions[0].listeners.click();
+  const patch = calls.find(call => call.url === `/api/v1/profile-requests/${requestId}`);
+  assert.equal(patch.init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(patch.init.body), { decision: 'approve' });
 });

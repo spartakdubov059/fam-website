@@ -1,0 +1,15 @@
+-- Temporary school-access requests. The Yandex subject is server supplied;
+-- browser input can never choose a role. Personal fields are cleared on review.
+CREATE TABLE fam_profile_requests (
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  request_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  first_name Utf8 NOT NULL,
+  last_name Utf8 NOT NULL,
+  class_name Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  reviewed_by Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (issuer, subject)
+);

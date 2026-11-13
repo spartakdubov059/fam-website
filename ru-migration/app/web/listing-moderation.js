@@ -32,22 +32,28 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
       ]);
-      const [result, eventResult] = await Promise.all([json(response), json(eventResponse)]);
+      const [result, eventResult, profileResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
-        || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)) throw new Error('queue_unavailable');
+        || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
+        || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)) throw new Error('queue_unavailable');
       queue.replaceChildren();
       const applications = eventResult.applications.filter(application => application
         && UUID.test(application.event_id) && UUID.test(application.user_id)
         && application.status === 'pending' && typeof application.event_title === 'string');
-      if (result.listings.length === 0 && applications.length === 0) {
-        status.textContent = 'Новых объявлений для проверки нет.';
+      const profileRequests = profileResult.requests.filter(request => request && UUID.test(request.request_id)
+        && typeof request.first_name === 'string' && typeof request.last_name === 'string'
+        && typeof request.class_name === 'string');
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0) {
+        status.textContent = 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Ожидают проверки: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}.`;
+      status.textContent = `Ожидают проверки: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}.`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -86,6 +92,16 @@ export async function initializeListingModeration({ document = globalThis.docume
         actions.append(actionButton(document, 'Отклонить заявку', () => decide(path, 'reject')));
         card.append(actions);
         queue.append(card);
+      }
+      for (const request of profileRequests) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', `${request.first_name} ${request.last_name}`));
+        card.append(node(document, 'p', '', `Заявка на ученический профиль · ${request.class_name}`));
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        const path = `/api/v1/profile-requests/${request.request_id}`;
+        actions.append(actionButton(document, 'Одобрить ученика', () => decide(path, 'approve')));
+        actions.append(actionButton(document, 'Отклонить заявку', () => decide(path, 'reject')));
+        card.append(actions); queue.append(card);
       }
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }

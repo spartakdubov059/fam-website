@@ -188,3 +188,26 @@ test('isolated server routes the event registration API only to its configured b
     assert.equal(response.status, 503);
   });
 });
+
+test('isolated server routes school catalog and access-request lifecycle to the configured backend', async () => {
+  const routed = [];
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await withServer({ listingsApi: async request => {
+    routed.push(`${request.method} ${request.url}`);
+    return { status: 200, body: { ok: true, route: request.url } };
+  } }, async origin => {
+    for (const [method, pathname] of [
+      ['GET', '/api/v1/schools'],
+      ['POST', '/api/v1/profile-requests'],
+      ['GET', '/api/v1/profile-requests/review'],
+      ['PATCH', `/api/v1/profile-requests/${id}`],
+    ]) {
+      const response = await fetch(new URL(pathname, origin), { method, headers: { 'content-type': 'application/json' }, body: ['POST', 'PATCH'].includes(method) ? '{}' : undefined });
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { ok: true, route: pathname });
+    }
+  });
+  assert.deepEqual(routed, [
+    'GET /api/v1/schools', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', `PATCH /api/v1/profile-requests/${id}`,
+  ]);
+});

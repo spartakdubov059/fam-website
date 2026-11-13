@@ -15,12 +15,22 @@ export async function initializeListingSubmission({ document = globalThis.docume
   const logout = document.getElementById('ruLogout');
   if (!form || !status) return;
 
+  let authenticatedProfile = false;
   let ideaForm;
   try {
     const response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
-    if (!response.ok) return;
     const result = await readJson(response);
-    if (!result?.ok || !result.profile?.id) return;
+    if (!response.ok || !result?.ok || !result.profile?.id) {
+      if (response.status === 403 && result?.error === 'profile_unavailable') {
+        if (login) login.hidden = true;
+        if (logout) logout.hidden = false;
+        status.textContent = 'Вход выполнен. Чтобы пользоваться FAM этой школы, отправьте заявку на профиль.';
+        await createProfileRequestForm(document, status, fetchImpl);
+        attachYandexLogout({ logout, fetchImpl, location, status });
+      }
+      return;
+    }
+    authenticatedProfile = true;
     form.hidden = false;
     status.textContent = 'Объявление и фото будут отправлены на проверку вашей школы.';
     ideaForm = createIdeaForm(document, form);
@@ -28,15 +38,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     if (logout) logout.hidden = false;
   } catch { return; }
 
-  if (logout) logout.addEventListener('click', async () => {
-    logout.disabled = true;
-    try {
-      const response = await fetchImpl('/auth/yandex/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
-      if (response.ok) location?.reload?.();
-      else status.textContent = 'Не удалось завершить сеанс. Попробуйте ещё раз.';
-    } catch { status.textContent = 'Не удалось завершить сеанс. Проверьте подключение.'; }
-    finally { logout.disabled = false; }
-  });
+  if (authenticatedProfile) attachYandexLogout({ logout, fetchImpl, location, status });
 
   if (ideaForm) ideaForm.addEventListener('submit', async event => {
     event.preventDefault();
@@ -136,6 +138,73 @@ function createIdeaForm(document, listingForm) {
   section.append(heading, note, form);
   shell.append(section);
   return form;
+}
+
+async function createProfileRequestForm(document, status, fetchImpl) {
+  if (document.getElementById('ruProfileRequestForm')) return;
+  const listingForm = document.getElementById('ruListingForm');
+  const shell = listingForm?.parentElement;
+  if (!shell || typeof document.createElement !== 'function') return;
+  let schools;
+  try {
+    const response = await fetchImpl('/api/v1/schools', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    const result = await readJson(response);
+    if (!response.ok || !result?.ok || !Array.isArray(result.schools) || result.schools.length === 0) throw new Error('schools_unavailable');
+    schools = result.schools.filter(item => typeof item?.id === 'string' && typeof item?.name === 'string');
+  } catch {
+    status.textContent = 'Не удалось загрузить список школ. Попробуйте позже.';
+    return;
+  }
+  const section = document.createElement('section'); section.className = 'ru-moderation'; section.setAttribute('aria-label', 'Заявка на школьный профиль');
+  const heading = document.createElement('h2'); heading.textContent = 'Запросить школьный профиль';
+  const note = document.createElement('p'); note.className = 'ru-note';
+  note.textContent = 'Школа проверит заявку. До одобрения будут доступны только открытая доска и вход.';
+  const form = document.createElement('form'); form.id = 'ruProfileRequestForm'; form.className = 'ru-listing-form';
+  const schoolLabel = document.createElement('label'); schoolLabel.textContent = 'Школа';
+  const school = document.createElement('select'); school.name = 'school_id'; school.required = true;
+  for (const item of schools) { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; school.append(option); }
+  schoolLabel.append(school);
+  const fields = [];
+  for (const [name, labelText, maxLength, pattern] of [['first_name', 'Имя', 80, null], ['last_name', 'Фамилия', 80, null], ['class_name', 'Класс, например 8А', 4, '[1-9][0-9]?[А-ЯЁA-Z]?']]) {
+    const label = document.createElement('label'); label.textContent = labelText;
+    const input = document.createElement('input'); input.name = name; input.maxLength = maxLength; input.required = true;
+    if (pattern) { input.pattern = pattern; input.autocomplete = 'off'; }
+    label.append(input); fields.push(label);
+  }
+  const result = document.createElement('p'); result.className = 'ru-note'; result.setAttribute('role', 'status'); result.setAttribute('aria-live', 'polite');
+  const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit'; submit.textContent = 'Отправить заявку';
+  form.append(schoolLabel, ...fields, result, submit);
+  section.append(heading, note, form); shell.append(section);
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); submit.disabled = true; result.textContent = 'Отправляем заявку…';
+    try {
+      const response = await fetchImpl('/api/v1/profile-requests', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ school_id: form.elements.school_id.value, first_name: form.elements.first_name.value,
+          last_name: form.elements.last_name.value, class_name: form.elements.class_name.value }),
+      });
+      const reply = await readJson(response);
+      if (!response.ok || !reply?.ok) throw new Error(reply?.error || 'request_failed');
+      form.hidden = true;
+      status.textContent = 'Заявка отправлена администратору школы. Доступ откроется после одобрения; затем обновите страницу.';
+    } catch { result.textContent = 'Не удалось отправить заявку. Проверьте данные и попробуйте снова.'; }
+    finally { submit.disabled = false; }
+  });
+}
+
+function attachYandexLogout({ logout, fetchImpl, location, status }) {
+  if (!logout || logout.hasYandexLogoutHandler) return;
+  logout.hasYandexLogoutHandler = true;
+  logout.addEventListener('click', async () => {
+    logout.disabled = true;
+    try {
+      const response = await fetchImpl('/auth/yandex/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+      if (response.ok) location?.reload?.();
+      else status.textContent = 'Не удалось завершить сеанс. Попробуйте ещё раз.';
+    } catch { status.textContent = 'Не удалось завершить сеанс. Проверьте подключение.'; }
+    finally { logout.disabled = false; }
+  });
 }
 
 if (globalThis.document) void initializeListingSubmission();

@@ -78,6 +78,58 @@ test('event review queue is school-scoped, staff-only, and does not query for st
   assert.equal(reads, 0);
 });
 
+test('unprovisioned Yandex identities can request student access but cannot choose a role', async () => {
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
+    resolveActor: async () => null,
+    repository: { createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
+  const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8а', role: 'school_admin', user_id: 'forged' });
+  request.url = '/api/v1/profile-requests';
+  const response = await handler(request);
+  assert.equal(response.status, 202);
+  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.equal(Object.hasOwn(saved, 'role'), false);
+
+  let writes = 0;
+  const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
+    repository: { createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
+  const invalid = req({ school_id: 'unlisted-school', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); invalid.url = '/api/v1/profile-requests';
+  assert.equal((await denied(invalid)).status, 400);
+  assert.equal(writes, 0);
+});
+
+test('only same-school administrators can read or decide profile access requests', async () => {
+  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let schoolId; let decision;
+  const admin = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
+    resolveActor: async () => ({ id: 'admin', school_id: 'lyceum_3', role: 'school_admin' }),
+    repository: { listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
+      reviewSchoolProfileRequest: async (...args) => { [decision, schoolId] = [args[3], args[1]]; return true; } } });
+  const list = req({}, 'GET'); list.url = '/api/v1/profile-requests/review';
+  assert.equal((await admin(list)).status, 200);
+  assert.equal(schoolId, 'lyceum_3');
+  const patch = req({ decision: 'approve' }, 'PATCH'); patch.url = `/api/v1/profile-requests/${requestId}`;
+  assert.deepEqual(await admin(patch), { status: 200, body: { ok: true, status: 'approved' } });
+  assert.equal(decision, 'approve');
+
+  let reads = 0;
+  const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
+    resolveActor: async () => ({ id: 'student', school_id: 'lyceum_3', role: 'student' }),
+    repository: { listPendingSchoolProfileRequests: async () => { reads++; return []; }, reviewSchoolProfileRequest: async () => { reads++; return true; } } });
+  const forbiddenList = req({}, 'GET'); forbiddenList.url = '/api/v1/profile-requests/review';
+  const forbiddenDecision = req({ decision: 'approve' }, 'PATCH'); forbiddenDecision.url = `/api/v1/profile-requests/${requestId}`;
+  assert.equal((await student(forbiddenList)).status, 403);
+  assert.equal((await student(forbiddenDecision)).status, 403);
+  assert.equal(reads, 0);
+});
+
+test('school catalog is a minimal public projection and needs no auth', async () => {
+  const handler = createListingsApi({ authenticate: async () => { throw new Error('school catalog is public'); },
+    schools: [{ id: 'lyceum_3', name: 'Лицей № 3', secret: 'hidden' }] });
+  const request = req({}, 'GET'); request.url = '/api/v1/schools';
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, schools: [{ id: 'lyceum_3', name: 'Лицей № 3' }] } });
+});
+
 test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'admin' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });

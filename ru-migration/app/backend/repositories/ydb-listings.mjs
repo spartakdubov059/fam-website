@@ -5,6 +5,62 @@ import { randomUUID } from 'node:crypto';
 export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
+    async createSchoolProfileRequest(record) {
+      if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
+        throw new TypeError('invalid school profile request');
+      }
+      const requestId = randomUUID();
+      return sql.begin(async tx => {
+        const existingProfile = await tx`SELECT user_id FROM fam_user_profiles
+          WHERE issuer = ${record.issuer} AND subject = ${record.subject} LIMIT 1;`;
+        if (existingProfile?.[0]?.length) return { ok: false, code: 'profile_exists' };
+        const existingRequest = await tx`SELECT request_id, status FROM fam_profile_requests
+          WHERE issuer = ${record.issuer} AND subject = ${record.subject} LIMIT 1;`;
+        const current = existingRequest?.[0]?.[0];
+        if (current?.status === 'pending') return { ok: true, status: 'pending', request_id: current.request_id };
+        await tx`UPSERT INTO fam_profile_requests
+          (issuer, subject, request_id, school_id, first_name, last_name, class_name, status, reviewed_by, created_at)
+          VALUES (${record.issuer}, ${record.subject}, ${requestId}, ${record.school_id}, ${record.first_name}, ${record.last_name}, ${record.class_name}, 'pending', '', CurrentUtcTimestamp());`;
+        return { ok: true, status: 'pending', request_id: requestId };
+      });
+    },
+
+    async listPendingSchoolProfileRequests(schoolId) {
+      if (!schoolId) throw new TypeError('invalid profile request school');
+      const statement = sql`SELECT request_id AS request_id, school_id AS school_id,
+          first_name AS first_name, last_name AS last_name, class_name AS class_name, created_at AS created_at
+        FROM fam_profile_requests WHERE school_id = ${schoolId} AND status = 'pending'
+        ORDER BY created_at ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async reviewSchoolProfileRequest(requestId, schoolId, reviewerId, decision) {
+      if (!requestId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid profile request decision');
+      return sql.begin(async tx => {
+        const requests = await tx`SELECT issuer, subject, school_id, first_name, last_name, class_name, status
+          FROM fam_profile_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const request = requests?.[0]?.[0];
+        if (!request || request.school_id !== schoolId || request.status !== 'pending') return false;
+        if (decision === 'approve') {
+          const profile = await tx`SELECT user_id FROM fam_user_profiles
+            WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
+          if (profile?.[0]?.length) return false;
+          await tx`INSERT INTO fam_user_profiles
+            (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)
+            VALUES (${request.issuer}, ${request.subject}, ${randomUUID()}, ${schoolId}, 'student', true,
+              ${request.first_name}, ${request.last_name}, ${request.class_name});`;
+        }
+        const status = decision === 'approve' ? 'approved' : 'rejected';
+        await tx`UPDATE fam_profile_requests SET status = ${status}, reviewed_by = ${reviewerId}, first_name = '',
+            last_name = '', class_name = '' WHERE issuer = ${request.issuer} AND subject = ${request.subject}
+            AND request_id = ${requestId} AND school_id = ${schoolId} AND status = 'pending';`;
+        const confirmed = await tx`SELECT status FROM fam_profile_requests WHERE issuer = ${request.issuer}
+          AND subject = ${request.subject} AND request_id = ${requestId} LIMIT 1;`;
+        return confirmed?.[0]?.[0]?.status === status;
+      });
+    },
+
     async createListing(record) {
       if (!record || record.status !== 'pending' || !record.user_id || !record.school_id) throw new TypeError('invalid pending listing');
       if (!Number.isInteger(record.max_seats) || record.max_seats < 0 || record.max_seats > 500) throw new TypeError('invalid max_seats');
