@@ -36,7 +36,7 @@ test("automated PR creation can use a repository-scoped App token without broade
 test("App setup documents merge capability and requires native main review protection", () => {
   assert.match(appSetup, /Contents: write.*Merge Pull Request API/s);
   assert.match(appSetup, /required_approving_review_count=0/);
-  assert.match(appSetup, /Не устанавливай App token.*native review/s);
+  assert.match(appSetup, /Не устанавливай App token.*нативное правило одобрения/s);
 });
 
 test("local AI developer cannot merge PRs or publish production", () => {
