@@ -46,3 +46,59 @@ test('guest board offers retry when the Russian API is unavailable', async () =>
   await root.children[1].listeners.click();
   assert.equal(calls, 2);
 });
+
+test('event card reads only the user own registrations and supports reservation and cancellation', async () => {
+  const root = new FakeNode('section');
+  const calls = [];
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options) => {
+    calls.push({ url, options });
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: eventId, title: 'Синтетический концерт', description: 'Проверка записи', category: 'Афиша', price_text: 'Бесплатно', is_event: true, event_type: 'limited', max_seats: 12, event_date: '2099-05-01', event_time: '12:00' },
+    ] }) };
+    if (url === '/api/v1/event-registrations') return { ok: true, status: 200, json: async () => ({ ok: true, registrations: [] }) };
+    if (url === `/api/v1/listings/${eventId}/registrations`) return { ok: true, status: 201, json: async () => ({ ok: true, registration: { event_id: eventId, user_id: 'synthetic-user', status: 'confirmed' } }) };
+    if (url === `/api/v1/listings/${eventId}/registrations/me`) return { ok: true, status: 200, json: async () => ({ ok: true, status: 'cancelled' }) };
+    throw new Error(`unexpected request ${url}`);
+  } });
+  const card = root.children[0].children[0];
+  const actions = card.children.find(node => node.className === 'ru-event-actions');
+  const [register, cancel] = actions.children;
+  assert.equal(calls[1].options.credentials, 'same-origin');
+  assert.equal(register.textContent, 'Записаться');
+  assert.equal(cancel.hidden, true);
+  await register.listeners.click();
+  assert.equal(calls[2].options.method, 'POST');
+  assert.equal(calls[2].options.body, undefined);
+  assert.equal(calls[2].options.credentials, 'same-origin');
+  assert.equal(register.textContent, 'Вы записаны');
+  assert.equal(cancel.hidden, false);
+  await cancel.listeners.click();
+  assert.equal(calls[3].options.method, 'DELETE');
+  assert.equal(register.textContent, 'Записаться');
+  assert.equal(cancel.hidden, true);
+});
+
+test('guest event action redirects to Yandex login and unavailable event APIs disable registration', async () => {
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  const makeRoot = () => new FakeNode('section');
+  const root = makeRoot();
+  let loginUrl;
+  await loadPublicBoard({ root, document: fakeDocument, location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) };
+    return { ok: false, status: 401, json: async () => ({}) };
+  } });
+  const actions = root.children[0].children[0].children.find(node => node.className === 'ru-event-actions');
+  await actions.children[0].listeners.click();
+  assert.equal(loginUrl, '/auth/yandex/start');
+
+  const unavailableRoot = makeRoot();
+  await loadPublicBoard({ root: unavailableRoot, document: fakeDocument, fetchImpl: async url =>
+    url === '/api/v1/listings'
+      ? { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) }
+      : { ok: false, status: 503, json: async () => ({}) },
+  });
+  const unavailableActions = unavailableRoot.children[0].children[0].children.find(node => node.className === 'ru-event-actions');
+  assert.equal(unavailableActions.children[0].disabled, true);
+  assert.equal(unavailableActions.children[0].textContent, 'Запись недоступна');
+});
