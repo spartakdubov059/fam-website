@@ -88,6 +88,64 @@ test("cloud monitor checks production pages and ignores stale GitHub failures", 
   assert.deepEqual(report.recent_failures, []);
 });
 
+test("cloud monitor checks GitHub Pages and Netlify independently", async () => {
+  const requests = [];
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      requests.push(parsed.origin + parsed.pathname);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.hostname === "famru.netlify.app" && parsed.pathname === "/") {
+        return response("temporarily unavailable", 503);
+      }
+      if (parsed.pathname.endsWith("/robots.txt")) {
+        return response("User-agent: *\nAllow: /\nSitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml\n");
+      }
+      if (parsed.pathname.endsWith("/sitemap.xml")) {
+        return response("<urlset><url><loc>https://spartakdubov059.github.io/fam-website/</loc></url></urlset>");
+      }
+      return response(homepage);
+    },
+    repository: "owner/repo",
+    token: "test-token",
+    now: Date.parse("2026-11-13T12:00:00Z"),
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.performance_by_site.length, 2);
+  assert.equal(report.performance_by_site[0].site, "GitHub Pages");
+  assert.equal(report.performance_by_site[1], null);
+  assert.ok(requests.includes("https://spartakdubov059.github.io/fam-website/"));
+  assert.ok(requests.includes("https://famru.netlify.app/"));
+  assert.equal(report.checks.some((check) => check.name.includes("Главная (Netlify)") && !check.ok), true);
+});
+
+test("cloud monitor validates both production hosts when both are available", async () => {
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) {
+        return response("User-agent: *\nAllow: /\nSitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml\n");
+      }
+      if (parsed.pathname.endsWith("/sitemap.xml")) {
+        return response("<urlset><url><loc>https://spartakdubov059.github.io/fam-website/</loc></url></urlset>");
+      }
+      return response(homepage);
+    },
+    repository: "owner/repo",
+    token: "test-token",
+    now: Date.parse("2026-11-13T12:00:00Z"),
+    retryDelayMs: 0,
+  });
+
+  assert.equal(report.ok, true);
+  assert.deepEqual(report.performance_by_site.map((site) => site.site), ["GitHub Pages", "Netlify"]);
+  assert.equal(report.checks.filter((check) => check.name.startsWith("Производительность")).length, 2);
+  assert.equal(report.checks.some((check) => check.name.includes("sitemap.xml (Netlify)") && check.ok), true);
+});
+
 test("cloud monitor reports bad homepage markup and recent failed workflows", async () => {
   const now = Date.parse("2026-11-11T05:00:00Z");
   const report = await runFAMCloudMonitor({
@@ -270,12 +328,17 @@ test("mobile Lighthouse runs daily or on a manual request only", () => {
   assert.ok(mobileJob.includes("github.event_name == 'workflow_dispatch'"));
   assert.ok(mobileJob.includes("github.event.schedule == '7 3 * * *'"));
   assert.ok(mobileJob.includes("lighthouse@13.6.0"));
+  assert.ok(mobileJob.includes("max-parallel: 1"));
   assert.ok(mobileJob.includes("--output=json"));
   assert.ok(mobileJob.includes("--output=html"));
   assert.ok(mobileJob.includes("actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"));
   assert.ok(mobileJob.includes("retention-days: 3"));
-  assert.ok(mobileJob.includes("fam-lighthouse.report.html"));
-  assert.ok(mobileJob.includes("fam-lighthouse.report.json"));
+  assert.ok(mobileJob.includes("fam-lighthouse-${{ matrix.site_key }}.report.html"));
+  assert.ok(mobileJob.includes("fam-lighthouse-${{ matrix.site_key }}.report.json"));
+  assert.ok(mobileJob.includes("matrix.site_url"));
+  assert.ok(mobileJob.includes("https://famru.netlify.app/"));
+  assert.ok(mobileJob.includes("https://spartakdubov059.github.io/fam-website/"));
+  assert.ok(mobileJob.includes("matrix.site_name"));
   assert.ok(mobileJob.includes("for attempt in 1 2"));
   assert.ok(mobileJob.includes("--headless=new --no-sandbox"));
   assert.ok(mobileJob.includes("permissions:\n      contents: read"));
@@ -301,6 +364,17 @@ test("mobile Lighthouse report uses lab metric thresholds and labels its scope",
   ]);
   assert.match(renderFAMMobileLighthouseSummary(result), /не INP/);
   assert.match(renderFAMMobileLighthouseSummary(result), /не полевые данные/);
+  const netlifyResult = summarizeFAMMobileLighthouse({
+    categories: { performance: { score: 0.73 } },
+    audits: {
+      "largest-contentful-paint": { numericValue: 4100 },
+      "cumulative-layout-shift": { numericValue: 0.26 },
+      "total-blocking-time": { numericValue: 610 },
+      "total-byte-weight": { numericValue: 456789 },
+    },
+  }, "Netlify");
+  assert.equal(netlifyResult.site_name, "Netlify");
+  assert.match(renderFAMMobileLighthouseSummary(netlifyResult), /Netlify/);
 });
 
 test("mobile Lighthouse report distinguishes moderate values from poor findings", () => {

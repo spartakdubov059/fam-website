@@ -46,6 +46,17 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '7 3 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - site_key: github-pages
+            site_name: GitHub Pages
+            site_url: https://spartakdubov059.github.io/fam-website/
+          - site_key: netlify
+            site_name: Netlify
+            site_url: https://famru.netlify.app/
     permissions:
       contents: read
     steps:
@@ -67,13 +78,13 @@ jobs:
           set -euo pipefail
           for attempt in 1 2; do
             if npx --yes lighthouse@13.6.0 \
-              https://spartakdubov059.github.io/fam-website/ \
+              "${{ matrix.site_url }}" \
               --form-factor=mobile \
               --throttling-method=simulate \
               --only-categories=performance \
               --output=json \
               --output=html \
-              --output-path="$RUNNER_TEMP/fam-lighthouse" \
+              --output-path="$RUNNER_TEMP/fam-lighthouse-${{ matrix.site_key }}" \
               --chrome-flags="--headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu" \
               --quiet; then
               exit 0
@@ -89,12 +100,12 @@ jobs:
         if: always() && steps.lighthouse.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
         with:
-          name: fam-mobile-lighthouse-${{ github.run_id }}
+          name: fam-mobile-lighthouse-${{ matrix.site_key }}-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/fam-lighthouse.report.html
-            ${{ runner.temp }}/fam-lighthouse.report.json
+            ${{ runner.temp }}/fam-lighthouse-${{ matrix.site_key }}.report.html
+            ${{ runner.temp }}/fam-lighthouse-${{ matrix.site_key }}.report.json
           if-no-files-found: error
           retention-days: 3
 
       - name: Publish normalized metrics and fail on poor lab thresholds
-        run: node scripts/run-fam-lighthouse-report.mjs "$RUNNER_TEMP/fam-lighthouse.report.json"
+        run: node scripts/run-fam-lighthouse-report.mjs "$RUNNER_TEMP/fam-lighthouse-${{ matrix.site_key }}.report.json" "${{ matrix.site_name }}"

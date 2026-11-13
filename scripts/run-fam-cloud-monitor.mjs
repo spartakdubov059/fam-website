@@ -3,7 +3,10 @@ import { Script } from "node:vm";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const SITE_BASE_URL = "https://spartakdubov059.github.io/fam-website/";
+const SITE_BASE_URLS = Object.freeze([
+  { label: "GitHub Pages", url: "https://spartakdubov059.github.io/fam-website/" },
+  { label: "Netlify", url: "https://famru.netlify.app/" },
+]);
 const DEFAULT_REPOSITORY = "spartakdubov059/fam-website";
 const MONITOR_WORKFLOW_PATH = ".github/workflows/fam-cloud-monitor.yml";
 const FAILURE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -188,16 +191,19 @@ function validatedRunUrl(value, repository) {
 
 export async function runFAMCloudMonitor({
   fetchImpl = globalThis.fetch,
-  baseUrl = SITE_BASE_URL,
+  baseUrl,
   repository = process.env.GITHUB_REPOSITORY || DEFAULT_REPOSITORY,
   token = process.env.GH_TOKEN || "",
   now = Date.now(),
   retryDelayMs = 1000,
 } = {}) {
   const checks = [];
-  const base = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+  const sites = baseUrl
+    ? [{ label: "Тестовая площадка", url: baseUrl.endsWith("/") ? baseUrl : baseUrl + "/" }]
+    : SITE_BASE_URLS;
+  const performanceBySite = [];
 
-  async function checkPage(name, path, validate) {
+  async function checkPage(name, path, validate, base) {
     const url = new URL(path, base).href;
     try {
       const started = performance.now();
@@ -218,56 +224,64 @@ export async function runFAMCloudMonitor({
     }
   }
 
-  const homepageResult = await checkPage("Главная и синтаксис встроенного JS", "", validateHomepage);
-  let performanceMetrics = null;
-  if (homepageResult) {
-    const measured = await measurePagePerformance(homepageResult.body, base, fetchImpl, retryDelayMs);
-    const findings = [];
-    if (homepageResult.elapsed_ms > PERFORMANCE_LIMITS.homepage_ms) findings.push("ответ главной дольше 8 секунд");
-    if (homepageResult.body_bytes > PERFORMANCE_LIMITS.html_bytes) findings.push("HTML больше 1.5 MB");
-    if (measured.resource_bytes > PERFORMANCE_LIMITS.resource_bytes) findings.push("сумма известных размеров ресурсов больше 20 MB");
-    if (measured.largest_resource_bytes > PERFORMANCE_LIMITS.largest_resource_bytes) findings.push("ресурс больше 8 MB");
-    performanceMetrics = {
-      homepage_ms: homepageResult.elapsed_ms,
-      html_bytes: homepageResult.body_bytes,
-      ...measured,
-      findings,
-    };
-    const resourceSummary = measured.resource_failures
-      ? "Некоторые локальные ресурсы не загрузились: " + measured.resource_errors.join("; ")
-      : "Все проверенные локальные ресурсы доступны.";
-    const performanceSummary = findings.length
-      ? "Превышены стартовые ориентиры: " + findings.join("; ") + "."
-      : "Стартовые ориентиры соблюдены.";
-    checks.push({
-      name: "Производительность: документ и локальные ресурсы",
-      ok: measured.resource_failures === 0 && findings.length === 0,
-      detail: "HTML " + homepageResult.body_bytes + " байт за " + homepageResult.elapsed_ms + " мс; " +
-        measured.local_resources_checked + "/" + measured.local_resources_total + " локальных ресурсов проверено, " +
-        measured.resource_bytes + " байт по HEAD-заголовкам (" + measured.resource_sizes_known + "/" +
-        measured.local_resources_checked + " размеров известно), крупнейший " + measured.largest_resource_bytes +
-        " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary + " " + performanceSummary +
-        (measured.resources_truncated ? " Остальные ресурсы не проверялись из-за лимита 12." : "") +
-        " Пороги: главная 8 с, HTML 1.5 MB, известный объём ресурсов 20 MB, один ресурс 8 MB. " +
-        "Это начальные грубые ориентиры, не browser-render/mobile benchmark.",
-    });
-  } else {
-    checks.push({
-      name: "Производительность: документ и локальные ресурсы",
-      ok: false,
-      detail: "Метрики недоступны: главная страница не прошла проверку.",
-    });
+  for (const site of sites) {
+    const base = site.url;
+    const homepageResult = await checkPage("Главная (" + site.label + ") и синтаксис встроенного JS", "", validateHomepage, base);
+    let performanceMetrics = null;
+    if (homepageResult) {
+      const measured = await measurePagePerformance(homepageResult.body, base, fetchImpl, retryDelayMs);
+      const findings = [];
+      if (homepageResult.elapsed_ms > PERFORMANCE_LIMITS.homepage_ms) findings.push("ответ главной дольше 8 секунд");
+      if (homepageResult.body_bytes > PERFORMANCE_LIMITS.html_bytes) findings.push("HTML больше 1.5 MB");
+      if (measured.resource_bytes > PERFORMANCE_LIMITS.resource_bytes) findings.push("сумма известных размеров ресурсов больше 20 MB");
+      if (measured.largest_resource_bytes > PERFORMANCE_LIMITS.largest_resource_bytes) findings.push("ресурс больше 8 MB");
+      performanceMetrics = {
+        site: site.label,
+        base_url: base,
+        homepage_ms: homepageResult.elapsed_ms,
+        html_bytes: homepageResult.body_bytes,
+        ...measured,
+        findings,
+      };
+      const resourceSummary = measured.resource_failures
+        ? "Некоторые локальные ресурсы не загрузились: " + measured.resource_errors.join("; ")
+        : "Все проверенные локальные ресурсы доступны.";
+      const performanceSummary = findings.length
+        ? "Превышены стартовые ориентиры: " + findings.join("; ") + "."
+        : "Стартовые ориентиры соблюдены.";
+      checks.push({
+        name: "Производительность: документ и локальные ресурсы (" + site.label + ")",
+        ok: measured.resource_failures === 0 && findings.length === 0,
+        detail: "HTML " + homepageResult.body_bytes + " байт за " + homepageResult.elapsed_ms + " мс; " +
+          measured.local_resources_checked + "/" + measured.local_resources_total + " локальных ресурсов проверено, " +
+          measured.resource_bytes + " байт по HEAD-заголовкам (" + measured.resource_sizes_known + "/" +
+          measured.local_resources_checked + " размеров известно), крупнейший " + measured.largest_resource_bytes +
+          " байт, медленнейший " + measured.slowest_resource_ms + " мс. " + resourceSummary + " " + performanceSummary +
+          (measured.resources_truncated ? " Остальные ресурсы не проверялись из-за лимита 12." : "") +
+          " Пороги: главная 8 с, HTML 1.5 MB, известный объём ресурсов 20 MB, один ресурс 8 MB. " +
+          "Это начальные грубые ориентиры, не browser-render/mobile benchmark.",
+      });
+    } else {
+      checks.push({
+        name: "Производительность: документ и локальные ресурсы (" + site.label + ")",
+        ok: false,
+        detail: "Метрики недоступны: главная страница не прошла проверку.",
+      });
+    }
+    performanceBySite.push(performanceMetrics);
+    await checkPage("robots.txt (" + site.label + ")", "robots.txt", (body) => {
+      const sitemapUrl = body.match(/^Sitemap:\s*(\S+)/im)?.[1];
+      const expectedSitemaps = [new URL("sitemap.xml", base).href, new URL("sitemap.xml", SITE_BASE_URLS[0].url).href];
+      if (!/^User-agent:\s*\*/im.test(body) || !expectedSitemaps.includes(sitemapUrl)) {
+        throw new Error("robots.txt is missing the allow rule or sitemap link.");
+      }
+    }, base);
+    await checkPage("sitemap.xml (" + site.label + ")", "sitemap.xml", (body) => {
+      if (!body.includes("<urlset") || (!body.includes(new URL("", base).href) && !body.includes(SITE_BASE_URLS[0].url))) {
+        throw new Error("sitemap.xml is missing the FAM homepage.");
+      }
+    }, base);
   }
-  await checkPage("robots.txt", "robots.txt", (body) => {
-    if (!/^User-agent:\s*\*/im.test(body) || !body.includes(new URL("sitemap.xml", base).href)) {
-      throw new Error("robots.txt is missing the allow rule or sitemap link.");
-    }
-  });
-  await checkPage("sitemap.xml", "sitemap.xml", (body) => {
-    if (!body.includes("<urlset") || !body.includes(new URL("", base).href)) {
-      throw new Error("sitemap.xml is missing the FAM homepage.");
-    }
-  });
 
   let recentRuns = [];
   let staleRuns = [];
@@ -327,7 +341,8 @@ export async function runFAMCloudMonitor({
     checks,
     recent_failures: recentFailures,
     stalled_runs: stalledRuns,
-    performance: performanceMetrics,
+    performance: performanceBySite[0] ?? null,
+    performance_by_site: performanceBySite,
   };
 }
 
@@ -355,20 +370,20 @@ export function renderFAMCloudMonitorReport(report) {
     "",
     "## Замеры производительности страницы",
     "",
-    report?.performance
-      ? "- Документ: " + report.performance.html_bytes + " байт; ответ за " + report.performance.homepage_ms + " мс."
-      : "- Замер документа недоступен.",
-    report?.performance
-      ? report.performance.findings.length
-        ? "- Предупреждения: " + report.performance.findings.map((finding) => escapeMarkdown(finding, 120)).join("; ")
-        : "- Предупреждения по стартовым порогам: не выявлены."
-      : "- Предупреждения: метрики недоступны.",
-    report?.performance
-      ? "- Локальные ресурсы: " + report.performance.local_resources_checked + "/" + report.performance.local_resources_total +
-        " проверено; " + report.performance.resource_bytes + " байт по HEAD-заголовкам (" +
-        report.performance.resource_sizes_known + "/" + report.performance.local_resources_checked +
-        " размеров известно); крупнейший " + report.performance.largest_resource_bytes + " байт; медленнейший " + report.performance.slowest_resource_ms + " мс."
-      : "- Ресурсы страницы не измерены.",
+    ...((report?.performance_by_site ?? (report?.performance ? [report.performance] : [])).filter(Boolean).flatMap((performance) => [
+      "- **" + escapeMarkdown(performance.site || "Площадка", 80) + "** (" + escapeMarkdown(performance.base_url || "", 160) + "): документ " +
+        performance.html_bytes + " байт; ответ за " + performance.homepage_ms + " мс.",
+      performance.findings.length
+        ? "- Предупреждения: " + performance.findings.map((finding) => escapeMarkdown(finding, 120)).join("; ")
+        : "- Предупреждения по стартовым порогам: не выявлены.",
+      "- Локальные ресурсы: " + performance.local_resources_checked + "/" + performance.local_resources_total +
+        " проверено; " + performance.resource_bytes + " байт по HEAD-заголовкам (" +
+        performance.resource_sizes_known + "/" + performance.local_resources_checked +
+        " размеров известно); крупнейший " + performance.largest_resource_bytes + " байт; медленнейший " + performance.slowest_resource_ms + " мс.",
+    ])),
+    ...(!(report?.performance_by_site ?? (report?.performance ? [report.performance] : [])).filter(Boolean).length
+      ? ["- Замер документа/ресурсов недоступен."]
+      : []),
     "- Это периодический сетевой замер с GitHub runner; он не измеряет browser rendering, Core Web Vitals или мобильные устройства.",
     "",
     "## Ошибки workflow за последние 24 часа",

@@ -17,12 +17,13 @@ function metric(report, auditId) {
   return value;
 }
 
-export function summarizeFAMMobileLighthouse(report) {
+export function summarizeFAMMobileLighthouse(report, siteName = "GitHub Pages") {
   const score = report?.categories?.performance?.score;
   if (!Number.isFinite(score) || score < 0 || score > 1) {
     throw new Error("missing_lighthouse_performance_score");
   }
   const result = {
+    site_name: String(siteName),
     performance_score: Math.round(score * 100),
     lcp_ms: Math.round(metric(report, "largest-contentful-paint")),
     cls: Number(metric(report, "cumulative-layout-shift").toFixed(3)),
@@ -48,7 +49,7 @@ export function summarizeFAMMobileLighthouse(report) {
 
 export function renderFAMMobileLighthouseSummary(result) {
   const lines = [
-    "## Мобильная производительность FAM — Lighthouse lab run",
+    "## Мобильная производительность FAM — " + result.site_name + " — Lighthouse lab run",
     "",
     "- Performance score: " + result.performance_score + "/100",
     "- LCP: " + result.lcp_ms + " мс",
@@ -68,7 +69,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const reportPath = process.argv[2];
   if (!reportPath) throw new Error("lighthouse_report_path_required");
   const report = JSON.parse(readFileSync(reportPath, "utf8"));
-  const result = summarizeFAMMobileLighthouse(report);
+  const result = summarizeFAMMobileLighthouse(report, process.argv[3] || "GitHub Pages");
   const summary = renderFAMMobileLighthouseSummary(result);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary, "utf8");
   process.stdout.write(summary);
