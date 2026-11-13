@@ -37,7 +37,7 @@ const reportMigration = readFileSync(
 
 test("workflow runs are bounded to the last 24 hours and summarized by outcome", () => {
   const runs = summarizeWorkflowRuns([
-    { name: "QA", status: "completed", conclusion: "success", created_at: "2026-11-13T05:00:00Z", run_number: 12, html_url: "https://github.com/a/b/actions/runs/12" },
+    { id: 120, name: "QA", status: "completed", conclusion: "success", created_at: "2026-11-13T05:00:00Z", run_number: 12, html_url: "https://github.com/a/b/actions/runs/12" },
     { name: "QA", status: "completed", conclusion: "failure", created_at: "2026-11-13T02:00:00Z", run_number: 11, html_url: "https://github.com/a/b/actions/runs/11" },
     { name: "old", status: "completed", conclusion: "success", created_at: "2026-11-11T02:00:00Z" },
   ], now);
@@ -46,6 +46,7 @@ test("workflow runs are bounded to the last 24 hours and summarized by outcome",
   assert.equal(runs[0].success, 1);
   assert.equal(runs[0].failure, 1);
   assert.equal(runs[0].latest.run_number, 12);
+  assert.equal(runs[0].latest.run_id, 120);
 });
 
 test("PR report strips titles and accepts only trusted GitHub URLs", () => {
