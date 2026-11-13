@@ -19,6 +19,7 @@ const snapshot = {
   latest_coder_task: { status: "failed", updated_at: "2026-11-13T03:15:00Z" },
   latest_site_error_check: { status: "completed", updated_at: "2026-11-13T05:30:00Z" },
   failed_tasks_24h: [{ task_type: "coder_patch_request", count: 1 }],
+  site_error_events_24h: [{ event_code: "js_runtime", page_area: "listings", occurrences: 4 }],
 };
 const reportWorkflow = readFileSync(
   new URL("../../.github/workflows/fam-agent-daily-report.yml", import.meta.url),
@@ -75,19 +76,21 @@ test("daily report states missing sources and records only allowlisted Supabase 
   });
   assert.deepEqual(Object.keys(report.supabase).sort(), [
     "agent_statuses", "cron_jobs", "daily_report", "failed_tasks_24h", "generated_at", "latest_coder_task",
-    "latest_site_error_check", "latest_system_health", "report_date",
+    "latest_site_error_check", "latest_system_health", "report_date", "site_error_events_24h",
   ]);
   assert.equal(report.workflows_24h.length, 2);
   assert.ok(report.role_statuses.some((role) => role.role === "QA" && role.status === "success"));
   assert.ok(report.role_statuses.some((role) => role.role === "Security Agent" && role.status === "coder_workflow_seen_individual_result_unavailable"));
   assert.equal(report.open_pull_requests[0].number, 8);
-  assert.ok(report.role_statuses.some((role) => role.role === "Analyst" && role.status === "not_separately_instrumented"));
+  assert.ok(report.role_statuses.some((role) => role.role === "Analyst" && role.status === "hypotheses_available"));
   assert.equal(JSON.stringify(report).includes("not included"), false);
   const markdown = renderDailyReport(report);
   assert.match(markdown, /ошибки 0/);
   assert.match(markdown, /последнее состояние: completed\/success/);
   assert.match(markdown, /PR #8 — draft/);
   assert.match(markdown, /coder_patch_request: 1 сбоев/);
+  assert.match(markdown, /Аналитические гипотезы по техническим сигналам/);
+  assert.match(markdown, /без stack trace/);
   assert.match(markdown, /Публичный сайт: reachable \(HTTP 200\)/);
   assert.match(markdown, /Проверка сайта выполняется один раз в сутки/);
 });
@@ -118,5 +121,6 @@ test("Reporter output fields match the Edge bridge and SQL persistence allowlist
   const edgeFields = [...declaration.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
   assert.deepEqual(edgeFields, Object.keys({ ...report, markdown: renderDailyReport(report) }).sort());
   assert.match(declaration, /"role_statuses"/);
-  assert.match(reportMigration, /'open_pull_requests','role_statuses','production_deployment'/);
+  assert.match(declaration, /"technical_analysis"/);
+  assert.match(reportMigration, /'open_pull_requests','role_statuses','technical_analysis','production_deployment'/);
 });
