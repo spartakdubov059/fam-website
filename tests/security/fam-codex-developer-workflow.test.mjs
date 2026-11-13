@@ -124,6 +124,8 @@ test("all changes require owner approval before merge and production publication
   assert.doesNotMatch(workflow, /REQUIRES_APPROVAL/);
   assert.match(workflow, /отдельного явного разрешения владельца/);
   assert.equal(workflow.includes("gh pr merge"), false);
+  assert.doesNotMatch(workflow, /gh pr ready/);
+  assert.doesNotMatch(workflow, /gh api\\s+-X\\s+(?:PUT|PATCH|POST).*pulls/i);
   assert.equal(workflow.includes("pages/builds"), false);
   assert.equal(workflow.includes("pages: write"), false);
   assert.equal(workflow.includes("github.io/fam-website"), false);
