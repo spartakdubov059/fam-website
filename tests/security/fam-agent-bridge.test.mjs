@@ -116,12 +116,16 @@ const edgeSource = readFileSync(
   new URL("../../supabase/functions/fam-agent-coder-bridge/index.ts", import.meta.url),
   "utf8",
 );
+const bridgeSource = readFileSync(
+  new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url),
+  "utf8",
+);
 
 test("model work starts only for a claimed queue task or a manual request", () => {
-  assert.match(bridge, /Bridge credentials are absent; skipping model work/);
-  assert.match(bridge, /No queued coder task; skipping model download and inference/);
-  assert.match(bridge, /run_model=false/);
-  assert.match(bridge, /run_model=true/);
+  assert.match(bridgeSource, /Bridge credentials are absent; skipping model work/);
+  assert.match(bridgeSource, /No queued coder task; skipping model download and inference/);
+  assert.match(bridgeSource, /run_model=false/);
+  assert.match(bridgeSource, /run_model=true/);
 });
 
 test("SQL bridge functions are invoker-only and restricted to service_role", () => {
