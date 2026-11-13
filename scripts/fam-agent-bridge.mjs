@@ -56,12 +56,12 @@ export function shouldRunModel({ manualTask = "", bridgeConfigured = false, task
   return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
 }
 
-export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true) {
+export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true) {
   if (!executionSucceeded) return "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
-    return qaSucceeded === true ? "model_completed" : "model_failed";
+    return qaSucceeded === true && prSucceeded === true ? "model_completed" : "model_failed";
   }
   return "model_no_patch";
 }
@@ -119,13 +119,27 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
     const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
+    const prUrl = process.env.FAM_AGENT_PR_URL || "";
+    const commitSha = process.env.FAM_AGENT_COMMIT_SHA || "";
+    const prMetadataValid =
+      /^https:\/\/github\.com\/spartakdubov059\/fam-website\/pull\/[1-9][0-9]*$/.test(prUrl) &&
+      /^[0-9a-f]{40}$/i.test(commitSha);
     const code = chooseResultCode(
       summary,
       process.env.FAM_MODEL_STEP_OUTCOME === "success",
       process.env.FAM_QA_OUTCOME === "success",
+      process.env.FAM_PR_MANAGER_OUTCOME === "success" && prMetadataValid,
     );
     const result = await bridgeRequest({
-      url, token, body: { action: "finish", task_id: taskId, result_code: code },
+      url,
+      token,
+      body: {
+        action: "finish",
+        task_id: taskId,
+        result_code: code,
+        pr_url: code === "model_completed" ? prUrl : null,
+        commit_sha: code === "model_completed" ? commitSha : null,
+      },
     });
     if (result?.ok !== true || result?.saved !== true) {
       throw new Error("Bridge did not accept the task result.");
