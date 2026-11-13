@@ -128,38 +128,48 @@ begin
   update private.fam_agent_tasks set status='completed'
   where task_type='coder_patch_request' and status in ('queued','claimed','in_progress');
 
+  insert into private.fam_agent_tasks(
+    id,agent_key,task_type,approval_required,source,payload,attempt_count,max_attempts,status,created_at,finished_at
+  ) values (
+    '823e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,'scheduled_audit',
+    '{"task_key":"audit_frontend_runtime","event_code":"js_runtime","page_area":"other","occurrences":3}'::jsonb,
+    2,2,'failed',now()-interval '20 days',now()-interval '20 days'
+  );
+
   insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
   values ('js_runtime','other',now()-interval '1 hour',3);
   perform private.enqueue_fam_agent_coder_task();
   if (select count(*) from private.fam_agent_tasks
-      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 1 then
+      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 2 then
     raise exception 'producer did not enqueue the threshold event';
   end if;
   select payload into v_payload from private.fam_agent_tasks
   where task_type='coder_patch_request' and payload->>'event_code'='js_runtime' order by created_at desc limit 1;
   if v_payload->>'event_summary' <> 'Ошибка выполнения JavaScript'
      or v_payload->>'observed_hour' !~ '^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$'
-     or v_payload->>'previous_attempts' <> '0' then
+     or v_payload->>'previous_attempts' <> '2' then
     raise exception 'producer did not persist bounded coder context';
   end if;
   select * into v_claim from public.claim_fam_agent_coder_tasks('fam-agent-qwen-coder-v1',1,7200);
   if v_claim.event_summary <> 'Ошибка выполнения JavaScript'
      or v_claim.observed_hour <> v_payload->>'observed_hour'
-     or v_claim.previous_attempts <> 0 then
+     or v_claim.previous_attempts <> 2 then
     raise exception 'claim RPC did not return bounded coder context';
   end if;
   update private.fam_agent_tasks
   set status='completed',finished_at=now(),claimed_by=null,claimed_at=null,lease_expires_at=null
-  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime';
+  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime'
+    and created_at >= now()-interval '1 day';
   if coalesce(private.enqueue_fam_agent_coder_task()->>'reason','') <> 'matching_coder_task_cooldown' then
     raise exception 'producer did not suppress the repeated event within seven days';
   end if;
   update private.fam_agent_tasks
   set created_at=now()-interval '8 days'
-  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime';
+  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime'
+    and created_at >= now()-interval '1 day';
   perform private.enqueue_fam_agent_coder_task();
   if (select count(*) from private.fam_agent_tasks
-      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 2 then
+      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 3 then
     raise exception 'producer did not allow a new task after the seven-day cooldown';
   end if;
 end
