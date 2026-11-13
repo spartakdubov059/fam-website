@@ -71,6 +71,38 @@ export function summarizeWorkflowRuns(runs, now = new Date()) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+const VALID_ACTION_STATUSES = new Set(["queued", "in_progress", "success", "failure", "cancelled", "skipped", "not_observed"]);
+
+function actionStatus(item) {
+  if (!item || typeof item !== "object") return "not_observed";
+  if (item.status === "queued" || item.status === "in_progress") return item.status;
+  if (item.status !== "completed") return "not_observed";
+  if (item.conclusion === "success") return "success";
+  if (item.conclusion === "skipped") return "skipped";
+  if (item.conclusion === "cancelled") return "cancelled";
+  if (["failure", "timed_out", "action_required", "startup_failure"].includes(item.conclusion)) return "failure";
+  return "not_observed";
+}
+
+export function summarizeAgentJobStatuses(jobs) {
+  if (!Array.isArray(jobs)) return null;
+  const findJob = (name) => jobs.find((job) => job?.name === name) ?? null;
+  const findStep = (job, name) => Array.isArray(job?.steps)
+    ? job.steps.find((step) => step?.name === name) ?? null
+    : null;
+  const coder = findJob("Локальная модель готовит исправление");
+  const qa = findJob("Независимая проверка без модели и секретов");
+  const prManager = findJob("Подготовить PR и проверить исправление без публикации");
+  return {
+    coder: actionStatus(findStep(coder, "Запустить локальную модель и подготовить patch")),
+    qa: actionStatus(qa),
+    reviewer: actionStatus(findStep(qa, "Подготовить независимый статический Reviewer отчёт")),
+    security: actionStatus(findStep(qa, "Запустить отдельный статический Security Agent")),
+    performance: actionStatus(findStep(qa, "Запустить отдельный статический Performance Agent")),
+    pr_manager: actionStatus(prManager),
+  };
+}
+
 export function sanitizePullRequests(pulls) {
   return (Array.isArray(pulls) ? pulls : [])
     .filter((pull) => pull?.state === "open" && Number.isSafeInteger(pull.number))
