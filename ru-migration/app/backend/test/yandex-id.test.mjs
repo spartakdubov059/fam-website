@@ -39,10 +39,24 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.match(sessionCookie, /Secure/);
   assert.match(sessionCookie, /SameSite=Lax/);
   assert.equal(sessionCookie.includes('temporary-yandex-access-token'), false);
-  const identity = await auth.authenticate({ headers: { cookie: cookiePair(sessionCookie) } });
+  const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } });
   assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789' });
+  assert.deepEqual(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://fam.example' } }), identity);
+  assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://attacker.example' } }), null);
+  assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie) } }), null, 'unsafe cookie requests require an Origin header');
   currentTime += 3_601_000;
-  assert.equal(await auth.authenticate({ headers: { cookie: cookiePair(sessionCookie) } }), null, 'session expires after one hour');
+  assert.equal(await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } }), null, 'session expires after one hour');
+});
+
+test('Yandex logout rejects missing and cross-origin requests', async () => {
+  const auth = createYandexIdAuth({ clientId: 'client', redirectUri: 'https://fam.example/auth/yandex/callback', sessionSecret: 'test-session-secret-with-32-bytes-minimum' });
+  const missingOrigin = await auth.handle({ method: 'POST', url: '/auth/yandex/logout', headers: {} });
+  const foreignOrigin = await auth.handle({ method: 'POST', url: '/auth/yandex/logout', headers: { origin: 'https://attacker.example' } });
+  assert.equal(missingOrigin.status, 403);
+  assert.equal(foreignOrigin.status, 403);
+  const sameOrigin = await auth.handle({ method: 'POST', url: '/auth/yandex/logout', headers: { origin: 'https://fam.example' } });
+  assert.equal(sameOrigin.status, 204);
+  assert.match(sameOrigin.headers['set-cookie'], /Max-Age=0/);
 });
 
 test('Yandex callback rejects missing or mismatched OAuth state before contacting Yandex', async () => {

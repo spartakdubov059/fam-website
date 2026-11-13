@@ -65,6 +65,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
   async function handle(req) {
     const url = new URL(req.url || '/', 'http://localhost');
     if (req.method === 'POST' && url.pathname === '/auth/yandex/logout') {
+      if (req.headers?.origin !== callback.origin) {
+        return { status: 403, headers: { 'cache-control': 'no-store' }, body: { ok: false, error: 'invalid_origin' } };
+      }
       return { status: 204, headers: { 'set-cookie': cookie(SESSION_COOKIE, '', { path: '/', maxAge: 0, secure }), 'cache-control': 'no-store' }, body: null };
     }
     if (req.method === 'GET' && url.pathname === '/auth/yandex/start') {
@@ -125,6 +128,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
   }
 
   async function authenticate(req) {
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers?.origin !== callback.origin) return null;
     const session = decodeSigned(getCookie(req, SESSION_COOKIE), secret, nowSeconds());
     if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string') return null;
     return { issuer: YANDEX_ISSUER, subject: session.sub };
