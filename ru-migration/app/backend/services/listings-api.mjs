@@ -7,6 +7,76 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
+    const eventRegistrationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations$/i);
+    const eventReviewMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
+    if (req.method === 'GET' && eventOccupancyMatch) {
+      if (typeof repository.getEventOccupancy !== 'function') return { status: 503, body: { ok: false, error: 'event_read_unavailable' } };
+      try { return { status: 200, body: { ok: true, taken: await repository.getEventOccupancy(eventOccupancyMatch[1]) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/event-registrations') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try { return { status: 200, body: { ok: true, registrations: await repository.listEventRegistrations(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && eventRegistrationMatch) {
+      let bodyBytes = 0;
+      for await (const chunk of req) {
+        bodyBytes += chunk.length;
+        if (bodyBytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } };
+      }
+      if (bodyBytes > 0) return { status: 400, body: { ok: false, error: 'unexpected_body' } };
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const registration = await repository.registerForEvent(eventRegistrationMatch[1], actor.id);
+        return { status: 201, body: { ok: true, registration } };
+      } catch (error) {
+        if (error?.code === 'event_unavailable') return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+        if (error?.code === 'organizer_registration') return { status: 403, body: { ok: false, error: 'organizer_cannot_register' } };
+        if (error?.code === 'already_registered') return { status: 409, body: { ok: false, error: 'already_registered' } };
+        if (error?.code === 'no_seats_available') return { status: 409, body: { ok: false, error: 'no_seats_available' } };
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
+    }
+    if (req.method === 'DELETE' && eventCancellationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const cancelled = await repository.cancelEventRegistration(eventCancellationMatch[1], actor.id);
+        return cancelled ? { status: 200, body: { ok: true, status: 'cancelled' } }
+          : { status: 404, body: { ok: false, error: 'registration_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && eventReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (!['school_admin', 'council_member'].includes(actor.role)) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'confirmed' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      try {
+        const updated = await repository.moderateEventRegistration(eventReviewMatch[1], eventReviewMatch[2], actor.id, actor.school_id, decision);
+        return updated ? { status: 200, body: { ok: true, status: decision } }
+          : { status: 404, body: { ok: false, error: 'registration_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'PATCH' && moderationMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

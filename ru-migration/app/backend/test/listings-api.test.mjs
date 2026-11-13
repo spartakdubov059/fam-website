@@ -182,3 +182,45 @@ test('listing moderation rejects student role and invalid decisions before repos
   assert.equal((await admin(invalid)).status, 400);
   assert.equal(writes, 0);
 });
+
+test('event registration is bound to the authenticated profile and capacity errors stay explicit', async () => {
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  const registrationRequest = () => {
+    const request = Readable.from([]); request.method = 'POST'; request.url = `/api/v1/listings/${eventId}/registrations`; return request;
+  };
+  let registeredAs;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'untrusted-subject' }),
+    resolveActor: async () => ({ id: 'synthetic-registrant', school_id: 'school-a', role: 'student' }),
+    repository: { registerForEvent: async (...args) => { registeredAs = args; return { event_id: args[0], user_id: args[1], status: 'confirmed' }; } } });
+  const request = registrationRequest();
+  const response = await handler(request);
+  assert.deepEqual(registeredAs, [eventId, 'synthetic-registrant']);
+  assert.deepEqual(response, { status: 201, body: { ok: true, registration: { event_id: eventId, user_id: 'synthetic-registrant', status: 'confirmed' } } });
+
+  const full = createListingsApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: 'u', role: 'student' }),
+    repository: { registerForEvent: async () => { throw Object.assign(new Error('full'), { code: 'no_seats_available' }); } } });
+  const fullResponse = await full(registrationRequest());
+  assert.equal(fullResponse.status, 409);
+  assert.equal(fullResponse.body.error, 'no_seats_available');
+});
+
+test('event registration review requires council role and delegates event-owner scoping to the repository', async () => {
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  const userId = '22222222-2222-4222-8222-222222222222';
+  let writes = 0;
+  const makeHandler = role => createListingsApi({ authenticate: async () => ({ subject: 'x' }),
+    resolveActor: async () => ({ id: 'organizer', school_id: 'school-a', role }),
+    repository: { moderateEventRegistration: async (...args) => { writes++; assert.deepEqual(args, [eventId, userId, 'organizer', 'school-a', 'confirmed']); return true; } } });
+  const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${eventId}/registrations/${userId}`;
+  assert.equal((await makeHandler('student')(request)).status, 403);
+  assert.equal(writes, 0);
+  assert.deepEqual(await makeHandler('council_member')(request), { status: 200, body: { ok: true, status: 'confirmed' } });
+});
+
+test('event occupancy is a public count with no registration identity details', async () => {
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  const handler = createListingsApi({ authenticate: async () => { throw new Error('public occupancy must not authenticate'); },
+    repository: { getEventOccupancy: async id => { assert.equal(id, eventId); return 3; } } });
+  const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
+});

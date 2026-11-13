@@ -111,3 +111,35 @@ test('isolated server routes school listing moderation to the backend', async ()
     assert.deepEqual(await response.json(), { ok: true, method: 'PATCH' });
   });
 });
+
+test('isolated server routes the event registration API only to its configured backend', async () => {
+  const routed = [];
+  const id = '11111111-1111-4111-8111-111111111111';
+  await withServer({ listingsApi: async request => {
+    routed.push(`${request.method} ${request.url}`);
+    return { status: 200, body: { ok: true, method: request.method } };
+  } }, async origin => {
+    for (const [method, pathname] of [
+      ['GET', `/api/v1/listings/${id}/occupancy`],
+      ['GET', '/api/v1/event-registrations'],
+      ['POST', `/api/v1/listings/${id}/registrations`],
+      ['DELETE', `/api/v1/listings/${id}/registrations/me`],
+      ['PATCH', `/api/v1/listings/${id}/registrations/22222222-2222-4222-8222-222222222222`],
+    ]) {
+      const response = await fetch(new URL(pathname, origin), { method, headers: { 'content-type': 'application/json' }, body: ['POST', 'PATCH'].includes(method) ? '{}' : undefined });
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { ok: true, method });
+    }
+  });
+  assert.deepEqual(routed, [
+    'GET /api/v1/listings/11111111-1111-4111-8111-111111111111/occupancy',
+    'GET /api/v1/event-registrations',
+    'POST /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations',
+    'DELETE /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations/me',
+    'PATCH /api/v1/listings/11111111-1111-4111-8111-111111111111/registrations/22222222-2222-4222-8222-222222222222',
+  ]);
+  await withServer({}, async origin => {
+    const response = await fetch(new URL(`/api/v1/listings/${id}/registrations`, origin), { method: 'POST', body: '{}' });
+    assert.equal(response.status, 503);
+  });
+});

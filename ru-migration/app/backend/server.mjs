@@ -64,6 +64,11 @@ export function createServer({ listingsApi = null, authApi = null } = {}) {
       || (req.method === 'POST' && url.pathname === '/api/v1/ideas')
       || (req.method === 'POST' && url.pathname === '/api/v1/messages')
       || (req.method === 'GET' && ['/api/v1/me', '/api/v1/favorites', '/api/v1/messages'].includes(url.pathname))
+      || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations')
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/occupancy$/i.test(url.pathname) && req.method === 'GET')
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/registrations$/i.test(url.pathname) && req.method === 'POST')
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/registrations\/me$/i.test(url.pathname) && req.method === 'DELETE')
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/registrations\/[0-9a-f-]{36}$/i.test(url.pathname) && req.method === 'PATCH')
       || (req.method === 'PATCH' && /^\/api\/v1\/messages\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/read$/i.test(url.pathname))
       || (req.method === 'PATCH' && /^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/moderation$/i.test(url.pathname))
       || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/favorite$/i.test(url.pathname) && ['PUT', 'DELETE'].includes(req.method)))) {

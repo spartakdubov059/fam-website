@@ -1,0 +1,18 @@
+-- Synthetic-test schema for the isolated FAM RU backend.
+-- Registration identity is the composite primary key, so a user cannot occupy
+-- two rows for the same event. Never apply this to a production database.
+CREATE TABLE fam_event_registrations (
+  event_id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id, user_id)
+);
+
+-- Updated in the same serializable transaction as each registration change.
+CREATE TABLE fam_event_occupancy (
+  event_id Utf8 NOT NULL,
+  taken Uint32 NOT NULL,
+  PRIMARY KEY (event_id)
+);

@@ -24,12 +24,13 @@ try {
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
   const listingsApi = createListingsApi({
-    authenticate: async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin' : 'subject-1' }),
+    authenticate: async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
+      : req.headers.authorization === 'Bearer synthetic-registrant' ? 'subject-2' : 'subject-1' }),
     resolveActor,
     repository: repo,
   });
   const apiRequest = (method, url, token, body = {}) => {
-    const request = Readable.from([Buffer.from(JSON.stringify(body))]);
+    const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;
   };
@@ -91,7 +92,48 @@ try {
   const readRows = await sql`SELECT is_read FROM fam_messages WHERE id = ${message.id};`;
   assert.equal(readRows[0][0].is_read, true);
   await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, listings, favorites, pending idea and same-school approved message on disposable local database');
+
+  const limitedEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическая встреча с ограниченным числом мест', description: 'Проверка атомарной записи', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-01', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
+  assert.equal(await repo.moderateListing(limitedEvent.id, 'synthetic-school', 'active'), true);
+  const eventApiRequest = apiRequest('POST', `/api/v1/listings/${limitedEvent.id}/registrations`, 'synthetic-registrant', null);
+  const registrationResponse = await listingsApi(eventApiRequest);
+  assert.equal(registrationResponse.status, 201);
+  assert.equal(registrationResponse.body.registration.status, 'confirmed');
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
+  await assert.rejects(repo.registerForEvent(limitedEvent.id, '22222222-2222-4222-8222-222222222222'), error => error.code === 'no_seats_available');
+  assert.equal(await repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'), true);
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
+  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
+    .filter(row => row.event_id === limitedEvent.id).map(row => row.status), ['cancelled']);
+
+  const concurrentEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое мероприятие для гонки за местом', description: 'Параллельная проверка вместимости', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
+  assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', 'active'), true);
+  const concurrentAttempts = await Promise.allSettled([
+    repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111'),
+    repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222'),
+  ]);
+  assert.equal(concurrentAttempts.filter(result => result.status === 'fulfilled').length, 1,
+    'serializable capacity check permits at most one successful registration for the final seat');
+  assert.equal(await repo.getEventOccupancy(concurrentEvent.id), 1, 'concurrent requests cannot overbook or lose the occupancy count');
+
+  const reviewEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое мероприятие по заявкам', description: 'Проверка школьного решения', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-02', event_time: '12:00', event_type: 'request', max_seats: 0, status: 'pending' });
+  assert.equal(await repo.moderateListing(reviewEvent.id, 'synthetic-school', 'active'), true);
+  const requestResponse = await listingsApi(apiRequest('POST', `/api/v1/listings/${reviewEvent.id}/registrations`, 'synthetic-registrant', null));
+  assert.equal(requestResponse.status, 201);
+  assert.equal(requestResponse.body.registration.status, 'pending');
+  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 1);
+  assert.equal(await repo.moderateEventRegistration(reviewEvent.id, '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'other-school', 'confirmed'), false,
+    'event registration review is scoped to the event owner school');
+  const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
+  assert.deepEqual(reviewResponse, { status: 200, body: { ok: true, status: 'rejected' } });
+  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 0, 'rejecting a pending request releases its reserved seat');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, listings, favorites, ideas, messages, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

@@ -144,5 +144,107 @@ export function createYdbListingsRepository(sql) {
         created_at: row.created_at,
       }));
     },
+
+    async getEventOccupancy(eventId) {
+      if (!eventId) throw new TypeError('invalid event id');
+      const statement = sql`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const rows = await statement;
+      return Number(rows?.[0]?.[0]?.taken ?? 0);
+    },
+
+    async listEventRegistrations(userId) {
+      if (!userId) throw new TypeError('invalid event registrant');
+      const statement = sql`SELECT r.event_id AS event_id, r.user_id AS user_id, r.status AS status,
+          r.created_at AS created_at, l.title AS event_title, l.event_date AS event_date,
+          l.event_time AS event_time, l.event_type AS event_type
+        FROM fam_event_registrations AS r
+        INNER JOIN fam_listings AS l ON l.id = r.event_id
+        WHERE r.user_id = ${userId}
+        ORDER BY r.created_at DESC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async registerForEvent(eventId, userId) {
+      if (!eventId || !userId) throw new TypeError('invalid event registration');
+      return sql.begin(async tx => {
+        const listingResult = await tx`SELECT user_id, school_id, is_event, status, event_type, max_seats
+          FROM fam_listings WHERE id = ${eventId} LIMIT 1;`;
+        const event = listingResult?.[0]?.[0];
+        if (!event || event.is_event !== true || event.status !== 'active'
+            || !['open', 'request', 'limited'].includes(event.event_type)) {
+          const error = new Error('event unavailable'); error.code = 'event_unavailable'; throw error;
+        }
+        if (event.user_id === userId) {
+          const error = new Error('organizer cannot register'); error.code = 'organizer_registration'; throw error;
+        }
+
+        const currentResult = await tx`SELECT status FROM fam_event_registrations
+          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
+        const current = currentResult?.[0]?.[0];
+        if (current && ['pending', 'confirmed'].includes(current.status)) {
+          const error = new Error('already registered'); error.code = 'already_registered'; throw error;
+        }
+
+        const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
+        const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
+        const limit = event.event_type === 'limited' ? Number(event.max_seats ?? 0) : 0;
+        if (limit > 0 && taken >= limit) {
+          const error = new Error('no seats available'); error.code = 'no_seats_available'; throw error;
+        }
+
+        const status = event.event_type === 'request' ? 'pending' : 'confirmed';
+        if (!current || !['pending', 'confirmed'].includes(current.status)) {
+          await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
+            VALUES (${eventId}, Unwrap(CAST(${taken + 1} AS Uint32)));`;
+        }
+        await tx`UPSERT INTO fam_event_registrations (event_id, user_id, school_id, status, created_at)
+          VALUES (${eventId}, ${userId}, ${event.school_id}, ${status}, CurrentUtcTimestamp());`;
+        return { event_id: eventId, user_id: userId, status };
+      });
+    },
+
+    async cancelEventRegistration(eventId, userId) {
+      if (!eventId || !userId) throw new TypeError('invalid event registration');
+      return sql.begin(async tx => {
+        const currentResult = await tx`SELECT status FROM fam_event_registrations
+          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
+        const current = currentResult?.[0]?.[0];
+        if (!current || !['pending', 'confirmed'].includes(current.status)) return false;
+        await tx`UPDATE fam_event_registrations SET status = 'cancelled'
+          WHERE event_id = ${eventId} AND user_id = ${userId};`;
+        const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
+        const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
+        await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
+          VALUES (${eventId}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
+        return true;
+      });
+    },
+
+    async moderateEventRegistration(eventId, userId, moderatorId, schoolId, decision) {
+      if (!eventId || !userId || !moderatorId || !schoolId || !['confirmed', 'rejected'].includes(decision)) {
+        throw new TypeError('invalid event review');
+      }
+      return sql.begin(async tx => {
+        const eventResult = await tx`SELECT user_id, school_id, is_event FROM fam_listings
+          WHERE id = ${eventId} LIMIT 1;`;
+        const event = eventResult?.[0]?.[0];
+        if (!event || event.is_event !== true || event.user_id !== moderatorId || event.school_id !== schoolId) return false;
+        const registrationResult = await tx`SELECT status FROM fam_event_registrations
+          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
+        const registration = registrationResult?.[0]?.[0];
+        if (!registration || registration.status !== 'pending') return false;
+        await tx`UPDATE fam_event_registrations SET status = ${decision}
+          WHERE event_id = ${eventId} AND user_id = ${userId};`;
+        if (decision === 'rejected') {
+          const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
+          const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
+          await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
+            VALUES (${eventId}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
+        }
+        return true;
+      });
+    },
   };
 }
