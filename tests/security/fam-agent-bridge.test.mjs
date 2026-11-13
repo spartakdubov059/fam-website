@@ -140,6 +140,10 @@ const contextMigration = readFileSync(
   new URL("../../supabase/migrations/20261113221844_fam_agent_coder_context.sql", import.meta.url),
   "utf8",
 );
+const boundedRetryMigration = readFileSync(
+  new URL("../../supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql", import.meta.url),
+  "utf8",
+);
 const bridgeSource = readFileSync(
   new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url),
   "utf8",
@@ -191,6 +195,13 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /!EVENT_CODES\.has\(task\.event_code\)/);
   assert.match(edgeSource, /!PAGE_AREAS\.has\(task\.page_area\)/);
   assert.match(edgeSource, /task\.previous_attempts > 20/);
+});
+
+test("Edge bridge accepts the bounded timeout result emitted by the runner", () => {
+  const finishAction = edgeSource.split('body.action === "finish"')[1]?.split('body.action === "report"')[0] ?? "";
+  assert.match(finishAction, /"model_failed", "model_timeout", "model_blocked"/);
+  assert.match(boundedRetryMigration, /when 'model_timeout'[\s\S]*?v_status := 'queued'/);
+  assert.match(boundedRetryMigration, /v_status = 'queued'[\s\S]*?pg_catalog\.now\(\) \+ interval '30 minutes'/);
 });
 
 
