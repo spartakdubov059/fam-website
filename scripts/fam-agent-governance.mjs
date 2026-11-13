@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -95,9 +96,9 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
   return warnings;
 }
 
-export function proposeRecruitment({ disputes = [], warnings = [] } = {}) {
+export function proposeRecruitment({ disputes = [], warnings = [], activeRoles = [] } = {}) {
   const proposals = [];
-  if (disputes.length >= 3) {
+  if (disputes.length >= 3 && !activeRoles.includes("integration_specialist")) {
     proposals.push({
       key: "integration_specialist",
       role: "Координатор интеграции изменений",
@@ -126,7 +127,7 @@ export function proposeRecruitment({ disputes = [], warnings = [] } = {}) {
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -143,6 +144,9 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], count
       (d.highRisk ? " (защищённая область; высокий риск)" : " (требуется сверка diff)"));
   }
   if (disputes.length > 15) lines.push("- Остальные конфликты: " + (disputes.length - 15) + " (нужна ручная проверка).");
+  lines.push("", "## INTEGRATOR — координация пересекающихся PR");
+  lines.push(integrationPlan ? formatIntegrationPlan(integrationPlan) :
+    "Не запускался: план интеграции отсутствует.");
   lines.push("", "## INSPECTOR — эффективность и простой");
   if (!warnings.length) lines.push("Подтверждённых технических сигналов в проверенной выборке нет.");
   for (const w of warnings) {
@@ -227,9 +231,13 @@ export async function main() {
   if (!Array.isArray(workflows.workflow_runs)) throw new Error("Не удалось получить запуски кодера.");
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
-  const proposals = proposeRecruitment({ disputes, warnings });
+  const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
+  const integrationPlan = buildIntegrationPlan({
+    pulls, disputes,
+    limited: prs.length > selected.length || pulls.some((p) => p.files === null),
+  });
   const report = makeReport({
-    disputes, warnings, proposals, count: selected.length,
+    disputes, warnings, proposals, integrationPlan, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   if (process.env.GITHUB_STEP_SUMMARY) {
