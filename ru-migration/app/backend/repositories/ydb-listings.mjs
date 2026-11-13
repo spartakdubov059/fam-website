@@ -23,7 +23,7 @@ export function createYdbListingsRepository(sql) {
 
     async listFavoriteIds(userId) {
       if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
-      const statement = sql`SELECT f.listing_id FROM fam_favorites AS f
+      const statement = sql`SELECT f.listing_id AS listing_id FROM fam_favorites AS f
         INNER JOIN fam_listings AS l ON f.listing_id = l.id
         WHERE f.user_id = ${userId} AND l.status = 'active';`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
