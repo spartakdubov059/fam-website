@@ -185,7 +185,9 @@ jobs:
           elif [[ "$status" != "0" ]]; then
             echo "failure_reason=unknown" >> "$GITHUB_OUTPUT"
           fi
-          exit "$status"
+          if [[ "$status" != "0" ]]; then
+            exit "$status"
+          fi
           cp "$RUNNER_TEMP/fam-agent-base.sha" "$RUNNER_TEMP/fam-agent/base.sha"
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
