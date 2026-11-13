@@ -3,6 +3,32 @@ import { submitListing } from './submit-listing.mjs';
 export function createListingsApi({ authenticate, resolveActor, repository, review }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);
+    if (req.method === 'GET' && pathname === '/api/v1/favorites') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.listFavoriteIds !== 'function') return { status: 503, body: { ok: false, error: 'favorite_read_unavailable' } };
+      try { return { status: 200, body: { ok: true, favorite_ids: await repository.listFavoriteIds(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (favoriteMatch && ['PUT', 'DELETE'].includes(req.method)) {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.setFavorite !== 'function') return { status: 503, body: { ok: false, error: 'favorite_write_unavailable' } };
+      try {
+        const favorited = await repository.setFavorite(actor.id, favoriteMatch[1], req.method === 'PUT');
+        if (!favorited) return { status: 404, body: { ok: false, error: 'listing_not_found' } };
+        return { status: 200, body: { ok: true, listing_id: favoriteMatch[1], favorited: req.method === 'PUT' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/me') {
       let identity;
       try { identity = await authenticate(req); } catch { identity = null; }

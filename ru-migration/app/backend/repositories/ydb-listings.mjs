@@ -21,6 +21,37 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async listFavoriteIds(userId) {
+      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
+      const statement = sql`SELECT f.listing_id FROM fam_favorites AS f
+        INNER JOIN fam_listings AS l ON f.listing_id = l.id
+        WHERE f.user_id = ${userId} AND l.status = 'active';`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const resultSets = await statement;
+      return (resultSets?.[0] ?? []).map(row => row.listing_id);
+    },
+
+    async setFavorite(userId, listingId, favorite) {
+      if (typeof userId !== 'string' || !userId || typeof listingId !== 'string' || !listingId || typeof favorite !== 'boolean') {
+        throw new TypeError('invalid favorite request');
+      }
+      if (favorite) {
+        const active = sql`SELECT id FROM fam_listings WHERE id = ${listingId} AND status = 'active' LIMIT 1;`;
+        if (typeof active?.on === 'function') active.on('error', () => {});
+        const rows = await active;
+        if (!(rows?.[0] ?? []).length) return false;
+        const insert = sql`UPSERT INTO fam_favorites (user_id, listing_id, created_at)
+          VALUES (${userId}, ${listingId}, CurrentUtcTimestamp());`;
+        if (typeof insert?.on === 'function') insert.on('error', () => {});
+        await insert;
+        return true;
+      }
+      const remove = sql`DELETE FROM fam_favorites WHERE user_id = ${userId} AND listing_id = ${listingId};`;
+      if (typeof remove?.on === 'function') remove.on('error', () => {});
+      await remove;
+      return true;
+    },
+
     async listActiveListings() {
       const statement = sql`SELECT id, title, description, category, price_text, is_event,
         event_date, event_time, event_type, max_seats, created_at

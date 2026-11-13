@@ -1,0 +1,7 @@
+-- Isolated user-to-listing favorites. The backend writes only for its verified actor.
+CREATE TABLE fam_favorites (
+  user_id Utf8 NOT NULL,
+  listing_id Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (user_id, listing_id)
+);

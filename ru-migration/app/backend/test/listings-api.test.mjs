@@ -50,3 +50,34 @@ test('profile endpoint rejects missing authentication', async () => {
   const request = req({}, 'GET'); request.url = '/api/v1/me';
   assert.equal((await handler(request)).status, 401);
 });
+
+test('favorites are scoped to the authenticated database actor', async () => {
+  let listedFor;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { listFavoriteIds: async (userId) => { listedFor = userId; return ['active-listing']; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/favorites';
+  const response = await handler(request);
+  assert.equal(listedFor, 'synthetic-user');
+  assert.deepEqual(response.body, { ok: true, favorite_ids: ['active-listing'] });
+});
+
+test('favorite writes use only the authenticated actor and return 404 for non-active listings', async () => {
+  let call;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { setFavorite: async (...args) => { call = args; return args[1] === '11111111-1111-4111-8111-111111111111'; } } });
+  const request = req({ user_id: 'forged-user' }, 'PUT'); request.url = '/api/v1/listings/11111111-1111-4111-8111-111111111111/favorite';
+  const response = await handler(request);
+  assert.deepEqual(call, ['synthetic-user', '11111111-1111-4111-8111-111111111111', true]);
+  assert.equal(response.status, 200);
+  const missing = req({}, 'PUT'); missing.url = '/api/v1/listings/22222222-2222-4222-8222-222222222222/favorite';
+  assert.equal((await handler(missing)).status, 404);
+});
+
+test('favorites fail closed when the database adapter is unavailable', async () => {
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });
+  const request = req({}, 'GET'); request.url = '/api/v1/favorites';
+  assert.equal((await handler(request)).status, 503);
+});
