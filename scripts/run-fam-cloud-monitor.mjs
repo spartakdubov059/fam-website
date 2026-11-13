@@ -78,12 +78,16 @@ function validateHomepage(html) {
   });
 }
 
+function isDynamicAssetReference(value) {
+  return /\$\{|\{\{|\}\}|\s\+\s|\besc\s*\(/.test(value);
+}
+
 function localAssetCandidates(html, baseUrl, limit = 12) {
   const candidates = [];
   const assetTag = /<(script|img)\b([^>]*)>/gi;
   for (const match of html.matchAll(assetTag)) {
     const src = match[2].match(/\bsrc\s*=\s*(["'])(.*?)\1/i);
-    if (src?.[2]) candidates.push(src[2]);
+    if (src?.[2] && !isDynamicAssetReference(src[2])) candidates.push(src[2]);
   }
   const linkTag = /<link\b([^>]*)>/gi;
   for (const match of html.matchAll(linkTag)) {
@@ -92,7 +96,7 @@ function localAssetCandidates(html, baseUrl, limit = 12) {
     const as = attrs.match(/\bas\s*=\s*(["'])(.*?)\1/i)?.[2]?.toLowerCase() ?? "";
     if (!rel.split(/\s+/).some((item) => item === "stylesheet" || (item === "preload" && ["style", "script", "image"].includes(as)))) continue;
     const href = attrs.match(/\bhref\s*=\s*(["'])(.*?)\1/i)?.[2];
-    if (href) candidates.push(href);
+    if (href && !isDynamicAssetReference(href)) candidates.push(href);
   }
 
   const base = new URL(baseUrl);

@@ -168,6 +168,9 @@ test("cloud monitor measures same-origin page assets and ignores external resour
     '<script src="js/app.js"></script>',
     '<link rel="stylesheet" href="css/site.css">',
     '<img src="assets/logo.svg">',
+    '<img src="${esc(profile.avatar_url)}">',
+    '<img src="${src}.webp">',
+    "<img src=\"' + esc(l.image_url) + '\">",
     '<img src="https://third-party.invalid/pixel.png">',
   ].join("");
   const requests = [];
