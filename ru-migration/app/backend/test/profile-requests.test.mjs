@@ -49,8 +49,8 @@ test('profile approval creates only a student profile and clears request PII aft
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   assert.equal(await repo.reviewSchoolProfileRequest(id, 'lyceum_3', 'admin-id', 'approve'), true);
   const insert = calls.find(call => call.text.includes('INSERT INTO fam_user_profiles'));
-  assert.ok(insert.values.includes('student'));
-  assert.equal(insert.values.includes('school_admin'), false);
+  assert.match(insert.text, /'student'/);
+  assert.doesNotMatch(insert.text, /school_admin/);
   const reviewUpdate = calls.find(call => call.text.includes('UPDATE fam_profile_requests'));
   assert.ok(reviewUpdate.text.includes("first_name = ''") && reviewUpdate.text.includes('status = ?'));
   assert.ok(reviewUpdate.values.includes('admin-id'), 'reviewer identity is retained for an audit trail');
