@@ -20,6 +20,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const html = await page.text();
     assert.match(html, /FAM RU — подготовка/);
     assert.match(html, /src="\/price-format\.js"/);
+    assert.match(html, /auth\/yandex\/start/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
 
     const formatter = await fetch(new URL('/price-format.js', origin));
@@ -47,6 +48,24 @@ test('unconfigured isolated server fails closed for health and user API routes',
     const api = await fetch(new URL('/api/v1/listings', origin));
     assert.equal(api.status, 503);
     assert.equal((await api.json()).error, 'backend_not_configured');
+  });
+});
+
+test('isolated server returns Yandex OAuth redirects without proxying credentials through the browser', async () => {
+  await withServer({ authApi: async request => ({
+    status: 302,
+    headers: { location: 'https://oauth.yandex.ru/authorize?response_type=code&state=synthetic', 'set-cookie': 'fam_ru_oauth_state=synthetic; HttpOnly; SameSite=Lax' },
+    body: null,
+  }) }, async origin => {
+    const response = await fetch(new URL('/auth/yandex/start', origin), { redirect: 'manual' });
+    assert.equal(response.status, 302);
+    assert.match(response.headers.get('location'), /^https:\/\/oauth\.yandex\.ru\/authorize/);
+    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+  });
+  await withServer({}, async origin => {
+    const response = await fetch(new URL('/auth/yandex/start', origin));
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { ok: false, error: 'auth_not_configured' });
   });
 });
 

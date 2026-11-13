@@ -20,7 +20,8 @@ function readiness() {
     mode: 'isolated-copy',
     ready: false,
     services: {
-      auth: Boolean(process.env.FAM_RU_AUTH_ISSUER && process.env.FAM_RU_AUTH_AUDIENCE),
+      auth: Boolean((process.env.FAM_RU_YANDEX_CLIENT_ID && process.env.FAM_RU_YANDEX_REDIRECT_URI && process.env.FAM_RU_SESSION_SECRET)
+        || (process.env.FAM_RU_AUTH_ISSUER && process.env.FAM_RU_AUTH_AUDIENCE)),
       database: Boolean(process.env.FAM_RU_DATABASE_URL),
       objectStorage: Boolean(process.env.FAM_RU_S3_ENDPOINT && process.env.FAM_RU_S3_BUCKET),
     },
@@ -39,9 +40,22 @@ function sendJson(res, status, value) {
   res.end(body);
 }
 
-export function createServer({ listingsApi = null } = {}) {
+export function createServer({ listingsApi = null, authApi = null } = {}) {
   return http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
+  if (['/auth/yandex/start', '/auth/yandex/callback', '/auth/yandex/logout'].includes(url.pathname)) {
+    if (!authApi) return sendJson(res, 503, { ok: false, error: 'auth_not_configured' });
+    try {
+      const result = await authApi(req);
+      if (result.body === null) {
+        res.writeHead(result.status, result.headers || {});
+        return res.end();
+      }
+      return sendJson(res, result.status, result.body);
+    } catch {
+      return sendJson(res, 503, { ok: false, error: 'auth_request_failed' });
+    }
+  }
   if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname === '/api/v1/status')) {
     const state = readiness();
     return sendJson(res, state.ready ? 200 : 503, state);
@@ -99,7 +113,7 @@ export function createServer({ listingsApi = null } = {}) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runtime = await (await import('./runtime.mjs')).createRuntime();
-  createServer({ listingsApi: runtime?.listingsApi }).listen(port, host, () => {
+  createServer({ listingsApi: runtime?.listingsApi, authApi: runtime?.authApi }).listen(port, host, () => {
     console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
   });
   if (runtime) {

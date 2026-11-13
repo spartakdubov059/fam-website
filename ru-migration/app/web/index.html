@@ -1273,7 +1273,7 @@ window.onunhandledrejection = function() {
 
 (function(){
   if (typeof supabase === 'undefined') {
-    document.body.innerHTML = '<main class="ru-shell"><h1>FAM RU — подготовка</h1><p class="ru-note">Российская копия изолирована. Ниже показываются только опубликованные объявления из российского backend. Авторизация, создание объявлений и закрытые разделы пока не подключены.</p><section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section></main>';
+    document.body.innerHTML = '<main class="ru-shell"><h1>FAM RU — подготовка</h1><p class="ru-note">Российская копия изолирована. Ниже показываются только опубликованные объявления из российского backend.</p><a class="ru-auth-link" href="/auth/yandex/start">Войти через Яндекс ID</a><p class="ru-note">Создание объявлений и закрытые разделы будут доступны после настройки авторизации и остальных российских сервисов.</p><section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section></main>';
     const boardStyles = document.createElement('link');
     boardStyles.rel = 'stylesheet';
     boardStyles.href = '/public-board.css';
