@@ -181,9 +181,9 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   const qa = join(work, "trusted-qa");
   await git(work, "clone", "--quiet", fixture, qa);
   const regressionPath = "tests/fixtures/fam-agent-pipeline-regression.test.mjs";
-  await assert.rejects(() => run(process.execPath, ["--test", regressionPath], { cwd: qa }));
+  await assert.rejects(() => run(process.execPath, [regressionPath], { cwd: qa }));
   await run("git", ["apply", patchPath], { cwd: qa });
-  await run(process.execPath, ["--test", regressionPath], { cwd: qa });
+  await run(process.execPath, [regressionPath], { cwd: qa });
 
   const badQa = join(work, "bad-qa");
   await git(work, "clone", "--quiet", fixture, badQa);
@@ -195,7 +195,7 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   const ineffectivePatchPath = join(work, "ineffective.patch");
   writeFileSync(ineffectivePatchPath, ineffectivePatch);
   await run("git", ["apply", ineffectivePatchPath], { cwd: badQa });
-  await assert.rejects(() => run(process.execPath, ["--test", regressionPath], { cwd: badQa }));
+  await assert.rejects(() => run(process.execPath, [regressionPath], { cwd: badQa }));
 
   const safety = buildSecurityReport(patch);
   const performance = buildPerformanceReport(patch);
