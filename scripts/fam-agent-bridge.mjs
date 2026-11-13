@@ -56,12 +56,12 @@ export function shouldRunModel({ manualTask = "", bridgeConfigured = false, task
   return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
 }
 
-export function chooseResultCode(summary, executionSucceeded = true) {
+export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true) {
   if (!executionSucceeded) return "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
-    return "model_completed";
+    return qaSucceeded === true ? "model_completed" : "model_failed";
   }
   return "model_no_patch";
 }
@@ -110,7 +110,7 @@ async function main() {
     }
     if (envFile) appendFileSync(envFile,
       "FAM_TASK=" + task.prompt + "\nFAM_CODER_TASK_ID=" + task.id + "\n");
-    if (output) appendFileSync(output, "claimed=true\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: true }) + "\n");
+    if (output) appendFileSync(output, "claimed=true\ntask_id=" + task.id + "\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: true }) + "\n");
     console.log("Claimed one allowlisted technical task; task contents are aggregate-only.");
     return;
   }
@@ -119,7 +119,11 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
     const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
-    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
+    const code = chooseResultCode(
+      summary,
+      process.env.FAM_MODEL_STEP_OUTCOME === "success",
+      process.env.FAM_QA_OUTCOME === "success",
+    );
     const result = await bridgeRequest({
       url, token, body: { action: "finish", task_id: taskId, result_code: code },
     });
