@@ -78,3 +78,10 @@
 - Draft PR #75 добавил отдельный мобильный Lighthouse lab-проход. Два ранее выполненных запуска на опубликованном сайте показали CLS 0.511 в обоих случаях; LCP 3.04/3.90 с и TBT 1.067/3.363 с различались. Это два одиночных lab-запуска, не полевые метрики, не p75 и не установленная причина проблемы. Проверка помечает превышение как performance failure.
 - Head #75 `e3c0625788e56e0ac99cd4852eace5212df79542` прошёл Russian content safety tests [#43427928539](https://github.com/spartakdubov059/fam-website/actions/runs/43427928539). Ветка PR намеренно больше не запускает Lighthouse при push. Добавлено сохранение HTML/JSON отчётов artifact на 3 дня, однако фактическая загрузка artifact ещё не подтверждена runner-ом: workflow остаётся draft, расписание не запущено, а повторный дорогой browser-run не выполнялся.
 - Все три PR остаются draft. GitHub ruleset и production не менялись; полный production путь очередь → Qwen → QA → draft PR и ежедневный объединённый Reporter по-прежнему не доказаны/не включены.
+
+
+## Runtime-проверка защиты публичных Agent Edge Functions — 13 ноября 2026, 13:05 UTC
+
+- Supabase показывает `verify_jwt=false` для `fam-agent-worker` v17 и `fam-agent-coder-bridge` v1. Выполнен безопасный unauthenticated POST `{"action":"claim"}` без `x-fam-agent-token` на обе функции; обе вернули HTTP 401 с нормализованным `unauthorized`. Вызов остановлен до RPC claim.
+- Сразу после проверки read-only агрегат очереди остался 82 `completed` / 3 `failed`. Payload, task content и пользовательские данные не читались, задача не была захвачена.
+- Это доказывает отказ запроса без токена на production runtime; корректный токен и успешный claim не проверялись. Функции, секреты, очередь и production не менялись.
