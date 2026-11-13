@@ -51,6 +51,9 @@ jobs:
       contents: read
     outputs:
       has_patch: ${{ steps.agent.outputs.has_patch }}
+      task_claimed: ${{ steps.coder-queue.outputs.claimed }}
+      task_id: ${{ steps.coder-queue.outputs.task_id }}
+      model_outcome: ${{ steps.agent.outcome }}
     steps:
       - name: Получить исходники FAM без GitHub credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -176,16 +179,6 @@ jobs:
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
           fi
-
-      - name: Вернуть результат задания в очередь
-        if: always() && steps.coder-queue.outputs.claimed == 'true'
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ env.FAM_CODER_TASK_ID }}
-          FAM_MODEL_STEP_OUTCOME: ${{ steps.agent.outcome }}
-          FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
-        run: node scripts/fam-agent-bridge.mjs finish
 
       - name: Показать структурированный результат модели
         if: always() && steps.agent.outcome == 'success'
@@ -334,6 +327,33 @@ jobs:
           path: ${{ runner.temp }}/fam-agent-review/
           if-no-files-found: error
           retention-days: 3
+
+
+  finish_task:
+    name: Зафиксировать результат coder после независимого QA
+    needs: [generate, verify]
+    if: always() && needs.generate.outputs.task_claimed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Скачать summary модели, если inference завершился
+        if: needs.generate.outputs.model_outcome == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-local-agent-result
+          path: ${{ runner.temp }}/fam-agent
+
+      - name: Сохранить результат с учётом QA
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.task_id }}
+          FAM_MODEL_STEP_OUTCOME: ${{ needs.generate.outputs.model_outcome }}
+          FAM_QA_OUTCOME: ${{ needs.verify.result }}
+          FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
+        run: node scripts/fam-agent-bridge.mjs finish
 
   prepare_review:
     name: Подготовить PR и проверить исправление без публикации
