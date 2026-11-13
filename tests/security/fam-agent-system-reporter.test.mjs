@@ -148,6 +148,8 @@ test("report workflow reads sources but does not publish private report contents
   assert.doesNotMatch(reportWorkflow, /upload-artifact|GITHUB_STEP_SUMMARY/);
   const reporterSource = readFileSync(new URL("../../scripts/fam-agent-system-reporter.mjs", import.meta.url), "utf8");
   assert.match(reporterSource, /action: "save_report"/);
+  assert.match(reporterSource, /actions\/runs\/.*\/jobs\?per_page=100/);
+  assert.ok(reporterSource.includes("summarizeAgentJobStatuses"));
   assert.doesNotMatch(reporterSource, /GITHUB_STEP_SUMMARY|upload-artifact/);
 });
 
