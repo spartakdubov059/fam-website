@@ -40,14 +40,23 @@ test("independent QA rejects an applied patch with a failing regression test", (
     execFileSync("git", ["-C", root, "apply", patchPath]);
     assert.equal(readFileSync(absoluteFixturePath, "utf8"), broken);
 
-    const qa = spawnSync(process.execPath, ["--test", fixturePath], {
+    const testEnvironment = { ...process.env };
+    delete testEnvironment.NODE_TEST_CONTEXT;
+    const qa = spawnSync(process.execPath, ["--test", absoluteFixturePath], {
       cwd: root,
+      env: testEnvironment,
       encoding: "utf8",
       timeout: 15000,
     });
     assert.equal(qa.error, undefined, qa.error?.message);
-    assert.notEqual(qa.status, 0, "independent regression QA must reject the deliberately broken patch");
-    assert.match(qa.stdout + qa.stderr, /synthetic invariant|AssertionError/);
+    assert.notEqual(
+      qa.status,
+      0,
+      "independent regression QA must reject the deliberately broken patch; output: " +
+        (qa.stdout + qa.stderr).slice(0, 2000),
+    );
+    assert.match(qa.stdout + qa.stderr, /# tests 1/);
+    assert.match(qa.stdout + qa.stderr, /# fail 1/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
