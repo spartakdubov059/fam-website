@@ -774,8 +774,16 @@ Deno.serve(async (req: Request) => {
         }, 200, headers);
       }
 
+      const textModeration = moderation;
+      let photoUnavailable = false;
       for (const imageUrl of imageUrls) {
         moderation = await moderate(text, authorization, origin, true, imageUrl, safetyContext);
+        if (moderation.action === "pending") {
+          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+          photoUnavailable = true;
+          moderation = textModeration;
+          break;
+        }
         if (moderation.action !== "ok") {
           await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
           return respond({
@@ -791,7 +799,7 @@ Deno.serve(async (req: Request) => {
 
       const publishedImagePaths: string[] = [];
       try {
-        for (const imageUrl of imageUrls) {
+        for (const imageUrl of (photoUnavailable ? [] : imageUrls)) {
           publishedImagePaths.push(await publishPendingIdeaImage(imageUrl, userId));
         }
       } catch (error) {
@@ -821,10 +829,10 @@ Deno.serve(async (req: Request) => {
       return respond({
         ok: true,
         status: moderation.action,
-        degraded: moderation.degraded === true,
+        degraded: photoUnavailable || moderation.degraded === true,
         diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
-        reason: moderation.reason ?? null,
+        reason: photoUnavailable ? "Идея отправлена без фото: фотографию не удалось проверить." : (moderation.reason ?? null),
       }, 200, headers);
     }
 
