@@ -220,9 +220,18 @@ with locked_candidates as (
         and active.payload->>'page_area'=t.payload->>'page_area'
     )
     and not exists (
-      select 1 from private.fam_agent_task_events as prior_retry
-      where prior_retry.task_id=t.id
-        and prior_retry.event_type='retry_scheduled'
+      select 1
+      from private.fam_agent_task_events as prior_retry
+      join private.fam_agent_tasks as prior_task on prior_task.id=prior_retry.task_id
+      where prior_retry.event_type='retry_scheduled'
+        and prior_retry.created_at >= pg_catalog.now()-interval '7 days'
+        and prior_task.agent_key='technical'
+        and prior_task.task_type='coder_patch_request'
+        and prior_task.approval_required=false
+        and prior_task.source in ('system','scheduled_audit')
+        and prior_task.payload->>'task_key'=t.payload->>'task_key'
+        and prior_task.payload->>'event_code'=t.payload->>'event_code'
+        and prior_task.payload->>'page_area'=t.payload->>'page_area'
     )
   order by t.created_at desc,t.id desc
   for update of t skip locked
