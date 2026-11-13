@@ -4,13 +4,13 @@ import { submitListing } from '../services/submit-listing.mjs';
 const actor = { id: 'synthetic-user', school_id: 'school-1', role: 'student' };
 const input = { title: 'Книга', description: 'Учебник математики', category: 'Учёба', user_id: 'attacker' };
 const approve = async () => ({ action: 'ok' });
-test('requires authentication and an available reviewer before any write', async () => {
+test('requires authentication; unavailable review persists content as pending', async () => {
   let writes = 0;
   const repository = { createListing: async () => { writes++; return { id: '1' }; } };
   assert.equal((await submitListing({ input, repository, review: approve })).code, 'unauthenticated');
   assert.equal((await submitListing({ actor, input, repository })).status, 'pending');
   assert.equal((await submitListing({ actor, input: { ...input, description: 'Пишите learner@example.ru' }, repository, review: approve })).code, 'personal_contact_data');
-  assert.equal(writes, 0);
+  assert.equal(writes, 1);
 });
 test('uses authenticated actor identity and never marks a listing active', async () => {
   let record;
