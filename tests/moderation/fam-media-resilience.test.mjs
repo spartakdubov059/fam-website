@@ -125,8 +125,10 @@ test("student identity is visible to school admins only through same-school admi
   assert.match(migration, /grant update \(first_name,last_name,class_name\) on public\.profiles to authenticated/i);
   assert.match(contentSafety, /serious_hate_or_threat/);
   const council = readFileSync(resolve(root, "supabase/functions/council-management/index.ts"), "utf8");
-  assert.match(council, /profiles\?select=id,email,role,created_at,first_name,last_name,class_name&school_id=eq\./);
-  assert.match(council, /profiles\?select=id,email,role,first_name,last_name,class_name&school_id=eq\./);
+  assert.match(council, /profiles\\?select=id,role,created_at,first_name,last_name,class_name&school_id=eq\\./);
+  assert.match(council, /profiles\\?select=id,role,first_name,last_name,class_name&school_id=eq\\./);
   assert.match(html, /Класс: \$\{esc\(studentClass\)\}/);
-  assert.match(html, /studentName \|\| row\.email/);
+  assert.ok(html.includes('studentName || "Аккаунт #'));
+  assert.doesNotMatch(council, /profiles\\?select=[^"]*email/);
+  assert.doesNotMatch(html, /row\.email|author\?\.email|applicant_email/);
 });
