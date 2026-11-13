@@ -1,6 +1,7 @@
 do $test$
 declare
   v_snapshot jsonb;
+  v_signal_count integer;
   v_technical jsonb;
   v_saved jsonb;
   v_stored jsonb;
@@ -13,6 +14,7 @@ declare
     'workflows_24h', '[]'::jsonb,
     'open_pull_requests', '[]'::jsonb,
     'role_statuses', jsonb_build_array(jsonb_build_object('role', 'Reporter', 'status', 'ready_to_store')),
+    'technical_analysis', jsonb_build_object('status', 'no_allowlisted_signals', 'findings', '[]'::jsonb),
     'production_deployment', jsonb_build_object('status', 'success'),
     'public_site', jsonb_build_object('status', 'reachable', 'http_status', 200),
     'limitations', jsonb_build_array('Synthetic integration fixture'),
@@ -32,10 +34,14 @@ begin
   end if;
 
   v_snapshot := public.get_fam_agent_report_snapshot();
+  select pg_catalog.jsonb_array_length(v_snapshot -> 'site_error_events_24h') into v_signal_count;
   select item into v_technical
   from jsonb_array_elements(v_snapshot -> 'agent_statuses') as item
   where item ->> 'agent_key' = 'technical';
-  if v_snapshot ->> 'report_date' <> to_char(current_date, 'YYYY-MM-DD')
+  if v_signal_count <> 2
+     or v_snapshot #>> '{site_error_events_24h,0,event_code}' <> 'js_runtime'
+     or v_snapshot #>> '{site_error_events_24h,0,occurrences}' <> '4'
+     or v_snapshot ->> 'report_date' <> to_char(current_date, 'YYYY-MM-DD')
      or v_snapshot #>> '{latest_coder_task,status}' <> 'failed'
      or v_snapshot #>> '{latest_system_health,status}' is not null
      or v_snapshot #>> '{cron_jobs,0,last_run_status}' <> 'succeeded'
