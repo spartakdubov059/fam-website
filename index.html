@@ -112,6 +112,7 @@
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
     .hero-script { font-family: 'Caveat', cursive, sans-serif; font-size: 52px; line-height: 1; font-weight: 700; color: #fff; transform: rotate(-2deg); }
@@ -2383,8 +2384,8 @@ window.onunhandledrejection = function() {
       { src: "banner-5", alt: "Творчество и идеи: камера и вдохновение." },
       { src: "banner-6", alt: "Ученический совет: команда волонтёров." }
     ];
-    banners.forEach(({ src, alt }) => {
-      html.push(`<div class="hero-slide hero-img"><img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
+    banners.forEach(({ src, alt }, index) => {
+      html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="sr-only hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
     if (user && profile && profile.school_id) {
       listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {

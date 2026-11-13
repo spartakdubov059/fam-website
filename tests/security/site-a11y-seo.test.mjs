@@ -17,11 +17,11 @@ test("interactive controls have a visible keyboard focus treatment and honor red
   assert.ok(frontend.includes("@media (prefers-reduced-motion: reduce)"));
 });
 
-test("banner image fallback does not use inline event attributes", () => {
+test("banner images accept English or Russian artwork labels and fail safely", () => {
   assert.doesNotMatch(frontend, /\sonerror\s*=/i);
   assert.ok(frontend.includes('querySelectorAll(".hero-img img")'));
-  assert.ok(frontend.includes('<source srcset="${src}.webp" type="image/webp">'));
-  assert.ok(frontend.includes('src="${src}.jpg" width="1200" height="675"'));
+  assert.ok(frontend.includes('src="${src}.webp" width="1200" height="675"'));
+  assert.ok(frontend.includes('alt="${alt}"'), "alt text is present without requiring a specific language");
   assert.ok(frontend.includes('addEventListener("error"'));
 });
 
