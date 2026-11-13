@@ -5,8 +5,11 @@ import { initializeListingSubmission } from '../../web/listing-submit.js';
 function fixture(file = { type: 'image/png', size: 100, name: 'synthetic.png' }) {
   const shellChildren = [];
   const listeners = {};
-  const form = { hidden: true, elements: { photo: { files: file ? [file] : [] } },
+  const category = { value: 'Учёба', options: ['Вещи', 'Услуги', 'Творчество', 'Учёба', 'Мероприятия'].map(value => ({ value })), listeners: {}, addEventListener(name, fn) { this.listeners[name] = fn; } };
+  const values = { title: 'Книга', description: 'Синтетическое описание', category: 'Учёба', price_text: '' };
+  const form = { hidden: true, elements: { photo: { files: file ? [file] : [] }, category }, children: [],
     addEventListener: (name, fn) => { listeners[name] = fn; },
+    append(child) { this.children.push(child); const collect = node => { if (node.name) this.elements[node.name] = node; for (const nested of node.children || []) collect(nested); }; collect(child); },
     querySelector: () => ({ disabled: false }), reset: () => { form.wasReset = true; }, parentElement: { append: child => shellChildren.push(child) } };
   const status = { textContent: '' };
   const login = { hidden: false };
@@ -17,8 +20,8 @@ function fixture(file = { type: 'image/png', size: 100, name: 'synthetic.png' })
       addEventListener(name, handler) { this.listeners[name] = handler; }, setAttribute(name, value) { this[name] = value; },
       querySelector(selector) { return selector.includes('button') ? { disabled: false } : this.children.find(child => child.role === 'status'); },
       reset() { this.wasReset = true; } }) };
-  class FormDataMock { get(name) { return ({ title: 'Книга', description: 'Синтетическое описание', category: 'Учёба', price_text: '' })[name]; } }
-  return { document, form, status, login, logout, listeners, shellChildren, FormDataCtor: FormDataMock };
+  class FormDataMock { get(name) { return values[name] ?? form.elements[name]?.value ?? ''; } }
+  return { document, form, status, login, logout, listeners, shellChildren, values, FormDataCtor: FormDataMock };
 }
 
 test('listing form authenticates first, then uploads a private photo and submits its key to the Russian API', async () => {
@@ -101,6 +104,46 @@ test('authenticated students can submit a school idea through the moderated Russ
   assert.equal(JSON.parse(calls[1].init.body).text, 'Открыть школьный книжный обмен');
   assert.equal(ideaForm.wasReset, true);
   assert.match(ideaForm.children[1].textContent, /ждёт проверки безопасности/);
+});
+
+test('school council can create a dated limited event while students cannot select event category', async () => {
+  const organizer = fixture(null);
+  organizer.values.category = 'Мероприятия';
+  organizer.form.elements.category.value = 'Мероприятия';
+  const calls = [];
+  await initializeListingSubmission({ ...organizer, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'council-user', role: 'council_member' } }) };
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true }) };
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, request: null }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const eventOption = organizer.form.elements.category.options.find(option => option.value === 'Мероприятия');
+  assert.equal(eventOption.disabled, undefined);
+  const fields = organizer.form.children.find(child => child.tagName === 'fieldset');
+  assert.ok(fields);
+  organizer.form.elements.event_date.value = '2027-04-20';
+  organizer.form.elements.event_time.value = '15:30';
+  organizer.form.elements.event_type.value = 'limited';
+  organizer.form.elements.max_seats.value = '24';
+  organizer.form.elements.event_type.listeners.change();
+  assert.equal(organizer.form.elements.max_seats.required, true);
+  await organizer.listeners.submit({ preventDefault() {} });
+  const payload = JSON.parse(calls.find(call => call.url === '/api/v1/listings').init.body);
+  assert.deepEqual({ event_date: payload.event_date, event_time: payload.event_time, event_type: payload.event_type, max_seats: payload.max_seats },
+    { event_date: '2027-04-20', event_time: '15:30', event_type: 'limited', max_seats: 24 });
+
+  const student = fixture(null);
+  await initializeListingSubmission({ ...student, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student', role: 'student' } }) };
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, request: null }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const studentEventOption = student.form.elements.category.options.find(option => option.value === 'Мероприятия');
+  assert.equal(studentEventOption.disabled, true);
+  assert.equal(student.form.children.some(child => child.tagName === 'fieldset'), false);
 });
 
 test('student role request UI refreshes status and never sends a browser-selected school or identity', async () => {

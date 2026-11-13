@@ -33,6 +33,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     authenticatedProfile = true;
     form.hidden = false;
     status.textContent = 'Объявление и фото будут отправлены на проверку вашей школы.';
+    initializeEventFields(document, form, result.profile.role);
     createProfileIdentityForm(document, form, result.profile, fetchImpl);
     if (result.profile.role === 'student') await createSchoolRoleRequestForm(document, form, fetchImpl);
     ideaForm = createIdeaForm(document, form);
@@ -97,6 +98,11 @@ export async function initializeListingSubmission({ document = globalThis.docume
         description: String(data.get('description') || ''),
         category: String(data.get('category') || ''),
         price_text: String(data.get('price_text') || '').trim() || 'Бесплатно',
+        event_date: String(data.get('category') || '') === 'Мероприятия' ? (String(data.get('event_date') || '') || null) : null,
+        event_time: String(data.get('category') || '') === 'Мероприятия' ? (String(data.get('event_time') || '') || null) : null,
+        event_type: String(data.get('category') || '') === 'Мероприятия' ? (String(data.get('event_type') || 'open')) : null,
+        max_seats: String(data.get('category') || '') === 'Мероприятия' && String(data.get('event_type') || '') === 'limited'
+          ? Number(data.get('max_seats')) : 0,
         ...(imageKey ? { image_key: imageKey } : {}),
       };
       const submitted = await fetchImpl('/api/v1/listings', {
@@ -118,6 +124,50 @@ export async function initializeListingSubmission({ document = globalThis.docume
       } else status.textContent = 'Не удалось отправить объявление. Проверьте подключение и попробуйте снова.';
     } finally { if (submit) submit.disabled = false; }
   });
+}
+
+function initializeEventFields(document, listingForm, role) {
+  const category = listingForm.elements?.category;
+  if (!category) return;
+  const eventOption = Array.from(category.options || []).find(option => option.value === 'Мероприятия');
+  const canCreateEvents = ['school_admin', 'council_member'].includes(role);
+  if (eventOption && !canCreateEvents) {
+    eventOption.disabled = true;
+    eventOption.hidden = true;
+  }
+  if (!canCreateEvents || typeof document.createElement !== 'function') return;
+
+  const section = document.createElement('fieldset');
+  section.className = 'ru-event-fields';
+  section.hidden = true;
+  const legend = document.createElement('legend'); legend.textContent = 'Параметры мероприятия';
+  section.append(legend);
+  for (const [name, title, type] of [['event_date', 'Дата', 'date'], ['event_time', 'Время', 'time']]) {
+    const label = document.createElement('label'); label.textContent = title;
+    const input = document.createElement('input'); input.name = name; input.type = type;
+    label.append(input); section.append(label);
+  }
+  const typeLabel = document.createElement('label'); typeLabel.textContent = 'Запись';
+  const typeSelect = document.createElement('select'); typeSelect.name = 'event_type';
+  typeSelect.value = 'open';
+  for (const [value, text] of [['open', 'Свободная запись'], ['request', 'По заявке'], ['limited', 'С ограничением мест']]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = text; typeSelect.append(option);
+  }
+  typeLabel.append(typeSelect); section.append(typeLabel);
+  const seatsLabel = document.createElement('label'); seatsLabel.textContent = 'Количество мест';
+  const seats = document.createElement('input'); seats.name = 'max_seats'; seats.type = 'number'; seats.min = '1'; seats.max = '500';
+  seatsLabel.append(seats); section.append(seatsLabel);
+  const updateVisibility = () => {
+    const isEvent = category.value === 'Мероприятия';
+    section.hidden = !isEvent;
+    const limited = isEvent && typeSelect.value === 'limited';
+    seatsLabel.hidden = !limited;
+    seats.required = limited;
+  };
+  typeSelect.addEventListener('change', updateVisibility);
+  category.addEventListener('change', updateVisibility);
+  listingForm.append(section);
+  updateVisibility();
 }
 
 function createProfileIdentityForm(document, listingForm, profile, fetchImpl) {
