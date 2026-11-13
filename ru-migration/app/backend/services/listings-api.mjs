@@ -5,6 +5,17 @@ import { submitMessage } from './submit-message.mjs';
 export function createListingsApi({ authenticate, resolveActor, repository, review }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    if (req.method === 'PATCH' && readMessageMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const updated = await repository.markMessageRead(actor.id, actor.school_id, readMessageMatch[1]);
+        return updated ? { status: 200, body: { ok: true, is_read: true } } : { status: 404, body: { ok: false, error: 'message_not_found' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/messages') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

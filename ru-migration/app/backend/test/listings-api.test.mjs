@@ -144,3 +144,14 @@ test('message read rejects missing identity before querying the database', async
   assert.equal((await handler(request)).status, 401);
   assert.equal(reads, 0);
 });
+
+test('only the authenticated recipient can mark a message read', async () => {
+  let args;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { markMessageRead: async (...values) => { args = values; return true; } } });
+  const request = req({}, 'PATCH'); request.url = '/api/v1/messages/11111111-1111-4111-8111-111111111111/read';
+  const response = await handler(request);
+  assert.deepEqual(args, ['synthetic-user', 'synthetic-school', '11111111-1111-4111-8111-111111111111']);
+  assert.equal(response.body.is_read, true);
+});

@@ -72,3 +72,21 @@ test('message reads bind user and school and return only the bounded projection'
   assert.match(query.text, /receiver_id = \?/);
   assert.equal(rows[0].body, 'private');
 });
+
+test('mark-read checks recipient and school before updating the message', async () => {
+  const calls = [];
+  const sql = (strings, ...values) => {
+    const query = { text: strings.join('?'), values }; calls.push(query);
+    return Promise.resolve(calls.length === 1 ? [[{ id: 'message-id' }]] : [[]]);
+  };
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.markMessageRead('recipient-id', 'school-id', 'message-id'), true);
+  assert.ok(calls[0].values.includes('recipient-id'));
+  assert.ok(calls[0].values.includes('school-id'));
+  assert.match(calls[1].text, /SET is_read = true/);
+
+  let writes = 0;
+  const absent = createYdbListingsRepository(() => { writes++; return Promise.resolve([[]]); });
+  assert.equal(await absent.markMessageRead('other-user', 'school-id', 'message-id'), false);
+  assert.equal(writes, 1);
+});

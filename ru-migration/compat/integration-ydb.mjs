@@ -57,6 +57,10 @@ try {
   assert.equal(messageRows[0][0].is_read, false);
   assert.deepEqual((await repo.listMessages('synthetic-user', 'synthetic-school')).map(row => row.id), [message.id]);
   assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);
+  assert.equal(await repo.markMessageRead('synthetic-user', 'synthetic-school', message.id), false, 'sender cannot mark the recipient inbox as read');
+  assert.equal(await repo.markMessageRead('11111111-1111-4111-8111-111111111111', 'synthetic-school', message.id), true);
+  const readRows = await sql`SELECT is_read FROM fam_messages WHERE id = ${message.id};`;
+  assert.equal(readRows[0][0].is_read, true);
   await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
   console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, listings, favorites, pending idea and same-school approved message on disposable local database');
 } catch (error) {
