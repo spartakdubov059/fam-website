@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
       Object.keys(body).length === 5 &&
       typeof body.task_id === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
-      ["model_completed", "model_review", "model_no_patch", "model_failed", "model_blocked"].includes(body.result_code) &&
+      ["model_completed", "model_review", "model_no_patch", "model_failed", "model_timeout", "model_blocked"].includes(body.result_code) &&
       (body.pr_url === null || (
         typeof body.pr_url === "string" &&
         /^https:\/\/github\.com\/spartakdubov059\/fam-website\/pull\/[1-9][0-9]*$/.test(body.pr_url)
