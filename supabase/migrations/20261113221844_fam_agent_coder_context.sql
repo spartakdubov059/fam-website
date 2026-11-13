@@ -96,7 +96,7 @@ begin
       'task_key',v_task_key,
       'event_code',v_event.event_code,
       'page_area',v_event.page_area,
-      'occurrences',pg_catalog.least(pg_catalog.greatest(v_event.occurrences,0),1000),
+      'occurrences',least(greatest(v_event.occurrences,0),1000),
       'event_summary',v_event_summary,
       'observed_hour',pg_catalog.to_char(v_event.observed_hour at time zone 'UTC','YYYY-MM-DD"T"HH24:00:00"Z"'),
       'previous_attempts',v_previous_attempts
