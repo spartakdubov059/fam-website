@@ -380,7 +380,7 @@ async function main() {
   }
   const base = API_ROOT + "/repos/" + repository;
   const [runData, pullData, deploymentData, snapshotData, siteProbe] = await Promise.all([
-    githubGet(base + "/actions/runs?per_page=100", token),
+    githubGet(base + "/actions/runs?branch=main&per_page=100", token),
     githubGet(base + "/pulls?state=open&per_page=100", token),
     githubGet(base + "/deployments?environment=github-pages&per_page=5", token),
     bridgeUrl && bridgeToken
