@@ -9,12 +9,12 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 74,
+      "passed": 79,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow run 43461730330 on commit dd07adcbd769e4d6dc41796ce730bfcee419df87; includes OIDC, listings, favorites, ideas, same-school messages, event registration and school-scoped applicant reads, Yandex cookie mutation Origin checks, public-board auth/event-signup/cancellation flows, HTTP routes, privacy and media unit tests"
+      "source": "GitHub Actions SDK compatibility workflow run 43463998476 on commit 78f6975ad3682b0d7e4070f3df2cdff112acee7b; includes OIDC, listings, favorites, ideas, same-school messages, event registration and school-scoped applicant reads, Yandex cookie mutation Origin checks, private media upload API, public-board auth/event-signup/cancellation flows, HTTP routes, privacy and media unit tests"
     },
     "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend unit tests (71/71) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
+    "reproduction": "PASS — current backend unit tests (79/79) in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
   "sdk_gate": "PASS — pinned YDB/AWS SDK and Sharp compatibility on GitHub Actions",
   "cloud_staging": "NOT DEPLOYED",
@@ -24,6 +24,7 @@
     "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs are not fully ported",
     "Cloud YDB, object storage, auth and moderation integrations not tested; only disposable local YDB integration passed",
     "No free-only school-controlled cloud staging has been provisioned or budget-verified",
+    "Image upload is not yet linked to listing moderation, public media delivery or orphan cleanup",
     "Actual auth, moderation, account-migration and safe access policy/legal review before real students join"
   ],
   "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
@@ -35,15 +36,16 @@
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43461730330,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43461730330",
-    "ydb_run_id": 43461729875,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43461729875",
+    "sdk_run_id": 43463998476,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43463998476",
+    "ydb_run_id": 43464000024,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43464000024",
     "result": "success",
-    "tested_commit": "dd07adcbd769e4d6dc41796ce730bfcee419df87"
+    "tested_commit": "78f6975ad3682b0d7e4070f3df2cdff112acee7b"
   },
   "local_ydb_integration": "PASS — disposable local YDB; synthetic profile lookup, pending listing invisibility, active public projection, favorite CRUD limited to active listings, pending idea storage, approved same-school message, rejection of cross-school recipient, bounded event registration under concurrent requests, participant cancellation, school-scoped event review and applicant read",
   "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
+  "media_upload_api": "PASS — authenticated uploads are limited to 5 MiB and JPEG/PNG/WebP, normalized to WebP, and stored under private user-scoped keys; listing attachment, review, public serving and orphan cleanup remain incomplete",
   "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
   "pricing_evidence": [
     {

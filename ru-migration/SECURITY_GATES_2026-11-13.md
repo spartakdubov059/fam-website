@@ -36,7 +36,8 @@
 
 Эта запись обновляет статус проверок выше; исторические замечания об отсутствии запуска workflow больше не описывают текущее состояние кода.
 
-- В коммите [`dd07adc`](https://github.com/spartakdubov059/fam-website/commit/dd07adcbd769e4d6dc41796ce730bfcee419df87) сессионный Яндекс ID auth отклоняет небезопасные запросы без точного `Origin` тестового домена и запрещает logout без same-origin `Origin`.
-- Новые и текущие backend-тесты: **74/74 PASS** в [GitHub Actions](https://github.com/spartakdubov059/fam-website/actions/runs/43461730330). Доступные локально тесты без двух package-зависимых media cases: **72/72 PASS**.
-- Одноразовая YDB с синтетическими данными: [интеграционный workflow PASS](https://github.com/spartakdubov059/fam-website/actions/runs/43461729875).
+- В коммите [`78f6975`](https://github.com/spartakdubov059/fam-website/commit/78f6975ad3682b0d7e4070f3df2cdff112acee7b) сессионный Яндекс ID auth отклоняет unsafe-запросы без точного `Origin`; добавлен приватный media upload API с привязкой объекта к подтверждённому UUID профиля, а некорректные image bytes отклоняются до записи.
+- Полный backend-набор: **79/79 PASS** в [GitHub Actions](https://github.com/spartakdubov059/fam-website/actions/runs/43463998476). Локально прошли **77/77** доступных тестов; два S3/Sharp теста требуют установленных пакетов и запускаются в CI.
+- Одноразовая YDB с синтетическими данными: [интеграционный workflow PASS](https://github.com/spartakdubov059/fam-website/actions/runs/43464000024).
+- Загрузка фото пока не соединена с созданием объявления, очередью модерации, публичной выдачей и очисткой сиротских объектов.
 - Облачный staging по-прежнему не создан: нет отдельной подтверждённой среды с гарантированным нулевым расходом. Production, `main` и данные учеников не подключались.
