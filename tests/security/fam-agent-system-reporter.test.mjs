@@ -5,6 +5,7 @@ import {
   createDailyReport,
   renderDailyReport,
   sanitizePullRequests,
+  summarizePullRequestChecks,
   summarizeAgentJobStatuses,
   summarizeWorkflowRuns,
 } from "../../scripts/fam-agent-system-reporter.mjs";
@@ -50,6 +51,24 @@ test("workflow runs are bounded to the last 24 hours and summarized by outcome",
   assert.equal(runs[0].latest.run_id, 120);
 });
 
+test("PR checks report only allowlisted latest outcomes and omit untrusted check metadata", () => {
+  const summary = summarizePullRequestChecks([
+    { name: "Russian content safety tests", status: "completed", conclusion: "failure", started_at: "2026-11-13T04:00:00Z", output: { text: "private" } },
+    { name: "Russian content safety tests", status: "completed", conclusion: "success", started_at: "2026-11-13T05:00:00Z" },
+    { name: "coder-qa-postgres", status: "in_progress", started_at: "2026-11-13T05:30:00Z" },
+    { name: "untrusted check name with private text", status: "completed", conclusion: "failure" },
+  ]);
+  assert.deepEqual(summary, {
+    status: "available",
+    checks: [
+      { key: "coder_qa", status: "in_progress" },
+      { key: "regression", status: "success" },
+    ],
+  });
+  assert.deepEqual(summarizePullRequestChecks([]), { status: "not_observed", checks: [] });
+  assert.deepEqual(summarizePullRequestChecks(null), { status: "unavailable", checks: [] });
+});
+
 test("PR report strips titles and accepts only trusted GitHub URLs", () => {
   const pulls = sanitizePullRequests([
     { number: 5, state: "open", draft: true, title: "private student data", html_url: "https://github.com/a/b/pull/5" },
@@ -57,8 +76,8 @@ test("PR report strips titles and accepts only trusted GitHub URLs", () => {
     { number: 7, state: "closed", html_url: "https://github.com/a/b/pull/7" },
   ]);
   assert.deepEqual(pulls, [
-    { number: 5, draft: true, html_url: "https://github.com/a/b/pull/5", created_at: null },
-    { number: 6, draft: false, html_url: null, created_at: null },
+    { number: 5, draft: true, html_url: "https://github.com/a/b/pull/5", created_at: null, checks: { status: "unavailable", checks: [] } },
+    { number: 6, draft: false, html_url: null, created_at: null, checks: { status: "unavailable", checks: [] } },
   ]);
   assert.equal(JSON.stringify(pulls).includes("private student data"), false);
 });
@@ -126,7 +145,7 @@ test("daily report states missing sources and records only allowlisted Supabase 
   const markdown = renderDailyReport(report);
   assert.match(markdown, /ошибки 0/);
   assert.match(markdown, /последнее состояние: completed\/success/);
-  assert.match(markdown, /PR #8 — draft/);
+  assert.match(markdown, /PR #8 — draft; проверки: недоступны/);
   assert.match(markdown, /coder_patch_request: 1 сбоев/);
   assert.match(markdown, /Аналитические гипотезы по техническим сигналам/);
   assert.match(markdown, /без stack trace/);
@@ -155,6 +174,8 @@ test("report workflow reads sources but does not publish private report contents
   assert.match(reporterSource, /action: "save_report"/);
   assert.match(reporterSource, /actions\/runs\/.*\/jobs\?per_page=100/);
   assert.match(reporterSource, /actions\/runs\?branch=main&per_page=100/);
+  assert.match(reporterSource, /commits\/" \+ sha \+ "\/check-runs\?per_page=100/);
+  assert.match(reportWorkflow, /checks: read/);
   assert.ok(reporterSource.includes("summarizeAgentJobStatuses"));
   assert.doesNotMatch(reporterSource, /GITHUB_STEP_SUMMARY|upload-artifact/);
 });

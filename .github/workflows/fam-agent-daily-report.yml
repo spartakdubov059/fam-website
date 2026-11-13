@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   actions: read
+  checks: read
   deployments: read
   pull-requests: read
 
@@ -24,6 +25,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      checks: read
       deployments: read
       pull-requests: read
     steps:

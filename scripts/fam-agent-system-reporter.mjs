@@ -101,6 +101,41 @@ export function summarizeAgentJobStatuses(jobs) {
   };
 }
 
+const PR_CHECK_ALLOWLIST = new Map([
+  ["Russian content safety tests", "regression"],
+  ["coder-qa-postgres", "coder_qa"],
+  ["reporter-postgres", "reporter_qa"],
+  ["postgres-safety", "database_safety"],
+]);
+
+export function summarizePullRequestChecks(checkRuns) {
+  if (!Array.isArray(checkRuns)) return { status: "unavailable", checks: [] };
+  const latest = new Map();
+  for (const check of checkRuns) {
+    const key = PR_CHECK_ALLOWLIST.get(check?.name);
+    if (!key) continue;
+    const timestamp = Date.parse(check?.started_at ?? check?.completed_at ?? "");
+    const previous = latest.get(key);
+    if (!previous || (Number.isFinite(timestamp) && timestamp > previous.timestamp)) {
+      latest.set(key, { check, timestamp: Number.isFinite(timestamp) ? timestamp : 0 });
+    }
+  }
+  const checks = [...latest.entries()].map(([key, { check }]) => {
+    let status = "not_observed";
+    if (check.status === "queued" || check.status === "requested" || check.status === "waiting") status = "queued";
+    else if (check.status === "in_progress") status = "in_progress";
+    else if (check.status === "completed") {
+      if (check.conclusion === "success") status = "success";
+      else if (check.conclusion === "neutral" || check.conclusion === "skipped") status = check.conclusion;
+      else if (check.conclusion === "cancelled") status = "cancelled";
+      else if (["failure", "timed_out", "action_required", "startup_failure"].includes(check.conclusion)) status = "failure";
+      else status = "other";
+    }
+    return { key, status };
+  }).sort((a, b) => a.key.localeCompare(b.key));
+  return { status: checks.length ? "available" : "not_observed", checks };
+}
+
 export function sanitizePullRequests(pulls) {
   return (Array.isArray(pulls) ? pulls : [])
     .filter((pull) => pull?.state === "open" && Number.isSafeInteger(pull.number))
@@ -110,6 +145,7 @@ export function sanitizePullRequests(pulls) {
       draft: pull.draft === true,
       html_url: safeGithubUrl(pull.html_url),
       created_at: typeof pull.created_at === "string" ? pull.created_at : null,
+      checks: summarizePullRequestChecks(pull.check_runs),
     }));
 }
 
@@ -203,7 +239,7 @@ export function createDailyReport({
       "Проверка сайта выполняется один раз в сутки и не является непрерывным мониторингом.",
       "Окно pg_net ограничено шестью часами и показывает только распознанные JSON-ответы Worker; транспортные ошибки без ответа не привязываются к конкретной функции.",
       "Состояние Edge Functions отражено через HTTP-ответы Worker и последний system health task; версия функции не попадает в ежедневный отчёт.",
-      "Проверены не более 100 последних запусков Actions и 50 открытых PR.",
+      "Проверены не более 100 последних запусков Actions и 50 открытых PR; статусы check runs собираются только для PR из этого репозитория и фиксированного списка проверок.",
       "Технический Analyst группирует только разрешённые коды событий; выводы являются гипотезами, а не подтверждённой первопричиной.",
     ],
   };
@@ -327,7 +363,11 @@ export function renderDailyReport(report) {
   } else {
     for (const pull of report.open_pull_requests) {
       const link = pull.html_url ? " ([открыть](" + pull.html_url + "))" : "";
-      lines.push("- PR #" + pull.number + (pull.draft ? " — draft" : " — открыт") + link + ".");
+      const checks = pull.checks?.checks?.length
+        ? pull.checks.checks.map((check) => check.key + "=" + check.status).join(", ")
+        : pull.checks?.status === "not_observed" ? "не наблюдались" : "недоступны";
+      lines.push("- PR #" + pull.number + (pull.draft ? " — draft" : " — открыт") +
+        "; проверки: " + checks + link + ".");
     }
   }
 
@@ -358,6 +398,35 @@ async function githubGet(url, token) {
   } catch {
     return null;
   }
+}
+
+async function pullRequestsWithChecks(pulls, base, token, repository) {
+  if (!Array.isArray(pulls)) return pulls;
+  const selected = pulls.slice(0, 50);
+  const checksByNumber = new Map();
+  for (let start = 0; start < selected.length; start += 5) {
+    const batch = selected.slice(start, start + 5);
+    const results = await Promise.all(batch.map(async (pull) => {
+      const sha = pull?.head?.sha;
+      if (pull?.head?.repo?.full_name !== repository || typeof sha !== "string" || !/^[0-9a-f]{40}$/i.test(sha)) {
+        return { number: pull?.number, check_runs: null };
+      }
+      const data = await githubGet(base + "/commits/" + sha + "/check-runs?per_page=100", token);
+      return {
+        number: pull.number,
+        check_runs: Array.isArray(data?.check_runs) ? data.check_runs : null,
+      };
+    }));
+    for (const result of results) checksByNumber.set(result.number, result.check_runs);
+  }
+  return selected.map((pull) => ({
+    number: pull.number,
+    state: pull.state,
+    draft: pull.draft,
+    html_url: pull.html_url,
+    created_at: pull.created_at,
+    check_runs: checksByNumber.get(pull.number) ?? null,
+  }));
 }
 
 async function supabaseSnapshot(url, token) {
@@ -407,6 +476,7 @@ async function main() {
     probePublicSite(),
   ]);
 
+  const pullRequests = await pullRequestsWithChecks(pullData, base, token, repository);
   let production = { status: deploymentData ? "not_found" : "unavailable" };
   const deployment = Array.isArray(deploymentData) ? deploymentData[0] : null;
   if (deployment && Number.isSafeInteger(deployment.id)) {
@@ -443,7 +513,7 @@ async function main() {
     snapshotStatus: snapshotData.status,
     workflowRuns: runData?.workflow_runs ?? [],
     workflowStatus: Array.isArray(runData?.workflow_runs) ? "available" : "unavailable",
-    pullRequests: pullData,
+    pullRequests,
     pullRequestStatus: Array.isArray(pullData) ? "available" : "unavailable",
     agentJobStatus: agentJobsStatus,
     agentJobStatuses,
