@@ -117,7 +117,11 @@ test("all coder-editable paths trigger required CI and PR manager waits with rea
 test("all changes require owner approval before merge and production publication", () => {
   assert.match(validator, /CRITICAL_CHANGE_PATTERNS/);
   assert.match(validator, /export function requiresManualApproval/);
-  assert.match(workflow, /gh pr create --draft/);
+  const createCommands = workflow.match(/gh pr create[^\\n]*/g) ?? [];
+  assert.equal(createCommands.length, 1, "agent has exactly one PR creation path");
+  assert.match(createCommands[0], /--draft/);
+  assert.doesNotMatch(workflow, /gh pr create --base/);
+  assert.doesNotMatch(workflow, /REQUIRES_APPROVAL/);
   assert.match(workflow, /отдельного явного разрешения владельца/);
   assert.equal(workflow.includes("gh pr merge"), false);
   assert.equal(workflow.includes("pages/builds"), false);
