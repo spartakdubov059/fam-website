@@ -3,7 +3,7 @@ name: FAM Reporter PostgreSQL integration
 on:
   pull_request:
     paths:
-      - "supabase/migrations/20261113090000_add_fam_agent_report_snapshot_rpc.sql"
+      - "supabase/migrations/20261113215335_fam_agent_report_snapshot_rpc.sql"
       - "tests/sql/fam-agent-reporter-*"
       - ".github/workflows/fam-agent-reporter-postgres.yml"
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-reporter-bootstrap.sql
 
       - name: Apply Reporter migration to PostgreSQL 17
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113090000_add_fam_agent_report_snapshot_rpc.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113215335_fam_agent_report_snapshot_rpc.sql
 
       - name: Verify snapshot, private persistence, bounds and grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-reporter-assert.sql

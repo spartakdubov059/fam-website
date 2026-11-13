@@ -30,3 +30,16 @@ test("migration filenames match the versions already recorded in FAM production"
     assert.ok(!files.has(file), `Stale migration version could be reapplied: ${file}`);
   }
 });
+
+
+test("migration version prefixes are unique across the repository", () => {
+  const versions = new Map();
+  const migrationFiles = readdirSync(migrationDirectory).filter((file) => file.endsWith(".sql"));
+  for (const file of migrationFiles) {
+    const version = file.match(/^(\d{14})_/i)?.[1];
+    assert.ok(version, `Invalid Supabase migration filename: ${file}`);
+    const previous = versions.get(version);
+    assert.equal(previous, undefined, `Duplicate Supabase migration version ${version}: ${previous}, ${file}`);
+    versions.set(version, file);
+  }
+});
