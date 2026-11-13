@@ -2,6 +2,15 @@
   "name": "fam-ru-isolated-backend",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.15.0 <23" },
-  "scripts": { "start": "node server.mjs" }
+  "engines": {
+    "node": ">=22.15.0 <23"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1167.0",
+    "sharp": "0.35.5"
+  }
 }
