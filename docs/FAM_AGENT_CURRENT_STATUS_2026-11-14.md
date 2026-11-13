@@ -21,7 +21,8 @@
 ## Проверенные ограничения
 
 - В PR #65 Worker теперь прекращает запрос ошибкой, если RPC завершения вернул не `true`. Production Worker остаётся v17, поэтому исправление там не действует до отдельного rollout.
-- Контролируемый локальный synthetic pipeline покрывает подготовку patch, trusted QA, статические Reviewer/Security/Performance-проверки и finish bridge. Полный production queue → Qwen → QA → PR цикл не подтверждён; свежих coder-задач для такого наблюдения нет.
+- Два hosted synthetic Qwen runs на SHA `7c1439c297df0ec08036356b317bc60b2d8dc055` реально выполнили скачивание/проверку Qwen2.5 весов, сборку pinned `llama.cpp`, генерацию точного patch и независимую QA на чистом fixture; оба job успешны и сохранили `fam-qwen-exact-edit-smoke` artifact: [push run](https://github.com/spartakdubov059/fam-website/actions/runs/43445287038), [PR run](https://github.com/spartakdubov059/fam-website/actions/runs/43445293786). Это доказывает синтетический model path, но не production queue → Qwen → QA → PR; свежих production coder-задач нет.
+- Отдельный локальный synthetic pipeline тест покрывает trusted QA, статические Reviewer/Security/Performance-проверки и finish bridge.
 - Reviewer, Security и Performance являются статическими/тестовыми проверками, не независимыми ИИ-моделями. Публичный `main` ruleset требует 0 одобрений; owner gate из PR #65 не действует на main до отдельного принятия/настройки.
 - Нативный HTTP-ответ production Worker при `finish_fam_agent_task=false` не проверялся, поскольку это потребовало бы изменения/развёртывания production. Конфигурация существующей ChatGPT automation не найдена в доступных локальных файлах/API; карточка automation была открыта, но настройки прочитать не удалось.
 
