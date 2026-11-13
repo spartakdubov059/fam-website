@@ -262,3 +262,11 @@
 - Production `finish_fam_agent_coder_task(uuid,text,text)` всё ещё содержит старую ветку, которая переводит `model_completed` в `completed` без подтверждённых QA/PR метаданных. В production ledger отсутствуют PR #65 QA completion/bounded retry и Reporter migrations. Полный облачный путь по-прежнему не включён и не доказан.
 - Повторно прочитан ruleset `FAM — защита main` (ID 27066766): он активен, требует PR и `Russian content safety tests`, запрещает удаление и force-push, bypass actors отсутствуют, но `required_approving_review_count=0`. Owner approval check из PR ещё не действует в main. Merge/deploy/production migration не выполнялись.
 - Первоначальный локальный запуск обнаружил несовместимость negative-control теста с TAP-форматом Node 24 (`ℹ tests 1` вместо `# tests 1`). Проверка обновлена для обоих форматов, после чего полный локальный набор moderation/security прошёл 276/276. SQL-регрессия отдельно прошла на hosted PostgreSQL 17.
+
+
+## Свежий запуск Qwen на пустой очереди в main — 13 ноября 2026, 20:59–21:10 UTC
+
+- Main run [#43506543746](https://github.com/spartakdubov059/fam-website/actions/runs/43506543746) стартовал после push на `a1376ff9457230dd9d1909a99accd8e87570724e`. Queue step сообщил `No queued coder task; using the existing scheduled audit.`
+- До проверки очереди workflow восстановил model cache, проверил/подготовил веса Qwen и собрал `llama.cpp`; затем выполнил inference. Верификация и PR jobs были пропущены. Runner job длился 11 минут 23 секунды; inference step — 5 минут 53 секунды.
+- Это прямое подтверждение, что main всё ещё расходует runner-время и вычисления на модель при пустой очереди. Draft PR #65 переносит claim перед cache/download/build/inference и защищает все четыре model steps условием `run_model == 'true'`; пока PR не принят, экономия не действует на main.
+- Run был инициирован обычным push main и завершился успешно, но не создал patch/PR и не проверил production coder task. Production не изменялся этим аудитом.
