@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { postJson } from "../../scripts/local-model-http.mjs";
+import { postJson, LocalInferenceTimeoutError } from "../../scripts/local-model-http.mjs";
 
 async function withServer(handler, run) {
   const server = createServer(handler);
@@ -44,7 +44,7 @@ test("local model HTTP client enforces its explicit socket timeout", async () =>
   }, async (url) => {
     await assert.rejects(
       postJson(url, { prompt: "timeout test" }, { timeoutMs: 25 }),
-      /timed out after 0 minutes/,
+      LocalInferenceTimeoutError,
     );
   });
 });

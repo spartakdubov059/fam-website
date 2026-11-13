@@ -53,7 +53,7 @@ begin
   select attempt_count into v_attempt from private.fam_agent_tasks where id=v_retry_id;
   if v_attempt <> 1 then raise exception 'first claim did not increment attempt count'; end if;
 
-  if not public.finish_fam_agent_coder_task(v_retry_id,'fam-agent-qwen-coder-v1','model_failed') then
+  if not public.finish_fam_agent_coder_task(v_retry_id,'fam-agent-qwen-coder-v1','model_timeout') then
     raise exception 'first reported failure was not accepted';
   end if;
   select status,attempt_count,available_at,finished_at,claimed_by
@@ -79,7 +79,7 @@ begin
   select attempt_count into v_attempt from private.fam_agent_tasks where id=v_retry_id;
   if v_attempt <> 2 then raise exception 'retry claim did not increment attempt count'; end if;
 
-  if not public.finish_fam_agent_coder_task(v_retry_id,'fam-agent-qwen-coder-v1','model_failed') then
+  if not public.finish_fam_agent_coder_task(v_retry_id,'fam-agent-qwen-coder-v1','model_timeout') then
     raise exception 'final failure was not accepted';
   end if;
   select status,finished_at into v_status,v_finished from private.fam_agent_tasks where id=v_retry_id;
@@ -104,6 +104,7 @@ insert into private.fam_agent_tasks (
   ('00000000-0000-4000-8000-000000000002','technical','coder_patch_request','final','final fixture','normal','claimed','system',false,'{}',2,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()+interval '2 hours'),
   ('00000000-0000-4000-8000-000000000003','technical','coder_patch_request','expired','expired fixture','normal','claimed','system',false,'{}',1,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()-interval '1 minute'),
   ('00000000-0000-4000-8000-000000000004','technical','coder_patch_request','manual','manual fixture','normal','claimed','manual',false,'{}',1,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()+interval '2 hours'),
+  ('00000000-0000-4000-8000-000000000006','technical','coder_patch_request','unknown','unknown fixture','normal','claimed','system',false,'{}',1,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()+interval '2 hours'),
   ('00000000-0000-4000-8000-000000000005','technical','coder_patch_request','invalid','invalid fixture','normal','claimed','system',false,'{}',1,2,'fam-agent-qwen-coder-v1',pg_catalog.now(),pg_catalog.now()+interval '2 hours');
 
 set role service_role;
@@ -117,7 +118,9 @@ declare
   v_claimed_by text;
   v_event text;
 begin
-  v_saved := public.finish_fam_agent_coder_task('00000000-0000-4000-8000-000000000001','fam-agent-qwen-coder-v1','model_failed');
+  if not public.finish_fam_agent_coder_task('00000000-0000-4000-8000-000000000006','fam-agent-qwen-coder-v1','model_failed') then raise exception 'unknown failure rejected'; end if;
+  if (select status from private.fam_agent_tasks where id='00000000-0000-4000-8000-000000000006') <> 'failed' then raise exception 'unknown failure retried'; end if;
+  v_saved := public.finish_fam_agent_coder_task('00000000-0000-4000-8000-000000000001','fam-agent-qwen-coder-v1','model_timeout');
   if not v_saved then raise exception 'first reported failure was not accepted'; end if;
   select status,attempt_count,available_at,finished_at,claimed_by into v_status,v_attempt,v_available,v_finished,v_claimed_by
   from private.fam_agent_tasks where id='00000000-0000-4000-8000-000000000001';

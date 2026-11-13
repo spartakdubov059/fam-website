@@ -59,6 +59,8 @@ test("maps model results to fixed result codes only", () => {
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
   assert.equal(chooseResultCode(null), "model_failed");
   assert.equal(chooseResultCode({}, false), "model_failed");
+  assert.equal(chooseResultCode({}, false, "timeout"), "model_timeout");
+  assert.equal(chooseResultCode({}, false, "other"), "model_failed");
 });
 
 test("reads the persisted model summary before selecting a queue result", async () => {

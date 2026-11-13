@@ -58,9 +58,12 @@ begin
       v_status := 'completed';
       v_summary := 'Локальная модель не предложила подтверждённое исправление.';
     when 'model_failed' then
+      v_status := 'failed';
+      v_summary := 'Локальный анализатор завершился с ошибкой неизвестной причины.';
+    when 'model_timeout' then
       if v_has_retry then
         v_status := 'queued';
-        v_summary := 'Ошибка локального анализатора; назначена одна повторная попытка.';
+        v_summary := 'Таймаут локального анализатора; назначена одна повторная попытка.';
       else
         v_status := 'failed';
         v_summary := 'Локальный анализатор исчерпал разрешённое число попыток.';
