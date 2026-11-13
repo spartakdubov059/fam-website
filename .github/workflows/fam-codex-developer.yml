@@ -54,6 +54,7 @@ jobs:
       task_claimed: ${{ steps.coder-queue.outputs.claimed }}
       task_id: ${{ steps.coder-queue.outputs.task_id }}
       model_outcome: ${{ steps.agent.outcome }}
+      model_failure_reason: ${{ steps.agent.outputs.failure_reason }}
     steps:
       - name: Получить исходники FAM без GitHub credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -175,7 +176,16 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/fam-agent"
           git rev-parse HEAD > "$RUNNER_TEMP/fam-agent-base.sha"
-          node scripts/run-local-coder.mjs
+          set +e
+          node scripts/run-local-coder-classified.mjs
+          status=$?
+          set -e
+          if [[ "$status" == "75" ]]; then
+            echo "failure_reason=timeout" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" != "0" ]]; then
+            echo "failure_reason=unknown" >> "$GITHUB_OUTPUT"
+          fi
+          exit "$status"
           cp "$RUNNER_TEMP/fam-agent-base.sha" "$RUNNER_TEMP/fam-agent/base.sha"
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
@@ -411,6 +421,7 @@ jobs:
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.task_id }}
           FAM_MODEL_STEP_OUTCOME: ${{ needs.generate.outputs.model_outcome }}
+          FAM_MODEL_FAILURE_REASON: ${{ needs.generate.outputs.model_failure_reason }}
           FAM_QA_OUTCOME: ${{ needs.trusted_qa.result }}
           FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}
           FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}
