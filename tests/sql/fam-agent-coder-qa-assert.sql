@@ -121,6 +121,28 @@ begin
   if (select count(*) from private.fam_agent_task_events) <> 6 then
     raise exception 'coder finish RPC did not write one event per task';
   end if;
+
+  insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
+  values ('js_runtime','other',now()-interval '1 hour',3);
+  perform private.enqueue_fam_agent_coder_task();
+  if (select count(*) from private.fam_agent_tasks
+      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 1 then
+    raise exception 'producer did not enqueue the threshold event';
+  end if;
+  update private.fam_agent_tasks
+  set status='completed',finished_at=now()
+  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime';
+  if coalesce(private.enqueue_fam_agent_coder_task()->>'reason','') <> 'matching_coder_task_cooldown' then
+    raise exception 'producer did not suppress the repeated event within seven days';
+  end if;
+  update private.fam_agent_tasks
+  set created_at=now()-interval '8 days'
+  where task_type='coder_patch_request' and payload->>'event_code'='js_runtime';
+  perform private.enqueue_fam_agent_coder_task();
+  if (select count(*) from private.fam_agent_tasks
+      where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 2 then
+    raise exception 'producer did not allow a new task after the seven-day cooldown';
+  end if;
 end
 $test$;
 
