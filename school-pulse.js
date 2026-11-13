@@ -109,7 +109,7 @@
     }));
     announcementTrack?.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");
-      if(!button||!rootNode.contains(button)||loading)return;
+      if(!button||!announcementTrack?.contains(button)||loading)return;
       const viewer=getViewer();
       if(!viewer?.id||!viewer?.school_id)return alertUser("Войдите в школьный аккаунт.");
       const id=button.getAttribute("data-pulse-vote");
