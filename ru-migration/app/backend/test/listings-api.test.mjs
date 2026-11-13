@@ -24,13 +24,15 @@ test('public listing read needs no student identity and returns only repository-
   const handler = createListingsApi({ authenticate: async () => { throw new Error('public read must not authenticate'); },
     resolveActor: async () => { throw new Error('public read must not resolve a profile'); },
     repository: { listActiveListings: async () => [safeRow] } });
-  const response = await handler(req({}, 'GET'));
+  const request = req({}, 'GET'); request.url = '/api/v1/listings';
+  const response = await handler(request);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { ok: true, listings: [safeRow] });
 });
 test('public listing read fails closed when the database is unavailable', async () => {
   const handler = createListingsApi({ repository: { listActiveListings: async () => { throw new Error('offline'); } } });
-  const response = await handler(req({}, 'GET'));
+  const request = req({}, 'GET'); request.url = '/api/v1/listings';
+  const response = await handler(request);
   assert.equal(response.status, 503);
   assert.equal(response.body.error, 'database_unavailable');
 });
