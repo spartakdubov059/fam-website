@@ -345,7 +345,6 @@ jobs:
       contents: write
       pull-requests: write
       checks: read
-      actions: read
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -424,26 +423,21 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.pr_url }}
         run: |
           set -euo pipefail
-          BRANCH_SHA="$(git rev-parse HEAD)"
           REQUIRED_CHECK="Russian content safety tests"
-          CHECK_CONCLUSION=""
+          REQUIRED_BUCKET=""
           for attempt in $(seq 1 90); do
-            CHECK_DATA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$BRANCH_SHA/check-runs?per_page=100")"
-            CHECK="$(jq -c --arg name "$REQUIRED_CHECK" '[.check_runs[] | select(.name == $name)] | sort_by(.started_at // .created_at) | last // empty' <<< "$CHECK_DATA")"
-            if [[ -n "$CHECK" && "$CHECK" != "null" ]]; then
-              CHECK_STATUS="$(jq -r '.status // empty' <<< "$CHECK")"
-              CHECK_CONCLUSION="$(jq -r '.conclusion // empty' <<< "$CHECK")"
-              if [[ "$CHECK_STATUS" == "completed" ]]; then
-                if [[ "$CHECK_CONCLUSION" != "success" ]]; then
-                  echo "::error::Обязательная проверка PR не прошла: $CHECK_CONCLUSION"
-                  exit 1
-                fi
-                break
-              fi
+            CHECKS_JSON="$(gh pr checks "$PR_URL" --required --json name,state,bucket 2>/dev/null || true)"
+            REQUIRED_BUCKET="$(jq -r '[.[] | select(.name == "Russian content safety tests")] | last | .bucket // empty' <<< "${CHECKS_JSON:-[]}")"
+            if [[ "$REQUIRED_BUCKET" == "pass" ]]; then
+              break
+            fi
+            if [[ "$REQUIRED_BUCKET" == "fail" || "$REQUIRED_BUCKET" == "cancel" ]]; then
+              echo "::error::Обязательная проверка PR завершилась без успеха: $REQUIRED_BUCKET"
+              exit 1
             fi
             sleep 10
           done
-          if [[ "$CHECK_CONCLUSION" != "success" ]]; then
+          if [[ "$REQUIRED_BUCKET" != "pass" ]]; then
             echo "::error::Обязательная проверка PR не завершилась успешно за отведённое время."
             exit 1
           fi
