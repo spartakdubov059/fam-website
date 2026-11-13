@@ -45,6 +45,13 @@ begin
      or v_snapshot #>> '{latest_coder_task,status}' <> 'failed'
      or v_snapshot #>> '{latest_system_health,status}' is not null
      or v_snapshot #>> '{cron_jobs,0,last_run_status}' <> 'succeeded'
+     or v_snapshot #>> '{worker_http_6h,window_hours}' <> '6'
+     or v_snapshot #>> '{worker_http_6h,response_count}' <> '2'
+     or v_snapshot #>> '{worker_http_6h,success_count}' <> '1'
+     or v_snapshot #>> '{worker_http_6h,http_error_count}' <> '1'
+     or v_snapshot #>> '{worker_http_6h,reported_error_count}' <> '1'
+     or v_snapshot #>> '{worker_http_6h,observed_from}' is null
+     or v_snapshot::text like '%worker_execution_failed%'
      or v_technical ->> 'failed_24h' <> '1'
      or v_snapshot #>> '{failed_tasks_24h,0,task_type}' <> 'coder_patch_request'
      or v_snapshot #>> '{daily_report,metrics,completed}' <> '2' then
