@@ -26,7 +26,8 @@ export async function submitListing({ actor, input, repository, review }) {
   const eventTime = isEvent && typeof input.event_time === 'string' ? input.event_time : null;
   if ((eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) || (eventTime && !/^\d{2}:\d{2}$/.test(eventTime))) return { ok: false, code: 'invalid_listing' };
   const decision = await reviewText([title, description, price].join('\n'), { review });
-  if (decision.action !== 'ok') return { ok: false, code: decision.reason_code || 'review_pending', status: decision.action };
+  if (decision.action === 'reject') return { ok: false, code: decision.reason_code || 'rejected', status: 'rejected' };
+  // Unreviewed content is stored only as pending and remains invisible to public listing queries.
   if (!repository || typeof repository.createListing !== 'function') return { ok: false, code: 'database_unavailable' };
   try {
     const listing = await repository.createListing({ user_id: actor.id, school_id: actor.school_id, title, description, category: input.category, price_text: price || 'Бесплатно', is_event: isEvent, event_date: eventDate, event_time: eventTime, event_type: eventType, max_seats: maxSeats, status: 'pending' });
