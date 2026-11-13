@@ -118,3 +118,11 @@
 ## Подготовка к настройке GitHub App — 13 ноября 2026
 
 В draft PR #65 добавлено optional использование short-lived, repository-scoped GitHub App token для запуска PR checks без approval-required режима `GITHUB_TOKEN`. Подготовлена инструкция [FAM GitHub App setup](FAM_AGENT_GITHUB_APP_SETUP.md) с минимальными правами и безопасной проверкой. App, variable и private-key secret пока не создавались; production и GitHub ruleset не менялись.
+
+
+## Уточнение merge-capability агента и нативной защиты — 13 ноября 2026, 14:10 UTC
+
+- Повторно прочитан активный ruleset ID 27066766: он требует PR и check `Russian content safety tests`, но `required_approving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
+- GitHub Merge Pull Request API требует `Contents:write`. Текущий PR Manager и подготовленный App token получают `contents:write` для push branch, значит технически имеют merge API capability. Запрет `gh pr merge` в workflow доказывает только отсутствие этой команды в текущем коде, не серверную невозможность merge.
+- Owner approval required check блокирует coder PR, пока проверенный workflow исполняется из trusted base, но нативный ruleset не требует review; изменение gate workflow вне patch allowlist может ослабить check. Безопасное завершение требует нативно установить как минимум одно approving review, stale-review dismissal и отсутствие bypass. Это изменение ruleset не выполнено из-за ограничения «без production-изменений»; App setup инструкция исправлена и предписывает не настраивать App до включения native review.
+- Merge API permission and required-review rule documentation: [GitHub Merge a pull request](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request), [available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).

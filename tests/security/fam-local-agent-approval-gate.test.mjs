@@ -6,6 +6,10 @@ const workflow = readFileSync(
   new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url),
   "utf8",
 );
+const appSetup = readFileSync(
+  new URL("../../docs/FAM_AGENT_GITHUB_APP_SETUP.md", import.meta.url),
+  "utf8",
+);
 
 test("local AI developer can prepare a PR and wait for the required independent check", () => {
   assert.match(workflow, /gh pr create/);
@@ -27,6 +31,12 @@ test("automated PR creation can use a repository-scoped App token without broade
   assert.match(workflow, /permission-checks: read/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \|\| github\.token \}\}/);
   assert.match(workflow, /FAM_PR_TOKEN_MODE/);
+});
+
+test("App setup documents merge capability and requires native main review protection", () => {
+  assert.match(appSetup, /Contents: write.*Merge Pull Request API/s);
+  assert.match(appSetup, /required_approving_review_count=0/);
+  assert.match(appSetup, /Не устанавливай App token.*native review/s);
 });
 
 test("local AI developer cannot merge PRs or publish production", () => {
