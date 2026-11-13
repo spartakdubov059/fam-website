@@ -59,9 +59,13 @@ begin
     raise exception 'no-patch result was not stored accurately';
   end if;
 
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('623e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+
   begin
     perform public.finish_fam_agent_coder_task_with_pr(
-      '323e4567-e89b-42d3-a456-426614174000',
+      '623e4567-e89b-42d3-a456-426614174000',
       'fam-agent-qwen-coder-v1','model_completed',null,null
     );
     raise exception 'completed task without verified PR metadata was accepted';
