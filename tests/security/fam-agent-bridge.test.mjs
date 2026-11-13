@@ -55,7 +55,10 @@ test("rejects non-aggregate and out-of-range payloads", () => {
 });
 
 test("maps model results to fixed result codes only", () => {
-  assert.equal(chooseResultCode({ finding_status: "issue_found", patch_available: true }), "model_completed");
+  const patch = { finding_status: "issue_found", patch_available: true };
+  assert.equal(chooseResultCode(patch, true, true), "model_completed");
+  assert.equal(chooseResultCode(patch, true, false), "model_failed");
+  assert.equal(chooseResultCode({ finding_status: "no_issue", patch_available: false }, true, false), "model_no_patch");
   assert.equal(chooseResultCode({ finding_status: "no_issue", patch_available: false }), "model_no_patch");
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
   assert.equal(chooseResultCode(null), "model_failed");
