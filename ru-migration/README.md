@@ -6,10 +6,10 @@
 
 ## Подтверждено сейчас
 
-- Backend CI: **26/26 тестов успешно** на GitHub Actions (Node 22); локально ранее воспроизведены 24 unit-теста на Node 22.15.0.
-- GitHub Actions [SDK compatibility](https://github.com/spartakdubov059/fam-website/actions/runs/43436229571): успешно; проверены зафиксированные YDB/AWS SDK и Sharp 0.35.5, включая WebP-конвертацию.
-- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43436229599): успешно; одноразовая YDB в GitHub runner приняла обе схемы и синтетические записи профиля/объявления, проверены чтение и параметризованные запросы.
-- Smoke test HTTP-сервера подтверждает локальную раздачу FAM RU shell/форматтера и закрытые ответы `503` до настройки российского backend. YDB сценарий не подключался к облаку, SDK-тест не делал deployment.
+- Backend CI: **28/28 тестов успешно** на GitHub Actions (Node 22); локально ранее воспроизведены 24 unit-теста на Node 22.15.0.
+- GitHub Actions [SDK compatibility](https://github.com/spartakdubov059/fam-website/actions/runs/43436976299): успешно; проверены зафиксированные YDB/AWS SDK и Sharp 0.35.5, включая WebP-конвертацию.
+- GitHub Actions [local YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/43436976371): успешно; одноразовая YDB в GitHub runner приняла обе схемы и синтетические записи профиля/объявления, проверены чтение и параметризованные запросы.
+- Smoke test HTTP-сервера подтверждает локальную раздачу FAM RU shell/форматтера и закрытые ответы `503` до настройки российского backend. YDB integration проверяет, что `pending` объявления невидимы, а публикабельный synthetic `active` возвращается без `user_id` и `school_id`. YDB сценарий не подключался к облаку, SDK-тест не делал deployment.
 - YDB зависимости backend зафиксированы точными версиями и lockfile.
 
 ## Что уже реализовано в изолированном коде
@@ -17,7 +17,7 @@
 - Отдельная копия статического интерфейса в `app/web`.
 - Fail-closed HTTP backend с API подачи объявления.
 - OIDC bearer verification, разрешение ролей через профиль в YDB.
-- YDB схема профилей и объявлений, параметризованный repository.
+- YDB схема профилей и объявлений, параметризованный repository; добавлено публичное чтение только активных объявлений с ограниченным набором полей.
 - Локальные privacy/moderation gates; новые записи остаются `pending`, если проверка недоступна.
 - Обработка изображений через Sharp и адаптер приватного S3-совместимого хранилища; проверены unit-тестами с синтетическими данными и mock storage.
 
