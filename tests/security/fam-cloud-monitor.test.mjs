@@ -279,6 +279,7 @@ test("mobile Lighthouse runs daily or on a manual request only", () => {
   assert.ok(mobileJob.includes("for attempt in 1 2"));
   assert.ok(mobileJob.includes("--headless=new --no-sandbox"));
   assert.ok(mobileJob.includes("permissions:\n      contents: read"));
+  assert.equal(mobileJob.includes(": write"), false);
   assert.equal(mobileJob.includes("github.event.schedule == '*/30 * * * *'"), false);
   assert.equal(mobileJob.includes("github.event_name == 'push'"), false);
 });
