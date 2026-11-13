@@ -55,3 +55,8 @@ create table private.fam_site_error_counts (
 grant select, insert, update, delete on private.fam_agent_tasks,
   private.fam_agent_task_events, private.fam_site_error_counts to service_role;
 grant usage, select on all sequences in schema private to service_role;
+
+-- Stand-in for pg_cron in the isolated PostgreSQL fixture. The production migration is otherwise applied verbatim.
+create schema cron;
+create function cron.schedule(text,text,text)
+returns bigint language sql immutable as $ select 1::bigint $;
