@@ -21,6 +21,21 @@ export function createYdbListingsRepository(sql) {
       return { id };
     },
 
+    async createIdea(record) {
+      if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
+          || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {
+        throw new TypeError('invalid idea submission');
+      }
+      const id = randomUUID();
+      const statement = sql`INSERT INTO fam_ideas
+        (id, user_id, school_id, text, ai_status, ai_summary, ai_reason, admin_status, created_at)
+        VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.text}, ${record.ai_status},
+          ${record.ai_summary ?? ''}, ${record.ai_reason ?? ''}, ${record.admin_status}, CurrentUtcTimestamp());`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      await statement;
+      return { id };
+    },
+
     async listFavoriteIds(userId) {
       if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
       const statement = sql`SELECT f.listing_id AS listing_id FROM fam_favorites AS f

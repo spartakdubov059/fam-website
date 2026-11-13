@@ -1,4 +1,5 @@
 import { submitListing } from './submit-listing.mjs';
+import { submitIdea } from './submit-idea.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review }) {
   return async function handle(req) {
@@ -50,6 +51,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       }
     }
     if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
+    if (!['/api/v1/listings', '/api/v1/ideas'].includes(pathname)) return { status: 404, body: { ok: false, error: 'not_found' } };
 
     let identity;
     try { identity = await authenticate(req); } catch { identity = null; }
@@ -67,7 +69,9 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       }
       input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-    const result = await submitListing({ actor, input, repository, review });
+    const result = pathname === '/api/v1/ideas'
+      ? await submitIdea({ actor, input, repository, review })
+      : await submitListing({ actor, input, repository, review });
     const status = result.ok ? 201 : result.code === 'database_unavailable' ? 503 : result.code === 'forbidden' ? 403 : 400;
     return { status, body: result };
   };

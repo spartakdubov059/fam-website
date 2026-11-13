@@ -1,0 +1,13 @@
+-- Ideas remain outside public reads until school review is ported and verified.
+CREATE TABLE fam_ideas (
+  id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  text Utf8 NOT NULL,
+  ai_status Utf8 NOT NULL,
+  ai_summary Utf8 NOT NULL,
+  ai_reason Utf8 NOT NULL,
+  admin_status Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (id)
+);

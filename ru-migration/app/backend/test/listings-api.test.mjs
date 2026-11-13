@@ -5,6 +5,7 @@ import { createListingsApi } from '../services/listings-api.mjs';
 function req(body = {}, method = 'POST') {
   const request = Readable.from(method === 'GET' ? [] : [Buffer.from(JSON.stringify(body))]);
   request.method = method;
+  request.url = '/api/v1/listings';
   return request;
 }
 test('API requires verified identity and database profile before writing', async () => {
@@ -80,4 +81,18 @@ test('favorites fail closed when the database adapter is unavailable', async () 
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });
   const request = req({}, 'GET'); request.url = '/api/v1/favorites';
   assert.equal((await handler(request)).status, 503);
+});
+
+test('idea submission is authenticated and bound to the database profile', async () => {
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { createIdea: async record => { saved = record; return { id: 'synthetic-idea' }; } } });
+  const request = req({ text: 'Было бы здорово открыть книжный обмен', user_id: 'forged-user' });
+  request.url = '/api/v1/ideas';
+  const response = await handler(request);
+  assert.equal(response.status, 201);
+  assert.equal(saved.user_id, 'synthetic-user');
+  assert.equal(saved.school_id, 'synthetic-school');
+  assert.equal(saved.admin_status, 'new');
 });

@@ -39,7 +39,15 @@ try {
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, pending isolation, approved listing projection, favorites and read on disposable local database');
+  const idea = await repo.createIdea({ user_id: 'synthetic-user', school_id: 'synthetic-school',
+    text: 'Синтетическая идея книжного обмена', ai_status: 'pending', ai_summary: 'Синтетическая идея',
+    ai_reason: 'review_unavailable', admin_status: 'new' });
+  const ideaRows = await sql`SELECT user_id, school_id, text, ai_status, admin_status FROM fam_ideas WHERE id = ${idea.id};`;
+  assert.equal(ideaRows[0][0].user_id, 'synthetic-user');
+  assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
+  assert.equal(ideaRows[0][0].ai_status, 'pending');
+  assert.equal(ideaRows[0][0].admin_status, 'new');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, pending isolation, approved listing projection, favorites, pending idea and read on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
