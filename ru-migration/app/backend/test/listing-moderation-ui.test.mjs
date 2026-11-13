@@ -25,6 +25,7 @@ test('school moderators review same-school pending photos and publish only after
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/listings/moderation' && calls.filter(call => call.url === url).length === 1) {
       return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: '<script>unsafe</script>', description: 'Текст', category: 'Учёба', photo_status: 'pending', photo_url: `/api/v1/listings/${id}/photo` }] }) };
     }
@@ -53,4 +54,27 @@ test('student profiles do not receive the school moderation queue', async () => 
   } });
   assert.deepEqual(routes, ['/api/v1/me']);
   assert.equal(f.panel.hidden, true);
+});
+
+test('staff can confirm or reject a pending event application using safe text rendering', async () => {
+  const f = fixture();
+  const eventId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const userId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const calls = [];
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>Событие</b>', user_id: userId, status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }] }) };
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  const card = f.queue.children[0];
+  assert.equal(card.children[0].textContent, '<b>Событие</b>');
+  assert.equal(card.children[1].textContent, 'Заявка: Аня Иванова · 8А');
+  const actions = card.children[2].children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Подтвердить заявку', 'Отклонить заявку']);
+  await actions[1].listeners.click();
+  const decision = calls.find(call => call.url === `/api/v1/listings/${eventId}/registrations/${userId}`);
+  assert.equal(decision.init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(decision.init.body), { decision: 'reject' });
 });

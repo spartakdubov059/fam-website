@@ -237,6 +237,20 @@ export function createYdbListingsRepository(sql) {
       return (await statement)?.[0] ?? [];
     },
 
+    async listPendingEventReviews(schoolId) {
+      if (!schoolId) throw new TypeError('invalid event review school');
+      const statement = sql`SELECT r.event_id AS event_id, l.title AS event_title,
+          r.user_id AS user_id, r.status AS status, r.created_at AS created_at,
+          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name
+        FROM fam_event_registrations AS r
+        INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
+        INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
+        WHERE r.school_id = ${schoolId} AND l.is_event = true AND l.status = 'active' AND r.status = 'pending'
+        ORDER BY r.created_at ASC LIMIT 200;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
     async registerForEvent(eventId, userId) {
       if (!eventId || !userId) throw new TypeError('invalid event registration');
       const outcome = await sql.begin(async tx => {

@@ -31,15 +31,23 @@ export async function initializeListingModeration({ document = globalThis.docume
   async function load() {
     status.textContent = 'Загружаем очередь…';
     try {
-      const response = await fetchImpl('/api/v1/listings/moderation', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
-      const result = await json(response);
-      if (!response.ok || !result?.ok || !Array.isArray(result.listings)) throw new Error('queue_unavailable');
+      const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
+      const [response, eventResponse] = await Promise.all([
+        fetchImpl('/api/v1/listings/moderation', options),
+        fetchImpl('/api/v1/event-registrations/review', options),
+      ]);
+      const [result, eventResult] = await Promise.all([json(response), json(eventResponse)]);
+      if (!response.ok || !result?.ok || !Array.isArray(result.listings)
+        || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)) throw new Error('queue_unavailable');
       queue.replaceChildren();
-      if (result.listings.length === 0) {
+      const applications = eventResult.applications.filter(application => application
+        && UUID.test(application.event_id) && UUID.test(application.user_id)
+        && application.status === 'pending' && typeof application.event_title === 'string');
+      if (result.listings.length === 0 && applications.length === 0) {
         status.textContent = 'Новых объявлений для проверки нет.';
         return;
       }
-      status.textContent = `Ожидают проверки: ${result.listings.length}`;
+      status.textContent = `Ожидают проверки: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}.`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -64,6 +72,18 @@ export async function initializeListingModeration({ document = globalThis.docume
           actions.append(actionButton(document, 'Опубликовать', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'approve')));
         }
         actions.append(actionButton(document, 'Отклонить объявление', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'reject')));
+        card.append(actions);
+        queue.append(card);
+      }
+      for (const application of applications) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', application.event_title));
+        const name = [application.first_name, application.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+        card.append(node(document, 'p', '', `Заявка: ${name || 'Ученик'}${application.class_name ? ` · ${application.class_name}` : ''}`));
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        const path = `/api/v1/listings/${application.event_id}/registrations/${application.user_id}`;
+        actions.append(actionButton(document, 'Подтвердить заявку', () => decide(path, 'approve')));
+        actions.append(actionButton(document, 'Отклонить заявку', () => decide(path, 'reject')));
         card.append(actions);
         queue.append(card);
       }

@@ -128,6 +128,14 @@ try {
   assert.equal(requestResponse.status, 201);
   assert.equal(requestResponse.body.registration.status, 'pending');
   assert.equal(await repo.getEventOccupancy(reviewEvent.id), 1);
+  const reviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-admin'));
+  assert.equal(reviewQueue.status, 200);
+  assert.equal(reviewQueue.body.applications.some(row => row.event_id === reviewEvent.id && row.user_id === '11111111-1111-4111-8111-111111111111'), true,
+    'same-school moderator can see the synthetic pending registration');
+  assert.equal(reviewQueue.body.applications.some(row => row.user_id === '22222222-2222-4222-8222-222222222222'), false,
+    'event review queue excludes registrations from other schools');
+  const studentReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-student'));
+  assert.equal(studentReviewQueue.status, 403, 'students cannot read the event review queue');
   assert.equal(await repo.moderateEventRegistration(reviewEvent.id, '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'other-school', 'confirmed'), false,
     'event registration review is scoped to the event owner school');
   const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
@@ -149,7 +157,7 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, listings, favorites, ideas, messages, school-scoped photo moderation queue, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profiles, listings, favorites, ideas, messages, school-scoped photo/event review queues, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

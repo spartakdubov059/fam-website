@@ -33,6 +33,15 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, registrations: await repository.listEventRegistrations(actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/event-registrations/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listPendingEventReviews !== 'function') return { status: 503, body: { ok: false, error: 'event_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, applications: await repository.listPendingEventReviews(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'POST' && eventRegistrationMatch) {
       let bodyBytes = 0;
       for await (const chunk of req) {

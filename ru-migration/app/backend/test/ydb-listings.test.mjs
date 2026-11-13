@@ -156,6 +156,23 @@ test('event applicant query binds event and school and exposes only profile disp
   await assert.rejects(repo.listEventApplicants('event-1', ''), TypeError);
 });
 
+test('pending event review queue binds the school and exposes only minimal applicant fields', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ event_id: 'event-a', event_title: 'Встреча', user_id: 'student-a', status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }]]);
+  });
+  const rows = await repo.listPendingEventReviews('school-a');
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /r\.school_id = \?/);
+  assert.match(query.text, /l\.is_event = true/);
+  assert.match(query.text, /l\.status = 'active'/);
+  assert.match(query.text, /r\.status = 'pending'/);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['class_name', 'event_id', 'event_title', 'first_name', 'last_name', 'status', 'user_id']);
+  assert.doesNotMatch(query.text, /email|phone|address/i);
+  await assert.rejects(repo.listPendingEventReviews(''), TypeError);
+});
+
 test('event registration reserves a seat and stores only the database actor identity in one transaction', async () => {
   const operations = [];
   const tx = async (strings, ...values) => {
