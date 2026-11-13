@@ -7,10 +7,12 @@ const workflow = readFileSync(
   "utf8",
 );
 
-test("local AI developer can prepare a reviewed PR and wait for independent tests", () => {
+test("local AI developer can prepare a PR and wait for the required independent check", () => {
   assert.match(workflow, /gh pr create/);
-  assert.match(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml/);
-  assert.match(workflow, /gh run watch/);
+  assert.match(workflow, /REQUIRED_CHECK="Russian content safety tests"/);
+  assert.match(workflow, /gh api .*check-runs/);
+  assert.match(workflow, /CHECK_CONCLUSION/);
+  assert.doesNotMatch(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml/);
   assert.match(workflow, /gh pr comment/);
 });
 
