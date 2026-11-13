@@ -358,7 +358,7 @@ jobs:
   prepare_review:
     name: Подготовить PR и проверить исправление без публикации
     needs: [generate, verify, finish_task]
-    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && needs.finish_task.result == 'success'
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && (needs.finish_task.result == 'success' || needs.generate.outputs.task_claimed != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
