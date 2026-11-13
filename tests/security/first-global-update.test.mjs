@@ -30,7 +30,7 @@ test("profile shows the student's name with a neutral fallback and keeps email i
  assert.match(html,/const displayName = \[profile\?\.first_name, profile\?\.last_name\]/);
  assert.match(html,/displayName \|\| "Участник FAM"/);
  assert.match(html,/id="accountEmail"/);
- assert.match(html,/\$\("accountEmail"\)\.textContent = user\.email/);
+ assert.match(html,/\$\("accountEmail"\)\.value = user\.email/);
  assert.doesNotMatch(html,/\$\("profEmail"\)\.textContent = user\.email/);
 });
 
