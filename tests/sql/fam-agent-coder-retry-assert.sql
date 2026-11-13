@@ -1,55 +1,13 @@
 do $$
-declare
-  v_count integer;
-  v_status text;
 begin
-  select count(*) into v_count
-  from private.fam_agent_tasks
-  where id in (
-    '10000000-0000-4000-8000-000000000001',
-    '10000000-0000-4000-8000-000000000003'
-  ) and status='queued' and attempt_count=1 and max_attempts=2
-    and available_at between pg_catalog.now()+interval '29 minutes'
-                         and pg_catalog.now()+interval '31 minutes'
-    and finished_at is null and claimed_by is null and lease_expires_at is null;
-  if v_count <> 2 then raise exception 'recent unique transient failures were not requeued exactly once'; end if;
-
-  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000002';
-  if v_status <> 'failed' then raise exception 'older duplicate signature was also requeued'; end if;
-  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000004';
-  if v_status <> 'failed' then raise exception 'failure with an active duplicate was requeued'; end if;
-  select status into v_status from private.fam_agent_tasks where id='10000000-0000-4000-8000-000000000005';
-  if v_status <> 'queued' then raise exception 'active duplicate fixture was modified'; end if;
-
-  select count(*) into v_count
-  from private.fam_agent_task_events
-  where event_type='retry_scheduled'
-    and actor='fam-agent-retry-migration-v1'
-    and task_id in (
-      '10000000-0000-4000-8000-000000000001',
-      '10000000-0000-4000-8000-000000000003'
-    );
-  if v_count <> 2 then raise exception 'backfill retry events were not recorded'; end if;
-
-  select count(*) into v_count
-  from private.fam_agent_tasks
-  where id in (
-    '10000000-0000-4000-8000-000000000006',
-    '10000000-0000-4000-8000-000000000007',
-    '10000000-0000-4000-8000-000000000008',
-    '10000000-0000-4000-8000-000000000009',
-    '10000000-0000-4000-8000-000000000010'
-  ) and status='failed';
-  if v_count <> 5 then raise exception 'exhausted, manual, approval, unknown-summary, or stale failures were modified'; end if;
-
-  -- Clear the synthetic queue fixture so the subsequent producer/claim test is isolated.
-  update private.fam_agent_tasks
-  set status='completed',finished_at=pg_catalog.now(),updated_at=pg_catalog.now()
-  where id in (
-    '10000000-0000-4000-8000-000000000001',
-    '10000000-0000-4000-8000-000000000003',
-    '10000000-0000-4000-8000-000000000005'
-  );
+  if (select count(*) from private.fam_agent_tasks where status='failed') <> 9 then
+    raise exception 'migration changed historical failures with unknown causes';
+  end if;
+  if exists (select 1 from private.fam_agent_task_events where event_type='retry_scheduled') then
+    raise exception 'migration scheduled a retry for a historical failure';
+  end if;
+  update private.fam_agent_tasks set status='completed', finished_at=pg_catalog.now()
+  where status='queued';
 end;
 $$;
 
@@ -96,7 +54,7 @@ begin
   if v_attempt <> 1 then raise exception 'first claim did not increment attempt count'; end if;
 
   if not public.finish_fam_agent_coder_task(v_retry_id,'fam-agent-qwen-coder-v1','model_failed') then
-    raise exception 'first transient failure was not accepted';
+    raise exception 'first reported failure was not accepted';
   end if;
   select status,attempt_count,available_at,finished_at,claimed_by
   into v_status,v_attempt,v_available,v_finished,v_claimed_by
@@ -160,7 +118,7 @@ declare
   v_event text;
 begin
   v_saved := public.finish_fam_agent_coder_task('00000000-0000-4000-8000-000000000001','fam-agent-qwen-coder-v1','model_failed');
-  if not v_saved then raise exception 'first transient failure was not accepted'; end if;
+  if not v_saved then raise exception 'first reported failure was not accepted'; end if;
   select status,attempt_count,available_at,finished_at,claimed_by into v_status,v_attempt,v_available,v_finished,v_claimed_by
   from private.fam_agent_tasks where id='00000000-0000-4000-8000-000000000001';
   if v_status <> 'queued' or v_attempt <> 1 or v_available < pg_catalog.now()+interval '29 minutes'

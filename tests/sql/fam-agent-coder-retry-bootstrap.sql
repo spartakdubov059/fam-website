@@ -61,18 +61,18 @@ create schema cron;
 create function cron.schedule(text,text,text)
 returns bigint language sql immutable as 'select 1::bigint';
 
--- Simulate recent terminal transient failures that predate the bounded retry migration.
+-- Simulate recent terminal failures with unknown causes that predate the bounded retry migration.
 insert into private.fam_agent_tasks (
   id,agent_key,task_type,title,description,priority,status,source,approval_required,
   payload,result_summary,attempt_count,max_attempts,created_at,updated_at,finished_at
 ) values
-  ('10000000-0000-4000-8000-000000000001','technical','coder_patch_request','old transient A','synthetic fixture','normal','failed','scheduled_audit',false,
+  ('10000000-0000-4000-8000-000000000001','technical','coder_patch_request','old failure A','synthetic fixture','normal','failed','scheduled_audit',false,
    '{"task_key":"audit_frontend_runtime","event_code":"js_runtime","page_area":"other","occurrences":4}',
    'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
-  ('10000000-0000-4000-8000-000000000002','technical','coder_patch_request','old transient duplicate','synthetic fixture','normal','failed','scheduled_audit',false,
+  ('10000000-0000-4000-8000-000000000002','technical','coder_patch_request','old failure duplicate','synthetic fixture','normal','failed','scheduled_audit',false,
    '{"task_key":"audit_frontend_runtime","event_code":"js_runtime","page_area":"other","occurrences":4}',
    'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '2 days',pg_catalog.now()-interval '2 days',pg_catalog.now()-interval '2 days'),
-  ('10000000-0000-4000-8000-000000000003','technical','coder_patch_request','old transient B','synthetic fixture','normal','failed','scheduled_audit',false,
+  ('10000000-0000-4000-8000-000000000003','technical','coder_patch_request','old failure B','synthetic fixture','normal','failed','scheduled_audit',false,
    '{"task_key":"audit_accessibility","event_code":"js_runtime","page_area":"other","occurrences":4}',
    'Локальный анализатор завершился с ошибкой.',1,2,pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day',pg_catalog.now()-interval '1 day'),
   ('10000000-0000-4000-8000-000000000004','technical','coder_patch_request','active duplicate candidate','synthetic fixture','normal','failed','scheduled_audit',false,

@@ -1,4 +1,4 @@
--- Retry a transient local coder failure at most once and deduplicate repeated
+-- Retry a reported local coder failure at most once and deduplicate repeated
 -- producer signals. Keep generated patches in review until the QA-aware bridge
 -- records verified PR metadata.
 
@@ -60,7 +60,7 @@ begin
     when 'model_failed' then
       if v_has_retry then
         v_status := 'queued';
-        v_summary := 'Временная ошибка локального анализатора; назначена одна повторная попытка.';
+        v_summary := 'Ошибка локального анализатора; назначена одна повторная попытка.';
       else
         v_status := 'failed';
         v_summary := 'Локальный анализатор исчерпал разрешённое число попыток.';
@@ -194,81 +194,3 @@ $function$;
 
 revoke all on function private.enqueue_fam_agent_coder_task() from public,anon,authenticated;
 grant execute on function private.enqueue_fam_agent_coder_task() to postgres,service_role;
-
--- Recover at most one recent, signature-unique task that the previous bridge
--- marked failed on a transient model error before the bounded retry was added.
--- Exact summary matching, attempt bounds, source/approval allowlists, active
--- duplicate suppression, a seven-day age bound, and retry-event idempotency
--- keep this one-time backfill narrow and safe.
-with locked_candidates as (
-  select t.id,t.payload,t.created_at
-  from private.fam_agent_tasks as t
-  where t.agent_key='technical'
-    and t.task_type='coder_patch_request'
-    and t.approval_required=false
-    and t.source in ('system','scheduled_audit')
-    and t.status='failed'
-    and t.result_summary='Локальный анализатор завершился с ошибкой.'
-    and t.created_at >= pg_catalog.now()-interval '7 days'
-    and t.attempt_count < t.max_attempts
-    and t.payload ?& array['task_key','event_code','page_area','occurrences']
-    and (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(t.payload)) = 4
-    and t.payload->>'task_key' in ('audit_frontend_runtime','audit_client_resilience','audit_accessibility')
-    and t.payload->>'event_code' in ('js_runtime','unhandled_rejection','listings_load_failed')
-    and t.payload->>'page_area' in ('auth','listings','notifications','database','other')
-    and pg_catalog.jsonb_typeof(t.payload->'occurrences')='number'
-    and (t.payload->>'occurrences') ~ '^[0-9]{1,4}$'
-    and (t.payload->>'occurrences')::integer between 0 and 1000
-    and not exists (
-      select 1 from private.fam_agent_tasks as active
-      where active.agent_key='technical'
-        and active.task_type='coder_patch_request'
-        and active.approval_required=false
-        and active.source in ('system','scheduled_audit')
-        and active.status in ('queued','claimed','in_progress')
-        and active.payload->>'task_key'=t.payload->>'task_key'
-        and active.payload->>'event_code'=t.payload->>'event_code'
-        and active.payload->>'page_area'=t.payload->>'page_area'
-    )
-    and not exists (
-      select 1
-      from private.fam_agent_task_events as prior_retry
-      join private.fam_agent_tasks as prior_task on prior_task.id=prior_retry.task_id
-      where prior_retry.event_type='retry_scheduled'
-        and prior_retry.created_at >= pg_catalog.now()-interval '7 days'
-        and prior_task.agent_key='technical'
-        and prior_task.task_type='coder_patch_request'
-        and prior_task.approval_required=false
-        and prior_task.source in ('system','scheduled_audit')
-        and prior_task.payload->>'task_key'=t.payload->>'task_key'
-        and prior_task.payload->>'event_code'=t.payload->>'event_code'
-        and prior_task.payload->>'page_area'=t.payload->>'page_area'
-    )
-  order by t.created_at desc,t.id desc
-  for update of t skip locked
-), ranked_candidates as (
-  select id,
-    pg_catalog.row_number() over (
-      partition by payload->>'task_key',payload->>'event_code',payload->>'page_area'
-      order by created_at desc,id desc
-    ) as signature_rank
-  from locked_candidates
-), reopened as (
-  update private.fam_agent_tasks as t
-  set status='queued',
-      result_summary='Недавняя временная ошибка локальной модели; назначена одна повторная попытка.',
-      available_at=pg_catalog.now()+interval '30 minutes',
-      claimed_by=null,
-      claimed_at=null,
-      lease_expires_at=null,
-      finished_at=null,
-      updated_at=pg_catalog.now()
-  where t.id in (select id from ranked_candidates where signature_rank=1)
-    and t.status='failed'
-    and t.attempt_count < t.max_attempts
-  returning t.id
-)
-insert into private.fam_agent_task_events(task_id,event_type,actor,summary)
-select id,'retry_scheduled','fam-agent-retry-migration-v1',
-  'Для недавней временной ошибки назначена одна повторная попытка.'
-from reopened;
