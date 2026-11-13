@@ -146,3 +146,15 @@ test("draft PR creation depends on the independent Reviewer artifact after QA", 
   assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify\]/);
   assert.match(workflow, /needs\.verify\.result == 'success'/);
 });
+
+test("separate Security and Performance reports gate independent QA and reach the PR", () => {
+  assert.match(workflow, /Запустить отдельный статический Security Agent/);
+  assert.match(workflow, /node scripts\/fam-agent-security\.mjs/);
+  assert.match(workflow, /Запустить отдельный статический Performance Agent/);
+  assert.match(workflow, /node scripts\/fam-agent-performance\.mjs/);
+  assert.match(workflow, /name: fam-agent-independent-review/);
+  assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/security\.md"/);
+  assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/performance\.md"/);
+  assert.match(workflow, /node --check scripts\/fam-agent-security\.mjs/);
+  assert.match(workflow, /node --check scripts\/fam-agent-performance\.mjs/);
+});
