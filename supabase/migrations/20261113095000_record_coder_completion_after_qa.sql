@@ -1,14 +1,16 @@
+-- Queue completion means a patch passed QA and required PR checks.
+-- Keep the old bridge contract safe during staged deployment: it may only move a
+-- generated patch to review, never mark that patch completed without QA evidence.
 alter table private.fam_agent_tasks
   add column pr_url text,
   add column commit_sha text,
   add constraint fam_agent_tasks_pr_metadata_pair_check
     check ((pr_url is null) = (commit_sha is null)),
   add constraint fam_agent_tasks_pr_url_check
-    check (pr_url is null or pr_url ~ '^https://github\\.com/spartakdubov059/fam-website/pull/[1-9][0-9]*$'),
+    check (pr_url is null or pr_url ~ '^https://github\.com/spartakdubov059/fam-website/pull/[1-9][0-9]*$'),
   add constraint fam_agent_tasks_commit_sha_check
     check (commit_sha is null or commit_sha ~ '^[0-9a-fA-F]{40}$');
 
--- Persist PR identity only after independent QA and required PR checks succeed.
 create or replace function public.finish_fam_agent_coder_task(
   p_task_id uuid,
   p_worker_id text,
@@ -29,14 +31,14 @@ begin
   end if;
   case p_result_code
     when 'model_completed' then
-      v_status := 'completed';
-      v_summary := 'Локальная модель подготовила исправление, прошедшее независимую QA-проверку.';
+      v_status := 'review';
+      v_summary := 'Локальная модель подготовила patch; требуется независимый QA и PR.';
     when 'model_no_patch' then
       v_status := 'completed';
       v_summary := 'Локальная модель завершила анализ и не предложила подтверждённое исправление.';
     when 'model_failed' then
       v_status := 'failed';
-      v_summary := 'Локальная модель или независимая QA-проверка завершилась с ошибкой.';
+      v_summary := 'Локальный анализатор завершился с ошибкой.';
     when 'model_blocked' then
       v_status := 'blocked';
       v_summary := 'Задание остановлено защитными ограничениями.';
@@ -46,6 +48,8 @@ begin
   update private.fam_agent_tasks as t
   set status = v_status,
       result_summary = v_summary,
+      pr_url = null,
+      commit_sha = null,
       claimed_by = null,
       lease_expires_at = null,
       finished_at = case when v_status in ('completed','failed') then pg_catalog.now() else null end,
@@ -64,6 +68,9 @@ begin
   return true;
 end;
 $function$;
+
+revoke all on function public.finish_fam_agent_coder_task(uuid,text,text) from public,anon,authenticated;
+grant execute on function public.finish_fam_agent_coder_task(uuid,text,text) to service_role;
 
 create or replace function public.finish_fam_agent_coder_task_with_pr(
   p_task_id uuid,
@@ -85,7 +92,6 @@ begin
   if p_worker_id is distinct from 'fam-agent-qwen-coder-v1' then
     raise exception 'invalid coder worker';
   end if;
-
   case p_result_code
     when 'model_completed' then
       if p_pr_url is null or p_commit_sha is null then
@@ -114,14 +120,12 @@ begin
     else
       raise exception 'invalid coder result code';
   end case;
-
-  if p_pr_url is not null and p_pr_url !~ '^https://github\\.com/spartakdubov059/fam-website/pull/[1-9][0-9]*$' then
+  if p_pr_url is not null and p_pr_url !~ '^https://github\.com/spartakdubov059/fam-website/pull/[1-9][0-9]*$' then
     raise exception 'invalid coder PR URL';
   end if;
   if p_commit_sha is not null and p_commit_sha !~ '^[0-9a-fA-F]{40}$' then
     raise exception 'invalid coder commit SHA';
   end if;
-
   update private.fam_agent_tasks as t
   set status = v_status,
       result_summary = v_summary,
@@ -139,12 +143,9 @@ begin
     and t.status = 'claimed'
     and t.lease_expires_at > pg_catalog.now()
   returning t.id into v_updated;
-
   if v_updated is null then return false; end if;
-
   insert into private.fam_agent_task_events(task_id,event_type,actor,summary)
   values (v_updated,v_status,p_worker_id,v_summary);
-
   return true;
 end;
 $function$;
