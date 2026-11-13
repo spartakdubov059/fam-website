@@ -137,6 +137,12 @@ begin
       end if;
       v_status := 'completed';
       v_summary := 'Локальная модель подготовила исправление, прошедшее независимый QA и обязательные проверки PR.';
+    when 'model_review' then
+      if p_pr_url is null or p_commit_sha is null then
+        raise exception 'review coder task requires PR metadata';
+      end if;
+      v_status := 'review';
+      v_summary := 'Draft PR создан; обязательная проверка не завершилась успешно, требуется ручной просмотр.';
     when 'model_no_patch' then
       if p_pr_url is not null or p_commit_sha is not null then
         raise exception 'no-patch coder task cannot store PR metadata';
