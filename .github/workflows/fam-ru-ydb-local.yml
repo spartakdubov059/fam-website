@@ -3,7 +3,7 @@ on:
   push:
     branches: ["migration/yandex-cloud"]
     paths:
-      - "ru-migration/app/backend/repositories/**"
+      - "ru-migration/app/backend/**"
       - "ru-migration/app/backend/schema/**"
       - "ru-migration/compat/**"
       - ".github/workflows/fam-ru-ydb-local.yml"
@@ -26,7 +26,7 @@ jobs:
       - name: Wait for database and apply isolated schema
         shell: bash
         run: |
-          schema=$(cat ru-migration/app/backend/schema/01_listings.yql)
+          schema="$(cat ru-migration/app/backend/schema/01_listings.yql)\n$(cat ru-migration/app/backend/schema/02_user_profiles.yql)"
           for i in $(seq 1 120); do
             if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
             if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi
