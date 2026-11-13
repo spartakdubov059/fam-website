@@ -270,3 +270,11 @@
 - До проверки очереди workflow восстановил model cache, проверил/подготовил веса Qwen и собрал `llama.cpp`; затем выполнил inference. Верификация и PR jobs были пропущены. Runner job длился 11 минут 23 секунды; inference step — 5 минут 53 секунды.
 - Это прямое подтверждение, что main всё ещё расходует runner-время и вычисления на модель при пустой очереди. Draft PR #65 переносит claim перед cache/download/build/inference и защищает все четыре model steps условием `run_model == 'true'`; пока PR не принят, экономия не действует на main.
 - Run был инициирован обычным push main и завершился успешно, но не создал patch/PR и не проверил production coder task. Production не изменялся этим аудитом.
+
+
+## Проверка production Reporter — 14 ноября 2026, около 00:40 МСК
+
+- Production legacy `private.fam_agent_daily_reports` содержит пять дат с 9 по 13 ноября; последний отчёт создан `2026-11-13 04:00:00 UTC`. Таблица по-прежнему имеет только `report_date`, `generated_at`, `summary`, `metrics` — новую нормализованную schema и роль-покрытие из PR #65 не содержит.
+- `daily_report_digest` завершился 13 ноября в 04:00:03 UTC; следующий ежедневный слот 14 ноября 04:00 UTC на момент проверки ещё не наступил. Это подтверждает регулярность legacy digest, но не единый отчёт всех специализированных агентов.
+- Периодические `site_error_digest` продолжаются: 80 completed, последний завершён 13 ноября в 21:30:01 UTC. `system_health_check` имеет 4 completed, последнее 13 ноября в 03:40 UTC. `queue_health_check` имеет только 2 исторических completed, последнее 9 ноября в 14:34 UTC; активного отдельного Cron для этого task type в текущем списке нет.
+- Production Reporter, queue, Cron и схема не изменялись. Report contents/metrics и пользовательские данные при этой сверке не читались.
