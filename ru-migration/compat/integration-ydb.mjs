@@ -26,7 +26,15 @@ try {
   assert.equal(sets[0][0].user_id, 'synthetic-user');
   assert.equal(sets[0][0].school_id, 'synthetic-school');
   assert.equal(sets[0][0].status, 'pending');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, schema, insert and read on disposable local database');
+  assert.deepEqual(await repo.listActiveListings(), [], 'pending content must not appear publicly');
+  await sql`UPDATE fam_listings SET status = 'active' WHERE id = ${listing.id};`;
+  const publicListings = await repo.listActiveListings();
+  assert.equal(publicListings.length, 1);
+  assert.equal(publicListings[0].id, listing.id);
+  assert.equal(publicListings[0].title, title);
+  assert.equal(Object.hasOwn(publicListings[0], 'user_id'), false);
+  assert.equal(Object.hasOwn(publicListings[0], 'school_id'), false);
+  console.log('YDB_LOCAL_INTEGRATION_PASS: profile lookup, pending isolation, approved listing projection, insert and read on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
