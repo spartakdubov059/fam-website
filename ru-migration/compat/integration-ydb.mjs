@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
+import { createListingsApi } from '../app/backend/services/listings-api.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -21,6 +23,27 @@ try {
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
+  const listingsApi = createListingsApi({
+    authenticate: async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin' : 'subject-1' }),
+    resolveActor,
+    repository: repo,
+  });
+  const apiRequest = (method, url, token, body = {}) => {
+    const request = Readable.from([Buffer.from(JSON.stringify(body))]);
+    request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
+    return request;
+  };
+  const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
+    title: 'Обмен учебниками', description: 'Синтетическое объявление для интеграционной проверки', category: 'Учёба',
+  }));
+  assert.equal(apiSubmission.status, 201);
+  assert.equal(apiSubmission.body.status, 'pending');
+  assert.deepEqual(await repo.listActiveListings(), [], 'API submissions remain invisible before school moderation');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-student', { decision: 'approve' }))).status, 403,
+    'student cannot moderate even when using a valid database-backed identity');
+  const apiApproval = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-admin', { decision: 'approve' }));
+  assert.deepEqual(apiApproval, { status: 200, body: { ok: true, status: 'active' } });
+  assert.equal((await repo.listActiveListings()).length, 1, 'approved API submission becomes visible through public projection');
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
   const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
     description: 'Учебник', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
@@ -36,11 +59,12 @@ try {
   assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
   assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
   const publicListings = await repo.listActiveListings();
-  assert.equal(publicListings.length, 1);
-  assert.equal(publicListings[0].id, listing.id);
-  assert.equal(publicListings[0].title, title);
-  assert.equal(Object.hasOwn(publicListings[0], 'user_id'), false);
-  assert.equal(Object.hasOwn(publicListings[0], 'school_id'), false);
+  assert.equal(publicListings.length, 2);
+  const publicDirectListing = publicListings.find(row => row.id === listing.id);
+  assert.ok(publicDirectListing);
+  assert.equal(publicDirectListing.title, title);
+  assert.equal(Object.hasOwn(publicDirectListing, 'user_id'), false);
+  assert.equal(Object.hasOwn(publicDirectListing, 'school_id'), false);
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), true);
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
