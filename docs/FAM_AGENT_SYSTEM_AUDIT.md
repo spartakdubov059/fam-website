@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 21213)
-Total output lines: 264
-
 # Аудит агентной системы FAM
 
 Снимок: 13 ноября 2026, 09:05 UTC. Проверены репозиторий, GitHub Actions и живой Supabase проект `tfacqpljrvfpcrhdovbu`. В production выполнялись только чтение миграций, агрегированных статусов очереди, расписаний, последних запусков и советников безопасности/производительности.
@@ -104,7 +101,28 @@ Total output lines: 264
 ## Ограничение запуска CI на PR от workflow — подтверждено по коду и документации GitHub, 13 ноября 2026
 
 - `prepare_review` создаёт ветку и draft PR через `GITHUB_TOKEN`, затем до 15 минут ждёт обязательный check `Russian content safety tests`. В этой же ветке у coder-модели нет allowlist-пути для изменения `.github/workflows/**` или `scripts/verify-agent-pr-owner-approval.mjs`; отдельный security-тест теперь проверяет этот запрет.
-- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автом…1213 tokens truncated…oving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
+- Актуальная документация GitHub указывает, что PR-события от `GITHUB_TOKEN` получают workflow runs в состоянии approval-required; пользователь с write-доступом должен разрешить их запуск. Поэтому автоматическое создание PR само по себе не доказывает запуск required CI. Пока такой запуск не разрешён, менеджер не получает зелёную проверку; bridge сохраняет созданные URL/SHA со статусом `review`, не отмечая задачу завершённой и не создавая дубликат.
+- Синтетический Qwen run `43371755985` доказал генерацию patch и независимый regression QA на чистом fixture, но не создание PR. Полный cloud-путь очередь → модель → PR → required CI остаётся недоказанным.
+- Для полностью автоматического запуска CI нужен отдельный проверенный механизм: например, минимально разрешённый GitHub App installation token для создания PR либо доверенный dispatcher/check-run поток. Первый требует ручной настройки App secret; второй расширяет permission set Actions. В этом изменении ни secrets, ни workflow permissions не расширялись. До выбора и проверки одного из механизмов PR остаётся draft, а ручное разрешение workflow-запуска — отдельная человеческая операция.
+- Источник правила GitHub: [GITHUB_TOKEN и запуск workflow](https://docs.github.com/en/actions/concepts/security/github_token). Production, queue, secrets и правила доступа не менялись.
+
+
+## Подготовлен короткоживущий GitHub App token для agent PR — 13 ноября 2026, 14:02 UTC
+
+- В draft PR #65 `prepare_review` теперь может получить installation token только для текущего репозитория через официальный `actions/create-github-app-token` v3.2.0, pinned SHA. Запрашиваются только `contents:write`, `pull-requests:write` и `checks:read`; токен короткоживущий и action отзывает его после job.
+- При наличии repository variable `FAM_GITHUB_APP_CLIENT_ID` и secret `FAM_GITHUB_APP_PRIVATE_KEY` token используется для push/создания draft PR. По документации GitHub это устраняет approval-required запуск PR workflow для событий от `GITHUB_TOKEN`; owner approval gate перед merge остаётся в обязательной проверке.
+- Без App variable/secret сохраняется прежний `GITHUB_TOKEN` fallback, и отчёт PR теперь явно указывает, что workflow может потребовать ручного разрешения. Никакие App, variables или secrets не создавались; автоматический запуск CI через App token ещё не проверен. Рабочее состояние системы остаётся условным до установки бесплатного App и безопасной проверки реального draft PR.
+- Regression test проверяет pinned action, repository scope, точные permissions и token selection. На head `b9a305d85fbf117ad4f8c7411d3181fcc844f8ae` прошли Russian content safety [#43438644549](https://github.com/spartakdubov059/fam-website/actions/runs/43438644549), coder QA PostgreSQL [#43438644477](https://github.com/spartakdubov059/fam-website/actions/runs/43438644477), Reporter PostgreSQL [#43438644893](https://github.com/spartakdubov059/fam-website/actions/runs/43438644893). Secrets, workflow write permissions, ruleset, Supabase и production не менялись.
+
+
+## Подготовка к настройке GitHub App — 13 ноября 2026
+
+В draft PR #65 добавлено optional использование short-lived, repository-scoped GitHub App token для запуска PR checks без approval-required режима `GITHUB_TOKEN`. Подготовлена инструкция [FAM GitHub App setup](FAM_AGENT_GITHUB_APP_SETUP.md) с минимальными правами и безопасной проверкой. App, variable и private-key secret пока не создавались; production и GitHub ruleset не менялись.
+
+
+## Уточнение merge-capability агента и нативной защиты — 13 ноября 2026, 14:10 UTC
+
+- Повторно прочитан активный ruleset ID 27066766: он требует PR и check `Russian content safety tests`, но `required_approving_review_count=0`, `require_last_push_approval=false`, bypass actors пусты.
 - GitHub Merge Pull Request API требует `Contents:write`. Текущий PR Manager и подготовленный App token получают `contents:write` для push branch, значит технически имеют merge API capability. Запрет `gh pr merge` в workflow доказывает только отсутствие этой команды в текущем коде, не серверную невозможность merge.
 - Owner approval required check блокирует coder PR, пока проверенный workflow исполняется из trusted base, но нативный ruleset не требует review; изменение gate workflow вне patch allowlist может ослабить check. Безопасное завершение требует нативно установить как минимум одно approving review, stale-review dismissal и отсутствие bypass. Владелец затем разрешил рационально усилить ruleset, однако доступный GitHub connector поддерживает только чтение rulesets и не предоставляет операцию изменения; App setup инструкция исправлена и предписывает не настраивать App до включения native review.
 - Merge API permission and required-review rule documentation: [GitHub Merge a pull request](https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request), [available rules for rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
