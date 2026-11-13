@@ -74,7 +74,7 @@ function validateHomepage(html) {
 function mostRecentRuns(runs, sinceMs) {
   const latest = new Map();
   for (const run of runs) {
-    if (run?.head_branch !== "main" || run?.path === MONITOR_WORKFLOW_PATH) continue;
+    if (run?.head_branch !== "main" || run?.path === MONITOR_WORKFLOW_PATH || run?.status !== "completed") continue;
     const createdAt = Date.parse(run?.created_at ?? "");
     if (!Number.isFinite(createdAt) || createdAt < sinceMs) continue;
     const key = String(run.workflow_id ?? run.name ?? run.id ?? "unknown");
