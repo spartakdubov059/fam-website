@@ -12,6 +12,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import sharp from 'sharp';
+import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 
 for (const [name, value] of Object.entries({
   Driver, query, MetadataCredentialsProvider, S3Client, HeadBucketCommand,
@@ -29,6 +30,24 @@ assert.equal(typeof offlineSql.begin, 'function', 'FAM adapters require client.b
 const offlineStatement = offlineSql`SELECT $testValue;`;
 assert.equal(typeof offlineStatement.parameter, 'function', 'FAM adapters require .parameter()');
 assert.equal(typeof offlineStatement.timeout, 'function', 'FAM adapters require .timeout()');
+
+// Construct the actual listing query with the pinned SDK without connecting to YDB.
+// The wrapper deliberately does not execute the resulting statement.
+let constructed = false;
+const sentinel = "not-sql'); DELETE FROM fam_listings; --";
+const repository = createYdbListingsRepository((strings, ...values) => {
+  assert.equal(strings.join('').includes(sentinel), false);
+  assert.ok(values.includes(sentinel));
+  const statement = offlineSql(strings, ...values);
+  assert.equal(typeof statement.parameter, 'function');
+  constructed = true;
+  return Promise.resolve();
+});
+await repository.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title: sentinel,
+  description: 'Synthetic text', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
+  event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' });
+assert.equal(constructed, true);
+
 
 assert.equal(sharp.versions.sharp, '0.35.5', 'Installed native Sharp must match the pinned dependency');
 const testImage = await sharp({
