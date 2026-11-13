@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanupPendingMedia } from '../services/cleanup-pending-media.mjs';
+import { cleanupPendingMedia, createPendingMediaCleanupOperation } from '../services/cleanup-pending-media.mjs';
 
 const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
 
@@ -36,4 +36,12 @@ test('cleanup releases failed deletes for a later retry and refuses malformed ke
 test('cleanup refuses unbounded batches and incomplete dependencies', async () => {
   await assert.rejects(cleanupPendingMedia({ limit: 1000 }), TypeError);
   await assert.rejects(cleanupPendingMedia({ repository: {}, pendingImages: {} }), TypeError);
+});
+
+test('runtime exposes pending media cleanup only when a private image store is configured', async () => {
+  const repository = { claimExpiredPendingImages: async () => [], finishPendingImageCleanup: async () => true };
+  assert.equal(createPendingMediaCleanupOperation({ repository, pendingImages: null }), null);
+  const run = createPendingMediaCleanupOperation({ repository, pendingImages: { delete: async () => {} } });
+  assert.equal(typeof run, 'function');
+  assert.deepEqual(await run(), { claimed: 0, deleted: 0, failed: 0 });
 });

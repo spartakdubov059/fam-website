@@ -1,6 +1,11 @@
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const PENDING_KEY = new RegExp(`^pending/${UUID}/${UUID}\\.webp$`, 'i');
 
+export function createPendingMediaCleanupOperation({ repository, pendingImages } = {}) {
+  if (!pendingImages || typeof pendingImages.delete !== 'function') return null;
+  return () => cleanupPendingMedia({ repository, pendingImages });
+}
+
 // Called by an operator or a separately reviewed free scheduler. Never scans
 // arbitrary bucket keys; it only processes DB-claimed pending image uploads.
 export async function cleanupPendingMedia({ repository, pendingImages, limit = 50 } = {}) {
