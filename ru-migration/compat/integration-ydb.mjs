@@ -55,7 +55,9 @@ try {
   assert.equal(sets[0][0].school_id, 'synthetic-school');
   assert.equal(sets[0][0].status, 'pending');
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
-  assert.deepEqual(await repo.listActiveListings(), [], 'pending content must not appear publicly');
+  const beforeDirectModeration = await repo.listActiveListings();
+  assert.equal(beforeDirectModeration.length, 1, 'only the separately API-approved item is public');
+  assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
   assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
   assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
   const publicListings = await repo.listActiveListings();
