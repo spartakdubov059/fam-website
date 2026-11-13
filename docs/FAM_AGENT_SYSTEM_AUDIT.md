@@ -142,3 +142,10 @@
 - В двух push runs основного coder workflow YAML был синтаксически неверен: некавыченное `run: echo ...` содержало двоеточие в обычном тексте. GitHub зарегистрировал run с именем файла, создал 0 jobs и списал 0 billable minutes. Команда переведена в block scalar; Ruby YAML parser подтвердил корректный синтаксис обоих workflow после исправления.
 - На head `286db92fd6f52a4110864ba28c7690ba0ce8d818` прошли moderation regression, coder QA PostgreSQL и Reporter PostgreSQL integration. Само новое Qwen workflow теперь требует `workflow_dispatch`; его полный smoke уже проверен на предыдущем head с теми же job-командами, до изменения только trigger.
 - Ограничения не сняты: production очередь не проходила через Qwen до draft PR; GitHub ruleset main требует 0 approvals; правила Reporter и migrations не развёрнуты; все три PR остаются draft.
+
+## Доверенный QA на отдельном runner — 13 ноября 2026, 16:08 UTC
+
+- Кандидатский набор moderation/security по-прежнему проверяет тесты вместе с изменением и статические отчёты. Дополнительно выделен отдельный `trusted_qa` job: он получает patch непосредственно из генератора, сверяет базовый SHA, повторно проверяет allowlist, применяет patch на чистой `main` и восстанавливает тестовые файлы из доверенной ревизии.
+- Отдельный runner запускает только tracked moderation/security tests из `main`, поэтому предложенные моделью тесты не могут заменить этот QA набор. Создание draft PR требует успеха и кандидатской проверки, и доверенной проверки; финализация очереди получает статус `trusted_qa`, так что failure/skip не отмечает patch успешно прошедшим QA.
+- Reporter включает отдельный bounded `trusted_qa` status; приватные отчёты не раскрывают названия job, введённые пользователем, или содержимое patch.
+- Локально прошёл полный candidate regression suite: 257/257; доверенный job отдельно смоделирован с synthetic CSS patch, и все 187 тестов базовой `main` прошли. `git diff --check` и разбор workflow YAML прошли. GitHub CI для нового commit ещё ожидается. Production workflow, Supabase, расписания и данные не менялись.

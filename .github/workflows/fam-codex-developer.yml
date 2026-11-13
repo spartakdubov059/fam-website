@@ -330,9 +330,57 @@ jobs:
           retention-days: 3
 
 
+  trusted_qa:
+    name: Доверенная регрессия main против патча
+    needs: [generate, verify]
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Получить исходники main без сохранения credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Установить Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Скачать предложенный patch из доверенного запуска генерации
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-local-agent-result
+          path: ${{ runner.temp }}/fam-agent
+
+      - name: Запустить тесты main на patch в отдельном runner
+        run: |
+          set -euo pipefail
+          EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-agent/base.sha")"
+          ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
+          if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
+            echo "::error::Основная ветка изменилась после создания patch."
+            exit 1
+          fi
+          git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          node scripts/validate-local-agent-patch.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent/summary.json" > "$RUNNER_TEMP/fam-agent/trusted-safety.json"
+          git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          git restore --source=HEAD --worktree -- tests
+          git ls-files 'tests/moderation/*.test.mjs' 'tests/security/*.test.mjs' > "$RUNNER_TEMP/fam-agent/trusted-tests.txt"
+          if [[ ! -s "$RUNNER_TEMP/fam-agent/trusted-tests.txt" ]]; then
+            echo "::error::В main не найдены доверенные moderation/security tests."
+            exit 1
+          fi
+          xargs node --test < "$RUNNER_TEMP/fam-agent/trusted-tests.txt"
+
   finish_task:
     name: Зафиксировать результат coder после QA и PR
-    needs: [generate, verify, prepare_review]
+    needs: [generate, verify, trusted_qa, prepare_review]
     if: always() && needs.generate.outputs.task_claimed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -363,7 +411,7 @@ jobs:
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.task_id }}
           FAM_MODEL_STEP_OUTCOME: ${{ needs.generate.outputs.model_outcome }}
-          FAM_QA_OUTCOME: ${{ needs.verify.result }}
+          FAM_QA_OUTCOME: ${{ needs.trusted_qa.result }}
           FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}
           FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}
           FAM_AGENT_COMMIT_SHA: ${{ needs.prepare_review.outputs.commit_sha }}
@@ -372,11 +420,11 @@ jobs:
 
   prepare_review:
     name: Подготовить PR и проверить исправление без публикации
-    needs: [generate, verify]
+    needs: [generate, verify, trusted_qa]
     outputs:
       pr_url: ${{ steps.pr.outputs.pr_url }}
       commit_sha: ${{ steps.pr.outputs.commit_sha }}
-    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && needs.trusted_qa.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

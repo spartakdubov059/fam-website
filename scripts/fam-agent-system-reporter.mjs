@@ -90,10 +90,12 @@ export function summarizeAgentJobStatuses(jobs) {
     : null;
   const coder = findJob("Локальная модель готовит исправление");
   const qa = findJob("Независимая проверка без модели и секретов");
+  const trustedQa = findJob("Доверенная регрессия main против патча");
   const prManager = findJob("Подготовить PR и проверить исправление без публикации");
   return {
     coder: actionStatus(findStep(coder, "Запустить локальную модель и подготовить patch")),
     qa: actionStatus(qa),
+    trusted_qa: actionStatus(trustedQa),
     reviewer: actionStatus(findStep(qa, "Подготовить независимый статический Reviewer отчёт")),
     security: actionStatus(findStep(qa, "Запустить отдельный статический Security Agent")),
     performance: actionStatus(findStep(qa, "Запустить отдельный статический Performance Agent")),
@@ -191,7 +193,7 @@ export function createDailyReport({
     { role: "Analyst", status: analyzeTechnicalSignals(validSnapshot ? snapshot.site_error_events_24h : []).status },
     { role: "Coder", status: "queue:" + (validSnapshot ? safeLabel(snapshot.latest_coder_task?.status ?? "no_task", 40) : "unavailable") +
       ";run:" + agentStatus("coder") },
-    { role: "QA", status: "patch:" + agentStatus("qa") + ";regression:" + runOutcome(qaRun) },
+    { role: "QA", status: "patch:" + agentStatus("qa") + ";trusted:" + agentStatus("trusted_qa") + ";regression:" + runOutcome(qaRun) },
     { role: "Reviewer", status: agentStatus("reviewer") },
     { role: "Security Agent", status: agentStatus("security") },
     { role: "Performance Agent", status: agentStatus("performance") },

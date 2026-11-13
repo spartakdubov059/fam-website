@@ -57,6 +57,7 @@ async function runFreshFinish(selectedSteps, outcomes = {}) {
     "needs.generate.outputs.task_id": taskId,
     "needs.generate.outputs.model_outcome": "success",
     "needs.verify.result": "success",
+    "needs.trusted_qa.result": "success",
     "needs.prepare_review.result": "success",
     "needs.prepare_review.outputs.pr_url": prUrl,
     "needs.prepare_review.outputs.commit_sha": commitSha,
@@ -121,8 +122,9 @@ test("queue finalization checks out its trusted workflow revision before executi
 for (const scenario of [
   { name: "completed patch", outcomes: {}, expected: "model_completed", metadata: true },
   { name: "created PR awaiting review", outcomes: { "needs.prepare_review.result": "failure" }, expected: "model_review", metadata: true },
-  { name: "failed QA", outcomes: { "needs.verify.result": "failure", "needs.prepare_review.result": "skipped" }, expected: "model_failed", metadata: false },
-  { name: "failed inference without a summary artifact", outcomes: { "needs.generate.outputs.model_outcome": "failure", "needs.verify.result": "skipped", "needs.prepare_review.result": "skipped" }, expected: "model_failed", metadata: false },
+  { name: "failed candidate QA", outcomes: { "needs.verify.result": "failure", "needs.trusted_qa.result": "skipped", "needs.prepare_review.result": "skipped" }, expected: "model_failed", metadata: false },
+  { name: "failed trusted main QA", outcomes: { "needs.verify.result": "success", "needs.trusted_qa.result": "failure", "needs.prepare_review.result": "skipped" }, expected: "model_failed", metadata: false },
+  { name: "failed inference without a summary artifact", outcomes: { "needs.generate.outputs.model_outcome": "failure", "needs.verify.result": "skipped", "needs.trusted_qa.result": "skipped", "needs.prepare_review.result": "skipped" }, expected: "model_failed", metadata: false },
 ]) {
   test(`fresh finish runner persists ${scenario.name} through the real bridge CLI`, async () => {
     const { execution, requests } = await runFreshFinish(steps, scenario.outcomes);

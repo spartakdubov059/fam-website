@@ -109,6 +109,19 @@ test("independent verification runs without model or write credentials", () => {
   assert.match(workflow, /node --check scripts\/validate-local-agent-patch\.mjs/);
 });
 
+test("trusted main tests run against proposed runtime code alongside candidate tests", () => {
+  const trustedQa = workflow.split("\n  trusted_qa:")[1]?.split("\n  finish_task:")[0] ?? "";
+  assert.match(trustedQa, /needs: \[generate, verify\]/);
+  assert.match(trustedQa, /permissions:\n\s+contents: read/);
+  assert.match(trustedQa, /ref: main/);
+  assert.match(trustedQa, /persist-credentials: false/);
+  assert.match(trustedQa, /validate-local-agent-patch\.mjs/);
+  assert.match(trustedQa, /git restore --source=HEAD --worktree -- tests/);
+  assert.match(trustedQa, /git ls-files 'tests\/moderation\/\*\.test\.mjs' 'tests\/security\/\*\.test\.mjs'/);
+  assert.match(trustedQa, /xargs node --test < "\$RUNNER_TEMP\/fam-agent\/trusted-tests\.txt"/);
+  assert.match(workflow, /name: Выполнить полный набор регрессионных тестов/);
+});
+
 test("all coder-editable paths trigger required CI and PR manager waits with read-only workflow permissions", () => {
   const pullRequestPaths = testWorkflow.split("  pull_request:")[1]?.split("\npermissions:")[0] ?? "";
   for (const path of ["'css/**'", "'js/**'", "'assets/**'", "'docs/**'"]) {
@@ -184,8 +197,9 @@ test("queued coder tasks complete only after QA and PR checks", () => {
   const generateJob = workflow.split("\n  verify:")[0] ?? "";
   assert.doesNotMatch(generateJob, /fam-agent-bridge\.mjs finish/);
   assert.ok(workflow.includes("task_id: ${{ steps.coder-queue.outputs.task_id }}"));
-  assert.ok(workflow.includes("finish_task:\n    name: Зафиксировать результат coder после QA и PR\n    needs: [generate, verify, prepare_review]"));
-  assert.ok(workflow.includes("FAM_QA_OUTCOME: ${{ needs.verify.result }}"));
+  assert.ok(workflow.includes("trusted_qa:\n    name: Доверенная регрессия main против патча\n    needs: [generate, verify]"));
+  assert.ok(workflow.includes("finish_task:\n    name: Зафиксировать результат coder после QA и PR\n    needs: [generate, verify, trusted_qa, prepare_review]"));
+  assert.ok(workflow.includes("FAM_QA_OUTCOME: ${{ needs.trusted_qa.result }}"));
   assert.ok(workflow.includes("FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}"));
   assert.ok(workflow.includes("FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}"));
   assert.ok(workflow.includes("FAM_AGENT_COMMIT_SHA: ${{ needs.prepare_review.outputs.commit_sha }}"));
@@ -201,7 +215,8 @@ test("draft PR creation depends on the independent Reviewer artifact after QA", 
   assert.match(workflow, /name: fam-agent-independent-review/);
   assert.match(workflow, /Скачать независимый Reviewer отчёт/);
   assert.match(workflow, /cat "\$RUNNER_TEMP\/fam-agent-review\/review\.md"/);
-  assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify\]/);
+  assert.match(workflow, /prepare_review:[\s\S]*?needs: \[generate, verify, trusted_qa\]/);
+  assert.match(workflow, /needs\.trusted_qa\.result == 'success'/);
   assert.match(workflow, /needs\.verify\.result == 'success'/);
 });
 
