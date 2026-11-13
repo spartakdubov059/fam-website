@@ -56,8 +56,8 @@ export function shouldRunModel({ manualTask = "", bridgeConfigured = false, task
   return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
 }
 
-export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true, prMetadataValid = false) {
-  if (!executionSucceeded) return "model_failed";
+export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true, prMetadataValid = false, failureReason = "") {
+  if (!executionSucceeded) return failureReason === "timeout" ? "model_timeout" : "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
@@ -132,6 +132,7 @@ async function main() {
       process.env.FAM_QA_OUTCOME === "success",
       process.env.FAM_PR_MANAGER_OUTCOME === "success",
       prMetadataValid,
+      process.env.FAM_MODEL_FAILURE_REASON || "",
     );
     const result = await bridgeRequest({
       url,
