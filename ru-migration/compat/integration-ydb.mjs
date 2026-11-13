@@ -181,7 +181,7 @@ try {
     (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
     VALUES ('synthetic-school', 'synthetic-user', 'synthetic-suspension', 'student', 24,
       'Synthetic integration suspension', 'active', 'synthetic-admin', CurrentUtcTimestamp(),
-      CurrentUtcTimestamp() + Interval('PT24H'));`;
+      Unwrap(CurrentUtcTimestamp() + Interval('PT24H')));`;
   const suspendedWrite = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-user', {
     title: 'Не должно сохраниться', description: 'Synthetic suspension guard', category: 'Учёба',
   }));
