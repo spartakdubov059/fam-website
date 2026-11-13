@@ -10,8 +10,9 @@ const workflow = readFileSync(
 test("local AI developer can prepare a PR and wait for the required independent check", () => {
   assert.match(workflow, /gh pr create/);
   assert.match(workflow, /REQUIRED_CHECK="Russian content safety tests"/);
-  assert.match(workflow, /gh api .*check-runs/);
-  assert.match(workflow, /CHECK_CONCLUSION/);
+  assert.match(workflow, /gh pr checks "\$PR_URL" --required --json name,state,bucket/);
+  assert.match(workflow, /REQUIRED_BUCKET/);
+  assert.doesNotMatch(workflow, /check-runs/);
   assert.doesNotMatch(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml/);
   assert.match(workflow, /gh pr comment/);
 });
