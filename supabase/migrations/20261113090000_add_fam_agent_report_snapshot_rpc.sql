@@ -28,10 +28,11 @@ begin
      or pg_catalog.jsonb_typeof(p_report -> 'open_pull_requests') <> 'array'
      or pg_catalog.jsonb_typeof(p_report -> 'production_deployment') <> 'object'
      or pg_catalog.jsonb_typeof(p_report -> 'public_site') <> 'object'
+     or pg_catalog.jsonb_typeof(p_report -> 'technical_analysis') <> 'object'
      or pg_catalog.jsonb_typeof(p_report -> 'limitations') <> 'array'
      or not (p_report ?& array[
        'report_date','generated_at','sources','supabase','workflows_24h',
-       'open_pull_requests','role_statuses','production_deployment','public_site','limitations','markdown'
+       'open_pull_requests','role_statuses','technical_analysis','production_deployment','public_site','limitations','markdown'
      ])
      or (p_report - array[
        'report_date','generated_at','sources','supabase','workflows_24h',
@@ -79,6 +80,7 @@ declare
   v_latest_coder jsonb;
   v_latest_site_error jsonb;
   v_failed_tasks_24h jsonb;
+  v_site_error_events jsonb;
 begin
   select pg_catalog.jsonb_build_object(
     'report_date', r.report_date,
@@ -163,6 +165,33 @@ begin
     group by t.task_type
   ) as failures;
 
+  select coalesce(
+    pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'event_code', grouped.event_code,
+        'page_area', grouped.page_area,
+        'occurrences', grouped.occurrences
+      )
+      order by grouped.occurrences desc, grouped.event_code, grouped.page_area
+    ),
+    '[]'::jsonb
+  )
+  into v_site_error_events
+  from (
+    select c.event_code, c.page_area, pg_catalog.sum(c.event_count)::integer as occurrences
+    from private.fam_site_error_counts as c
+    where c.hour_bucket >= pg_catalog.now() - interval '24 hours'
+      and c.event_code in (
+        'js_runtime','unhandled_rejection','supabase_sdk_unavailable',
+        'listings_load_failed','notifications_load_failed',
+        'database_request_failed','auth_backend_failed'
+      )
+      and c.page_area in ('auth','listings','notifications','database','other')
+    group by c.event_code, c.page_area
+    order by pg_catalog.sum(c.event_count) desc, c.event_code, c.page_area
+    limit 35
+  ) as grouped;
+
   select pg_catalog.jsonb_build_object('status', t.status, 'updated_at', t.updated_at)
   into v_latest_health
   from private.fam_agent_tasks as t
@@ -193,7 +222,8 @@ begin
     'latest_system_health', v_latest_health,
     'latest_coder_task', v_latest_coder,
     'latest_site_error_check', v_latest_site_error,
-    'failed_tasks_24h', v_failed_tasks_24h
+    'failed_tasks_24h', v_failed_tasks_24h,
+    'site_error_events_24h', v_site_error_events
   );
 end;
 $function$;
