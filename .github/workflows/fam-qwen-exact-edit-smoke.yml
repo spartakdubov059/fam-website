@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - ".github/workflows/fam-qwen-exact-edit-smoke.yml"
       - "scripts/run-local-coder.mjs"
       - "scripts/local-model-edits.mjs"
       - "tests/fixtures/fam-agent-qwen-smoke*"

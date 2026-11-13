@@ -79,7 +79,8 @@ jobs:
 
       - name: Показать пропуск модели при пустой очереди
         if: steps.coder-queue.outputs.run_model != 'true'
-        run: echo "Модель не загружалась: очередь не выдала задачу и ручной запрос не задан." >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Модель не загружалась: очередь не выдала задачу и ручной запрос не задан." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Восстановить бесплатные веса модели из кэша
         if: steps.coder-queue.outputs.run_model == 'true'
