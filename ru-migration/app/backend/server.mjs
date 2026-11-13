@@ -89,6 +89,7 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/schools')
       || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests')
+      || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests/review')
       || (/^\/api\/v1\/profile-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname) && req.method === 'PATCH')
       || (req.method === 'GET' && url.pathname === '/api/v1/listings/moderation')

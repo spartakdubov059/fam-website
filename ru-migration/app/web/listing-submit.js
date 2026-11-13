@@ -25,7 +25,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
         if (login) login.hidden = true;
         if (logout) logout.hidden = false;
         status.textContent = 'Вход выполнен. Чтобы пользоваться FAM этой школы, отправьте заявку на профиль.';
-        await createProfileRequestForm(document, status, fetchImpl);
+        await createProfileRequestForm(document, status, fetchImpl, location);
         attachYandexLogout({ logout, fetchImpl, location, status });
       }
       return;
@@ -140,11 +140,52 @@ function createIdeaForm(document, listingForm) {
   return form;
 }
 
-async function createProfileRequestForm(document, status, fetchImpl) {
+async function createProfileRequestForm(document, status, fetchImpl, location = globalThis.location) {
   if (document.getElementById('ruProfileRequestForm')) return;
   const listingForm = document.getElementById('ruListingForm');
   const shell = listingForm?.parentElement;
   if (!shell || typeof document.createElement !== 'function') return;
+  let previousRequest = null;
+  try {
+    const response = await fetchImpl('/api/v1/profile-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    const result = await readJson(response);
+    if (response.ok && result?.ok) previousRequest = result.request || null;
+  } catch { /* Request status is private and can be retried after the form mounts. */ }
+  if (previousRequest && ['pending', 'reviewing', 'approved'].includes(previousRequest.status)) {
+    const section = document.createElement('section'); section.className = 'ru-moderation';
+    section.setAttribute('aria-label', 'Статус заявки на школьный профиль');
+    const heading = document.createElement('h2'); heading.textContent = previousRequest.status === 'approved' ? 'Заявка одобрена' : 'Заявка на проверке';
+    const note = document.createElement('p'); note.className = 'ru-note';
+    note.textContent = previousRequest.status === 'approved'
+      ? 'Школа одобрила профиль. Обновите статус, чтобы открыть доступ.'
+      : 'Заявка уже отправлена и ожидает решения школы. Повторно отправлять её не нужно.';
+    const refresh = document.createElement('button'); refresh.type = 'button'; refresh.className = 'ru-button'; refresh.textContent = 'Проверить статус';
+    refresh.addEventListener('click', async () => {
+      refresh.disabled = true;
+      try {
+        if (previousRequest.status === 'approved') {
+          const profileResponse = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+          const profile = await readJson(profileResponse);
+          if (profileResponse.ok && profile?.profile?.id) { location?.reload?.(); return; }
+        }
+        const response = await fetchImpl('/api/v1/profile-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+        const result = await readJson(response);
+        previousRequest = response.ok && result?.ok ? result.request : null;
+        if (!previousRequest) {
+          section.remove();
+          await createProfileRequestForm(document, status, fetchImpl, location);
+        } else if (previousRequest.status === 'approved') {
+          note.textContent = 'Заявка одобрена. Профиль появится после обновления страницы.';
+        } else {
+          note.textContent = 'Заявка всё ещё ожидает решения школы.';
+        }
+      } catch { note.textContent = 'Не удалось обновить статус. Проверьте подключение и попробуйте позже.'; }
+      finally { refresh.disabled = false; }
+    });
+    section.append(heading, note, refresh); shell.append(section);
+    status.textContent = previousRequest.status === 'approved' ? 'Школа одобрила профиль.' : 'Заявка на школьный профиль ожидает проверки.';
+    return;
+  }
   let schools;
   try {
     const response = await fetchImpl('/api/v1/schools', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });

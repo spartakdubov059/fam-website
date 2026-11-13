@@ -44,6 +44,10 @@ try {
   }));
   assert.equal(profileSubmission.status, 202);
   assert.equal(profileSubmission.body.status, 'pending');
+  const privateProfileStatus = await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'));
+  assert.equal(privateProfileStatus.status, 200);
+  assert.equal(privateProfileStatus.body.request.status, 'pending');
+  assert.deepEqual(Object.keys(privateProfileStatus.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new' }), null,
     'an access request alone never creates a profile');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-student'))).status, 403,
@@ -64,6 +68,7 @@ try {
     last_name: approvedActor.last_name, class_name: approvedActor.class_name }, {
     school_id: 'lyceum_3', role: 'student', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б',
   });
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
   const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
     title: 'Обмен учебниками', description: 'Синтетическое объявление для интеграционной проверки', category: 'Учёба',
   }));

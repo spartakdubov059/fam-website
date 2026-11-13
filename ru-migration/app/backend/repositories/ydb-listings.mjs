@@ -33,6 +33,15 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async getSchoolProfileRequest(issuer, subject) {
+      if (!issuer || !subject) throw new TypeError('invalid school profile request identity');
+      const statement = sql`SELECT request_id AS request_id, school_id AS school_id,
+          status AS status, created_at AS created_at
+        FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
+
     async listPendingSchoolProfileRequests(schoolId) {
       if (!schoolId) throw new TypeError('invalid profile request school');
       const statement = sql`SELECT request_id AS request_id, school_id AS school_id,

@@ -8,6 +8,20 @@ function req(body = {}, method = 'POST') {
   request.url = '/api/v1/listings';
   return request;
 }
+test('school profile request status is private to the authenticated identity and omits submitted PII', async () => {
+  let identity;
+  const handler = createListingsApi({ authenticate: async () => identity,
+    repository: { getSchoolProfileRequest: async (issuer, subject) => ({
+      request_id: 'request-id', school_id: 'lyceum_3', status: 'pending', created_at: '2099-01-01T00:00:00Z',
+    }) } });
+  const request = req({}, 'GET'); request.url = '/api/v1/profile-requests';
+  assert.equal((await handler(request)).status, 401);
+  identity = { issuer: 'https://issuer.example', subject: 'synthetic-student' };
+  const result = await handler(request);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.status, 'pending');
+  assert.deepEqual(Object.keys(result.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

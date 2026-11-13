@@ -109,6 +109,7 @@ test('authenticated unprovisioned Yandex users can request a school profile with
   await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: false, status: 403, json: async () => ({ ok: false, error: 'profile_unavailable' }) };
+    if (url === '/api/v1/profile-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, request: null }) };
     if (url === '/api/v1/schools') return { ok: true, json: async () => ({ ok: true, schools: [{ id: 'lyceum_3', name: 'Лицей № 3' }] }) };
     if (url === '/api/v1/profile-requests') return { ok: true, status: 202, json: async () => ({ ok: true, status: 'pending' }) };
     throw new Error(`unexpected route ${url}`);
@@ -118,8 +119,28 @@ test('authenticated unprovisioned Yandex users can request a school profile with
   const form = f.shellChildren[0].children[2];
   form.elements = { school_id: { value: 'lyceum_3' }, first_name: { value: 'Аня' }, last_name: { value: 'Иванова' }, class_name: { value: '8А' } };
   await form.listeners.submit({ preventDefault() {} });
-  const request = calls.find(call => call.url === '/api/v1/profile-requests');
+  const request = calls.find(call => call.url === '/api/v1/profile-requests' && call.init.method === 'POST');
   assert.deepEqual(JSON.parse(request.init.body), { school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
   assert.equal(request.init.credentials, 'same-origin');
   assert.match(f.status.textContent, /после одобрения/);
+});
+
+test('returning applicant sees private request status and can refresh it without resubmitting PII', async () => {
+  const f = fixture(null);
+  let reads = 0;
+  await initializeListingSubmission({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: false, status: 403, json: async () => ({ ok: false, error: 'profile_unavailable' }) };
+    if (url === '/api/v1/profile-requests') {
+      reads++;
+      return { ok: true, json: async () => ({ ok: true, request: { status: 'pending', school_id: 'lyceum_3' } }) };
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren[0];
+  assert.match(section.children[1].textContent, /уже отправлена/);
+  assert.equal(section.children[2].textContent, 'Проверить статус');
+  await section.children[2].listeners.click();
+  assert.equal(reads, 2);
+  assert.match(section.children[1].textContent, /всё ещё ожидает/);
+  assert.equal(f.document.getElementById('ruProfileRequestForm'), undefined);
 });

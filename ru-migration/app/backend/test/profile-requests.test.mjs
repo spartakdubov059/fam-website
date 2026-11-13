@@ -57,3 +57,18 @@ test('profile approval creates only a student profile and clears request PII aft
   assert.equal(await repo.reviewSchoolProfileRequest(id, 'gymnasium_4', 'admin-id', 'approve'), false, 'another school cannot approve the request');
   await assert.rejects(repo.reviewSchoolProfileRequest(id, 'lyceum_3', 'admin-id', 'school_admin'), TypeError);
 });
+
+test('profile request status is scoped to the authenticated identity and exposes no applicant PII', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ request_id: 'request-id', school_id: 'lyceum_3', status: 'pending', created_at: '2099-01-01T00:00:00Z' }]]);
+  });
+  const request = await repo.getSchoolProfileRequest('https://issuer.example', 'student-subject');
+  assert.equal(request.status, 'pending');
+  assert.ok(query.values.includes('https://issuer.example'));
+  assert.ok(query.values.includes('student-subject'));
+  assert.match(query.text, /WHERE issuer = \? AND subject = \?/);
+  assert.doesNotMatch(query.text, /first_name|last_name|class_name|SELECT \*/);
+  await assert.rejects(repo.getSchoolProfileRequest('', 'student-subject'), TypeError);
+});

@@ -18,6 +18,15 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'GET' && pathname === '/api/v1/schools') {
       return { status: 200, body: { ok: true, schools: schools.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string').map(({ id, name }) => ({ id, name })) } };
     }
+    if (req.method === 'GET' && pathname === '/api/v1/profile-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (typeof repository?.getSchoolProfileRequest !== 'function') return { status: 503, body: { ok: false, error: 'profile_request_status_unavailable' } };
+      try {
+        const request = await repository.getSchoolProfileRequest(identity.issuer, identity.subject);
+        return { status: 200, body: { ok: true, request } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
