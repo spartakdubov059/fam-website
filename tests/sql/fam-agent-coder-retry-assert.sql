@@ -84,7 +84,7 @@ begin
   if v_result->>'task_created' <> 'true' then raise exception 'task was not reconsidered after cooldown'; end if;
   v_retry_id := (v_result->>'task_id')::uuid;
   select count(*) into v_count from private.fam_agent_tasks
-  where task_type='coder_patch_request' and payload->>'event_code'='unhandled_rejection' and payload->>'page_area'='auth';
+  where task_type='coder_patch_request' and agent_key='technical' and source in ('system','scheduled_audit') and payload->>'task_key'='audit_frontend_runtime' and payload->>'event_code'='unhandled_rejection' and payload->>'page_area'='auth';
   if v_count <> 2 then raise exception 'unexpected number of producer tasks: %', v_count; end if;
 
   -- Exercise the existing production claim RPC, then the bounded failure path.
