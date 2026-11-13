@@ -40,7 +40,7 @@ try{
         notify:()=>{}});
       void window.pulse.refresh();
     },testId);
-    await page.locator("#pulseGrid .pulse-card").first().waitFor();
+    await page.locator("#pulseAnnouncementTrack .pulse-card").first().waitFor();
     assert.equal(await page.locator("#pulseGrid .pulse-card").count(),0,"poll cards are moved into the top carousel");
     assert.equal(await page.locator("#pulseAnnouncementTrack .pulse-card").count(),4,"announcements and polls render in the top carousel");
     assert.equal(await page.locator(".pulse-card.is-open-event").count(),1,"open event renders in the carousel");
