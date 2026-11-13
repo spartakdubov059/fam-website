@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/20261113095000_record_coder_completion_after_qa.sql"
+      - "supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql"
       - "tests/sql/fam-agent-coder-qa-*"
       - ".github/workflows/fam-agent-coder-qa-postgres.yml"
   workflow_dispatch:
@@ -41,5 +42,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-coder-qa-bootstrap.sql
       - name: Apply QA completion migration to PostgreSQL 17
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113095000_record_coder_completion_after_qa.sql
+      - name: Apply final bounded-retry and QA gate migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql
       - name: Verify completion, PR metadata and grants
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-coder-qa-assert.sql
