@@ -36,7 +36,7 @@ begin
      ])
      or (p_report - array[
        'report_date','generated_at','sources','supabase','workflows_24h',
-       'open_pull_requests','role_statuses','production_deployment','public_site','limitations','markdown'
+       'open_pull_requests','role_statuses','technical_analysis','production_deployment','public_site','limitations','markdown'
      ]) <> '{}'::jsonb
      or pg_catalog.pg_column_size(p_report) > 65536 then
     raise exception 'invalid FAM system report';
