@@ -1,0 +1,77 @@
+do $test$
+declare
+  v_saved boolean;
+  v_task private.fam_agent_tasks%rowtype;
+begin
+  if has_function_privilege('anon', 'public.finish_fam_agent_coder_task_with_pr(uuid,text,text,text,text)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.finish_fam_agent_coder_task_with_pr(uuid,text,text,text,text)', 'EXECUTE')
+     or not has_function_privilege('service_role', 'public.finish_fam_agent_coder_task_with_pr(uuid,text,text,text,text)', 'EXECUTE') then
+    raise exception 'coder finish RPC grants are incorrect';
+  end if;
+
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('123e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+
+  v_saved := public.finish_fam_agent_coder_task_with_pr(
+    '123e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1',
+    'model_completed',
+    'https://github.com/spartakdubov059/fam-website/pull/65',
+    '0123456789abcdef0123456789abcdef01234567'
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='123e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true
+     or v_task.status <> 'completed'
+     or v_task.pr_url <> 'https://github.com/spartakdubov059/fam-website/pull/65'
+     or v_task.commit_sha <> '0123456789abcdef0123456789abcdef01234567'
+     or v_task.result_summary not like '%QA и обязательные проверки PR%' then
+    raise exception 'successful coder completion was not tied to verified PR metadata';
+  end if;
+
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('223e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  v_saved := public.finish_fam_agent_coder_task_with_pr(
+    '223e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1','model_failed',null,null
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='223e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true or v_task.status <> 'failed'
+     or v_task.pr_url is not null or v_task.commit_sha is not null then
+    raise exception 'failed coder task incorrectly stored PR metadata';
+  end if;
+
+  insert into private.fam_agent_tasks(id,agent_key,task_type,approval_required,claimed_by,status,lease_expires_at)
+  values ('323e4567-e89b-42d3-a456-426614174000','technical','coder_patch_request',false,
+          'fam-agent-qwen-coder-v1','claimed',now()+interval '1 hour');
+  v_saved := public.finish_fam_agent_coder_task_with_pr(
+    '323e4567-e89b-42d3-a456-426614174000',
+    'fam-agent-qwen-coder-v1','model_no_patch',null,null
+  );
+  select * into v_task from private.fam_agent_tasks
+  where id='323e4567-e89b-42d3-a456-426614174000';
+  if v_saved is distinct from true or v_task.status <> 'completed'
+     or v_task.pr_url is not null or v_task.commit_sha is not null then
+    raise exception 'no-patch result was not stored accurately';
+  end if;
+
+  begin
+    perform public.finish_fam_agent_coder_task_with_pr(
+      '323e4567-e89b-42d3-a456-426614174000',
+      'fam-agent-qwen-coder-v1','model_completed',null,null
+    );
+    raise exception 'completed task without verified PR metadata was accepted';
+  exception when raise_exception then
+    if sqlerrm = 'completed task without verified PR metadata was accepted' then raise; end if;
+  end;
+
+  if (select count(*) from private.fam_agent_task_events) <> 3 then
+    raise exception 'coder finish RPC did not write one event per task';
+  end if;
+end
+$test$;
+
+select 'Coder queue QA/PR PostgreSQL integration checks passed' as result;
