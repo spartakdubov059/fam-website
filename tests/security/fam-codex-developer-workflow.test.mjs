@@ -42,6 +42,16 @@ test("local FAM coding agent has scheduled and owner-only manual triggers", () =
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
 });
 
+test("the queue is checked before model download and compilation, and empty runs skip them", () => {
+  const queueIndex = workflow.indexOf("Получить одно безопасное задание из очереди");
+  const downloadIndex = workflow.indexOf("Скачать бесплатную модель");
+  const buildIndex = workflow.indexOf("Собрать llama.cpp");
+  assert.ok(queueIndex >= 0 && queueIndex < downloadIndex && queueIndex < buildIndex);
+  assert.match(workflow, /run_model == 'true'[\s\S]*?name: Скачать бесплатную модель/);
+  assert.match(workflow, /run_model == 'true'[\s\S]*?name: Собрать llama\.cpp/);
+  assert.match(workflow, /run_model != 'true'[\s\S]*?Модель не загружалась/);
+});
+
 test("agent uses local open weights and never needs a paid API key", () => {
   assert.match(workflow, /Qwen2\.5-Coder-7B-Instruct-GGUF/);
   assert.match(workflow, /ggml-org\/llama\.cpp/);
