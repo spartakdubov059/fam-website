@@ -44,8 +44,8 @@ test("social previews and crawler metadata are complete for the public homepage"
   assert.ok(sitemap.includes("<loc>https://spartakdubov059.github.io/fam-website/</loc>"));
 });
 
-test("the photo form does not claim moderation is disabled", () => {
+test("the photo form states that photos are checked before display", () => {
   assert.ok(!frontend.includes("Автоматическая проверка содержимого фото пока не выполняется"));
-  assert.ok(frontend.includes("Фото проходит проверку FAM"));
-  assert.ok(frontend.includes("не считается одобренной"));
+  assert.ok(frontend.includes("Фото появится после проверки."));
+  assert.ok(frontend.includes("Не загружайте лица, документы, пропуска и контакты."));
 });
