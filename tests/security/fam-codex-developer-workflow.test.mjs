@@ -189,7 +189,8 @@ test("the local coder uses exact edit operations and Git-generated patches", () 
 test("the main agent workflow tests the exact edit helper", () => {
   assert.match(workflow, /local-model-edits\.test\.mjs/);
   assert.match(workflow, /node --check scripts\/local-model-edits\.mjs/);
-  assert.match(workflow, /scripts\/run-local-coder-classified\.mjs/);
+  const pushPaths = workflow.split("\n  push:")[1]?.split("\n  workflow_dispatch:")[0] ?? "";
+  assert.ok(pushPaths.includes('"scripts/run-local-coder-classified.mjs"'));
 });
 
 
