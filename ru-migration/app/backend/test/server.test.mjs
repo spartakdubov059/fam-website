@@ -51,6 +51,9 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(await pulse.text(), /api\/v1\/pulse/);
     assert.match(html, /id="ruPulse"/);
     assert.match(html, /pulseScript\.src = '\/pulse\.js'/);
+    assert.match(html, /href="\/auth\/yandex\/start\?reauth=1"/);
+    assert.match(html, /fetch\("\/api\/v1\/me\/account"/);
+    assert.doesNotMatch(html, /selfDeletePassword/);
 
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
     assert.equal(moderation.status, 200);
