@@ -203,7 +203,7 @@ export function createYdbListingsRepository(sql) {
           AND school_id = ${schoolId} AND suspension_id = ${suspension.suspension_id};`;
         await tx`INSERT INTO fam_account_suspension_audit
           (event_id, school_id, target_id, actor_id, suspension_id, action, duration_hours, reason, expires_at, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${targetId}, ${actorId}, ${suspension.suspension_id}, 'lifted', ${suspension.duration_hours}, ${suspension.reason}, ${suspension.expires_at}, CurrentUtcTimestamp());`;
+          VALUES (${randomUUID()}, ${schoolId}, ${targetId}, ${actorId}, ${suspension.suspension_id}, 'lifted', Unwrap(CAST(${suspension.duration_hours} AS Uint32)), ${suspension.reason}, CAST(${suspension.expires_at} AS Timestamp), CurrentUtcTimestamp());`;
         return true;
       });
     },
