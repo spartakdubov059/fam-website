@@ -17,6 +17,11 @@ function reviewRequest(body = { decision: 'approve', confirmation: 'УДАЛИТ
   req.method = 'PATCH'; req.url = '/api/v1/deletion-requests/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; req.headers = {};
   return req;
 }
+function adminDeleteRequest(targetId = '22222222-2222-4222-8222-222222222222', body = { confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }) {
+  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  req.method = 'DELETE'; req.url = `/api/v1/school/accounts/${targetId}`; req.headers = {};
+  return req;
+}
 function api({ authenticated = identity, resolvedActor = actor, repository = {}, pendingImages = {}, clock = now } = {}) {
   return createAccountDeletionApi({
     authenticate: async () => authenticated,
@@ -127,4 +132,33 @@ test('request approval rejects stale authentication and restores both request an
   assert.equal(response.status, 503);
   assert.equal(restored.length, 1);
   assert.equal(restored[0].targetId, targetId);
+});
+
+test('direct school-admin deletion requires fresh authentication and never deletes self', async () => {
+  const admin = { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' };
+  let begins = 0;
+  const stale = await api({ authenticated: { ...identity, authenticated_at: Math.floor(now / 1000) - 601 }, resolvedActor: admin,
+    repository: { beginAdminAccountDeletion: async () => { begins++; } } })(adminDeleteRequest());
+  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } });
+  const self = await api({ resolvedActor: admin, repository: { beginAdminAccountDeletion: async () => { begins++; } } })(adminDeleteRequest(admin.id));
+  assert.deepEqual(self, { status: 403, body: { ok: false, error: 'cannot_delete_self' } });
+  assert.equal(begins, 0);
+});
+
+test('direct school-admin deletion deactivates only the eligible same-school account, removes its files and writes the audit', async () => {
+  const targetId = '22222222-2222-4222-8222-222222222222';
+  const targetKey = `pending/${targetId}/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp`;
+  const admin = { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' };
+  const calls = [];
+  const response = await api({ resolvedActor: admin, repository: {
+    beginAdminAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, role: 'student' }; },
+    finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true, deleted: true }; },
+    restoreAccountAfterDeletionFailure: async input => { calls.push(['restore', input]); return true; },
+  }, pendingImages: {
+    listUserObjects: async id => { calls.push(['list', id]); return [targetKey]; },
+    delete: async keyName => { calls.push(['delete', keyName]); },
+  } })(adminDeleteRequest());
+  assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.deepEqual(calls.map(call => call[0]), ['begin', 'list', 'delete', 'finish']);
+  assert.deepEqual(calls[3][1].adminAudit, { actorId: admin.id, schoolId: actor.school_id, targetRole: 'student' });
 });

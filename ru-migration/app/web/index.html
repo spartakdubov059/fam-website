@@ -3902,7 +3902,25 @@ window.onunhandledrejection = function() {
     if (!confirm("Удалить аккаунт #" + accountCode + " этой школы? Перед подтверждением проверьте его роль и публикации в карточке. Действие необратимо.")) return;
     if (!confirm("Подтвердите окончательное удаление аккаунта #" + accountCode + ".")) return;
     try {
-      await callCouncilManagement("delete_account", targetId);
+      const response = await fetch(`/api/v1/school/accounts/${encodeURIComponent(targetId)}`, {
+        method: "DELETE", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmation: "УДАЛИТЬ АККАУНТ УЧАСТНИКА" })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        if (data?.error === "recent_yandex_login_required") {
+          if (confirm("Для удаления требуется свежий вход. Перейти к подтверждению входа через Яндекс ID? После входа снова откройте это действие.")) {
+            location.assign("/auth/yandex/start?reauth=1");
+          }
+          return;
+        }
+        const message = data?.error === "target_role_forbidden"
+          ? "Удалять можно только аккаунты учеников и участников Совета."
+          : data?.error === "target_unavailable" ? "Аккаунт не найден в вашей школе."
+            : data?.error === "private_storage_unavailable" ? "Российское хранилище файлов не подключено."
+              : "Не удалось безопасно удалить аккаунт.";
+        throw new Error(message);
+      }
       notice("Аккаунт и связанные данные удалены.");
       await loadCouncilAdminTools();
       await loadAll();

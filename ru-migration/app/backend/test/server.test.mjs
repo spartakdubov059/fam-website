@@ -53,6 +53,8 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(html, /pulseScript\.src = '\/pulse\.js'/);
     assert.match(html, /href="\/auth\/yandex\/start\?reauth=1"/);
     assert.match(html, /fetch\("\/api\/v1\/me\/account"/);
+    assert.match(html, /api\/v1\/school\/accounts\/\$\{encodeURIComponent\(targetId\)\}/);
+    assert.match(html, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
     assert.doesNotMatch(html, /selfDeletePassword/);
 
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
@@ -94,6 +96,22 @@ test('self account deletion routes through the configured Russian backend', asyn
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, deleted: true });
     assert.equal(method, 'DELETE');
+  });
+});
+
+test('direct school account deletion routes through the configured Russian backend', async () => {
+  let url;
+  const targetId = '22222222-2222-4222-8222-222222222222';
+  await withServer({ listingsApi: async req => {
+    url = req.url;
+    return { status: 200, body: { ok: true, deleted: true } };
+  } }, async origin => {
+    const response = await fetch(new URL(`/api/v1/school/accounts/${targetId}`, origin), {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: 'synthetic' }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, deleted: true });
+    assert.equal(url, `/api/v1/school/accounts/${targetId}`);
   });
 });
 
@@ -287,6 +305,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
       ['GET', '/api/v1/deletion-requests/review'],
       ['POST', '/api/v1/deletion-requests'],
       ['PATCH', `/api/v1/deletion-requests/${id}`],
+      ['DELETE', `/api/v1/school/accounts/${id}`],
     ]) {
       const response = await fetch(new URL(pathname, origin), { method, headers: { 'content-type': 'application/json' }, body: ['POST', 'PATCH'].includes(method) ? '{}' : undefined });
       assert.equal(response.status, 200);
@@ -296,6 +315,6 @@ test('isolated server routes school catalog and access-request lifecycle to the 
   assert.deepEqual(routed, [
     'GET /api/v1/schools', 'PATCH /api/v1/me', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', `PATCH /api/v1/profile-requests/${id}`,
     'POST /api/v1/role-requests', 'GET /api/v1/role-requests', 'GET /api/v1/role-requests/review', `PATCH /api/v1/role-requests/${id}`,
-    'GET /api/v1/deletion-requests/targets', 'GET /api/v1/deletion-requests', 'GET /api/v1/deletion-requests/review', 'POST /api/v1/deletion-requests', `PATCH /api/v1/deletion-requests/${id}`,
+    'GET /api/v1/deletion-requests/targets', 'GET /api/v1/deletion-requests', 'GET /api/v1/deletion-requests/review', 'POST /api/v1/deletion-requests', `PATCH /api/v1/deletion-requests/${id}`, `DELETE /api/v1/school/accounts/${id}`,
   ]);
 });

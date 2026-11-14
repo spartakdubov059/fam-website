@@ -358,6 +358,24 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async beginAdminAccountDeletion({ schoolId, reviewerId, targetId }) {
+      if (!schoolId || !reviewerId || !targetId || reviewerId === targetId) throw new TypeError('invalid administrator account deletion');
+      return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const targetRows = await tx`SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
+        const target = targetRows?.[0]?.[0];
+        if (!target || target.active !== true || target.school_id !== schoolId) return { ok: false, code: 'target_unavailable' };
+        if (!['student', 'council_member'].includes(target.role)) return { ok: false, code: 'target_role_forbidden' };
+        await tx`UPDATE fam_user_profiles SET active = false WHERE user_id = ${targetId} AND school_id = ${schoolId}
+          AND role IN ('student', 'council_member') AND active = true;`;
+        const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} AND school_id = ${schoolId} LIMIT 1;`;
+        if (confirmed?.[0]?.[0]?.active !== false) return { ok: false, code: 'target_unavailable' };
+        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id, role: target.role };
+      });
+    },
+
     async beginAccountDeletion({ issuer, subject, userId }) {
       if (!issuer || !subject || !userId) throw new TypeError('invalid account deletion actor');
       return sql.begin(async tx => {
@@ -390,13 +408,21 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
-    async finishAccountDeletion({ issuer, subject, userId, schoolId, preserveRequestId = null, reviewerId = null, reviewNote = '' }) {
+    async finishAccountDeletion({ issuer, subject, userId, schoolId, preserveRequestId = null, reviewerId = null, reviewNote = '', adminAudit = null }) {
       if (!issuer || !subject || !userId || !schoolId) throw new TypeError('invalid account deletion');
       return sql.begin(async tx => {
         const profileRows = await tx`SELECT active, school_id FROM fam_user_profiles
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
         const profile = profileRows?.[0]?.[0];
         if (!profile || profile.active !== false || profile.school_id !== schoolId) return { ok: false, code: 'profile_unavailable' };
+        if (adminAudit) {
+          const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${adminAudit.actorId} LIMIT 1;`;
+          const reviewer = reviewers?.[0]?.[0];
+          if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId
+              || adminAudit.schoolId !== schoolId || !['student', 'council_member'].includes(adminAudit.targetRole)) {
+            return { ok: false, code: 'forbidden' };
+          }
+        }
 
         const listingRows = await tx`SELECT id FROM fam_listings WHERE user_id = ${userId};`;
         const listingIds = (listingRows?.[0] ?? []).map(row => row.id).filter(id => typeof id === 'string');
@@ -458,6 +484,9 @@ export function createYdbListingsRepository(sql) {
         await tx`DELETE FROM fam_school_announcements WHERE author_id = ${userId};`;
         await tx`DELETE FROM fam_school_poll_votes WHERE voter_id = ${userId};`;
         await tx`DELETE FROM fam_pending_media WHERE user_id = ${userId};`;
+        if (adminAudit) await tx`INSERT INTO fam_school_admin_audit
+          (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${adminAudit.actorId}, ${userId}, 'account_deleted', ${adminAudit.targetRole}, CurrentUtcTimestamp());`;
         await tx`DELETE FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
         return { ok: true, deleted: true };
       });

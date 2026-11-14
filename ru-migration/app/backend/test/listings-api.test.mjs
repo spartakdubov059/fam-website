@@ -148,6 +148,27 @@ test('council members can read only their own school-scoped deletion request his
   assert.deepEqual(args, ['school-a', 'council-id']);
   assert.deepEqual(response.body.requests, [{ request_id: 'synthetic', status: 'pending' }]);
 });
+test('direct same-origin school-account deletion is dispatched to the Russian deletion handler', async () => {
+  const targetId = '22222222-2222-4222-8222-222222222222';
+  const admin = { id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'school_admin' };
+  const now = Date.now(); let finalized;
+  const handler = createListingsApi({
+    authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin-subject', authenticated_at: Math.floor(now / 1000) }),
+    resolveActor: async () => admin,
+    repository: {
+      beginAdminAccountDeletion: async input => ({ ok: true, id: targetId, issuer: 'https://issuer.example', subject: 'target-subject', school_id: input.schoolId, role: 'student' }),
+      finishAccountDeletion: async input => { finalized = input; return { ok: true, deleted: true }; },
+      restoreAccountAfterDeletionFailure: async () => true,
+    },
+    pendingImages: { listUserObjects: async () => [], delete: async () => {} }, now: () => now,
+  });
+  const request = req({ confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }, 'DELETE');
+  request.url = `/api/v1/school/accounts/${targetId}`;
+  const response = await handler(request);
+  assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 0 } });
+  assert.equal(finalized.userId, targetId);
+  assert.deepEqual(finalized.adminAudit, { actorId: admin.id, schoolId: admin.school_id, targetRole: 'student' });
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

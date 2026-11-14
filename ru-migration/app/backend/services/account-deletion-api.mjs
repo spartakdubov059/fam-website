@@ -22,7 +22,9 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const reviewMatch = pathname.match(new RegExp(`^/api/v1/deletion-requests/(${UUID_SOURCE})$`, 'i'));
     const selfDeletion = req.method === 'DELETE' && pathname === '/api/v1/me/account';
-    if (!selfDeletion && !(req.method === 'PATCH' && reviewMatch)) {
+    const adminDeleteMatch = pathname.match(new RegExp(`^/api/v1/school/accounts/(${UUID_SOURCE})$`, 'i'));
+    const adminDeletion = req.method === 'DELETE' && adminDeleteMatch;
+    if (!selfDeletion && !adminDeletion && !(req.method === 'PATCH' && reviewMatch)) {
       return { status: 404, body: { ok: false, error: 'not_found' } };
     }
     let identity;
@@ -33,7 +35,16 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
     const parsed = await readJson(req);
     if (parsed.error) return { status: parsed.error === 'request_too_large' ? 413 : 400, body: { ok: false, error: parsed.error } };
-    if (!selfDeletion) {
+    if (adminDeletion) {
+      if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const currentSeconds = Math.floor(now() / 1000);
+      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
+          || identity.authenticated_at < currentSeconds - 600) {
+        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+      }
+      if (adminDeleteMatch[1].toLowerCase() === actor.id.toLowerCase()) return { status: 403, body: { ok: false, error: 'cannot_delete_self' } };
+      if (parsed.value.confirmation !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+    } else if (!selfDeletion) {
       if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
       if (parsed.value.decision === 'reject') {
         const note = typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '';
@@ -61,10 +72,11 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       if (parsed.value.confirmation !== CONFIRMATION) return { status: 400, body: { ok: false, error: 'confirmation_required' } };
     }
     if ((selfDeletion && typeof repository?.beginAccountDeletion !== 'function')
-        || (!selfDeletion && typeof repository?.beginRequestedAccountDeletion !== 'function')
+        || (adminDeletion && typeof repository?.beginAdminAccountDeletion !== 'function')
+        || (!selfDeletion && !adminDeletion && typeof repository?.beginRequestedAccountDeletion !== 'function')
         || typeof repository?.finishAccountDeletion !== 'function'
-        || (selfDeletion && typeof repository?.restoreAccountAfterDeletionFailure !== 'function')
-        || (!selfDeletion && typeof repository?.restoreRequestedAccountDeletion !== 'function')) {
+        || ((selfDeletion || adminDeletion) && typeof repository?.restoreAccountAfterDeletionFailure !== 'function')
+        || (!selfDeletion && !adminDeletion && typeof repository?.restoreRequestedAccountDeletion !== 'function')) {
       return { status: 503, body: { ok: false, error: 'account_deletion_unavailable' } };
     }
     if (typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') {
@@ -76,14 +88,18 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     try {
       const begun = selfDeletion
         ? await repository.beginAccountDeletion({ issuer: identity.issuer, subject: identity.subject, userId: actor.id })
-        : await repository.beginRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id });
+        : adminDeletion
+          ? await repository.beginAdminAccountDeletion({ schoolId: actor.school_id, reviewerId: actor.id, targetId: adminDeleteMatch[1] })
+          : await repository.beginRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id });
       if (!begun?.ok) {
         const code = begun?.code || 'profile_unavailable';
-        return { status: code === 'last_school_admin' ? 409 : 403, body: { ok: false, error: code } };
+        const status = code === 'last_school_admin' ? 409 : code === 'target_unavailable' ? 404 : 403;
+        return { status, body: { ok: false, error: code } };
       }
       deactivated = true;
       target = selfDeletion ? { id: actor.id, issuer: identity.issuer, subject: identity.subject, school_id: actor.school_id }
-        : { ...begun, request_id: reviewMatch[1], reviewer_id: actor.id };
+        : adminDeletion ? { ...begun, reviewer_id: actor.id, direct_admin_deletion: true }
+          : { ...begun, request_id: reviewMatch[1], reviewer_id: actor.id };
       if (!target.id || !USER_ID.test(target.id) || !target.issuer || !target.subject) throw new Error('invalid deletion target');
       const keys = await pendingImages.listUserObjects(target.id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
@@ -92,6 +108,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       const deleted = await repository.finishAccountDeletion({
         issuer: target.issuer, subject: target.subject, userId: target.id, schoolId: target.school_id,
         preserveRequestId: target.request_id, reviewerId: target.reviewer_id,
+        adminAudit: target.direct_admin_deletion ? { actorId: actor.id, schoolId: actor.school_id, targetRole: target.role } : null,
         reviewNote: typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '',
       });
       if (!deleted?.ok) throw new Error('database_deletion_failed');
@@ -100,6 +117,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       if (deactivated) {
         try {
           if (selfDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id });
+          else if (adminDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: target?.issuer, subject: target?.subject, userId: target?.id });
           else await repository.restoreRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, targetId: target?.id });
         }
         catch { /* failed cleanup remains inactive until an operator repairs the isolated staging database */ }

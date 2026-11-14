@@ -95,6 +95,25 @@ test('approved account deletion claims only an active same-school request and it
   assert.ok(calls.some(call => call.text.includes("SET status = 'processing'") && call.values.includes('request-a')));
   assert.ok(calls.some(call => call.text.includes('SET active = false') && call.values.includes('school-a')));
 });
+test('direct account deletion requires an active same-school administrator and student or council target', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('SELECT active FROM fam_user_profiles')) return [[{ active: false }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'admin-a', targetId: 'target-a' });
+  assert.deepEqual(result, { ok: true, id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'council_member' });
+  const scopedDeactivate = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET active = false'));
+  assert.ok(scopedDeactivate);
+  assert.ok(scopedDeactivate.values.includes('school-a'));
+  assert.match(scopedDeactivate.text, /role IN \('student', 'council_member'\)/);
+  assert.equal(await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'same-id', targetId: 'same-id' }).then(() => false, () => true), true);
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

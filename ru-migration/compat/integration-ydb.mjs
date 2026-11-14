@@ -431,7 +431,25 @@ try {
   assert.deepEqual(approvedRequest[0][0], { status: 'approved', reviewed_by: '33333333-3333-4333-8333-333333333333', review_note: 'Подтверждено синтетическим тестом' });
   assert.equal((await sql`SELECT request_id FROM fam_account_deletion_open WHERE target_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0,
     'approved deletion closes the unique open request while retaining the decision record');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, role revocation, school-scoped announcements/polls/voting, own-profile identity update, own-listing delete and cleanup, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  const adminDeleteTargetId = '77777777-7777-4777-8777-777777777777';
+  const adminDeleteImageKey = `pending/${adminDeleteTargetId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
+  accountMediaKeys.add(adminDeleteImageKey);
+  await repo.registerPendingImage(adminDeleteTargetId, adminDeleteImageKey);
+  const adminDeleteListing = await repo.createListing({ user_id: adminDeleteTargetId, school_id: 'synthetic-school',
+    title: 'Объявление аккаунта для административного удаления', description: 'Синтетическая YDB проверка', category: 'Учёба',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: adminDeleteImageKey, photo_status: 'pending', status: 'pending' });
+  const adminDeletion = await listingsApi(apiRequest('DELETE', `/api/v1/school/accounts/${adminDeleteTargetId}`, 'synthetic-admin', {
+    confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА',
+  }));
+  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.ok(deletedMediaKeys.includes(adminDeleteImageKey), 'direct school-admin deletion removes the eligible synthetic target private image');
+  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' }), null,
+    'direct school-admin deletion removes only the same-school student identity mapping');
+  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${adminDeleteListing.id};`)?.[0]?.length ?? 0, 0);
+  const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
+  assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
+    'administrator deletion is preserved in the audit after the profile is removed');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion request workflows, approved and direct same-school account deletion with private media cleanup and audit, school-scoped announcements/polls/voting, own-profile identity update, listing/media cleanup, favorites, ideas, messages, event registration/review, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
