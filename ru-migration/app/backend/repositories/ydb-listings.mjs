@@ -907,7 +907,7 @@ export function createYdbListingsRepository(sql) {
         if (kind === 'open_event') {
           await tx`INSERT INTO fam_school_announcements
             (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
-            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(${eventStartsAt} AS Timestamp), CurrentUtcTimestamp(), Unwrap(CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H')));`;
+            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, Unwrap(CAST(${eventStartsAt} AS Timestamp)), CurrentUtcTimestamp(), Unwrap(CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H')));`;
         } else {
           await tx`INSERT INTO fam_school_announcements
             (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
@@ -929,7 +929,7 @@ export function createYdbListingsRepository(sql) {
           WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`;
         if (Number(countRows?.[0]?.[0]?.count ?? 0) >= 2) return { ok: false, code: 'daily_poll_limit' };
         await tx`INSERT INTO fam_school_polls (poll_id, school_id, author_id, question, options_json, closes_at, created_at)
-          VALUES (${pollId}, ${schoolId}, ${authorId}, ${question}, ${optionsJson}, CAST(${closesAt} AS Timestamp), CurrentUtcTimestamp());`;
+          VALUES (${pollId}, ${schoolId}, ${authorId}, ${question}, ${optionsJson}, Unwrap(CAST(${closesAt} AS Timestamp)), CurrentUtcTimestamp());`;
         return { ok: true, id: pollId };
       });
     },
