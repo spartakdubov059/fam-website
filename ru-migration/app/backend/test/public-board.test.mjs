@@ -101,6 +101,8 @@ test('event card reads only the user own registrations and supports reservation 
     throw new Error(`unexpected request ${url}`);
   } });
   const card = boardCard(root);
+  const eventCategory = root.children[0].children[1].children.find(button => button.textContent === 'Афиша');
+  assert.ok(eventCategory, 'categories returned by public listings are available as filters');
   const actions = card.children.find(node => node.className === 'ru-event-actions');
   const [register, cancel] = actions.children;
   assert.equal(calls[1].options.credentials, 'same-origin');
