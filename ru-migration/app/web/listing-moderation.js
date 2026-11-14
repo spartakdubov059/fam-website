@@ -397,6 +397,37 @@ export async function initializeListingModeration({ document = globalThis.docume
             await loadDeletionRequests();
           } catch { requestStatus.textContent = 'Не удалось отклонить обращение. Очередь не обновлена.'; }
         }));
+        actions.append(actionButton(document, 'Одобрить и удалить аккаунт', async () => {
+          const confirmAction = document.defaultView?.confirm || globalThis.confirm;
+          const promptAction = document.defaultView?.prompt || globalThis.prompt;
+          if (typeof confirmAction !== 'function' || typeof promptAction !== 'function') {
+            requestStatus.textContent = 'Браузер не поддерживает подтверждение удаления. Обращение не изменено.';
+            return;
+          }
+          if (!confirmAction('Подтвердите окончательное удаление аккаунта ученика или участника Совета и связанных данных этой школы.')) return;
+          if (promptAction('Для продолжения введите точно: УДАЛИТЬ АККАУНТ УЧАСТНИКА') !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') {
+            requestStatus.textContent = 'Фраза не совпала. Обращение и аккаунт не изменены.';
+            return;
+          }
+          requestStatus.textContent = 'Проверяем свежесть входа и удаляем аккаунт…';
+          try {
+            const decision = await fetchImpl(`/api/v1/deletion-requests/${item.request_id}`, {
+              method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ decision: 'approve', confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }),
+            });
+            const decided = await json(decision);
+            if (!decision.ok || !decided?.ok) {
+              if (decided?.error === 'recent_yandex_login_required') {
+                requestStatus.textContent = 'Для удаления нужно повторно войти через Яндекс ID. Обращение осталось открытым.';
+                return;
+              }
+              throw new Error('decision_failed');
+            }
+            requestStatus.textContent = 'Аккаунт и связанные данные удалены. Обновляем очередь…';
+            await loadDeletionRequests();
+          } catch { requestStatus.textContent = 'Не удалось удалить аккаунт. Обращение должно остаться в очереди; обновите её перед повтором.'; }
+        }));
         card.append(actions); reviewQueue.append(card);
       }
     } catch { requestStatus.textContent = 'Не удалось загрузить обращения этой школы.'; }

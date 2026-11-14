@@ -323,9 +323,40 @@ test('school administrator can reject a request and receives no account deletion
   const card = f.document.getElementById('ruDeletionReviewQueue').children[0];
   assert.equal(card.children[2].textContent, 'Причина: Повторяющиеся спам-публикации.');
   const actions = card.children[3].children;
-  assert.deepEqual(actions.map(button => button.textContent), ['Отклонить обращение']);
+  assert.deepEqual(actions.map(button => button.textContent), ['Отклонить обращение', 'Одобрить и удалить аккаунт']);
   await actions[0].listeners.click();
   const patch = calls.find(call => call.url === `/api/v1/deletion-requests/${requestId}`);
   assert.deepEqual(JSON.parse(patch.init.body), { decision: 'reject' });
+  assert.equal(f.document.getElementById('ruDeletionReviewQueue').children.length, 0);
+});
+
+test('school administrator approval requires the exact browser confirmation before deleting a requested account', async () => {
+  const f = fixture(); const calls = [];
+  const requestId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  let pending = true; let confirmation = 'УДАЛИТЬ АККАУНТ УЧАСТНИКА';
+  f.document.defaultView = { confirm: () => true, prompt: () => confirmation };
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    if (url === '/api/v1/deletion-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, target_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', target_role: 'student', reason_code: 'spam', reason: 'Повторяющиеся спам-публикации.' }] : [] }) };
+    if (url === `/api/v1/deletion-requests/${requestId}` && init.method === 'PATCH') {
+      pending = false; return { ok: true, json: async () => ({ ok: true, deleted: true }) };
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const actions = f.document.getElementById('ruDeletionReviewQueue').children[0].children[3].children;
+  assert.equal(actions[1].textContent, 'Одобрить и удалить аккаунт');
+  confirmation = 'удалить';
+  await actions[1].listeners.click();
+  assert.equal(calls.some(call => call.url === `/api/v1/deletion-requests/${requestId}` && call.init.method === 'PATCH'), false);
+  assert.match(f.document.getElementById('ruDeletionReviewStatus').textContent, /не совпала/);
+  confirmation = 'УДАЛИТЬ АККАУНТ УЧАСТНИКА';
+  await actions[1].listeners.click();
+  const patch = calls.find(call => call.url === `/api/v1/deletion-requests/${requestId}` && call.init.method === 'PATCH');
+  assert.deepEqual(JSON.parse(patch.init.body), { decision: 'approve', confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' });
   assert.equal(f.document.getElementById('ruDeletionReviewQueue').children.length, 0);
 });
