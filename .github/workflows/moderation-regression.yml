@@ -8,26 +8,40 @@ on:
       - 'supabase/**'
       - 'tests/**'
       - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'assets/**'
+      - 'docs/**'
       - '.github/workflows/**'
   pull_request:
     paths:
       - 'supabase/**'
       - 'tests/**'
       - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'assets/**'
+      - 'docs/**'
       - '.github/workflows/**'
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 
 permissions:
   contents: read
 
 jobs:
   moderation-tests:
-    name: Russian content safety tests
+    name: Regression suite
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: 22
       - name: Run moderation tests
@@ -50,3 +64,51 @@ jobs:
           fs.writeFileSync('/tmp/fam-inline-scripts.js', inlineScript);
           NODE
           node --check /tmp/fam-inline-scripts.js
+
+  owner-approval:
+    name: Verify agent PR owner approval
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Set up Node.js for the trusted verifier
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: 22
+      - name: Checkout trusted approval verifier from the base commit
+        if: github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'codex/fam-run-')
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted-base-${{ github.run_id }}
+          persist-credentials: false
+      - name: Require owner approval for the current agent PR revision
+        if: github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.head.ref, 'codex/fam-run-')
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          APPROVAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TRUSTED_BASE_DIR: trusted-base-${{ github.run_id }}
+        run: node "$TRUSTED_BASE_DIR/scripts/verify-agent-pr-owner-approval.mjs"
+
+  required-safety-check:
+    name: Russian content safety tests
+    needs: [moderation-tests, owner-approval]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require regression and isolated approval verification to succeed
+        env:
+          REGRESSION_RESULT: ${{ needs.moderation-tests.result }}
+          APPROVAL_RESULT: ${{ needs.owner-approval.result }}
+        run: |
+          if [[ "$REGRESSION_RESULT" != "success" || "$APPROVAL_RESULT" != "success" ]]; then
+            echo "::error::Regression or owner approval verification did not succeed."
+            exit 1
+          fi

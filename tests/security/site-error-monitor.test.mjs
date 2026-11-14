@@ -31,6 +31,10 @@ const worker = readFileSync(
   "utf8",
 );
 const frontend = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+const writeCapMigration = readFileSync(
+  new URL("../../supabase/migrations/20261113221255_fam_site_error_telemetry_write_cap.sql", import.meta.url),
+  "utf8",
+);
 
 test("frontend telemetry stores only fixed aggregate error categories", () => {
   assert.match(migration, /create table if not exists private\.fam_site_error_counts/i);
@@ -97,4 +101,12 @@ test("site-error telemetry is callable by anonymous browser requests without gra
   const telemetryEnd = frontend.indexOf('\nwindow.onerror', telemetryStart);
   assert.ok(telemetryStart >= 0 && telemetryEnd > telemetryStart);
   assert.doesNotMatch(frontend.slice(telemetryStart, telemetryEnd), /authorization\s*:/i);
+});
+
+
+test("saturated anonymous telemetry aggregates stop issuing row updates", () => {
+  assert.match(writeCapMigration, /least\(fam_site_error_counts\.event_count\s*\+\s*1,\s*1000\)/i);
+  assert.match(writeCapMigration, /where fam_site_error_counts\.event_count < 1000/i);
+  assert.match(writeCapMigration, /revoke execute on function public\.report_fam_site_error\(text,text\) from authenticated/i);
+  assert.match(writeCapMigration, /grant execute on function public\.report_fam_site_error\(text,text\) to anon/i);
 });

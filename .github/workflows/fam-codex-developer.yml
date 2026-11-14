@@ -13,12 +13,18 @@ on:
       - "docs/**"
       - "tests/**"
       - "scripts/run-local-coder.mjs"
+      - "scripts/run-local-coder-classified.mjs"
+      - "scripts/local-model-edits.mjs"
+      - "tests/security/local-model-edits.test.mjs"
       - "scripts/local-model-http.mjs"
       - "scripts/fam-agent-bridge.mjs"
       - "supabase/functions/fam-agent-coder-bridge/**"
       - "scripts/validate-local-agent-patch.mjs"
       - "scripts/fam-agent-report.mjs"
       - "scripts/render-fam-agent-report.mjs"
+      - "scripts/fam-agent-reviewer.mjs"
+      - "scripts/fam-agent-security.mjs"
+      - "scripts/fam-agent-performance.mjs"
       - "tests/security/fam-local-agent.test.mjs"
   workflow_dispatch:
     inputs:
@@ -46,6 +52,10 @@ jobs:
       contents: read
     outputs:
       has_patch: ${{ steps.agent.outputs.has_patch }}
+      task_claimed: ${{ steps.coder-queue.outputs.claimed }}
+      task_id: ${{ steps.coder-queue.outputs.task_id }}
+      model_outcome: ${{ steps.agent.outcome }}
+      model_failure_reason: ${{ steps.agent.outputs.failure_reason }}
     steps:
       - name: Получить исходники FAM без GitHub credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -58,7 +68,24 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Проверить безопасные операции локального редактирования
+        run: node --test tests/security/local-model-edits.test.mjs
+
+      - name: Получить одно безопасное задание из очереди (необязательно)
+        id: coder-queue
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_MANUAL_TASK: ${{ inputs.task }}
+        run: node scripts/fam-agent-bridge.mjs claim
+
+      - name: Показать пропуск модели при пустой очереди
+        if: steps.coder-queue.outputs.run_model != 'true'
+        run: |
+          echo "Модель не загружалась: очередь не выдала задачу и ручной запрос не задан." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Восстановить бесплатные веса модели из кэша
+        if: steps.coder-queue.outputs.run_model == 'true'
         id: model-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
         with:
@@ -66,6 +93,7 @@ jobs:
           key: fam-qwen25-coder-7b-q4km-v1
 
       - name: Скачать бесплатную модель с лицензией Apache 2.0
+        if: steps.coder-queue.outputs.run_model == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/fam-model"
@@ -95,6 +123,7 @@ jobs:
           fi
 
       - name: Собрать llama.cpp без GPU и стороннего API
+        if: steps.coder-queue.outputs.run_model == 'true'
         env:
           LLAMA_CPP_COMMIT: cd959bae99ff4bed22bef2604f45241c09bbb8c8
         run: |
@@ -113,15 +142,8 @@ jobs:
             -DGGML_OPENMP=ON
           cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
 
-      - name: Получить одно безопасное задание из очереди (необязательно)
-        id: coder-queue
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_MANUAL_TASK: ${{ inputs.task }}
-        run: node scripts/fam-agent-bridge.mjs claim
-
       - name: Запустить локальную модель и подготовить patch
+        if: steps.coder-queue.outputs.run_model == 'true'
         id: agent
         run: |
           set -euo pipefail
@@ -155,21 +177,22 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/fam-agent"
           git rev-parse HEAD > "$RUNNER_TEMP/fam-agent-base.sha"
-          node scripts/run-local-coder.mjs
+          set +e
+          node scripts/run-local-coder-classified.mjs
+          status=$?
+          set -e
+          if [[ "$status" == "75" ]]; then
+            echo "failure_reason=timeout" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" != "0" ]]; then
+            echo "failure_reason=unknown" >> "$GITHUB_OUTPUT"
+          fi
+          if [[ "$status" != "0" ]]; then
+            exit "$status"
+          fi
           cp "$RUNNER_TEMP/fam-agent-base.sha" "$RUNNER_TEMP/fam-agent/base.sha"
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
           fi
-
-      - name: Вернуть результат задания в очередь
-        if: always() && steps.coder-queue.outputs.claimed == 'true'
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ env.FAM_CODER_TASK_ID }}
-          FAM_MODEL_STEP_OUTCOME: ${{ steps.agent.outcome }}
-          FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
-        run: node scripts/fam-agent-bridge.mjs finish
 
       - name: Показать структурированный результат модели
         if: always() && steps.agent.outcome == 'success'
@@ -264,8 +287,12 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/run-local-coder.mjs
+          node --check scripts/local-model-edits.mjs
           node --check scripts/fam-agent-bridge.mjs
           node --check scripts/validate-local-agent-patch.mjs
+          node --check scripts/fam-agent-reviewer.mjs
+          node --check scripts/fam-agent-security.mjs
+          node --check scripts/fam-agent-performance.mjs
 
       - name: Проверить синтаксис встроенного JavaScript
         run: |
@@ -281,17 +308,143 @@ jobs:
           NODE
           node --check /tmp/fam-inline-scripts.js
 
-  prepare_review:
-    name: Подготовить PR и проверить исправление без публикации
+      - name: Подготовить независимый статический Reviewer отчёт
+        env:
+          FAM_QA_STATUS: passed
+        run: |
+          node scripts/fam-agent-reviewer.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent/summary.json" \
+            "$RUNNER_TEMP/fam-agent/safety.json" \
+            "$RUNNER_TEMP/fam-agent/base.sha" \
+            "$RUNNER_TEMP/fam-agent-review/review.json" \
+            "$RUNNER_TEMP/fam-agent-review/review.md"
+
+      - name: Запустить отдельный статический Security Agent
+        run: |
+          node scripts/fam-agent-security.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent-review/security.json" \
+            "$RUNNER_TEMP/fam-agent-review/security.md"
+
+      - name: Запустить отдельный статический Performance Agent
+        run: |
+          node scripts/fam-agent-performance.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent-review/performance.json" \
+            "$RUNNER_TEMP/fam-agent-review/performance.md"
+
+      - name: Сохранить независимый Reviewer отчёт
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: fam-agent-independent-review
+          path: ${{ runner.temp }}/fam-agent-review/
+          if-no-files-found: error
+          retention-days: 3
+
+
+  trusted_qa:
+    name: Доверенная регрессия main против патча
     needs: [generate, verify]
     if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Получить исходники main без сохранения credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Установить Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Скачать предложенный patch из доверенного запуска генерации
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-local-agent-result
+          path: ${{ runner.temp }}/fam-agent
+
+      - name: Запустить тесты main на patch в отдельном runner
+        run: |
+          set -euo pipefail
+          EXPECTED_BASE_SHA="$(cat "$RUNNER_TEMP/fam-agent/base.sha")"
+          ACTUAL_BASE_SHA="$(git rev-parse HEAD)"
+          if [[ "$EXPECTED_BASE_SHA" != "$ACTUAL_BASE_SHA" ]]; then
+            echo "::error::Основная ветка изменилась после создания patch."
+            exit 1
+          fi
+          git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          node scripts/validate-local-agent-patch.mjs \
+            "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
+            "$RUNNER_TEMP/fam-agent/summary.json" > "$RUNNER_TEMP/fam-agent/trusted-safety.json"
+          git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          git restore --source=HEAD --worktree -- tests
+          git ls-files 'tests/moderation/*.test.mjs' 'tests/security/*.test.mjs' > "$RUNNER_TEMP/fam-agent/trusted-tests.txt"
+          if [[ ! -s "$RUNNER_TEMP/fam-agent/trusted-tests.txt" ]]; then
+            echo "::error::В main не найдены доверенные moderation/security tests."
+            exit 1
+          fi
+          xargs node --test < "$RUNNER_TEMP/fam-agent/trusted-tests.txt"
+
+  finish_task:
+    name: Зафиксировать результат coder после QA и PR
+    needs: [generate, verify, trusted_qa, prepare_review]
+    if: always() && needs.generate.outputs.task_claimed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Получить доверенный bridge из ревизии запуска
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Установить Node.js для завершения задачи
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Скачать summary модели, если inference завершился
+        if: needs.generate.outputs.model_outcome == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-local-agent-result
+          path: ${{ runner.temp }}/fam-agent
+
+      - name: Сохранить результат с учётом QA
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.task_id }}
+          FAM_MODEL_STEP_OUTCOME: ${{ needs.generate.outputs.model_outcome }}
+          FAM_MODEL_FAILURE_REASON: ${{ needs.generate.outputs.model_failure_reason }}
+          FAM_QA_OUTCOME: ${{ needs.trusted_qa.result }}
+          FAM_PR_MANAGER_OUTCOME: ${{ needs.prepare_review.result }}
+          FAM_AGENT_PR_URL: ${{ needs.prepare_review.outputs.pr_url }}
+          FAM_AGENT_COMMIT_SHA: ${{ needs.prepare_review.outputs.commit_sha }}
+          FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
+        run: node scripts/fam-agent-bridge.mjs finish
+
+  prepare_review:
+    name: Подготовить PR и проверить исправление без публикации
+    needs: [generate, verify, trusted_qa]
+    outputs:
+      pr_url: ${{ steps.pr.outputs.pr_url }}
+      commit_sha: ${{ steps.pr.outputs.commit_sha }}
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && needs.trusted_qa.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
       checks: read
-      actions: write
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -305,11 +458,28 @@ jobs:
           name: fam-local-agent-result
           path: ${{ runner.temp }}/fam-agent
 
+      - name: Скачать независимый Reviewer отчёт
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # actions/download-artifact v4
+        with:
+          name: fam-agent-independent-review
+          path: ${{ runner.temp }}/fam-agent-review
+      - name: Создать короткоживущий токен GitHub App с правами только на этот репозиторий
+        id: app-token
+        if: vars.FAM_GITHUB_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.FAM_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FAM_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Создать PR; публикация всегда требует решения владельца
         id: pr
         env:
-          GH_TOKEN: ${{ github.token }}
-          REQUIRES_APPROVAL: ${{ needs.verify.outputs.requires_approval }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          FAM_PR_TOKEN_MODE: ${{ steps.app-token.outputs.token != '' && 'github-app' || 'github-token' }}
         run: |
           set -euo pipefail
           node scripts/render-fam-agent-report.mjs \
@@ -334,6 +504,12 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git -c core.hooksPath=/dev/null push --set-upstream origin "$BRANCH"
           {
+            cat "$RUNNER_TEMP/fam-agent-review/review.md"
+            echo
+            cat "$RUNNER_TEMP/fam-agent-review/security.md"
+            echo
+            cat "$RUNNER_TEMP/fam-agent-review/performance.md"
+            echo
             cat "$RUNNER_TEMP/fam-agent/verified-report.md"
             echo
             echo "- Модель: Qwen2.5-Coder-7B-Instruct-GGUF, запущена локально на временном GitHub runner."
@@ -341,17 +517,19 @@ jobs:
             echo "- Patch прошёл независимые тесты и проверку безопасности в отдельном job этого запуска."
             echo "- Supabase, миграции, права доступа и аккаунты не менялись."
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            if [[ "$FAM_PR_TOKEN_MODE" == "github-app" ]]; then
+              echo "- CI trigger: scoped GitHub App token; PR workflow runs can start without manual workflow approval."
+              echo "- The owner approval gate remains required before merging."
+            else
+              echo "- CI trigger: GITHUB_TOKEN; GitHub may require manual approval before PR workflow runs start."
+            fi
             echo "- Production этим workflow не изменяется."
             echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
-          if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
-            PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
-            echo "requires_approval=true" >> "$GITHUB_OUTPUT"
-          else
-            PR_URL="$(gh pr create --base main --head "$BRANCH" --title "Исправление FAM после тестов — ожидает разрешения" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
-            echo "requires_approval=false" >> "$GITHUB_OUTPUT"
-          fi
+          PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
+          echo "requires_approval=true" >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
         env:
@@ -359,22 +537,22 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.pr_url }}
         run: |
           set -euo pipefail
-          BRANCH_SHA="$(git rev-parse HEAD)"
-          gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
-          TEST_RUN_ID=""
-          for attempt in $(seq 1 60); do
-            TEST_RUN_ID="$(gh run list --workflow .github/workflows/moderation-regression.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,event --jq ".[] | select(.headSha == \"$BRANCH_SHA\" and .event == \"workflow_dispatch\") | .databaseId" | head -n 1)"
-            [[ -n "$TEST_RUN_ID" ]] && break
-            sleep 5
+          REQUIRED_CHECK="Russian content safety tests"
+          REQUIRED_BUCKET=""
+          for attempt in $(seq 1 90); do
+            CHECKS_JSON="$(gh pr checks "$PR_URL" --required --json name,state,bucket 2>/dev/null || true)"
+            REQUIRED_BUCKET="$(jq -r --arg name "$REQUIRED_CHECK" '[.[] | select(.name == $name)] | last | .bucket // empty' <<< "${CHECKS_JSON:-[]}")"
+            if [[ "$REQUIRED_BUCKET" == "pass" ]]; then
+              break
+            fi
+            if [[ "$REQUIRED_BUCKET" == "fail" || "$REQUIRED_BUCKET" == "cancel" ]]; then
+              echo "::error::Обязательная проверка PR завершилась без успеха: $REQUIRED_BUCKET"
+              exit 1
+            fi
+            sleep 10
           done
-          if [[ -z "$TEST_RUN_ID" ]]; then
-            echo "::error::Не найден отдельный запуск регрессионных тестов для ветки агента."
-            exit 1
-          fi
-          gh run watch "$TEST_RUN_ID" --exit-status --interval 10
-          TEST_CONCLUSION="$(gh run view "$TEST_RUN_ID" --json conclusion --jq '.conclusion')"
-          if [[ "$TEST_CONCLUSION" != "success" ]]; then
-            echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
+          if [[ "$REQUIRED_BUCKET" != "pass" ]]; then
+            echo "::error::Обязательная проверка PR не завершилась успешно за отведённое время."
             exit 1
           fi
           gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."

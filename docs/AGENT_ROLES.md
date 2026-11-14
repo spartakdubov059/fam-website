@@ -105,7 +105,7 @@
 Worker вызывается через активный pg_cron job каждые 5 минут. Вызов использует отдельный секрет `fam_agent_worker_token` из Supabase Vault и заголовок `x-fam-agent-token`. Проверка токена находится внутри самой Edge Function; `verify_jwt=false` не означает отсутствие защиты.
 
 Текущий allowlist содержит ровно четыре типа задач, все с `approval_required=false` и только для чтения агрегированных технических показателей:
-- `quality / queue_health_check` — число ожидающих, захваченных и выполняющихся заданий, ошибки и просроченные аренды;
+- `quality / queue_health_check` — разрешённая ad hoc проверка агрегатов очереди; отдельного периодического producer/Cron для неё сейчас нет. Ежедневный `technical / system_health_check` уже включает число queued/claimed/in-progress задач, failed за 24 часа и просроченные lease; отдельный Cron для `queue_health_check` дублировал бы часть этой проверки.
 - `orchestrator / daily_report_digest` — сводные рабочие счётчики FAM;
 - `technical / system_health_check` — наличие служебных расширений, расписаний, права RPC и агрегаты очереди;
 - `technical / site_error_digest` — агрегированные фиксированные коды клиентских ошибок и разделы сайта.
