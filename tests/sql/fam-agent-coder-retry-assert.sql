@@ -252,7 +252,7 @@ set status='completed',claimed_by=null,claimed_at=null,lease_expires_at=null,fin
 where status in ('queued','claimed','in_progress');
 
 set role service_role;
-do $
+do $context_check$
 declare
   v_result jsonb;
   v_payload jsonb;
@@ -271,5 +271,5 @@ begin
     raise exception 'producer failed to preserve extended claim context';
   end if;
 end;
-$$;
+$context_check$;
 reset role;
