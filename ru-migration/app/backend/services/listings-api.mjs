@@ -63,6 +63,37 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolRoleRequests(actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/role-management/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listSchoolRoleTargets !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listSchoolRoleTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const roleManagementTarget = pathname.match(/^\/api\/v1\/role-management\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && roleManagementTarget) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      const authenticatedAt = Number(identity.authenticated_at);
+      const ageSeconds = now() / 1000 - authenticatedAt;
+      if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.revokeSchoolRole !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.action !== 'revoke') return { status: 400, body: { ok: false, error: 'invalid_action' } };
+      try {
+        const result = await repository.revokeSchoolRole({ schoolId: actor.school_id, actorId: actor.id, targetId: roleManagementTarget[1] });
+        if (result?.ok) return { status: 200, body: result };
+        const status = result?.code === 'target_unavailable' ? 404 : result?.code === 'forbidden' ? 403
+          : result?.code === 'last_school_admin' || result?.code === 'role_unavailable' ? 409 : 400;
+        return { status, body: { ok: false, error: result?.code || 'role_update_failed' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/suspensions') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

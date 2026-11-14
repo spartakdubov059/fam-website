@@ -23,6 +23,8 @@ try {
     ('https://issuer.synthetic', 'subject-role-student', '55555555-5555-4555-8555-555555555555', 'synthetic-school', 'student', true),
     ('https://issuer.synthetic', 'subject-3', '22222222-2222-4222-8222-222222222222', 'other-school', 'student', true),
     ('https://issuer.synthetic', 'subject-council', '66666666-6666-4666-8666-666666666666', 'synthetic-school', 'council_member', true),
+    ('https://issuer.synthetic', 'subject-role-target', '77777777-7777-4777-8777-777777777777', 'synthetic-school', 'council_member', true),
+    ('https://issuer.synthetic', 'subject-admin-target', '88888888-8888-4888-8888-888888888888', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true);`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
@@ -76,6 +78,20 @@ try {
   assert.deepEqual(finalSuspensionAudit[0].map(row => row.action), ['issued', 'lifted']);
   const staleAdminAuth = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-stale-admin', { action: 'lift' }));
   assert.equal(staleAdminAuth.status, 403);
+  const roleTargets = await listingsApi(apiRequest('GET', '/api/v1/role-management/targets', 'synthetic-admin'));
+  assert.equal(roleTargets.status, 200);
+  assert.ok(roleTargets.body.targets.some(row => row.id === '77777777-7777-4777-8777-777777777777'));
+  assert.ok(!roleTargets.body.targets.some(row => row.id === '33333333-3333-4333-8333-333333333333'), 'administrator cannot demote self');
+  const revokeCouncilRole = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/77777777-7777-4777-8777-777777777777', 'synthetic-admin', { action: 'revoke' }));
+  assert.deepEqual(revokeCouncilRole, { status: 200, body: { ok: true, target_id: '77777777-7777-4777-8777-777777777777', previous_role: 'council_member', role: 'student' } });
+  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' })).role, 'student');
+  const revokedAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = '77777777-7777-4777-8777-777777777777';`;
+  assert.equal(revokedAudit[0][0].action, 'role_revoked');
+  assert.equal(revokedAudit[0][0].previous_role, 'council_member');
+  const deniedStaleRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-stale-admin', { action: 'revoke' }));
+  assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
+  const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
+  assert.equal(otherSchoolRevoke.status, 404, 'role revocation cannot cross school boundaries');
   const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
     reason: 'Repeated unrelated posts in the school group.',

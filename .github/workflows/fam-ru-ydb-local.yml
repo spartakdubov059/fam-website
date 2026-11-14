@@ -51,6 +51,19 @@ jobs:
           schema+="$(cat ru-migration/app/backend/schema/12_account_suspension_audit.yql)"
           schema+=$'\n'
           schema+="$(cat ru-migration/app/backend/schema/13_account_suspension_open.yql)"
+          schema+=
+          for i in $(seq 1 120); do
+            if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
+            if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi
+            sleep 2
+          done
+      - name: Exercise schema and repository with synthetic data
+        run: node ru-migration/compat/integration-ydb.mjs
+      - name: Remove disposable database
+        if: always()
+        run: docker rm -f fam-ru-test-ydb || true
+\n'
+          schema+="$(cat ru-migration/app/backend/schema/14_school_admin_audit.yql)"
           for i in $(seq 1 120); do
             if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
             if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi

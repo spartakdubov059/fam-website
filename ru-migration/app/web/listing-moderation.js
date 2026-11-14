@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -43,8 +43,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, suspensions: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions/targets', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-management/targets', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -59,6 +61,9 @@ export async function initializeListingModeration({ document = globalThis.docume
       const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
         && ['council_member', 'school_admin'].includes(request.requested_role)
         && ['pending', 'reviewing'].includes(request.status));
+      const roleManagementAvailable = me.profile.role !== 'school_admin' || (roleManagementResponse.ok && roleManagementResult?.ok && Array.isArray(roleManagementResult.targets));
+      const roleManagementTargets = me.profile.role === 'school_admin' && roleManagementAvailable
+        ? roleManagementResult.targets.filter(item => item && UUID.test(item.id) && ['council_member', 'school_admin'].includes(item.role)) : [];
       const suspensionsAvailable = me.profile.role !== 'school_admin'
         || (suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions));
       const suspensions = me.profile.role === 'school_admin' && suspensionsAvailable
@@ -91,7 +96,24 @@ export async function initializeListingModeration({ document = globalThis.docume
           form.append(select, duration, reason, submit); panel.append(note, form); queue.append(panel);
         }
       }
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0) {
+      if (me.profile.role === 'school_admin' && roleManagementTargets.length) {
+        const panel = node(document, 'section', 'ru-moderation-card');
+        panel.append(node(document, 'h3', '', 'Управление полномочиями школы'));
+        panel.append(node(document, 'p', '', 'После подтверждения полномочий аккаунт останется активным.'));
+        for (const target of roleManagementTargets) {
+          const row = node(document, 'div', 'ru-moderation-actions');
+          const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+          row.append(node(document, 'span', '', `${name || 'Пользователь'} · ${target.role === 'school_admin' ? 'администратор школы' : 'участник Совета'}${target.class_name ? ` · ${target.class_name}` : ''}`));
+          row.append(actionButton(document, 'Снять роль', async () => {
+            const confirmAction = document.defaultView?.confirm || globalThis.confirm;
+            if (!confirmAction || !confirmAction(`Снять роль у ${name || 'пользователя'}? Аккаунт останется активным.`)) return;
+            await patch(`/api/v1/role-management/${target.id}`, { action: 'revoke' });
+          }));
+          panel.append(row);
+        }
+        queue.append(panel);
+      }
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0) {
         status.textContent = suspensionsAvailable ? 'Очереди школьной проверки пусты.'
           : 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.';
         return;
@@ -199,7 +221,9 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (result?.error === 'already_suspended') { status.textContent = 'У этого аккаунта уже есть действующее ограничение.'; return; }
         throw new Error('decision_failed');
       }
-      status.textContent = body.action === 'issue' ? 'Временное ограничение установлено.' : 'Временное ограничение снято.';
+      status.textContent = body.action === 'issue' ? 'Временное ограничение установлено.'
+        : body.action === 'revoke' ? 'Полномочия сняты. Аккаунт остался активным.'
+          : 'Временное ограничение снято.';
       await load();
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
   }

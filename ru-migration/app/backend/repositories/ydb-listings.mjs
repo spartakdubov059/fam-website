@@ -107,6 +107,40 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async listSchoolRoleTargets(schoolId, actorId) {
+      if (!schoolId || !actorId) throw new TypeError('invalid school role target lookup');
+      const statement = sql`SELECT user_id AS id, role, first_name, last_name, class_name
+        FROM fam_user_profiles WHERE school_id = ${schoolId} AND active = true
+          AND user_id != ${actorId} AND role IN ('council_member', 'school_admin')
+        ORDER BY role ASC, first_name ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async revokeSchoolRole({ schoolId, actorId, targetId }) {
+      if (!schoolId || !actorId || !targetId || actorId === targetId) return { ok: false, code: 'invalid_target' };
+      return sql.begin(async tx => {
+        const actorRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
+        const actor = actorRows?.[0]?.[0];
+        if (!actor || !actor.active || actor.role !== 'school_admin' || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const targetRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
+        const target = targetRows?.[0]?.[0];
+        if (!target || !target.active || target.school_id !== schoolId) return { ok: false, code: 'target_unavailable' };
+        if (!['council_member', 'school_admin'].includes(target.role)) return { ok: false, code: 'role_unavailable' };
+        if (target.role === 'school_admin') {
+          const adminRows = await tx`SELECT user_id FROM fam_user_profiles WHERE school_id = ${schoolId} AND active = true AND role = 'school_admin';`;
+          if ((adminRows?.[0] ?? []).length <= 1) return { ok: false, code: 'last_school_admin' };
+        }
+        const previousRole = target.role;
+        await tx`UPDATE fam_user_profiles SET role = 'student' WHERE user_id = ${targetId} AND school_id = ${schoolId} AND role = ${previousRole} AND active = true;`;
+        const confirmedRows = await tx`SELECT role FROM fam_user_profiles WHERE user_id = ${targetId} AND school_id = ${schoolId} LIMIT 1;`;
+        if (confirmedRows?.[0]?.[0]?.role !== 'student') return { ok: false, code: 'role_update_failed' };
+        await tx`INSERT INTO fam_school_admin_audit (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${targetId}, 'role_revoked', ${previousRole}, CurrentUtcTimestamp());`;
+        return { ok: true, target_id: targetId, previous_role: previousRole, role: 'student' };
+      });
+    },
+
     async getActiveAccountSuspension(schoolId, userId) {
       if (!schoolId || !userId) throw new TypeError('invalid suspension lookup');
       const statement = sql`SELECT reason, duration_hours, expires_at

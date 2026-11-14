@@ -57,3 +57,23 @@ test('school suspension target list is administrator-only and bounded by reposit
   const denied = await api({ role: 'council_member', repository: { listSuspensionTargets: async () => [] } })(request('GET', '/api/v1/suspensions/targets'));
   assert.equal(denied.status, 403);
 });
+
+test('school role revocation requires a fresh school-admin session and preserves active accounts', async () => {
+  const calls = [];
+  const repository = {
+    listSchoolRoleTargets: async (...args) => { calls.push(['list', ...args]); return [{ id: targetId, role: 'council_member' }]; },
+    revokeSchoolRole: async input => { calls.push(['revoke', input]); return { ok: true, target_id: input.targetId, previous_role: 'council_member', role: 'student' }; },
+  };
+  const handler = api({ repository });
+  const targets = await handler(request('GET', '/api/v1/role-management/targets'));
+  assert.equal(targets.status, 200);
+  assert.deepEqual(calls[0], ['list', admin.school_id, admin.id]);
+  const revoked = await handler(request('PATCH', `/api/v1/role-management/${targetId}`, { action: 'revoke' }));
+  assert.equal(revoked.status, 200);
+  assert.deepEqual(calls[1], ['revoke', { schoolId: admin.school_id, actorId: admin.id, targetId }]);
+  const stale = await api({ authenticatedAt: Math.floor(Date.now() / 1000) - 601, repository })
+    (request('PATCH', `/api/v1/role-management/${targetId}`, { action: 'revoke' }));
+  assert.equal(stale.status, 403);
+  const wrongRole = await api({ role: 'council_member', repository })(request('GET', '/api/v1/role-management/targets'));
+  assert.equal(wrongRole.status, 403);
+});
