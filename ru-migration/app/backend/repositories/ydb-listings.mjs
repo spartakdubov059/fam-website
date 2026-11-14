@@ -907,11 +907,11 @@ export function createYdbListingsRepository(sql) {
         if (kind === 'open_event') {
           await tx`INSERT INTO fam_school_announcements
             (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
-            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(${eventStartsAt} AS Timestamp), CurrentUtcTimestamp(), CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H'));`;
+            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(${eventStartsAt} AS Timestamp), CurrentUtcTimestamp(), Unwrap(CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H')));`;
         } else {
           await tx`INSERT INTO fam_school_announcements
             (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
-            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('P14D'));`;
+            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(NULL AS Timestamp?), CurrentUtcTimestamp(), Unwrap(CurrentUtcTimestamp() + Interval('P14D')));`;
         }
         return { ok: true, id: announcementId };
       });
