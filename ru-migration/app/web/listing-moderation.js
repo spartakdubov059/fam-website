@@ -175,10 +175,10 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(reviewPanel);
       };
-      if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
       if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0) {
         renderPendingMessagesPanel();
         renderSafetyPanel();
+        if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
         status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
           : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
             : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
