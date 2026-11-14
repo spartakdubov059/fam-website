@@ -184,7 +184,7 @@ begin
     'occurrences',least(greatest(v_event.occurrences,0),1000)
   );
 
-  select coalesce(pg_catalog.array_length(p.proargnames,1),0) >= 11
+  select coalesce(pg_catalog.array_length(p.proallargtypes,1),0) > 8
     into v_has_context
   from pg_catalog.pg_proc as p
   where p.oid = 'public.claim_fam_agent_coder_tasks(text,integer,integer)'::pg_catalog.regprocedure;
