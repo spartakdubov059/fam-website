@@ -80,3 +80,9 @@ Live source и SQL определения читались без вызова R
 - В `main` ruleset `FAM — защита main` по-прежнему `required_approving_review_count=0`. Пользователь разрешил установить обязательное review; для записи требуется завершить отдельную GitHub OAuth-связь. Существующие GitHub и Supabase production настройки не менялись.
 
 Сверка использовала только агрегаты, статусы, расписания, advisory и исходники функций; payload, `result_summary`, секреты и пользовательские записи не читались. Production, `main`, миграции, Auth/RLS, Cron и пользовательские данные не изменялись.
+
+### Дополнение — 14 ноября 2026, 19:30 UTC
+
+- После снимка выше PR #65 обновлён до `6f66d95d54b75ab53734fbab399d8483b42460f2`; Regression suite, owner approval verifier, Russian content safety, coder QA/PostgreSQL, Reporter/PostgreSQL, telemetry/PostgreSQL и Netlify preview завершились успешно.
+- PR добавляет bounded-задачу `audit_notifications_resilience` только для агрегированного события `notifications_load_failed` с порогом не менее трёх событий. Промпт запрещает читать личное содержимое и менять Auth, RLS, backend и состояние уведомлений. PostgreSQL 17 QA проверил создание и claim этой задачи и подтвердил, что даже 100 `auth_backend_failed` не попадают в локальную coder-очередь. Изменение остаётся в draft PR; миграция не применена к production.
+- Изменения fail-closed для coder finish и report-save также прошли Regression suite; production bridge v1 не изменён и остаётся отдельным rollout-пробелом.
