@@ -14,7 +14,7 @@
 5. Сохрани Client ID в repository variable `FAM_GITHUB_APP_CLIENT_ID`.
 6. Создай private key и сохрани его только в repository secret `FAM_GITHUB_APP_PRIVATE_KEY`. Не добавляй ключ в репозиторий, issue, PR или чат.
 
-Workflow запрашивает installation token только для `fam-website` и только с `contents:write`, `pull-requests:write`, `checks:read`. GitHub не предоставляет отдельного `Contents:write` без Merge Pull Request API: merge защищается правилами ветки, а не ограничением этого токена.
+Workflow запрашивает installation token только для `fam-website` и только с `contents:write` и `pull-requests:write`. Эти права нужны для push отдельной ветки и создания draft PR. Проверки PR читаются другим шагом через `GITHUB_TOKEN`, поэтому App-токен не запрашивает `checks:read`. GitHub не предоставляет отдельного `Contents:write` без Merge Pull Request API: merge защищается правилами ветки, а не ограничением этого токена.
 
 ## Обязательная защита main
 

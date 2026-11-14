@@ -28,7 +28,7 @@ test("automated PR creation can use a repository-scoped App token without broade
   assert.match(workflow, /repositories: \$\{\{ github\.event\.repository\.name \}\}/);
   assert.match(workflow, /permission-contents: write/);
   assert.match(workflow, /permission-pull-requests: write/);
-  assert.match(workflow, /permission-checks: read/);
+  assert.doesNotMatch(workflow, /permission-checks:/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \|\| github\.token \}\}/);
   assert.match(workflow, /FAM_PR_TOKEN_MODE/);
 });
