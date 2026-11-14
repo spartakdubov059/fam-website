@@ -60,3 +60,28 @@ test('Russian fallback offers Yandex sign-in for a guest who opens messages', as
   assert.equal(values.ruMessageList.children[0].href, '/auth/yandex/start');
   assert.equal(values.ruMessageList.children[0].textContent, 'Войти через Яндекс ID');
 });
+
+test('message awaiting school review is not presented as delivered to its recipient', async () => {
+  const { document, values } = fixture();
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  const peerId = '22222222-2222-4222-8222-222222222222';
+  const messageId = '33333333-3333-4333-8333-333333333333';
+  const calls = [];
+  await initializeMessages({ document, fetchImpl: async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url === '/api/v1/me') return { status: 200, ok: true, json: async () => ({ ok: true, profile: { id: ownerId } }) };
+    if (url === '/api/v1/messages' && options.method === 'POST') return { status: 201, ok: true, json: async () => ({ ok: true, status: 'pending', id: 'pending-id' }) };
+    if (url === '/api/v1/messages') return { status: 200, ok: true, json: async () => ({ ok: true, messages: [
+      { id: messageId, sender_id: ownerId, receiver_id: peerId, body: 'Старый диалог', is_read: true, created_at: '2026-01-01T00:00:00Z' },
+    ] }) };
+    return { status: 200, ok: true, json: async () => ({ ok: true }) };
+  } });
+  await values.ruOpenMessages.listeners.click();
+  await values.ruMessageList.children[0].listeners.click();
+  values.ruMessageForm.elements.namedItem('body').value = 'Новое сообщение для проверки';
+  await values.ruMessageForm.listeners.submit({ preventDefault() {} });
+  const sent = calls.find(call => call.options.method === 'POST');
+  assert.deepEqual(JSON.parse(sent.options.body), { receiver_id: peerId, body: 'Новое сообщение для проверки' });
+  assert.match(values.ruMessagesStatus.textContent, /передано администратору школы на проверку/);
+  assert.match(values.ruMessagesStatus.textContent, /Получатель увидит его после одобрения/);
+});

@@ -16,6 +16,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'PATCH' && /^\/api\/v1\/deletion-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
     if (pathname === '/api/v1/pulse' || pathname.startsWith('/api/v1/pulse/')) return schoolPulseApi(req);
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
@@ -488,6 +489,29 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, messages: await repository.listMessages(actor.id, actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if ((req.method === 'GET' && pathname === '/api/v1/messages/moderation') || (req.method === 'PATCH' && pendingMessageReviewMatch)) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (req.method === 'GET') {
+        if (typeof repository?.listPendingMessages !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+        try { return { status: 200, body: { ok: true, messages: await repository.listPendingMessages(actor.school_id) } }; }
+        catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.decidePendingMessage !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+      try {
+        const updated = await repository.decidePendingMessage({ messageId: pendingMessageReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return updated ? { status: 200, body: { ok: true } } : { status: 404, body: { ok: false, error: 'pending_message_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'POST' && listingContactMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
@@ -505,7 +529,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
         const result = await submitMessage({ actor, input: { body: input?.body, receiver_id }, repository, review });
         const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
-          : result.code === 'recipient_unavailable' ? 404 : 400;
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
         return { status, body: result };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
@@ -670,7 +694,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const status = result.ok ? 201
       : result.code === 'database_unavailable' || result.status === 'pending' ? 503
         : result.code === 'forbidden' ? 403
-          : result.code === 'recipient_unavailable' ? 404 : 400;
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
     return { status, body: result };
   };
 }

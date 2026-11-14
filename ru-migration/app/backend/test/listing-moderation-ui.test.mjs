@@ -197,6 +197,7 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
+    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
     if (url === `/api/v1/role-requests/${id}`) { state = init.body.includes('start_review') ? 'reviewing' : 'approved'; return { ok: true, json: async () => ({ ok: true }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
   } });
@@ -210,6 +211,37 @@ test('school role request review is claimed before only its reviewer can decide'
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
   assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
   assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+});
+
+test('unreviewed student messages appear only in the same-school admin queue until approved', async () => {
+  const f = fixture(); const calls = [];
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let pending = true;
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === `/api/v1/messages/moderation/${id}` && init.method === 'PATCH') { pending = false; return { ok: true, json: async () => ({ ok: true }) }; }
+    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: pending ? [{ id, sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: '<img src=x onerror=alert(1)>', created_at: '2026-11-14T10:00:00Z' }] : [] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
+    return { ok: true, json: async () => ({ ok: true, targets: [] }) };
+  } });
+  let reviewPanel = f.queue.children.find(item => item.children[0]?.textContent === 'Сообщения на школьной проверке');
+  assert.ok(reviewPanel);
+  const card = reviewPanel.children[1];
+  assert.equal(card.children[1].textContent, '<img src=x onerror=alert(1)>');
+  assert.equal(card.children[1].tagName, 'p');
+  const actions = card.children.at(-1).children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить и доставить', 'Отклонить']);
+  await actions[0].listeners.click();
+  const write = calls.find(call => call.url === `/api/v1/messages/moderation/${id}`);
+  assert.equal(write.init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(write.init.body), { decision: 'approve' });
+  reviewPanel = f.queue.children.find(item => item.children[0]?.textContent === 'Сообщения на школьной проверке');
+  assert.equal(reviewPanel.children[1].textContent, 'Сообщений на проверке нет.');
 });
 
 test('school safety reports render as text and can be acknowledged through the RU API', async () => {

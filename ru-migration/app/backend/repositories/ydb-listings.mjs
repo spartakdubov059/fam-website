@@ -600,6 +600,7 @@ export function createYdbListingsRepository(sql) {
         await tx`DELETE FROM fam_favorites WHERE user_id = ${userId};`;
         await tx`DELETE FROM fam_ideas WHERE user_id = ${userId};`;
         await tx`DELETE FROM fam_messages WHERE sender_id = ${userId} OR receiver_id = ${userId};`;
+        await tx`DELETE FROM fam_pending_messages WHERE sender_id = ${userId} OR receiver_id = ${userId};`;
         await tx`DELETE FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
         await tx`DELETE FROM fam_school_role_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
         await tx`UPDATE fam_school_role_requests SET reviewed_by = NULL WHERE reviewed_by = ${userId};`;
@@ -865,6 +866,67 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return { id };
+    },
+
+    async createPendingMessage(record) {
+      if (!record || !record.sender_id || !record.receiver_id || !record.school_id
+          || typeof record.body !== 'string' || !record.body.trim() || record.body.length > 1000
+          || record.sender_id === record.receiver_id) throw new TypeError('invalid pending message');
+      const id = randomUUID();
+      return sql.begin(async tx => {
+        const recent = await tx`SELECT id FROM fam_pending_messages WHERE sender_id = ${record.sender_id}
+          AND school_id = ${record.school_id} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H') LIMIT 5;`;
+        if ((recent?.[0] ?? []).length >= 5) {
+          const error = new Error('pending message rate limit'); error.code = 'rate_limited'; throw error;
+        }
+        const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
+          WHERE (user_id = ${record.sender_id} OR user_id = ${record.receiver_id}) AND school_id = ${record.school_id};`;
+        const byId = new Map((participants?.[0] ?? []).map(row => [row.user_id, row]));
+        if (byId.get(record.sender_id)?.active !== true) throw new Error('sender unavailable');
+        if (byId.get(record.receiver_id)?.active !== true) {
+          const error = new Error('recipient unavailable'); error.code = 'recipient_unavailable'; throw error;
+        }
+        await tx`INSERT INTO fam_pending_messages (id, sender_id, receiver_id, school_id, body, created_at)
+          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.body}, CurrentUtcTimestamp());`;
+        return { id };
+      });
+    },
+
+    async listPendingMessages(schoolId) {
+      if (!schoolId) throw new TypeError('invalid pending message school');
+      const cleanup = sql`DELETE FROM fam_pending_messages WHERE school_id = ${schoolId}
+        AND created_at < CurrentUtcTimestamp() - Interval('P30D');`;
+      if (typeof cleanup?.on === 'function') cleanup.on('error', () => {});
+      await cleanup;
+      const statement = sql`SELECT id, sender_id, body, created_at FROM fam_pending_messages
+        WHERE school_id = ${schoolId} ORDER BY created_at ASC LIMIT 50;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async decidePendingMessage({ messageId, schoolId, reviewerId, decision }) {
+      if (!messageId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid pending message decision');
+      return sql.begin(async tx => {
+        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewers?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
+        const rows = await tx`SELECT id, sender_id, receiver_id, school_id, body FROM fam_pending_messages
+          WHERE id = ${messageId} AND school_id = ${schoolId} LIMIT 1;`;
+        const pending = rows?.[0]?.[0];
+        if (!pending) return false;
+        if (decision === 'approve') {
+          const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
+            WHERE (user_id = ${pending.sender_id} OR user_id = ${pending.receiver_id}) AND school_id = ${schoolId};`;
+          const activeIds = new Set((participants?.[0] ?? []).filter(row => row.school_id === schoolId && row.active === true).map(row => row.user_id));
+          if (!activeIds.has(pending.sender_id) || !activeIds.has(pending.receiver_id)) return false;
+          await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, body, is_read, created_at)
+            VALUES (${pending.id}, ${pending.sender_id}, ${pending.receiver_id}, ${schoolId}, ${pending.body}, false, CurrentUtcTimestamp());`;
+        }
+        await tx`DELETE FROM fam_pending_messages WHERE id = ${messageId} AND school_id = ${schoolId};`;
+        await tx`INSERT INTO fam_school_admin_audit (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${pending.sender_id}, ${decision === 'approve' ? 'message_approved' : 'message_rejected'}, '', CurrentUtcTimestamp());`;
+        return true;
+      });
     },
 
     async getListingContactRecipient(listingId, senderId, schoolId) {

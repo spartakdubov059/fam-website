@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -47,8 +47,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/safety-reports', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/messages/moderation', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -80,6 +82,11 @@ export async function initializeListingModeration({ document = globalThis.docume
           && ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
             'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(item.category)
           && ['medium', 'high'].includes(item.severity) && Number.isInteger(item.occurrences)) : [];
+      const pendingMessagesAvailable = me.profile.role !== 'school_admin'
+        || (pendingMessagesResponse.ok && pendingMessagesResult?.ok && Array.isArray(pendingMessagesResult.messages));
+      const pendingMessages = me.profile.role === 'school_admin' && pendingMessagesAvailable
+        ? pendingMessagesResult.messages.filter(item => item && UUID.test(item.id || '') && UUID.test(item.sender_id || '')
+          && typeof item.body === 'string' && item.body.length > 0 && item.body.length <= 1000) : [];
       if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
         const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
         if (targets.length) {
@@ -150,14 +157,34 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(safetyPanel);
       };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0) {
+      const renderPendingMessagesPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const reviewPanel = node(document, 'section', 'ru-moderation-card');
+        reviewPanel.append(node(document, 'h3', '', 'Сообщения на школьной проверке'));
+        if (!pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'Не удалось загрузить сообщения на проверку.'));
+        if (!pendingMessages.length && pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'Сообщений на проверке нет.'));
+        for (const message of pendingMessages) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'p', '', `Отправитель · ${message.sender_id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', '', message.body));
+          if (typeof message.created_at === 'string') card.append(node(document, 'p', '', `Получено: ${new Date(message.created_at).toLocaleString('ru-RU')}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          actions.append(actionButton(document, 'Одобрить и доставить', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'approve' })));
+          actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'reject' })));
+          card.append(actions); reviewPanel.append(card);
+        }
+        queue.append(reviewPanel);
+      };
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0) {
+        renderPendingMessagesPanel();
         renderSafetyPanel();
         status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
-          : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
-            : 'Очереди школьной проверки пусты.';
+          : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
+            : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
+              : 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сигналов безопасности — ${safetyReports.length}.${suspensionsAvailable && safetyReportsAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, сигналов безопасности — ${safetyReports.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -231,6 +258,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         card.append(lift);
         queue.append(card);
       }
+      renderPendingMessagesPanel();
       renderSafetyPanel();
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }

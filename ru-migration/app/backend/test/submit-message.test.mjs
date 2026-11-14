@@ -13,6 +13,17 @@ test('message is not sent or stored while moderation is unavailable', async () =
   assert.equal(writes, 0);
 });
 
+test('message without a classifier is saved only to a pending school review queue', async () => {
+  let record; let delivered = false;
+  const result = await submitMessage({ actor, input, repository: {
+    createPendingMessage: async value => { record = value; return { id: 'pending-message' }; },
+    createMessage: async () => { delivered = true; return { id: 'unsafe-direct-delivery' }; },
+  } });
+  assert.deepEqual(result, { ok: true, status: 'pending', id: 'pending-message' });
+  assert.deepEqual(record, { sender_id: actor.id, receiver_id: input.receiver_id, school_id: actor.school_id, body: input.body });
+  assert.equal(delivered, false);
+});
+
 test('only an explicit moderation approval can insert a message', async () => {
   let record;
   const result = await submitMessage({ actor, input, review: async () => ({ action: 'ok' }),

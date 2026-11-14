@@ -112,6 +112,11 @@ export async function initializeMessages({ document = globalThis.document, fetch
         return;
       }
       input.value = '';
+      if (sent.result.status === 'pending') {
+        if (await refresh()) await showConversation(currentPeer);
+        status.textContent = 'Сообщение передано администратору школы на проверку. Получатель увидит его после одобрения.';
+        return;
+      }
       if (await refresh()) await showConversation(currentPeer);
     } catch { status.textContent = 'Нет связи с сервером. Попробуйте ещё раз.'; }
     finally { busy = false; if (button) button.disabled = false; }

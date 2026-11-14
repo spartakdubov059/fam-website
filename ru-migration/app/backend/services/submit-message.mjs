@@ -12,8 +12,18 @@ export async function submitMessage({ actor, input, repository, review }) {
     return { ok: false, code: 'invalid_message' };
   }
   const decision = await reviewText(body, { review });
-  if (decision.action !== 'ok') {
-    return { ok: false, code: decision.reason_code || (decision.action === 'pending' ? 'review_pending' : 'rejected'), status: decision.action };
+  if (decision.action === 'reject') return { ok: false, code: decision.reason_code || 'rejected', status: 'rejected' };
+  if (decision.action === 'pending') {
+    if (typeof repository?.createPendingMessage !== 'function') return { ok: false, code: 'review_unavailable', status: 'pending' };
+    try {
+      const pending = await repository.createPendingMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, body });
+      if (!pending || typeof pending.id !== 'string') return { ok: false, code: 'database_unavailable', status: 'pending' };
+      return { ok: true, status: 'pending', id: pending.id };
+    } catch (error) {
+      if (error?.code === 'recipient_unavailable') return { ok: false, code: 'recipient_unavailable' };
+      if (error?.code === 'rate_limited') return { ok: false, code: 'rate_limited' };
+      return { ok: false, code: 'database_unavailable', status: 'pending' };
+    }
   }
   if (!repository || typeof repository.createMessage !== 'function') return { ok: false, code: 'database_unavailable' };
   try {

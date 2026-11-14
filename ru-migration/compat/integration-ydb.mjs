@@ -313,6 +313,34 @@ try {
   assert.equal(readRows[0][0].is_read, true);
   await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
 
+  const pendingMessageResponse = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-user', {
+    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Синтетическое сообщение ожидает школьной проверки',
+  }));
+  assert.equal(pendingMessageResponse.status, 201);
+  assert.deepEqual({ ok: pendingMessageResponse.body.ok, status: pendingMessageResponse.body.status }, { ok: true, status: 'pending' });
+  const pendingMessageId = pendingMessageResponse.body.id;
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), false,
+    'recipient inbox cannot see messages awaiting review');
+  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), true);
+  assert.equal((await repo.listPendingMessages('lyceum_3')).some(row => row.id === pendingMessageId), false,
+    'pending messages are school-scoped');
+  assert.equal(await repo.decidePendingMessage({ messageId: pendingMessageId, schoolId: 'synthetic-school', reviewerId: '44444444-4444-4444-8444-444444444444', decision: 'approve' }), false,
+    'an administrator from another school cannot approve the message');
+  const messageReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/messages/moderation', 'synthetic-admin', null));
+  assert.equal(messageReviewQueue.status, 200);
+  assert.equal(messageReviewQueue.body.messages.some(row => row.id === pendingMessageId), true);
+  const messageReview = await listingsApi(apiRequest('PATCH', `/api/v1/messages/moderation/${pendingMessageId}`, 'synthetic-admin', { decision: 'approve' }));
+  assert.equal(messageReview.status, 200);
+  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), false);
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), true,
+    'approved message is atomically delivered to the recipient inbox');
+
+  const rejectedPending = await repo.createPendingMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+    school_id: 'synthetic-school', body: 'Синтетическое сообщение будет отклонено' });
+  assert.equal(await repo.decidePendingMessage({ messageId: rejectedPending.id, schoolId: 'synthetic-school', reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'reject' }), true);
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === rejectedPending.id), false,
+    'rejected message is never delivered');
+
   const limitedEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическая встреча с ограниченным числом мест', description: 'Проверка атомарной записи', category: 'Афиша',
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-01', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });

@@ -1,0 +1,10 @@
+-- Messages awaiting a same-school administrator review stay invisible to recipients.
+CREATE TABLE fam_pending_messages (
+  id Utf8 NOT NULL,
+  sender_id Utf8 NOT NULL,
+  receiver_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  body Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (id)
+);

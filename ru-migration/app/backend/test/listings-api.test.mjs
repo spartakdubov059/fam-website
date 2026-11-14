@@ -31,6 +31,29 @@ test('school safety reports are administrator-only and acknowledgement is school
   assert.equal((await handler(malformed)).status, 400);
 });
 
+test('manual message review queue and decision are limited to the same school administrator', async () => {
+  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  let selectedSchool; let decision;
+  const messageId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
+    resolveActor: async () => actor,
+    repository: {
+      listPendingMessages: async schoolId => { selectedSchool = schoolId; return [{ id: messageId, sender_id: 'student-a', body: '<script>текст</script>' }]; },
+      decidePendingMessage: async input => { decision = input; return input.schoolId === 'school-a'; },
+    } });
+  const list = req({}, 'GET'); list.url = '/api/v1/messages/moderation';
+  assert.deepEqual((await handler(list)).body.messages, [{ id: messageId, sender_id: 'student-a', body: '<script>текст</script>' }]);
+  assert.equal(selectedSchool, 'school-a');
+  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(list)).status, 403);
+  actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  const patch = req({ decision: 'approve' }, 'PATCH'); patch.url = `/api/v1/messages/moderation/${messageId}`;
+  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true } });
+  assert.deepEqual(decision, { messageId, schoolId: 'school-a', reviewerId: 'admin-a', decision: 'approve' });
+  const invalid = req({ decision: 'publish' }, 'PATCH'); invalid.url = patch.url;
+  assert.equal((await handler(invalid)).status, 400);
+});
+
 test('school administrator overview is private to the active administrator and bounded to their school', async () => {
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
   let selectedSchool;
