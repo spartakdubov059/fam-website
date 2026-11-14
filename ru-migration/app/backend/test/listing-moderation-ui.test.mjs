@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { initializeListingModeration } from '../../web/listing-moderation.js';
 
 class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.textContent = ''; this.hidden = false; }
+  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.textContent = ''; this.hidden = false; this.dataset = {}; this.value = ''; this.disabled = false; }
   append(...items) { this.children.push(...items); }
   replaceChildren(...items) { this.children = items; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
@@ -14,7 +14,21 @@ function fixture() {
   panel.hidden = true;
   const status = new FakeNode('p');
   const queue = new FakeNode('div');
-  const elements = { ruModeration: panel, ruModerationStatus: status, ruModerationQueue: queue };
+  const deletionFormSection = new FakeNode('section'); deletionFormSection.hidden = true;
+  const deletionForm = new FakeNode('form');
+  const deletionTarget = new FakeNode('select');
+  const deletionReasonCode = new FakeNode('select'); deletionReasonCode.value = 'spam';
+  const deletionReason = new FakeNode('textarea');
+  const deletionStatus = new FakeNode('p');
+  const ownDeletionRequests = new FakeNode('div');
+  const deletionReviewSection = new FakeNode('section'); deletionReviewSection.hidden = true;
+  const deletionReviewStatus = new FakeNode('p');
+  const deletionReviewQueue = new FakeNode('div');
+  const elements = { ruModeration: panel, ruModerationStatus: status, ruModerationQueue: queue,
+    ruDeletionRequestSubmit: deletionFormSection, ruDeletionRequestForm: deletionForm, ruDeletionTarget: deletionTarget,
+    ruDeletionReasonCode: deletionReasonCode, ruDeletionReason: deletionReason, ruDeletionRequestStatus: deletionStatus,
+    ruDeletionOwnRequests: ownDeletionRequests, ruDeletionRequestReview: deletionReviewSection,
+    ruDeletionReviewStatus: deletionReviewStatus, ruDeletionReviewQueue: deletionReviewQueue };
   return { document: { getElementById: id => elements[id], createElement: tag => new FakeNode(tag) }, panel, status, queue };
 }
 
@@ -160,4 +174,57 @@ test('school role request review is claimed before only its reviewer can decide'
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
   assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
   assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+});
+
+test('council member submits a same-school removal request and sees personal history', async () => {
+  const f = fixture(); const calls = [];
+  const targetId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let posted = false;
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'council-id', role: 'council_member' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/deletion-requests/targets') return { ok: true, json: async () => ({ ok: true, targets: [{ id: targetId, role: 'student', first_name: '<Аня>', last_name: 'Тест' }] }) };
+    if (url === '/api/v1/deletion-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, requests: posted ? [{ request_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', status: 'pending', reason: '<script>тест</script>' }] : [] }) };
+    if (url === '/api/v1/deletion-requests' && init.method === 'POST') { posted = true; return { ok: true, json: async () => ({ ok: true, request_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }) }; }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.equal(f.document.getElementById('ruDeletionRequestSubmit').hidden, false);
+  const select = f.document.getElementById('ruDeletionTarget');
+  assert.equal(select.children[1].textContent, '<Аня> Тест · ученик');
+  select.value = targetId;
+  f.document.getElementById('ruDeletionReason').value = 'Несколько спам-публикаций в школьном чате.';
+  await f.document.getElementById('ruDeletionRequestForm').listeners.submit({ preventDefault() {} });
+  const post = calls.find(call => call.url === '/api/v1/deletion-requests' && call.init.method === 'POST');
+  assert.deepEqual(JSON.parse(post.init.body), { target_id: targetId, reason_code: 'spam', reason: 'Несколько спам-публикаций в школьном чате.' });
+  assert.match(f.document.getElementById('ruDeletionRequestStatus').textContent, /Аккаунт не удалён/);
+  const renderedReason = f.document.getElementById('ruDeletionOwnRequests').children[0].children[1];
+  assert.equal(renderedReason.textContent, '<script>тест</script>');
+});
+
+test('school administrator can reject a request and receives no account deletion action', async () => {
+  const f = fixture(); const calls = [];
+  const requestId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  let pending = true;
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    if (url === '/api/v1/deletion-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, target_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', target_role: 'student', reason_code: 'spam', reason: 'Повторяющиеся спам-публикации.' }] : [] }) };
+    if (url === `/api/v1/deletion-requests/${requestId}` && init.method === 'PATCH') { pending = false; return { ok: true, json: async () => ({ ok: true, status: 'rejected' }) }; }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.equal(f.document.getElementById('ruDeletionRequestReview').hidden, false);
+  const card = f.document.getElementById('ruDeletionReviewQueue').children[0];
+  assert.equal(card.children[2].textContent, 'Причина: Повторяющиеся спам-публикации.');
+  const actions = card.children[3].children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Отклонить обращение']);
+  await actions[0].listeners.click();
+  const patch = calls.find(call => call.url === `/api/v1/deletion-requests/${requestId}`);
+  assert.deepEqual(JSON.parse(patch.init.body), { decision: 'reject' });
+  assert.equal(f.document.getElementById('ruDeletionReviewQueue').children.length, 0);
 });

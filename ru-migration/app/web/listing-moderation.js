@@ -164,6 +164,124 @@ export async function initializeListingModeration({ document = globalThis.docume
   }
 
   await load();
+  await loadDeletionRequests();
+
+  async function loadDeletionRequests() {
+    if (me.profile.role === 'council_member') {
+      const section = document.getElementById('ruDeletionRequestSubmit');
+      const targetsSelect = document.getElementById('ruDeletionTarget');
+      const reasonCode = document.getElementById('ruDeletionReasonCode');
+      const reason = document.getElementById('ruDeletionReason');
+      const form = document.getElementById('ruDeletionRequestForm');
+      const requestStatus = document.getElementById('ruDeletionRequestStatus');
+      const ownRequests = document.getElementById('ruDeletionOwnRequests');
+      if (!section || !targetsSelect || !reasonCode || !reason || !form || !requestStatus || !ownRequests) return;
+      section.hidden = false;
+      try {
+        const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
+        const [targetResponse, ownResponse] = await Promise.all([
+          fetchImpl('/api/v1/deletion-requests/targets', options),
+          fetchImpl('/api/v1/deletion-requests', options),
+        ]);
+        const [targetResult, ownResult] = await Promise.all([json(targetResponse), json(ownResponse)]);
+        if (!targetResponse.ok || !targetResult?.ok || !Array.isArray(targetResult.targets)
+          || !ownResponse.ok || !ownResult?.ok || !Array.isArray(ownResult.requests)) throw new Error('deletion_requests_unavailable');
+        targetsSelect.replaceChildren();
+        const prompt = node(document, 'option', '', 'Выберите аккаунт'); prompt.value = ''; prompt.disabled = true; prompt.selected = true;
+        targetsSelect.append(prompt);
+        for (const target of targetResult.targets) {
+          if (!target || !UUID.test(target.id) || !['student', 'council_member'].includes(target.role)) continue;
+          const label = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+          const option = node(document, 'option', '', `${label || 'Ученик'} · ${target.role === 'student' ? 'ученик' : 'Совет'}`);
+          option.value = target.id;
+          targetsSelect.append(option);
+        }
+        renderOwnDeletionRequests(document, ownRequests, ownResult.requests);
+        requestStatus.textContent = targetResult.targets.length ? '' : 'В школе нет доступных аккаунтов для обращения.';
+      } catch {
+        requestStatus.textContent = 'Не удалось загрузить список аккаунтов и обращений. Попробуйте позже.';
+      }
+      if (!form.dataset?.bound) {
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (!UUID.test(targetsSelect.value || '') || reason.value.trim().length < 15 || reason.value.trim().length > 500) {
+            requestStatus.textContent = 'Выберите аккаунт и укажите объяснение длиной 15–500 символов.';
+            return;
+          }
+          requestStatus.textContent = 'Отправляем обращение…';
+          try {
+            const response = await fetchImpl('/api/v1/deletion-requests', {
+              method: 'POST', credentials: 'same-origin', cache: 'no-store',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ target_id: targetsSelect.value, reason_code: reasonCode.value, reason: reason.value.trim() }),
+            });
+            const result = await json(response);
+            if (!response.ok || !result?.ok) throw new Error('request_failed');
+            requestStatus.textContent = result.already_exists
+              ? 'По этому аккаунту уже есть открытое обращение.'
+              : 'Обращение передано администратору школы. Аккаунт не удалён.';
+            if (!result.already_exists) reason.value = '';
+            const historyResponse = await fetchImpl('/api/v1/deletion-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store' });
+            const history = await json(historyResponse);
+            if (historyResponse.ok && history?.ok && Array.isArray(history.requests)) renderOwnDeletionRequests(document, ownRequests, history.requests);
+          } catch { requestStatus.textContent = 'Не удалось отправить обращение. Повторите попытку позже.'; }
+        });
+        if (form.dataset) form.dataset.bound = 'true';
+      }
+      return;
+    }
+
+    if (me.profile.role !== 'school_admin') return;
+    const section = document.getElementById('ruDeletionRequestReview');
+    const requestStatus = document.getElementById('ruDeletionReviewStatus');
+    const reviewQueue = document.getElementById('ruDeletionReviewQueue');
+    if (!section || !requestStatus || !reviewQueue) return;
+    section.hidden = false;
+    try {
+      const response = await fetchImpl('/api/v1/deletion-requests/review', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+      const result = await json(response);
+      if (!response.ok || !result?.ok || !Array.isArray(result.requests)) throw new Error('deletion_review_unavailable');
+      reviewQueue.replaceChildren();
+      const requests = result.requests.filter(item => item && UUID.test(item.request_id)
+        && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
+        && ['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(item.reason_code));
+      requestStatus.textContent = requests.length ? `Открытых обращений: ${requests.length}.` : 'Открытых обращений нет.';
+      for (const item of requests) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', 'Обращение по аккаунту'));
+        card.append(node(document, 'p', '', `ID аккаунта: ${item.target_id}`));
+        card.append(node(document, 'p', '', `Причина: ${item.reason}`));
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        actions.append(actionButton(document, 'Отклонить обращение', async () => {
+          requestStatus.textContent = 'Закрываем обращение…';
+          try {
+            const decision = await fetchImpl(`/api/v1/deletion-requests/${item.request_id}`, {
+              method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
+              headers: { 'content-type': 'application/json', accept: 'application/json' },
+              body: JSON.stringify({ decision: 'reject' }),
+            });
+            if (!decision.ok) throw new Error('decision_failed');
+            await loadDeletionRequests();
+          } catch { requestStatus.textContent = 'Не удалось отклонить обращение. Очередь не обновлена.'; }
+        }));
+        card.append(actions); reviewQueue.append(card);
+      }
+    } catch { requestStatus.textContent = 'Не удалось загрузить обращения этой школы.'; }
+  }
+}
+
+function renderOwnDeletionRequests(document, container, requests) {
+  container.replaceChildren();
+  if (!requests.length) { container.append(node(document, 'p', 'ru-note', 'Обращений пока нет.')); return; }
+  for (const request of requests.slice(0, 10)) {
+    if (!request || !UUID.test(request.request_id) || typeof request.status !== 'string' || typeof request.reason !== 'string') continue;
+    const card = node(document, 'article', 'ru-moderation-card');
+    const status = request.status === 'pending' ? 'ожидает рассмотрения' : request.status === 'rejected' ? 'отклонено' : request.status;
+    card.append(node(document, 'p', '', `Обращение: ${status}`));
+    card.append(node(document, 'p', '', request.reason));
+    if (request.review_note) card.append(node(document, 'p', 'ru-note', `Комментарий: ${request.review_note}`));
+    container.append(card);
+  }
 }
 
 function actionButton(document, label, handler) {
