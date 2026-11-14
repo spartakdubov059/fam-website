@@ -9,14 +9,14 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 220,
+      "passed": 221,
       "failed": 0,
-      "source": "GitHub Actions SDK compatibility workflow run 43633624712 on commit 17263b049a4aaf8d5bfeb6c794759590e1ebaf3b (Node 22.23.4)"
+      "source": "GitHub Actions SDK compatibility workflow run 43634320637 on commit 3959b1baff2b3992f2bbaeacd32f5fe6b1636c42 (Node 22.23.4)"
     },
     "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend tests (220/220) in GitHub Actions; historical ZIP remains unavailable and its integrity/report are not independently reproduced"
+    "reproduction": "PASS — current backend tests (221/221) in GitHub Actions; historical ZIP remains unavailable and its integrity/report are not independently reproduced"
   },
-  "sdk_gate": "PASS — workflow 43633624712 installed locked backend SDKs and Sharp 0.35.5, passed 220 backend tests and native image processing checks",
+  "sdk_gate": "PASS — workflow 43634320637 installed locked backend SDKs and Sharp 0.35.5, passed 221 backend tests and native image processing checks",
   "cloud_staging": "NOT DEPLOYED",
   "production": "UNCHANGED",
   "release_blockers": [
@@ -33,20 +33,20 @@
   "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
   "sdk_compatibility_check": {
     "node": "24.22.1 local runtime; GitHub Actions Node 22.23.4",
-    "command": "GitHub Actions run 43633624712: npm ci, backend tests (220/220), pinned YDB/AWS SDK + Sharp checks and native image processing",
-    "result": "PASS in CI on commit 17263b049a4aaf8d5bfeb6c794759590e1ebaf3b; historical ZIP remains unavailable",
+    "command": "GitHub Actions run 43634320637: npm ci, backend tests (221/221), pinned YDB/AWS SDK + Sharp checks and native image processing",
+    "result": "PASS in CI on commit 3959b1baff2b3992f2bbaeacd32f5fe6b1636c42; historical ZIP remains unavailable",
     "sharp": "0.35.5",
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43633624712,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43633624712",
-    "ydb_run_id": 43633624700,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43633624700",
+    "sdk_run_id": 43634320637,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43634320637",
+    "ydb_run_id": 43634320631,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43634320631",
     "result": "success",
-    "tested_commit": "17263b049a4aaf8d5bfeb6c794759590e1ebaf3b for SDK/backend and disposable YDB integration"
+    "tested_commit": "3959b1baff2b3992f2bbaeacd32f5fe6b1636c42 for SDK/backend and disposable YDB integration"
   },
-  "local_ydb_integration": "NOT AVAILABLE locally: Docker is not installed. Disposable YDB integration passed in GitHub Actions run 43633624700 with synthetic fixtures, including school-scoped avatar review; no cloud instance or user data was used.",
+  "local_ydb_integration": "NOT AVAILABLE locally: Docker is not installed. Disposable YDB integration passed in GitHub Actions run 43634320631 with synthetic fixtures, including school-scoped avatar review and requested account deletion; no cloud instance or user data was used.",
   "idea_submission_ui": "PASS — existing CI test covers authenticated UI submission to moderated API and pending status feedback",
   "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
   "media_upload_api": "PASS — authenticated listing and avatar images are validated, normalized to WebP, and stored privately; the Russian shell now includes profile upload and same-school manual review. Approved avatars are served only while current. Orphan cleanup after browser/network loss is not automatically scheduled.",

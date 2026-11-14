@@ -304,7 +304,7 @@ test('council member submits a same-school removal request and sees personal his
   assert.equal(renderedReason.textContent, '<script>тест</script>');
 });
 
-test('school administrator can reject a request and receives no account deletion action', async () => {
+test('school administrator can reject a request and also sees a separately confirmed deletion action', async () => {
   const f = fixture(); const calls = [];
   const requestId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   let pending = true;
