@@ -40,7 +40,26 @@ test("accepts a single allowlisted aggregate task", () => {
   assert.match(task.prompt, /index\.html/);
   assert.match(task.prompt, /window\.onerror/);
   assert.match(task.prompt, /window\.onunhandledrejection/);
-  assert.equal(Object.keys(TASK_PROMPTS).length, 3);
+  assert.equal(Object.keys(TASK_PROMPTS).length, 4);
+});
+
+test("accepts bounded notification failures with a prompt that excludes private content and persistence changes", () => {
+  const task = validateClaimResponse({
+    ok: true,
+    task: {
+      id,
+      task_key: "audit_notifications_resilience",
+      event_code: "notifications_load_failed",
+      page_area: "notifications",
+      occurrences: 3,
+      event_summary: "Не удалось загрузить уведомления",
+      observed_hour: "2026-11-14T16:00:00Z",
+      previous_attempts: 0,
+    },
+  });
+  assert.match(task.prompt, /состояния загрузки/);
+  assert.match(task.prompt, /личное содержимое уведомлений/);
+  assert.match(task.prompt, /сохранения, прочтения и удаления/);
 });
 
 test("accepts an empty queue", () => {
@@ -214,6 +233,8 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
   assert.match(edgeSource, /!EVENT_CODES\.has\(task\.event_code\)/);
+  assert.match(edgeSource, /audit_notifications_resilience/);
+  assert.match(edgeSource, /Не удалось загрузить уведомления/);
   assert.match(edgeSource, /!PAGE_AREAS\.has\(task\.page_area\)/);
   assert.match(edgeSource, /task\.previous_attempts > 20/);
 });

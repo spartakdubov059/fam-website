@@ -172,6 +172,35 @@ begin
       where task_type='coder_patch_request' and payload->>'event_code'='js_runtime') <> 3 then
     raise exception 'producer did not allow a new task after the seven-day cooldown';
   end if;
+
+  -- Notification failures are eligible only as aggregate UI-resilience audits.
+  update private.fam_agent_tasks
+  set status='completed',finished_at=now(),claimed_by=null,claimed_at=null,lease_expires_at=null
+  where task_type='coder_patch_request' and status in ('queued','claimed','in_progress');
+  update private.fam_site_error_counts set event_count=0 where event_code='js_runtime';
+  insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
+  values ('auth_backend_failed','auth',now()-interval '1 hour',100);
+  insert into private.fam_site_error_counts(event_code,page_area,hour_bucket,event_count)
+  values ('notifications_load_failed','notifications',now()-interval '1 hour',3);
+  perform private.enqueue_fam_agent_coder_task();
+  select payload into v_payload from private.fam_agent_tasks
+  where task_type='coder_patch_request' and payload->>'event_code'='notifications_load_failed'
+  order by created_at desc limit 1;
+  if v_payload->>'task_key' <> 'audit_notifications_resilience'
+     or v_payload->>'event_summary' <> 'Не удалось загрузить уведомления'
+     or v_payload->>'page_area' <> 'notifications' then
+    raise exception 'producer did not create a bounded notification-resilience task';
+  end if;
+  if exists (select 1 from private.fam_agent_tasks
+      where task_type='coder_patch_request' and payload->>'event_code'='auth_backend_failed') then
+    raise exception 'producer escalated an Auth failure into the local coder queue';
+  end if;
+  select * into v_claim from public.claim_fam_agent_coder_tasks('fam-agent-qwen-coder-v1',1,7200);
+  if v_claim.task_key <> 'audit_notifications_resilience'
+     or v_claim.event_code <> 'notifications_load_failed'
+     or v_claim.event_summary <> 'Не удалось загрузить уведомления' then
+    raise exception 'claim RPC did not return the allowlisted notification-resilience task';
+  end if;
 end
 $test$;
 

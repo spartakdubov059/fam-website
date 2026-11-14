@@ -24,7 +24,7 @@ begin
   into v_event
   from private.fam_site_error_counts as c
   where c.hour_bucket >= pg_catalog.now() - interval '24 hours'
-    and c.event_code in ('js_runtime','unhandled_rejection','listings_load_failed')
+    and c.event_code in ('js_runtime','unhandled_rejection','listings_load_failed','notifications_load_failed')
   group by c.event_code,c.page_area
   having sum(c.event_count) >= 3
   order by sum(c.event_count) desc,c.event_code,c.page_area
@@ -37,6 +37,7 @@ begin
   v_task_key := case
     when v_event.event_code in ('js_runtime','unhandled_rejection') then 'audit_frontend_runtime'
     when v_event.event_code = 'listings_load_failed' then 'audit_client_resilience'
+    when v_event.event_code = 'notifications_load_failed' then 'audit_notifications_resilience'
     else 'audit_accessibility'
   end;
 
@@ -44,6 +45,7 @@ begin
     when 'js_runtime' then 'Ошибка выполнения JavaScript'
     when 'unhandled_rejection' then 'Необработанное отклонение Promise'
     when 'listings_load_failed' then 'Не удалось загрузить объявления'
+    when 'notifications_load_failed' then 'Не удалось загрузить уведомления'
     else 'Техническое событие интерфейса'
   end;
 
@@ -193,7 +195,8 @@ begin
           and t.payload->>'event_summary' in (
             'Ошибка выполнения JavaScript',
             'Необработанное отклонение Promise',
-            'Не удалось загрузить объявления'
+            'Не удалось загрузить объявления',
+            'Не удалось загрузить уведомления'
           )
           and t.payload->>'observed_hour' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:00:00Z$'
           and pg_catalog.jsonb_typeof(t.payload->'previous_attempts') = 'number'
@@ -204,6 +207,7 @@ begin
       and t.payload->>'task_key' in (
         'audit_frontend_runtime',
         'audit_client_resilience',
+        'audit_notifications_resilience',
         'audit_accessibility'
       )
       and t.payload->>'event_code' in (
@@ -249,6 +253,7 @@ begin
       when 'js_runtime' then 'Ошибка выполнения JavaScript'
       when 'unhandled_rejection' then 'Необработанное отклонение Promise'
       when 'listings_load_failed' then 'Не удалось загрузить объявления'
+      when 'notifications_load_failed' then 'Не удалось загрузить уведомления'
       else 'Техническое событие интерфейса'
     end),
     coalesce(nullif(c.payload->>'observed_hour',''),pg_catalog.to_char(c.created_at at time zone 'UTC','YYYY-MM-DD"T"HH24:00:00"Z"')),

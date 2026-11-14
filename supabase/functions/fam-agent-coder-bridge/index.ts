@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
       if (
         typeof task?.id !== "string" ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(task.id) ||
-        !["audit_frontend_runtime", "audit_client_resilience", "audit_accessibility"].includes(task.task_key) ||
+        !["audit_frontend_runtime", "audit_client_resilience", "audit_notifications_resilience", "audit_accessibility"].includes(task.task_key) ||
         typeof task.event_code !== "string" ||
         !EVENT_CODES.has(task.event_code) ||
         typeof task.page_area !== "string" ||
@@ -138,7 +138,7 @@ Deno.serve(async (req: Request) => {
         !Number.isInteger(task.occurrences) ||
         task.occurrences < 0 ||
         task.occurrences > 1000 ||
-        !["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления"].includes(task.event_summary) ||
+        !["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления", "Не удалось загрузить уведомления"].includes(task.event_summary) ||
         typeof task.observed_hour !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(task.observed_hour) ||
         !Number.isInteger(task.previous_attempts) || task.previous_attempts < 0 || task.previous_attempts > 20
       ) {

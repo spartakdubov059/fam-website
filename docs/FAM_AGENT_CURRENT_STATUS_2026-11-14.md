@@ -56,3 +56,27 @@ Production, `main`, миграции, Cron, Auth/RLS, secrets, очередь и
 - На текущем локальном HEAD целевые тесты Worker, coder bridge и workflow прошли 45/45; latest hosted Regression, owner gate, три PostgreSQL интеграции и Russian content safety также прошли на PR head `a1f8ef482cbcf00df10e8adee2592fff338c293c`.
 
 Live source и SQL определения читались без вызова RPC, секретов и пользовательских данных. Production не менялся.
+
+## Свежая сверка облачной системы — 14 ноября 2026, 19:23 UTC
+
+Этот снимок заменяет более ранние ссылки на SHA и статусы PR выше; исторические наблюдения оставлены для хронологии.
+
+### GitHub и hosted-проверки
+
+- `main` остаётся на `7a463458ba5ca2d9be2bf67d4f5931271e2c3478`.
+- [PR #65](https://github.com/spartakdubov059/fam-website/pull/65) открыт, draft и mergeable на `31fb8a1c818355f16c75c95d915b833ae2b867b4`. Regression suite, owner approval verifier, Russian content safety и PostgreSQL integration для coder QA, Reporter и telemetry прошли; Netlify preview status — success. Этот PR включает fail-closed обработку результата coder-finish и report-save RPC: `saved=false` больше не возвращается как успешный bridge-ответ. Изменение не развернуто в production.
+- [PR #64](https://github.com/spartakdubov059/fam-website/pull/64) остаётся open/draft на `36c08bf1b36f374d152795084bf366ad488e7008`. Последний Mellum smoke [успешен](https://github.com/spartakdubov059/fam-website/actions/runs/43627286734): модель подготовила patch только для fixture, целевой регрессионный тест и 171 moderation/security тест прошли, а artifact зафиксировал `verification_status=passed`. Из трёх завершённых inference-прогонов два подготовили прошедший QA patch; один не выдал применимый patch и был остановлен QA gate. Это подтверждает ограниченный synthetic flow, но не устойчивую production-автономность и не интеграцию Mellum в `main`.
+- Ревьюер, Security и Performance в PR остаются статическими и тестовыми проверками, а не отдельной ИИ-моделью. Независимый ИИ-рецензент и production path `queue → model → QA → PR` не подтверждены.
+
+### Production Supabase, read-only
+
+- Проект `tfacqpljrvfpcrhdovbu`: `ACTIVE_HEALTHY`, PostgreSQL 17.11, `eu-central-1`; активны семь Edge Functions и восемь Cron-заданий.
+- `fam-agent-worker` — ACTIVE v17; `fam-agent-coder-bridge` — ACTIVE v1. В production Worker при `finish_fam_agent_task=false` может продолжить работу и вернуть HTTP 200 / `ok:true`; bridge v1 также возвращает HTTP 200 с `ok:true, saved:false` при несохранённом finish. PR #65 закрывает второй путь в исходниках, но ни одно исправление PR не действует в production.
+- В очереди `private.fam_agent_tasks`: 114 completed и 3 failed; pending/claimed/in-progress записей в статусной сводке нет. Четыре `coder_patch_request` (1 completed, 3 failed) созданы 11 ноября; новых coder-задач после этого нет. Ежедневные агрегатные отчёты и почасовой `site_error_digest` продолжают создаваться.
+- Все восемь Cron активны; доступная семидневная сводка содержит только `succeeded` для каждого задания. Worker расписан каждые 5 минут; coder producer — ежедневно в 03:10 UTC. Успех Cron подтверждает завершение вызова расписания, но не получение/исправление coder-задачи.
+- За последние 24 часа агрегированная телеметрия содержала 3 `auth_backend_failed` и 1 `notifications_load_failed`. Текущий producer создаёт coder-задачи только для `js_runtime`, `unhandled_rejection` и `listings_load_failed`; эти четыре события не попадают в coder queue. Это ограничение безопасного allowlist, а не подтверждённый дефект соответствующих функций.
+- Security Advisor: 4 RLS-enabled таблицы без policy, `pg_net` в `public`, один anon-доступный и четыре authenticated-доступных SECURITY DEFINER RPC, отключена leaked-password protection. Проверенная таблица показывает нулевые прямые права `anon`/`authenticated` на эти четыре таблицы; School Pulse RPC проверяют `auth.uid()` и школьную роль, а anon telemetry RPC принимает только фиксированные категории и пишет ограниченные агрегаты. Эти элементы требуют отдельного продуктового/security review; Auth/RLS и extension не менялись.
+- Performance Advisor: 4 unindexed FK и 24 unused-index notices; Health Advisor пуст. Индексы и advisor findings не менялись.
+- В `main` ruleset `FAM — защита main` по-прежнему `required_approving_review_count=0`. Пользователь разрешил установить обязательное review; для записи требуется завершить отдельную GitHub OAuth-связь. Существующие GitHub и Supabase production настройки не менялись.
+
+Сверка использовала только агрегаты, статусы, расписания, advisory и исходники функций; payload, `result_summary`, секреты и пользовательские записи не читались. Production, `main`, миграции, Auth/RLS, Cron и пользовательские данные не изменялись.
