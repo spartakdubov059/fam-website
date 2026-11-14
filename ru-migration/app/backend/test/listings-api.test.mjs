@@ -447,12 +447,12 @@ test('school administrators require fresh Yandex auth to delete another member l
   const ownRemove = req({ confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ' }, 'DELETE');
   ownRemove.url = remove.url;
   assert.equal((await handler(ownRemove)).status, 200, 'owner can remove their own listing without the extra freshness gate');
+  const wrongConfirmation = req({ confirmation: 'delete' }, 'DELETE'); wrongConfirmation.url = remove.url;
+  assert.equal((await handler(wrongConfirmation)).body.error, 'confirmation_required');
   context = null;
   const unavailableRemove = req({ confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ' }, 'DELETE');
   unavailableRemove.url = remove.url;
   assert.equal((await handler(unavailableRemove)).status, 404, 'cross-school or missing listing remains unavailable');
-  const wrongConfirmation = req({ confirmation: 'delete' }, 'DELETE'); wrongConfirmation.url = remove.url;
-  assert.equal((await handler(wrongConfirmation)).body.error, 'confirmation_required');
 });
 
 test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
