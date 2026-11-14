@@ -60,6 +60,15 @@ try {
   };
   const agentMetrics = await repo.getSchoolAgentMetrics('synthetic-school');
   assert.ok(Number.isInteger(agentMetrics.listings.active));
+  const globalAgentMetrics = await repo.getGlobalAgentDailyMetrics();
+  assert.ok(Number.isInteger(globalAgentMetrics.listings.active));
+  assert.ok(Number.isInteger(globalAgentMetrics.safety.unreviewed));
+  assert.ok(Number.isInteger(globalAgentMetrics.ideas.pending));
+  await repo.saveGlobalAgentDailyReport({ date: '2026-11-14',
+    summary: 'Синтетическая внутренняя сводка', metrics: globalAgentMetrics });
+  const savedGlobalAgentReport = await sql`SELECT report_date, summary, metrics_json FROM fam_agent_daily_reports WHERE report_date = '2026-11-14';`;
+  assert.equal(savedGlobalAgentReport?.[0]?.[0]?.summary, 'Синтетическая внутренняя сводка');
+  assert.deepEqual(JSON.parse(savedGlobalAgentReport[0][0].metrics_json), globalAgentMetrics);
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);

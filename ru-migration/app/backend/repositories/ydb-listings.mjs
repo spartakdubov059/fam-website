@@ -1521,6 +1521,35 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async getGlobalAgentDailyMetrics() {
+      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
+      const [activeListings, newListings, unreviewedSafety, deletionRequests, activeSuspensions,
+        pendingIdeas, approvedIdeas, rejectedIdeas] = await Promise.all([
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE status = 'active';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE reviewed_at IS NULL;`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_account_deletion_requests WHERE status IN ('pending', 'processing');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_account_suspensions WHERE status = 'active' AND expires_at > CurrentUtcTimestamp();`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'pending';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'approved';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'rejected';`),
+      ]);
+      return {
+        listings: { active: activeListings, new_24h: newListings },
+        safety: { unreviewed: unreviewedSafety },
+        account_requests: { deletion_pending: deletionRequests, active_suspensions: activeSuspensions },
+        ideas: { pending: pendingIdeas, approved: approvedIdeas, rejected: rejectedIdeas },
+      };
+    },
+
+    async saveGlobalAgentDailyReport({ date, summary, metrics }) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || typeof summary !== 'string' || !metrics) {
+        throw new TypeError('invalid global agent report');
+      }
+      await sql`UPSERT INTO fam_agent_daily_reports (report_date, generated_at, summary, metrics_json)
+        VALUES (${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
+    },
+
     async getSchoolAgentDashboard(schoolId) {
       if (!schoolId) throw new TypeError('invalid school agent dashboard school');
       const [reports, ideas] = await Promise.all([
