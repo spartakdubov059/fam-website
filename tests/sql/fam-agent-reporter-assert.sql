@@ -3,6 +3,8 @@ declare
   v_snapshot jsonb;
   v_signal_count integer;
   v_technical jsonb;
+  v_quality jsonb;
+  v_moderation jsonb;
   v_saved jsonb;
   v_stored jsonb;
   v_rejected boolean;
@@ -38,6 +40,12 @@ begin
   select item into v_technical
   from jsonb_array_elements(v_snapshot -> 'agent_statuses') as item
   where item ->> 'agent_key' = 'technical';
+  select item into v_quality
+  from jsonb_array_elements(v_snapshot -> 'agent_statuses') as item
+  where item ->> 'agent_key' = 'quality';
+  select item into v_moderation
+  from jsonb_array_elements(v_snapshot -> 'agent_statuses') as item
+  where item ->> 'agent_key' = 'moderation';
   if v_signal_count <> 2
      or v_snapshot #>> '{site_error_events_24h,0,event_code}' <> 'js_runtime'
      or v_snapshot #>> '{site_error_events_24h,0,occurrences}' <> '4'
@@ -57,6 +65,8 @@ begin
      or v_snapshot::text like '%worker_execution_failed%'
      or v_snapshot::text like '%unrelated_failure%'
      or v_technical ->> 'failed_24h' <> '1'
+     or v_quality ->> 'claimed' <> '1'
+     or v_moderation ->> 'review' <> '1'
      or v_snapshot #>> '{failed_tasks_24h,0,task_type}' <> 'coder_patch_request'
      or v_snapshot #>> '{daily_report,metrics,completed}' <> '2' then
     raise exception 'snapshot did not return the expected aggregate fields: %', v_snapshot;
