@@ -128,7 +128,6 @@ declare
   v_payload jsonb;
   v_event_summary text;
   v_previous_attempts integer;
-  v_claim_result text;
   v_has_context boolean;
 begin
   perform pg_catalog.pg_advisory_xact_lock(
@@ -185,10 +184,10 @@ begin
     'occurrences',least(greatest(v_event.occurrences,0),1000)
   );
 
-  v_claim_result := pg_catalog.pg_get_function_result(
-    'public.claim_fam_agent_coder_tasks(text,integer,integer)'::pg_catalog.regprocedure
-  );
-  v_has_context := pg_catalog.strpos(v_claim_result,'event_summary') > 0;
+  select 'event_summary' = any(p.proargnames)
+    into v_has_context
+  from pg_catalog.pg_proc as p
+  where p.oid = 'public.claim_fam_agent_coder_tasks(text,integer,integer)'::pg_catalog.regprocedure;
 
   if v_has_context then
     v_event_summary := case v_event.event_code
