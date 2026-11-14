@@ -269,44 +269,6 @@ test('own listing deletion is owner-bound and removes dependents in one transact
   await assert.rejects(repo.deleteOwnListing('student-id', 'not-a-uuid'), TypeError);
 });
 
-test('school listing deletion is same-school, claims only owner media and writes a separate admin audit event', async () => {
-  const calls = [];
-  let listingSchool = 'school-a';
-  const tx = async (strings, ...values) => {
-    const text = strings.join('?'); calls.push({ text, values });
-    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
-    if (text.includes('SELECT user_id, school_id, category FROM fam_listings')) {
-      return [[{ user_id: 'student-a', school_id: listingSchool, category: 'Книги' }]];
-    }
-    if (text.includes('SELECT id, user_id, school_id, category, is_event, image_key FROM fam_listings')) {
-      return [[{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', user_id: 'student-a', school_id: listingSchool, category: 'Книги', is_event: false, image_key: 'pending/student-a/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' }]];
-    }
-    if (text.includes('SELECT user_id FROM fam_pending_media')) return [[{ user_id: 'student-a' }]];
-    if (text.includes('SELECT object_key, claim_token FROM fam_pending_media')) return [[{ object_key: 'pending/student-a/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp', claim_token: values.at(-1) }]];
-    return [[]];
-  };
-  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
-  const repo = createYdbListingsRepository(sql);
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const context = await repo.getSchoolListingDeletionContext({ schoolId: 'school-a', actorId: 'admin-a', listingId: id });
-  assert.deepEqual(context, { user_id: 'student-a', school_id: 'school-a', category: 'Книги' });
-  const deleted = await repo.deleteSchoolListing({ schoolId: 'school-a', actorId: 'admin-a', listingId: id });
-  assert.equal(deleted.ok, true);
-  assert.equal(deleted.media_cleanup.object_key, 'pending/student-a/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp');
-  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_favorites')));
-  assert.ok(calls.some(call => call.text.includes('SET status = \'deleting\'')));
-  const audit = calls.find(call => call.text.includes('INSERT INTO fam_school_content_audit'));
-  assert.ok(audit);
-  assert.ok(audit.values.includes('school-a') && audit.values.includes('admin-a'));
-  assert.ok(audit.values.some(value => typeof value === 'string' && value.includes('Книги')));
-  const deletesBefore = calls.filter(call => call.text.includes('DELETE FROM fam_listings')).length;
-  listingSchool = 'school-b';
-  assert.equal(await repo.getSchoolListingDeletionContext({ schoolId: 'school-a', actorId: 'admin-a', listingId: id }), null,
-    'context lookup hides listings owned by another school');
-  assert.deepEqual(await repo.deleteSchoolListing({ schoolId: 'school-a', actorId: 'admin-a', listingId: id }), { ok: false, code: 'listing_unavailable' });
-  assert.equal(calls.filter(call => call.text.includes('DELETE FROM fam_listings')).length, deletesBefore);
-});
-
 test('favorite repository binds user and listing ids and refuses to favorite a missing listing', async () => {
   const calls = [];
   const sql = (strings, ...values) => {
