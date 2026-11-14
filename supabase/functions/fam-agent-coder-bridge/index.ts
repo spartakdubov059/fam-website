@@ -20,11 +20,15 @@ const SUPABASE_SECRET_KEY =
   "";
 const LEGACY_SECRET_IS_JWT = SUPABASE_SECRET_KEY.startsWith("eyJ");
 const WORKER_ID = "fam-agent-qwen-coder-v1";
-const MAX_BODY_BYTES = 2048;
+const MAX_BODY_BYTES = 65536;
 const EVENT_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
   "listings_load_failed", "notifications_load_failed",
   "database_request_failed", "auth_backend_failed",
+]);
+const REPORT_FIELDS = new Set([
+  "report_date", "generated_at", "sources", "supabase", "workflows_24h",
+  "open_pull_requests", "role_statuses", "technical_analysis", "production_deployment", "public_site", "limitations", "markdown",
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 
@@ -126,10 +130,15 @@ Deno.serve(async (req: Request) => {
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(task.id) ||
         !["audit_frontend_runtime", "audit_client_resilience", "audit_accessibility"].includes(task.task_key) ||
         typeof task.event_code !== "string" ||
+        !EVENT_CODES.has(task.event_code) ||
         typeof task.page_area !== "string" ||
+        !PAGE_AREAS.has(task.page_area) ||
         !Number.isInteger(task.occurrences) ||
         task.occurrences < 0 ||
-        task.occurrences > 1000
+        task.occurrences > 1000 ||
+        !["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления"].includes(task.event_summary) ||
+        typeof task.observed_hour !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(task.observed_hour) ||
+        !Number.isInteger(task.previous_attempts) || task.previous_attempts < 0 || task.previous_attempts > 20
       ) {
         return json({ ok: false, error: "invalid_task_shape" }, 502);
       }
@@ -141,23 +150,64 @@ Deno.serve(async (req: Request) => {
           event_code: task.event_code,
           page_area: task.page_area,
           occurrences: task.occurrences,
+          event_summary: task.event_summary,
+          observed_hour: task.observed_hour,
+          previous_attempts: task.previous_attempts,
         },
       });
     }
 
     if (
       body.action === "finish" &&
-      Object.keys(body).length === 3 &&
+      Object.keys(body).length === 5 &&
       typeof body.task_id === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
-      ["model_completed", "model_no_patch", "model_failed", "model_blocked"].includes(body.result_code)
+      ["model_completed", "model_review", "model_no_patch", "model_failed", "model_timeout", "model_blocked"].includes(body.result_code) &&
+      (body.pr_url === null || (
+        typeof body.pr_url === "string" &&
+        /^https:\/\/github\.com\/spartakdubov059\/fam-website\/pull\/[1-9][0-9]*$/.test(body.pr_url)
+      )) &&
+      (body.commit_sha === null || (
+        typeof body.commit_sha === "string" && /^[0-9a-f]{40}$/i.test(body.commit_sha)
+      )) &&
+      ((["model_completed", "model_review"].includes(body.result_code) && body.pr_url !== null && body.commit_sha !== null) ||
+        (!["model_completed", "model_review"].includes(body.result_code) && body.pr_url === null && body.commit_sha === null))
     ) {
-      const saved = await rpc("finish_fam_agent_coder_task", {
+      const saved = await rpc("finish_fam_agent_coder_task_with_pr", {
         p_task_id: body.task_id,
         p_worker_id: WORKER_ID,
         p_result_code: body.result_code,
+        p_pr_url: body.pr_url,
+        p_commit_sha: body.commit_sha,
       });
       return json({ ok: true, saved: saved === true });
+    }
+
+    if (body.action === "report" && Object.keys(body).length === 1) {
+      const snapshot = await rpc("get_fam_agent_report_snapshot", {});
+      if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+        return json({ ok: false, error: "invalid_report_snapshot" }, 502);
+      }
+      return json({ ok: true, report: snapshot });
+    }
+
+    if (body.action === "save_report" && Object.keys(body).length === 3) {
+      const reportDateValid = typeof body.report_date === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(body.report_date);
+      const reportKeys = body.report && typeof body.report === "object" && !Array.isArray(body.report)
+        ? Object.keys(body.report)
+        : [];
+      const reportValid = reportKeys.length === REPORT_FIELDS.size &&
+        reportKeys.every((key) => REPORT_FIELDS.has(key)) &&
+        body.report.report_date === body.report_date &&
+        typeof body.report.markdown === "string" &&
+        new TextEncoder().encode(JSON.stringify(body.report)).byteLength <= 65536;
+      if (!reportDateValid || !reportValid) return json({ ok: false, error: "invalid_report" }, 400);
+      const saved = await rpc("save_fam_agent_system_report", {
+        p_report_date: body.report_date,
+        p_report: body.report,
+      });
+      return json({ ok: true, saved: saved?.ok === true && saved.report_date === body.report_date });
     }
 
     return json({ ok: false, error: "invalid_action" }, 400);

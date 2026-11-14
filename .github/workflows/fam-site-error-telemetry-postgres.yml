@@ -1,0 +1,45 @@
+name: FAM site-error telemetry PostgreSQL integration
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/*fam_site_error_telemetry_write_cap.sql"
+      - "tests/sql/fam-site-error-telemetry-*.sql"
+      - ".github/workflows/fam-site-error-telemetry-postgres.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telemetry-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: fam_site_error_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fam_site_error_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: fam_site_error_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - name: Create isolated telemetry fixture
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-site-error-telemetry-bootstrap.sql
+      - name: Apply telemetry cap migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113221255_fam_site_error_telemetry_write_cap.sql
+      - name: Verify aggregation cap and saturated write behavior
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-site-error-telemetry-assert.sql

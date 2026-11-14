@@ -16,6 +16,8 @@ const EVENT_CODES = new Set([
   "database_request_failed", "auth_backend_failed",
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
+const EVENT_SUMMARIES = new Set(["Ошибка выполнения JavaScript", "Необработанное отклонение Promise", "Не удалось загрузить объявления"]);
+const UTC_HOUR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateClaimResponse(data) {
@@ -31,7 +33,10 @@ export function validateClaimResponse(data) {
     !EVENT_CODES.has(task.event_code) ||
     !PAGE_AREAS.has(task.page_area) ||
     !Number.isSafeInteger(task.occurrences) ||
-    task.occurrences < 0 || task.occurrences > 1000
+    task.occurrences < 0 || task.occurrences > 1000 ||
+    !EVENT_SUMMARIES.has(task.event_summary) ||
+    typeof task.observed_hour !== "string" || !UTC_HOUR_RE.test(task.observed_hour) ||
+    !Number.isSafeInteger(task.previous_attempts) || task.previous_attempts < 0 || task.previous_attempts > 20
   ) throw new Error("Bridge returned an invalid task.");
   return Object.freeze({
     id: task.id,
@@ -39,7 +44,10 @@ export function validateClaimResponse(data) {
     prompt: TASK_PROMPTS[task.task_key] +
       " Контекст: код события " + task.event_code +
       ", раздел " + task.page_area +
-      ", агрегированное число событий " + task.occurrences + ".",
+      ", агрегированное число событий " + task.occurrences +
+      ", описание события: " + task.event_summary +
+      ", последний час наблюдения UTC: " + task.observed_hour +
+      ", попыток по этому типу за 30 дней: " + task.previous_attempts + ".",
   });
 }
 
@@ -52,12 +60,18 @@ export async function readTaskSummary(filePath) {
   }
 }
 
-export function chooseResultCode(summary, executionSucceeded = true) {
-  if (!executionSucceeded) return "model_failed";
+export function shouldRunModel({ manualTask = "", bridgeConfigured = false, taskClaimed = false } = {}) {
+  return manualTask.trim().length > 0 || (bridgeConfigured === true && taskClaimed === true);
+}
+
+export function chooseResultCode(summary, executionSucceeded = true, qaSucceeded = true, prSucceeded = true, prMetadataValid = false, failureReason = "") {
+  if (!executionSucceeded) return failureReason === "timeout" ? "model_timeout" : "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
-    return "model_completed";
+    if (qaSucceeded !== true) return "model_failed";
+    if (prMetadataValid !== true) return "model_failed";
+    return prSucceeded === true ? "model_completed" : "model_review";
   }
   return "model_no_patch";
 }
@@ -89,24 +103,24 @@ async function main() {
     if (manualTask) {
       if (manualTask.length > 3000) throw new Error("Manual task exceeds 3000 characters.");
       if (envFile) appendFileSync(envFile, "FAM_TASK=" + manualTask.replace(/\r?\n/g, " ") + "\n");
-      if (output) appendFileSync(output, "claimed=false\n");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask }) + "\n");
       return;
     }
     if (!url || !token) {
-      if (output) appendFileSync(output, "claimed=false\n");
-      console.log("Bridge secrets are absent; using the existing scheduled audit.");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: false }) + "\n");
+      console.log("Bridge credentials are absent; skipping model work because no task can be claimed.");
       return;
     }
     const data = await bridgeRequest({ url, token, body: { action: "claim" } });
     const task = validateClaimResponse(data);
     if (!task) {
-      if (output) appendFileSync(output, "claimed=false\n");
-      console.log("No queued coder task; using the existing scheduled audit.");
+      if (output) appendFileSync(output, "claimed=false\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: false }) + "\n");
+      console.log("No queued coder task; skipping model download and inference.");
       return;
     }
     if (envFile) appendFileSync(envFile,
       "FAM_TASK=" + task.prompt + "\nFAM_CODER_TASK_ID=" + task.id + "\n");
-    if (output) appendFileSync(output, "claimed=true\n");
+    if (output) appendFileSync(output, "claimed=true\ntask_id=" + task.id + "\nrun_model=" + shouldRunModel({ manualTask, bridgeConfigured: true, taskClaimed: true }) + "\n");
     console.log("Claimed one allowlisted technical task; task contents are aggregate-only.");
     return;
   }
@@ -115,9 +129,29 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
     const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
-    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
+    const prUrl = process.env.FAM_AGENT_PR_URL || "";
+    const commitSha = process.env.FAM_AGENT_COMMIT_SHA || "";
+    const prMetadataValid =
+      /^https:\/\/github\.com\/spartakdubov059\/fam-website\/pull\/[1-9][0-9]*$/.test(prUrl) &&
+      /^[0-9a-f]{40}$/i.test(commitSha);
+    const code = chooseResultCode(
+      summary,
+      process.env.FAM_MODEL_STEP_OUTCOME === "success",
+      process.env.FAM_QA_OUTCOME === "success",
+      process.env.FAM_PR_MANAGER_OUTCOME === "success",
+      prMetadataValid,
+      process.env.FAM_MODEL_FAILURE_REASON || "",
+    );
     const result = await bridgeRequest({
-      url, token, body: { action: "finish", task_id: taskId, result_code: code },
+      url,
+      token,
+      body: {
+        action: "finish",
+        task_id: taskId,
+        result_code: code,
+        pr_url: ["model_completed", "model_review"].includes(code) ? prUrl : null,
+        commit_sha: ["model_completed", "model_review"].includes(code) ? commitSha : null,
+      },
     });
     if (result?.ok !== true || result?.saved !== true) {
       throw new Error("Bridge did not accept the task result.");
