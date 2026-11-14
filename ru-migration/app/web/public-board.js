@@ -369,7 +369,12 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
       count.textContent = visible === 0 ? 'Ничего не найдено. Измените запрос или категорию.' : `Показано ${visible} из ${cards.length} объявлений.`;
     };
-    for (const name of BOARD_CATEGORIES) {
+    const categories = [...BOARD_CATEGORIES];
+    for (const { listing } of cards) {
+      if (typeof listing.category === 'string' && listing.category.length <= 40
+          && !categories.includes(listing.category) && categories.length < 12) categories.push(listing.category);
+    }
+    for (const name of categories) {
       const button = element(document, 'button', 'ru-board-category', name);
       button.type = 'button'; button.setAttribute('aria-pressed', String(name === category));
       button.addEventListener('click', () => { category = name; updateResults(); });
