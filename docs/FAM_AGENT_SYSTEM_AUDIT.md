@@ -228,3 +228,11 @@ Total output lines: 411
 - Прямые read-only проверки привилегий подтвердили: `anon` и `authenticated` не имеют `SELECT` к трём школьным таблицам (`fam_school_announcements`, `fam_school_polls`, `fam_school_poll_votes`); `service_role` имеет `SELECT`. У приватной очереди аватаров RLS включён и прямого `SELECT` нет даже у `service_role`, что соответствует RPC-only пути. Следовательно, четыре advisor finding об отсутствии RLS policies сами по себе не показывают доступ к строкам.
 - Привилегии функций: `report_fam_site_error(text,text)` — `SECURITY DEFINER`, `search_path=''`, доступна `anon`, но не `authenticated`; четыре школьные RPC — `SECURITY DEFINER`, `search_path=''`, доступны `authenticated`, не `anon`. Это подтверждает доступный класс вызова, но не заменяет проверку тела каждой RPC. Права, политики и функции не менялись.
 - `pg_net` не перемещался; конфигурация Auth, включая HaveIBeenPwned/compromised-password protection, не менялась. Эти изменения оставлены вне PR, поскольку требуют отдельного планирования production-конфигурации.
+
+
+## Reporter: покрытие Cron image moderation — 14 ноября 2026
+
+- Review SQL snapshot показал, что фильтр `cron.jobname LIKE 'fam-agent-%'` исключал активный `fam-listing-image-moderation-every-minute`; ежедневный Reporter поэтому не показывал состояние минутного moderation scheduler.
+- В PR #65 snapshot расширен точным allowlist исключением этого job. PostgreSQL fixture теперь включает отдельный image-moderation job и проверяет его последнее состояние, в том числе ошибку, чтобы сбой не пропал из отчёта.
+- На head `00cfed035e43580eb7889b19bc209ddf48feda53` прошли Reporter PostgreSQL integration [#43609136529](https://github.com/spartakdubov059/fam-website/actions/runs/43609136529), Regression [#43609136525](https://github.com/spartakdubov059/fam-website/actions/runs/43609136525), Coder QA PostgreSQL [#43609136557](https://github.com/spartakdubov059/fam-website/actions/runs/43609136557) и telemetry PostgreSQL [#43609136490](https://github.com/spartakdubov059/fam-website/actions/runs/43609136490).
+- Production cron, migration ledger, Reporter deployment, Edge Functions и отчётные данные не менялись; исправление действует только в draft PR.
