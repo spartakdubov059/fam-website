@@ -189,6 +189,18 @@ jobs:
           fi
           echo "QA_STATUS=$QA_STATUS" >> "$GITHUB_STEP_SUMMARY"
           echo "qa_status=$QA_STATUS" >> "$GITHUB_OUTPUT"
+          if [[ -s "$SUMMARY" ]]; then
+            SUMMARY_PATH="$SUMMARY" QA_VALUE="$QA_STATUS" node --input-type=module - <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const path = process.env.SUMMARY_PATH;
+          const summary = JSON.parse(readFileSync(path, "utf8"));
+          summary.verification_status = process.env.QA_VALUE;
+          summary.independent_test_suites = process.env.QA_VALUE === "passed"
+            ? ["tests/fixtures/qwen-model-benchmark.test.mjs", "tests/moderation/*.test.mjs", "tests/security/*.test.mjs"]
+            : [];
+          writeFileSync(path, `${JSON.stringify(summary, null, 2)}\n`);
+          NODE
+          fi
           if [[ "$QA_STATUS" != "passed" ]]; then
             echo "::error::Mellum2.1 must generate an applicable patch that passes independent tests; QA=$QA_STATUS."
             exit 1
