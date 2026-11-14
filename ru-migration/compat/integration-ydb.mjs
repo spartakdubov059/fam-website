@@ -415,6 +415,12 @@ try {
   const schoolDeleteAudit = await sql`SELECT school_id, actor_id, entity_id, entity_type, action FROM fam_school_content_audit WHERE entity_id = ${schoolDeleteListing.id};`;
   assert.deepEqual(schoolDeleteAudit?.[0]?.[0], { school_id: 'synthetic-school', actor_id: '33333333-3333-4333-8333-333333333333',
     entity_id: schoolDeleteListing.id, entity_type: 'listing', action: 'listing_deleted' });
+  const adminOverview = await listingsApi(apiRequest('GET', '/api/v1/school/admin/overview', 'synthetic-admin'));
+  assert.equal(adminOverview.status, 200);
+  assert.ok(adminOverview.body.users.some(row => row.id === '33333333-3333-4333-8333-333333333333'));
+  assert.ok(!adminOverview.body.users.some(row => row.id === '22222222-2222-4222-8222-222222222222'), 'school overview excludes profiles from other schools');
+  assert.ok(adminOverview.body.listings.some(row => row.id === otherSchoolPending.id) === false, 'school overview excludes listings from another school');
+  assert.ok(adminOverview.body.audit.some(row => row.action === 'listing_deleted'), 'school overview returns the recent school action audit');
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
   accountMediaKeys.add(deletingImageKey);

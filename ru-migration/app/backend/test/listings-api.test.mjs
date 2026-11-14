@@ -8,6 +8,22 @@ function req(body = {}, method = 'POST') {
   request.url = '/api/v1/listings';
   return request;
 }
+test('school administrator overview is private to the active administrator and bounded to their school', async () => {
+  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  let selectedSchool;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
+    resolveActor: async () => actor,
+    repository: { getSchoolAdminOverview: async schoolId => { selectedSchool = schoolId; return { users: [{ id: 'synthetic-user' }], listings: [], audit: [], deletion_requests: [], suspensions: [] }; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/school/admin/overview';
+  assert.equal((await handler(request)).status, 200);
+  assert.equal(selectedSchool, 'school-a');
+  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(request)).status, 403);
+  actor = { id: 'admin-b', school_id: 'school-b', role: 'school_admin' };
+  assert.equal((await handler(request)).status, 200);
+  assert.equal(selectedSchool, 'school-b');
+});
+
 test('school profile request status is private to the authenticated identity and omits submitted PII', async () => {
   let identity;
   const handler = createListingsApi({ authenticate: async () => identity,

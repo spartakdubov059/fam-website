@@ -3282,11 +3282,11 @@ window.onunhandledrejection = function() {
     $("councilAdminListings").textContent = "Загружаем объявления...";
     $("councilAdminAudit").textContent = "Загружаем историю...";
     try {
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "overview" }
+      const response = await fetch("/api/v1/school/admin/overview", {
+        method: "GET", credentials: "same-origin", cache: "no-store",
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить управление школой.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось загрузить управление школой.");
 
       const users = Array.isArray(data.users) ? data.users : [];
       const activeSuspensions = Array.isArray(data.suspensions) ? data.suspensions : [];

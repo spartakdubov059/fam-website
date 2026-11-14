@@ -250,6 +250,54 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
+    async getSchoolAdminOverview(schoolId) {
+      if (!schoolId) throw new TypeError('invalid school overview school');
+      const queryRows = async statement => {
+        if (typeof statement?.on === 'function') statement.on('error', () => {});
+        return (await statement)?.[0] ?? [];
+      };
+      const [users, listings, roleAudit, suspensionAudit, contentAudit, deletionRequests, suspensions] = await Promise.all([
+        queryRows(sql`SELECT user_id AS id, role, first_name, last_name, class_name FROM fam_user_profiles
+          WHERE school_id = ${schoolId} AND active = true ORDER BY role ASC, first_name ASC LIMIT 100;`),
+        queryRows(sql`SELECT id, title, description, price_text, category, user_id, status, is_event,
+          event_date, created_at, photo_status FROM fam_listings WHERE school_id = ${schoolId}
+          ORDER BY created_at DESC LIMIT 100;`),
+        queryRows(sql`SELECT actor_id, target_id, action, created_at FROM fam_school_admin_audit
+          WHERE school_id = ${schoolId} ORDER BY created_at DESC LIMIT 20;`),
+        queryRows(sql`SELECT actor_id, target_id, action, created_at FROM fam_account_suspension_audit
+          WHERE school_id = ${schoolId} ORDER BY created_at DESC LIMIT 20;`),
+        queryRows(sql`SELECT actor_id, entity_id AS target_id, action, created_at FROM fam_school_content_audit
+          WHERE school_id = ${schoolId} ORDER BY created_at DESC LIMIT 20;`),
+        queryRows(sql`SELECT request_id AS id, requester_id, target_id, target_role, reason_code, reason, status, created_at
+          FROM fam_account_deletion_requests WHERE school_id = ${schoolId}
+          AND (status = 'pending' OR status = 'processing') ORDER BY created_at ASC LIMIT 50;`),
+        queryRows(sql`SELECT suspension_id AS id, target_id, target_role, duration_hours, reason, expires_at, created_at
+          FROM fam_account_suspensions WHERE school_id = ${schoolId} AND status = 'active'
+          AND expires_at > CurrentUtcTimestamp() ORDER BY expires_at ASC LIMIT 100;`),
+      ]);
+      const timestamp = value => {
+        if (value instanceof Date) return value.getTime();
+        if (typeof value === 'number') return value;
+        const parsed = Date.parse(String(value ?? ''));
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      const audit = [...roleAudit, ...suspensionAudit, ...contentAudit]
+        .sort((a, b) => timestamp(b.created_at) - timestamp(a.created_at))
+        .slice(0, 20).map(row => ({
+          actor: typeof row.actor_id === 'string' ? row.actor_id.slice(0, 8) : '',
+          target: typeof row.target_id === 'string' ? row.target_id.slice(0, 8) : '',
+          action: row.action,
+          created_at: row.created_at,
+        }));
+      return {
+        users: users.map(({ id, role, first_name, last_name, class_name }) => ({ id, role, first_name: first_name ?? null, last_name: last_name ?? null, class_name: class_name ?? null, created_at: null })),
+        listings: listings.map(row => ({ ...row, moderation_status: row.status === 'rejected' || row.photo_status === 'rejected' ? 'rejected' : row.status === 'pending' ? 'pending' : 'approved', city: null })),
+        audit,
+        deletion_requests: deletionRequests.map(row => ({ ...row, target_email: 'Аккаунт', requester_email: 'Участник совета' })),
+        suspensions,
+      };
+    },
+
     async listPendingAccountDeletionRequests(schoolId) {
       if (!schoolId) throw new TypeError('invalid deletion request school');
       const statement = sql`SELECT request_id, requester_id, target_id, target_role, reason_code, reason, created_at

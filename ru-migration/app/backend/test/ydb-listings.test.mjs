@@ -28,6 +28,29 @@ test('active suspension list is school-bound, time-filtered, and bounded', async
   assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
   assert.match(query.text, /LIMIT 100/);
 });
+test('school admin overview binds every projection to its school and returns no external identity fields', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ id: 'synthetic-user', role: 'student', first_name: 'Тест' }]];
+    if (text.includes('FROM fam_listings')) return [[{ id: 'listing-id', user_id: 'synthetic-user', status: 'pending', photo_status: 'pending' }]];
+    if (text.includes('FROM fam_school_admin_audit')) return [[{ actor_id: 'admin-a', target_id: 'student-a', action: 'role_revoked', created_at: '2026-01-01T00:00:00Z' }]];
+    if (text.includes('FROM fam_account_suspension_audit')) return [[]];
+    if (text.includes('FROM fam_school_content_audit')) return [[]];
+    if (text.includes('FROM fam_account_deletion_requests')) return [[]];
+    if (text.includes('FROM fam_account_suspensions')) return [[]];
+    return [[]];
+  };
+  const overview = await createYdbListingsRepository(sql).getSchoolAdminOverview('school-a');
+  assert.equal(overview.users[0].id, 'synthetic-user');
+  assert.equal(overview.listings[0].moderation_status, 'pending');
+  assert.equal(overview.audit[0].actor, 'admin-a');
+  assert.equal(Object.hasOwn(overview.users[0], 'subject'), false);
+  assert.equal(calls.length, 7);
+  for (const call of calls) assert.ok(call.values.includes('school-a'));
+  await assert.rejects(createYdbListingsRepository(sql).getSchoolAdminOverview(''), TypeError);
+});
+
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

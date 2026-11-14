@@ -54,6 +54,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(html, /href="\/auth\/yandex\/start\?reauth=1"/);
     assert.match(html, /fetch\("\/api\/v1\/me\/account"/);
     assert.match(html, /api\/v1\/school\/accounts\/\$\{encodeURIComponent\(targetId\)\}/);
+    assert.match(html, /api\/v1\/school\/admin\/overview/);
     assert.match(html, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
     assert.doesNotMatch(html, /selfDeletePassword/);
 
@@ -81,6 +82,10 @@ test('unconfigured isolated server fails closed for health and user API routes',
     const pulse = await fetch(new URL('/api/v1/pulse', origin));
     assert.equal(pulse.status, 503);
     assert.equal((await pulse.json()).error, 'backend_not_configured');
+
+    const overview = await fetch(new URL('/api/v1/school/admin/overview', origin));
+    assert.equal(overview.status, 503);
+    assert.equal((await overview.json()).error, 'backend_not_configured');
   });
 });
 
@@ -96,6 +101,18 @@ test('self account deletion routes through the configured Russian backend', asyn
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, deleted: true });
     assert.equal(method, 'DELETE');
+  });
+});
+
+test('school admin overview routes through the configured Russian backend', async () => {
+  let routed;
+  await withServer({ listingsApi: async request => {
+    routed = { method: request.method, url: request.url };
+    return { status: 200, body: { ok: true, users: [] } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/school/admin/overview', origin));
+    assert.equal(response.status, 200);
+    assert.deepEqual(routed, { method: 'GET', url: '/api/v1/school/admin/overview' });
   });
 });
 

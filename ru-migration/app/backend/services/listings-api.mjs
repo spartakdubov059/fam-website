@@ -26,6 +26,15 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
     const profileRequestMatch = pathname.match(/^\/api\/v1\/profile-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const roleRequestMatch = pathname.match(/^\/api\/v1\/role-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'GET' && pathname === '/api/v1/school/admin/overview') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.getSchoolAdminOverview !== 'function') return { status: 503, body: { ok: false, error: 'overview_unavailable' } };
+      try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAdminOverview(actor.school_id)) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/schools') {
       return { status: 200, body: { ok: true, schools: schools.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string').map(({ id, name }) => ({ id, name })) } };
     }
