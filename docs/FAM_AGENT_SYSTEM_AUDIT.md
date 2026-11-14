@@ -386,3 +386,9 @@
 - На head `1608f815c29cdb8949b19cff1750af35fe855bd5` hosted Regression suite (включает весь moderation/security набор), owner verifier, Coder QA PostgreSQL, Reporter PostgreSQL, telemetry PostgreSQL и Russian content safety завершились успешно; Netlify preview готов. Локально запустить Node tests невозможно: в текущей среде отсутствует `node`.
 - Это сужает доступ installation token, но не устраняет его необходимые `contents:write`/ `pull-requests:write` права и не заменяет review rule. Read-only GitHub API повторно подтвердил active ruleset: `required_approving_review_count=0`, strict required check `Russian content safety tests`, bypass actors пусты. Требуемое владельцем одно одобрение не применено из-за отсутствия доступа на запись ruleset; окно GitHub на компьютере остаётся недоступным при заблокированном Mac.
 - Production не менялся.
+
+
+## CI trigger path для coder classifier — 14 ноября 2026, 14:11 UTC
+
+- Основной coder workflow использует `scripts/run-local-coder-classified.mjs`, но этот файл отсутствовал в списке `push.paths`; изменение одного timeout-classifier файла поэтому не запускало scheduled/push coder workflow. Добавил путь и точный regression assertion, что он входит в push filter.
+- На head `3ab50ed8d85c5945a98d62d972ba17161cd73ceb` Regression suite, Russian content safety, owner verifier, Coder QA PostgreSQL, Reporter PostgreSQL и telemetry PostgreSQL завершились успешно; preview готов. Production и расписания не менялись.
