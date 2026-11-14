@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -51,8 +51,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/technical-alerts', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, alerts: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/overview', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -98,6 +100,9 @@ export async function initializeListingModeration({ document = globalThis.docume
           && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
           && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
           && Number.isFinite(Date.parse(item.hour_bucket))) : [];
+      const schoolOverviewAvailable = me.profile.role !== 'school_admin'
+        || (schoolOverviewResponse.ok && schoolOverviewResult?.ok
+          && ['users', 'listings', 'audit', 'deletion_requests', 'suspensions'].every(key => Array.isArray(schoolOverviewResult[key])));
       if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
         const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
         if (targets.length) {
@@ -206,10 +211,41 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(alertsPanel);
       };
+      const renderSchoolOverviewPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const overview = node(document, 'section', 'ru-moderation-card');
+        overview.append(node(document, 'h3', '', 'Обзор школы'));
+        if (!schoolOverviewAvailable) {
+          overview.append(node(document, 'p', '', 'Не удалось загрузить обзор школы. Повторите попытку позже.'));
+          queue.append(overview);
+          return;
+        }
+        const users = schoolOverviewResult.users.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member', 'school_admin'].includes(item.role));
+        const listings = schoolOverviewResult.listings.filter(item => item && UUID.test(item.id || '')
+          && ['active', 'pending', 'rejected', 'removed'].includes(item.status));
+        const deletionRequests = schoolOverviewResult.deletion_requests.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member'].includes(item.target_role) && ['pending', 'processing'].includes(item.status));
+        const suspensions = schoolOverviewResult.suspensions.filter(item => item && UUID.test(item.target_id || '')
+          && ['student', 'council_member'].includes(item.target_role));
+        overview.append(node(document, 'p', '', `В выборке: активных профилей — ${users.length}, активных публикаций — ${listings.filter(item => item.status === 'active').length}, ожидают проверки — ${listings.filter(item => item.status === 'pending').length}, заявок на удаление — ${deletionRequests.length}, ограничений — ${suspensions.length}.`));
+        overview.append(node(document, 'p', '', 'Список ограничен последними 100 профилями и публикациями, 50 заявками и 100 ограничениями.'));
+        const actionNames = { role_revoked: 'Снята школьная роль', account_deleted: 'Удалён аккаунт по решению школы',
+          account_deleted_by_admin: 'Удалён аккаунт администратором', listing_deleted: 'Удалено объявление',
+          issued: 'Выдано временное ограничение', lifted: 'Снято временное ограничение',
+          message_approved: 'Одобрена доставка сообщения', message_rejected: 'Отклонено сообщение' };
+        const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
+          && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);
+        overview.append(node(document, 'h4', '', 'Последние действия школы'));
+        if (!audit.length) overview.append(node(document, 'p', '', 'Записанных действий пока нет.'));
+        for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} · ${new Date(item.created_at).toLocaleString('ru-RU')}`));
+        queue.append(overview);
+      };
       if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0) {
         renderPendingMessagesPanel();
         renderSafetyPanel();
         renderTechnicalAlertsPanel();
+        renderSchoolOverviewPanel();
         if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
         status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
           : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
@@ -295,6 +331,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       renderPendingMessagesPanel();
       renderSafetyPanel();
       renderTechnicalAlertsPanel();
+      renderSchoolOverviewPanel();
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
 

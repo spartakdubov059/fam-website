@@ -127,6 +127,10 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
       { event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning', hour_bucket: '2026-11-15T12:00:00Z' },
       { event_code: '<script>x</script>', page_area: 'other', event_count: 999, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
     ] }) };
+    if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true,
+      users: [{ id: '11111111-1111-4111-8111-111111111111', role: 'student' }],
+      listings: [{ id: '22222222-2222-4222-8222-222222222222', status: 'active' }, { id: '33333333-3333-4333-8333-333333333333', status: 'pending' }],
+      deletion_requests: [], suspensions: [], audit: [{ action: 'listing_deleted', created_at: '2026-11-15T12:00:00Z', actor: '<unsafe>' }] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
     if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
     if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
@@ -147,6 +151,12 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   const rejectionAlert = panel.children.filter(item => item.tagName === 'article')[1];
   assert.equal(rejectionAlert.children[0].textContent, 'Предупреждение · Сбой фоновой операции');
   assert.equal(panel.children.some(item => item.textContent.includes('<script>')), false);
+  const overview = f.queue.children.find(item => item.children?.[0]?.textContent === 'Обзор школы');
+  assert.ok(overview);
+  assert.equal(overview.children[1].textContent, 'В выборке: активных профилей — 1, активных публикаций — 1, ожидают проверки — 1, заявок на удаление — 0, ограничений — 0.');
+  assert.match(overview.children[2].textContent, /последними 100 профилями и публикациями/);
+  assert.equal(overview.children.at(-1).textContent, 'Удалено объявление · 15.11.2026, 12:00:00');
+  assert.equal(overview.textContent.includes('<unsafe>'), false);
 });
 
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
