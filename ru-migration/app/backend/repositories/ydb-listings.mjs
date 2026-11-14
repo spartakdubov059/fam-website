@@ -315,6 +315,49 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async beginRequestedAccountDeletion({ requestId, schoolId, reviewerId }) {
+      if (!requestId || !schoolId || !reviewerId) throw new TypeError('invalid requested account deletion');
+      return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const requestRows = await tx`SELECT target_id, school_id, status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const request = requestRows?.[0]?.[0];
+        if (!request || request.school_id !== schoolId || request.status !== 'pending' || request.target_id === reviewerId) return { ok: false, code: 'request_unavailable' };
+        const openRows = await tx`SELECT request_id, school_id FROM fam_account_deletion_open WHERE target_id = ${request.target_id} LIMIT 1;`;
+        const openRequest = openRows?.[0]?.[0];
+        if (openRequest?.request_id !== requestId || openRequest.school_id !== schoolId) return { ok: false, code: 'request_unavailable' };
+        const targetRows = await tx`SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles WHERE user_id = ${request.target_id} LIMIT 1;`;
+        const target = targetRows?.[0]?.[0];
+        if (!target || target.active !== true || target.school_id !== schoolId || !['student', 'council_member'].includes(target.role)) {
+          return { ok: false, code: 'target_unavailable' };
+        }
+        await tx`UPDATE fam_user_profiles SET active = false WHERE user_id = ${target.user_id} AND active = true AND school_id = ${schoolId};`;
+        await tx`UPDATE fam_account_deletion_requests SET status = 'processing', reviewed_by = ${reviewerId}
+          WHERE request_id = ${requestId} AND school_id = ${schoolId} AND status = 'pending';`;
+        const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${target.user_id} LIMIT 1;`;
+        const claimed = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        if (confirmed?.[0]?.[0]?.active !== false || claimed?.[0]?.[0]?.status !== 'processing') return { ok: false, code: 'request_unavailable' };
+        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id };
+      });
+    },
+
+    async restoreRequestedAccountDeletion({ requestId, schoolId, reviewerId, targetId }) {
+      if (!requestId || !schoolId || !reviewerId || !targetId) return false;
+      return sql.begin(async tx => {
+        const requests = await tx`SELECT target_id, status, reviewed_by FROM fam_account_deletion_requests
+          WHERE request_id = ${requestId} AND school_id = ${schoolId} LIMIT 1;`;
+        const request = requests?.[0]?.[0];
+        if (!request || request.target_id !== targetId || request.status !== 'processing' || request.reviewed_by !== reviewerId) return false;
+        await tx`UPDATE fam_user_profiles SET active = true WHERE user_id = ${targetId} AND school_id = ${schoolId} AND active = false;`;
+        await tx`UPDATE fam_account_deletion_requests SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL, review_note = NULL
+          WHERE request_id = ${requestId} AND school_id = ${schoolId} AND status = 'processing' AND reviewed_by = ${reviewerId};`;
+        const profile = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
+        const restored = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        return profile?.[0]?.[0]?.active === true && restored?.[0]?.[0]?.status === 'pending';
+      });
+    },
+
     async beginAccountDeletion({ issuer, subject, userId }) {
       if (!issuer || !subject || !userId) throw new TypeError('invalid account deletion actor');
       return sql.begin(async tx => {
@@ -347,7 +390,7 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
-    async finishAccountDeletion({ issuer, subject, userId, schoolId }) {
+    async finishAccountDeletion({ issuer, subject, userId, schoolId, preserveRequestId = null, reviewerId = null, reviewNote = '' }) {
       if (!issuer || !subject || !userId || !schoolId) throw new TypeError('invalid account deletion');
       return sql.begin(async tx => {
         const profileRows = await tx`SELECT active, school_id FROM fam_user_profiles
@@ -381,9 +424,20 @@ export function createYdbListingsRepository(sql) {
           await tx`DELETE FROM fam_school_poll_votes WHERE poll_id = ${poll.poll_id};`;
           await tx`DELETE FROM fam_school_polls WHERE poll_id = ${poll.poll_id} AND author_id = ${userId};`;
         }
+        if (preserveRequestId) {
+          const approvedRequest = await tx`SELECT target_id, school_id, status FROM fam_account_deletion_requests
+            WHERE request_id = ${preserveRequestId} AND school_id = ${schoolId} AND status = 'processing' LIMIT 1;`;
+          const row = approvedRequest?.[0]?.[0];
+          if (!reviewerId || typeof reviewNote !== 'string' || reviewNote.length > 240 || row?.target_id !== userId) return { ok: false, code: 'request_unavailable' };
+          await tx`UPDATE fam_account_deletion_requests SET status = 'approved', reviewed_by = ${reviewerId},
+            reviewed_at = CurrentUtcTimestamp(), review_note = ${reviewNote}
+            WHERE request_id = ${preserveRequestId} AND school_id = ${schoolId} AND status = 'processing';`;
+          await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${userId} AND request_id = ${preserveRequestId} AND school_id = ${schoolId};`;
+        }
         const deletionRows = await tx`SELECT target_id, request_id FROM fam_account_deletion_requests
           WHERE requester_id = ${userId} OR target_id = ${userId};`;
         for (const item of deletionRows?.[0] ?? []) {
+          if (item.request_id === preserveRequestId) continue;
           await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${item.target_id} AND request_id = ${item.request_id};`;
           await tx`DELETE FROM fam_account_deletion_requests WHERE request_id = ${item.request_id};`;
         }

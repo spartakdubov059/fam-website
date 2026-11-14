@@ -12,6 +12,11 @@ function request(body = { confirmation: 'УДАЛИТЬ МОЙ АККАУНТ' }
   req.method = 'DELETE'; req.url = '/api/v1/me/account'; req.headers = {};
   return req;
 }
+function reviewRequest(body = { decision: 'approve', confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }) {
+  const req = Readable.from([Buffer.from(JSON.stringify(body))]);
+  req.method = 'PATCH'; req.url = '/api/v1/deletion-requests/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; req.headers = {};
+  return req;
+}
 function api({ authenticated = identity, resolvedActor = actor, repository = {}, pendingImages = {}, clock = now } = {}) {
   return createAccountDeletionApi({
     authenticate: async () => authenticated,
@@ -85,4 +90,41 @@ test('unexpected keys in the account storage inventory are never deleted', async
   assert.equal((await handler(request())).status, 503);
   assert.equal(deleted, false);
   assert.equal(restored, true);
+});
+
+test('school administrator approval freshly authenticates, deactivates, cleans storage and finalizes the same-school request', async () => {
+  const targetId = '22222222-2222-4222-8222-222222222222';
+  const targetKey = `pending/${targetId}/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp`;
+  const calls = [];
+  const handler = api({ resolvedActor: { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' }, repository: {
+    beginRequestedAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id }; },
+    finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true, deleted: true }; },
+    restoreRequestedAccountDeletion: async input => { calls.push(['restore', input]); return true; },
+  }, pendingImages: {
+    listUserObjects: async id => { calls.push(['list', id]); return [targetKey]; },
+    delete: async imageKey => { calls.push(['delete', imageKey]); },
+  } });
+  const response = await handler(reviewRequest());
+  assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.deepEqual(calls.map(call => call[0]), ['begin', 'list', 'delete', 'finish']);
+  assert.equal(calls[0][1].reviewerId, '33333333-3333-4333-8333-333333333333');
+  assert.equal(calls[3][1].preserveRequestId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+});
+
+test('request approval rejects stale authentication and restores both request and profile after storage failure', async () => {
+  const targetId = '22222222-2222-4222-8222-222222222222';
+  const restored = [];
+  const admin = { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' };
+  const stale = await api({ authenticated: { ...identity, authenticated_at: Math.floor(now / 1000) - 601 }, resolvedActor: admin,
+    repository: { beginRequestedAccountDeletion: async () => { throw new Error('must not begin'); } } })(reviewRequest());
+  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } });
+
+  const response = await api({ resolvedActor: admin, repository: {
+    beginRequestedAccountDeletion: async () => ({ ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id }),
+    finishAccountDeletion: async () => { throw new Error('must not finalize'); },
+    restoreRequestedAccountDeletion: async input => { restored.push(input); return true; },
+  }, pendingImages: { listUserObjects: async () => { throw new Error('storage offline'); }, delete: async () => {} } })(reviewRequest());
+  assert.equal(response.status, 503);
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].targetId, targetId);
 });

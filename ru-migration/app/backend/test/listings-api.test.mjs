@@ -131,10 +131,11 @@ test('only the same-school school administrator can read pending account deletio
   assert.deepEqual(await handler(patch), { status: 200, body: { ok: true, status: 'rejected' } });
   assert.deepEqual(rejected, [requestId, 'school-b', 'other-admin', 'Проверено']);
   const unsupported = req({ decision: 'approve' }, 'PATCH'); unsupported.url = `/api/v1/deletion-requests/${requestId}`;
-  assert.equal((await handler(unsupported)).status, 400);
+  assert.equal((await handler(unsupported)).status, 403);
   actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
   assert.equal((await handler(request)).status, 403);
-  assert.equal((await handler(patch)).status, 403);
+  const councilPatch = req({ decision: 'reject', review_note: 'Проверено' }, 'PATCH'); councilPatch.url = `/api/v1/deletion-requests/${requestId}`;
+  assert.equal((await handler(councilPatch)).status, 403);
 });
 test('council members can read only their own school-scoped deletion request history', async () => {
   let args;

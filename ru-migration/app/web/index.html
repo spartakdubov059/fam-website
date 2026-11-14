@@ -3671,13 +3671,15 @@ window.onunhandledrejection = function() {
       if (reviewNote.length < 10) return notice("Напишите причину отказа — минимум 10 символов.");
     }
     try {
-      const { data: authData, error: authError } = await sb.auth.getUser();
-      if (authError || !authData?.user?.id || authData.user.id !== user.id) throw new Error("Сессия завершена. Войдите в аккаунт заново.");
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "review_account_deletion", request_id: requestId, decision, review_note: reviewNote }
+      const response = await fetch(`/api/v1/deletion-requests/${encodeURIComponent(requestId)}`, {
+        method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ decision, review_note: reviewNote, ...(decision === "approve" ? { confirmation: "УДАЛИТЬ АККАУНТ УЧАСТНИКА" } : {}) })
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось обработать запрос.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        if (data?.error === "recent_yandex_login_required") throw new Error("Для удаления требуется свежий вход. Подтвердите вход через Яндекс ID и повторите действие.");
+        throw new Error(data?.error || "Не удалось обработать запрос.");
+      }
       notice(decision === "approve" ? "Аккаунт и связанные данные удалены." : "Запрос отклонён.");
       await loadCouncilAdminTools();
       await loadAll();

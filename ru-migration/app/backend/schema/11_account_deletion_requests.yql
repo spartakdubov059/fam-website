@@ -1,5 +1,6 @@
--- School-scoped requests only. Approval does not itself delete an account.
--- Deletion requires a separately audited cleanup operation and is not exposed here.
+-- School-scoped requests only. Approval marks the request as processing while
+-- the backend removes the target's private objects, then preserves the final
+-- approved review row and removes the unique open-request key atomically.
 CREATE TABLE fam_account_deletion_requests (
   request_id Utf8 NOT NULL,
   school_id Utf8 NOT NULL,

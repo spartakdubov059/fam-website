@@ -76,6 +76,25 @@ test('account deletion history is private to its requester and rejection closes 
   assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_account_deletion_open')));
   assert.equal(await repo.rejectAccountDeletionRequest('request-a', 'other-school', 'admin-a'), false);
 });
+test('approved account deletion claims only an active same-school request and its eligible target in one transaction', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT target_id, school_id, status FROM fam_account_deletion_requests')) return [[{ target_id: 'target-a', school_id: 'school-a', status: 'pending' }]];
+    if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[{ request_id: 'request-a', school_id: 'school-a' }]];
+    if (text.includes('SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT active FROM fam_user_profiles')) return [[{ active: false }]];
+    if (text.includes('SELECT status FROM fam_account_deletion_requests')) return [[{ status: 'processing' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.beginRequestedAccountDeletion({ requestId: 'request-a', schoolId: 'school-a', reviewerId: 'admin-a' });
+  assert.deepEqual(result, { ok: true, id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a' });
+  assert.ok(calls.some(call => call.text.includes("SET status = 'processing'") && call.values.includes('request-a')));
+  assert.ok(calls.some(call => call.text.includes('SET active = false') && call.values.includes('school-a')));
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

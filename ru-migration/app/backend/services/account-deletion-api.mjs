@@ -19,51 +19,89 @@ async function readJson(req) {
 export function createAccountDeletionApi({ authenticate = async () => null, resolveActor = async () => null,
   repository, pendingImages, now = Date.now } = {}) {
   return async function handle(req) {
-    if (req.method !== 'DELETE' || new URL(req.url || '/', 'http://localhost').pathname !== '/api/v1/me/account') {
+    const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    const reviewMatch = pathname.match(new RegExp(`^/api/v1/deletion-requests/(${UUID_SOURCE})$`, 'i'));
+    const selfDeletion = req.method === 'DELETE' && pathname === '/api/v1/me/account';
+    if (!selfDeletion && !(req.method === 'PATCH' && reviewMatch)) {
       return { status: 404, body: { ok: false, error: 'not_found' } };
     }
     let identity;
     try { identity = await authenticate(req); } catch { identity = null; }
     if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-    const currentSeconds = Math.floor(now() / 1000);
-    if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
-        || identity.authenticated_at < currentSeconds - 600) {
-      return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
-    }
     let actor;
     try { actor = await resolveActor(identity); } catch { actor = null; }
     if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
     const parsed = await readJson(req);
     if (parsed.error) return { status: parsed.error === 'request_too_large' ? 413 : 400, body: { ok: false, error: parsed.error } };
-    if (parsed.value.confirmation !== CONFIRMATION) return { status: 400, body: { ok: false, error: 'confirmation_required' } };
-    if (typeof repository?.beginAccountDeletion !== 'function' || typeof repository?.finishAccountDeletion !== 'function'
-        || typeof repository?.restoreAccountAfterDeletionFailure !== 'function') {
+    if (!selfDeletion) {
+      if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (parsed.value.decision === 'reject') {
+        const note = typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '';
+        if (typeof repository?.rejectAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+        try {
+          const rejected = await repository.rejectAccountDeletionRequest(reviewMatch[1], actor.school_id, actor.id, note);
+          return rejected ? { status: 200, body: { ok: true, status: 'rejected' } }
+            : { status: 409, body: { ok: false, error: 'request_unavailable' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      const currentSeconds = Math.floor(now() / 1000);
+      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
+          || identity.authenticated_at < currentSeconds - 600) {
+        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+      }
+      if (parsed.value.decision !== 'approve' || parsed.value.confirmation !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') {
+        return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      }
+    } else {
+      const currentSeconds = Math.floor(now() / 1000);
+      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
+          || identity.authenticated_at < currentSeconds - 600) {
+        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+      }
+      if (parsed.value.confirmation !== CONFIRMATION) return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+    }
+    if ((selfDeletion && typeof repository?.beginAccountDeletion !== 'function')
+        || (!selfDeletion && typeof repository?.beginRequestedAccountDeletion !== 'function')
+        || typeof repository?.finishAccountDeletion !== 'function'
+        || (selfDeletion && typeof repository?.restoreAccountAfterDeletionFailure !== 'function')
+        || (!selfDeletion && typeof repository?.restoreRequestedAccountDeletion !== 'function')) {
       return { status: 503, body: { ok: false, error: 'account_deletion_unavailable' } };
     }
-    if (!USER_ID.test(actor.id) || typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') {
+    if (typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') {
       return { status: 503, body: { ok: false, error: 'private_storage_unavailable' } };
     }
 
     let deactivated = false;
+    let target;
     try {
-      const begun = await repository.beginAccountDeletion({ issuer: identity.issuer, subject: identity.subject, userId: actor.id });
+      const begun = selfDeletion
+        ? await repository.beginAccountDeletion({ issuer: identity.issuer, subject: identity.subject, userId: actor.id })
+        : await repository.beginRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id });
       if (!begun?.ok) {
         const code = begun?.code || 'profile_unavailable';
         return { status: code === 'last_school_admin' ? 409 : 403, body: { ok: false, error: code } };
       }
       deactivated = true;
-      const keys = await pendingImages.listUserObjects(actor.id);
+      target = selfDeletion ? { id: actor.id, issuer: identity.issuer, subject: identity.subject, school_id: actor.school_id }
+        : { ...begun, request_id: reviewMatch[1], reviewer_id: actor.id };
+      if (!target.id || !USER_ID.test(target.id) || !target.issuer || !target.subject) throw new Error('invalid deletion target');
+      const keys = await pendingImages.listUserObjects(target.id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
-          || key.split('/')[1].toLowerCase() !== actor.id.toLowerCase())) throw new Error('invalid_storage_inventory');
+          || key.split('/')[1].toLowerCase() !== target.id.toLowerCase())) throw new Error('invalid_storage_inventory');
       for (const key of new Set(keys)) await pendingImages.delete(key);
       const deleted = await repository.finishAccountDeletion({
-        issuer: identity.issuer, subject: identity.subject, userId: actor.id, schoolId: actor.school_id,
+        issuer: target.issuer, subject: target.subject, userId: target.id, schoolId: target.school_id,
+        preserveRequestId: target.request_id, reviewerId: target.reviewer_id,
+        reviewNote: typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '',
       });
       if (!deleted?.ok) throw new Error('database_deletion_failed');
       return { status: 200, body: { ok: true, deleted: true, removed_images: new Set(keys).size } };
     } catch {
       if (deactivated) {
-        try { await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id }); }
+        try {
+          if (selfDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id });
+          else await repository.restoreRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, targetId: target?.id });
+        }
         catch { /* failed cleanup remains inactive until an operator repairs the isolated staging database */ }
       }
       return { status: 503, body: { ok: false, error: 'account_deletion_failed' } };
