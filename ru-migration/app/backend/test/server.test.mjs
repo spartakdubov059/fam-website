@@ -46,6 +46,12 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(messages.headers.get('content-type'), /javascript/);
     assert.match(await messages.text(), /api\/v1\/messages/);
 
+    const pulse = await fetch(new URL('/pulse.js', origin));
+    assert.equal(pulse.status, 200);
+    assert.match(await pulse.text(), /api\/v1\/pulse/);
+    assert.match(html, /id="ruPulse"/);
+    assert.match(html, /pulseScript\.src = '\/pulse\.js'/);
+
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
     assert.equal(moderation.status, 200);
     assert.match(moderation.headers.get('content-type'), /javascript/);
@@ -66,6 +72,10 @@ test('unconfigured isolated server fails closed for health and user API routes',
     const api = await fetch(new URL('/api/v1/listings', origin));
     assert.equal(api.status, 503);
     assert.equal((await api.json()).error, 'backend_not_configured');
+
+    const pulse = await fetch(new URL('/api/v1/pulse', origin));
+    assert.equal(pulse.status, 503);
+    assert.equal((await pulse.json()).error, 'backend_not_configured');
   });
 });
 
