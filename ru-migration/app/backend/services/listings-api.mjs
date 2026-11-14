@@ -2,11 +2,14 @@ import { submitListing } from './submit-listing.mjs';
 import { submitIdea } from './submit-idea.mjs';
 import { submitMessage } from './submit-message.mjs';
 import { requestSchoolProfile } from './request-school-profile.mjs';
+import { createSchoolPulseApi } from './school-pulse-api.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
+  const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    if (pathname === '/api/v1/pulse' || pathname.startsWith('/api/v1/pulse/')) return schoolPulseApi(req);
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
