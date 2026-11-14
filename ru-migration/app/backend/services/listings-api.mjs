@@ -92,6 +92,15 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, targets: await repository.listAccountDeletionTargets(actor.school_id, actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listOwnAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listOwnAccountDeletionRequests(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/review') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
@@ -100,6 +109,27 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.listPendingAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
       try { return { status: 200, body: { ok: true, requests: await repository.listPendingAccountDeletionRequests(actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const deletionReview = pathname.match(/^\/api\/v1\/deletion-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && deletionReview) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.decision !== 'reject') return { status: 400, body: { ok: false, error: 'unsupported_decision' } };
+      const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
+      if (typeof repository?.rejectAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try {
+        const rejected = await repository.rejectAccountDeletionRequest(deletionReview[1], actor.school_id, actor.id, note);
+        return rejected ? { status: 200, body: { ok: true, status: 'rejected' } }
+          : { status: 409, body: { ok: false, error: 'request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'POST' && pathname === '/api/v1/deletion-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

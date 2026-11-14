@@ -111,19 +111,41 @@ test('council deletion requests are same-school, bounded, and reject personal co
   assert.equal((await handler(submit)).status, 403);
 });
 test('only the same-school school administrator can read pending account deletion requests', async () => {
+  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
   let selectedSchool;
+  let rejected;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
     resolveActor: async () => actor,
-    repository: { listPendingAccountDeletionRequests: async school => { selectedSchool = school; return [{ request_id: 'synthetic-request', reason: 'synthetic' }]; } } });
+    repository: {
+      listPendingAccountDeletionRequests: async school => { selectedSchool = school; return [{ request_id: requestId, reason: 'synthetic' }]; },
+      rejectAccountDeletionRequest: async (...args) => { rejected = args; return args[1] === actor.school_id; },
+    } });
   const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests/review';
   assert.equal((await handler(request)).status, 200);
   assert.equal(selectedSchool, 'school-a');
   actor = { id: 'other-admin', school_id: 'school-b', role: 'school_admin' };
   assert.equal((await handler(request)).status, 200);
   assert.equal(selectedSchool, 'school-b');
+  const patch = req({ decision: 'reject', review_note: 'Проверено' }, 'PATCH'); patch.url = `/api/v1/deletion-requests/${requestId}`;
+  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true, status: 'rejected' } });
+  assert.deepEqual(rejected, [requestId, 'school-b', 'other-admin', 'Проверено']);
+  const unsupported = req({ decision: 'approve' }, 'PATCH'); unsupported.url = `/api/v1/deletion-requests/${requestId}`;
+  assert.equal((await handler(unsupported)).status, 400);
   actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
   assert.equal((await handler(request)).status, 403);
+  assert.equal((await handler(patch)).status, 403);
+});
+test('council members can read only their own school-scoped deletion request history', async () => {
+  let args;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'council' }),
+    resolveActor: async () => ({ id: 'council-id', school_id: 'school-a', role: 'council_member' }),
+    repository: { listOwnAccountDeletionRequests: async (...values) => { args = values; return [{ request_id: 'synthetic', status: 'pending' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests';
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(args, ['school-a', 'council-id']);
+  assert.deepEqual(response.body.requests, [{ request_id: 'synthetic', status: 'pending' }]);
 });
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;

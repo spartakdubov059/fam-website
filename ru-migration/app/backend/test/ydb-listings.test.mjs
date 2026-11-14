@@ -54,6 +54,28 @@ test('account deletion request validates requester and target from same-school p
   assert.ok(openKey.values.includes('student-id'));
   assert.equal(await repo.createAccountDeletionRequest({ schoolId: '', requesterId: 'a', targetId: 'b', reasonCode: 'spam', reason: 'this is a sufficiently long reason' }).then(() => false, () => true), true);
 });
+test('account deletion history is private to its requester and rejection closes the request in one transaction', async () => {
+  let listQuery; const calls = [];
+  const sql = Object.assign((strings, ...values) => { listQuery = { text: strings.join('?'), values }; return Promise.resolve([[{ request_id: 'request-a', status: 'pending' }]]); }, {
+    begin: callback => callback(async (strings, ...values) => {
+      const text = strings.join('?'); calls.push({ text, values });
+      if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+      if (text.includes('SELECT target_id, school_id, status FROM fam_account_deletion_requests')) return [[{ target_id: 'student-a', school_id: 'school-a', status: 'pending' }]];
+      if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[{ request_id: 'request-a', school_id: 'school-a' }]];
+      if (text.includes('SELECT status FROM fam_account_deletion_requests')) return [[{ status: 'rejected' }]];
+      return [[]];
+    }),
+  });
+  const repo = createYdbListingsRepository(sql);
+  const own = await repo.listOwnAccountDeletionRequests('school-a', 'council-a');
+  assert.deepEqual(own, [{ request_id: 'request-a', status: 'pending' }]);
+  assert.ok(listQuery.values.includes('school-a') && listQuery.values.includes('council-a'));
+  assert.match(listQuery.text, /ORDER BY created_at DESC LIMIT 10/);
+  assert.equal(await repo.rejectAccountDeletionRequest('request-a', 'school-a', 'admin-a', 'Проверено'), true);
+  assert.ok(calls.some(call => call.text.includes("SET status = 'rejected'")));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_account_deletion_open')));
+  assert.equal(await repo.rejectAccountDeletionRequest('request-a', 'other-school', 'admin-a'), false);
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

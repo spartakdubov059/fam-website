@@ -141,6 +141,14 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
+    async listOwnAccountDeletionRequests(schoolId, requesterId) {
+      if (!schoolId || !requesterId) throw new TypeError('invalid own deletion request lookup');
+      const statement = sql`SELECT request_id, target_role, reason_code, reason, status, review_note, created_at, reviewed_at
+        FROM fam_account_deletion_requests WHERE school_id = ${schoolId} AND requester_id = ${requesterId}
+        ORDER BY created_at DESC LIMIT 10;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
     async createAccountDeletionRequest({ schoolId, requesterId, targetId, reasonCode, reason }) {
       if (!schoolId || !requesterId || !targetId || requesterId === targetId
           || !['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(reasonCode)
@@ -166,6 +174,27 @@ export function createYdbListingsRepository(sql) {
         await tx`INSERT INTO fam_account_deletion_open (target_id, request_id, school_id, created_at)
           VALUES (${targetId}, ${requestId}, ${schoolId}, CurrentUtcTimestamp());`;
         return { ok: true, already_exists: false, request_id: requestId };
+      });
+    },
+    async rejectAccountDeletionRequest(requestId, schoolId, reviewerId, reviewNote = '') {
+      if (!requestId || !schoolId || !reviewerId || typeof reviewNote !== 'string' || reviewNote.length > 240) throw new TypeError('invalid deletion request decision');
+      return sql.begin(async tx => {
+        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewers?.[0]?.[0];
+        if (!reviewer || !reviewer.active || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
+        const requests = await tx`SELECT target_id, school_id, status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        const request = requests?.[0]?.[0];
+        if (!request || request.school_id !== schoolId || request.status !== 'pending') return false;
+        const openRows = await tx`SELECT request_id, school_id FROM fam_account_deletion_open WHERE target_id = ${request.target_id} LIMIT 1;`;
+        const openRequest = openRows?.[0]?.[0];
+        if (openRequest?.request_id !== requestId || openRequest.school_id !== schoolId) return false;
+        await tx`UPDATE fam_account_deletion_requests SET status = 'rejected', reviewed_by = ${reviewerId},
+          reviewed_at = CurrentUtcTimestamp(), review_note = ${reviewNote}
+          WHERE request_id = ${requestId} AND school_id = ${schoolId} AND status = 'pending';`;
+        await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${request.target_id}
+          AND request_id = ${requestId} AND school_id = ${schoolId};`;
+        const confirmed = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
+        return confirmed?.[0]?.[0]?.status === 'rejected';
       });
     },
     async createSchoolProfileRequest(record) {

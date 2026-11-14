@@ -61,11 +61,22 @@ try {
   assert.equal(deletionQueue.status, 200);
   assert.equal(deletionQueue.body.requests.length, 1);
   assert.equal(Object.hasOwn(deletionQueue.body.requests[0], 'issuer'), false);
+  const ownDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
+  assert.equal(ownDeletionRequests.status, 200);
+  assert.equal(ownDeletionRequests.body.requests.length, 1);
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-lyceum-admin'))).body.requests.length, 0,
+    'the review queue is restricted to the administrator school');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/deletion-requests/${deletionRequest.body.request_id}`, 'synthetic-admin', {
+    decision: 'reject', review_note: 'Проверено в тестовой школе',
+  })), { status: 200, body: { ok: true, status: 'rejected' } });
+  const updatedOwnDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
+  assert.equal(updatedOwnDeletionRequests.body.requests[0].status, 'rejected');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'))).body.requests.length, 0);
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-registrant'))).status, 403);
   assert.equal((await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-registrant', {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
   }))).status, 403);
-  console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission, same-school admin queue, duplicate guard, and role enforcement');
+  console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
   const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
   }));
