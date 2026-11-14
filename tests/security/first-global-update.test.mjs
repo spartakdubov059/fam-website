@@ -39,12 +39,14 @@ test("chat titles use listing names and dialogs retain listing identity",()=>{
  assert.ok(html.includes('data-listing-id="${esc(d.listingId || "")}"'));
 });
 
-test("announcements stay separate from listings and polls and disappear when empty",()=>{
- assert.match(html,/id="pulseAnnouncementCarousel"/);
+test("announcements, open events, and polls lead the main hero carousel",()=>{
+ assert.match(html,/id="bannerCarousel"/);
+ assert.doesNotMatch(html,/id="pulseAnnouncementCarousel"/);
  assert.match(html,/data-pulse-scroll="-1"/);
  assert.match(html,/data-pulse-scroll="1"/);
- assert.match(html,/scroll-snap-type:\\s*x mandatory/);
+ assert.match(html,/scroll-snap-type:\s*x mandatory/);
+ assert.match(pulse,/hero-pulse-slide pulse-generated/);
  assert.match(pulse,/priorityNews\.map\(announcementCard\)\.concat\(polls\.map\(pollCard\),otherNews\.map\(announcementCard\)\)/);
- assert.match(pulse,/carousel\?\.classList\.toggle\("hidden",featured\.length===0\)/);
+ assert.match(pulse,/featured\.length===0/);
  assert.match(pulse,/grid\.innerHTML=""/);
 });
