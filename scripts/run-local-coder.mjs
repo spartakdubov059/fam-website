@@ -70,10 +70,21 @@ async function askModel(messages, schema, maxTokens, normalizeResponse) {
 
       const choice = result?.choices?.[0];
       const content = choice?.message?.content;
-      if (process.env.FAM_DEBUG_MODEL_RESPONSES === "1" && typeof content === "string") {
+      if (process.env.FAM_DEBUG_MODEL_RESPONSES === "1") {
         const outputDir = process.env.RUNNER_TEMP || "/tmp";
         mkdirSync(outputDir, { recursive: true });
-        writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.txt`), content);
+        writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.json`), JSON.stringify({
+          finish_reason: choice?.finish_reason ?? null,
+          usage: result?.usage ?? null,
+          message_keys: choice?.message && typeof choice.message === "object" ? Object.keys(choice.message) : [],
+          content_type: typeof content,
+          content_length: typeof content === "string" ? content.length : null,
+          has_reasoning_content: typeof choice?.message?.reasoning_content === "string",
+          has_thinking: typeof choice?.message?.thinking === "string",
+        }, null, 2));
+        if (typeof content === "string") {
+          writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.txt`), content);
+        }
       }
       const parsed = parseJson(content);
       const normalized = normalizeResponse?.(parsed) ?? parsed;

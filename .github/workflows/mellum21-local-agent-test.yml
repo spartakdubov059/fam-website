@@ -105,6 +105,8 @@ jobs:
           SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
           "$SERVER" -m "$MODEL" \
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+            --reasoning-budget 1024 \
+            --reasoning-budget-message "Stop reasoning and return the required final JSON object now." \
             --temp 0.6 --top-p 0.95 --top-k 20 \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/fam-llama-server.pid"
