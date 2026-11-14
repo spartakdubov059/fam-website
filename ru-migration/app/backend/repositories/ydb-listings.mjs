@@ -1550,6 +1550,22 @@ export function createYdbListingsRepository(sql) {
         VALUES (${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
     },
 
+    async recordSiteError({ eventCode, pageArea, occurredAt = new Date() }) {
+      const bucket = new Date(occurredAt);
+      if (!Number.isFinite(bucket.getTime())) throw new TypeError('invalid site error timestamp');
+      bucket.setUTCMinutes(0, 0, 0);
+      const hourBucket = bucket.toISOString();
+      return sql.begin(async tx => {
+        const priorRows = await tx`SELECT event_count FROM fam_site_error_counts
+          WHERE hour_bucket = Unwrap(CAST(${hourBucket} AS Timestamp)) AND event_code = ${eventCode} AND page_area = ${pageArea} LIMIT 1;`;
+        const count = Math.min(1000, Number(priorRows?.[0]?.[0]?.event_count ?? 0) + 1);
+        await tx`UPSERT INTO fam_site_error_counts (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
+          VALUES (Unwrap(CAST(${hourBucket} AS Timestamp)), ${eventCode}, ${pageArea}, Unwrap(CAST(${count} AS Uint32)),
+            CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+        return count;
+      });
+    },
+
     async getSchoolAgentDashboard(schoolId) {
       if (!schoolId) throw new TypeError('invalid school agent dashboard school');
       const [reports, ideas] = await Promise.all([

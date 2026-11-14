@@ -69,6 +69,14 @@ try {
   const savedGlobalAgentReport = await sql`SELECT report_date, summary, metrics_json FROM fam_agent_daily_reports WHERE report_date = '2026-11-14';`;
   assert.equal(savedGlobalAgentReport?.[0]?.[0]?.summary, 'Синтетическая внутренняя сводка');
   assert.deepEqual(JSON.parse(savedGlobalAgentReport[0][0].metrics_json), globalAgentMetrics);
+  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:34:00.000Z') }), 1);
+  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:59:00.000Z') }), 2);
+  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T13:00:00.000Z') }), 1);
+  const siteErrorBuckets = await sql`SELECT hour_bucket, event_code, page_area, event_count FROM fam_site_error_counts WHERE event_code = 'js_runtime' AND page_area = 'other' ORDER BY hour_bucket ASC;`;
+  assert.deepEqual(siteErrorBuckets?.[0] ?? [], [
+    { hour_bucket: new Date('2026-11-14T12:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 2 },
+    { hour_bucket: new Date('2026-11-14T13:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 1 },
+  ]);
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);
@@ -596,7 +604,7 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

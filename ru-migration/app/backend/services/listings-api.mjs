@@ -5,12 +5,15 @@ import { requestSchoolProfile } from './request-school-profile.mjs';
 import { createSchoolPulseApi } from './school-pulse-api.mjs';
 import { createAccountDeletionApi } from './account-deletion-api.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
+import { createSiteErrorTelemetry } from './site-error-telemetry.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review, safetyKey, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
+  const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    if (pathname === '/api/v1/site-errors') return siteErrorTelemetry(req);
     if (pathname === '/api/v1/me/account') return accountDeletionApi(req);
     if (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
     if (req.method === 'PATCH' && /^\/api\/v1\/deletion-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);

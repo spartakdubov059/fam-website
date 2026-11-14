@@ -24,6 +24,9 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(html, /messagesScript\.src = '\/messages\.js'/);
     assert.match(html, /src="\/price-format\.js"/);
     assert.match(html, /auth\/yandex\/start/);
+    assert.match(html, /fetch\("\/api\/v1\/site-errors"/);
+    assert.match(html, /JSON\.stringify\(\{ event_code: eventCode, page_area: pageArea \}\)/);
+    assert.doesNotMatch(html, /body:\s*JSON\.stringify\(\{[^}]*\b(?:error|message|user_id):/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
 
     const formatter = await fetch(new URL('/price-format.js', origin));
@@ -368,4 +371,23 @@ test('isolated server routes school catalog and access-request lifecycle to the 
     'GET /api/v1/messages/moderation', `PATCH /api/v1/messages/moderation/${id}`,
     'GET /api/v1/deletion-requests/targets', 'GET /api/v1/deletion-requests', 'GET /api/v1/deletion-requests/review', 'POST /api/v1/deletion-requests', `PATCH /api/v1/deletion-requests/${id}`, `DELETE /api/v1/school/accounts/${id}`,
   ]);
+});
+
+test('isolated server routes anonymous site error counters only to its configured backend', async () => {
+  let routed;
+  await withServer({ listingsApi: async request => {
+    routed = `${request.method} ${request.url}`;
+    return { status: 202, body: { ok: true } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/site-errors', origin), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event_code: 'js_runtime', page_area: 'other' }),
+    });
+    assert.equal(response.status, 202);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(routed, 'POST /api/v1/site-errors');
+  });
+  await withServer({}, async origin => {
+    const response = await fetch(new URL('/api/v1/site-errors', origin), { method: 'POST', body: '{}' });
+    assert.equal(response.status, 503);
+  });
 });
