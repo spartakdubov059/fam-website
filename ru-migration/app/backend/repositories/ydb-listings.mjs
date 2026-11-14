@@ -840,6 +840,59 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async getSchoolListingDeletionContext({ schoolId, actorId, listingId }) {
+      if (!schoolId || !actorId || !UUID.test(listingId || '')) throw new TypeError('invalid school listing deletion lookup');
+      const statement = sql`SELECT user_id, school_id, category FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const listing = (await statement)?.[0]?.[0];
+      if (!listing || listing.school_id !== schoolId) return null;
+      return { user_id: listing.user_id, school_id: listing.school_id, category: listing.category };
+    },
+
+    async deleteSchoolListing({ schoolId, actorId, listingId }) {
+      if (!schoolId || !actorId || !UUID.test(listingId || '')) throw new TypeError('invalid school listing deletion');
+      return sql.begin(async tx => {
+        const actorRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
+        const actor = actorRows?.[0]?.[0];
+        if (!actor || actor.active !== true || actor.role !== 'school_admin' || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const listingRows = await tx`SELECT id, user_id, school_id, category, is_event, image_key FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
+        const listing = listingRows?.[0]?.[0];
+        if (!listing || listing.school_id !== schoolId) return { ok: false, code: 'listing_unavailable' };
+
+        if (listing.is_event === true) {
+          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
+          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
+        }
+        await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
+
+        let mediaCleanup = null;
+        if (typeof listing.image_key === 'string' && UUID.test(listing.user_id || '')) {
+          const keyParts = listing.image_key.split('/');
+          const validOwnedKey = keyParts.length === 3 && keyParts[0] === 'pending'
+            && keyParts[1].toLowerCase() === listing.user_id.toLowerCase()
+            && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(keyParts[2]);
+          if (validOwnedKey) {
+            const mediaRows = await tx`SELECT user_id FROM fam_pending_media WHERE object_key = ${listing.image_key} LIMIT 1;`;
+            if (mediaRows?.[0]?.[0]?.user_id === listing.user_id) {
+              const claimToken = randomUUID();
+              await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
+                claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M')) WHERE object_key = ${listing.image_key};`;
+              const claim = await tx`SELECT object_key, claim_token FROM fam_pending_media
+                WHERE object_key = ${listing.image_key} AND status = 'deleting' AND claim_token = ${claimToken} LIMIT 1;`;
+              if (claim?.[0]?.[0]) mediaCleanup = claim[0][0];
+            }
+          }
+        }
+
+        await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND school_id = ${schoolId};`;
+        await tx`INSERT INTO fam_school_content_audit
+          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${listingId}, 'listing', 'listing_deleted',
+            ${JSON.stringify({ category: String(listing.category ?? '').slice(0, 40), image_cleanup: mediaCleanup ? 'queued' : 'not_needed' })}, CurrentUtcTimestamp());`;
+        return { ok: true, id: listingId, media_cleanup: mediaCleanup };
+      });
+    },
+
     async listActiveListings() {
       const statement = sql`SELECT id, title, description, category, price_text, is_event,
         event_date, event_time, event_type, max_seats, created_at, image_key, photo_status

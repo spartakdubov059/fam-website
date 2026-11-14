@@ -17,6 +17,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (pathname === '/api/v1/pulse' || pathname.startsWith('/api/v1/pulse/')) return schoolPulseApi(req);
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
+    const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
@@ -477,6 +478,45 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
       try { return { status: 200, body: { ok: true, listing_ids: await repository.listOwnActiveListingIds(actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolListingDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.getSchoolListingDeletionContext !== 'function' || typeof repository?.deleteSchoolListing !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
+      }
+      let context;
+      try { context = await repository.getSchoolListingDeletionContext({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+      if (context.user_id !== actor.id) {
+        const authenticatedAt = Number(identity.authenticated_at);
+        const ageSeconds = now() / 1000 - authenticatedAt;
+        if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) {
+          return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+        }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 2 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.confirmation !== 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      try {
+        const deleted = await repository.deleteSchoolListing({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] });
+        if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function' && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'DELETE' && ownListingMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

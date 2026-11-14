@@ -396,6 +396,25 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
+  const schoolDeleteMedia = 'pending/55555555-5555-4555-8555-555555555555/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp';
+  await repo.registerPendingImage('55555555-5555-4555-8555-555555555555', schoolDeleteMedia);
+  const schoolDeleteListing = await repo.createListing({ user_id: '55555555-5555-4555-8555-555555555555', school_id: 'synthetic-school',
+    title: 'Синтетическое объявление для удаления администратором', description: 'Тестируется только на одноразовой базе', category: 'Книги',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: schoolDeleteMedia, photo_status: 'pending', status: 'pending' });
+  accountMediaKeys.add(schoolDeleteMedia);
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${otherSchoolPending.id}`, 'synthetic-admin', {
+    confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ',
+  }))).status, 404, 'administrator cannot delete another school listing');
+  const schoolDeleteResult = await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${schoolDeleteListing.id}`, 'synthetic-admin', {
+    confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ',
+  }));
+  assert.deepEqual(schoolDeleteResult, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.ok(deletedMediaKeys.includes(schoolDeleteMedia), 'school listing deletion removes its registered private image');
+  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${schoolDeleteListing.id};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${schoolDeleteMedia};`)?.[0]?.length ?? 0, 0);
+  const schoolDeleteAudit = await sql`SELECT school_id, actor_id, entity_id, entity_type, action FROM fam_school_content_audit WHERE entity_id = ${schoolDeleteListing.id};`;
+  assert.deepEqual(schoolDeleteAudit?.[0]?.[0], { school_id: 'synthetic-school', actor_id: '33333333-3333-4333-8333-333333333333',
+    entity_id: schoolDeleteListing.id, entity_type: 'listing', action: 'listing_deleted' });
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
   accountMediaKeys.add(deletingImageKey);
@@ -449,7 +468,7 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion request workflows, approved and direct same-school account deletion with private media cleanup and audit, school-scoped announcements/polls/voting, own-profile identity update, listing/media cleanup, favorites, ideas, messages, event registration/review, all on disposable synthetic local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion request workflows, approved and direct same-school account deletion with private media cleanup and audit, school-scoped listing deletion with private media cleanup and audit, school-scoped announcements/polls/voting, own-profile identity update, listing/media cleanup, favorites, ideas, messages, event registration/review, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

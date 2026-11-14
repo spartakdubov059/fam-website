@@ -228,6 +228,20 @@ test('isolated server routes school listing moderation to the backend', async ()
   });
 });
 
+test('isolated server routes school administrator listing deletion to the backend', async () => {
+  let received;
+  await withServer({ listingsApi: async request => {
+    received = { method: request.method, url: request.url };
+    return { status: 200, body: { ok: true } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/school/listings/11111111-1111-4111-8111-111111111111', origin), {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ' }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(received, { method: 'DELETE', url: '/api/v1/school/listings/11111111-1111-4111-8111-111111111111' });
+  });
+});
+
 test('isolated server routes listing contact messages to the configured backend', async () => {
   let received;
   await withServer({ listingsApi: async request => { received = { method: request.method, url: request.url, body: await new Promise(resolve => {

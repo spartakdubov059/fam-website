@@ -414,6 +414,41 @@ test('ordinary students can delete only their own listing and media cleanup stay
   assert.equal((await handler(remove)).status, 403);
 });
 
+test('school administrators require fresh Yandex auth to delete another member listing', async () => {
+  const listingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const adminId = '11111111-1111-4111-8111-111111111111';
+  let identity = { issuer: 'issuer', subject: 'admin', authenticated_at: 1_800_000_000 };
+  let context = { user_id: '22222222-2222-4222-8222-222222222222', school_id: 'school-a', category: 'Книги' };
+  let deleted = 0; const calls = [];
+  const handler = createListingsApi({ authenticate: async () => identity,
+    resolveActor: async () => ({ id: adminId, role: 'school_admin', school_id: 'school-a' }),
+    now: () => 1_800_000_000_000,
+    pendingImages: { delete: async key => calls.push(['image', key]) },
+    repository: {
+      getSchoolListingDeletionContext: async input => { calls.push(['context', input]); return context; },
+      deleteSchoolListing: async input => { calls.push(['delete', input]); deleted++; return {
+        ok: true, id: listingId, media_cleanup: { object_key: 'pending/owner/image.webp', claim_token: 'claim' },
+      }; },
+      finishPendingImageCleanup: async (...args) => { calls.push(['finish', ...args]); return true; },
+    } });
+  const remove = req({ confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ' }, 'DELETE');
+  remove.url = `/api/v1/school/listings/${listingId}`;
+  identity.authenticated_at = null;
+  assert.equal((await handler(remove)).body.error, 'recent_yandex_login_required');
+  assert.equal(deleted, 0);
+  identity.authenticated_at = 1_800_000_000;
+  assert.deepEqual(await handler(remove), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.equal(deleted, 1);
+  assert.deepEqual(calls.slice(-3).map(call => call[0]), ['delete', 'image', 'finish']);
+  context = { user_id: adminId, school_id: 'school-a', category: 'Афиша' };
+  identity.authenticated_at = null;
+  assert.equal((await handler(remove)).status, 200, 'owner can remove their own listing without the extra freshness gate');
+  context = null;
+  assert.equal((await handler(remove)).status, 404, 'cross-school or missing listing remains unavailable');
+  const wrongConfirmation = req({ confirmation: 'delete' }, 'DELETE'); wrongConfirmation.url = remove.url;
+  assert.equal((await handler(wrongConfirmation)).body.error, 'confirmation_required');
+});
+
 test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
   let actor = { id: 'staff-id', role: 'school_admin' };
   let queries = 0;

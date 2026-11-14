@@ -87,6 +87,7 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'GET' && ['/api/v1/me', '/api/v1/favorites', '/api/v1/messages'].includes(url.pathname))
       || (req.method === 'DELETE' && url.pathname === '/api/v1/me/account')
       || (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
+      || (req.method === 'DELETE' && /^\/api\/v1\/school\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (req.method === 'GET' && url.pathname === '/api/v1/me/listings')
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations')
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations/review')

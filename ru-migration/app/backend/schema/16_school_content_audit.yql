@@ -1,0 +1,13 @@
+-- Server-only audit for school administrator actions on community content.
+CREATE TABLE fam_school_content_audit (
+  event_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  actor_id Utf8 NOT NULL,
+  entity_id Utf8 NOT NULL,
+  entity_type Utf8 NOT NULL,
+  action Utf8 NOT NULL,
+  details Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id)
+);
+
