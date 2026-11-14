@@ -1,0 +1,9 @@
+-- One open-restriction key per target serializes concurrent administrator actions.
+-- The key is inserted, replaced after expiry, and removed on early lift in the same transaction.
+CREATE TABLE fam_account_suspension_open (
+  target_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  suspension_id Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (target_id)
+);

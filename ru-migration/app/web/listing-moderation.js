@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -41,8 +41,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions', options)
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, suspensions: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions/targets', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -63,6 +65,32 @@ export async function initializeListingModeration({ document = globalThis.docume
         ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
           && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
           && typeof item.expires_at === 'string') : [];
+      if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
+        const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
+        if (targets.length) {
+          const panel = node(document, 'section', 'ru-moderation-card');
+          panel.append(node(document, 'h3', '', 'Временное ограничение действий аккаунта'));
+          const note = node(document, 'p', '', 'Доступно администраторам этой школы после повторного подтверждения входа. Выберите срок и укажите фактическую причину без личных данных.');
+          const form = document.createElement('form'); form.className = 'ru-suspension-form';
+          const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', 'Аккаунт');
+          const prompt = node(document, 'option', '', 'Выберите аккаунт'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);
+          for (const target of targets) {
+            const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+            const option = node(document, 'option', '', `${name || 'Ученик'} · ${target.role === 'student' ? 'ученик' : 'Совет'}`);
+            option.value = target.id; select.append(option);
+          }
+          const duration = document.createElement('select'); duration.required = true; duration.setAttribute('aria-label', 'Срок ограничения');
+          for (const [hours, label] of [[24, '24 часа'], [72, '3 дня'], [168, '7 дней']]) { const option = node(document, 'option', '', label); option.value = String(hours); duration.append(option); }
+          const reason = document.createElement('textarea'); reason.required = true; reason.minLength = 15; reason.maxLength = 400; reason.placeholder = 'Причина (15–400 символов, без контактов)';
+          const issueSuspension = async () => {
+            if (!UUID.test(select.value || '') || reason.value.trim().length < 15 || reason.value.trim().length > 400) { status.textContent = 'Выберите аккаунт и укажите причину длиной 15–400 символов.'; return; }
+            await patch(`/api/v1/suspensions/${select.value}`, { action: 'issue', duration_hours: Number(duration.value), reason: reason.value.trim() });
+          };
+          const submit = actionButton(document, 'Установить ограничение', issueSuspension);
+          form.addEventListener('submit', async event => { event.preventDefault(); await issueSuspension(); });
+          form.append(select, duration, reason, submit); panel.append(note, form); queue.append(panel);
+        }
+      }
       if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0) {
         status.textContent = suspensionsAvailable ? 'Очереди школьной проверки пусты.'
           : 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.';
@@ -138,6 +166,8 @@ export async function initializeListingModeration({ document = globalThis.docume
         card.append(node(document, 'p', '', `ID аккаунта: ${suspension.target_id}`));
         card.append(node(document, 'p', '', `Причина: ${suspension.reason}`));
         card.append(node(document, 'p', '', `Действует до: ${new Date(suspension.expires_at).toLocaleString('ru-RU')}`));
+        const lift = actionButton(document, 'Снять ограничение', () => patch(`/api/v1/suspensions/${suspension.target_id}`, { action: 'lift' }));
+        card.append(lift);
         queue.append(card);
       }
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
@@ -158,7 +188,18 @@ export async function initializeListingModeration({ document = globalThis.docume
     try {
       const response = await fetchImpl(path, { method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error('decision_failed');
+      const result = await json(response);
+      if (!response.ok) {
+        if (result?.error === 'fresh_auth_required') {
+          status.replaceChildren(node(document, 'span', '', 'Для этого действия повторно войдите через Яндекс ID. '));
+          const link = node(document, 'a', '', 'Подтвердить вход'); link.href = '/auth/yandex/start?reauth=1';
+          status.append(link);
+          return;
+        }
+        if (result?.error === 'already_suspended') { status.textContent = 'У этого аккаунта уже есть действующее ограничение.'; return; }
+        throw new Error('decision_failed');
+      }
+      status.textContent = body.action === 'issue' ? 'Временное ограничение установлено.' : 'Временное ограничение снято.';
       await load();
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
   }

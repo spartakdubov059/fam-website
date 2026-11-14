@@ -4,7 +4,7 @@ import { submitMessage } from './submit-message.mjs';
 import { requestSchoolProfile } from './request-school-profile.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
 
-export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG, pendingImages = null }) {
+export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
@@ -71,6 +71,55 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.listActiveAccountSuspensions !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
       try { return { status: 200, body: { ok: true, suspensions: await repository.listActiveAccountSuspensions(actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/suspensions/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listSuspensionTargets !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listSuspensionTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const suspensionAction = pathname.match(/^\/api\/v1\/suspensions\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && suspensionAction) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      const authenticatedAt = Number(identity.authenticated_at);
+      const ageSeconds = now() / 1000 - authenticatedAt;
+      if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) {
+        return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
+      }
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.action === 'issue') {
+        const durationHours = Number(input.duration_hours);
+        const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+        const digits = (reason.match(/[0-9]/g) || []).length;
+        const hasContact = /https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(reason) || digits >= 11;
+        if (![24, 72, 168].includes(durationHours)) return { status: 400, body: { ok: false, error: 'invalid_duration' } };
+        if (reason.length < 15 || reason.length > 400 || hasContact) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
+        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_suspend_self' } };
+        if (typeof repository?.issueAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+        try {
+          const result = await repository.issueAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id, durationHours, reason });
+          return result?.ok ? { status: 201, body: { ok: true, suspension: result.suspension } }
+            : { status: result?.code === 'target_unavailable' ? 404 : result?.code === 'already_suspended' ? 409 : 403, body: { ok: false, error: result?.code || 'suspension_failed' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      if (input?.action === 'lift') {
+        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_manage_self' } };
+        if (typeof repository?.liftAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+        try {
+          const lifted = await repository.liftAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id });
+          return lifted ? { status: 200, body: { ok: true, status: 'lifted' } }
+            : { status: 409, body: { ok: false, error: 'suspension_unavailable' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      return { status: 400, body: { ok: false, error: 'invalid_action' } };
     }
     if (req.method === 'GET' && pathname === '/api/v1/me/suspension') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

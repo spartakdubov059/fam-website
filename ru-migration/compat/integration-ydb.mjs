@@ -32,7 +32,8 @@ try {
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
-          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1' });
+          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1',
+    authenticated_at: req.headers.authorization === 'Bearer synthetic-admin' ? Math.floor(Date.now() / 1000) : null });
   const deletedMediaKeys = [];
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
@@ -45,6 +46,36 @@ try {
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;
   };
+  const suspensionTargets = await listingsApi(apiRequest('GET', '/api/v1/suspensions/targets', 'synthetic-admin'));
+  assert.equal(suspensionTargets.status, 200);
+  assert.equal(suspensionTargets.body.targets.some(row => row.id === '22222222-2222-4222-8222-222222222222'), false,
+    'suspension target directory never includes another school');
+  assert.equal(suspensionTargets.body.targets.some(row => row.id === '33333333-3333-4333-8333-333333333333'), false,
+    'administrator cannot suspend self');
+  const suspensionIssue = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', {
+    action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the shared school board.',
+  }));
+  assert.equal(suspensionIssue.status, 201);
+  assert.equal(suspensionIssue.body.suspension.target_role, 'student');
+  const openSuspension = await sql`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
+  assert.equal(openSuspension[0][0].suspension_id, suspensionIssue.body.suspension.suspension_id);
+  assert.equal((await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', {
+    action: 'issue', duration_hours: 72, reason: 'Repeatedly disrupted the shared school board.',
+  }))).status, 409, 'a second active restriction cannot be issued');
+  const suspensionAudit = await sql`SELECT action, duration_hours FROM fam_account_suspension_audit WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
+  assert.equal(suspensionAudit[0].length, 1);
+  assert.equal(suspensionAudit[0][0].action, 'issued');
+  const suspensionLift = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', { action: 'lift' }));
+  assert.equal(suspensionLift.status, 200);
+  const liftedRecord = await sql`SELECT status, lifted_by FROM fam_account_suspensions WHERE suspension_id = ${suspensionIssue.body.suspension.suspension_id};`;
+  assert.equal(liftedRecord[0][0].status, 'lifted');
+  assert.equal(liftedRecord[0][0].lifted_by, '33333333-3333-4333-8333-333333333333');
+  const clearedSuspension = await sql`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
+  assert.equal(clearedSuspension[0].length, 0, 'lifting removes the open key atomically with the audit record');
+  const finalSuspensionAudit = await sql`SELECT action FROM fam_account_suspension_audit WHERE target_id = '11111111-1111-4111-8111-111111111111' ORDER BY created_at ASC;`;
+  assert.deepEqual(finalSuspensionAudit[0].map(row => row.action), ['issued', 'lifted']);
+  const staleAdminAuth = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-stale-admin', { action: 'lift' }));
+  assert.equal(staleAdminAuth.status, 403);
   const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
     reason: 'Repeated unrelated posts in the school group.',

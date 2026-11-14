@@ -124,6 +124,89 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
+    async listSuspensionTargets(schoolId, actorId) {
+      if (!schoolId || !actorId) throw new TypeError('invalid suspension target lookup');
+      const statement = sql`SELECT user_id AS id, role, first_name, last_name, class_name
+        FROM fam_user_profiles WHERE school_id = ${schoolId} AND active = true AND user_id != ${actorId}
+          AND role IN ('student', 'council_member') ORDER BY first_name ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+    async issueAccountSuspension({ schoolId, targetId, actorId, durationHours, reason }) {
+      if (!schoolId || !targetId || !actorId || ![24, 72, 168].includes(durationHours)
+          || typeof reason !== 'string' || reason.length < 15 || reason.length > 400) throw new TypeError('invalid account suspension');
+      const suspensionId = randomUUID();
+      return sql.begin(async tx => {
+        const admins = await tx`SELECT school_id FROM fam_user_profiles WHERE user_id = ${actorId}
+          AND active = true AND role = 'school_admin' LIMIT 1;`;
+        if (admins?.[0]?.[0]?.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const targets = await tx`SELECT school_id, role FROM fam_user_profiles WHERE user_id = ${targetId} AND active = true LIMIT 1;`;
+        const target = targets?.[0]?.[0];
+        if (!target || target.school_id !== schoolId || !['student', 'council_member'].includes(target.role)) return { ok: false, code: 'target_unavailable' };
+        const activeRows = await tx`SELECT suspension_id FROM fam_account_suspensions
+          WHERE school_id = ${schoolId} AND target_id = ${targetId} AND status = 'active'
+            AND expires_at > CurrentUtcTimestamp() LIMIT 1;`;
+        if (activeRows?.[0]?.length) return { ok: false, code: 'already_suspended' };
+        const openRows = await tx`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = ${targetId} LIMIT 1;`;
+        const staleOpen = openRows?.[0]?.[0];
+        if (staleOpen?.suspension_id) {
+          await tx`DELETE FROM fam_account_suspension_open WHERE target_id = ${targetId} AND suspension_id = ${staleOpen.suspension_id};`;
+          await tx`UPDATE fam_account_suspensions SET status = 'expired'
+            WHERE school_id = ${schoolId} AND target_id = ${targetId} AND suspension_id = ${staleOpen.suspension_id} AND status = 'active';`;
+        }
+        if (durationHours === 24) {
+          await tx`INSERT INTO fam_account_suspensions
+            (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 24, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT24H'), NULL, NULL);`;
+        } else if (durationHours === 72) {
+          await tx`INSERT INTO fam_account_suspensions
+            (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 72, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT72H'), NULL, NULL);`;
+        } else {
+          await tx`INSERT INTO fam_account_suspensions
+            (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 168, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT168H'), NULL, NULL);`;
+        }
+        const inserted = await tx`SELECT suspension_id, target_id, target_role, duration_hours, reason, status, created_at, expires_at
+          FROM fam_account_suspensions WHERE target_id = ${targetId} AND suspension_id = ${suspensionId} LIMIT 1;`;
+        const suspension = inserted?.[0]?.[0];
+        if (!suspension) return { ok: false, code: 'suspension_failed' };
+        await tx`INSERT INTO fam_account_suspension_open (target_id, school_id, suspension_id, created_at)
+          VALUES (${targetId}, ${schoolId}, ${suspensionId}, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_account_suspension_audit
+          (event_id, school_id, target_id, actor_id, suspension_id, action, duration_hours, reason, expires_at, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${targetId}, ${actorId}, ${suspensionId}, 'issued', ${durationHours}, ${reason}, ${suspension.expires_at}, CurrentUtcTimestamp());`;
+        return { ok: true, suspension };
+      });
+    },
+    async liftAccountSuspension({ schoolId, targetId, actorId }) {
+      if (!schoolId || !targetId || !actorId) throw new TypeError('invalid account suspension lift');
+      return sql.begin(async tx => {
+        const admins = await tx`SELECT school_id FROM fam_user_profiles WHERE user_id = ${actorId}
+          AND active = true AND role = 'school_admin' LIMIT 1;`;
+        if (admins?.[0]?.[0]?.school_id !== schoolId) return false;
+        const targets = await tx`SELECT school_id, role FROM fam_user_profiles WHERE user_id = ${targetId} AND active = true LIMIT 1;`;
+        const target = targets?.[0]?.[0];
+        if (!target || target.school_id !== schoolId || !['student', 'council_member'].includes(target.role)) return false;
+        const rows = await tx`SELECT suspension_id, duration_hours, reason, expires_at FROM fam_account_suspensions
+          WHERE school_id = ${schoolId} AND target_id = ${targetId} AND status = 'active'
+            AND expires_at > CurrentUtcTimestamp() ORDER BY created_at DESC LIMIT 1;`;
+        const suspension = rows?.[0]?.[0];
+        if (!suspension) return false;
+        await tx`UPDATE fam_account_suspensions SET status = 'lifted', lifted_by = ${actorId}, lifted_at = CurrentUtcTimestamp()
+          WHERE school_id = ${schoolId} AND target_id = ${targetId} AND suspension_id = ${suspension.suspension_id}
+            AND status = 'active' AND expires_at > CurrentUtcTimestamp();`;
+        const changed = await tx`SELECT status FROM fam_account_suspensions
+          WHERE school_id = ${schoolId} AND target_id = ${targetId} AND suspension_id = ${suspension.suspension_id} LIMIT 1;`;
+        if (changed?.[0]?.[0]?.status !== 'lifted') return false;
+        await tx`DELETE FROM fam_account_suspension_open WHERE target_id = ${targetId}
+          AND school_id = ${schoolId} AND suspension_id = ${suspension.suspension_id};`;
+        await tx`INSERT INTO fam_account_suspension_audit
+          (event_id, school_id, target_id, actor_id, suspension_id, action, duration_hours, reason, expires_at, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${targetId}, ${actorId}, ${suspension.suspension_id}, 'lifted', ${suspension.duration_hours}, ${suspension.reason}, ${suspension.expires_at}, CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
     async listAccountDeletionTargets(schoolId, requesterId) {
       if (!schoolId || !requesterId) throw new TypeError('invalid deletion request target lookup');
       const statement = sql`SELECT user_id AS id, role, first_name, last_name, class_name

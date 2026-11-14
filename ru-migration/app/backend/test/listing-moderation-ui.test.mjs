@@ -7,6 +7,7 @@ class FakeNode {
   append(...items) { this.children.push(...items); }
   replaceChildren(...items) { this.children = items; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
+  setAttribute(name, value) { this[name] = value; }
 }
 
 function fixture() {
@@ -86,6 +87,40 @@ test('school admins see active suspensions returned by the same-school endpoint 
   assert.equal(card.children[1].textContent, 'ID аккаунта: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   assert.equal(card.children[2].textContent, 'Причина: <script>unsafe</script>');
   assert.equal(card.children[2].tagName, 'p');
+});
+
+test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
+  const f = fixture(); const calls = [];
+  const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [{ target_id: target, target_role: 'student', reason: 'Repeated disruption', expires_at: '2099-01-01T00:00:00Z' }] }) };
+    if (url === '/api/v1/suspensions/targets') return { ok: true, json: async () => ({ ok: true, targets: [{ id: target, role: 'student', first_name: '<script>', last_name: 'Имя' }] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review' || url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, applications: [], requests: [] }) };
+    if (url === `/api/v1/suspensions/${target}` && init.method === 'PATCH') {
+      const body = JSON.parse(init.body);
+      if (body.action === 'issue') return { ok: false, json: async () => ({ ok: false, error: 'fresh_auth_required' }) };
+      if (body.action === 'lift') return { ok: true, json: async () => ({ ok: true, status: 'lifted' }) };
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const panel = f.queue.children[0];
+  const form = panel.children[2];
+  const [targetSelect, duration, reason, submit] = form.children;
+  assert.equal(targetSelect.children[1].textContent, '<script> Имя · ученик', 'names are rendered as text');
+  targetSelect.value = target; duration.value = '72'; reason.value = 'Repeatedly disrupted the shared school board.';
+  await form.listeners.submit({ preventDefault() {} });
+  const issue = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'issue');
+  assert.equal(issue.url, `/api/v1/suspensions/${target}`);
+  assert.deepEqual(JSON.parse(issue.init.body), { action: 'issue', duration_hours: 72, reason: reason.value });
+  assert.equal(f.status.children.find(child => child.href)?.href, '/auth/yandex/start?reauth=1', JSON.stringify(f.status.children));
+  const activeCard = f.queue.children.find(card => card.children.some(child => child.textContent?.startsWith('Причина:')));
+  const lift = activeCard.children.at(-1);
+  await lift.listeners.click();
+  const liftCall = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'lift');
+  assert.equal(liftCall.url, `/api/v1/suspensions/${target}`);
 });
 
 test('school admins are told when suspension status could not be loaded instead of seeing a false empty result', async () => {

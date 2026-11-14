@@ -1,6 +1,5 @@
 -- Suspension records retain each issue/lift event. The target-first key lets
 -- active-status reads remain bounded to one account while preserving history.
--- Administrative issue/lift API and UI are a separate porting step.
 CREATE TABLE fam_account_suspensions (
   school_id Utf8 NOT NULL,
   target_id Utf8 NOT NULL,

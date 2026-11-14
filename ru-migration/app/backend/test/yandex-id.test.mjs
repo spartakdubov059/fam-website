@@ -25,6 +25,7 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.equal(authorization.origin, 'https://oauth.yandex.ru');
   assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
   assert.equal(authorization.searchParams.get('scope'), 'login:info');
+  assert.equal(authorization.searchParams.has('force_confirm'), false);
   const stateCookie = cookiePair(start.headers['set-cookie']);
   const state = authorization.searchParams.get('state');
   const callback = await auth.handle(callbackRequest(state, stateCookie));
@@ -46,6 +47,14 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie) } }), null, 'unsafe cookie requests require an Origin header');
   currentTime += 3_601_000;
   assert.equal(await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } }), null, 'session expires after one hour');
+});
+
+test('sensitive-action reauthentication requests explicit Yandex account confirmation', async () => {
+  const auth = createYandexIdAuth({ clientId: 'client', redirectUri: 'https://fam.example/auth/yandex/callback', sessionSecret: 'test-session-secret-with-32-bytes-minimum' });
+  const start = await auth.handle({ method: 'GET', url: '/auth/yandex/start?reauth=1', headers: {} });
+  const authorize = new URL(start.headers.location);
+  assert.equal(authorize.searchParams.get('force_confirm'), 'yes');
+  assert.match(start.headers['set-cookie'], /HttpOnly/);
 });
 
 test('Yandex logout rejects missing and cross-origin requests', async () => {

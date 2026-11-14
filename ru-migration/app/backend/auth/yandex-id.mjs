@@ -80,6 +80,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
       authorize.search = new URLSearchParams({
         response_type: 'code', client_id: clientId, redirect_uri: callback.toString(),
         scope: 'login:info', state, code_challenge: challenge, code_challenge_method: 'S256',
+        ...(url.searchParams.get('reauth') === '1' ? { force_confirm: 'yes' } : {}),
       }).toString();
       return { status: 302, headers: {
         location: authorize.toString(),
