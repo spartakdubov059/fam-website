@@ -582,7 +582,7 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
