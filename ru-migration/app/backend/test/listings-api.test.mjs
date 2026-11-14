@@ -318,6 +318,7 @@ test('contacting a listing derives the recipient on the server and sends only re
   assert.equal(saved.receiver_id, recipient);
   assert.equal(saved.school_id, 'school-a');
   assert.equal(saved.body, 'hello');
+  assert.equal(saved.listing_id, listingId, 'the listing contact route links the conversation to the validated listing');
 });
 
 test('listing contact rejects unavailable or cross-school listing without storing a message', async () => {

@@ -357,10 +357,12 @@ try {
   assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
   assert.equal(ideaRows[0][0].ai_status, 'pending');
   assert.equal(ideaRows[0][0].admin_status, 'new');
-  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', body: 'Синтетическое одобренное сообщение' });
-  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
+  const linkedListingId = '99999999-9999-4999-8999-999999999999';
+  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
+  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, listing_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
   assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
   assert.equal(messageRows[0][0].school_id, 'synthetic-school');
+  assert.equal(messageRows[0][0].listing_id, linkedListingId);
   assert.equal(messageRows[0][0].is_read, false);
   assert.deepEqual((await repo.listMessages('synthetic-user', 'synthetic-school')).map(row => row.id), [message.id]);
   assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);

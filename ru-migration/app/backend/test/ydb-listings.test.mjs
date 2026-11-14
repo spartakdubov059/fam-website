@@ -443,7 +443,8 @@ test('message repository verifies same-school active recipient before inserting 
     return Promise.resolve([[]]);
   };
   const repo = createYdbListingsRepository(sql);
-  const result = await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-id', body: 'Привет' });
+  const result = await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-id', listing_id: 'listing-id', body: 'Привет' });
+  assert.ok(calls.some(call => call.text.includes('listing_id') && call.values.includes('listing-id')));
   assert.match(result.id, /^[0-9a-f-]{36}$/);
   assert.ok(calls[0].values.includes('school-id'));
   assert.ok(calls[0].values.includes('recipient-id'));

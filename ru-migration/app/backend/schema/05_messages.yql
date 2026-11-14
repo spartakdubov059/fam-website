@@ -5,6 +5,7 @@ CREATE TABLE fam_messages (
   sender_id Utf8 NOT NULL,
   receiver_id Utf8 NOT NULL,
   school_id Utf8 NOT NULL,
+  listing_id Utf8 NOT NULL,
   body Utf8 NOT NULL,
   is_read Bool NOT NULL,
   created_at Timestamp NOT NULL,

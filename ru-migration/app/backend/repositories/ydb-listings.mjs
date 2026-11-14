@@ -968,8 +968,8 @@ export function createYdbListingsRepository(sql) {
         throw error;
       }
       const id = randomUUID();
-      const statement = sql`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, body, is_read, created_at)
-        VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.body}, false, CurrentUtcTimestamp());`;
+      const statement = sql`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
+        VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, false, CurrentUtcTimestamp());`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return { id };
@@ -993,8 +993,8 @@ export function createYdbListingsRepository(sql) {
         if (byId.get(record.receiver_id)?.active !== true) {
           const error = new Error('recipient unavailable'); error.code = 'recipient_unavailable'; throw error;
         }
-        await tx`INSERT INTO fam_pending_messages (id, sender_id, receiver_id, school_id, body, created_at)
-          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.body}, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_pending_messages (id, sender_id, receiver_id, school_id, listing_id, body, created_at)
+          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, CurrentUtcTimestamp());`;
         return { id };
       });
     },
@@ -1017,7 +1017,7 @@ export function createYdbListingsRepository(sql) {
         const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
         const reviewer = reviewers?.[0]?.[0];
         if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
-        const rows = await tx`SELECT id, sender_id, receiver_id, school_id, body FROM fam_pending_messages
+        const rows = await tx`SELECT id, sender_id, receiver_id, school_id, listing_id, body FROM fam_pending_messages
           WHERE id = ${messageId} AND school_id = ${schoolId} LIMIT 1;`;
         const pending = rows?.[0]?.[0];
         if (!pending) return false;
@@ -1026,8 +1026,8 @@ export function createYdbListingsRepository(sql) {
             WHERE (user_id = ${pending.sender_id} OR user_id = ${pending.receiver_id}) AND school_id = ${schoolId};`;
           const activeIds = new Set((participants?.[0] ?? []).filter(row => row.school_id === schoolId && row.active === true).map(row => row.user_id));
           if (!activeIds.has(pending.sender_id) || !activeIds.has(pending.receiver_id)) return false;
-          await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, body, is_read, created_at)
-            VALUES (${pending.id}, ${pending.sender_id}, ${pending.receiver_id}, ${schoolId}, ${pending.body}, false, CurrentUtcTimestamp());`;
+          await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
+            VALUES (${pending.id}, ${pending.sender_id}, ${pending.receiver_id}, ${schoolId}, ${pending.listing_id ?? ''}, ${pending.body}, false, CurrentUtcTimestamp());`;
         }
         await tx`DELETE FROM fam_pending_messages WHERE id = ${messageId} AND school_id = ${schoolId};`;
         await tx`INSERT INTO fam_school_admin_audit (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
@@ -1047,7 +1047,7 @@ export function createYdbListingsRepository(sql) {
 
     async listMessages(userId, schoolId) {
       if (!userId || !schoolId) throw new TypeError('invalid message owner');
-      const statement = sql`SELECT id, sender_id, receiver_id, body, is_read, created_at FROM fam_messages
+      const statement = sql`SELECT id, sender_id, receiver_id, listing_id, body, is_read, created_at FROM fam_messages
         WHERE school_id = ${schoolId} AND (sender_id = ${userId} OR receiver_id = ${userId})
         ORDER BY created_at DESC LIMIT 100;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});

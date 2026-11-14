@@ -9,7 +9,9 @@ export async function submitMessage({ actor, input, repository, review, safetyKe
   if (!input || typeof input.body !== 'string' || typeof input.receiver_id !== 'string') return { ok: false, code: 'invalid_message' };
   const body = input.body.trim();
   const receiverId = input.receiver_id;
-  if (!body || body.length > 1000 || !UUID_RE.test(receiverId) || receiverId === actor.id) {
+  const listingId = input.listing_id == null ? '' : input.listing_id;
+  if (!body || body.length > 1000 || !UUID_RE.test(receiverId) || receiverId === actor.id
+      || (listingId && !UUID_RE.test(listingId))) {
     return { ok: false, code: 'invalid_message' };
   }
   const decision = await reviewText(body, { review });
@@ -21,7 +23,7 @@ export async function submitMessage({ actor, input, repository, review, safetyKe
   if (decision.action === 'pending') {
     if (typeof repository?.createPendingMessage !== 'function') return { ok: false, code: 'review_unavailable', status: 'pending' };
     try {
-      const pending = await repository.createPendingMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, body });
+      const pending = await repository.createPendingMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, listing_id: listingId, body });
       if (!pending || typeof pending.id !== 'string') return { ok: false, code: 'database_unavailable', status: 'pending' };
       return { ok: true, status: 'pending', id: pending.id };
     } catch (error) {
@@ -32,7 +34,7 @@ export async function submitMessage({ actor, input, repository, review, safetyKe
   }
   if (!repository || typeof repository.createMessage !== 'function') return { ok: false, code: 'database_unavailable' };
   try {
-    const message = await repository.createMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, body });
+    const message = await repository.createMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, listing_id: listingId, body });
     if (!message || typeof message.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: 'approved', id: message.id };
   } catch (error) {

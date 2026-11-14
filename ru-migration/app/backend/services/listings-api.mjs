@@ -608,7 +608,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try {
         const receiver_id = await repository.getListingContactRecipient(listingContactMatch[1], actor.id, actor.school_id);
         if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
-        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id }, repository, review, safetyKey });
+        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id, listing_id: listingContactMatch[1] }, repository, review, safetyKey });
         const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
           : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
         return { status, body: result };

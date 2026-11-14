@@ -20,7 +20,7 @@ test('message without a classifier is saved only to a pending school review queu
     createMessage: async () => { delivered = true; return { id: 'unsafe-direct-delivery' }; },
   } });
   assert.deepEqual(result, { ok: true, status: 'pending', id: 'pending-message' });
-  assert.deepEqual(record, { sender_id: actor.id, receiver_id: input.receiver_id, school_id: actor.school_id, body: input.body });
+  assert.deepEqual(record, { sender_id: actor.id, receiver_id: input.receiver_id, school_id: actor.school_id, listing_id: '', body: input.body });
   assert.equal(delivered, false);
 });
 
@@ -52,7 +52,7 @@ test('only an explicit moderation approval can insert a message', async () => {
   let record;
   const result = await submitMessage({ actor, input, review: async () => ({ action: 'ok' }),
     repository: { createMessage: async value => { record = value; return { id: 'synthetic-message' }; } } });
-  assert.deepEqual(record, { sender_id: actor.id, receiver_id: input.receiver_id, school_id: actor.school_id, body: input.body });
+  assert.deepEqual(record, { sender_id: actor.id, receiver_id: input.receiver_id, school_id: actor.school_id, listing_id: '', body: input.body });
   assert.deepEqual(result, { ok: true, status: 'approved', id: 'synthetic-message' });
 });
 
@@ -61,8 +61,18 @@ test('message rejects self-send, malformed recipients and contact details before
   const options = { actor, review: async () => { reviews++; return { action: 'ok' }; }, repository: { createMessage: async () => ({ id: 'unexpected' }) } };
   assert.equal((await submitMessage({ ...options, input: { ...input, receiver_id: actor.id } })).code, 'invalid_message');
   assert.equal((await submitMessage({ ...options, input: { ...input, receiver_id: 'not-a-uuid' } })).code, 'invalid_message');
+  assert.equal((await submitMessage({ ...options, input: { ...input, listing_id: 'not-a-uuid' } })).code, 'invalid_message');
   assert.equal((await submitMessage({ ...options, input: { ...input, body: 'Пиши на test@example.ru' } })).code, 'personal_contact_data');
   assert.equal(reviews, 0);
+});
+
+test('message started from a listing preserves its server-validated listing reference', async () => {
+  const listing_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  let saved;
+  const result = await submitMessage({ actor, input: { ...input, listing_id }, review: async () => ({ action: 'ok' }),
+    repository: { createMessage: async value => { saved = value; return { id: 'message-id' }; } } });
+  assert.equal(result.ok, true);
+  assert.equal(saved.listing_id, listing_id);
 });
 
 test('message rejects profiles without a school', async () => {
