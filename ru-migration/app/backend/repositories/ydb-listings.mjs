@@ -1516,7 +1516,7 @@ export function createYdbListingsRepository(sql) {
         if (prior?.[0]?.length) return false;
         await tx`INSERT INTO fam_agent_ideas
           (id, school_id, report_date, agent_rule_key, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by, status, reviewed_by, reviewed_at, decision_note, created_at)
-          VALUES (${id}, ${schoolId}, ${date}, ${rule.key}, ${rule.title}, ${rule.summary(count)}, ${rule.benefit}, 'small', 'low', 'observed', ${rule.evidence(count)}, ${rule.proposedBy}, 'pending', NULL, NULL, NULL, CurrentUtcTimestamp());`;
+          VALUES (${id}, ${schoolId}, ${date}, ${rule.key}, ${rule.title}, ${rule.summary(count)}, ${rule.benefit}, ${rule.complexity || 'small'}, 'low', 'observed', ${rule.evidence(count)}, ${rule.proposedBy}, 'pending', NULL, NULL, NULL, CurrentUtcTimestamp());`;
         return true;
       });
     },

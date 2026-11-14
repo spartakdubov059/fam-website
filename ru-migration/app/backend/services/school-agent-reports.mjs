@@ -4,6 +4,10 @@ const RULES = [
   { key: 'safety_review', title: 'Проверить сигналы безопасности', path: 'safety.unreviewed', summary: n => `Есть ${n} непроверенных обезличенных сигналов безопасности. Просмотрите категории и при серьёзных случаях подключите ответственного взрослого. Сигнал не доказывает нарушение.`, benefit: 'Помогает вовремя замечать повторные сигналы и передавать серьёзные ситуации ответственному взрослому.', evidence: n => `Агрегированная сводка школы: непроверенных сигналов ${n}.`, proposedBy: 'fam_safety_analyst' },
   { key: 'council_ideas_review', title: 'Разобрать идеи учеников', path: 'ideas.awaiting_council', summary: n => `В очереди Совета ожидают рассмотрения ${n} предложений. Просмотрите их в панели Совета и отметьте дальнейший статус.`, benefit: 'Помогает не оставлять предложения без обратной связи.', evidence: n => `В очереди Совета находится ${n} новых идей.`, proposedBy: 'fam_council_analyst' },
   { key: 'deletion_requests_review', title: 'Проверить обращения участников', path: 'account_requests.deletion_pending', summary: n => `Есть ${n} открытых запросов на рассмотрение аккаунтов. Проверьте их по школьной процедуре.`, benefit: 'Помогает не оставлять обращения без ответа; решение остаётся за администратором.', evidence: n => `Открытых обращений на рассмотрение: ${n}.`, proposedBy: 'fam_operations_analyst' },
+  { key: 'board_empty', title: 'Проверить наполнение доски FAM', path: 'listings.active', when: n => n === 0,
+    summary: () => 'Сейчас в школе нет активных объявлений. Проверьте, правильно ли настроены категории и правила публикации, и расскажите ученикам о возможностях доски без давления на них.',
+    benefit: 'Помогает понять, удобно ли ученикам пользоваться доской и знают ли они о ней.',
+    evidence: () => 'В агрегированной сводке школы число активных объявлений равно нулю.', proposedBy: 'fam_growth_analyst', complexity: 'medium' },
 ];
 
 export function createSchoolAgentReports({ repository, schools, now = () => new Date() }) {
@@ -18,7 +22,7 @@ export function createSchoolAgentReports({ repository, schools, now = () => new 
       await repository.saveSchoolAgentReport({ schoolId: school.id, date, summary, metrics });
       for (const rule of RULES) {
         const count = rule.path.split('.').reduce((value, key) => value?.[key], metrics);
-        if (!Number.isInteger(count) || count <= 0) continue;
+        if (!Number.isInteger(count) || !(rule.when ? rule.when(count) : count > 0)) continue;
         const id = createHash('sha256').update(`${school.id}:${date}:${rule.key}`).digest('hex');
         await repository.createSchoolAgentIdea({ id, schoolId: school.id, date, rule, count });
       }

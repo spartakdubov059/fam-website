@@ -63,9 +63,14 @@ try {
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);
-  await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
+  const insertedSyntheticAgentIdea = await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
     rule: { key: 'integration_review', title: 'Проверить синтетический сигнал', summary: () => 'Только синтетическая проверка.',
       benefit: 'Проверка YDB.', evidence: () => 'Синтетическая агрегированная запись.', proposedBy: 'integration_test' } });
+  assert.equal(insertedSyntheticAgentIdea, true);
+  assert.equal(await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
+    rule: { key: 'integration_review', title: 'Проверить синтетический сигнал', summary: () => 'Повтор не должен создавать дубль.',
+      benefit: 'Проверка YDB.', evidence: () => 'Синтетическая агрегированная запись.', proposedBy: 'integration_test' } }), false,
+  'daily reruns must not duplicate a same-school same-day rule proposal');
   const agentDashboard = await listingsApi(apiRequest('GET', '/api/v1/school/admin/agent-dashboard', 'synthetic-admin'));
   assert.equal(agentDashboard.status, 200);
   assert.equal(agentDashboard.body.report.summary, 'Синтетическая сводка без пользовательских данных');
