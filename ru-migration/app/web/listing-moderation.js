@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -45,8 +45,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-management/targets', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/safety-reports', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -70,6 +72,14 @@ export async function initializeListingModeration({ document = globalThis.docume
         ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
           && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
           && typeof item.expires_at === 'string') : [];
+      const safetyReportsAvailable = me.profile.role !== 'school_admin'
+        || (safetyResponse.ok && safetyResult?.ok && Array.isArray(safetyResult.reports));
+      const safetyReports = me.profile.role === 'school_admin' && safetyReportsAvailable
+        ? safetyResult.reports.filter(item => item && /^[0-9a-f]{64}$/.test(item.fingerprint || '')
+          && ['message', 'idea', 'listing', 'image'].includes(item.source_kind)
+          && ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
+            'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(item.category)
+          && ['medium', 'high'].includes(item.severity) && Number.isInteger(item.occurrences)) : [];
       if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
         const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
         if (targets.length) {
@@ -113,12 +123,41 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(panel);
       }
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0) {
-        status.textContent = suspensionsAvailable ? 'Очереди школьной проверки пусты.'
-          : 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.';
+      const renderSafetyPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const safetyPanel = node(document, 'section', 'ru-moderation-card');
+        safetyPanel.append(node(document, 'h3', '', 'Сигналы безопасности'));
+        safetyPanel.append(node(document, 'p', '', 'Сводка пока неполная: российская модерация ещё не записывает новые сигналы безопасности.'));
+        if (!safetyReportsAvailable) safetyPanel.append(node(document, 'p', '', 'Не удалось загрузить сохранённые сигналы.'));
+        const categoryNames = { targeted_harassment: 'Травля', hate_or_discrimination: 'Ненависть или дискриминация',
+          threat_or_intimidation: 'Угроза или запугивание', negative_personal_call: 'Оскорбление',
+          spam_or_repeated_abuse: 'Спам или повторное нарушение', unsafe_image: 'Небезопасное изображение',
+          personal_data_in_image: 'Личные данные на изображении', unclear_safety_signal: 'Другой сигнал безопасности' };
+        const sourceNames = { message: 'сообщение', idea: 'идея', listing: 'объявление', image: 'изображение' };
+        for (const report of safetyReports) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'h4', '', `${report.severity === 'high' ? 'Высокая' : 'Средняя'} важность · ${categoryNames[report.category]}`));
+          card.append(node(document, 'p', '', `Источник: ${sourceNames[report.source_kind]} · Повторений: ${report.occurrences}`));
+          const personName = person => person ? [person.first_name, person.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ') || `Аккаунт ${person.account_code || ''}` : 'Неизвестно';
+          card.append(node(document, 'p', '', `Участник: ${personName(report.actor)} · Затронут: ${personName(report.target)}`));
+          if (typeof report.evidence_excerpt === 'string') card.append(node(document, 'p', '', `Фрагмент: ${report.evidence_excerpt}`));
+          if (typeof report.source_origin === 'string') card.append(node(document, 'p', '', `Раздел: ${report.source_origin}`));
+          if (typeof report.last_seen === 'string') card.append(node(document, 'p', '', `Последний сигнал: ${new Date(report.last_seen).toLocaleString('ru-RU')}`));
+          card.append(actionButton(document, 'Отметить просмотренным', () => patch('/api/v1/school/admin/safety-reports', {
+            fingerprint: report.fingerprint, category: report.category, source_kind: report.source_kind,
+          })));
+          safetyPanel.append(card);
+        }
+        queue.append(safetyPanel);
+      };
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0) {
+        renderSafetyPanel();
+        status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
+          : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
+            : 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}.${suspensionsAvailable ? '' : ' Не удалось загрузить ограничения; список неполный.'}`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сигналов безопасности — ${safetyReports.length}.${suspensionsAvailable && safetyReportsAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -192,6 +231,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         card.append(lift);
         queue.append(card);
       }
+      renderSafetyPanel();
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
 

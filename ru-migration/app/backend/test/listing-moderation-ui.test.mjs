@@ -196,6 +196,7 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
+    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
     if (url === `/api/v1/role-requests/${id}`) { state = init.body.includes('start_review') ? 'reviewing' : 'approved'; return { ok: true, json: async () => ({ ok: true }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
   } });
@@ -209,6 +210,39 @@ test('school role request review is claimed before only its reviewer can decide'
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
   assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
   assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+});
+
+test('school safety reports render as text and can be acknowledged through the RU API', async () => {
+  const f = fixture(); const calls = [];
+  const fingerprint = 'a'.repeat(64);
+  let pending = true;
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/school/admin/safety-reports' && init.method === 'PATCH') { pending = false; return { ok: true, json: async () => ({ ok: true }) }; }
+    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: pending ? [{
+      fingerprint, source_kind: 'message', category: 'targeted_harassment', severity: 'high', occurrences: 3,
+      actor: { first_name: '<Аня>', last_name: 'Тест', account_code: 'AB12CD' }, target: null,
+      evidence_excerpt: '<img src=x onerror=alert(1)>', source_origin: 'messages', last_seen: '2026-11-14T10:00:00Z',
+    }] : [] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    return { ok: true, json: async () => ({ ok: true, targets: [] }) };
+  } });
+  const panel = f.queue.children.find(item => item.children[0]?.textContent === 'Сигналы безопасности');
+  assert.ok(panel);
+  assert.match(panel.children[1].textContent, /ещё не записывает новые сигналы/);
+  const card = panel.children[2];
+  assert.equal(card.children[2].textContent, 'Участник: <Аня> Тест · Затронут: Неизвестно');
+  assert.equal(card.children[3].textContent, 'Фрагмент: <img src=x onerror=alert(1)>');
+  assert.equal(card.children[3].tagName, 'p');
+  await card.children.at(-1).listeners.click();
+  const write = calls.find(call => call.url === '/api/v1/school/admin/safety-reports' && call.init.method === 'PATCH');
+  assert.deepEqual(JSON.parse(write.init.body), { fingerprint, category: 'targeted_harassment', source_kind: 'message' });
+  const refreshedPanel = f.queue.children.find(item => item.children[0]?.textContent === 'Сигналы безопасности');
+  assert.equal(refreshedPanel.children.length, 2, 'acknowledged report is removed after reload');
 });
 
 test('council member submits a same-school removal request and sees personal history', async () => {
