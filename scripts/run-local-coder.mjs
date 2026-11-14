@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
+import { normalizePlannerResponse } from "./local-model-plan.mjs";
 import {
   frameSingleFileHunkDiff,
   normalizeUnifiedDiffHunkCounts,
@@ -35,7 +36,7 @@ function allowed(path) {
   return path === "index.html" || ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-async function askModel(messages, schema, maxTokens) {
+async function askModel(messages, schema, maxTokens, normalizeResponse) {
   let lastError;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -75,7 +76,8 @@ async function askModel(messages, schema, maxTokens) {
         writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.txt`), content);
       }
       const parsed = parseJson(content);
-      return assertRequiredFields(parsed, schema.schema, schema.name);
+      const normalized = normalizeResponse?.(parsed) ?? parsed;
+      return assertRequiredFields(normalized, schema.schema, schema.name);
     } catch (error) {
       lastError = error;
       if (attempt === 0) {
@@ -226,7 +228,10 @@ const plan = await askModel([
     role: "user",
     content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
   },
-], planSchema, 4000);
+], planSchema, 4000, (parsed) => normalizePlannerResponse(parsed, {
+  explicitPaths: taskReferencedPaths,
+  trackedPaths: tracked,
+}));
 
 if (!Array.isArray(plan.files) || plan.files.length === 0) {
   const outDir = process.env.RUNNER_TEMP || "/tmp";
@@ -318,7 +323,20 @@ const patchMessages = [
   },
 ];
 
-let result = await askModel(patchMessages, patchSchema, 7000);
+let result = typeof plan.unified_diff === "string" && plan.unified_diff.trim()
+  ? {
+      finding_status: plan.finding_status,
+      problem_summary: plan.problem_summary,
+      root_cause: plan.root_cause,
+      evidence: plan.evidence,
+      unified_diff: plan.unified_diff,
+      summary: plan.summary || plan.plan,
+      proposed_change: plan.proposed_change || plan.plan,
+      risk: ["low", "medium", "high"].includes(plan.risk) ? plan.risk : "high",
+      requires_approval: true,
+      tests: Array.isArray(plan.tests) ? plan.tests : [],
+    }
+  : await askModel(patchMessages, patchSchema, 7000);
 if (result.finding_status === "issue_found" && !String(result.unified_diff || "").trim()) {
   console.warn("Model confirmed a concrete issue but returned an empty diff; requesting one focused patch retry.");
   result = await askModel([
