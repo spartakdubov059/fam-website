@@ -59,7 +59,7 @@
       '<h3>'+escapeHtml(clamp(poll?.question,140))+'</h3><div class="pulse-options">'+content+'</div>'+
       '<div class="pulse-poll-foot"><span>'+escapeHtml(message)+'</span><span>'+total+' голосов</span></div></article>';
   }
-  function mount({sb,getViewer,notify}){
+  function mount({sb,getViewer,getListings=()=>[],notify}){
     const rootNode=document.getElementById("schoolPulse");
     if(!rootNode)return null;
     const grid=document.getElementById("pulseGrid");
@@ -76,9 +76,11 @@
       const viewer=getViewer();
       if(!viewer?.id||!viewer?.school_id){
         rootNode.classList.add("hidden");
-        carousel?.classList.add("hidden");
         grid.textContent="";
-        if(announcementTrack)announcementTrack.textContent="";
+        const events=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&Number(item.max_seats||0)===0&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
+        const cards=events.map(item=>announcementCard({...item,body:item.description,kind:"open_event"}));
+        if(announcementTrack)announcementTrack.innerHTML=cards.join("");
+        carousel?.classList.toggle("hidden",cards.length===0);
         return;
       }
       const isStaff=["school_admin","council_member"].includes(viewer.role);

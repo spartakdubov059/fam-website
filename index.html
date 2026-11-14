@@ -1456,6 +1456,7 @@ window.onunhandledrejection = function() {
     ? window.FAMSchoolPulse.mount({
         sb,
         getViewer: () => ({ id: user?.id, school_id: profile?.school_id, role: profile?.role }),
+        getListings: () => listings,
         notify: msg => alert(msg)
       })
     : null;
