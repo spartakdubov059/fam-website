@@ -96,10 +96,15 @@ try {
   assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
   const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
   assert.equal(otherSchoolRevoke.status, 404, 'role revocation cannot cross school boundaries');
+  const directPulseProbe = await repo.publishSchoolAnnouncement({
+    schoolId: 'synthetic-school', authorId: '33333333-3333-4333-8333-333333333333',
+    title: 'Проверка школьной доски', body: 'Встреча состоится в пятницу', kind: 'news', eventStartsAt: null,
+  });
+  console.log('PULSE_DIRECT_REPOSITORY_PROBE', JSON.stringify(directPulseProbe));
   const pulseAnnouncement = await listingsApi(apiRequest('POST', '/api/v1/pulse/announcements', 'synthetic-admin', {
     title: 'Проверка школьной доски', body: 'Встреча состоится в пятницу', kind: 'news', school_id: 'other-school', author_id: '22222222-2222-4222-8222-222222222222',
   }));
-  assert.equal(pulseAnnouncement.status, 201);
+  assert.equal(pulseAnnouncement.status, 201, JSON.stringify(pulseAnnouncement.body));
   const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
     question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'],
   }));
