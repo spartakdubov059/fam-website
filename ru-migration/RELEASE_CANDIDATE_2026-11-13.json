@@ -21,7 +21,7 @@
   "production": "UNCHANGED",
   "release_blockers": [
     "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
-    "Full FAM transfer remains incomplete: seven source Edge Functions, 69 SQL migrations and scheduled jobs are not fully ported",
+    "Full FAM transfer remains incomplete: only part of the seven source Edge Functions and 72 SQL migrations has been mapped and implemented; scheduled jobs, agent workflows, and automatic image classification remain unported",
     "Cloud YDB, object storage, real OAuth, and reviewed moderation provider are not configured; only synthetic local YDB integration passed",
     "School catalog remains incomplete; verify cloud backup retention against profile-request TTL and complete privacy/legal review",
     "No free-only school-controlled cloud staging has been provisioned; strict zero-ruble cost cannot be guaranteed with quota-based free tiers",
