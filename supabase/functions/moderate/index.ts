@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
 import { reviewListingImage } from "./image-reviewer.ts";
+import { constantTimeSecretMatches } from "./internal-key.mjs";
 import { splitFlaggedCategoriesByInputType } from "./moderation-input-types.js";
 import { recordSafetySignal, type SafetyContext, type SafetyCategory } from "./user-safety-agent.ts";
 
@@ -240,7 +241,7 @@ serve(async (req: Request) => {
 
   // Only submit-content may call this endpoint; direct calls cannot bypass per-user send quotas.
   const internalKey = req.headers.get("x-fam-internal-key") ?? "";
-  if (!SUPABASE_INTERNAL_KEY || internalKey !== SUPABASE_INTERNAL_KEY) {
+  if (!await constantTimeSecretMatches(internalKey, SUPABASE_INTERNAL_KEY)) {
     return jsonResponse({
       action: "pending",
       degraded: true,
