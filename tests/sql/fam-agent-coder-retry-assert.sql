@@ -36,7 +36,17 @@ begin
   v_id := (v_result->>'task_id')::uuid;
   select payload into v_payload from private.fam_agent_tasks where id=v_id;
   if v_payload->>'event_summary' is null
-     or v_payload->>'observed_hour' !~ '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:00:00Z  v_result := private.enqueue_fam_agent_coder_task();
+     or v_payload->>'observed_hour' is null
+     or v_payload->>'previous_attempts' is null then
+    raise exception 'producer omitted the bounded event context';
+  end if;
+  select pg_catalog.pg_get_functiondef('private.enqueue_fam_agent_coder_task()'::regprocedure)
+    into v_producer_definition;
+  if pg_catalog.strpos(v_producer_definition,'pg_advisory_xact_lock')=0 then
+    raise exception 'producer is not serialized against concurrent enqueue calls';
+  end if;
+
+  v_result := private.enqueue_fam_agent_coder_task();
   if v_result->>'reason' <> 'coder_task_already_active' then raise exception 'active duplicate was not suppressed'; end if;
   update private.fam_agent_tasks set status='failed' where id=v_id;
   v_result := private.enqueue_fam_agent_coder_task();
