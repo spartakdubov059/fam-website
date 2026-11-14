@@ -43,7 +43,7 @@ test("announcements stay separate from listings and polls and disappear when emp
  assert.match(html,/id="pulseAnnouncementCarousel"/);
  assert.match(html,/data-pulse-scroll="-1"/);
  assert.match(html,/data-pulse-scroll="1"/);
- assert.match(html,/scroll-snap-type:x mandatory/);
+ assert.match(html,/scroll-snap-type:\\s*x mandatory/);
  assert.match(pulse,/priorityNews\.map\(announcementCard\)\.concat\(polls\.map\(pollCard\),otherNews\.map\(announcementCard\)\)/);
  assert.match(pulse,/carousel\?\.classList\.toggle\("hidden",featured\.length===0\)/);
  assert.match(pulse,/grid\.innerHTML=""/);
