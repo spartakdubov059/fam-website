@@ -101,3 +101,25 @@ body {
 .ru-board-category[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
 .ru-board-count { grid-column: 1 / -1; margin: 0; color: #b8bbc7; font-size: 0.9rem; }
 .ru-listing-card[hidden] { display: none; }
+.ru-pulse { display: grid; gap: 0.9rem; margin: 1.5rem 0; }
+.ru-pulse > h2, .ru-pulse-publish h3 { margin: 0; }
+.ru-pulse-status, .ru-pulse-empty, .ru-pulse-form-status { margin: 0; color: #b8bbc7; }
+.ru-pulse-feed { display: grid; gap: 0.8rem; }
+.ru-pulse-card, .ru-pulse-publish { display: grid; gap: 0.65rem; padding: 1rem; border: 1px solid #30323a; border-radius: 1rem; background: #191b22; }
+.ru-pulse-card h3, .ru-pulse-card p { margin: 0; }
+.ru-pulse-kind { color: #b8bbc7; font-size: 0.8rem; font-weight: 700; }
+.ru-pulse-body { white-space: pre-wrap; line-height: 1.5; }
+.ru-pulse-important { border-color: #bd9750; }
+.ru-pulse-event { border-color: #7561b8; }
+.ru-pulse-date { color: #b8bbc7; font-size: 0.85rem; }
+.ru-pulse-options { display: grid; gap: 0.5rem; }
+.ru-pulse-option { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.ru-pulse-vote { padding: 0.6rem 0.85rem; border: 1px solid #454752; border-radius: 0.7rem; background: #111218; color: #f5f6f8; font: inherit; text-align: left; }
+.ru-pulse-vote[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
+.ru-pulse-vote:disabled { opacity: 0.75; cursor: default; }
+.ru-pulse-vote-count, .ru-pulse-total { color: #b8bbc7; font-size: 0.85rem; }
+.ru-pulse-publish { margin-top: 0.4rem; }
+.ru-pulse-form { display: grid; gap: 0.55rem; }
+.ru-pulse-form input, .ru-pulse-form textarea, .ru-pulse-form select { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; font: inherit; }
+.ru-pulse-form textarea { min-height: 5rem; resize: vertical; }
+.ru-pulse-form input[hidden] { display: none; }
