@@ -88,6 +88,9 @@ try {
   const revokedAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = '77777777-7777-4777-8777-777777777777';`;
   assert.equal(revokedAudit[0][0].action, 'role_revoked');
   assert.equal(revokedAudit[0][0].previous_role, 'council_member');
+  const revokeSecondAdmin = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-admin', { action: 'revoke' }));
+  assert.deepEqual(revokeSecondAdmin, { status: 200, body: { ok: true, target_id: '88888888-8888-4888-8888-888888888888', previous_role: 'school_admin', role: 'student' } });
+  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-admin-target' })).role, 'student');
   const deniedStaleRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-stale-admin', { action: 'revoke' }));
   assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
   const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
