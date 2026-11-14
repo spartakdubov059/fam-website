@@ -96,6 +96,8 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'GET' && url.pathname === '/api/v1/avatars/moderation')
       || (req.method === 'PATCH' && /^\/api\/v1\/avatars\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/moderation$/i.test(url.pathname))
       || (['GET', 'PATCH'].includes(req.method) && url.pathname === '/api/v1/school/admin/safety-reports')
+      || (req.method === 'GET' && url.pathname === '/api/v1/school/admin/agent-dashboard')
+      || (req.method === 'PATCH' && /^\/api\/v1\/school\/admin\/agent-ideas\/[a-f0-9]{64}$/.test(url.pathname))
       || (req.method === 'GET' && url.pathname === '/api/v1/me/listings')
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations')
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations/review')

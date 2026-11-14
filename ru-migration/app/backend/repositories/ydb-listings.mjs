@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 26712)
+Total output lines: 1552
+
 import { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -500,409 +503,7 @@ export function createYdbListingsRepository(sql) {
         if (!request || request.target_id !== targetId || request.status !== 'processing' || request.reviewed_by !== reviewerId) return false;
         await tx`UPDATE fam_user_profiles SET active = true WHERE user_id = ${targetId} AND school_id = ${schoolId} AND active = false;`;
         await tx`UPDATE fam_account_deletion_requests SET status = 'pending', reviewed_by = NULL, reviewed_at = NULL, review_note = NULL
-          WHERE request_id = ${requestId} AND school_id = ${schoolId} AND status = 'processing' AND reviewed_by = ${reviewerId};`;
-        const profile = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
-        const restored = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
-        return profile?.[0]?.[0]?.active === true && restored?.[0]?.[0]?.status === 'pending';
-      });
-    },
-
-    async beginAdminAccountDeletion({ schoolId, reviewerId, targetId }) {
-      if (!schoolId || !reviewerId || !targetId || reviewerId === targetId) throw new TypeError('invalid administrator account deletion');
-      return sql.begin(async tx => {
-        const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewerRows?.[0]?.[0];
-        if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return { ok: false, code: 'forbidden' };
-        const targetRows = await tx`SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
-        const target = targetRows?.[0]?.[0];
-        if (!target || target.active !== true || target.school_id !== schoolId) return { ok: false, code: 'target_unavailable' };
-        if (!['student', 'council_member'].includes(target.role)) return { ok: false, code: 'target_role_forbidden' };
-        await tx`UPDATE fam_user_profiles SET active = false WHERE user_id = ${targetId} AND school_id = ${schoolId}
-          AND role IN ('student', 'council_member') AND active = true;`;
-        const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} AND school_id = ${schoolId} LIMIT 1;`;
-        if (confirmed?.[0]?.[0]?.active !== false) return { ok: false, code: 'target_unavailable' };
-        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id, role: target.role };
-      });
-    },
-
-    async beginAccountDeletion({ issuer, subject, userId }) {
-      if (!issuer || !subject || !userId) throw new TypeError('invalid account deletion actor');
-      return sql.begin(async tx => {
-        const profileRows = await tx`SELECT user_id, school_id, role, active FROM fam_user_profiles
-          WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile || profile.user_id !== userId || profile.active !== true) return { ok: false, code: 'profile_unavailable' };
-        if (profile.role === 'school_admin') {
-          const admins = await tx`SELECT user_id FROM fam_user_profiles
-            WHERE school_id = ${profile.school_id} AND role = 'school_admin' AND active = true AND user_id != ${userId} LIMIT 1;`;
-          if (!(admins?.[0] ?? []).length) return { ok: false, code: 'last_school_admin' };
-        }
-        await tx`UPDATE fam_user_profiles SET active = false
-          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = true;`;
-        const inactive = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
-        if (inactive?.[0]?.[0]?.active !== false) return { ok: false, code: 'profile_unavailable' };
-        return { ok: true, school_id: profile.school_id, role: profile.role };
-      });
-    },
-
-    async restoreAccountAfterDeletionFailure({ issuer, subject, userId }) {
-      if (!issuer || !subject || !userId) return false;
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
-        if (!rows?.[0]?.length || rows[0][0].active !== false) return false;
-        await tx`UPDATE fam_user_profiles SET active = true
-          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
-        const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
-        return confirmed?.[0]?.[0]?.active === true;
-      });
-    },
-
-    async finishAccountDeletion({ issuer, subject, userId, schoolId, preserveRequestId = null, reviewerId = null, reviewNote = '', adminAudit = null }) {
-      if (!issuer || !subject || !userId || !schoolId) throw new TypeError('invalid account deletion');
-      return sql.begin(async tx => {
-        const profileRows = await tx`SELECT active, school_id FROM fam_user_profiles
-          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile || profile.active !== false || profile.school_id !== schoolId) return { ok: false, code: 'profile_unavailable' };
-        if (adminAudit) {
-          const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${adminAudit.actorId} LIMIT 1;`;
-          const reviewer = reviewers?.[0]?.[0];
-          if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId
-              || adminAudit.schoolId !== schoolId || !['student', 'council_member'].includes(adminAudit.targetRole)) {
-            return { ok: false, code: 'forbidden' };
-          }
-        }
-
-        const listingRows = await tx`SELECT id FROM fam_listings WHERE user_id = ${userId};`;
-        const listingIds = (listingRows?.[0] ?? []).map(row => row.id).filter(id => typeof id === 'string');
-        const ownListingIds = new Set(listingIds);
-        const registrationRows = await tx`SELECT event_id, status FROM fam_event_registrations WHERE user_id = ${userId};`;
-        for (const registration of registrationRows?.[0] ?? []) {
-          if (ownListingIds.has(registration.event_id)) continue;
-          if (['pending', 'confirmed'].includes(registration.status)) {
-            const occupancyRows = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${registration.event_id} LIMIT 1;`;
-            const taken = Number(occupancyRows?.[0]?.[0]?.taken ?? 0);
-            await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
-              VALUES (${registration.event_id}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
-          }
-          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${registration.event_id} AND user_id = ${userId};`;
-        }
-        for (const listingId of listingIds) {
-          await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
-          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
-          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
-          await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND user_id = ${userId};`;
-        }
-
-        const pollRows = await tx`SELECT poll_id FROM fam_school_polls WHERE author_id = ${userId};`;
-        for (const poll of pollRows?.[0] ?? []) {
-          await tx`DELETE FROM fam_school_poll_votes WHERE poll_id = ${poll.poll_id};`;
-          await tx`DELETE FROM fam_school_polls WHERE poll_id = ${poll.poll_id} AND author_id = ${userId};`;
-        }
-        if (preserveRequestId) {
-          const approvedRequest = await tx`SELECT target_id, school_id, status FROM fam_account_deletion_requests
-            WHERE request_id = ${preserveRequestId} AND school_id = ${schoolId} AND status = 'processing' LIMIT 1;`;
-          const row = approvedRequest?.[0]?.[0];
-          if (!reviewerId || typeof reviewNote !== 'string' || reviewNote.length > 240 || row?.target_id !== userId) return { ok: false, code: 'request_unavailable' };
-          await tx`UPDATE fam_account_deletion_requests SET status = 'approved', reviewed_by = ${reviewerId},
-            reviewed_at = CurrentUtcTimestamp(), review_note = ${reviewNote}
-            WHERE request_id = ${preserveRequestId} AND school_id = ${schoolId} AND status = 'processing';`;
-          await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${userId} AND request_id = ${preserveRequestId} AND school_id = ${schoolId};`;
-        }
-        const deletionRows = await tx`SELECT target_id, request_id FROM fam_account_deletion_requests
-          WHERE requester_id = ${userId} OR target_id = ${userId};`;
-        for (const item of deletionRows?.[0] ?? []) {
-          if (item.request_id === preserveRequestId) continue;
-          await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${item.target_id} AND request_id = ${item.request_id};`;
-          await tx`DELETE FROM fam_account_deletion_requests WHERE request_id = ${item.request_id};`;
-        }
-
-        await tx`DELETE FROM fam_favorites WHERE user_id = ${userId};`;
-        await tx`DELETE FROM fam_ideas WHERE user_id = ${userId};`;
-        await tx`DELETE FROM fam_messages WHERE sender_id = ${userId} OR receiver_id = ${userId};`;
-        await tx`DELETE FROM fam_pending_messages WHERE sender_id = ${userId} OR receiver_id = ${userId};`;
-        await tx`DELETE FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
-        await tx`DELETE FROM fam_school_role_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
-        await tx`UPDATE fam_school_role_requests SET reviewed_by = NULL WHERE reviewed_by = ${userId};`;
-        await tx`DELETE FROM fam_school_role_request_audit WHERE actor_id = ${userId};`;
-        await tx`DELETE FROM fam_account_suspensions WHERE target_id = ${userId};`;
-        await tx`UPDATE fam_account_suspensions SET issued_by = 'deleted-account' WHERE issued_by = ${userId};`;
-        await tx`DELETE FROM fam_account_suspension_open WHERE target_id = ${userId};`;
-        await tx`DELETE FROM fam_account_suspension_audit WHERE target_id = ${userId} OR actor_id = ${userId};`;
-        await tx`UPDATE fam_account_deletion_requests SET reviewed_by = NULL WHERE reviewed_by = ${userId};`;
-        await tx`DELETE FROM fam_school_admin_audit WHERE target_id = ${userId} OR actor_id = ${userId};`;
-        await tx`DELETE FROM fam_school_announcements WHERE author_id = ${userId};`;
-        await tx`DELETE FROM fam_school_poll_votes WHERE voter_id = ${userId};`;
-        await tx`DELETE FROM fam_pending_media WHERE user_id = ${userId};`;
-        if (adminAudit) await tx`INSERT INTO fam_school_admin_audit
-          (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${adminAudit.actorId}, ${userId}, 'account_deleted', ${adminAudit.targetRole}, CurrentUtcTimestamp());`;
-        await tx`DELETE FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
-        return { ok: true, deleted: true };
-      });
-    },
-
-    async createSchoolProfileRequest(record) {
-      if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
-        throw new TypeError('invalid school profile request');
-      }
-      const requestId = randomUUID();
-      return sql.begin(async tx => {
-        const existingProfile = await tx`SELECT user_id FROM fam_user_profiles
-          WHERE issuer = ${record.issuer} AND subject = ${record.subject} LIMIT 1;`;
-        if (existingProfile?.[0]?.length) return { ok: false, code: 'profile_exists' };
-        const existingRequest = await tx`SELECT request_id, status FROM fam_profile_requests
-          WHERE issuer = ${record.issuer} AND subject = ${record.subject} LIMIT 1;`;
-        const current = existingRequest?.[0]?.[0];
-        if (current?.status === 'pending') return { ok: true, status: 'pending', request_id: current.request_id };
-        await tx`UPSERT INTO fam_profile_requests
-          (issuer, subject, request_id, school_id, first_name, last_name, class_name, status, reviewed_by, created_at)
-          VALUES (${record.issuer}, ${record.subject}, ${requestId}, ${record.school_id}, ${record.first_name}, ${record.last_name}, ${record.class_name}, 'pending', '', CurrentUtcTimestamp());`;
-        return { ok: true, status: 'pending', request_id: requestId };
-      });
-    },
-
-    async getSchoolProfileRequest(issuer, subject) {
-      if (!issuer || !subject) throw new TypeError('invalid school profile request identity');
-      const statement = sql`SELECT request_id AS request_id, school_id AS school_id,
-          status AS status, created_at AS created_at
-        FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0] ?? null;
-    },
-
-    async listPendingSchoolProfileRequests(schoolId) {
-      if (!schoolId) throw new TypeError('invalid profile request school');
-      const statement = sql`SELECT request_id AS request_id, school_id AS school_id,
-          first_name AS first_name, last_name AS last_name, class_name AS class_name, created_at AS created_at
-        FROM fam_profile_requests WHERE school_id = ${schoolId} AND status = 'pending'
-        ORDER BY created_at ASC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async reviewSchoolProfileRequest(requestId, schoolId, reviewerId, decision) {
-      if (!requestId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid profile request decision');
-      return sql.begin(async tx => {
-        const requests = await tx`SELECT issuer, subject, school_id, first_name, last_name, class_name, status
-          FROM fam_profile_requests WHERE request_id = ${requestId} LIMIT 1;`;
-        const request = requests?.[0]?.[0];
-        if (!request || request.school_id !== schoolId || request.status !== 'pending') return false;
-        if (decision === 'approve') {
-          const profile = await tx`SELECT user_id FROM fam_user_profiles
-            WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
-          if (profile?.[0]?.length) return false;
-          await tx`INSERT INTO fam_user_profiles
-            (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)
-            VALUES (${request.issuer}, ${request.subject}, ${randomUUID()}, ${schoolId}, 'student', true,
-              ${request.first_name}, ${request.last_name}, ${request.class_name});`;
-        }
-        const status = decision === 'approve' ? 'approved' : 'rejected';
-        await tx`UPDATE fam_profile_requests SET status = ${status}, reviewed_by = ${reviewerId}, first_name = '',
-            last_name = '', class_name = '' WHERE issuer = ${request.issuer} AND subject = ${request.subject}
-            AND request_id = ${requestId} AND school_id = ${schoolId} AND status = 'pending';`;
-        const confirmed = await tx`SELECT status FROM fam_profile_requests WHERE issuer = ${request.issuer}
-          AND subject = ${request.subject} AND request_id = ${requestId} LIMIT 1;`;
-        return confirmed?.[0]?.[0]?.status === status;
-      });
-    },
-
-    async createListing(record) {
-      if (!record || record.status !== 'pending' || !record.user_id || !record.school_id) throw new TypeError('invalid pending listing');
-      if (!Number.isInteger(record.max_seats) || record.max_seats < 0 || record.max_seats > 500) throw new TypeError('invalid max_seats');
-      const id = randomUUID();
-      const insertListing = tx => tx`INSERT INTO fam_listings
-          (id, user_id, school_id, title, description, category, price_text, is_event,
-           event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
-          VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.title}, ${record.description},
-            ${record.category}, ${record.price_text}, ${record.is_event}, ${record.event_date ?? ''},
-            ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
-            ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
-            ${record.status}, CurrentUtcTimestamp());`;
-      if (record.image_key) {
-        return sql.begin(async tx => {
-          const pending = await tx`SELECT user_id, status FROM fam_pending_media
-            WHERE object_key = ${record.image_key} AND created_at > CurrentUtcTimestamp() - Interval('P7D') LIMIT 1;`;
-          const upload = pending?.[0]?.[0];
-          if (!upload || upload.user_id !== record.user_id || upload.status !== 'pending') {
-            const error = new Error('pending image is unavailable'); error.code = 'pending_image_unavailable'; throw error;
-          }
-          await insertListing(tx);
-          await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${record.image_key}
-            AND user_id = ${record.user_id} AND status = 'pending';`;
-          return { id };
-        });
-      }
-      const statement = insertListing(sql);
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      await statement;
-      return { id };
-    },
-
-    async registerPendingImage(userId, objectKey) {
-      if (typeof userId !== 'string' || !UUID.test(userId) || typeof objectKey !== 'string'
-          || !new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(objectKey)) {
-        throw new TypeError('invalid pending image registration');
-      }
-      const statement = sql`INSERT INTO fam_pending_media (object_key, user_id, created_at, status, claim_token, claim_until)
-        VALUES (${objectKey}, ${userId}, CurrentUtcTimestamp(), 'pending', '', CurrentUtcTimestamp());`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      await statement;
-      return true;
-    },
-
-    async claimPendingImageDeletion(userId, objectKey) {
-      if (typeof userId !== 'string' || !UUID.test(userId) || typeof objectKey !== 'string'
-          || !new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(objectKey)) {
-        throw new TypeError('invalid pending image deletion request');
-      }
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${objectKey}
-          AND user_id = ${userId} LIMIT 1;`;
-        if (rows?.[0]?.[0]?.status !== 'pending') return null;
-        const linked = await tx`SELECT id FROM fam_listings WHERE image_key = ${objectKey} LIMIT 1;`;
-        if (linked?.[0]?.length) return null;
-        const token = randomUUID();
-        await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
-            claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
-          WHERE object_key = ${objectKey} AND user_id = ${userId} AND status = 'pending';`;
-        const claimed = await tx`SELECT claim_token FROM fam_pending_media WHERE object_key = ${objectKey}
-          AND status = 'deleting' AND claim_token = ${token} LIMIT 1;`;
-        return claimed?.[0]?.[0]?.claim_token ?? null;
-      });
-    },
-
-    async claimExpiredPendingImages(limit = 50) {
-      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new TypeError('invalid pending media claim limit');
-      return sql.begin(async tx => {
-        const expired = await tx`SELECT object_key FROM fam_pending_media
-          WHERE (status = 'pending' AND created_at < CurrentUtcTimestamp() - Interval('P7D'))
-             OR (status = 'deleting' AND claim_until < CurrentUtcTimestamp())
-          ORDER BY created_at ASC LIMIT ${limit};`;
-        const claims = [];
-        for (const row of expired?.[0] ?? []) {
-          const objectKey = row.object_key;
-          const stillLinked = await tx`SELECT id FROM fam_listings WHERE image_key = ${objectKey} LIMIT 1;`;
-          if (stillLinked?.[0]?.length) {
-            await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '' WHERE object_key = ${objectKey};`;
-            continue;
-          }
-          const token = randomUUID();
-          await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${token},
-              claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
-            WHERE object_key = ${objectKey}
-              AND ((status = 'pending' AND created_at < CurrentUtcTimestamp() - Interval('P7D'))
-                OR (status = 'deleting' AND claim_until < CurrentUtcTimestamp()));`;
-          const claimed = await tx`SELECT object_key, claim_token FROM fam_pending_media
-            WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${token} LIMIT 1;`;
-          if (claimed?.[0]?.[0]) claims.push(claimed[0][0]);
-        }
-        return claims;
-      });
-    },
-
-    async finishPendingImageCleanup(objectKey, claimToken, deleted) {
-      if (!objectKey || !claimToken || typeof deleted !== 'boolean') throw new TypeError('invalid pending image cleanup result');
-      return sql.begin(async tx => {
-        const claimed = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${objectKey}
-          AND status = 'deleting' AND claim_token = ${claimToken} LIMIT 1;`;
-        if (!claimed?.[0]?.length) return false;
-        if (deleted) await tx`DELETE FROM fam_pending_media WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${claimToken};`;
-        else await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
-          WHERE object_key = ${objectKey} AND status = 'deleting' AND claim_token = ${claimToken};`;
-        return true;
-      });
-    },
-
-    async moderateListing(listingId, schoolId, decision) {
-      if (!listingId || !schoolId || !['active', 'rejected'].includes(decision)) throw new TypeError('invalid listing decision');
-      return sql.begin(async tx => {
-        const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
-        const row = current?.[0]?.[0];
-        if (!row || row.school_id !== schoolId || row.status !== 'pending') return false;
-        if (decision === 'active' && row.image_key && row.photo_status !== 'approved') return false;
-        await tx`UPDATE fam_listings SET status = ${decision} WHERE id = ${listingId};`;
-        return true;
-      });
-    },
-
-    async getListingPhoto(listingId) {
-      if (!listingId) throw new TypeError('invalid listing id');
-      const statement = sql`SELECT school_id, status, image_key, photo_status
-        FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0] ?? null;
-    },
-
-    async listingUsesPhoto(imageKey) {
-      if (!imageKey) throw new TypeError('invalid photo key');
-      const statement = sql`SELECT id FROM fam_listings WHERE image_key = ${imageKey} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return Boolean((await statement)?.[0]?.[0]?.id);
-    },
-
-    async moderateListingPhoto(listingId, schoolId, decision) {
-      if (!listingId || !schoolId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
-      return sql.begin(async tx => {
-        const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
-        const row = current?.[0]?.[0];
-        if (!row || row.school_id !== schoolId || row.status !== 'pending' || !row.image_key || row.photo_status !== 'pending') return false;
-        await tx`UPDATE fam_listings SET photo_status = ${decision} WHERE id = ${listingId};`;
-        return true;
-      });
-    },
-
-    async createAvatarReview({ userId, schoolId, imageKey }) {
-      if (!userId || !schoolId || !imageKey) throw new TypeError('invalid avatar review request');
-      const id = randomUUID();
-      return sql.begin(async tx => {
-        const pending = await tx`SELECT user_id, status FROM fam_pending_media
-          WHERE object_key = ${imageKey} LIMIT 1;`;
-        const upload = pending?.[0]?.[0];
-        if (!upload || upload.user_id !== userId || upload.status !== 'pending') return null;
-        const existing = await tx`SELECT id FROM fam_avatar_reviews WHERE user_id = ${userId}
-          AND status = 'pending' LIMIT 1;`;
-        if (existing?.[0]?.length) return null;
-        await tx`INSERT INTO fam_avatar_reviews
-          (id, user_id, school_id, image_key, status, created_at, reviewed_by, reviewed_at)
-          VALUES (${id}, ${userId}, ${schoolId}, ${imageKey}, 'pending', CurrentUtcTimestamp(), '', NULL);`;
-        await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${imageKey}
-          AND user_id = ${userId} AND status = 'pending';`;
-        return { id, status: 'pending' };
-      });
-    },
-
-    async listPendingAvatarReviews(schoolId) {
-      if (!schoolId) throw new TypeError('invalid avatar review school');
-      const statement = sql`SELECT id, user_id, image_key, created_at FROM fam_avatar_reviews
-        WHERE school_id = ${schoolId} AND status = 'pending'
-        ORDER BY created_at ASC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return ((await statement)?.[0] ?? []).map(row => ({
-        id: row.id, user_id: row.user_id, created_at: row.created_at,
-        photo_url: `/api/v1/avatars/${row.id}/photo`,
-      }));
-    },
-
-    async getAvatarReview(reviewId) {
-      if (!reviewId) throw new TypeError('invalid avatar review id');
-      const statement = sql`SELECT id, user_id, school_id, image_key, status FROM fam_avatar_reviews
-        WHERE id = ${reviewId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0] ?? null;
-    },
-
-    async isCurrentAvatar(reviewId) {
-      if (!reviewId) throw new TypeError('invalid avatar review id');
-      const avatarUrl = `/api/v1/avatars/${reviewId}/photo`;
-      const statement = sql`SELECT user_id FROM fam_avatar_reviews WHERE id = ${reviewId}
-        AND status = 'approved' LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const userId = (await statement)?.[0]?.[0]?.user_id;
-      if (!userId) return false;
-      const profile = sql`SELECT user_id FROM fam_user_profiles WHERE user_id = ${userId}
-        AND active = true AND avatar_url = ${avatarUrl} LIMIT 1;`;
-      if (typeof profile?.on === 'function') profile.on('error', () => {});
+          WHERE request_id = $…6712 tokens truncated…profile.on('error', () => {});
       return Boolean((await profile)?.[0]?.[0]?.user_id);
     },
 
@@ -1484,6 +1085,67 @@ export function createYdbListingsRepository(sql) {
           await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
             VALUES (${eventId}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
         }
+        return true;
+      });
+    },
+
+    async getSchoolAgentMetrics(schoolId) {
+      if (!schoolId) throw new TypeError('invalid agent report school');
+      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
+      const [active, fresh, safety, deletion, suspensions, ideas] = await Promise.all([
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND status = 'active';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL;`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_account_deletion_requests WHERE school_id = ${schoolId} AND status IN ('pending', 'processing');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_account_suspensions WHERE school_id = ${schoolId} AND status = 'active' AND expires_at > CurrentUtcTimestamp();`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_ideas WHERE school_id = ${schoolId} AND admin_status = 'new';`),
+      ]);
+      return { listings: { active, new_24h: fresh }, safety: { unreviewed: safety },
+        account_requests: { deletion_pending: deletion, active_suspensions: suspensions }, ideas: { awaiting_council: ideas } };
+    },
+
+    async saveSchoolAgentReport({ schoolId, date, summary, metrics }) {
+      if (!schoolId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || typeof summary !== 'string' || !metrics) throw new TypeError('invalid school agent report');
+      await sql`UPSERT INTO fam_agent_school_daily_reports (school_id, report_date, generated_at, summary, metrics_json)
+        VALUES (${schoolId}, ${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
+    },
+
+    async createSchoolAgentIdea({ id, schoolId, date, rule, count }) {
+      if (!id || !schoolId || !date || !rule || !Number.isInteger(count) || count <= 0) throw new TypeError('invalid school agent idea');
+      return sql.begin(async tx => {
+        const prior = await tx`SELECT id FROM fam_agent_ideas WHERE school_id = ${schoolId} AND report_date = ${date} AND agent_rule_key = ${rule.key} LIMIT 1;`;
+        if (prior?.[0]?.length) return false;
+        await tx`INSERT INTO fam_agent_ideas
+          (id, school_id, report_date, agent_rule_key, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by, status, reviewed_by, reviewed_at, decision_note, created_at)
+          VALUES (${id}, ${schoolId}, ${date}, ${rule.key}, ${rule.title}, ${rule.summary(count)}, ${rule.benefit}, 'small', 'low', 'observed', ${rule.evidence(count)}, ${rule.proposedBy}, 'pending', NULL, NULL, NULL, CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
+    async getSchoolAgentDashboard(schoolId) {
+      if (!schoolId) throw new TypeError('invalid school agent dashboard school');
+      const [reports, ideas] = await Promise.all([
+        sql`SELECT report_date, generated_at, summary, metrics_json FROM fam_agent_school_daily_reports WHERE school_id = ${schoolId} ORDER BY report_date DESC LIMIT 1;`,
+        sql`SELECT id, report_date, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by, status
+          FROM fam_agent_ideas WHERE school_id = ${schoolId} AND status = 'pending' ORDER BY created_at ASC LIMIT 20;`,
+      ]);
+      const report = reports?.[0]?.[0] ?? null;
+      let metrics = null;
+      try { metrics = report?.metrics_json ? JSON.parse(report.metrics_json) : null; } catch { metrics = null; }
+      return { report: report ? { report_date: report.report_date, generated_at: report.generated_at, summary: report.summary, metrics } : null,
+        ideas: ideas?.[0] ?? [] };
+    },
+
+    async reviewSchoolAgentIdea({ id, schoolId, reviewerId, decision }) {
+      if (!id || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid school agent idea decision');
+      return sql.begin(async tx => {
+        const actorRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const actor = actorRows?.[0]?.[0];
+        if (!actor || actor.active !== true || actor.role !== 'school_admin' || actor.school_id !== schoolId) return false;
+        const rows = await tx`SELECT status FROM fam_agent_ideas WHERE id = ${id} AND school_id = ${schoolId} LIMIT 1;`;
+        if (rows?.[0]?.[0]?.status !== 'pending') return false;
+        await tx`UPDATE fam_agent_ideas SET status = ${decision}, reviewed_by = ${reviewerId}, reviewed_at = CurrentUtcTimestamp()
+          WHERE id = ${id} AND school_id = ${schoolId} AND status = 'pending';`;
         return true;
       });
     },

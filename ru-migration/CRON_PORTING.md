@@ -8,13 +8,13 @@
 | `fam-agent-orchestrator-daily-digest` | `5 6 * * *` | `private.refresh_and_enqueue_fam_agent_daily_digest()` | `20261110170529_route_daily_operational_report_to_orchestrator.sql` | Не перенесено |
 | `fam-agent-technical-system-health` | `10 6 * * *` | `private.enqueue_fam_agent_system_health_check()` | `20261110171353_add_read_only_fam_technical_health_agent.sql` | Не перенесено |
 | `fam-agent-site-error-audit` | `*/15 * * * *` | `private.enqueue_fam_agent_site_error_digest()` | `20261110173255_fam_site_error_monitoring.sql` | Не перенесено |
-| `fam-agent-school-daily-report` | `0 6 * * *` | `private.refresh_fam_agent_school_daily_reports()` | `20261109152842_school_scoped_agent_reports_and_free_analysts.sql` | Не перенесено |
+| `fam-agent-school-daily-report` | `0 6 * * *` | `private.refresh_fam_agent_school_daily_reports()` | `20261109152842_school_scoped_agent_reports_and_free_analysts.sql` | Перенесено для каталога школ RU; unit/timer подготовлены, не установлены и не включены |
 | `fam-listing-image-moderation-every-minute` | `* * * * *` | HTTP POST в исходный Supabase Edge Function `fam-listing-image-worker` | `20261110210025_add_persistent_listing_image_review_queue.sql` | Не переносить исходный URL; функция/очередь не перенесены |
 | `fam-agent-daily-report` | `0 6 * * *` | `private.refresh_fam_agent_daily_report()` | `20261109144741_create_fam_agent_daily_reports.sql` | Не перенесено |
 
 ## Безопасная очистка загрузок
 
-Российский backend содержит реестр `fam_pending_media` и CLI `ru-migration/app/backend/cleanup-pending-media.mjs`: он удаляет только неподвязанные загрузки старше семи дней, предварительно получив для каждой lease в YDB. Привязка загрузки к объявлению выполняется транзакционно; ошибку удаления можно повторить после lease. Репозиторные тесты и одноразовая YDB-интеграция покрывают этот жизненный цикл. Для самостоятельного хоста добавлены systemd unit/timer файлы, но они не установлены и не включены: настроенных бесплатных YDB/S3 и хоста нет. Семь расписаний исходного FAM выше остаются неперенесёнными и выключенными; очистка медиа не запланирована к запуску.
+Российский backend содержит реестр `fam_pending_media` и CLI `ru-migration/app/backend/cleanup-pending-media.mjs`: он удаляет только неподвязанные загрузки старше семи дней, предварительно получив для каждой lease в YDB. Привязка загрузки к объявлению выполняется транзакционно; ошибку удаления можно повторить после lease. Также перенесён школьный агрегированный отчёт с правилами предложений без внешней модели и стоимостью API 0; он не сохраняет текст переписок или идентификаторы пользователей. К нему добавлены CLI и systemd unit/timer на 06:00 UTC (09:00 МСК). Оба задания подготовлены, но не установлены и не включены: бесплатная среда не настроена. Остальные шесть исходных расписаний остаются неперенесёнными и выключенными; очистка медиа не запланирована к запуску.
 
 ## Условия переноса
 

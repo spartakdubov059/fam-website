@@ -1,0 +1,33 @@
+-- School-only aggregate reports and deterministic, human-reviewed suggestions.
+-- Never store student text, identifiers, email addresses, or model output here.
+CREATE TABLE fam_agent_school_daily_reports (
+  school_id Utf8 NOT NULL,
+  report_date Utf8 NOT NULL,
+  generated_at Timestamp NOT NULL,
+  summary Utf8 NOT NULL,
+  metrics_json Utf8 NOT NULL,
+  PRIMARY KEY (school_id, report_date)
+);
+
+CREATE TABLE fam_agent_ideas (
+  id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  report_date Utf8 NOT NULL,
+  agent_rule_key Utf8 NOT NULL,
+  title Utf8 NOT NULL,
+  summary Utf8 NOT NULL,
+  benefit Utf8 NOT NULL,
+  complexity Utf8 NOT NULL,
+  risk Utf8 NOT NULL,
+  evidence_kind Utf8 NOT NULL,
+  evidence_summary Utf8 NOT NULL,
+  proposed_by Utf8 NOT NULL,
+  status Utf8 NOT NULL DEFAULT 'pending',
+  reviewed_by Utf8,
+  reviewed_at Timestamp,
+  decision_note Utf8,
+  created_at Timestamp NOT NULL,
+  INDEX fam_agent_ideas_school_status_created_idx GLOBAL SYNC
+    ON (school_id, status, created_at)
+    COVER (id, report_date, agent_rule_key, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by)
+);

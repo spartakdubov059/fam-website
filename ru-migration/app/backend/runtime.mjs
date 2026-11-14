@@ -10,6 +10,8 @@ import { createListingsApi } from './services/listings-api.mjs';
 import { createMediaApi } from './services/media-api.mjs';
 import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
 import { createPendingMediaCleanupOperation } from './services/cleanup-pending-media.mjs';
+import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
+import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export async function createRuntime(env = process.env) {
   const databaseUrl = env.FAM_RU_DATABASE_URL;
@@ -43,6 +45,7 @@ export async function createRuntime(env = process.env) {
     listingsApi,
     mediaApi,
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
+    refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

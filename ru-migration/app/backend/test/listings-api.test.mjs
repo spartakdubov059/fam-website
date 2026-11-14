@@ -70,6 +70,26 @@ test('school administrator overview is private to the active administrator and b
   assert.equal(selectedSchool, 'school-b');
 });
 
+test('school agent dashboard and idea decisions are school-admin-only and school scoped', async () => {
+  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' }; let saved; let reviewed;
+  const ideaId = 'a'.repeat(64);
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'user' }), resolveActor: async () => actor,
+    repository: {
+      getSchoolAgentDashboard: async schoolId => { saved = schoolId; return { report: null, ideas: [] }; },
+      reviewSchoolAgentIdea: async input => { reviewed = input; return input.schoolId === actor.school_id; },
+    } });
+  const dashboard = req({}, 'GET'); dashboard.url = '/api/v1/school/admin/agent-dashboard';
+  assert.equal((await handler(dashboard)).status, 200); assert.equal(saved, 'school-a');
+  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(dashboard)).status, 403);
+  actor = { id: 'admin-b', school_id: 'school-b', role: 'school_admin' };
+  const decision = req({ decision: 'approve' }, 'PATCH'); decision.url = `/api/v1/school/admin/agent-ideas/${ideaId}`;
+  assert.equal((await handler(decision)).status, 200);
+  assert.deepEqual(reviewed, { id: ideaId, schoolId: 'school-b', reviewerId: 'admin-b', decision: 'approved' });
+  const invalid = req({ decision: 'publish' }, 'PATCH'); invalid.url = decision.url;
+  assert.equal((await handler(invalid)).status, 400);
+});
+
 test('school profile request status is private to the authenticated identity and omits submitted PII', async () => {
   let identity;
   const handler = createListingsApi({ authenticate: async () => identity,

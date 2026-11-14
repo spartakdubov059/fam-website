@@ -65,6 +65,31 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAdminOverview(actor.school_id)) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/school/admin/agent-dashboard') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.getSchoolAgentDashboard !== 'function') return { status: 503, body: { ok: false, error: 'agent_dashboard_unavailable' } };
+      try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAgentDashboard(actor.school_id)) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const agentIdeaReview = pathname.match(/^\/api\/v1\/school\/admin\/agent-ideas\/([a-f0-9]{64})$/);
+    if (req.method === 'PATCH' && agentIdeaReview) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'approved' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolAgentIdea !== 'function') return { status: 503, body: { ok: false, error: 'agent_dashboard_unavailable' } };
+      try { const changed = await repository.reviewSchoolAgentIdea({ id: agentIdeaReview[1], schoolId: actor.school_id, reviewerId: actor.id, decision });
+        return changed ? { status: 200, body: { ok: true, status: decision } } : { status: 409, body: { ok: false, error: 'idea_unavailable' } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'POST' && pathname === '/api/v1/me/avatar') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

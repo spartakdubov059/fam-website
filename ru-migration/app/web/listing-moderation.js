@@ -260,6 +260,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       }
       renderPendingMessagesPanel();
       renderSafetyPanel();
+      if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
 
@@ -271,6 +272,31 @@ export async function initializeListingModeration({ document = globalThis.docume
       if (!response.ok) throw new Error('decision_failed');
       await load();
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
+  }
+
+  async function renderSchoolAgentDashboard(options) {
+    let response; let result;
+    try { response = await fetchImpl('/api/v1/school/admin/agent-dashboard', options); result = await json(response); } catch { return; }
+    if (!response.ok || !result?.ok) return;
+    const report = result.report;
+    const ideas = Array.isArray(result.ideas) ? result.ideas.filter(item => item && /^[a-f0-9]{64}$/.test(item.id || '')
+      && typeof item.title === 'string' && typeof item.summary === 'string' && typeof item.evidence_summary === 'string') : [];
+    const card = node(document, 'section', 'ru-moderation-card');
+    card.append(node(document, 'h3', '', 'Ежедневная сводка и предложения помощников'));
+    if (report && typeof report.summary === 'string') {
+      card.append(node(document, 'p', '', report.summary));
+      if (typeof report.generated_at === 'string') card.append(node(document, 'p', '', `Обновлено: ${new Date(report.generated_at).toLocaleString('ru-RU')}`));
+    } else card.append(node(document, 'p', '', 'Сводка появится после первого запуска фонового задания.'));
+    if (!ideas.length) card.append(node(document, 'p', '', 'Открытых предложений помощников нет.'));
+    for (const idea of ideas) {
+      const item = node(document, 'article', 'ru-moderation-card');
+      item.append(node(document, 'h4', '', idea.title), node(document, 'p', '', idea.summary), node(document, 'p', '', `Основание: ${idea.evidence_summary}`));
+      const actions = node(document, 'div', 'ru-moderation-actions');
+      actions.append(actionButton(document, 'Принять к работе', () => patch(`/api/v1/school/admin/agent-ideas/${idea.id}`, { decision: 'approve' })));
+      actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/school/admin/agent-ideas/${idea.id}`, { decision: 'reject' })));
+      item.append(actions); card.append(item);
+    }
+    queue.append(card);
   }
 
   async function patch(path, body) {
