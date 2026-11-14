@@ -6,7 +6,6 @@ export const SITE_ERROR_CODES = Object.freeze([
 export const SITE_ERROR_AREAS = Object.freeze(['auth', 'listings', 'notifications', 'database', 'other']);
 
 export function createSiteErrorTelemetry({ repository, now = () => new Date() }) {
-  if (!repository) throw new TypeError('repository is required');
   return async function report(req) {
     if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
     const origin = req.headers?.origin;
@@ -36,7 +35,7 @@ export function createSiteErrorTelemetry({ repository, now = () => new Date() })
     if (!SITE_ERROR_CODES.includes(input?.event_code) || !SITE_ERROR_AREAS.includes(input?.page_area)) {
       return { status: 400, body: { ok: false, error: 'invalid_event' } };
     }
-    if (typeof repository.recordSiteError !== 'function') {
+    if (typeof repository?.recordSiteError !== 'function') {
       return { status: 503, body: { ok: false, error: 'telemetry_unavailable' } };
     }
     try {
