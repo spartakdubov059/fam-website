@@ -45,6 +45,9 @@ begin
      or v_snapshot #>> '{latest_coder_task,status}' <> 'failed'
      or v_snapshot #>> '{latest_system_health,status}' is not null
      or v_snapshot #>> '{cron_jobs,0,last_run_status}' <> 'succeeded'
+     or pg_catalog.jsonb_array_length(v_snapshot -> 'cron_jobs') <> 2
+     or v_snapshot #>> '{cron_jobs,1,jobname}' <> 'fam-listing-image-moderation-every-minute'
+     or v_snapshot #>> '{cron_jobs,1,last_run_status}' <> 'failed'
      or v_snapshot #>> '{worker_http_6h,window_hours}' <> '6'
      or v_snapshot #>> '{worker_http_6h,response_count}' <> '2'
      or v_snapshot #>> '{worker_http_6h,success_count}' <> '1'
