@@ -75,6 +75,9 @@ body {
 .ru-suspension-form select, .ru-suspension-form textarea { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #aaa5bb; border-radius: 0.5rem; font: inherit; }
 .ru-suspension-form textarea { min-height: 5rem; resize: vertical; }
 .ru-avatar-workflow { display: grid; gap: 0.65rem; max-width: 42rem; margin: 1.5rem 0; padding: 1rem; border: 1px solid #30323a; border-radius: 1rem; background: #191b22; }
+.ru-account-workflow { display: grid; gap: 0.65rem; max-width: 42rem; margin: 1.5rem 0; padding: 1rem; border: 1px solid #60363a; border-radius: 1rem; background: #211a1d; }
+.ru-account-workflow h2, .ru-account-workflow p { margin: 0; }
+.ru-account-delete-button { justify-self: start; border-color: #a7444d; color: #ffdfe1; }
 .ru-avatar-workflow h2, .ru-avatar-workflow p { margin: 0; }
 .ru-avatar-workflow img, .ru-avatar-review-list img { border-radius: 50%; object-fit: cover; }
 .ru-avatar-form { display: grid; justify-items: start; gap: 0.65rem; }

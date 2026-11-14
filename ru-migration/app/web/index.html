@@ -1283,6 +1283,7 @@ window.onunhandledrejection = function() {
         <button id="ruOpenMessages" class="ru-button" type="button" aria-expanded="false" aria-controls="ruMessages">Мои сообщения</button>
         <button id="ruLogout" class="ru-button" type="button" hidden>Выйти</button>
         <p id="ruSubmitStatus" class="ru-note" role="status" aria-live="polite">Войдите через Яндекс ID, чтобы подать объявление.</p>
+        <section id="ruAccountWorkflow" class="ru-account-workflow" hidden aria-label="Управление аккаунтом"></section>
         <section id="ruAvatarWorkflow" class="ru-avatar-workflow" hidden aria-label="Фото профиля"></section>
         <form id="ruListingForm" class="ru-listing-form" hidden>
           <label>Название<input name="title" maxlength="80" required></label>
@@ -1349,6 +1350,10 @@ window.onunhandledrejection = function() {
     avatarScript.type = 'module';
     avatarScript.src = '/avatar-workflow.js';
     document.body.append(avatarScript);
+    const accountScript = document.createElement('script');
+    accountScript.type = 'module';
+    accountScript.src = '/account-workflow.js';
+    document.body.append(accountScript);
     const pulseScript = document.createElement('script');
     pulseScript.type = 'module';
     pulseScript.src = '/pulse.js';
