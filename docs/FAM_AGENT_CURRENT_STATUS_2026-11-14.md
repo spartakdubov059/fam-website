@@ -27,3 +27,14 @@
 - Нативный HTTP-ответ production Worker при `finish_fam_agent_task=false` не проверялся, поскольку это потребовало бы изменения/развёртывания production. Конфигурация существующей ChatGPT automation не найдена в доступных локальных файлах/API; карточка automation была открыта, но настройки прочитать не удалось.
 
 Production, `main`, миграции, Cron, Auth/RLS, secrets, очередь и пользовательские данные этим аудитом не менялись.
+
+## Read-only повторная сверка — 14 ноября 2026, 12:09 UTC
+
+- В фактической схеме очередь находится в `private.fam_agent_tasks`; запросы читали только статусы/времена и поля управления, без payload, result summary и пользовательских данных. В `coder_patch_request` по-прежнему 1 `completed` и 3 `failed`; все четыре задачи созданы 11 ноября. Последняя завершённая — `audit_frontend_runtime` в 19:26 UTC; последний `audit_accessibility` завершился failed в 19:52 UTC. С 11 ноября новых coder-задач нет.
+- Очередь также показывает ежедневные `daily_report_digest` и `system_health_check` со статусом completed, а `site_error_digest` продолжает завершаться примерно раз в час. Последний daily digest завершился 14 ноября в 04:00:02 UTC.
+- Все 8 активных Cron на момент снимка имели последний статус `succeeded`. Это подтверждает последний запуск каждого задания, а не полноту каждого результата или непрерывное наблюдение.
+- Migration ledger всё ещё заканчивается `20261113215610` (72 записи); миграции PR #65/#74 не применялись.
+- PR #65 остаётся open/draft/mergeable на head `82bd7a3d774173ecee2f03a1cb13d9e3a9ebab04`. На этом SHA успешно завершились Regression suite, Russian content safety tests, owner approval verifier и PostgreSQL Coder QA, Reporter и telemetry интеграции; Netlify preview готов. PR не объединён.
+- Эти данные подтверждают работоспособность расписания и ежедневной агрегированной отчётности, но не production запуск coder-модели: очередь не выдала новых заданий после 11 ноября. Worker v17 и production finish RPC остаются без изменений; исправления PR не действуют в production.
+
+Все запросы в этой сверке были read-only; production, `main`, конфигурация GitHub и пользовательские данные не менялись.
