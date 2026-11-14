@@ -88,6 +88,19 @@ test("frames an unlabelled hunk only for one explicit allowlisted file", () => {
   assert.throws(() => frameSingleFileHunkDiff("--- a/a\n+++ b/a", "tests/fixture.mjs"), /start with a unified diff hunk/);
 });
 
+test("frames file-labelled unified hunks only when both headers match the selected file", () => {
+  const framed = frameSingleFileHunkDiff(
+    "--- a/tests/fixture.mjs\n+++ b/tests/fixture.mjs\n@@ -1 +1 @@\n-old\n+new",
+    "tests/fixture.mjs",
+  );
+  assert.match(framed, /^diff --git a\/tests\/fixture\.mjs b\/tests\/fixture\.mjs\n/);
+  assert.match(framed, /@@ -1 \+1 @@\n-old\n\+new$/);
+  assert.throws(
+    () => frameSingleFileHunkDiff("--- a/tests/other.mjs\n+++ b/tests/other.mjs\n@@ -1 +1 @@", "tests/fixture.mjs"),
+    /selected path/,
+  );
+});
+
 test("git apply accepts a framed hunk against the selected file", () => {
   const root = mkdtempSync(join(tmpdir(), "fam-model-patch-"));
   const relativePath = "tests/fixture.mjs";
