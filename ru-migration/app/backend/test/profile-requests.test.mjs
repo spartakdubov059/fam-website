@@ -13,6 +13,12 @@ test('school profile request accepts only catalog schools and bounded student fi
   assert.equal(Object.hasOwn(record, 'role'), false);
   assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'made-up', first_name: 'А', last_name: 'Б', class_name: '8А' }, repository })).code, 'invalid_profile_request');
   assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'lyceum_3', first_name: 'А', last_name: 'Б', class_name: '999А' }, repository })).code, 'invalid_profile_request');
+  for (const class_name of ['4А', '12А', '8Д', '8A']) {
+    assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'lyceum_3', first_name: 'А', last_name: 'Б', class_name }, repository })).code, 'invalid_profile_request');
+  }
+  for (const class_name of ['5А', '9К', '10Б', '11Г']) {
+    assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'lyceum_3', first_name: 'А', last_name: 'Б', class_name }, repository })).ok, true);
+  }
 });
 
 test('profile request repository is idempotent and binds Yandex identity values', async () => {

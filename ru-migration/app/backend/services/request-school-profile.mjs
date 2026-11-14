@@ -1,6 +1,4 @@
-import { getSchool } from '../policies/school-catalog.mjs';
-
-const CLASS_NAME = /^[1-9][0-9]?[А-ЯЁA-Z]?$/u;
+import { getSchool, isSchoolClassName } from '../policies/school-catalog.mjs';
 
 export async function requestSchoolProfile({ identity, input, repository }) {
   if (!identity || typeof identity.issuer !== 'string' || typeof identity.subject !== 'string'
@@ -10,7 +8,7 @@ export async function requestSchoolProfile({ identity, input, repository }) {
   const lastName = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
   const className = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '') : '';
   if (!school || firstName.length < 1 || firstName.length > 80 || lastName.length < 1 || lastName.length > 80
-      || !CLASS_NAME.test(className) || /[<>]/u.test(firstName + lastName)) {
+      || !isSchoolClassName(className) || /[<>]/u.test(firstName + lastName)) {
     return { ok: false, code: 'invalid_profile_request' };
   }
   if (typeof repository?.createSchoolProfileRequest !== 'function') return { ok: false, code: 'database_unavailable' };

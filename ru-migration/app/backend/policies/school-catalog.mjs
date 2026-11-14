@@ -5,6 +5,12 @@ export const SCHOOL_CATALOG = Object.freeze([
   Object.freeze({ id: 'gymnasium_4', name: 'Гимназия № 4' }),
 ]);
 
+const CLASS_NAME = /^(?:[5-9]|1[01])[АБВГК]$/u;
+
+export function isSchoolClassName(value) {
+  return typeof value === 'string' && CLASS_NAME.test(value);
+}
+
 export function getSchool(schoolId) {
   return SCHOOL_CATALOG.find(school => school.id === schoolId) || null;
 }

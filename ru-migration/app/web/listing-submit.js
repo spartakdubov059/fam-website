@@ -181,7 +181,7 @@ function createProfileIdentityForm(document, listingForm, profile, fetchImpl) {
   const form = document.createElement('form'); form.className = 'ru-listing-form';
   const fields = {};
   for (const [name, title, maxLength, pattern] of [
-    ['first_name', 'Имя', 60, null], ['last_name', 'Фамилия', 60, null], ['class_name', 'Класс, например 8А', 4, '[1-9][0-9]?[А-ЯЁA-Zа-яёa-z]?'],
+    ['first_name', 'Имя', 60, null], ['last_name', 'Фамилия', 60, null], ['class_name', 'Класс, например 8А', 4, '(?:[5-9]|1[01])[АБВГКабвгк]'],
   ]) {
     const label = document.createElement('label'); label.textContent = title;
     const input = document.createElement('input'); input.name = name; input.maxLength = maxLength; input.required = true;
@@ -340,7 +340,7 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
   for (const item of schools) { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; school.append(option); }
   schoolLabel.append(school);
   const fields = [];
-  for (const [name, labelText, maxLength, pattern] of [['first_name', 'Имя', 80, null], ['last_name', 'Фамилия', 80, null], ['class_name', 'Класс, например 8А', 4, '[1-9][0-9]?[А-ЯЁA-Z]?']]) {
+  for (const [name, labelText, maxLength, pattern] of [['first_name', 'Имя', 80, null], ['last_name', 'Фамилия', 80, null], ['class_name', 'Класс, например 8А', 4, '(?:[5-9]|1[01])[АБВГКабвгк]']]) {
     const label = document.createElement('label'); label.textContent = labelText;
     const input = document.createElement('input'); input.name = name; input.maxLength = maxLength; input.required = true;
     if (pattern) { input.pattern = pattern; input.autocomplete = 'off'; }

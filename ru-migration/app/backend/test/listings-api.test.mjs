@@ -465,6 +465,21 @@ test('profile identity update rejects invalid values before touching the reposit
   assert.equal(writes, 0);
 });
 
+test('profile identity update enforces the current FAM school class format', async () => {
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
+    repository: { updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
+  for (const class_name of ['4А', '12А', '8Д', '8A']) {
+    const request = req({ first_name: 'Аня', last_name: 'Тест', class_name }, 'PATCH'); request.url = '/api/v1/me';
+    assert.equal((await handler(request)).status, 400, class_name);
+  }
+  for (const class_name of ['5А', '9К', '10Б', '11Г']) {
+    const request = req({ first_name: 'Аня', last_name: 'Тест', class_name }, 'PATCH'); request.url = '/api/v1/me';
+    assert.equal((await handler(request)).status, 200, class_name);
+    assert.equal(saved.class_name, class_name);
+  }
+});
+
 test('favorites are scoped to the authenticated database actor', async () => {
   let listedFor;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),

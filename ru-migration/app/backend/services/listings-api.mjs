@@ -1,6 +1,7 @@
 import { submitListing } from './submit-listing.mjs';
 import { submitIdea } from './submit-idea.mjs';
 import { submitMessage } from './submit-message.mjs';
+import { isSchoolClassName } from '../policies/school-catalog.mjs';
 import { requestSchoolProfile } from './request-school-profile.mjs';
 import { createSchoolPulseApi } from './school-pulse-api.mjs';
 import { createAccountDeletionApi } from './account-deletion-api.mjs';
@@ -718,7 +719,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       const last_name = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
       const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '') : '';
       const validName = value => value.length >= 1 && value.length <= 60 && !/[<>\u0000-\u001f]/u.test(value);
-      if (!validName(first_name) || !validName(last_name) || !/^[1-9][0-9]?[А-ЯЁA-Z]?$/u.test(class_name)) {
+      if (!validName(first_name) || !validName(last_name) || !isSchoolClassName(class_name)) {
         return { status: 400, body: { ok: false, error: 'invalid_profile_identity' } };
       }
       if (typeof repository?.updateOwnProfileIdentity !== 'function') return { status: 503, body: { ok: false, error: 'profile_update_unavailable' } };
