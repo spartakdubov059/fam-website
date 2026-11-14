@@ -268,7 +268,7 @@ begin
      or v_payload->>'event_summary' is null
      or v_payload->>'observed_hour' is null
      or v_payload->>'previous_attempts' is null then
-    raise exception 'producer failed to preserve extended claim context';
+    raise exception 'producer failed to preserve extended claim context: %',v_payload;
   end if;
 end;
 $context_check$;
