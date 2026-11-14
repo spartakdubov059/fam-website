@@ -46,3 +46,13 @@ Production, `main`, миграции, Cron, Auth/RLS, secrets, очередь и
 - Параметры pull request: `required_approving_review_count=0`, stale approvals не dismiss-ятся, code-owner review и approval последнего push выключены. Следовательно, обязательная проверка статуса сама по себе не требует review для всех PR.
 - Встроенная workflow-проверка дополнительно требует актуальное одобрение владельца только для веток `codex/fam-run-*`; она не заменяет общее серверное правило branch protection.
 - Подключённый GitHub API credential не имеет доступной операции обновления ruleset, а GitHub web app в доступной UI-сессии не открыл страницу настроек. Конфигурацию не менял. Требуется отдельный authorized write path для установки хотя бы одного обязательного approving review; пользователь ранее разрешил выбрать рациональное усиление.
+
+## Сверка live coder contracts и PR — 14 ноября 2026, 12:16 UTC
+
+- Supabase source read-only: `fam-agent-worker` остаётся ACTIVE v17, SHA-256 `07340a16acfcb08fa38e292292a89ac2da49b0b231dfc6e5fac415ddd57a5a5c`; `fam-agent-coder-bridge` остаётся ACTIVE v1, SHA-256 `ad27b05de9e35a07ec8e0eb2ab066a16568ecf1afc5f22f4387a908d0efd1ed6`.
+- В production Worker v17 результат `finish_fam_agent_task` учитывается только при `saved === true`, но `false` не приводит к исключению; handler продолжает цикл и может вернуть HTTP 200 с `ok:true`. Это позволяет расписанию выглядеть успешным при несохранённой задаче.
+- Реальное production `public.finish_fam_agent_coder_task` — SECURITY INVOKER с пустым `search_path`. Оно переводит `model_completed` прямо в `completed`, хотя текст результата говорит, что исправление ещё ожидает независимой проверки. Production bridge v1 принимает только старые коды `model_completed/model_no_patch/model_failed/model_blocked` и вызывает только этот RPC.
+- PR #65 заменяет Worker finish на fail-closed helper. Для coder queue PR добавляет отдельный `finish_fam_agent_coder_task_with_pr`, новые коды `model_review/model_timeout` и фиксирует завершение patch-задачи после trusted QA, создания draft PR и обязательного check. Этот контракт остаётся только в PR до отдельного безопасного rollout; production функции, bridge и схема не изменялись.
+- На текущем локальном HEAD целевые тесты Worker, coder bridge и workflow прошли 45/45; latest hosted Regression, owner gate, три PostgreSQL интеграции и Russian content safety также прошли на PR head `a1f8ef482cbcf00df10e8adee2592fff338c293c`.
+
+Live source и SQL определения читались без вызова RPC, секретов и пользовательских данных. Production не менялся.
