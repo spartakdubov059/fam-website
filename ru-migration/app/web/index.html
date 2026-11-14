@@ -1963,7 +1963,9 @@ window.onunhandledrejection = function() {
           .eq("status", "pending").order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [], error: null });
     const accessPromise = ["school_admin", "student"].includes(profile?.role)
-      ? sb.functions.invoke("school-admin-access", { body: { action: "status" } })
+      ? fetch(profile.role === "school_admin" ? "/api/v1/role-requests/review" : "/api/v1/role-requests", { credentials: "same-origin", cache: "no-store" })
+          .then(async response => ({ data: await response.json().catch(() => null), error: response.ok ? null : new Error("role_requests_unavailable") }))
+          .catch(error => ({ data: null, error }))
       : Promise.resolve({ data: null, error: null });
     const deletionPromise = profile?.role === "school_admin"
       ? sb.functions.invoke("council-management", { body: { action: "overview" } })
@@ -1999,8 +2001,8 @@ window.onunhandledrejection = function() {
       if (profile?.role === "school_admin") {
         (Array.isArray(accessResult.data.requests) ? accessResult.data.requests : [])
           .filter(row => ["pending", "reviewing"].includes(row.status)).forEach(row => add({
-            id: "school-access-request:" + row.id, kind: "access-request", icon: "🏫",
-            title: row.applicant_note === "Администратор"
+            id: "school-access-request:" + row.request_id, kind: "access-request", icon: "🏫",
+            title: row.requested_role === "school_admin"
               ? "Заявка на полномочия администратора школы"
               : "Заявка на вступление в Ученический совет",
             text: "Новая заявка от ученика. До решения администратора роль не изменяется.",
@@ -2010,7 +2012,7 @@ window.onunhandledrejection = function() {
         const request = accessResult.data.request;
         if (request && ["approved", "rejected"].includes(request.status)
           && new Date(request.reviewed_at || request.created_at || 0).getTime() >= recentCutoff) add({
-            id: "school-access-result:" + request.id + ":" + request.status, kind: "access-result",
+            id: "school-access-result:" + request.request_id + ":" + request.status, kind: "access-result",
             icon: request.status === "approved" ? "✅" : "ℹ️",
             title: request.status === "approved" ? "Заявка одобрена" : "Заявка рассмотрена",
             text: request.status === "approved" ? "Ваша заявка на вступление в Ученический совет одобрена."
@@ -3021,72 +3023,40 @@ window.onunhandledrejection = function() {
       if (applyBtn) applyBtn.classList.remove("hidden");
 
       try {
-        const { data, error } = await sb.functions.invoke("school-admin-access", {
-          body: { action: "status" }
-        });
-        if (error) throw error;
-        if (!data?.ok) throw new Error(data?.error || "Не удалось проверить заявку.");
-
+        const response = await fetch("/api/v1/role-requests", { credentials: "same-origin", cache: "no-store" });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось проверить заявку.");
         if (["council_member", "school_admin"].includes(data.role)) {
           profile.role = data.role;
           await loadSchoolAdminAccess();
           return;
         }
-
         const request = data.request;
+        const requestedRole = request?.requested_role === "school_admin" ? "Администратор" : "Участник Ученического совета";
         if (request?.status === "pending") {
-          const requestedRole = request.applicant_note === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет";
-          const submittedAt = request.created_at
-            ? new Date(request.created_at).toLocaleString("ru-RU")
-            : "";
-          showSchoolAdminAccessStatus(
-            "Заявка отправлена",
-            "Вы отправили заявку на " + requestedRole + ". До решения администратора ваш статус остаётся «Ученик». Повторно отправлять её не нужно.",
-            "new",
-            "pending",
-            submittedAt ? "Отправлена: " + submittedAt : ""
-          );
+          const submittedAt = request.created_at ? new Date(request.created_at).toLocaleString("ru-RU") : "";
+          showSchoolAdminAccessStatus("Заявка отправлена",
+            "Вы отправили заявку на " + (requestedRole === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет") + ". До решения администратора ваш статус остаётся «Ученик». Повторно отправлять её не нужно.",
+            "new", "pending", submittedAt ? "Отправлена: " + submittedAt : "");
           if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
         } else if (request?.status === "reviewing") {
-          const when = request.review_started_at
-            ? new Date(request.review_started_at).toLocaleString("ru-RU")
-            : "";
-          showSchoolAdminAccessStatus(
-            "Заявка на рассмотрении",
-            "Совет начал проверку вашей заявки. Новую заявку создавать не нужно.",
-            "work",
-            "reviewing",
-            when ? "Взята в работу: " + when : ""
-          );
+          const when = request.review_started_at ? new Date(request.review_started_at).toLocaleString("ru-RU") : "";
+          showSchoolAdminAccessStatus("Заявка на рассмотрении", "Совет начал проверку вашей заявки. Новую заявку создавать не нужно.",
+            "work", "reviewing", when ? "Взята в работу: " + when : "");
           if (roleSelect) { roleSelect.disabled = true; roleSelect.classList.add("hidden"); }
           if (applyBtn) applyBtn.classList.add("hidden");
         } else if (request?.status === "rejected") {
-          const rejectedRole = request.applicant_note === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет";
-          const rejectedAt = request.reviewed_at
-            ? new Date(request.reviewed_at).toLocaleString("ru-RU")
-            : "";
-          showSchoolAdminAccessStatus(
-            "Заявка отклонена",
-            "Заявка на " + rejectedRole + " не одобрена. " +
+          const rejectedAt = request.reviewed_at ? new Date(request.reviewed_at).toLocaleString("ru-RU") : "";
+          showSchoolAdminAccessStatus("Заявка отклонена",
+            "Заявка на " + (requestedRole === "Администратор" ? "полномочия администратора школы" : "вступление в Ученический совет") + " не одобрена. " +
               (request.review_note || "Совет не подтвердил членство. При необходимости уточните причину у действующего представителя и отправьте новую заявку."),
-            "rejected",
-            "rejected",
-            rejectedAt ? "Решение принято: " + rejectedAt : ""
-          );
-          if (roleSelect) {
-            roleSelect.disabled = !profile.school_id;
-            roleSelect.classList.remove("hidden");
-            if (request.applicant_note) roleSelect.value = request.applicant_note;
-          }
+            "rejected", "rejected", rejectedAt ? "Решение принято: " + rejectedAt : "");
+          if (roleSelect) { roleSelect.disabled = !profile.school_id; roleSelect.classList.remove("hidden"); roleSelect.value = requestedRole; }
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         } else {
-          showSchoolAdminAccessStatus(
-            "Обычный пользователь",
-            profile.school_id
-              ? "Это стандартный статус каждого нового аккаунта FAM. Если вы состоите в Ученическом совете, выберите свою роль и отправьте одну заявку."
-              : "Это стандартный статус каждого нового аккаунта FAM. Сначала выберите школу в профиле."
-          );
+          showSchoolAdminAccessStatus("Обычный пользователь",
+            profile.school_id ? "Это стандартный статус каждого нового аккаунта FAM. Если вы состоите в Ученическом совете, выберите свою роль и отправьте одну заявку." : "Это стандартный статус каждого нового аккаунта FAM. Сначала выберите школу в профиле.");
           if (roleSelect) { roleSelect.disabled = !profile.school_id; roleSelect.classList.remove("hidden"); }
           if (applyBtn) { applyBtn.classList.remove("hidden"); applyBtn.disabled = !profile.school_id; }
         }
@@ -3106,36 +3076,33 @@ window.onunhandledrejection = function() {
     const list = $("schoolAdminReviewList");
     if (list) list.textContent = "Загружаем заявки...";
     try {
-      const { data, error } = await sb.functions.invoke("school-admin-access", {
-        body: { action: "status" }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось загрузить заявки.");
+      const response = await fetch("/api/v1/role-requests/review", { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось загрузить заявки.");
       const requests = Array.isArray(data.requests) ? data.requests : [];
       if (!list) return;
       list.innerHTML = requests.length ? requests.map(request => {
         const statusText = request.status === "reviewing" ? "Взята на рассмотрение" : "Ожидает рассмотрения";
-        const requestType = request.applicant_note === "Администратор" ? "Заявка на полномочия администратора школы" : "Заявка на вступление в Ученический совет";
+        const isAdminRequest = request.requested_role === "school_admin";
+        const requestType = isAdminRequest ? "Заявка на полномочия администратора школы" : "Заявка на вступление в Ученический совет";
         const accountCode = String(request.user_id || "").slice(-6).toUpperCase();
         let actions = "";
         if (request.status === "pending") {
-          actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.id)}">Взять на рассмотрение</button>`;
+          actions = `<button type="button" class="button button-primary button-small" data-action="start-school-admin-review" data-id="${esc(request.request_id)}">Взять на рассмотрение</button>`;
         } else if (request.status === "reviewing" && request.review_started_by === user.id) {
           actions = `
-            <button type="button" class="button button-success button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="approve">Подтвердить</button>
-            <button type="button" class="button button-danger button-small" data-action="review-school-admin" data-id="${esc(request.id)}" data-decision="reject">Отклонить</button>
+            <button type="button" class="button button-success button-small" data-action="review-school-admin" data-id="${esc(request.request_id)}" data-decision="approve">Подтвердить</button>
+            <button type="button" class="button button-danger button-small" data-action="review-school-admin" data-id="${esc(request.request_id)}" data-decision="reject">Отклонить</button>
           `;
         } else if (request.status === "reviewing") {
           actions = '<span style="font-size:10px;color:var(--muted);">Заявку уже рассматривает другой администратор.</span>';
         }
-        const reviewDate = request.review_started_at
-          ? new Date(request.review_started_at).toLocaleString("ru-RU")
-          : "";
+        const reviewDate = request.review_started_at ? new Date(request.review_started_at).toLocaleString("ru-RU") : "";
         return `
           <div class="idea-card" style="margin-bottom:8px;">
             <b style="font-size:11px;">${esc(requestType)}</b>
-            <div style="font-size:10px;color:var(--muted);margin:5px 0;">Аккаунт #${esc(accountCode || "—")} · ${esc(request.applicant_email || "почта скрыта")}</div>
-            <div style="font-size:10px;margin:5px 0;">Цель заявки: <b>${request.applicant_note === "Администратор" ? "получить полномочия администратора школы" : "вступить в Ученический совет"}</b></div>
+            <div style="font-size:10px;color:var(--muted);margin:5px 0;">Аккаунт #${esc(accountCode || "—")} · данные профиля скрыты</div>
+            <div style="font-size:10px;margin:5px 0;">Цель заявки: <b>${isAdminRequest ? "получить полномочия администратора школы" : "вступить в Ученический совет"}</b></div>
             <div style="font-size:10px;margin:5px 0;">Статус: <b>${esc(statusText)}</b> · заявитель пока ученик</div>
             <div style="font-size:9px;color:var(--muted);margin-bottom:8px;">Отправлена: ${esc(new Date(request.created_at).toLocaleString("ru-RU"))}${reviewDate ? " · Взята в работу: " + esc(reviewDate) : ""}</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">${actions}</div>
@@ -3154,27 +3121,23 @@ window.onunhandledrejection = function() {
     }
     const noteEl = $("schoolAdminRequestNote");
     const button = $("schoolAdminApplyBtn");
-    const applicantNote = noteEl?.value?.trim() || "";
-    const allowedRoles = [
-      "Участник Ученического совета",
-      "Администратор"
-    ];
-    if (!allowedRoles.includes(applicantNote)) {
+    const requestedRole = noteEl?.value?.trim() || "";
+    if (!["Участник Ученического совета", "Администратор"].includes(requestedRole)) {
       notice("Выберите одну из двух должностей.");
       return;
     }
     if (button) { button.disabled = true; button.textContent = "Отправляем..."; }
     try {
-      const { data, error } = await sb.functions.invoke("school-admin-access", {
-        body: { action: "request", applicant_note: applicantNote }
+      const response = await fetch("/api/v1/role-requests", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ requested_role: requestedRole }),
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось отправить заявку.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось отправить заявку.");
       if (noteEl) noteEl.value = "";
       await loadSchoolAdminAccess();
-      notice(data.already_pending
-        ? "Заявка уже существует и ожидает рассмотрения."
-        : "Заявка отправлена. Теперь её статус виден в профиле.");
+      notice(data.already_exists ? "Заявка уже существует и ожидает рассмотрения." : "Заявка отправлена. Теперь её статус виден в профиле.");
     } catch (error) {
       notice("Ошибка: " + (error?.message || "Не удалось отправить заявку."));
     } finally {
@@ -3188,11 +3151,13 @@ window.onunhandledrejection = function() {
       return;
     }
     try {
-      const { data, error } = await sb.functions.invoke("school-admin-access", {
-        body: { action: "start_review", request_id: requestId }
+      const response = await fetch("/api/v1/role-requests/" + encodeURIComponent(requestId), {
+        method: "PATCH", credentials: "same-origin", cache: "no-store",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ action: "start_review" }),
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось взять заявку на рассмотрение.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось взять заявку на рассмотрение.");
       notice("Заявка взята на рассмотрение. Теперь можно проверить членство и принять решение.");
       await loadSchoolAdminAccess();
     } catch (error) {
@@ -3201,18 +3166,20 @@ window.onunhandledrejection = function() {
   }
 
   async function reviewSchoolAdminRequest(requestId, decision) {
-    if (!user || profile?.role !== "school_admin" || !requestId || !["approve","reject"].includes(decision)) {
+    if (!user || profile?.role !== "school_admin" || !requestId || !["approve", "reject"].includes(decision)) {
       notice("Недостаточно прав для рассмотрения заявки.");
       return;
     }
     const verb = decision === "approve" ? "выдать права школьного Совета" : "отклонить заявку";
     if (!confirm("Вы уверены, что хотите " + verb + "? Перед подтверждением проверьте принадлежность заявителя к Совету.")) return;
     try {
-      const { data, error } = await sb.functions.invoke("school-admin-access", {
-        body: { action: "review", request_id: requestId, decision }
+      const response = await fetch("/api/v1/role-requests/" + encodeURIComponent(requestId), {
+        method: "PATCH", credentials: "same-origin", cache: "no-store",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ decision }),
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось обработать заявку.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось обработать заявку.");
       notice(decision === "approve" ? "Права школьного Совета выданы." : "Заявка отклонена.");
       await loadSchoolAdminAccess();
     } catch (error) {

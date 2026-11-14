@@ -87,6 +87,15 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
   assert.equal((await handler(approve)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id', 'approve', 'Проверено школой']);
 });
 
+test('role request status includes the current database role for migrated school access UI', async () => {
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
+    resolveActor: async () => ({ id: 'student-id', role: 'council_member', school_id: 'school-a' }),
+    repository: { getSchoolRoleRequest: async (issuer, subject) => ({ request_id: 'request-a', status: 'approved', requested_role: 'council_member' }) } });
+  const request = req({}, 'GET'); request.url = '/api/v1/role-requests';
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, role: 'council_member',
+    request: { request_id: 'request-a', status: 'approved', requested_role: 'council_member' } } });
+});
+
 test('role request submission and review fail closed for unprovisioned or non-admin profiles', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),

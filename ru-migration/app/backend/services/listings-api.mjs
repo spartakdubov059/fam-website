@@ -79,8 +79,11 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       if (typeof repository?.getSchoolRoleRequest !== 'function') return { status: 503, body: { ok: false, error: 'role_request_unavailable' } };
-      try { return { status: 200, body: { ok: true, request: await repository.getSchoolRoleRequest(identity.issuer, identity.subject) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      try {
+        let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+        return { status: 200, body: { ok: true, role: actor?.role ?? null,
+          request: await repository.getSchoolRoleRequest(identity.issuer, identity.subject) } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'POST' && pathname === '/api/v1/role-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

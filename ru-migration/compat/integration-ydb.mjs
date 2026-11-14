@@ -198,11 +198,15 @@ try {
   });
   const roleSubmission = await listingsApi(apiRequest('POST', '/api/v1/role-requests', 'synthetic-role-student', { requested_role: 'Участник Ученического совета' }));
   assert.equal(roleSubmission.status, 202, 'a verified student may request a fixed school role');
+  const roleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));
+  assert.equal(roleStatus.body.role, 'student');
+  assert.equal(roleStatus.body.request.request_id, roleSubmission.body.request_id);
   const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
   assert.equal(roleQueue.status, 200);
   const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
   assert.ok(roleRequest);
   assert.equal(roleRequest.requested_role, 'council_member');
+  assert.equal(roleRequest.user_id, '55555555-5555-4555-8555-555555555555');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-lyceum-admin', { action: 'start_review' }))).status, 409,
     'a different school cannot claim the role request');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { action: 'start_review' }))).status, 200);
@@ -210,6 +214,8 @@ try {
     { status: 200, body: { ok: true, status: 'approved' } });
   const elevatedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-student' });
   assert.equal(elevatedActor.role, 'council_member', 'only the same-school administrator decision grants the role');
+  const elevatedRoleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));
+  assert.equal(elevatedRoleStatus.body.role, 'council_member', 'the profile UI can refresh its database-backed role after approval');
   const profileEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-role-student', {
     first_name: 'Советник', last_name: 'Тестовый', class_name: '9Б', role: 'school_admin', school_id: 'other-school', user_id: 'forged-user',
   }));
