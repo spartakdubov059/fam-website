@@ -125,8 +125,15 @@ declare
   v_event record;
   v_task_key text;
   v_task_id uuid;
+  v_event_summary text;
+  v_previous_attempts integer;
 begin
-  select c.event_code,c.page_area,sum(c.event_count)::integer as occurrences
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtext('fam-agent-coder-task-producer')::bigint
+  );
+
+  select c.event_code,c.page_area,sum(c.event_count)::integer as occurrences,
+         pg_catalog.max(c.hour_bucket) as observed_hour
   into v_event
   from private.fam_site_error_counts as c
   where c.hour_bucket >= pg_catalog.now() - interval '24 hours'
@@ -146,6 +153,13 @@ begin
     else 'audit_accessibility'
   end;
 
+  v_event_summary := case v_event.event_code
+    when 'js_runtime' then 'Ошибка выполнения JavaScript'
+    when 'unhandled_rejection' then 'Необработанное отклонение Promise'
+    when 'listings_load_failed' then 'Не удалось загрузить объявления'
+    else 'Техническое событие интерфейса'
+  end;
+
   if exists (
     select 1 from private.fam_agent_tasks as t
     where t.agent_key='technical'
@@ -155,8 +169,6 @@ begin
     return pg_catalog.jsonb_build_object('ok',true,'task_created',false,'reason','coder_task_already_active');
   end if;
 
-  -- A recurring telemetry signal can create at most one new coding task per
-  -- signature in seven days, including after its bounded retry has failed.
   if exists (
     select 1 from private.fam_agent_tasks as t
     where t.agent_key='technical'
@@ -169,6 +181,17 @@ begin
   ) then
     return pg_catalog.jsonb_build_object('ok',true,'task_created',false,'reason','matching_coder_task_cooldown');
   end if;
+
+  select least(coalesce(sum(t.attempt_count),0),20)::integer
+    into v_previous_attempts
+  from private.fam_agent_tasks as t
+  where t.agent_key='technical'
+    and t.task_type='coder_patch_request'
+    and t.source in ('system','scheduled_audit')
+    and t.created_at >= pg_catalog.now() - interval '30 days'
+    and t.payload->>'task_key' = v_task_key
+    and t.payload->>'event_code' = v_event.event_code
+    and t.payload->>'page_area' = v_event.page_area;
 
   insert into private.fam_agent_tasks(
     agent_key,task_type,title,description,priority,status,source,
@@ -186,7 +209,10 @@ begin
       'task_key',v_task_key,
       'event_code',v_event.event_code,
       'page_area',v_event.page_area,
-      'occurrences',least(greatest(v_event.occurrences,0),1000)
+      'occurrences',least(greatest(v_event.occurrences,0),1000),
+      'event_summary',v_event_summary,
+      'observed_hour',pg_catalog.to_char(v_event.observed_hour at time zone 'UTC','YYYY-MM-DD"T"HH24:00:00"Z"'),
+      'previous_attempts',v_previous_attempts
     ),
     2
   ) returning id into v_task_id;
