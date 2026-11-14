@@ -314,6 +314,101 @@ export function createYdbListingsRepository(sql) {
         return confirmed?.[0]?.[0]?.status === 'rejected';
       });
     },
+
+    async beginAccountDeletion({ issuer, subject, userId }) {
+      if (!issuer || !subject || !userId) throw new TypeError('invalid account deletion actor');
+      return sql.begin(async tx => {
+        const profileRows = await tx`SELECT user_id, school_id, role, active FROM fam_user_profiles
+          WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile || profile.user_id !== userId || profile.active !== true) return { ok: false, code: 'profile_unavailable' };
+        if (profile.role === 'school_admin') {
+          const admins = await tx`SELECT user_id FROM fam_user_profiles
+            WHERE school_id = ${profile.school_id} AND role = 'school_admin' AND active = true AND user_id != ${userId} LIMIT 1;`;
+          if (!(admins?.[0] ?? []).length) return { ok: false, code: 'last_school_admin' };
+        }
+        await tx`UPDATE fam_user_profiles SET active = false
+          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = true;`;
+        const inactive = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
+        if (inactive?.[0]?.[0]?.active !== false) return { ok: false, code: 'profile_unavailable' };
+        return { ok: true, school_id: profile.school_id, role: profile.role };
+      });
+    },
+
+    async restoreAccountAfterDeletionFailure({ issuer, subject, userId }) {
+      if (!issuer || !subject || !userId) return false;
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
+        if (!rows?.[0]?.length || rows[0][0].active !== false) return false;
+        await tx`UPDATE fam_user_profiles SET active = true
+          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
+        const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
+        return confirmed?.[0]?.[0]?.active === true;
+      });
+    },
+
+    async finishAccountDeletion({ issuer, subject, userId, schoolId }) {
+      if (!issuer || !subject || !userId || !schoolId) throw new TypeError('invalid account deletion');
+      return sql.begin(async tx => {
+        const profileRows = await tx`SELECT active, school_id FROM fam_user_profiles
+          WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile || profile.active !== false || profile.school_id !== schoolId) return { ok: false, code: 'profile_unavailable' };
+
+        const listingRows = await tx`SELECT id FROM fam_listings WHERE user_id = ${userId};`;
+        const listingIds = (listingRows?.[0] ?? []).map(row => row.id).filter(id => typeof id === 'string');
+        const ownListingIds = new Set(listingIds);
+        const registrationRows = await tx`SELECT event_id, status FROM fam_event_registrations WHERE user_id = ${userId};`;
+        for (const registration of registrationRows?.[0] ?? []) {
+          if (ownListingIds.has(registration.event_id)) continue;
+          if (['pending', 'confirmed'].includes(registration.status)) {
+            const occupancyRows = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${registration.event_id} LIMIT 1;`;
+            const taken = Number(occupancyRows?.[0]?.[0]?.taken ?? 0);
+            await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
+              VALUES (${registration.event_id}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
+          }
+          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${registration.event_id} AND user_id = ${userId};`;
+        }
+        for (const listingId of listingIds) {
+          await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
+          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
+          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
+          await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND user_id = ${userId};`;
+        }
+
+        const pollRows = await tx`SELECT poll_id FROM fam_school_polls WHERE author_id = ${userId};`;
+        for (const poll of pollRows?.[0] ?? []) {
+          await tx`DELETE FROM fam_school_poll_votes WHERE poll_id = ${poll.poll_id};`;
+          await tx`DELETE FROM fam_school_polls WHERE poll_id = ${poll.poll_id} AND author_id = ${userId};`;
+        }
+        const deletionRows = await tx`SELECT target_id, request_id FROM fam_account_deletion_requests
+          WHERE requester_id = ${userId} OR target_id = ${userId};`;
+        for (const item of deletionRows?.[0] ?? []) {
+          await tx`DELETE FROM fam_account_deletion_open WHERE target_id = ${item.target_id} AND request_id = ${item.request_id};`;
+          await tx`DELETE FROM fam_account_deletion_requests WHERE request_id = ${item.request_id};`;
+        }
+
+        await tx`DELETE FROM fam_favorites WHERE user_id = ${userId};`;
+        await tx`DELETE FROM fam_ideas WHERE user_id = ${userId};`;
+        await tx`DELETE FROM fam_messages WHERE sender_id = ${userId} OR receiver_id = ${userId};`;
+        await tx`DELETE FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
+        await tx`DELETE FROM fam_school_role_requests WHERE issuer = ${issuer} AND subject = ${subject};`;
+        await tx`UPDATE fam_school_role_requests SET reviewed_by = NULL WHERE reviewed_by = ${userId};`;
+        await tx`DELETE FROM fam_school_role_request_audit WHERE actor_id = ${userId};`;
+        await tx`DELETE FROM fam_account_suspensions WHERE target_id = ${userId};`;
+        await tx`UPDATE fam_account_suspensions SET issued_by = 'deleted-account' WHERE issued_by = ${userId};`;
+        await tx`DELETE FROM fam_account_suspension_open WHERE target_id = ${userId};`;
+        await tx`DELETE FROM fam_account_suspension_audit WHERE target_id = ${userId} OR actor_id = ${userId};`;
+        await tx`UPDATE fam_account_deletion_requests SET reviewed_by = NULL WHERE reviewed_by = ${userId};`;
+        await tx`DELETE FROM fam_school_admin_audit WHERE target_id = ${userId} OR actor_id = ${userId};`;
+        await tx`DELETE FROM fam_school_announcements WHERE author_id = ${userId};`;
+        await tx`DELETE FROM fam_school_poll_votes WHERE voter_id = ${userId};`;
+        await tx`DELETE FROM fam_pending_media WHERE user_id = ${userId};`;
+        await tx`DELETE FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
+        return { ok: true, deleted: true };
+      });
+    },
+
     async createSchoolProfileRequest(record) {
       if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
         throw new TypeError('invalid school profile request');

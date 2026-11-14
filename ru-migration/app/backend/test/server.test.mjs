@@ -79,6 +79,21 @@ test('unconfigured isolated server fails closed for health and user API routes',
   });
 });
 
+test('self account deletion routes through the configured Russian backend', async () => {
+  let method;
+  await withServer({ listingsApi: async req => {
+    method = req.method;
+    return { status: 200, body: { ok: true, deleted: true } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/me/account', origin), {
+      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: 'synthetic' }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, deleted: true });
+    assert.equal(method, 'DELETE');
+  });
+});
+
 test('isolated server returns Yandex OAuth redirects without proxying credentials through the browser', async () => {
   await withServer({ authApi: async request => ({
     status: 302,

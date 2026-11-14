@@ -1101,8 +1101,8 @@
           <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Аватары проходят автоматическую проверку перед обновлением.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
           <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
             <details class="profile-help profile-delete-help"><summary>Удалить мой аккаунт навсегда</summary><div class="profile-help-body">
-              <p>Для защиты от случайного удаления войдите повторно, укажите текущий пароль и подтвердите действие точной фразой. У последнего администратора школы сначала должен появиться другой администратор.</p>
-              <div class="form-group"><label for="selfDeletePassword">Текущий пароль</label><input type="password" id="selfDeletePassword" class="form-control" autocomplete="current-password" maxlength="128"></div>
+              <p>Недавно подтвердите вход через Яндекс ID (не более 10 минут назад), затем введите точную фразу. У последнего администратора школы сначала должен появиться другой администратор.</p>
+              <a class="button button-secondary button-small" href="/auth/yandex/start?reauth=1">Подтвердить вход через Яндекс ID</a>
               <div class="form-group"><label for="selfDeleteConfirmation">Введите: УДАЛИТЬ МОЙ АККАУНТ</label><input type="text" id="selfDeleteConfirmation" class="form-control" autocomplete="off" maxlength="40" placeholder="УДАЛИТЬ МОЙ АККАУНТ"></div>
               <button type="button" class="button button-danger" style="width:100%;" data-action="self-delete-account" id="selfDeleteAccountBtn">Удалить аккаунт и мои данные</button>
             </div></details>
@@ -3738,37 +3738,31 @@ window.onunhandledrejection = function() {
   }
 
   async function deleteMyAccount() {
-    if (!user || !user.email) return;
-    const password = $("selfDeletePassword")?.value || "";
+    if (!user) return;
     const confirmation = $("selfDeleteConfirmation")?.value?.trim() || "";
     const button = $("selfDeleteAccountBtn");
-    if (!password) return notice("Введите текущий пароль для повторного входа.");
     if (confirmation !== "УДАЛИТЬ МОЙ АККАУНТ") return notice("Введите точную фразу подтверждения.");
     if (!confirm("Удалить ваш аккаунт FAM навсегда? Восстановить данные будет нельзя.")) return;
 
-    if (button) { button.disabled = true; button.textContent = "Проверяем пароль..."; }
+    if (button) { button.disabled = true; button.textContent = "Удаляем данные..."; }
     try {
-      // Re-authentication gives the server a freshly issued, short-lived JWT.
-      const { error: signInError } = await sb.auth.signInWithPassword({
-        email: user.email,
-        password
+      const response = await fetch("/api/v1/me/account", {
+        method: "DELETE", credentials: "same-origin", cache: "no-store",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ confirmation: "УДАЛИТЬ МОЙ АККАУНТ" }),
       });
-      if (signInError) throw new Error("Не удалось подтвердить пароль. Проверьте его и попробуйте снова.");
-
-      if (button) button.textContent = "Удаляем данные...";
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "delete_my_account", confirmation: "УДАЛИТЬ МОЙ АККАУНТ" }
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось удалить аккаунт.");
-
-      try { await sb.auth.signOut({ scope: "local" }); } catch (_) {}
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) {
+        if (data?.error === "recent_yandex_login_required") throw new Error("Сначала подтвердите вход по ссылке выше и повторите удаление в течение 10 минут.");
+        if (data?.error === "last_school_admin") throw new Error("Вы последний администратор школы. Сначала назначьте другого администратора.");
+        throw new Error(data?.error === "private_storage_unavailable" ? "Хранилище файлов не подключено. Аккаунт не удалён." : "Не удалось безопасно удалить все данные. Аккаунт не удалён.");
+      }
+      try { await fetch("/auth/yandex/logout", { method: "POST", credentials: "same-origin", cache: "no-store" }); } catch (_) {}
       alert("Аккаунт и связанные данные удалены.");
       location.replace(location.pathname);
     } catch (error) {
       notice("Удаление не выполнено: " + (error?.message || "Попробуйте позже."));
     } finally {
-      if ($("selfDeletePassword")) $("selfDeletePassword").value = "";
       if (button) { button.disabled = false; button.textContent = "Удалить аккаунт и мои данные"; }
     }
   }

@@ -43,3 +43,20 @@ test('S3 pending image deletion accepts only scoped image keys', async () => {
   await assert.rejects(store.delete('pending/../../private.webp'), /invalid private image key/);
   await store.close();
 });
+
+test('S3 account inventory paginates only validated objects below the account prefix', async () => {
+  const requests = [];
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const key = `pending/${userId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
+  const store = createS3PendingImageStore(env, { list: async input => {
+    requests.push(input);
+    return requests.length === 1
+      ? { Contents: [{ Key: key }], IsTruncated: true, NextContinuationToken: 'next-page' }
+      : { Contents: [], IsTruncated: false };
+  } });
+  assert.deepEqual(await store.listUserObjects(userId), [key]);
+  assert.equal(requests[0].Prefix, `pending/${userId}/`);
+  assert.equal(requests[1].ContinuationToken, 'next-page');
+  await assert.rejects(store.listUserObjects('../../other'), /invalid image owner/);
+  await store.close();
+});

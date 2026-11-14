@@ -6,6 +6,8 @@ export function createSuspensionWriteGuard({ authenticate, resolveActor, reposit
     if (typeof handler !== 'function') throw new TypeError('request handler is required');
     return async function guardedHandler(req) {
       if (['GET', 'HEAD', 'OPTIONS'].includes(String(req.method || '').toUpperCase())) return handler(req);
+      if (String(req.method || '').toUpperCase() === 'DELETE'
+          && new URL(req.url || '/', 'http://localhost').pathname === '/api/v1/me/account') return handler(req);
       let identity;
       try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return handler(req);

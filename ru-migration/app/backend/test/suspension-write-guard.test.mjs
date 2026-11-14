@@ -46,3 +46,17 @@ test('missing identity leaves authentication response to the underlying route', 
   assert.equal(called, true);
   assert.equal(result.status, 401);
 });
+
+test('self account deletion remains available to a suspended user', async () => {
+  let reached = false;
+  const guard = createSuspensionWriteGuard({
+    authenticate: async () => ({ issuer: 'issuer', subject: 'student' }),
+    resolveActor: async () => actor,
+    repository: { getActiveAccountSuspension: async () => ({ reason: 'synthetic', expires_at: '2099-01-01T00:00:00Z' }) },
+  });
+  const result = await guard(async () => { reached = true; return { status: 200 }; })({
+    method: 'DELETE', url: '/api/v1/me/account',
+  });
+  assert.equal(reached, true);
+  assert.equal(result.status, 200);
+});

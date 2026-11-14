@@ -29,20 +29,24 @@ try {
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
-  const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
-      : req.headers.authorization === 'Bearer synthetic-registrant' ? 'subject-2'
+  const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: ['Bearer synthetic-registrant', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? 'subject-2'
+      : req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
           : req.headers.authorization === 'Bearer synthetic-other-school' ? 'subject-3'
           : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1',
-    authenticated_at: req.headers.authorization === 'Bearer synthetic-admin' ? Math.floor(Date.now() / 1000) : null });
+    authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null });
   const deletedMediaKeys = [];
+  const accountMediaKeys = new Set();
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
     resolveActor,
     repository: repo,
-    pendingImages: { delete: async key => { deletedMediaKeys.push(key); } },
+    pendingImages: {
+      delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
+      listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
+    },
   }));
   const apiRequest = (method, url, token, body = {}) => {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
@@ -391,6 +395,22 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
+  const deletingUserId = '11111111-1111-4111-8111-111111111111';
+  const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
+  accountMediaKeys.add(deletingImageKey);
+  await repo.registerPendingImage(deletingUserId, deletingImageKey);
+  const deletingListing = await repo.createListing({ user_id: deletingUserId, school_id: 'synthetic-school',
+    title: 'Собственное объявление для удаления аккаунта', description: 'Удаление проверяется только на синтетической базе', category: 'Учёба',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletingImageKey, photo_status: 'pending', status: 'pending' });
+  const accountDeletion = await listingsApi(apiRequest('DELETE', '/api/v1/me/account', 'synthetic-recent-registrant', {
+    confirmation: 'УДАЛИТЬ МОЙ АККАУНТ',
+  }));
+  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.ok(deletedMediaKeys.includes(deletingImageKey), 'account deletion removes all private objects under its owner prefix');
+  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-2' }), null,
+    'account deletion removes the identity mapping after cleanup');
+  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${deletingListing.id};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletingImageKey};`)?.[0]?.length ?? 0, 0);
   console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, role revocation, school-scoped announcements/polls/voting, own-profile identity update, own-listing delete and cleanup, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
