@@ -175,6 +175,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(reviewPanel);
       };
+      if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
       if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0) {
         renderPendingMessagesPanel();
         renderSafetyPanel();
@@ -260,7 +261,6 @@ export async function initializeListingModeration({ document = globalThis.docume
       }
       renderPendingMessagesPanel();
       renderSafetyPanel();
-      if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
 
@@ -315,12 +315,9 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (result?.error === 'already_suspended') { status.textContent = 'У этого аккаунта уже есть действующее ограничение.'; return; }
         throw new Error('decision_failed');
       }
-      const successMessage = body.action === 'issue' ? 'Временное ограничение установлено.'
-        : body.action === 'revoke' ? 'Полномочия сняты. Аккаунт остался активным.'
-          : body.decision === 'approve' ? 'Предложение помощника принято к работе.'
-            : body.decision === 'reject' ? 'Предложение помощника отклонено.' : 'Временное ограничение снято.';
+      const agentIdeaDecision = path.startsWith('/api/v1/school/admin/agent-ideas/') && ['approve', 'reject'].includes(body.decision);
       await load();
-      status.textContent = successMessage;
+      if (agentIdeaDecision) status.textContent = `Предложение помощника ${body.decision === 'approve' ? 'принято к работе' : 'отклонено'}.`;
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
   }
 
