@@ -250,6 +250,87 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
+    async listSchoolSafetyReports(schoolId) {
+      if (typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid safety report school');
+      const cleanup = sql`DELETE FROM fam_safety_incidents WHERE school_id = ${schoolId}
+        AND created_at < CurrentUtcTimestamp() - Interval('P90D');`;
+      if (typeof cleanup?.on === 'function') cleanup.on('error', () => {});
+      await cleanup;
+      const statement = sql`SELECT pair_fingerprint, source_kind, category, severity, created_at,
+          actor_id, target_id, source_origin, evidence_excerpt
+        FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL
+          AND created_at >= CurrentUtcTimestamp() - Interval('P30D')
+        ORDER BY created_at DESC LIMIT 400;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const rows = (await statement)?.[0] ?? [];
+      const allowedSources = new Set(['message', 'idea', 'listing', 'image']);
+      const allowedCategories = new Set(['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation',
+        'negative_personal_call', 'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal']);
+      const grouped = new Map();
+      const time = value => value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(String(value ?? '')) || 0;
+      const iso = value => { const parsed = time(value); return parsed ? new Date(parsed).toISOString() : null; };
+      for (const row of rows) {
+        if (!/^[0-9a-f]{64}$/.test(row.pair_fingerprint || '') || !allowedSources.has(row.source_kind)
+            || !allowedCategories.has(row.category) || !['medium', 'high'].includes(row.severity)) continue;
+        const key = [row.pair_fingerprint, row.source_kind, row.category].join('|');
+        let current = grouped.get(key);
+        if (!current) {
+          current = { fingerprint: row.pair_fingerprint, source_kind: row.source_kind, category: row.category,
+            occurrences: 0, severity: 'medium', first_seen: iso(row.created_at), last_seen: iso(row.created_at),
+            actor_id: typeof row.actor_id === 'string' && /^[0-9a-f-]{36}$/i.test(row.actor_id) ? row.actor_id : null,
+            target_id: typeof row.target_id === 'string' && /^[0-9a-f-]{36}$/i.test(row.target_id) ? row.target_id : null,
+            source_origin: typeof row.source_origin === 'string' && /^[a-z0-9.-]{1,120}$/.test(row.source_origin) ? row.source_origin : null,
+            evidence_excerpt: typeof row.evidence_excerpt === 'string' && row.evidence_excerpt.length <= 260 ? row.evidence_excerpt : null };
+          grouped.set(key, current);
+        }
+        current.occurrences++;
+        if (row.severity === 'high' || current.occurrences >= 3) current.severity = 'high';
+        const rowTime = time(row.created_at);
+        if (!current.first_seen || rowTime < time(current.first_seen)) current.first_seen = iso(row.created_at);
+        if (!current.last_seen || rowTime > time(current.last_seen)) current.last_seen = iso(row.created_at);
+      }
+      const reports = [...grouped.values()].sort((a, b) => time(b.last_seen) - time(a.last_seen)).slice(0, 50);
+      const profileIds = [...new Set(reports.flatMap(row => [row.actor_id, row.target_id]).filter(Boolean))];
+      const profiles = await Promise.all(profileIds.map(async id => {
+        const query = sql`SELECT user_id AS id, role, first_name, last_name, class_name FROM fam_user_profiles
+          WHERE school_id = ${schoolId} AND user_id = ${id} LIMIT 1;`;
+        if (typeof query?.on === 'function') query.on('error', () => {});
+        return (await query)?.[0]?.[0] ?? null;
+      }));
+      const byId = new Map(profiles.filter(Boolean).map(profile => [profile.id, profile]));
+      const person = id => {
+        const profile = id ? byId.get(id) : null;
+        return profile ? { role: profile.role, first_name: profile.first_name ?? null,
+          last_name: profile.last_name ?? null, class_name: profile.class_name ?? null,
+          account_code: profile.id.slice(-6).toUpperCase() } : null;
+      };
+      return { reports: reports.map(row => ({
+        fingerprint: row.fingerprint, source_kind: row.source_kind, category: row.category,
+        occurrences: row.occurrences, severity: row.severity, repeated: row.occurrences >= 3,
+        first_seen: row.first_seen, last_seen: row.last_seen, source_origin: row.source_origin,
+        evidence_excerpt: row.evidence_excerpt, actor: person(row.actor_id), target: person(row.target_id),
+        identity_was_recorded: Boolean(row.actor_id),
+      })), period_days: 30 };
+    },
+
+    async acknowledgeSchoolSafetyReport({ schoolId, reviewerId, fingerprint, category, sourceKind }) {
+      const sources = new Set(['message', 'idea', 'listing', 'image']);
+      const categories = new Set(['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation',
+        'negative_personal_call', 'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal']);
+      if (!schoolId || !reviewerId || !/^[0-9a-f]{64}$/.test(fingerprint || '')
+          || !categories.has(category) || !sources.has(sourceKind)) throw new TypeError('invalid safety report acknowledgement');
+      return sql.begin(async tx => {
+        const matches = await tx`SELECT incident_id FROM fam_safety_incidents WHERE school_id = ${schoolId}
+          AND pair_fingerprint = ${fingerprint} AND source_kind = ${sourceKind} AND category = ${category}
+          AND reviewed_at IS NULL LIMIT 400;`;
+        if (!(matches?.[0] ?? []).length) return false;
+        await tx`UPDATE fam_safety_incidents SET reviewed_at = CurrentUtcTimestamp(), reviewed_by = ${reviewerId}
+          WHERE school_id = ${schoolId} AND pair_fingerprint = ${fingerprint}
+            AND source_kind = ${sourceKind} AND category = ${category} AND reviewed_at IS NULL;`;
+        return true;
+      });
+    },
+
     async getSchoolAdminOverview(schoolId) {
       if (!schoolId) throw new TypeError('invalid school overview school');
       const queryRows = async statement => {

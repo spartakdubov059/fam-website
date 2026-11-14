@@ -26,6 +26,34 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
     const profileRequestMatch = pathname.match(/^\/api\/v1\/profile-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const roleRequestMatch = pathname.match(/^\/api\/v1\/role-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if ((req.method === 'GET' || req.method === 'PATCH') && pathname === '/api/v1/school/admin/safety-reports') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (req.method === 'GET') {
+        if (typeof repository?.listSchoolSafetyReports !== 'function') return { status: 503, body: { ok: false, error: 'safety_reports_unavailable' } };
+        try { return { status: 200, body: { ok: true, ...(await repository.listSchoolSafetyReports(actor.school_id)) } }; }
+        catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const validFingerprint = typeof input?.fingerprint === 'string' && /^[0-9a-f]{64}$/.test(input.fingerprint);
+      const validCategory = ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
+        'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(input?.category);
+      const validSource = ['message', 'idea', 'listing', 'image'].includes(input?.source_kind);
+      if (!validFingerprint || !validCategory || !validSource) return { status: 400, body: { ok: false, error: 'invalid_safety_report' } };
+      if (typeof repository?.acknowledgeSchoolSafetyReport !== 'function') return { status: 503, body: { ok: false, error: 'safety_reports_unavailable' } };
+      try {
+        const updated = await repository.acknowledgeSchoolSafetyReport({ schoolId: actor.school_id, reviewerId: actor.id,
+          fingerprint: input.fingerprint, category: input.category, sourceKind: input.source_kind });
+        return updated ? { status: 200, body: { ok: true } } : { status: 404, body: { ok: false, error: 'safety_report_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'GET' && pathname === '/api/v1/school/admin/overview') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

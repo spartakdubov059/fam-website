@@ -8,6 +8,29 @@ function req(body = {}, method = 'POST') {
   request.url = '/api/v1/listings';
   return request;
 }
+test('school safety reports are administrator-only and acknowledgement is school-bound', async () => {
+  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  let selectedSchool; let acknowledged;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
+    resolveActor: async () => actor,
+    repository: {
+      listSchoolSafetyReports: async schoolId => { selectedSchool = schoolId; return { reports: [{ fingerprint: 'a'.repeat(64) }], period_days: 30 }; },
+      acknowledgeSchoolSafetyReport: async input => { acknowledged = input; return input.schoolId === actor.school_id; },
+    } });
+  const list = req({}, 'GET'); list.url = '/api/v1/school/admin/safety-reports';
+  assert.equal((await handler(list)).status, 200);
+  assert.equal(selectedSchool, 'school-a');
+  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(list)).status, 403);
+  actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  const ack = req({ fingerprint: 'a'.repeat(64), category: 'unsafe_image', source_kind: 'image' }, 'PATCH');
+  ack.url = '/api/v1/school/admin/safety-reports';
+  assert.deepEqual(await handler(ack), { status: 200, body: { ok: true } });
+  assert.deepEqual(acknowledged, { schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'a'.repeat(64), category: 'unsafe_image', sourceKind: 'image' });
+  const malformed = req({ fingerprint: 'bad', category: 'unsafe_image', source_kind: 'image' }, 'PATCH'); malformed.url = ack.url;
+  assert.equal((await handler(malformed)).status, 400);
+});
+
 test('school administrator overview is private to the active administrator and bounded to their school', async () => {
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
   let selectedSchool;

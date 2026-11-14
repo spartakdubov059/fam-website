@@ -421,6 +421,27 @@ try {
   assert.ok(!adminOverview.body.users.some(row => row.id === '22222222-2222-4222-8222-222222222222'), 'school overview excludes profiles from other schools');
   assert.ok(adminOverview.body.listings.some(row => row.id === otherSchoolPending.id) === false, 'school overview excludes listings from another school');
   assert.ok(adminOverview.body.audit.some(row => row.action === 'listing_deleted'), 'school overview returns the recent school action audit');
+  const safetyFingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  for (let i = 0; i < 3; i++) {
+    await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
+      created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
+      VALUES ('synthetic-school', ${safetyFingerprint}, 'message', 'targeted_harassment', ${`aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`},
+        ${i === 0 ? 'medium' : 'high'}, CurrentUtcTimestamp(), NULL, NULL, 'synthetic-user',
+        '11111111-1111-4111-8111-111111111111', 'fam.example.ru', 'synthetic sanitized excerpt');`;
+  }
+  const safetyReports = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
+  assert.equal(safetyReports.status, 200);
+  const safetyGroup = safetyReports.body.reports.find(row => row.fingerprint === safetyFingerprint);
+  assert.equal(safetyGroup.occurrences, 3);
+  assert.equal(safetyGroup.severity, 'high');
+  assert.equal(safetyGroup.actor.first_name, 'Тест');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-lyceum-admin'))).body.reports.length, 0,
+    'safety reports are isolated by school');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', '/api/v1/school/admin/safety-reports', 'synthetic-admin', {
+    fingerprint: safetyFingerprint, category: 'targeted_harassment', source_kind: 'message',
+  })), { status: 200, body: { ok: true } });
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'))).body.reports.some(row => row.fingerprint === safetyFingerprint), false,
+    'acknowledged safety clusters leave the unreviewed queue');
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
   accountMediaKeys.add(deletingImageKey);

@@ -3482,11 +3482,11 @@ window.onunhandledrejection = function() {
     if (summary) summary.textContent = "Загружаем сводку за последние 30 дней…";
     list.innerHTML = '<p style="font-size:11px;color:var(--muted);">Загружаем отчёты…</p>';
     try {
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: { action: "list_safety_reports" }
+      const response = await fetch("/api/v1/school/admin/safety-reports", {
+        method: "GET", credentials: "same-origin", cache: "no-store",
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось получить отчёты.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось получить отчёты.");
       const reports = Array.isArray(data.reports) ? data.reports : [];
       const highCount = reports.filter(report => report.severity === "high").length;
       if (badge) {
@@ -3548,16 +3548,12 @@ window.onunhandledrejection = function() {
   async function acknowledgeSafetyReport(button) {
     if (!button || profile?.role !== "school_admin") return;
     try {
-      const { data, error } = await sb.functions.invoke("council-management", {
-        body: {
-          action: "acknowledge_safety_report",
-          fingerprint: button.dataset.fingerprint,
-          category: button.dataset.category,
-          source_kind: button.dataset.sourceKind
-        }
+      const response = await fetch("/api/v1/school/admin/safety-reports", {
+        method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fingerprint: button.dataset.fingerprint, category: button.dataset.category, source_kind: button.dataset.sourceKind }),
       });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Не удалось обновить отчёт.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось обновить отчёт.");
       notice("Отчёт отмечен как рассмотренный.");
       await loadUserSafetyReports();
     } catch (error) {

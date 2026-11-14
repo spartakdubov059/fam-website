@@ -28,6 +28,39 @@ test('active suspension list is school-bound, time-filtered, and bounded', async
   assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
   assert.match(query.text, /LIMIT 100/);
 });
+test('safety report groups are bounded, sanitized, school-scoped and acknowledge atomically', async () => {
+  const fingerprint = 'a'.repeat(64); const calls = [];
+  const now = Date.parse('2026-05-03T00:00:00.000Z');
+  const incidents = [0, 1, 2].map((offset, i) => ({ pair_fingerprint: fingerprint, source_kind: 'message', category: 'targeted_harassment',
+    severity: i === 0 ? 'medium' : 'high', created_at: new Date(now - offset * 60_000), actor_id: '11111111-1111-4111-8111-111111111111',
+    target_id: '22222222-2222-4222-8222-222222222222', source_origin: 'fam.example.ru', evidence_excerpt: 'sanitized sample' }));
+  let acknowledged = false;
+  const sql = Object.assign(async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT pair_fingerprint, source_kind')) return [[...incidents]];
+    if (text.includes('FROM fam_user_profiles')) return [[{ id: values.at(-1), role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А' }]];
+    return [[]];
+  }, { begin: async callback => callback(async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT incident_id')) return acknowledged ? [[]] : [[{ incident_id: 'incident-1' }, { incident_id: 'incident-2' }]];
+    if (text.includes('UPDATE fam_safety_incidents')) { acknowledged = true; return [[]]; }
+    return [[]];
+  }) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.listSchoolSafetyReports('school-a');
+  assert.equal(result.period_days, 30);
+  assert.equal(result.reports.length, 1);
+  assert.equal(result.reports[0].occurrences, 3);
+  assert.equal(result.reports[0].severity, 'high');
+  assert.equal(result.reports[0].actor.first_name, 'Тест');
+  assert.equal(Object.hasOwn(result.reports[0].actor, 'subject'), false);
+  assert.ok(calls.some(call => call.text.includes("Interval('P90D')") && call.values.includes('school-a')));
+  assert.equal(await repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint, category: 'targeted_harassment', sourceKind: 'message' }), true);
+  assert.equal(await repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-b', reviewerId: 'admin-b', fingerprint, category: 'targeted_harassment', sourceKind: 'message' }), false);
+  assert.ok(calls.some(call => call.text.includes('reviewed_by = ?') && call.values.includes('school-a')));
+  await assert.rejects(repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'bad', category: 'targeted_harassment', sourceKind: 'message' }), TypeError);
+});
+
 test('school admin overview binds every projection to its school and returns no external identity fields', async () => {
   const calls = [];
   const sql = async (strings, ...values) => {
