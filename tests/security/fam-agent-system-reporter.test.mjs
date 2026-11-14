@@ -15,7 +15,7 @@ const snapshot = {
   generated_at: "2026-11-13T04:00:00.000Z",
   report_date: "2026-11-13",
   daily_report: { report_date: "2026-11-13", generated_at: "2026-11-13T04:00:00.000Z" },
-  agent_statuses: [{ agent_key: "technical", queued: 1, in_progress: 0, blocked: 0, completed_24h: 2, failed_24h: 1 }],
+  agent_statuses: [{ agent_key: "technical", queued: 1, claimed: 2, in_progress: 0, review: 1, blocked: 0, completed_24h: 2, failed_24h: 1 }],
   cron_jobs: [{ jobname: "fam-agent-worker-every-5-minutes", schedule: "*/5 * * * *", active: true, last_run_status: "succeeded", last_run_at: "2026-11-13T05:55:00Z" }],
   latest_system_health: { status: "completed", updated_at: "2026-11-13T03:40:00Z" },
   latest_coder_task: { status: "failed", updated_at: "2026-11-13T03:15:00Z" },
@@ -155,6 +155,8 @@ test("daily report states missing sources and records only allowlisted Supabase 
   assert.match(markdown, /Ответы Edge Worker по pg_net \(окно до 6 ч\): 3\/4 успешных распознанных ответов; HTTP-ошибок: 1; ошибок, сообщённых Worker: 1/);
   assert.match(markdown, /Самый ранний сохранённый ответ: 2026-11-13T00:00:00Z/);
   assert.match(markdown, /Проверка сайта выполняется один раз в сутки/);
+  assert.match(markdown, /\| Агент \| В очереди \| Захвачено \| В работе \| Review \| Заблокировано \| Готово за сутки \| Ошибки за сутки \|/);
+  assert.match(markdown, /\| technical \| 1 \| 2 \| 0 \| 1 \| 0 \| 2 \| 1 \|/);
 });
 
 test("unavailable Supabase data never renders as a healthy or empty source", () => {
