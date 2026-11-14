@@ -1283,6 +1283,7 @@ window.onunhandledrejection = function() {
         <button id="ruOpenMessages" class="ru-button" type="button" aria-expanded="false" aria-controls="ruMessages">Мои сообщения</button>
         <button id="ruLogout" class="ru-button" type="button" hidden>Выйти</button>
         <p id="ruSubmitStatus" class="ru-note" role="status" aria-live="polite">Войдите через Яндекс ID, чтобы подать объявление.</p>
+        <section id="ruAvatarWorkflow" class="ru-avatar-workflow" hidden aria-label="Фото профиля"></section>
         <form id="ruListingForm" class="ru-listing-form" hidden>
           <label>Название<input name="title" maxlength="80" required></label>
           <label>Описание<textarea name="description" maxlength="1000" required></textarea></label>
@@ -1301,7 +1302,7 @@ window.onunhandledrejection = function() {
             <button class="ru-message-send" type="submit">Отправить</button>
           </form>
         </section>
-        <section id="ruModeration" class="ru-moderation" hidden aria-label="Очередь школьной модерации"><h2>Проверка объявлений и фото</h2><p id="ruModerationStatus" class="ru-note" role="status" aria-live="polite"></p><div id="ruModerationQueue"></div>
+        <section id="ruModeration" class="ru-moderation" hidden aria-label="Очередь школьной модерации"><h2>Проверка объявлений и фото</h2><p id="ruModerationStatus" class="ru-note" role="status" aria-live="polite"></p><div id="ruAvatarReviewQueue"></div><div id="ruModerationQueue"></div>
           <section id="ruDeletionRequestSubmit" hidden aria-label="Обращение об удалении аккаунта">
             <h3>Обращение по аккаунту школы</h3>
             <p class="ru-note">Обращение увидит только администратор вашей школы. Оно не удаляет аккаунт автоматически; указывайте факты без контактов и личных сведений.</p>
@@ -1344,6 +1345,10 @@ window.onunhandledrejection = function() {
     moderationScript.type = 'module';
     moderationScript.src = '/listing-moderation.js';
     document.body.append(moderationScript);
+    const avatarScript = document.createElement('script');
+    avatarScript.type = 'module';
+    avatarScript.src = '/avatar-workflow.js';
+    document.body.append(avatarScript);
     const pulseScript = document.createElement('script');
     pulseScript.type = 'module';
     pulseScript.src = '/pulse.js';
