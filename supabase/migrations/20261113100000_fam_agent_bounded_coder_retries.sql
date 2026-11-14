@@ -184,7 +184,7 @@ begin
     'occurrences',least(greatest(v_event.occurrences,0),1000)
   );
 
-  select 'event_summary' = any(p.proargnames)
+  select pg_catalog.strpos(pg_catalog.pg_get_functiondef(p.oid),'event_summary text') > 0
     into v_has_context
   from pg_catalog.pg_proc as p
   where p.oid = 'public.claim_fam_agent_coder_tasks(text,integer,integer)'::pg_catalog.regprocedure;
