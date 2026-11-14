@@ -832,6 +832,108 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async listSchoolPulse(schoolId, userId) {
+      if (!schoolId || !userId) throw new TypeError('invalid school pulse read');
+      const announcementQuery = sql`SELECT announcement_id AS id, title, body, kind, published_at, event_starts_at
+        FROM fam_school_announcements WHERE school_id = ${schoolId} AND published_at <= CurrentUtcTimestamp()
+          AND expires_at > CurrentUtcTimestamp() ORDER BY published_at DESC LIMIT 6;`;
+      const pollQuery = sql`SELECT poll_id AS id, question, options_json, closes_at
+        FROM fam_school_polls WHERE school_id = ${schoolId}
+          AND closes_at > CurrentUtcTimestamp() - Interval('P7D') ORDER BY created_at DESC LIMIT 3;`;
+      for (const statement of [announcementQuery, pollQuery]) if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const [announcementResult, pollResult] = await Promise.all([announcementQuery, pollQuery]);
+      const announcements = (announcementResult?.[0] ?? []).map(row => ({
+        ...row,
+        event_starts_at: row.event_starts_at ?? null,
+      }));
+      const polls = [];
+      for (const poll of pollResult?.[0] ?? []) {
+        let options;
+        try { options = JSON.parse(poll.options_json); } catch { continue; }
+        if (!Array.isArray(options) || options.length < 2 || options.length > 4) continue;
+        const voteQuery = sql`SELECT choice_index, COUNT(*) AS votes FROM fam_school_poll_votes
+          WHERE poll_id = ${poll.id} AND school_id = ${schoolId} GROUP BY choice_index;`;
+        const myVoteQuery = sql`SELECT choice_index FROM fam_school_poll_votes
+          WHERE poll_id = ${poll.id} AND voter_id = ${userId} AND school_id = ${schoolId} LIMIT 1;`;
+        if (typeof voteQuery?.on === 'function') voteQuery.on('error', () => {});
+        if (typeof myVoteQuery?.on === 'function') myVoteQuery.on('error', () => {});
+        const [voteResult, myVoteResult] = await Promise.all([voteQuery, myVoteQuery]);
+        const rows = voteResult?.[0] ?? [];
+        const totalVotes = rows.reduce((sum, row) => sum + Number(row.votes ?? 0), 0);
+        const counts = totalVotes >= 5 ? options.map((_, index) => {
+          const row = rows.find(item => Number(item.choice_index) === index);
+          return Number(row?.votes ?? 0);
+        }) : null;
+        const myVote = myVoteResult?.[0]?.[0]?.choice_index;
+        polls.push({ ...poll, options, options_json: undefined, total_votes: totalVotes,
+          my_vote: myVote === undefined ? null : Number(myVote), counts });
+      }
+      return { announcements, polls };
+    },
+
+    async voteSchoolPoll({ pollId, schoolId, userId, choiceIndex }) {
+      if (!pollId || !schoolId || !userId || !Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 3) {
+        throw new TypeError('invalid school poll vote');
+      }
+      return sql.begin(async tx => {
+        const profileRows = await tx`SELECT school_id, active FROM fam_user_profiles WHERE user_id = ${userId} LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile?.active || profile.school_id !== schoolId) return { ok: false, code: 'school_profile_required' };
+        const pollRows = await tx`SELECT school_id, options_json, closes_at FROM fam_school_polls WHERE poll_id = ${pollId} LIMIT 1;`;
+        const poll = pollRows?.[0]?.[0];
+        if (!poll || poll.school_id !== schoolId) return { ok: false, code: 'poll_unavailable' };
+        let options;
+        try { options = JSON.parse(poll.options_json); } catch { return { ok: false, code: 'poll_unavailable' }; }
+        if (!Array.isArray(options) || choiceIndex >= options.length) return { ok: false, code: 'invalid_choice' };
+        if (new Date(poll.closes_at).getTime() <= Date.now()) return { ok: false, code: 'poll_closed' };
+        const priorRows = await tx`SELECT choice_index FROM fam_school_poll_votes WHERE poll_id = ${pollId} AND voter_id = ${userId} LIMIT 1;`;
+        if (priorRows?.[0]?.length) return { ok: false, code: 'already_voted' };
+        await tx`INSERT INTO fam_school_poll_votes (poll_id, voter_id, school_id, choice_index, created_at)
+          VALUES (${pollId}, ${userId}, ${schoolId}, Unwrap(CAST(${choiceIndex} AS Uint32)), CurrentUtcTimestamp());`;
+        return { ok: true };
+      });
+    },
+
+    async publishSchoolAnnouncement({ schoolId, authorId, title, body, kind, eventStartsAt }) {
+      if (!schoolId || !authorId || !title || !body || !['news', 'important', 'open_event'].includes(kind)) throw new TypeError('invalid school announcement');
+      const announcementId = randomUUID();
+      return sql.begin(async tx => {
+        const profileRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${authorId} LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile?.active || profile.school_id !== schoolId || !['school_admin', 'council_member'].includes(profile.role)) return { ok: false, code: 'trusted_school_role_required' };
+        const countRows = await tx`SELECT COUNT(*) AS count FROM fam_school_announcements
+          WHERE school_id = ${schoolId} AND published_at >= CurrentUtcTimestamp() - Interval('PT24H');`;
+        if (Number(countRows?.[0]?.[0]?.count ?? 0) >= 4) return { ok: false, code: 'daily_announcement_limit' };
+        if (kind === 'open_event') {
+          await tx`INSERT INTO fam_school_announcements
+            (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
+            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(${eventStartsAt} AS Timestamp), CurrentUtcTimestamp(), CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H'));`;
+        } else {
+          await tx`INSERT INTO fam_school_announcements
+            (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
+            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('P14D'));`;
+        }
+        return { ok: true, id: announcementId };
+      });
+    },
+
+    async publishSchoolPoll({ schoolId, authorId, question, options, closesAt }) {
+      if (!schoolId || !authorId || !question || !Array.isArray(options) || !closesAt) throw new TypeError('invalid school poll');
+      const pollId = randomUUID();
+      const optionsJson = JSON.stringify(options);
+      return sql.begin(async tx => {
+        const profileRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${authorId} LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile?.active || profile.school_id !== schoolId || !['school_admin', 'council_member'].includes(profile.role)) return { ok: false, code: 'trusted_school_role_required' };
+        const countRows = await tx`SELECT COUNT(*) AS count FROM fam_school_polls
+          WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`;
+        if (Number(countRows?.[0]?.[0]?.count ?? 0) >= 2) return { ok: false, code: 'daily_poll_limit' };
+        await tx`INSERT INTO fam_school_polls (poll_id, school_id, author_id, question, options_json, closes_at, created_at)
+          VALUES (${pollId}, ${schoolId}, ${authorId}, ${question}, ${optionsJson}, CAST(${closesAt} AS Timestamp), CurrentUtcTimestamp());`;
+        return { ok: true, id: pollId };
+      });
+    },
+
     async moderateEventRegistration(eventId, userId, moderatorId, schoolId, decision) {
       if (!eventId || !userId || !moderatorId || !schoolId || !['confirmed', 'rejected'].includes(decision)) {
         throw new TypeError('invalid event review');
