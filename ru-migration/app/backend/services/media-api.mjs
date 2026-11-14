@@ -5,6 +5,29 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 export function createMediaApi({ authenticate, resolveActor, pendingImages, repository }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    const avatarMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/photo$/i);
+    if (req.method === 'GET' && avatarMatch) {
+      let review;
+      try { review = await repository?.getAvatarReview?.(avatarMatch[1]); } catch { review = null; }
+      if (!review || !['pending', 'approved'].includes(review.status) || !UUID.test(review.user_id || '')
+          || typeof review.image_key !== 'string'
+          || !new RegExp(`^pending/${review.user_id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i').test(review.image_key)) {
+        return { status: 404, body: { ok: false, error: 'avatar_unavailable' } };
+      }
+      if (review.status === 'pending') {
+        let identity; try { identity = await authenticate(req); } catch { identity = null; }
+        if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+        let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+        if (!actor || !['school_admin', 'council_member'].includes(actor.role) || actor.school_id !== review.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      } else {
+        try {
+          if (typeof repository?.isCurrentAvatar !== 'function' || !await repository.isCurrentAvatar(avatarMatch[1])) return { status: 404, body: { ok: false, error: 'avatar_unavailable' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      if (typeof pendingImages?.get !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      try { return { status: 200, body: await pendingImages.get(review.image_key), headers: { 'content-type': 'image/webp', 'cache-control': review.status === 'approved' ? 'public, max-age=300' : 'private, no-store', 'x-content-type-options': 'nosniff' } }; }
+      catch { return { status: 404, body: { ok: false, error: 'avatar_unavailable' } }; }
+    }
     const photoMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/photo$/i);
     if (req.method === 'GET' && photoMatch) {
       let listing;

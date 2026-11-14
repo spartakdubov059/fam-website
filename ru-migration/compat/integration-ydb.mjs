@@ -417,6 +417,20 @@ try {
     'listing with pending photo cannot become public');
   assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
     'pending photo listing remains absent from the public projection');
+  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', avatarKey);
+  const avatarSubmit = await listingsApi(apiRequest('POST', '/api/v1/me/avatar', 'synthetic-registrant', { image_key: avatarKey }));
+  assert.equal(avatarSubmit.status, 202, 'avatar uploads stay private and enter manual school review');
+  const avatarQueue = await listingsApi(apiRequest('GET', '/api/v1/avatars/moderation', 'synthetic-admin', null));
+  assert.equal(avatarQueue.status, 200);
+  assert.ok(avatarQueue.body.requests.some(item => item.id === avatarSubmit.body.request_id));
+  assert.equal((await repo.listPendingAvatarReviews('other-school')).some(item => item.id === avatarSubmit.body.request_id), false,
+    'other schools cannot discover pending avatars');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-registrant', { decision: 'approve' }))).status, 403,
+    'students cannot approve an avatar');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-admin', { decision: 'approve' }))).status, 200);
+  assert.equal(await repo.isCurrentAvatar(avatarSubmit.body.request_id), true,
+    'approved avatar URL is associated with the reviewed profile');
   const orphanKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
   await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', orphanKey);
   await sql`UPDATE fam_pending_media SET created_at = Unwrap(CurrentUtcTimestamp() - Interval('P8D')) WHERE object_key = ${orphanKey};`;
@@ -550,7 +564,7 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion request workflows, approved and direct same-school account deletion with private media cleanup and audit, school-scoped listing deletion with private media cleanup and audit, school-scoped announcements/polls/voting, own-profile identity update, listing/media cleanup, favorites, ideas, messages, event registration/review, all on disposable synthetic local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

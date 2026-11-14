@@ -314,6 +314,36 @@ test('pending-media repository validates ownership keys and claims only expired 
   await assert.rejects(repo.claimExpiredPendingImages(101), TypeError);
 });
 
+test('avatar upload is atomically queued as linked private media and only same-school decisions publish it', async () => {
+  const calls = [];
+  let decision = 'approved';
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, status FROM fam_pending_media')) return [[{ user_id: '11111111-1111-4111-8111-111111111111', status: 'pending' }]];
+    if (text.includes('SELECT id FROM fam_avatar_reviews WHERE user_id')) return [[]];
+    if (text.includes('SELECT role, school_id, active FROM fam_user_profiles')) return [[{ role: 'school_admin', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT user_id, image_key, status FROM fam_avatar_reviews')) return [[{ user_id: '11111111-1111-4111-8111-111111111111', image_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', status: 'pending' }]];
+    if (text.includes('SELECT issuer, subject FROM fam_user_profiles')) return [[{ issuer: 'https://issuer.example', subject: 'synthetic' }]];
+    if (text.includes('SELECT status FROM fam_avatar_reviews WHERE id =')) return [[{ status: decision }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  const request = await repo.createAvatarReview({ userId: '11111111-1111-4111-8111-111111111111', schoolId: 'school-a', imageKey });
+  assert.equal(request.status, 'pending');
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_avatar_reviews')));
+  assert.ok(calls.some(call => call.text.includes("UPDATE fam_pending_media SET status = 'linked'")));
+  assert.equal(await repo.moderateAvatarReview(request.id, 'school-a', 'moderator-id', 'approved'), true);
+  const profileUpdate = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET avatar_url'));
+  assert.ok(profileUpdate);
+  assert.ok(profileUpdate.values.includes(`/api/v1/avatars/${request.id}/photo`));
+  assert.ok(calls.some(call => call.text.includes('SET status = ?') && call.text.includes('WHERE id = ? AND school_id = ? AND status =')));
+  decision = 'rejected';
+  assert.equal(await repo.moderateAvatarReview(request.id, 'school-a', 'moderator-id', 'rejected'), true);
+  assert.ok(calls.some(call => call.text.includes("UPDATE fam_pending_media SET status = 'pending'")));
+});
+
 test('own listing deletion is owner-bound and removes dependents in one transaction', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

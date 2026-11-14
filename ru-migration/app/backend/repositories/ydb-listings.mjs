@@ -852,6 +852,93 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
+    async createAvatarReview({ userId, schoolId, imageKey }) {
+      if (!userId || !schoolId || !imageKey) throw new TypeError('invalid avatar review request');
+      const id = randomUUID();
+      return sql.begin(async tx => {
+        const pending = await tx`SELECT user_id, status FROM fam_pending_media
+          WHERE object_key = ${imageKey} LIMIT 1;`;
+        const upload = pending?.[0]?.[0];
+        if (!upload || upload.user_id !== userId || upload.status !== 'pending') return null;
+        const existing = await tx`SELECT id FROM fam_avatar_reviews WHERE user_id = ${userId}
+          AND status = 'pending' LIMIT 1;`;
+        if (existing?.[0]?.length) return null;
+        await tx`INSERT INTO fam_avatar_reviews
+          (id, user_id, school_id, image_key, status, created_at, reviewed_by, reviewed_at)
+          VALUES (${id}, ${userId}, ${schoolId}, ${imageKey}, 'pending', CurrentUtcTimestamp(), '', NULL);`;
+        await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${imageKey}
+          AND user_id = ${userId} AND status = 'pending';`;
+        return { id, status: 'pending' };
+      });
+    },
+
+    async listPendingAvatarReviews(schoolId) {
+      if (!schoolId) throw new TypeError('invalid avatar review school');
+      const statement = sql`SELECT id, user_id, image_key, created_at FROM fam_avatar_reviews
+        WHERE school_id = ${schoolId} AND status = 'pending'
+        ORDER BY created_at ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return ((await statement)?.[0] ?? []).map(row => ({
+        id: row.id, user_id: row.user_id, created_at: row.created_at,
+        photo_url: `/api/v1/avatars/${row.id}/photo`,
+      }));
+    },
+
+    async getAvatarReview(reviewId) {
+      if (!reviewId) throw new TypeError('invalid avatar review id');
+      const statement = sql`SELECT id, user_id, school_id, image_key, status FROM fam_avatar_reviews
+        WHERE id = ${reviewId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
+
+    async isCurrentAvatar(reviewId) {
+      if (!reviewId) throw new TypeError('invalid avatar review id');
+      const avatarUrl = `/api/v1/avatars/${reviewId}/photo`;
+      const statement = sql`SELECT user_id FROM fam_avatar_reviews WHERE id = ${reviewId}
+        AND status = 'approved' LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const userId = (await statement)?.[0]?.[0]?.user_id;
+      if (!userId) return false;
+      const profile = sql`SELECT user_id FROM fam_user_profiles WHERE user_id = ${userId}
+        AND active = true AND avatar_url = ${avatarUrl} LIMIT 1;`;
+      if (typeof profile?.on === 'function') profile.on('error', () => {});
+      return Boolean((await profile)?.[0]?.[0]?.user_id);
+    },
+
+    async moderateAvatarReview(reviewId, schoolId, reviewerId, decision) {
+      if (!reviewId || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid avatar review decision');
+      return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT role, school_id, active FROM fam_user_profiles
+          WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)
+            || reviewer.school_id !== schoolId) return false;
+        const reviewRows = await tx`SELECT user_id, image_key, status FROM fam_avatar_reviews
+          WHERE id = ${reviewId} AND school_id = ${schoolId} LIMIT 1;`;
+        const review = reviewRows?.[0]?.[0];
+        if (!review || review.status !== 'pending' || review.user_id === reviewerId) return false;
+        const profileRows = await tx`SELECT issuer, subject FROM fam_user_profiles
+          WHERE user_id = ${review.user_id} AND school_id = ${schoolId} AND active = true LIMIT 1;`;
+        const profile = profileRows?.[0]?.[0];
+        if (!profile) return false;
+        if (decision === 'approved') {
+          const avatarUrl = `/api/v1/avatars/${reviewId}/photo`;
+          await tx`UPDATE fam_user_profiles SET avatar_url = ${avatarUrl}
+            WHERE issuer = ${profile.issuer} AND subject = ${profile.subject}
+              AND user_id = ${review.user_id} AND school_id = ${schoolId} AND active = true;`;
+        } else {
+          // Return rejected media to the existing bounded orphan-cleanup queue.
+          await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = NULL
+            WHERE object_key = ${review.image_key} AND user_id = ${review.user_id} AND status = 'linked';`;
+        }
+        await tx`UPDATE fam_avatar_reviews SET status = ${decision}, reviewed_by = ${reviewerId},
+          reviewed_at = CurrentUtcTimestamp() WHERE id = ${reviewId} AND school_id = ${schoolId} AND status = 'pending';`;
+        const confirmed = await tx`SELECT status FROM fam_avatar_reviews WHERE id = ${reviewId} LIMIT 1;`;
+        return confirmed?.[0]?.[0]?.status === decision;
+      });
+    },
+
     async createIdea(record) {
       if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
           || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {

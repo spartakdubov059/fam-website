@@ -16,6 +16,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'PATCH' && /^\/api\/v1\/deletion-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
     if (pathname === '/api/v1/pulse' || pathname.startsWith('/api/v1/pulse/')) return schoolPulseApi(req);
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    const avatarReviewMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
@@ -63,6 +64,48 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.getSchoolAdminOverview !== 'function') return { status: 503, body: { ok: false, error: 'overview_unavailable' } };
       try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAdminOverview(actor.school_id)) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/me/avatar') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try { const chunks = []; let size = 0; for await (const chunk of req) { size += chunk.length; if (size > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const key = input?.image_key;
+      if (typeof key !== 'string' || !new RegExp(`^pending/${actor.id}/[0-9a-f-]{36}\\.webp$`, 'i').test(key)) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (typeof repository?.createAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try {
+        const reviewRequest = await repository.createAvatarReview({ userId: actor.id, schoolId: actor.school_id, imageKey: key });
+        return reviewRequest ? { status: 202, body: { ok: true, status: 'pending', request_id: reviewRequest.id } }
+          : { status: 409, body: { ok: false, error: 'avatar_review_already_pending_or_image_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/avatars/moderation') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listPendingAvatarReviews !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingAvatarReviews(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && avatarReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let size = 0; for await (const chunk of req) { size += chunk.length; if (size > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'approved' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.moderateAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try {
+        const changed = await repository.moderateAvatarReview(avatarReviewMatch[1], actor.school_id, actor.id, decision);
+        return changed ? { status: 200, body: { ok: true, status: decision } } : { status: 409, body: { ok: false, error: 'avatar_review_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/schools') {
       return { status: 200, body: { ok: true, schools: schools.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string').map(({ id, name }) => ({ id, name })) } };

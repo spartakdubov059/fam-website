@@ -968,6 +968,11 @@
       </div>
 
       <details id="adminIdeasDash" class="profile-box profile-disclosure profile-council-disclosure hidden"><summary class="council-dashboard-summary"><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🏫</span><span><b>Управление школой</b><small>Заявки, участники и настройки школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary><div class="profile-disclosure-body"><p class="council-dashboard-note">Рабочее пространство Совета. Доступные действия зависят от вашей подтверждённой роли в школе.</p>
+          <div id="avatarReviewPanel" class="profile-box hidden" style="margin:0 0 12px;padding:12px;">
+            <h3 style="font-size:12px;margin:0 0 8px;">Проверка фотографий профиля</h3>
+            <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">Новые фотографии остаются приватными до решения модератора вашей школы.</p>
+            <div id="avatarReviewList" aria-live="polite"></div>
+          </div>
           <div id="schoolAdminReview" class="profile-box hidden" style="margin:0 0 12px; padding:12px;">
             <h3 style="font-size:12px; margin:0 0 8px;">Заявки на вступление и доступ</h3>
             <p style="font-size:10px; color:var(--muted); margin:0 0 8px;">Заявки учеников вашей школы. До одобрения заявитель сохраняет обычный статус ученика.</p>
@@ -1098,7 +1103,7 @@
       <details class="profile-box profile-disclosure profile-account-disclosure" id="profileAccountPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">⚙️</span><span><b>Управление аккаунтом</b><small>Настройки профиля, безопасность и выход</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
-          <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Аватары проходят автоматическую проверку перед обновлением.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
+          <div class="profile-avatar-settings"><div class="avatar-preview avatar-preview-small" id="avatarSettingsPreview">?</div><div><b>Фото профиля</b><p>Фото останется закрытым до проверки школьным модератором.</p></div><label class="button button-secondary button-small" for="avatarInput">Изменить</label></div>
           <div class="profile-danger-area"><b>Удаление аккаунта</b><p>Можно удалить аккаунт в любой момент. Будут удалены профиль, объявления, идеи, избранное, переписки, регистрации и связанные файлы. Восстановить данные будет нельзя.</p>
             <details class="profile-help profile-delete-help"><summary>Удалить мой аккаунт навсегда</summary><div class="profile-help-body">
               <p>Недавно подтвердите вход через Яндекс ID (не более 10 минут назад), затем введите точную фразу. У последнего администратора школы сначала должен появиться другой администратор.</p>
@@ -3512,6 +3517,40 @@ window.onunhandledrejection = function() {
     }
   }
 
+  async function loadAvatarReviews() {
+    const panel = $("avatarReviewPanel");
+    const list = $("avatarReviewList");
+    if (!panel || !list || !user || !["school_admin", "council_member"].includes(profile?.role)) return;
+    panel.classList.remove("hidden");
+    list.textContent = "Загружаем очередь...";
+    try {
+      const response = await fetch("/api/v1/avatars/moderation", { credentials: "same-origin", cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось загрузить очередь.");
+      const requests = Array.isArray(data.requests) ? data.requests : [];
+      list.innerHTML = requests.length ? requests.map(item => `<div class="idea-card" style="display:flex;align-items:center;gap:12px;">
+        <img src="${esc(item.photo_url)}" alt="Фото на проверке" style="width:72px;height:72px;object-fit:cover;border-radius:50%;">
+        <div><div style="font-size:11px;margin-bottom:8px;">Новое фото профиля · ${esc(new Date(item.created_at).toLocaleDateString("ru-RU"))}</div>
+          <button type="button" class="button button-success button-small" data-action="review-avatar" data-id="${esc(item.id)}" data-decision="approve">Одобрить</button>
+          <button type="button" class="button button-danger button-small" data-action="review-avatar" data-id="${esc(item.id)}" data-decision="reject">Отклонить</button>
+        </div></div>`).join("") : '<p style="color:var(--muted);font-size:11px;">Нет фотографий на проверке.</p>';
+    } catch (error) { list.textContent = error?.message || "Не удалось загрузить очередь."; }
+  }
+
+  async function reviewAvatar(id, decision) {
+    if (!/^[0-9a-f-]{36}$/i.test(id || "") || !["approve", "reject"].includes(decision)) return;
+    try {
+      const response = await fetch(`/api/v1/avatars/${id}/moderation`, {
+        method: "PATCH", credentials: "same-origin", cache: "no-store",
+        headers: { "content-type": "application/json", "accept": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) throw new Error(data?.error || "Не удалось сохранить решение.");
+      await loadAvatarReviews();
+    } catch (error) { notice(error?.message || "Не удалось сохранить решение."); }
+  }
+
   async function acknowledgeSafetyReport(button) {
     if (!button || profile?.role !== "school_admin") return;
     try {
@@ -3995,6 +4034,7 @@ window.onunhandledrejection = function() {
     const isCouncilMember = profile && ["school_admin", "council_member"].includes(profile.role);
     $("schoolIdeasInbox")?.classList.toggle("hidden", !isCouncilMember);
     if (isCouncilMember) {
+      await loadAvatarReviews();
       $("adminIdeasDash").classList.remove("hidden");
       $("councilAdminTools").classList.toggle("hidden", profile.role !== "school_admin");
       if (profile.role === "school_admin") {
@@ -4024,6 +4064,7 @@ window.onunhandledrejection = function() {
       $("councilAdminTools").classList.add("hidden");
       $("councilDeletionRequestPanel").classList.add("hidden");
       $("userSafetyReports").classList.add("hidden");
+      $("avatarReviewPanel")?.classList.add("hidden");
     }
   }
 
@@ -4061,46 +4102,38 @@ window.onunhandledrejection = function() {
   $("avatarInput").onchange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    let uploadedAvatarPath = null;
+    let uploadedAvatarKey = null;
     try {
       const safeImage = await prepareImageForUpload(file, 2 * 1024 * 1024, 512);
-      const extension = getImageExtension(safeImage);
-      const fileName = `${user.id}/avatar_${user.id}_${makeUniqueFileSuffix()}.${extension}`;
-      const pendingStorage = sb.storage.from("avatars-pending");
-      const { error: uploadError } = await pendingStorage.upload(fileName, safeImage, {
-        upsert: false,
-        contentType: safeImage.type,
-        cacheControl: "600"
+      const uploadResponse = await fetch("/api/v1/media/pending", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "content-type": safeImage.type, "accept": "application/json" }, body: safeImage,
       });
-      if (uploadError) throw uploadError;
-      uploadedAvatarPath = fileName;
-
-      const { data: signed, error: signedError } = await pendingStorage.createSignedUrl(fileName, 10 * 60);
-      if (signedError || !signed?.signedUrl) throw new Error("Не удалось подготовить защищённую ссылку для проверки аватара.");
-
-      const { data: submission, error } = await sb.functions.invoke("submit-content", {
-        body: { kind: "avatar", image_url: signed.signedUrl }
+      const uploaded = await uploadResponse.json().catch(() => null);
+      if (!uploadResponse.ok || !uploaded?.ok || typeof uploaded.image?.key !== "string") {
+        throw new Error(uploaded?.error || "Не удалось загрузить фото в российское хранилище.");
+      }
+      uploadedAvatarKey = uploaded.image.key;
+      const submissionResponse = await fetch("/api/v1/me/avatar", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "content-type": "application/json", "accept": "application/json" },
+        body: JSON.stringify({ image_key: uploadedAvatarKey }),
       });
-      if (error) throw error;
-      if (!submission?.ok || !["approved", "pending"].includes(submission.status)) {
-        throw new Error(submission?.reason || submission?.error || "Не удалось сохранить фото для проверки.");
+      const submission = await submissionResponse.json().catch(() => null);
+      if (!submissionResponse.ok || !submission?.ok || submission.status !== "pending") {
+        throw new Error(submission?.error || "Не удалось отправить фото на проверку.");
       }
-
-      uploadedAvatarPath = null; // The server has published the avatar or safely queued it.
-      if (submission.status === "approved" && submission.avatar_url) {
-        if (profile) profile.avatar_url = submission.avatar_url;
-        updateAuthUI();
-        await renderProfile();
-        notice(submission.avatar_review_bypassed ? "Аватар обновлён." : "Аватар проверен и обновлён.");
-      } else {
-        notice(submission.reason || "Фото сохранено приватно. Предыдущий аватар останется видимым до завершения проверки.");
-      }
+      uploadedAvatarKey = null; // The private object is now linked to its review request.
+      notice("Фото отправлено школьным модераторам. Старый аватар останется виден до решения.");
     } catch (err) {
-      if (uploadedAvatarPath) {
+      if (uploadedAvatarKey) {
         try {
-          await sb.storage.from("avatars-pending").remove([uploadedAvatarPath]);
+          const objectId = uploadedAvatarKey.split("/").at(-1)?.replace(/\.webp$/i, "");
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(objectId || "")) {
+            await fetch(`/api/v1/media/pending/${objectId}`, { method: "DELETE", credentials: "same-origin", cache: "no-store" });
+          }
         } catch (cleanupError) {
-          console.warn("Не удалось удалить временный аватар:", cleanupError);
+          console.warn("Не удалось удалить незакреплённое фото:", cleanupError);
         }
       }
       alert("Аватар не обновлён: " + (err?.message || "Ошибка проверки."));
@@ -4381,6 +4414,7 @@ window.onunhandledrejection = function() {
     else if (action === 'lift-council-suspension') { liftCouncilSuspension(btn.dataset.id); }
     else if (action === 'start-school-admin-review') { startSchoolAdminReview(btn.dataset.id); }
     else if (action === 'review-school-admin') { reviewSchoolAdminRequest(btn.dataset.id, btn.dataset.decision); }
+    else if (action === 'review-avatar') { reviewAvatar(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
     else if (action === 'update-idea') { window.updateIdea(btn.dataset.id, btn.dataset.status); }
     else if (action === 'confirm-reg') { window.confirmReg(btn.dataset.id, btn.dataset.evid, btn.dataset.actionType); }

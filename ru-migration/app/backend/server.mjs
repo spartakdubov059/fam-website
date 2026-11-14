@@ -71,7 +71,8 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
   }
   if ((req.method === 'POST' && url.pathname === '/api/v1/media/pending')
       || (req.method === 'DELETE' && /^\/api\/v1\/media\/pending\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
-      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/photo$/i.test(url.pathname) && ['GET', 'PATCH'].includes(req.method))) {
+      || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/photo$/i.test(url.pathname) && ['GET', 'PATCH'].includes(req.method))
+      || (/^\/api\/v1\/avatars\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/photo$/i.test(url.pathname) && req.method === 'GET')) {
     if (!mediaApi) return sendJson(res, 503, { ok: false, error: 'media_unavailable' });
     try {
       const result = await mediaApi(req);
@@ -91,6 +92,9 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (req.method === 'DELETE' && /^\/api\/v1\/school\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (req.method === 'GET' && url.pathname === '/api/v1/school/admin/overview')
+      || (req.method === 'POST' && url.pathname === '/api/v1/me/avatar')
+      || (req.method === 'GET' && url.pathname === '/api/v1/avatars/moderation')
+      || (req.method === 'PATCH' && /^\/api\/v1\/avatars\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/moderation$/i.test(url.pathname))
       || (['GET', 'PATCH'].includes(req.method) && url.pathname === '/api/v1/school/admin/safety-reports')
       || (req.method === 'GET' && url.pathname === '/api/v1/me/listings')
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations')
