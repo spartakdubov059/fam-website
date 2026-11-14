@@ -120,6 +120,7 @@ jobs:
           FAM_MODEL_TEMPERATURE: "0.6"
           FAM_MODEL_TOP_P: "0.95"
           FAM_MODEL_TOP_K: "20"
+          FAM_DEBUG_MODEL_RESPONSES: "1"
           FAM_TASK: "Исправь воспроизводимый дефект функции normalizeSearchInput в tests/fixtures/qwen-model-benchmark.mjs. Сейчас она приводит строку к нижнему регистру и обрезает края, но оставляет повторные пробелы, табуляции и переводы строк внутри. Сверни любую последовательность Unicode whitespace в один обычный пробел, сохрани нижний регистр, trim и сигнатуру функции. Регрессионные тесты находятся в tests/fixtures/qwen-model-benchmark.test.mjs. Измени только tests/fixtures/qwen-model-benchmark.mjs, не меняй тест и остальные файлы. Подготовь минимальный patch с доказательством причины."
         run: |
           set -euo pipefail
