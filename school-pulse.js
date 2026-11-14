@@ -92,10 +92,13 @@
         carousel?.classList.add("hidden");
         return;
       }
-      const news=data.announcements.filter(item=>item&&typeof item.title==="string").slice(0,6);
+      const allNews=data.announcements.filter(item=>item&&typeof item.title==="string");
+      const priorityNews=allNews.filter(item=>item.kind==="open_event"||item.kind==="important").slice(0,6);
+      const otherNews=allNews.filter(item=>item.kind!=="open_event"&&item.kind!=="important").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
-      if(announcementTrack)announcementTrack.innerHTML=news.map(announcementCard).concat(polls.map(pollCard)).join("");
-      carousel?.classList.toggle("hidden",news.length===0&&polls.length===0);
+      const featured=priorityNews.map(announcementCard).concat(polls.map(pollCard),otherNews.map(announcementCard));
+      if(announcementTrack)announcementTrack.innerHTML=featured.join("");
+      carousel?.classList.toggle("hidden",featured.length===0);
       grid.innerHTML="";
       grid.querySelectorAll(".pulse-card").forEach((card,index)=>card.style.setProperty("--pulse-order",String(Math.min(index,7))));
       rootNode.classList.toggle("hidden",!isStaff);
