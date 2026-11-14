@@ -111,7 +111,7 @@
       const direction=Number(button.getAttribute("data-pulse-scroll"));
       const card=announcementTrack?.querySelector(".pulse-card");
       if(!announcementTrack||!card||!Number.isFinite(direction))return;
-      announcementTrack.scrollBy({left:direction*(announcementTrack.clientWidth+10),behavior:"smooth"});
+      announcementTrack.scrollTo({left:Math.max(0,announcementTrack.scrollLeft+direction*(announcementTrack.clientWidth+10)),behavior:"instant"});
     }));
     announcementTrack?.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");
