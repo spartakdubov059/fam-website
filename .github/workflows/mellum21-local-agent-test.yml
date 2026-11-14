@@ -7,8 +7,10 @@ on:
     paths:
       - ".github/workflows/mellum21-local-agent-test.yml"
       - "scripts/local-model-patch.mjs"
+      - "scripts/local-model-plan.mjs"
       - "scripts/run-local-coder.mjs"
       - "tests/security/local-model-patch.test.mjs"
+      - "tests/security/local-model-plan.test.mjs"
       - "tests/security/fam-codex-developer-workflow.test.mjs"
 
 permissions:
@@ -41,6 +43,7 @@ jobs:
           set -euo pipefail
           node --test tests/security/local-model-json.test.mjs
           node --test tests/security/local-model-patch.test.mjs
+          node --test tests/security/local-model-plan.test.mjs
 
       - name: Restore the free model weights cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
@@ -69,6 +72,12 @@ jobs:
           fi
           echo "Verified Mellum2.1 Q4_K_M: $actual_size bytes"
           df -h "$RUNNER_TEMP"
+
+      - name: Cache verified model weights for later runs
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/fam-model/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+          key: fam-mellum21-12b-a2.5b-thinking-q4km-v1
 
       - name: Build pinned llama.cpp with CPU support
         env:
