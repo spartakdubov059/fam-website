@@ -1,0 +1,33 @@
+-- School scoped notices and polls. All actor IDs are supplied by the server.
+CREATE TABLE fam_school_announcements (
+  announcement_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  author_id Utf8 NOT NULL,
+  title Utf8 NOT NULL,
+  body Utf8 NOT NULL,
+  kind Utf8 NOT NULL,
+  event_starts_at Timestamp?,
+  published_at Timestamp NOT NULL,
+  expires_at Timestamp NOT NULL,
+  PRIMARY KEY (announcement_id)
+) WITH (TTL = Interval("P1D") ON expires_at);
+
+CREATE TABLE fam_school_polls (
+  poll_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  author_id Utf8 NOT NULL,
+  question Utf8 NOT NULL,
+  options_json Utf8 NOT NULL,
+  closes_at Timestamp NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (poll_id)
+) WITH (TTL = Interval("P7D") ON closes_at);
+
+CREATE TABLE fam_school_poll_votes (
+  poll_id Utf8 NOT NULL,
+  voter_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  choice_index Uint32 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (poll_id, voter_id)
+) WITH (TTL = Interval("P180D") ON created_at);
