@@ -271,7 +271,7 @@ test("synthetic queue task flows through local model, real patch, trusted QA, re
   };
   await run("/bin/bash", ["--noprofile", "--norc", "-e", "-c", workflowStepScript("id: pr\n        env:")], { cwd: fixture, env: prEnv });
   const createdPrBody = readFileSync(prBodyPath, "utf8");
-  assert.match(createdPrBody, /оставлен открытым|отдельное явное разрешение владельца/);
+  assert.match(createdPrBody, /Любое объединение PR и публикация требуют отдельного явного разрешения владельца/);
   assert.match(createdPrBody, /Production этим workflow не изменяется/);
   const prOutput = readFileSync(join(work, "pr-output.txt"), "utf8");
   assert.ok(prOutput.includes("pr_url=" + syntheticPrUrl));
