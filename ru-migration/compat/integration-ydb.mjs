@@ -34,6 +34,7 @@ try {
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
+          : req.headers.authorization === 'Bearer synthetic-other-school' ? 'subject-3'
           : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1',
     authenticated_at: req.headers.authorization === 'Bearer synthetic-admin' ? Math.floor(Date.now() / 1000) : null });
   const deletedMediaKeys = [];
@@ -95,6 +96,38 @@ try {
   assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
   const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
   assert.equal(otherSchoolRevoke.status, 404, 'role revocation cannot cross school boundaries');
+  const pulseAnnouncement = await listingsApi(apiRequest('POST', '/api/v1/pulse/announcements', 'synthetic-admin', {
+    title: 'Проверка школьной доски', body: 'Встреча состоится в пятницу', kind: 'news', school_id: 'other-school', author_id: '22222222-2222-4222-8222-222222222222',
+  }));
+  assert.equal(pulseAnnouncement.status, 201);
+  const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
+    question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'],
+  }));
+  assert.equal(pulsePoll.status, 201);
+  const invalidPulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
+    question: 'Какую книгу обсудим?', options: ['Сказки', ' сказки '],
+  }));
+  assert.equal(invalidPulsePoll.status, 400);
+  const pulseRead = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
+  assert.equal(pulseRead.status, 200);
+  assert.ok(pulseRead.body.announcements.some(row => row.id === pulseAnnouncement.body.id));
+  assert.equal(pulseRead.body.announcements[0].author_id, undefined, 'school pulse never exposes author identity');
+  assert.ok(pulseRead.body.polls.some(row => row.id === pulsePoll.body.id));
+  const pollVoters = ['synthetic-user', 'synthetic-registrant', 'synthetic-role-student', 'synthetic-admin', 'synthetic-council'];
+  for (const [index, token] of pollVoters.entries()) {
+    const vote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, token, { choice_index: index % 2 }));
+    assert.equal(vote.status, 201);
+  }
+  const duplicatePollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-registrant', { choice_index: 0 }));
+  assert.equal(duplicatePollVote.status, 409);
+  const otherSchoolPulse = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-other-school'));
+  assert.equal(otherSchoolPulse.status, 200);
+  assert.equal(otherSchoolPulse.body.announcements.length, 0, 'school pulse feed cannot cross school boundaries');
+  const pulseAfterVotes = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
+  const visiblePoll = pulseAfterVotes.body.polls.find(row => row.id === pulsePoll.body.id);
+  assert.equal(visiblePoll.total_votes, 5);
+  assert.deepEqual(visiblePoll.counts, [3, 2], 'choice totals appear only after five synthetic votes');
+  assert.equal(visiblePoll.my_vote, 1);
   const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
     reason: 'Repeated unrelated posts in the school group.',
@@ -358,7 +391,7 @@ try {
   assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
   assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');
   assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, same-school role review/audit, own-profile identity update, own-listing delete and cleanup, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media claim/link lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile and role requests, role revocation, school-scoped announcements/polls/voting, own-profile identity update, own-listing delete and cleanup, listings, favorites, ideas, messages, school-scoped photo/event queues, pending-media lifecycle, photo visibility gate, event capacity/cancellation/review on disposable local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
