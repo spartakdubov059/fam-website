@@ -85,7 +85,7 @@ test("frames an unlabelled hunk only for one explicit allowlisted file", () => {
   assert.match(framed, /^diff --git a\/tests\/fixture\.mjs b\/tests\/fixture\.mjs\n/);
   assert.match(framed, /--- a\/tests\/fixture\.mjs\n\+\+\+ b\/tests\/fixture\.mjs\n@@ -1,1 \+1,1 @@/);
   assert.throws(() => frameSingleFileHunkDiff("@@ -1 +1 @@\n-old\n+new", "../secrets.txt"), /disallowed path/);
-  assert.throws(() => frameSingleFileHunkDiff("--- a/a\n+++ b/a", "tests/fixture.mjs"), /start with a unified diff hunk/);
+  assert.throws(() => frameSingleFileHunkDiff("--- a/a\n+++ b/a", "tests/fixture.mjs"), /selected path/);
 });
 
 test("frames file-labelled unified hunks only when both headers match the selected file", () => {
