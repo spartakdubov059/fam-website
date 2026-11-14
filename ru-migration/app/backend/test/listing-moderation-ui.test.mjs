@@ -89,6 +89,32 @@ test('school admins see active suspensions returned by the same-school endpoint 
   assert.equal(card.children[2].tagName, 'p');
 });
 
+test('school admins can review rule-based analyst suggestions with safe text rendering', async () => {
+  const f = fixture(); const calls = []; let pending = true;
+  const ideaId = 'a'.repeat(64);
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
+    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true,
+      report: { summary: '<script>summary</script>', generated_at: '2026-11-14T06:00:00Z' },
+      ideas: pending ? [{ id: ideaId, title: '<script>idea</script>', summary: 'Синтетическое предложение', evidence_summary: 'Только агрегированные показатели.' }] : [] }) };
+    if (url === `/api/v1/school/admin/agent-ideas/${ideaId}`) { pending = false; return { ok: true, json: async () => ({ ok: true }) }; }
+    return { ok: true, json: async () => ({ ok: true, listings: [], applications: [], requests: [], suspensions: [], targets: [], reports: [], messages: [] }) };
+  } });
+  const card = f.queue.children.at(-1);
+  assert.equal(card.children[0].textContent, 'Ежедневная сводка и предложения помощников');
+  assert.equal(card.children[1].textContent, '<script>summary</script>');
+  const idea = card.children.find(item => item.tagName === 'article');
+  assert.equal(idea.children[0].textContent, '<script>idea</script>');
+  const actions = idea.children.at(-1).children;
+  assert.deepEqual(actions.map(item => item.textContent), ['Принять к работе', 'Отклонить']);
+  await actions[0].listeners.click();
+  const review = calls.find(call => call.url === `/api/v1/school/admin/agent-ideas/${ideaId}`);
+  assert.equal(review.init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(review.init.body), { decision: 'approve' });
+  assert.equal(pending, false);
+});
+
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
   const f = fixture(); const calls = [];
   const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
