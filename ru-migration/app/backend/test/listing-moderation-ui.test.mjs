@@ -101,7 +101,8 @@ test('school admins can review rule-based analyst suggestions with safe text ren
     if (url === `/api/v1/school/admin/agent-ideas/${ideaId}`) { pending = false; return { ok: true, json: async () => ({ ok: true }) }; }
     return { ok: true, json: async () => ({ ok: true, listings: [], applications: [], requests: [], suspensions: [], targets: [], reports: [], messages: [] }) };
   } });
-  const card = f.queue.children.at(-1);
+  const card = f.queue.children.find(item => item.children?.[0]?.textContent === 'Ежедневная сводка и предложения помощников');
+  assert.ok(card, 'school analyst dashboard should be rendered in the moderation queue');
   assert.equal(card.children[0].textContent, 'Ежедневная сводка и предложения помощников');
   assert.equal(card.children[1].textContent, '<script>summary</script>');
   const idea = card.children.find(item => item.tagName === 'article');
@@ -113,6 +114,7 @@ test('school admins can review rule-based analyst suggestions with safe text ren
   assert.equal(review.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(review.init.body), { decision: 'approve' });
   assert.equal(pending, false);
+  assert.equal(f.status.textContent, 'Предложение помощника принято к работе.');
 });
 
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {

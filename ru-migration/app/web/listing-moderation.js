@@ -315,11 +315,12 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (result?.error === 'already_suspended') { status.textContent = 'У этого аккаунта уже есть действующее ограничение.'; return; }
         throw new Error('decision_failed');
       }
-      status.textContent = body.action === 'issue' ? 'Временное ограничение установлено.'
+      const successMessage = body.action === 'issue' ? 'Временное ограничение установлено.'
         : body.action === 'revoke' ? 'Полномочия сняты. Аккаунт остался активным.'
           : body.decision === 'approve' ? 'Предложение помощника принято к работе.'
             : body.decision === 'reject' ? 'Предложение помощника отклонено.' : 'Временное ограничение снято.';
       await load();
+      status.textContent = successMessage;
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
   }
 
