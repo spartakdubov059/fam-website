@@ -35,10 +35,8 @@ begin
   if v_result->>'task_created' <> 'true' then raise exception 'first task was not created: %', v_result; end if;
   v_id := (v_result->>'task_id')::uuid;
   select payload into v_payload from private.fam_agent_tasks where id=v_id;
-  if v_payload->>'event_summary' is null
-     or v_payload->>'observed_hour' is null
-     or v_payload->>'previous_attempts' is null then
-    raise exception 'producer omitted the bounded event context';
+  if (select pg_catalog.count(*) from pg_catalog.jsonb_object_keys(v_payload)) <> 4 then
+    raise exception 'legacy claim RPC received an unexpected payload shape';
   end if;
   select pg_catalog.pg_get_functiondef('private.enqueue_fam_agent_coder_task()'::regprocedure)
     into v_producer_definition;
