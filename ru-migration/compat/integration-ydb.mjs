@@ -77,6 +77,15 @@ try {
     { hour_bucket: new Date('2026-11-14T12:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 2 },
     { hour_bucket: new Date('2026-11-14T13:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 1 },
   ]);
+  const alertBucket = new Date();
+  alertBucket.setUTCMinutes(0, 0, 0);
+  for (let i = 0; i < 3; i++) {
+    const occurredAt = new Date(alertBucket.getTime() + i * 60_000);
+    await repo.recordSiteError({ eventCode: 'database_request_failed', pageArea: 'database', occurredAt });
+  }
+  const technicalAlerts = await repo.listSiteErrorAlerts();
+  assert.deepEqual(technicalAlerts, [{ hour_bucket: alertBucket, event_code: 'database_request_failed',
+    page_area: 'database', event_count: 3, severity: 'critical' }]);
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);

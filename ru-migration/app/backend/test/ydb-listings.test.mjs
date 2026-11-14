@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createYdbListingsRepository } from '../repositories/ydb-listings.mjs';
+test('technical alert query applies the source thresholds and derives severity without raw diagnostics', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ event_code: 'database_request_failed', page_area: 'database', event_count: 3,
+      hour_bucket: new Date('2026-11-15T12:00:00Z') }]]);
+  });
+  const alerts = await repo.listSiteErrorAlerts();
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].severity, 'critical');
+  assert.match(query.text, /Interval\('PT24H'\)/);
+  assert.match(query.text, /event_count >= 3/);
+  assert.match(query.text, /event_count >= 10/);
+  assert.match(query.text, /LIMIT 20/);
+  assert.doesNotMatch(query.text, /message|description|user_id|email/i);
+});
+
 test('active suspension lookup is bounded to the actor school and ignores expired records', async () => {
   let query;
   const repo = createYdbListingsRepository((strings, ...values) => {

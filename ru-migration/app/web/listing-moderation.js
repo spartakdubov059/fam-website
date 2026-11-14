@@ -32,7 +32,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -49,8 +49,10 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/messages/moderation', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/technical-alerts', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, alerts: [] }) }),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse)]);
+      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -87,6 +89,15 @@ export async function initializeListingModeration({ document = globalThis.docume
       const pendingMessages = me.profile.role === 'school_admin' && pendingMessagesAvailable
         ? pendingMessagesResult.messages.filter(item => item && UUID.test(item.id || '') && UUID.test(item.sender_id || '')
           && typeof item.body === 'string' && item.body.length > 0 && item.body.length <= 1000) : [];
+      const technicalAlertsAvailable = me.profile.role !== 'school_admin'
+        || (technicalAlertsResponse.ok && technicalAlertsResult?.ok && Array.isArray(technicalAlertsResult.alerts));
+      const technicalAlerts = me.profile.role === 'school_admin' && technicalAlertsAvailable
+        ? technicalAlertsResult.alerts.filter(item => item
+          && ['js_runtime', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
+          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(item.page_area)
+          && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
+          && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
+          && Number.isFinite(Date.parse(item.hour_bucket))) : [];
       if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
         const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
         if (targets.length) {
@@ -175,17 +186,39 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(reviewPanel);
       };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0) {
+      const renderTechnicalAlertsPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const alertsPanel = node(document, 'section', 'ru-moderation-card');
+        alertsPanel.append(node(document, 'h3', '', 'Технические предупреждения FAM за сутки'));
+        alertsPanel.append(node(document, 'p', '', 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.'));
+        if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Не удалось загрузить технические предупреждения.'));
+        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Серьёзных повторяющихся сбоев не обнаружено.'));
+        const codeNames = { js_runtime: 'Ошибка интерфейса', supabase_sdk_unavailable: 'Служба данных недоступна',
+          listings_load_failed: 'Не загрузились объявления', notifications_load_failed: 'Не загрузились уведомления',
+          database_request_failed: 'Ошибка базы данных', auth_backend_failed: 'Ошибка входа' };
+        const areaNames = { auth: 'вход', listings: 'объявления', notifications: 'уведомления', database: 'база данных', other: 'другое' };
+        for (const alert of technicalAlerts) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'h4', '', `${alert.severity === 'critical' ? 'Критический сбой' : 'Предупреждение'} · ${codeNames[alert.event_code]}`));
+          card.append(node(document, 'p', '', `Раздел: ${areaNames[alert.page_area]} · Событий за час: ${alert.event_count}`));
+          card.append(node(document, 'p', '', `Час UTC: ${new Date(alert.hour_bucket).toLocaleString('ru-RU', { timeZone: 'UTC' })}`));
+          alertsPanel.append(card);
+        }
+        queue.append(alertsPanel);
+      };
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0) {
         renderPendingMessagesPanel();
         renderSafetyPanel();
+        renderTechnicalAlertsPanel();
         if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
         status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
           : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
             : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
+              : !technicalAlertsAvailable ? 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.'
               : 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, сигналов безопасности — ${safetyReports.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -261,6 +294,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       }
       renderPendingMessagesPanel();
       renderSafetyPanel();
+      renderTechnicalAlertsPanel();
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
 

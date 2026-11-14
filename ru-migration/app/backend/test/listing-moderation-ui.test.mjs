@@ -117,6 +117,35 @@ test('school admins can review rule-based analyst suggestions with safe text ren
   assert.equal(f.status.textContent, 'Предложение помощника принято к работе.');
 });
 
+test('school admins see only allowlisted aggregate technical alerts rendered as text', async () => {
+  const f = fixture(); const calls = [];
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
+    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, alerts: [
+      { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
+      { event_code: '<script>x</script>', page_area: 'other', event_count: 999, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
+    ] }) };
+    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
+    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
+    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    if (url === '/api/v1/suspensions/targets' || url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, targets: [] }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.ok(calls.some(call => call.url === '/api/v1/school/admin/technical-alerts' && call.init.credentials === 'same-origin'));
+  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Технические предупреждения FAM за сутки');
+  assert.ok(panel);
+  assert.equal(panel.children[1].textContent, 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.');
+  const alert = panel.children.find(item => item.tagName === 'article');
+  assert.equal(alert.children[0].textContent, 'Критический сбой · Ошибка базы данных');
+  assert.equal(alert.children[1].textContent, 'Раздел: база данных · Событий за час: 3');
+  assert.equal(panel.children.some(item => item.textContent.includes('<script>')), false);
+});
+
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
   const f = fixture(); const calls = [];
   const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
