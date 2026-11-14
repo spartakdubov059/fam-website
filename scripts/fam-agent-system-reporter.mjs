@@ -310,11 +310,11 @@ export function renderDailyReport(report) {
     } else {
       lines.push("- Ответы Edge Worker по pg_net: нет данных.");
     }
-    lines.push("", "| Агент | В очереди | В работе | Заблокировано | Готово за сутки | Ошибки за сутки |",
-      "|---|---:|---:|---:|---:|---:|");
+    lines.push("", "| Агент | В очереди | Захвачено | В работе | Review | Заблокировано | Готово за сутки | Ошибки за сутки |",
+      "|---|---:|---:|---:|---:|---:|---:|---:|");
     for (const agent of snapshot.agent_statuses ?? []) {
       lines.push("| " + safeLabel(agent.agent_key, 40) + " | " + count(agent.queued) + " | " +
-        count(agent.in_progress) + " | " + count(agent.blocked) + " | " +
+        count(agent.claimed) + " | " + count(agent.in_progress) + " | " + count(agent.review) + " | " + count(agent.blocked) + " | " +
         count(agent.completed_24h) + " | " + count(agent.failed_24h) + " |");
     }
     lines.push("", "### Cron", "",
