@@ -17,7 +17,12 @@ test('valid reviewer receives a local flag and its decision is returned', async 
   let received;
   const result = await reviewText('Обсудим вред вейпов', { review: async (input) => { received = input; return { action: 'pending', reason_code: 'manual_review' }; } });
   assert.equal(received.localFlag, 'nicotine_or_alcohol');
-  assert.deepEqual(result, { action: 'pending', reason_code: 'manual_review' });
+  assert.deepEqual(result, { action: 'pending', reason_code: 'manual_review', local_flag: 'nicotine_or_alcohol' });
+});
+test('serious local flags remain available to the Russian incident writer after review', async () => {
+  const result = await reviewText('Поступали угрозы в адрес ученика.', { review: async () => ({ action: 'pending' }) });
+  assert.equal(result.action, 'pending');
+  assert.equal(result.local_flag, 'serious_hate_or_threat');
 });
 test('empty and oversized input is rejected', async () => {
   assert.equal((await reviewText('   ')).reason_code, 'invalid_text');

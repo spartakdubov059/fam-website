@@ -24,6 +24,30 @@ test('message without a classifier is saved only to a pending school review queu
   assert.equal(delivered, false);
 });
 
+test('serious local message marker is recorded without content before pending delivery', async () => {
+  const writes = [];
+  const safetyKey = 'local-synthetic-safety-key-with-more-than-32-bytes';
+  const result = await submitMessage({ actor, input: { receiver_id: input.receiver_id, body: 'Поступали угрозы в адрес ученика.' }, safetyKey,
+    repository: {
+      recordSafetySignal: async signal => { writes.push(signal); return true; },
+      createPendingMessage: async value => { writes.push(value); return { id: 'pending-safety-message' }; },
+    } });
+  assert.deepEqual(result, { ok: true, status: 'pending', id: 'pending-safety-message' });
+  assert.equal(writes[0].category, 'threat_or_intimidation');
+  assert.equal(writes[0].severity, 'high');
+  assert.equal(Object.hasOwn(writes[0], 'text'), false);
+  assert.equal(Object.hasOwn(writes[0], 'evidence_excerpt'), false);
+  assert.equal(writes[1].body, 'Поступали угрозы в адрес ученика.');
+});
+
+test('serious local marker fails closed when the keyed signal store is unavailable', async () => {
+  let queued = false;
+  const result = await submitMessage({ actor, input: { receiver_id: input.receiver_id, body: 'Поступали угрозы.' },
+    repository: { createPendingMessage: async () => { queued = true; return { id: 'unexpected' }; } } });
+  assert.equal(result.code, 'safety_signal_unavailable');
+  assert.equal(queued, false);
+});
+
 test('only an explicit moderation approval can insert a message', async () => {
   let record;
   const result = await submitMessage({ actor, input, review: async () => ({ action: 'ok' }),

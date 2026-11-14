@@ -265,7 +265,7 @@ test('school safety reports render as text and can be acknowledged through the R
   } });
   const panel = f.queue.children.find(item => item.children[0]?.textContent === 'Сигналы безопасности');
   assert.ok(panel);
-  assert.match(panel.children[1].textContent, /ещё не записывает новые сигналы/);
+  assert.match(panel.children[1].textContent, /записывает локально обнаруженные угрозы и дискриминацию/);
   const card = panel.children[2];
   assert.equal(card.children[2].textContent, 'Участник: <Аня> Тест · Затронут: Неизвестно');
   assert.equal(card.children[3].textContent, 'Фрагмент: <img src=x onerror=alert(1)>');

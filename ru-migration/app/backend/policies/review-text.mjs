@@ -16,7 +16,7 @@ export async function reviewText(value, { review } = {}) {
   try {
     const result = await review({ text: value, localFlag: flag?.code ?? null });
     if (!result || !['ok', 'reject', 'pending'].includes(result.action)) throw new Error('invalid result');
-    return { action: result.action, reason_code: typeof result.reason_code === 'string' ? result.reason_code : null };
+    return { action: result.action, reason_code: typeof result.reason_code === 'string' ? result.reason_code : null, local_flag: flag?.code ?? null };
   } catch {
     return { action: 'pending', reason_code: 'review_unavailable', local_flag: flag?.code ?? null };
   }

@@ -38,7 +38,8 @@ try {
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
           : req.headers.authorization === 'Bearer synthetic-other-school' ? 'subject-3'
-          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1',
+          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin'
+            : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1',
     authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null });
   const deletedMediaKeys = [];
   const accountMediaKeys = new Set();
@@ -46,6 +47,7 @@ try {
     authenticate,
     resolveActor,
     repository: repo,
+    safetyKey: 'local-ci-only-synthetic-safety-key-over-32-bytes',
     pendingImages: {
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
@@ -471,6 +473,23 @@ try {
   assert.equal(safetyGroup.occurrences, 3);
   assert.equal(safetyGroup.severity, 'high');
   assert.equal(safetyGroup.actor.first_name, 'Тест');
+  const emittedSafety = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-safety-actor', {
+    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Поступали угрозы в адрес ученика.',
+  }));
+  assert.equal(emittedSafety.status, 201);
+  assert.equal(emittedSafety.body.status, 'pending');
+  assert.equal((await sql`SELECT id FROM fam_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 0,
+    'unreviewed message stays out of the recipient inbox');
+  assert.equal((await sql`SELECT id FROM fam_pending_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 1,
+    'unreviewed message is kept in the school review queue');
+  const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
+    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message' ORDER BY created_at DESC LIMIT 1;`;
+  assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
+  assert.equal(emittedIncident?.[0]?.[0]?.category, 'threat_or_intimidation');
+  assert.equal(emittedIncident?.[0]?.[0]?.severity, 'high');
+  assert.equal(emittedIncident?.[0]?.[0]?.evidence_excerpt, null);
+  const emittedQueue = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
+  assert.ok(emittedQueue.body.reports.some(row => row.category === 'threat_or_intimidation'));
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-lyceum-admin'))).body.reports.length, 0,
     'safety reports are isolated by school');
   assert.deepEqual(await listingsApi(apiRequest('PATCH', '/api/v1/school/admin/safety-reports', 'synthetic-admin', {

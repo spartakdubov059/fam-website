@@ -1,8 +1,9 @@
 import { reviewText } from '../policies/review-text.mjs';
+import { recordLocalSafetySignal } from '../policies/safety-signal.mjs';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function submitMessage({ actor, input, repository, review }) {
+export async function submitMessage({ actor, input, repository, review, safetyKey }) {
   if (!actor || typeof actor.id !== 'string' || !actor.id) return { ok: false, code: 'unauthenticated' };
   if (typeof actor.school_id !== 'string' || !actor.school_id.trim()) return { ok: false, code: 'school_required' };
   if (!input || typeof input.body !== 'string' || typeof input.receiver_id !== 'string') return { ok: false, code: 'invalid_message' };
@@ -12,6 +13,10 @@ export async function submitMessage({ actor, input, repository, review }) {
     return { ok: false, code: 'invalid_message' };
   }
   const decision = await reviewText(body, { review });
+  try {
+    await recordLocalSafetySignal({ actor, targetId: receiverId, sourceKind: 'message', sourceOrigin: 'messages',
+      localFlag: decision.local_flag, text: body, safetyKey, repository });
+  } catch { return { ok: false, code: 'safety_signal_unavailable', status: decision.action }; }
   if (decision.action === 'reject') return { ok: false, code: decision.reason_code || 'rejected', status: 'rejected' };
   if (decision.action === 'pending') {
     if (typeof repository?.createPendingMessage !== 'function') return { ok: false, code: 'review_unavailable', status: 'pending' };

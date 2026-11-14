@@ -134,7 +134,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (me.profile.role !== 'school_admin') return;
         const safetyPanel = node(document, 'section', 'ru-moderation-card');
         safetyPanel.append(node(document, 'h3', '', 'Сигналы безопасности'));
-        safetyPanel.append(node(document, 'p', '', 'Сводка пока неполная: российская модерация ещё не записывает новые сигналы безопасности.'));
+        safetyPanel.append(node(document, 'p', '', 'Сводка неполная: система записывает локально обнаруженные угрозы и дискриминацию; другие сигналы пока не перенесены.'));
         if (!safetyReportsAvailable) safetyPanel.append(node(document, 'p', '', 'Не удалось загрузить сохранённые сигналы.'));
         const categoryNames = { targeted_harassment: 'Травля', hate_or_discrimination: 'Ненависть или дискриминация',
           threat_or_intimidation: 'Угроза или запугивание', negative_personal_call: 'Оскорбление',

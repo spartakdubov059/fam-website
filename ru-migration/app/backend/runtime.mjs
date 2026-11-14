@@ -17,6 +17,7 @@ export async function createRuntime(env = process.env) {
   const audience = env.FAM_RU_AUTH_AUDIENCE;
   const jwksUri = env.FAM_RU_AUTH_JWKS_URL;
   const yandexConfigured = Boolean(env.FAM_RU_YANDEX_CLIENT_ID && env.FAM_RU_YANDEX_REDIRECT_URI && env.FAM_RU_SESSION_SECRET);
+  const safetyKey = env.FAM_RU_SAFETY_HMAC_KEY || (yandexConfigured ? env.FAM_RU_SESSION_SECRET : null);
   const oidcConfigured = Boolean(issuer && audience && jwksUri);
   if (!databaseUrl || (!yandexConfigured && !oidcConfigured)) return null;
   const yandexAuth = yandexConfigured ? createYandexIdAuth({
@@ -36,7 +37,7 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
-  const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages }));
+  const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages, safetyKey }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
   return {
     listingsApi,

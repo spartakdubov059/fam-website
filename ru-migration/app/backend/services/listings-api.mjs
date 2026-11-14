@@ -6,7 +6,7 @@ import { createSchoolPulseApi } from './school-pulse-api.mjs';
 import { createAccountDeletionApi } from './account-deletion-api.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
 
-export function createListingsApi({ authenticate, resolveActor, repository, review, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
+export function createListingsApi({ authenticate, resolveActor, repository, review, safetyKey, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
   return async function handle(req) {
@@ -527,7 +527,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try {
         const receiver_id = await repository.getListingContactRecipient(listingContactMatch[1], actor.id, actor.school_id);
         if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
-        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id }, repository, review });
+        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id }, repository, review, safetyKey });
         const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
           : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
         return { status, body: result };
@@ -687,10 +687,10 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
     const result = pathname === '/api/v1/ideas'
-      ? await submitIdea({ actor, input, repository, review })
+      ? await submitIdea({ actor, input, repository, review, safetyKey })
       : pathname === '/api/v1/messages'
-        ? await submitMessage({ actor, input, repository, review })
-        : await submitListing({ actor, input, repository, review });
+        ? await submitMessage({ actor, input, repository, review, safetyKey })
+        : await submitListing({ actor, input, repository, review, safetyKey });
     const status = result.ok ? 201
       : result.code === 'database_unavailable' || result.status === 'pending' ? 503
         : result.code === 'forbidden' ? 403

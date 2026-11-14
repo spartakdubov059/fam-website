@@ -61,6 +61,22 @@ test('safety report groups are bounded, sanitized, school-scoped and acknowledge
   await assert.rejects(repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'bad', category: 'targeted_harassment', sourceKind: 'message' }), TypeError);
 });
 
+test('safety signal writer stores only keyed metadata and never an evidence excerpt', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => { query = { text: strings.join('?'), values }; return Promise.resolve([[]]); });
+  assert.equal(await repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'a'.repeat(64), sourceKind: 'message',
+    category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111',
+    targetId: '22222222-2222-4222-8222-222222222222', sourceOrigin: 'messages' }), true);
+  assert.match(query.text, /INSERT INTO fam_safety_incidents/);
+  assert.match(query.text, /evidence_excerpt\)\s+VALUES/);
+  assert.ok(query.values.includes('school-a') && query.values.includes('a'.repeat(64)));
+  assert.equal(query.values.includes('текст угрозы'), false);
+  assert.equal(query.text.includes('текст угрозы'), false);
+  assert.ok(query.text.includes('NULL'), 'review fields and excerpt are null');
+  await assert.rejects(repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'bad', sourceKind: 'message',
+    category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111', sourceOrigin: 'messages' }), TypeError);
+});
+
 test('school admin overview binds every projection to its school and returns no external identity fields', async () => {
   const calls = [];
   const sql = async (strings, ...values) => {

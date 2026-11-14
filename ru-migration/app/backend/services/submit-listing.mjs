@@ -1,11 +1,12 @@
 import { reviewText } from '../policies/review-text.mjs';
+import { recordLocalSafetySignal } from '../policies/safety-signal.mjs';
 
 const CATEGORIES = new Set(['Вещи', 'Услуги', 'Творчество', 'Учёба', 'Мероприятия']);
 
 // actor and repository must come from the server's authentication and database
 // adapters, never from request JSON. This service is not exposed as an HTTP route
 // until those adapters and their authorization checks are available.
-export async function submitListing({ actor, input, repository, review }) {
+export async function submitListing({ actor, input, repository, review, safetyKey }) {
   if (!actor || typeof actor.id !== 'string' || !actor.id) return { ok: false, code: 'unauthenticated' };
   if (!input || typeof input !== 'object' || typeof input.title !== 'string' || typeof input.description !== 'string' || !CATEGORIES.has(input.category)) {
     return { ok: false, code: 'invalid_listing' };
@@ -30,6 +31,10 @@ export async function submitListing({ actor, input, repository, review }) {
   const eventTime = isEvent && typeof input.event_time === 'string' ? input.event_time : null;
   if ((eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) || (eventTime && !/^\d{2}:\d{2}$/.test(eventTime))) return { ok: false, code: 'invalid_listing' };
   const decision = await reviewText([title, description, price].join('\n'), { review });
+  try {
+    await recordLocalSafetySignal({ actor, sourceKind: 'listing', sourceOrigin: 'listings',
+      localFlag: decision.local_flag, text: [title, description, price].join('\n'), safetyKey, repository });
+  } catch { return { ok: false, code: 'safety_signal_unavailable', status: decision.action }; }
   if (decision.action === 'reject') return { ok: false, code: decision.reason_code || 'rejected', status: 'rejected' };
   // Unreviewed content is stored only as pending and remains invisible to public listing queries.
   if (!repository || typeof repository.createListing !== 'function') return { ok: false, code: 'database_unavailable' };
