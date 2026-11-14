@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/20261113095000_record_coder_completion_after_qa.sql"
+      - "supabase/migrations/20261113100000_fam_agent_bounded_coder_retries.sql"
       - "supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql"
       - "supabase/migrations/*fam_agent_coder_task_cooldown.sql"
       - "supabase/migrations/*fam_agent_coder_context.sql"
@@ -46,6 +47,13 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261111153059_fam_agent_coder_queue_bridge.sql
       - name: Apply QA completion migration to PostgreSQL 17
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113095000_record_coder_completion_after_qa.sql
+      - name: Fetch PR #74 bounded retry migration source
+        run: |
+          git fetch --no-tags --depth=1 origin refs/pull/74/head:refs/remotes/pull/74/head
+          git show refs/remotes/pull/74/head:supabase/migrations/20261113100000_fam_agent_bounded_coder_retries.sql > /tmp/fam-agent-bounded-coder-retries.sql
+          printf 'Tested PR #74 head: `%s`\n' "$(git rev-parse refs/remotes/pull/74/head)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply PR #74 bounded retry migration in version order
+        run: psql -v ON_ERROR_STOP=1 -f /tmp/fam-agent-bounded-coder-retries.sql
       - name: Apply final bounded-retry and QA gate migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113103000_preserve_qa_gate_with_bounded_retries.sql
       - name: Apply producer cooldown migration
