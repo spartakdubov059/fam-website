@@ -247,8 +247,12 @@ set created_at=pg_catalog.now()-interval '8 days'
 where payload->>'event_code'='unhandled_rejection'
   and payload->>'page_area'='auth';
 
+update private.fam_agent_tasks
+set status='completed',claimed_by=null,claimed_at=null,lease_expires_at=null,finished_at=pg_catalog.now()
+where status in ('queued','claimed','in_progress');
+
 set role service_role;
-do $$
+do $
 declare
   v_result jsonb;
   v_payload jsonb;
