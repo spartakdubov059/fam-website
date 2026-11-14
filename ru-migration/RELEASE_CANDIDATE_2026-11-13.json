@@ -9,14 +9,14 @@
     "historical_report_claimed_passed": 220,
     "reproduced_in_current_workspace": false,
     "current_backend_tests": {
-      "passed": 160,
+      "passed": 217,
       "failed": 0,
-      "source": "Local Node 22.15.0 run on 2026-11-14; GitHub Actions SDK compatibility workflow run 43597570797 on commit 89cbdd98691a6cf7d3ebf305cf50ff25fa608bc0"
+      "source": "Local Node 24.22.1 run in current workspace and GitHub Actions SDK compatibility workflow run 43631890009 on commit 872f063281b46501e87556c6399e8f6051c9aeb6 (Node 22.23.4)"
     },
     "command": "npm test --prefix ru-migration/app/backend",
-    "reproduction": "PASS — current backend tests (160/160) locally and in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
+    "reproduction": "PASS — current backend tests (217/217) locally and in GitHub Actions; historical 220-test archive remains unavailable and unreproduced"
   },
-  "sdk_gate": "PASS — workflow 43597570797 installed locked backend SDKs and Sharp, passed 160 backend tests and native image processing checks",
+  "sdk_gate": "PASS — workflow 43631890009 installed locked backend SDKs and Sharp 0.35.5, passed 217 backend tests and native image processing checks",
   "cloud_staging": "NOT DEPLOYED",
   "production": "UNCHANGED",
   "release_blockers": [
@@ -28,28 +28,28 @@
     "Orphaned private image cleanup after browser/network loss is not automatically scheduled",
     "Full auth, moderation, account-migration and safe access policy/legal review before real students join",
     "Message submission remains fail closed until a reviewed moderation provider is configured and verified",
-    "Account deletion is not implemented: the current UI accepts requests and administrator rejection only; no approval or physical deletion action exists"
+    "Account deletion is available only through reviewed RU API flows; cloud OAuth, YDB, object storage and school approval processes still need deployment-level verification before real users"
   ],
   "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
   "sdk_compatibility_check": {
-    "node": "22.15.0 locally; GitHub Actions Node 22",
-    "command": "GitHub Actions run 43597570797: npm ci, backend tests (160/160), pinned YDB/AWS SDK + Sharp checks and native image processing",
-    "result": "PASS in CI on commit 89cbdd98691a6cf7d3ebf305cf50ff25fa608bc0; local Node 22.15.0 checks also passed",
+    "node": "24.22.1 local runtime; GitHub Actions Node 22.23.4",
+    "command": "GitHub Actions run 43631890009: npm ci, backend tests (217/217), pinned YDB/AWS SDK + Sharp checks and native image processing",
+    "result": "PASS in CI on commit 872f063281b46501e87556c6399e8f6051c9aeb6; local backend tests (217/217) also passed",
     "sharp": "0.35.5",
     "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
   },
   "github_actions": {
-    "sdk_run_id": 43597570797,
-    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43597570797",
-    "ydb_run_id": 43597187699,
-    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43597187699",
+    "sdk_run_id": 43631890009,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43631890009",
+    "ydb_run_id": 43631890011,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43631890011",
     "result": "success",
-    "tested_commit": "89cbdd98691a6cf7d3ebf305cf50ff25fa608bc0 for SDK/backend; 3634c3c55e351662e1fa47f8dfb21f564a22cbb1 for disposable YDB integration"
+    "tested_commit": "872f063281b46501e87556c6399e8f6051c9aeb6 for SDK/backend and disposable YDB integration"
   },
-  "local_ydb_integration": "NOT AVAILABLE locally: Docker is not installed. Disposable YDB integration passed in GitHub Actions run 43597187699 with synthetic fixtures; no cloud instance or user data was used.",
+  "local_ydb_integration": "NOT AVAILABLE locally: Docker is not installed. Disposable YDB integration passed in GitHub Actions run 43631890011 with synthetic fixtures, including school-scoped avatar review; no cloud instance or user data was used.",
   "idea_submission_ui": "PASS — existing CI test covers authenticated UI submission to moderated API and pending status feedback",
   "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
-  "media_upload_api": "PASS — authenticated JPEG/PNG/WebP uploads are limited to 5 MiB, normalized to WebP, attached to pending listings, reviewed by school staff, and served only after approval; orphan cleanup after browser/network loss remains incomplete",
+  "media_upload_api": "PASS — authenticated JPEG/PNG/WebP uploads are limited to 5 MiB, normalized to WebP, and stored privately; listing photos and profile avatars remain unavailable until school review. Approved avatars are served only while current. Orphan cleanup after browser/network loss is not automatically scheduled.",
   "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
   "pricing_evidence": [
     {
@@ -61,5 +61,5 @@
       "url": "https://yandex.cloud/ru/docs/billing/concepts/budget"
     }
   ],
-  "account_deletion_requests": "PARTIAL — Russian UI lets council submit a same-school request and review own history; school admin can inspect and reject; no approval or physical deletion is exposed"
+  "account_deletion_requests": "IMPLEMENTED — school-scoped requests support admin rejection or approved deletion with fresh authentication, profile deactivation, private-object cleanup, and YDB finalization; synthetic CI only, no real student data"
 }
