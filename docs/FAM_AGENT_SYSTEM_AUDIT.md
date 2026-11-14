@@ -244,3 +244,11 @@ Total output lines: 411
 - В PR #65 добавлен `review` count, а Markdown показывает `queued`, `claimed`, `in_progress`, `review`, `blocked`, completed и failed. Node regression проверяет, что значения `claimed` и `review` отображаются без потери.
 - На head `f2f04bd3460b1b767df2be11c2fbe31192364959` прошли Regression [#43609489138](https://github.com/spartakdubov059/fam-website/actions/runs/43609489138), Reporter PostgreSQL [#43609489169](https://github.com/spartakdubov059/fam-website/actions/runs/43609489169), Coder QA PostgreSQL [#43609489140](https://github.com/spartakdubov059/fam-website/actions/runs/43609489140) и telemetry PostgreSQL [#43609489147](https://github.com/spartakdubov059/fam-website/actions/runs/43609489147).
 - Production очередь, функции, миграции и данные отчётов не менялись; полный queue → model → QA → PR production run остаётся недоказанным.
+
+
+## Офлайн интеграционный прогон PR Manager — 14 ноября 2026
+
+- Расширен `tests/security/fam-agent-local-pipeline.test.mjs`: после synthetic claim, coder patch, trusted QA и статических Reviewer/Security/Performance checks тест теперь исполняет непосредственно shell шаги `prepare_review` из `.github/workflows/fam-codex-developer.yml`.
+- Git push перенаправляется в локальный bare fixture repository; `gh pr create`, обязательная CI check и comment обслуживаются локальным stub. Проверяется draft-флаг, содержимое PR с ручным approval gate, фактические branch/commit SHA, ожидание `Russian content safety tests` и успешная передача PR metadata в finish bridge. Ни GitHub, ни Supabase, ни production не вызываются.
+- Этот тест использует stub модели. Он закрывает offline связку queue/bridge → patch → QA/review → PR-manager shell → finish; фактическое Qwen inference остаётся отдельно проверяемым ручным Qwen smoke, а production queue→PR по-прежнему не запускалась.
+- Локальный Node runtime в рабочей среде недоступен, поэтому сам тест локально не запускался; ES module parse и извлечение обоих shell блоков статически проверены. Результат hosted Regression CI ожидается после push.
