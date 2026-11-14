@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { postJson } from "./local-model-http.mjs";
+import { postJson, LocalInferenceTimeoutError } from "./local-model-http.mjs";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
@@ -70,6 +70,7 @@ async function askModel(messages, schema, maxTokens) {
       const parsed = parseJson(content);
       return assertRequiredFields(parsed, schema.schema, schema.name);
     } catch (error) {
+      if (error instanceof LocalInferenceTimeoutError) throw error;
       lastError = error;
       if (attempt === 0) {
         console.warn(

@@ -13,6 +13,7 @@ on:
       - "docs/**"
       - "tests/**"
       - "scripts/run-local-coder.mjs"
+      - "scripts/run-local-coder-classified.mjs"
       - "scripts/local-model-http.mjs"
       - "scripts/fam-agent-bridge.mjs"
       - "supabase/functions/fam-agent-coder-bridge/**"
@@ -155,7 +156,11 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/fam-agent"
           git rev-parse HEAD > "$RUNNER_TEMP/fam-agent-base.sha"
-          node scripts/run-local-coder.mjs
+          node scripts/run-local-coder-classified.mjs || {
+            code=$?
+            if [[ "$code" == "75" ]]; then echo "failure_reason=timeout" >> "$GITHUB_OUTPUT"; fi
+            exit "$code"
+          }
           cp "$RUNNER_TEMP/fam-agent-base.sha" "$RUNNER_TEMP/fam-agent/base.sha"
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
@@ -168,6 +173,7 @@ jobs:
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
           FAM_CODER_TASK_ID: ${{ env.FAM_CODER_TASK_ID }}
           FAM_MODEL_STEP_OUTCOME: ${{ steps.agent.outcome }}
+          FAM_MODEL_FAILURE_REASON: ${{ steps.agent.outputs.failure_reason }}
           FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
         run: node scripts/fam-agent-bridge.mjs finish
 

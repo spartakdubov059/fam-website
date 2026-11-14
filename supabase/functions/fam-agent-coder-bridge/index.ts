@@ -150,7 +150,7 @@ Deno.serve(async (req: Request) => {
       Object.keys(body).length === 3 &&
       typeof body.task_id === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
-      ["model_completed", "model_no_patch", "model_failed", "model_blocked"].includes(body.result_code)
+      ["model_completed", "model_no_patch", "model_failed", "model_timeout", "model_blocked"].includes(body.result_code)
     ) {
       const saved = await rpc("finish_fam_agent_coder_task", {
         p_task_id: body.task_id,

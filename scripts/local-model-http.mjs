@@ -4,6 +4,13 @@ import { request as httpsRequest } from "node:https";
 const DEFAULT_TIMEOUT_MS = 45 * 60 * 1000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
+export class LocalInferenceTimeoutError extends Error {
+  constructor(timeoutMs) {
+    super("Local inference timed out after " + Math.round(timeoutMs / 60000) + " minutes.");
+    this.name = "LocalInferenceTimeoutError";
+  }
+}
+
 /**
  * POST JSON without undici's fixed response-header timeout.
  * Local CPU inference can spend several minutes in prompt evaluation before
@@ -71,9 +78,7 @@ export function postJson(url, payload, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) 
     });
 
     request.setTimeout(timeoutMs, () => {
-      request.destroy(new Error(
-        "Local inference timed out after " + Math.round(timeoutMs / 60000) + " minutes.",
-      ));
+      request.destroy(new LocalInferenceTimeoutError(timeoutMs));
     });
     request.on("error", reject);
     request.end(body);
