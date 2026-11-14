@@ -61,7 +61,9 @@ insert into private.fam_site_error_counts (hour_bucket, event_code, page_area, e
 insert into private.fam_agent_tasks (agent_key, task_type, status, updated_at) values
   ('technical', 'coder_patch_request', 'failed', now()),
   ('technical', 'site_error_digest', 'completed', now()),
-  ('orchestrator', 'daily_report_digest', 'completed', now());
+  ('orchestrator', 'daily_report_digest', 'completed', now()),
+  ('quality', 'queue_health_check', 'claimed', now()),
+  ('moderation', 'image_review', 'review', now());
 
 insert into cron.job (jobid, jobname, schedule, active)
 values
