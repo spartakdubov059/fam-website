@@ -417,7 +417,7 @@ try {
     'listing with pending photo cannot become public');
   assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
     'pending photo listing remains absent from the public projection');
-  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
+  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp';
   await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', avatarKey);
   const avatarSubmit = await listingsApi(apiRequest('POST', '/api/v1/me/avatar', 'synthetic-registrant', { image_key: avatarKey }));
   assert.equal(avatarSubmit.status, 202, 'avatar uploads stay private and enter manual school review');
