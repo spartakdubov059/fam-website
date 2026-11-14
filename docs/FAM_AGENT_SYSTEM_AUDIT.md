@@ -392,3 +392,10 @@
 
 - Основной coder workflow использует `scripts/run-local-coder-classified.mjs`, но этот файл отсутствовал в списке `push.paths`; изменение одного timeout-classifier файла поэтому не запускало scheduled/push coder workflow. Добавил путь и точный regression assertion, что он входит в push filter.
 - На head `3ab50ed8d85c5945a98d62d972ba17161cd73ceb` Regression suite, Russian content safety, owner verifier, Coder QA PostgreSQL, Reporter PostgreSQL и telemetry PostgreSQL завершились успешно; preview готов. Production и расписания не менялись.
+
+
+## Свежий main run подтвердил лишний запуск Qwen — 14 ноября 2026, 10:23 UTC
+
+- Read-only список workflow runs показывает scheduled run [#43585044189](https://github.com/spartakdubov059/fam-website/actions/runs/43585044189) на main SHA `7a463458ba5ca2d9be2bf67d4f5931271e2c3478`. Job лог содержит cache hit для весов и успешную сборку `llama-server` до шага claim.
+- Claim затем вывел `No queued coder task; using the existing scheduled audit.` Несмотря на это, следующий шаг запустил локальный Qwen. Job log начинается в 10:23:22 UTC и заканчивается в 10:36:04 UTC (~12 мин 42 с); model output artifact записан, а verify и PR jobs пропущены.
+- Это подтверждает незакрытый дефект текущей main: пустая очередь всё ещё тратит runner-время и inference. PR #65 содержит queue-first порядок и guards на download/build/inference, но пока не действует на main. Этот audit не менял очередь, runner, main, production или deployment.
