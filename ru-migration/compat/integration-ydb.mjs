@@ -27,6 +27,8 @@ try {
     ('https://issuer.synthetic', 'subject-admin-target', '88888888-8888-4888-8888-888888888888', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-delete-target', '99999999-9999-4999-8999-999999999999', 'synthetic-school', 'council_member', true),
     ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true);`;
+  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)
+    VALUES ('https://issuer.synthetic', 'subject-safety-actor', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'synthetic-school', 'student', true, 'Тест', 'Нарушитель', '8Б');`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
@@ -426,7 +428,7 @@ try {
     await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
       created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
       VALUES ('synthetic-school', ${safetyFingerprint}, 'message', 'targeted_harassment', ${`aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`},
-        ${i === 0 ? 'medium' : 'high'}, CurrentUtcTimestamp(), NULL, NULL, 'synthetic-user',
+        ${i === 0 ? 'medium' : 'high'}, CurrentUtcTimestamp(), NULL, NULL, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         '11111111-1111-4111-8111-111111111111', 'fam.example.ru', 'synthetic sanitized excerpt');`;
   }
   const safetyReports = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
