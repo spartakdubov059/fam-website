@@ -108,7 +108,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
           const result = await repository.issueAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id, durationHours, reason });
           return result?.ok ? { status: 201, body: { ok: true, suspension: result.suspension } }
             : { status: result?.code === 'target_unavailable' ? 404 : result?.code === 'already_suspended' ? 409 : 403, body: { ok: false, error: result?.code || 'suspension_failed' } };
-        } catch (error) { console.error('account_suspension_issue_failed', error?.message || error); return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+        } catch (error) { console.error('account_suspension_issue_failed', error); return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       }
       if (input?.action === 'lift') {
         if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_manage_self' } };
@@ -117,7 +117,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
           const lifted = await repository.liftAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id });
           return lifted ? { status: 200, body: { ok: true, status: 'lifted' } }
             : { status: 409, body: { ok: false, error: 'suspension_unavailable' } };
-        } catch (error) { console.error('account_suspension_lift_failed', error?.message || error); return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+        } catch (error) { console.error('account_suspension_lift_failed', error); return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       }
       return { status: 400, body: { ok: false, error: 'invalid_action' } };
     }
