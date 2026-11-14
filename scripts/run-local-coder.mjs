@@ -4,12 +4,14 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
-import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
+import { normalizePlannerResponse } from "./local-model-plan.mjs";
+import {
+  frameSingleFileHunkDiff,
+  normalizeUnifiedDiffHunkCounts,
+} from "./local-model-patch.mjs";
 
-const MODEL_URL =
-  "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
-const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
+const MODEL_ID = (process.env.FAM_MODEL_ID || "JetBrains/Mellum2.1-12B-A2.5B-Thinking").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
@@ -34,7 +36,7 @@ function allowed(path) {
   return path === "index.html" || ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
-async function askModel(messages, schema, maxTokens) {
+async function askModel(messages, schema, maxTokens, normalizeResponse) {
   let lastError;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -58,8 +60,9 @@ async function askModel(messages, schema, maxTokens) {
       const result = await postJson(API_URL, {
         model: MODEL_ID,
         messages: requestMessages,
-        temperature: 0.1,
-        top_p: 0.9,
+        temperature: Number(process.env.FAM_MODEL_TEMPERATURE || "0.6"),
+        top_p: Number(process.env.FAM_MODEL_TOP_P || "0.95"),
+        top_k: Number(process.env.FAM_MODEL_TOP_K || "20"),
         max_tokens: maxTokens,
         stream: false,
         response_format: responseFormat,
@@ -67,8 +70,25 @@ async function askModel(messages, schema, maxTokens) {
 
       const choice = result?.choices?.[0];
       const content = choice?.message?.content;
+      if (process.env.FAM_DEBUG_MODEL_RESPONSES === "1") {
+        const outputDir = process.env.RUNNER_TEMP || "/tmp";
+        mkdirSync(outputDir, { recursive: true });
+        writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.json`), JSON.stringify({
+          finish_reason: choice?.finish_reason ?? null,
+          usage: result?.usage ?? null,
+          message_keys: choice?.message && typeof choice.message === "object" ? Object.keys(choice.message) : [],
+          content_type: typeof content,
+          content_length: typeof content === "string" ? content.length : null,
+          has_reasoning_content: typeof choice?.message?.reasoning_content === "string",
+          has_thinking: typeof choice?.message?.thinking === "string",
+        }, null, 2));
+        if (typeof content === "string") {
+          writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.txt`), content);
+        }
+      }
       const parsed = parseJson(content);
-      return assertRequiredFields(parsed, schema.schema, schema.name);
+      const normalized = normalizeResponse?.(parsed) ?? parsed;
+      return assertRequiredFields(normalized, schema.schema, schema.name);
     } catch (error) {
       lastError = error;
       if (attempt === 0) {
@@ -219,7 +239,10 @@ const plan = await askModel([
     role: "user",
     content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
   },
-], planSchema, 1800);
+], planSchema, 4000, (parsed) => normalizePlannerResponse(parsed, {
+  explicitPaths: taskReferencedPaths,
+  trackedPaths: tracked,
+}));
 
 if (!Array.isArray(plan.files) || plan.files.length === 0) {
   const outDir = process.env.RUNNER_TEMP || "/tmp";
@@ -294,6 +317,7 @@ const patchMessages = [
       "В evidence укажи точный путь и строку/фрагмент из переданных данных; если доказательства недостаточны, выбери needs_research и оставь diff пустым.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
       "unified_diff должен быть применим git apply и содержать заголовки diff --git a/path b/path.",
+      "Для одного выбранного файла включай diff --git, --- a/path, +++ b/path и все @@ hunks; не возвращай одиночный hunk без заголовков.",
       "Если не можешь достоверно выполнить задачу по предоставленным фрагментам, верни пустой diff.",
       "Укажи risk=low и requires_approval=false только для ясного, обратимого и строго ограниченного изменения пользовательского интерфейса или документации/тестов.",
       "Верни только JSON по заданной схеме.",
@@ -310,7 +334,20 @@ const patchMessages = [
   },
 ];
 
-let result = await askModel(patchMessages, patchSchema, 7000);
+let result = typeof plan.unified_diff === "string" && plan.unified_diff.trim()
+  ? {
+      finding_status: plan.finding_status,
+      problem_summary: plan.problem_summary,
+      root_cause: plan.root_cause,
+      evidence: plan.evidence,
+      unified_diff: plan.unified_diff,
+      summary: plan.summary || plan.plan,
+      proposed_change: plan.proposed_change || plan.plan,
+      risk: ["low", "medium", "high"].includes(plan.risk) ? plan.risk : "high",
+      requires_approval: true,
+      tests: Array.isArray(plan.tests) ? plan.tests : [],
+    }
+  : await askModel(patchMessages, patchSchema, 7000);
 if (result.finding_status === "issue_found" && !String(result.unified_diff || "").trim()) {
   console.warn("Model confirmed a concrete issue but returned an empty diff; requesting one focused patch retry.");
   result = await askModel([
@@ -325,7 +362,7 @@ if (result.finding_status === "issue_found" && !String(result.unified_diff || ""
         "Если исправление действительно невозможно, объясни конкретное техническое препятствие в summary и root_cause; не оставляй пустой diff без объяснения.",
       ].join("\\n"),
     },
-  ], patchSchema, 7000);
+  ], patchSchema, 10000);
 }
 
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
@@ -336,11 +373,17 @@ let patch = String(result.unified_diff || "").trim();
 let patchCheckError = "";
 
 if (patch) {
-  if (!patch.startsWith("diff --git ")) {
-    patchCheckError = "Patch is missing the required diff --git header.";
-  } else if (patch.length > 120000) {
+  if (!patch.startsWith("diff --git ") && selected.length === 1) {
+    try {
+      patch = frameSingleFileHunkDiff(patch, selected[0]);
+    } catch (error) {
+      patchCheckError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  if (!patchCheckError && patch.length > 120000) {
     patchCheckError = "Patch exceeds the 120 KB safety limit.";
-  } else {
+  } else if (!patchCheckError) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         patch = normalizeUnifiedDiffHunkCounts(patch);
@@ -379,7 +422,7 @@ if (patch) {
                 "Верни полный исправленный unified_diff, который применим к переданному исходному файлу.",
               ].join("\n"),
             },
-          ], patchSchema, 7000);
+          ], patchSchema, 10000);
           patch = String(result.unified_diff || "").trim();
           if (!patch) {
             patchCheckError = "Model returned an empty patch during the repair attempt.";
