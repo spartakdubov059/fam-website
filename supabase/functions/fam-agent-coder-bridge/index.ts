@@ -1,3 +1,5 @@
+import { requireSavedReport, requireSavedTaskResult } from "./finish-task.mjs";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const WORKER_TOKEN = Deno.env.get("FAM_AGENT_WORKER_TOKEN") ?? "";
 
@@ -180,7 +182,7 @@ Deno.serve(async (req: Request) => {
         p_pr_url: body.pr_url,
         p_commit_sha: body.commit_sha,
       });
-      return json({ ok: true, saved: saved === true });
+      return json(requireSavedTaskResult(saved));
     }
 
     if (body.action === "report" && Object.keys(body).length === 1) {
@@ -207,7 +209,7 @@ Deno.serve(async (req: Request) => {
         p_report_date: body.report_date,
         p_report: body.report,
       });
-      return json({ ok: true, saved: saved?.ok === true && saved.report_date === body.report_date });
+      return json(requireSavedReport(saved, body.report_date));
     }
 
     return json({ ok: false, error: "invalid_action" }, 400);

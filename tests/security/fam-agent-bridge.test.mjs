@@ -11,6 +11,10 @@ import {
   bridgeRequest,
   shouldRunModel,
 } from "../../scripts/fam-agent-bridge.mjs";
+import {
+  requireSavedReport,
+  requireSavedTaskResult,
+} from "../../supabase/functions/fam-agent-coder-bridge/finish-task.mjs";
 
 const id = "123e4567-e89b-42d3-a456-426614174000";
 
@@ -120,6 +124,23 @@ test("bridge request never logs or returns the supplied token", async () => {
   assert.equal(data.task, null);
   assert.equal(captured.headers["x-fam-agent-token"], "secret-test-token");
   assert.equal(JSON.stringify(data).includes("secret-test-token"), false);
+});
+
+test("coder bridge fails closed when finishing a task was not saved", () => {
+  assert.deepEqual(requireSavedTaskResult(true), { ok: true, saved: true });
+  assert.throws(() => requireSavedTaskResult(false), /task_finish_not_saved/);
+  assert.throws(() => requireSavedTaskResult(null), /task_finish_not_saved/);
+  assert.match(edgeSource, /return json\(requireSavedTaskResult\(saved\)\)/);
+});
+
+test("coder bridge fails closed when saving a daily report was not confirmed", () => {
+  assert.deepEqual(requireSavedReport({ ok: true, report_date: "2026-11-14" }, "2026-11-14"), {
+    ok: true,
+    saved: true,
+  });
+  assert.throws(() => requireSavedReport({ ok: false }, "2026-11-14"), /report_save_not_saved/);
+  assert.throws(() => requireSavedReport({ ok: true, report_date: "2026-11-13" }, "2026-11-14"), /report_save_not_saved/);
+  assert.match(edgeSource, /return json\(requireSavedReport\(saved, body\.report_date\)\)/);
 });
 
 import { readFileSync } from "node:fs";
