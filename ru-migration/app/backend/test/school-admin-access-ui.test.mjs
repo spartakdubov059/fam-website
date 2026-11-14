@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
+const html = await readFile(new URL('../../web/index.html', import.meta.url), 'utf8');
 
 test('Russian school role request screen uses only the same-origin YDB API', () => {
   assert.doesNotMatch(html, /school-admin-access|sb\.functions\.invoke\(\s*["']school-admin-access/);
