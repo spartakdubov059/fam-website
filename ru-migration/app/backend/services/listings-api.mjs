@@ -72,6 +72,17 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, suspensions: await repository.listActiveAccountSuspensions(actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/me/suspension') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.getActiveAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+      try {
+        const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
+        return { status: 200, body: { ok: true, suspended: Boolean(suspension), suspension } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'PATCH' && roleRequestMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

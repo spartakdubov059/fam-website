@@ -72,6 +72,22 @@ test('active suspensions are visible only to the authenticated school administra
   actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
   assert.equal((await handler(request)).status, 403);
 });
+test('a user can read only their own active suspension status', async () => {
+  let lookedUp;
+  const actor = { id: 'synthetic-user', school_id: 'school-a', role: 'student' };
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
+    resolveActor: async () => actor,
+    repository: { getActiveAccountSuspension: async (schoolId, userId) => {
+      lookedUp = { schoolId, userId };
+      return { reason: 'synthetic reason', duration_hours: 24, expires_at: '2099-01-01T00:00:00Z' };
+    } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/me/suspension';
+  const result = await handler(request);
+  assert.equal(result.status, 200);
+  assert.deepEqual(lookedUp, { schoolId: 'school-a', userId: 'synthetic-user' });
+  assert.equal(result.body.suspended, true);
+  assert.equal(result.body.suspension.reason, 'synthetic reason');
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

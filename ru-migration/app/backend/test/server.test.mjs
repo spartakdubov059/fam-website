@@ -136,6 +136,16 @@ test('isolated server routes school suspension status to listings API', async ()
   assert.equal(routed, true);
 });
 
+test('isolated server routes personal suspension status to the authenticated listings API', async () => {
+  await withServer({ listingsApi: async request => ({ status: 200, body: {
+    ok: true, route: new URL(request.url, 'http://localhost').pathname,
+  } }) }, async origin => {
+    const response = await fetch(new URL('/api/v1/me/suspension', origin));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, route: '/api/v1/me/suspension' });
+  });
+});
+
 test('isolated server routes private image uploads only to the configured media handler', async () => {
   await withServer({ mediaApi: async request => ({ status: 201, body: { ok: true, method: request.method, type: request.headers['content-type'] } }) }, async origin => {
     const response = await fetch(new URL('/api/v1/media/pending', origin), { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'synthetic-image' });

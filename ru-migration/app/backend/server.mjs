@@ -93,6 +93,7 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/suspensions')
+      || (req.method === 'GET' && url.pathname === '/api/v1/me/suspension')
       || (/^\/api\/v1\/profile-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname) && req.method === 'PATCH')
       || (req.method === 'POST' && url.pathname === '/api/v1/role-requests')
       || (req.method === 'GET' && ['/api/v1/role-requests', '/api/v1/role-requests/review'].includes(url.pathname))
