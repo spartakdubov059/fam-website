@@ -124,6 +124,7 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
     if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, alerts: [
       { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
+      { event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning', hour_bucket: '2026-11-15T12:00:00Z' },
       { event_code: '<script>x</script>', page_area: 'other', event_count: 999, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
     ] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
@@ -143,6 +144,8 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   const alert = panel.children.find(item => item.tagName === 'article');
   assert.equal(alert.children[0].textContent, 'Критический сбой · Ошибка базы данных');
   assert.equal(alert.children[1].textContent, 'Раздел: база данных · Событий за час: 3');
+  const rejectionAlert = panel.children.filter(item => item.tagName === 'article')[1];
+  assert.equal(rejectionAlert.children[0].textContent, 'Предупреждение · Сбой фоновой операции');
   assert.equal(panel.children.some(item => item.textContent.includes('<script>')), false);
 });
 

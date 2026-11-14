@@ -93,7 +93,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         || (technicalAlertsResponse.ok && technicalAlertsResult?.ok && Array.isArray(technicalAlertsResult.alerts));
       const technicalAlerts = me.profile.role === 'school_admin' && technicalAlertsAvailable
         ? technicalAlertsResult.alerts.filter(item => item
-          && ['js_runtime', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
+          && ['js_runtime', 'unhandled_rejection', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
           && ['auth', 'listings', 'notifications', 'database', 'other'].includes(item.page_area)
           && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
           && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
@@ -192,8 +192,8 @@ export async function initializeListingModeration({ document = globalThis.docume
         alertsPanel.append(node(document, 'h3', '', 'Технические предупреждения FAM за сутки'));
         alertsPanel.append(node(document, 'p', '', 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.'));
         if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Не удалось загрузить технические предупреждения.'));
-        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Серьёзных повторяющихся сбоев не обнаружено.'));
-        const codeNames = { js_runtime: 'Ошибка интерфейса', supabase_sdk_unavailable: 'Служба данных недоступна',
+        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Пороговых повторяющихся сбоев не обнаружено.'));
+        const codeNames = { js_runtime: 'Ошибка интерфейса', unhandled_rejection: 'Сбой фоновой операции', supabase_sdk_unavailable: 'Служба данных недоступна',
           listings_load_failed: 'Не загрузились объявления', notifications_load_failed: 'Не загрузились уведомления',
           database_request_failed: 'Ошибка базы данных', auth_backend_failed: 'Ошибка входа' };
         const areaNames = { auth: 'вход', listings: 'объявления', notifications: 'уведомления', database: 'база данных', other: 'другое' };

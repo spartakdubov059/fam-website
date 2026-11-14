@@ -1572,7 +1572,7 @@ export function createYdbListingsRepository(sql) {
         WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
           AND ((event_code IN ('database_request_failed', 'supabase_sdk_unavailable') AND event_count >= 3)
             OR (event_code = 'auth_backend_failed' AND event_count >= 5)
-            OR (event_code = 'js_runtime' AND event_count >= 10)
+            OR (event_code IN ('js_runtime', 'unhandled_rejection') AND event_count >= 10)
             OR (event_code IN ('listings_load_failed', 'notifications_load_failed') AND event_count >= 8))
         ORDER BY hour_bucket DESC, event_count DESC LIMIT 20;`;
       return (result?.[0] ?? []).map(row => ({ ...row,

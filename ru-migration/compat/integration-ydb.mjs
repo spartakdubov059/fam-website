@@ -83,9 +83,15 @@ try {
     const occurredAt = new Date(alertBucket.getTime() + i * 60_000);
     await repo.recordSiteError({ eventCode: 'database_request_failed', pageArea: 'database', occurredAt });
   }
+  for (let i = 0; i < 10; i++) {
+    const occurredAt = new Date(alertBucket.getTime() + i * 60_000);
+    await repo.recordSiteError({ eventCode: 'unhandled_rejection', pageArea: 'other', occurredAt });
+  }
   const technicalAlerts = await repo.listSiteErrorAlerts();
-  assert.deepEqual(technicalAlerts, [{ hour_bucket: alertBucket, event_code: 'database_request_failed',
-    page_area: 'database', event_count: 3, severity: 'critical' }]);
+  assert.deepEqual(technicalAlerts, [
+    { hour_bucket: alertBucket, event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning' },
+    { hour_bucket: alertBucket, event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
+  ]);
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);
