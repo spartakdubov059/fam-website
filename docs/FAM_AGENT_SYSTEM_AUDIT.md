@@ -378,3 +378,11 @@
 - На PR #65 head `4e96241999282dffcaa0170c925c64ea30e415c7` успешно прошли Russian content safety, Regression, owner verifier, Coder QA PostgreSQL, Reporter PostgreSQL и telemetry PostgreSQL; Netlify preview ready. PR #74 head `7f42129a106d7ba01e0cbd66a967b341af2f9788` сохраняет успешные PostgreSQL retry/safety checks и Russian content safety. PR #75 head `3c49268e955219b87e9b049f81e4fca579268a21` сохраняет успешные read-only site/CI smoke и Russian content safety; ежедневный Lighthouse job был skipped. Все три PR открыты и draft.
 - Правило merge остаётся неполным: опубликованный ruleset требует 0 одобрений. Настроить одно обязательное одобрение пользователь разрешил, однако GitHub MCP не поддерживает запись rulesets, а браузерная сессия GitHub не авторизована и окно GitHub на компьютере недоступно, пока Mac заблокирован. Никакие правила не менялись.
 - Production functions, база, очередь, Auth/RLS, расписания, secrets, main и сайт не изменялись.
+
+
+## Сужение прав PR Manager — 14 ноября 2026, 14:04 UTC
+
+- В PR #65 убран ненужный scope `checks:read` из короткоживущего GitHub App token: workflow использует этот токен только для push агентской ветки и создания draft PR; ожидание required checks выполняет следующий шаг через `GITHUB_TOKEN`. Тест проверяет отсутствие этого scope, инструкция GitHub App setup синхронизирована.
+- На head `1608f815c29cdb8949b19cff1750af35fe855bd5` hosted Regression suite (включает весь moderation/security набор), owner verifier, Coder QA PostgreSQL, Reporter PostgreSQL, telemetry PostgreSQL и Russian content safety завершились успешно; Netlify preview готов. Локально запустить Node tests невозможно: в текущей среде отсутствует `node`.
+- Это сужает доступ installation token, но не устраняет его необходимые `contents:write`/ `pull-requests:write` права и не заменяет review rule. Read-only GitHub API повторно подтвердил active ruleset: `required_approving_review_count=0`, strict required check `Russian content safety tests`, bypass actors пусты. Требуемое владельцем одно одобрение не применено из-за отсутствия доступа на запись ruleset; окно GitHub на компьютере остаётся недоступным при заблокированном Mac.
+- Production не менялся.
