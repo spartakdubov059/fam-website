@@ -55,11 +55,12 @@ test("Open events behave as announcements with no bookings, attendee cap or publ
  assert.match(sql,/coalesce\(l\.max_seats,0\)=0/);
  assert.match(sql,/l\.school_id=school and l\.status='active'/);
 });
-test("Announcements animations are responsive and optional for reduced motion",()=>{
- assert.match(html,/id="pulseCarouselTitle">Анонсы и мероприятия/);
- assert.match(html,/id="pulseAnnouncementTrack" class="pulse-announcement-track"/);
- assert.match(html,/>Школьные опросы <span class="pulse-heading-star"/);
- assert.doesNotMatch(html,/>Школьный пульс/);
+test("Announcements and open events use the main hero carousel, not a duplicate section",()=>{
+ assert.match(html,/id="bannerCarousel"/);
+ assert.match(html,/data-pulse-scroll="-1"/);
+ assert.match(html,/data-pulse-scroll="1"/);
+ assert.doesNotMatch(html,/id="pulseAnnouncementCarousel"/);
+ assert.doesNotMatch(html,/id="pulseAnnouncementTrack"/);
  assert.match(css,/@keyframes pulseReveal/);
  assert.match(css,/@keyframes pulseBarGrow/);
  assert.match(css,/prefers-reduced-motion:reduce/);

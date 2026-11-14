@@ -64,13 +64,14 @@
     if(!rootNode)return null;
     const grid=document.getElementById("pulseGrid");
     const carousel=document.getElementById("pulseAnnouncementCarousel");
-    const announcementTrack=document.getElementById("pulseAnnouncementTrack");
+    const announcementTrack=document.getElementById("bannerCarousel");
     const admin=document.getElementById("pulseAdmin");
     const announcer=document.getElementById("pulseAnnouncementForm");
     const poller=document.getElementById("pulsePollForm");
     const status=document.getElementById("pulseStatus");
     let loading=false,epoch=0;
     const alertUser=message=>(typeof notify==="function"?notify(message):window.alert(message));
+    const insertFeatured=cards=>{announcementTrack?.querySelectorAll(".pulse-generated").forEach(card=>card.remove());if(announcementTrack&&cards.length)announcementTrack.insertAdjacentHTML("afterbegin",cards.map(card=>'<div class="hero-slide hero-pulse-slide pulse-generated">'+card+'</div>').join(""));document.getElementById("heroDots")?.replaceChildren(...Array.from(announcementTrack?.children||[]).map((_,i)=>{const b=document.createElement("button");b.className="hero-dot"+(i===0?" active":"");b.dataset.action="scroll-to-slide";b.dataset.idx=String(i);b.setAttribute("aria-label","Слайд "+(i+1));return b;}));};
     async function refresh(){
       const iteration=++epoch;
       const viewer=getViewer();
@@ -79,7 +80,7 @@
         grid.textContent="";
         const events=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&Number(item.max_seats||0)===0&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
         const cards=events.map(item=>announcementCard({...item,body:item.description,kind:"open_event"}));
-        if(announcementTrack)announcementTrack.innerHTML=cards.join("");
+        insertFeatured(cards);
         carousel?.classList.toggle("hidden",cards.length===0);
         return;
       }
@@ -99,7 +100,7 @@
       const otherNews=allNews.filter(item=>item.kind!=="open_event"&&item.kind!=="important").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
       const featured=priorityNews.map(announcementCard).concat(polls.map(pollCard),otherNews.map(announcementCard));
-      if(announcementTrack)announcementTrack.innerHTML=featured.join("");
+      insertFeatured(featured);
       carousel?.classList.toggle("hidden",featured.length===0);
       grid.innerHTML="";
       grid.querySelectorAll(".pulse-card").forEach((card,index)=>card.style.setProperty("--pulse-order",String(Math.min(index,7))));
@@ -110,7 +111,7 @@
       const direction=Number(button.getAttribute("data-pulse-scroll"));
       const card=announcementTrack?.querySelector(".pulse-card");
       if(!announcementTrack||!card||!Number.isFinite(direction))return;
-      announcementTrack.scrollBy({left:direction*(card.getBoundingClientRect().width+10),behavior:"smooth"});
+      announcementTrack.scrollTo({left:Math.max(0,announcementTrack.scrollLeft+direction*(announcementTrack.clientWidth+10)),behavior:"instant"});
     }));
     announcementTrack?.addEventListener("click",async event=>{
       const button=event.target.closest("button[data-pulse-vote]");

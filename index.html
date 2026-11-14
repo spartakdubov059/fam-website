@@ -106,11 +106,11 @@
     .ai-offline-banner .icon { font-size: 18px; }
     .ai-offline-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
 
-    .hero-wrap { margin: 4px 0 6px; }
+    .hero-wrap { position:relative; margin: 4px 0 6px; }
     .hero { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
-    .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
+    .hero-carousel-controls{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:8px;z-index:5}.hero-carousel-controls button{width:38px;height:38px;border:0;border-radius:50%;background:rgba(23,20,34,.86);color:#fff;font-size:24px;cursor:pointer}.hero-pulse-slide .pulse-card{flex:none;width:100%;min-height:0}@media(max-width:600px){.hero-carousel-controls{display:none}}\n    .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
     @keyframes famBannerDrift {
       0% { transform: scale(1.015) translate3d(-1.2%, 0.4%, 0); filter: saturate(1); }
@@ -983,15 +983,12 @@
     <div class="hero-wrap">
       <div class="hero" id="bannerCarousel"></div>
       <div class="hero-dots" id="heroDots"></div>
+      <div class="hero-carousel-controls"><button type="button" data-pulse-scroll="-1" aria-label="Предыдущие баннеры">‹</button><button type="button" data-pulse-scroll="1" aria-label="Следующие баннеры">›</button></div>
     </div>
     <div class="search-pill">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="search" id="searchInput" placeholder="Поиск по названию или описанию..." aria-label="Поиск по объявлениям">
     </div>
-    <section id="pulseAnnouncementCarousel" class="pulse-announcement-carousel hidden" aria-labelledby="pulseCarouselTitle">
-      <div class="pulse-carousel-head"><h2 id="pulseCarouselTitle">Анонсы и мероприятия</h2><div class="pulse-carousel-controls"><button type="button" data-pulse-scroll="-1" aria-label="Предыдущие анонсы">‹</button><button type="button" data-pulse-scroll="1" aria-label="Следующие анонсы">›</button></div></div>
-      <div id="pulseAnnouncementTrack" class="pulse-announcement-track" aria-label="Лента анонсов и мероприятий"></div>
-    </section>
     <div class="cat-tiles">
       <button class="cat-tile t-things" data-cat="Вещи"><span class="tile-emoji">🛍️</span>Вещи</button>
       <button class="cat-tile t-services" data-cat="Услуги"><span class="tile-emoji">⚡</span>Услуги</button>
@@ -2479,20 +2476,6 @@ window.onunhandledrejection = function() {
     banners.forEach(({ src, alt }, index) => {
       html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
-    if (user && profile && profile.school_id) {
-      listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
-        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        const meta = [ds, e.event_time || ''].filter(Boolean).join(' · ');
-        const taken = getTaken(e.id), max = e.max_seats || 0;
-        const info = max > 0 ? `👥 ${taken} из ${max}` : '👥 Без ограничений';
-        html.push(`<div class="hero-slide hero-img hero-event-photo"><div class="hero-event">
-          <span class="school-badge">🎭 Афиша</span>
-          <div class="event-title">${esc(e.title)}</div>
-          ${meta ? `<div class="event-meta">📅 ${esc(meta)} · ${info}</div>` : ''}
-          <button class="button button-primary button-small" style="align-self:flex-start;" data-action="handle-event" data-id="${esc(e.id)}">Записаться</button>
-        </div></div>`);
-      });
-    }
     box.innerHTML = html.join("");
     // Keep error handling outside HTML attributes for a stricter Content Security Policy.
     box.querySelectorAll(".hero-img img").forEach(image => {
