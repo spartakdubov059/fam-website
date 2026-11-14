@@ -124,6 +124,50 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
+    async listAccountDeletionTargets(schoolId, requesterId) {
+      if (!schoolId || !requesterId) throw new TypeError('invalid deletion request target lookup');
+      const statement = sql`SELECT user_id AS id, role, first_name, last_name, class_name
+        FROM fam_user_profiles WHERE school_id = ${schoolId} AND active = true
+          AND user_id != ${requesterId} AND role IN ('student', 'council_member')
+        ORDER BY first_name ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+    async listPendingAccountDeletionRequests(schoolId) {
+      if (!schoolId) throw new TypeError('invalid deletion request school');
+      const statement = sql`SELECT request_id, requester_id, target_id, target_role, reason_code, reason, created_at
+        FROM fam_account_deletion_requests WHERE school_id = ${schoolId} AND status = 'pending'
+        ORDER BY created_at ASC LIMIT 50;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+    async createAccountDeletionRequest({ schoolId, requesterId, targetId, reasonCode, reason }) {
+      if (!schoolId || !requesterId || !targetId || requesterId === targetId
+          || !['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(reasonCode)
+          || typeof reason !== 'string' || reason.length < 15 || reason.length > 500) throw new TypeError('invalid account deletion request');
+      const requestId = randomUUID();
+      return sql.begin(async tx => {
+        const requesterRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${requesterId} LIMIT 1;`;
+        const requester = requesterRows?.[0]?.[0];
+        if (!requester || !requester.active || requester.role !== 'council_member' || requester.school_id !== schoolId) return { ok: false, code: 'requester_unavailable' };
+        const targetRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
+        const target = targetRows?.[0]?.[0];
+        if (!target || !target.active || !['student', 'council_member'].includes(target.role) || target.school_id !== schoolId) return { ok: false, code: 'target_unavailable' };
+        const existingRows = await tx`SELECT request_id, school_id FROM fam_account_deletion_open
+          WHERE target_id = ${targetId} LIMIT 1;`;
+        const existing = existingRows?.[0]?.[0];
+        if (existing?.school_id === schoolId) return { ok: true, already_exists: true, request_id: existing.request_id };
+        if (existing) return { ok: false, code: 'target_unavailable' };
+        await tx`INSERT INTO fam_account_deletion_requests
+          (request_id, school_id, requester_id, target_id, target_role, reason_code, reason, status,
+           reviewed_by, reviewed_at, review_note, created_at)
+          VALUES (${requestId}, ${schoolId}, ${requesterId}, ${targetId}, ${target.role}, ${reasonCode}, ${reason},
+            'pending', NULL, NULL, NULL, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_account_deletion_open (target_id, request_id, school_id, created_at)
+          VALUES (${targetId}, ${requestId}, ${schoolId}, CurrentUtcTimestamp());`;
+        return { ok: true, already_exists: false, request_id: requestId };
+      });
+    },
     async createSchoolProfileRequest(record) {
       if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
         throw new TypeError('invalid school profile request');

@@ -83,6 +83,54 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         return { status: 200, body: { ok: true, suspended: Boolean(suspension), suspension } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listAccountDeletionTargets !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listAccountDeletionTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listPendingAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingAccountDeletionRequests(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/deletion-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const targetId = typeof input?.target_id === 'string' ? input.target_id : '';
+      const reasonCode = input?.reason_code;
+      const reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetId) || targetId === actor.id) {
+        return { status: 400, body: { ok: false, error: 'invalid_target' } };
+      }
+      if (!['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(reasonCode)) return { status: 400, body: { ok: false, error: 'invalid_reason_code' } };
+      if (reason.length < 15 || reason.length > 500) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
+      const digits = reason.replace(/\D/g, '');
+      if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason) || digits.length >= 11) {
+        return { status: 400, body: { ok: false, error: 'personal_contact_not_allowed' } };
+      }
+      if (typeof repository?.createAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try {
+        const result = await repository.createAccountDeletionRequest({ schoolId: actor.school_id, requesterId: actor.id, targetId, reasonCode, reason });
+        return result?.ok ? { status: result.already_exists ? 200 : 202, body: result }
+          : { status: result?.code === 'requester_unavailable' ? 403 : 404, body: { ok: false, error: result?.code || 'request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'PATCH' && roleRequestMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };

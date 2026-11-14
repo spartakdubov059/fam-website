@@ -22,6 +22,7 @@ try {
     ('https://issuer.synthetic', 'subject-admin', '33333333-3333-4333-8333-333333333333', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-role-student', '55555555-5555-4555-8555-555555555555', 'synthetic-school', 'student', true),
     ('https://issuer.synthetic', 'subject-3', '22222222-2222-4222-8222-222222222222', 'other-school', 'student', true),
+    ('https://issuer.synthetic', 'subject-council', '66666666-6666-4666-8666-666666666666', 'synthetic-school', 'council_member', true),
     ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true);`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null });
@@ -29,6 +30,7 @@ try {
   const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
       : req.headers.authorization === 'Bearer synthetic-registrant' ? 'subject-2'
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
+        : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
           : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin' : 'subject-1' });
   const deletedMediaKeys = [];
@@ -43,6 +45,27 @@ try {
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;
   };
+  const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
+    reason: 'Repeated unrelated posts in the school group.',
+  }));
+  assert.equal(deletionRequest.status, 202);
+  assert.equal(deletionRequest.body.already_exists, false);
+  const duplicateDeletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
+    reason: 'Repeated unrelated posts in the school group.',
+  }));
+  assert.equal(duplicateDeletionRequest.status, 200);
+  assert.equal(duplicateDeletionRequest.body.request_id, deletionRequest.body.request_id);
+  const deletionQueue = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'));
+  assert.equal(deletionQueue.status, 200);
+  assert.equal(deletionQueue.body.requests.length, 1);
+  assert.equal(Object.hasOwn(deletionQueue.body.requests[0], 'issuer'), false);
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-registrant'))).status, 403);
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-registrant', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
+  }))).status, 403);
+  console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission, same-school admin queue, duplicate guard, and role enforcement');
   const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
   }));

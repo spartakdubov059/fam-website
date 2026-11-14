@@ -1,0 +1,27 @@
+-- School-scoped requests only. Approval does not itself delete an account.
+-- Deletion requires a separately audited cleanup operation and is not exposed here.
+CREATE TABLE fam_account_deletion_requests (
+  request_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  requester_id Utf8 NOT NULL,
+  target_id Utf8 NOT NULL,
+  target_role Utf8 NOT NULL,
+  reason_code Utf8 NOT NULL,
+  reason Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  reviewed_by Utf8,
+  reviewed_at Timestamp,
+  review_note Utf8,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (request_id)
+);
+
+-- Unique target key serializes concurrent open requests. Admin review must
+-- remove this row in the same transaction that closes the request.
+CREATE TABLE fam_account_deletion_open (
+  target_id Utf8 NOT NULL,
+  request_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (target_id)
+);

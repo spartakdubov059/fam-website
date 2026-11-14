@@ -88,6 +88,43 @@ test('a user can read only their own active suspension status', async () => {
   assert.equal(result.body.suspended, true);
   assert.equal(result.body.suspension.reason, 'synthetic reason');
 });
+test('council deletion requests are same-school, bounded, and reject personal contact data', async () => {
+  const targetId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
+    resolveActor: async () => actor,
+    repository: {
+      listAccountDeletionTargets: async (school, requester) => [{ id: targetId, role: 'student' }],
+      createAccountDeletionRequest: async input => { saved = input; return { ok: true, request_id: 'synthetic-request', already_exists: false }; },
+    } });
+  const targets = req({}, 'GET'); targets.url = '/api/v1/deletion-requests/targets';
+  assert.equal((await handler(targets)).status, 200);
+  const submit = req({ target_id: targetId, reason_code: 'spam', reason: 'Repeated unrelated messages in the school group.' });
+  submit.url = '/api/v1/deletion-requests';
+  assert.equal((await handler(submit)).status, 202);
+  assert.deepEqual(saved, { schoolId: 'school-a', requesterId: 'council-id', targetId, reasonCode: 'spam', reason: 'Repeated unrelated messages in the school group.' });
+  const pii = req({ target_id: targetId, reason_code: 'spam', reason: 'Repeated messages; contact me at test@example.org' });
+  pii.url = '/api/v1/deletion-requests';
+  assert.equal((await handler(pii)).status, 400);
+  actor = { id: 'student-id', school_id: 'school-a', role: 'student' };
+  assert.equal((await handler(submit)).status, 403);
+});
+test('only the same-school school administrator can read pending account deletion requests', async () => {
+  let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
+  let selectedSchool;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
+    resolveActor: async () => actor,
+    repository: { listPendingAccountDeletionRequests: async school => { selectedSchool = school; return [{ request_id: 'synthetic-request', reason: 'synthetic' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests/review';
+  assert.equal((await handler(request)).status, 200);
+  assert.equal(selectedSchool, 'school-a');
+  actor = { id: 'other-admin', school_id: 'school-b', role: 'school_admin' };
+  assert.equal((await handler(request)).status, 200);
+  assert.equal(selectedSchool, 'school-b');
+  actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(request)).status, 403);
+});
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });

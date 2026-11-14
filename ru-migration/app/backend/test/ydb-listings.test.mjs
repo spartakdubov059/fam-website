@@ -28,6 +28,32 @@ test('active suspension list is school-bound, time-filtered, and bounded', async
   assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
   assert.match(query.text, /LIMIT 100/);
 });
+test('account deletion request validates requester and target from same-school profiles before insert', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) {
+      return [[{ school_id: 'school-a', role: calls.length === 1 ? 'council_member' : 'student', active: true }]];
+    }
+    if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.createAccountDeletionRequest({ schoolId: 'school-a', requesterId: 'council-id', targetId: 'student-id', reasonCode: 'spam', reason: 'Repeated unrelated messages in group.' });
+  assert.equal(result.ok, true);
+  const insert = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_requests'));
+  assert.ok(insert);
+  assert.ok(insert.values.includes('school-a'));
+  assert.ok(insert.values.includes('council-id'));
+  assert.ok(insert.values.includes('student-id'));
+  assert.equal(insert.values.includes('https://issuer'), false);
+  assert.match(insert.text, /'pending'/);
+  const openKey = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_open'));
+  assert.ok(openKey);
+  assert.ok(openKey.values.includes('student-id'));
+  assert.equal(await repo.createAccountDeletionRequest({ schoolId: '', requesterId: 'a', targetId: 'b', reasonCode: 'spam', reason: 'this is a sufficiently long reason' }).then(() => false, () => true), true);
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
