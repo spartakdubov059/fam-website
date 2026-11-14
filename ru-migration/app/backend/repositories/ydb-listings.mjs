@@ -157,15 +157,15 @@ export function createYdbListingsRepository(sql) {
         if (durationHours === 24) {
           await tx`INSERT INTO fam_account_suspensions
             (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
-            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 24, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT24H'), NULL, NULL);`;
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, CAST(24 AS Uint32), ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT24H'), NULL, NULL);`;
         } else if (durationHours === 72) {
           await tx`INSERT INTO fam_account_suspensions
             (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
-            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 72, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT72H'), NULL, NULL);`;
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, CAST(72 AS Uint32), ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT72H'), NULL, NULL);`;
         } else {
           await tx`INSERT INTO fam_account_suspensions
             (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
-            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, 168, ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT168H'), NULL, NULL);`;
+            VALUES (${schoolId}, ${targetId}, ${suspensionId}, ${target.role}, CAST(168 AS Uint32), ${reason}, 'active', ${actorId}, CurrentUtcTimestamp(), CurrentUtcTimestamp() + Interval('PT168H'), NULL, NULL);`;
         }
         const inserted = await tx`SELECT suspension_id, target_id, target_role, duration_hours, reason, status, created_at, expires_at
           FROM fam_account_suspensions WHERE target_id = ${targetId} AND suspension_id = ${suspensionId} LIMIT 1;`;
