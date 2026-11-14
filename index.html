@@ -110,7 +110,9 @@
     .hero { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
-    .hero-carousel-controls{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:8px;z-index:5}.hero-carousel-controls button{width:38px;height:38px;border:0;border-radius:50%;background:rgba(23,20,34,.86);color:#fff;font-size:24px;cursor:pointer}.hero-pulse-slide .pulse-card{flex:none;width:100%;min-height:0}@media(max-width:600px){.hero-carousel-controls{display:none}}\n    @media(max-width:600px){.hero-slide.hero-img{height:260px}}\n    .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 300px; display: flex; align-items: center; justify-content: center; }
+    .hero-carousel-controls{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:8px;z-index:5}.hero-carousel-controls button{width:38px;height:38px;border:0;border-radius:50%;background:rgba(23,20,34,.86);color:#fff;font-size:24px;cursor:pointer}.hero-pulse-slide .pulse-card{flex:none;width:100%;min-height:0}@media(max-width:600px){.hero-carousel-controls{display:none}}
+    @media(max-width:600px){.hero-slide.hero-img{height:260px}}
+    .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 300px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
     @keyframes famBannerDrift {
       0% { transform: scale(1.015) translate3d(-1.2%, 0.4%, 0); filter: saturate(1); }
