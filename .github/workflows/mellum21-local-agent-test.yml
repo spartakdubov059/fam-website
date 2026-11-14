@@ -6,6 +6,10 @@ on:
       - ai/mellum21-free-cpu-rollout
     paths:
       - ".github/workflows/mellum21-local-agent-test.yml"
+      - "scripts/local-model-patch.mjs"
+      - "scripts/run-local-coder.mjs"
+      - "tests/security/local-model-patch.test.mjs"
+      - "tests/security/fam-codex-developer-workflow.test.mjs"
 
 permissions:
   contents: read
