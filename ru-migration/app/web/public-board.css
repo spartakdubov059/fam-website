@@ -94,3 +94,10 @@ body {
 .ru-message-bubble[data-own="true"] { justify-self: end; background: #373044; }
 .ru-message-form { display: flex; gap: 0.5rem; }
 .ru-message-form input { flex: 1; min-width: 0; padding: 0.65rem; border: 1px solid #454752; border-radius: 0.6rem; background: #111218; color: #f5f6f8; font: inherit; }
+.ru-board-controls { grid-column: 1 / -1; display: grid; gap: 0.7rem; }
+.ru-board-controls input { width: 100%; padding: 0.8rem 1rem; border: 1px solid #454752; border-radius: 0.7rem; background: #191b22; color: #f5f6f8; font: inherit; }
+.ru-board-categories { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.ru-board-category { min-height: 38px; padding: 0.45rem 0.8rem; border: 1px solid #454752; border-radius: 999px; background: #191b22; color: #f5f6f8; font: inherit; cursor: pointer; }
+.ru-board-category[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
+.ru-board-count { grid-column: 1 / -1; margin: 0; color: #b8bbc7; font-size: 0.9rem; }
+.ru-listing-card[hidden] { display: none; }
