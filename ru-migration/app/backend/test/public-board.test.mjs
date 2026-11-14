@@ -11,6 +11,8 @@ class FakeNode {
   getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
 }
+function boardCard(root, index = 0) { return root.children.filter(node => node.className === 'ru-listing-card')[index]; }
+
 const fakeDocument = {
   createElement: tag => new FakeNode(tag),
   createDocumentFragment: () => new FakeNode('#fragment'),
@@ -26,9 +28,43 @@ test('guest board requests only the public endpoint and writes listing data as t
   assert.equal(options.url, '/api/v1/listings');
   assert.equal(options.init.credentials, 'omit');
   assert.equal(options.init.cache, 'no-store');
-  const title = root.children[0].children[0].children[1];
+  const title = boardCard(root).children[1];
   assert.equal(title.textContent, '<script>alert(1)</script>');
   assert.equal(title.children.length, 0, 'untrusted listing title is never parsed as markup');
+});
+
+
+test('public board filters the approved result set by Russian category and text without another request', async () => {
+  const root = new FakeNode('section');
+  let listingRequests = 0;
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+    if (url === '/api/v1/listings') {
+      listingRequests++;
+      return { ok: true, json: async () => ({ ok: true, listings: [
+        { id: 'listing-a', title: 'Словарь русского языка', description: 'Для школы', category: 'Учёба', price_text: '300 ₽' },
+        { id: 'listing-b', title: 'Настольная игра', description: 'Для друзей', category: 'Вещи', price_text: 'Бесплатно' },
+      ] }) };
+    }
+    return { ok: false, status: 401, json: async () => ({}) };
+  } });
+  const toolbar = root.children[0];
+  const search = toolbar.children[0];
+  const filters = toolbar.children[1];
+  const cards = root.children.filter(node => node.className === 'ru-listing-card');
+  const study = filters.children.find(button => button.textContent === 'Учёба');
+  study.listeners.click();
+  assert.equal(cards[0].hidden, false);
+  assert.equal(cards[1].hidden, true);
+  assert.equal(study.getAttribute('aria-pressed'), 'true');
+  search.value = 'настольная'; search.listeners.input();
+  assert.equal(cards[0].hidden, true);
+  assert.equal(cards[1].hidden, true, 'category and text filters are combined');
+  assert.match(toolbar.children[2].textContent, /Ничего не найдено/);
+  const all = filters.children.find(button => button.textContent === 'Все');
+  all.listeners.click();
+  assert.equal(cards[0].hidden, true);
+  assert.equal(cards[1].hidden, false);
+  assert.equal(listingRequests, 1, 'filters operate only on the already-authorized public response');
 });
 
 test('guest board renders a useful empty state when there are no approved listings', async () => {
@@ -64,7 +100,7 @@ test('event card reads only the user own registrations and supports reservation 
     if (url === `/api/v1/listings/${eventId}/registrations/me`) return { ok: true, status: 200, json: async () => ({ ok: true, status: 'cancelled' }) };
     throw new Error(`unexpected request ${url}`);
   } });
-  const card = root.children[0].children[0];
+  const card = boardCard(root);
   const actions = card.children.find(node => node.className === 'ru-event-actions');
   const [register, cancel] = actions.children;
   assert.equal(calls[1].options.credentials, 'same-origin');
@@ -94,7 +130,7 @@ test('authenticated board users can toggle favorites through their own Russian A
     if (url === '/api/v1/favorites') return { ok: true, json: async () => ({ ok: true, favorite_ids: [id] }) };
     return { ok: true, json: async () => ({ ok: true, favorited: options.method === 'PUT' }) };
   } });
-  const card = root.children[0].children[0];
+  const card = boardCard(root);
   const actions = card.children.find(node => node.className === 'ru-favorite-actions');
   const [toggle] = actions.children;
   assert.equal(toggle.textContent, 'Убрать из избранного');
@@ -119,7 +155,7 @@ test('guest favorite action sends the user to Yandex login without a write', asy
     if (options?.method === 'PUT' || options?.method === 'DELETE') writes++;
     return { ok: true, json: async () => ({ ok: true }) };
   } });
-  const card = root.children[0].children[0];
+  const card = boardCard(root);
   const button = card.children.find(node => node.className === 'ru-favorite-actions').children[0];
   await button.listeners.click();
   assert.equal(loginUrl, '/auth/yandex/start');
@@ -141,7 +177,7 @@ test('only the authenticated owner sees the own-listing delete action, and confi
     if (url === `/api/v1/listings/${id}` && options.method === 'DELETE') return { ok: true, json: async () => ({ ok: true, deleted: true, image_cleanup: 'not_needed' }) };
     throw new Error(`unexpected request ${url}`);
   } });
-  const card = root.children[0].children[0];
+  const card = boardCard(root);
   const actions = card.children.find(node => node.className === 'ru-own-listing-actions');
   assert.ok(actions);
   const button = actions.children[0];
@@ -165,7 +201,7 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) };
     return { ok: false, status: 401, json: async () => ({}) };
   } });
-  const actions = root.children[0].children[0].children.find(node => node.className === 'ru-event-actions');
+  const actions = boardCard(root).children.find(node => node.className === 'ru-event-actions');
   await actions.children[0].listeners.click();
   assert.equal(loginUrl, '/auth/yandex/start');
 
@@ -175,7 +211,7 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
       ? { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) }
       : { ok: false, status: 503, json: async () => ({}) },
   });
-  const unavailableActions = unavailableRoot.children[0].children[0].children.find(node => node.className === 'ru-event-actions');
+  const unavailableActions = boardCard(unavailableRoot).children.find(node => node.className === 'ru-event-actions');
   assert.equal(unavailableActions.children[0].disabled, true);
   assert.equal(unavailableActions.children[0].textContent, 'Запись недоступна');
 });
