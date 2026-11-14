@@ -1,6 +1,7 @@
 import { initializeMessages } from './messages.js';
 
 const MAX_PUBLIC_LISTINGS = 100;
+const BOARD_CATEGORIES = ['Все', 'Вещи', 'Услуги', 'Творчество', 'Учёба', 'Мероприятия'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let messagesInitialized = false;
 
@@ -316,7 +317,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     }
     const favorites = await loadMyFavorites(fetchImpl);
     const ownListingIds = await loadMyActiveListingIds(fetchImpl);
-    const fragment = document.createDocumentFragment();
+    const cards = [];
     for (const listing of result.listings) {
       if (!listing || typeof listing.id !== 'string' || typeof listing.title !== 'string'
           || typeof listing.description !== 'string' || typeof listing.category !== 'string') continue;
@@ -341,10 +342,43 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
         card.append(element(document, 'p', 'ru-listing-event', 'Мероприятие'));
         addEventRegistrationControls({ card, listing, document, fetchImpl, session, location });
       }
-      fragment.append(card);
+      cards.push({ card, listing });
     }
-    if (fragment.childNodes.length === 0) throw new Error('invalid_listing_response');
-    root.replaceChildren(fragment);
+    if (cards.length === 0) throw new Error('invalid_listing_response');
+
+    const toolbar = element(document, 'div', 'ru-board-controls');
+    const search = document.createElement('input');
+    search.type = 'search'; search.maxLength = 120; search.placeholder = 'Поиск по объявлениям';
+    search.setAttribute('aria-label', 'Поиск по объявлениям');
+    const filters = element(document, 'div', 'ru-board-categories');
+    filters.setAttribute('role', 'group'); filters.setAttribute('aria-label', 'Категории объявлений');
+    const count = element(document, 'p', 'ru-board-count', ''); count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite');
+    let category = 'Все';
+    const filterButtons = new Map();
+    const updateResults = () => {
+      const query = String(search.value || '').trim().toLocaleLowerCase('ru');
+      let visible = 0;
+      for (const { card, listing } of cards) {
+        const categoryMatches = category === 'Все' || listing.category === category;
+        const searchable = [listing.title, listing.description, listing.category, listing.price_text]
+          .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
+        const textMatches = !query || searchable.includes(query);
+        card.hidden = !categoryMatches || !textMatches;
+        if (!card.hidden) visible++;
+      }
+      for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
+      count.textContent = visible === 0 ? 'Ничего не найдено. Измените запрос или категорию.' : `Показано ${visible} из ${cards.length} объявлений.`;
+    };
+    for (const name of BOARD_CATEGORIES) {
+      const button = element(document, 'button', 'ru-board-category', name);
+      button.type = 'button'; button.setAttribute('aria-pressed', String(name === category));
+      button.addEventListener('click', () => { category = name; updateResults(); });
+      filterButtons.set(name, button); filters.append(button);
+    }
+    search.addEventListener('input', updateResults);
+    toolbar.append(search, filters, count);
+    root.replaceChildren(toolbar, ...cards.map(item => item.card));
+    updateResults();
   } catch {
     const error = element(document, 'p', 'ru-board-status', 'Не удалось загрузить объявления. Проверьте подключение и попробуйте ещё раз.');
     error.setAttribute('role', 'status');
