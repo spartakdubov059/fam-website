@@ -747,7 +747,7 @@ Deno.serve(async (req: Request) => {
       if (submittedImages.length > 3 || submittedImages.some((image) => typeof image !== "string")) {
         return fail("Можно приложить не больше 3 фотографий.", 400, headers);
       }
-      const imageUrls = [...new Set(submittedImages as string[])];
+      let imageUrls = [...new Set(submittedImages as string[])];
       if (imageUrls.length !== submittedImages.length) return fail("Удалите повторяющиеся фотографии.", 400, headers);
       const pendingPaths = imageUrls.map((imageUrl) => pendingListingImagePath(imageUrl, userId));
       if (pendingPaths.some((path) => !path)) {
@@ -767,11 +767,7 @@ Deno.serve(async (req: Request) => {
       }
       if (imageUrls.length && moderation.action === "pending") {
         await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
-        return respond({
-          ok: false,
-          status: "pending",
-          reason: "Текст идеи ожидает проверки. Отправьте предложение без фото или попробуйте позже.",
-        }, 200, headers);
+        imageUrls = [];
       }
 
       const textModeration = moderation;
