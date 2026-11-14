@@ -267,7 +267,7 @@ test('school role request review is claimed before only its reviewer can decide'
   await actions[0].listeners.click();
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
   assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
-  assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+  assert.equal(f.status.textContent, 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.');
 });
 
 test('unreviewed student messages appear only in the same-school admin queue until approved', async () => {
