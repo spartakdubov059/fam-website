@@ -100,6 +100,7 @@ begin
         'queued', coalesce(counts.queued, 0),
         'claimed', coalesce(counts.claimed, 0),
         'in_progress', coalesce(counts.in_progress, 0),
+        'review', coalesce(counts.review, 0),
         'blocked', coalesce(counts.blocked, 0),
         'completed_24h', coalesce(counts.completed_24h, 0),
         'failed_24h', coalesce(counts.failed_24h, 0)
@@ -118,6 +119,7 @@ begin
       count(*) filter (where t.status = 'queued')::integer as queued,
       count(*) filter (where t.status = 'claimed')::integer as claimed,
       count(*) filter (where t.status = 'in_progress')::integer as in_progress,
+      count(*) filter (where t.status = 'review')::integer as review,
       count(*) filter (where t.status = 'blocked')::integer as blocked,
       count(*) filter (where t.status = 'completed' and t.updated_at >= pg_catalog.now() - interval '24 hours')::integer as completed_24h,
       count(*) filter (where t.status = 'failed' and t.updated_at >= pg_catalog.now() - interval '24 hours')::integer as failed_24h
