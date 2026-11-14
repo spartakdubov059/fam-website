@@ -147,7 +147,8 @@ begin
     order by details.start_time desc
     limit 1
   ) as latest on true
-  where jobs.jobname like 'fam-agent-%';
+  where jobs.jobname like 'fam-agent-%'
+     or jobs.jobname = 'fam-listing-image-moderation-every-minute';
 
   select coalesce(
     pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('task_type', failures.task_type, 'count', failures.count) order by failures.task_type),
