@@ -66,6 +66,11 @@ async function askModel(messages, schema, maxTokens) {
 
       const choice = result?.choices?.[0];
       const content = choice?.message?.content;
+      if (process.env.FAM_DEBUG_MODEL_RESPONSES === "1" && typeof content === "string") {
+        const outputDir = process.env.RUNNER_TEMP || "/tmp";
+        mkdirSync(outputDir, { recursive: true });
+        writeFileSync(join(outputDir, `model-response-attempt-${attempt + 1}.txt`), content);
+      }
       const parsed = parseJson(content);
       return assertRequiredFields(parsed, schema.schema, schema.name);
     } catch (error) {
