@@ -2473,20 +2473,6 @@ window.onunhandledrejection = function() {
       { src: "banner-clean-5", alt: "Творчество и идеи: камера и вдохновение." },
       { src: "banner-clean-6", alt: "Ученический совет: команда волонтёров." }
     ];
-    if (user && profile && profile.school_id) {
-      listings.filter(l => l.is_event && l.school_id === profile.school_id).slice(0, 5).forEach(e => {
-        const ds = e.event_date ? new Date(e.event_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : '';
-        const meta = [ds, e.event_time || ''].filter(Boolean).join(' · ');
-        const taken = getTaken(e.id), max = e.max_seats || 0;
-        const info = max > 0 ? `👥 ${taken} из ${max}` : '👥 Без ограничений';
-        html.push(`<div class="hero-slide hero-img hero-event-photo"><div class="hero-event">
-          <span class="school-badge">🎭 Афиша</span>
-          <div class="event-title">${esc(e.title)}</div>
-          ${meta ? `<div class="event-meta">📅 ${esc(meta)} · ${info}</div>` : ''}
-          <button class="button button-primary button-small" style="align-self:flex-start;" data-action="handle-event" data-id="${esc(e.id)}">Записаться</button>
-        </div></div>`);
-      });
-    }
     banners.forEach(({ src, alt }, index) => {
       html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
