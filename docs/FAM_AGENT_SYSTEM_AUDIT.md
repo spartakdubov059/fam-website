@@ -236,3 +236,11 @@ Total output lines: 411
 - В PR #65 snapshot расширен точным allowlist исключением этого job. PostgreSQL fixture теперь включает отдельный image-moderation job и проверяет его последнее состояние, в том числе ошибку, чтобы сбой не пропал из отчёта.
 - На head `00cfed035e43580eb7889b19bc209ddf48feda53` прошли Reporter PostgreSQL integration [#43609136529](https://github.com/spartakdubov059/fam-website/actions/runs/43609136529), Regression [#43609136525](https://github.com/spartakdubov059/fam-website/actions/runs/43609136525), Coder QA PostgreSQL [#43609136557](https://github.com/spartakdubov059/fam-website/actions/runs/43609136557) и telemetry PostgreSQL [#43609136490](https://github.com/spartakdubov059/fam-website/actions/runs/43609136490).
 - Production cron, migration ledger, Reporter deployment, Edge Functions и отчётные данные не менялись; исправление действует только в draft PR.
+
+
+## Reporter: видимость claimed и review задач — 14 ноября 2026
+
+- Code review обнаружил, что snapshot уже считал `claimed`, но Markdown не выводил эту колонку; status `review` не агрегировался. Поэтому активные claim и ожидающие QA/ручного review задачи могли быть не видны в общей очередной таблице.
+- В PR #65 добавлен `review` count, а Markdown показывает `queued`, `claimed`, `in_progress`, `review`, `blocked`, completed и failed. Node regression проверяет, что значения `claimed` и `review` отображаются без потери.
+- На head `f2f04bd3460b1b767df2be11c2fbe31192364959` прошли Regression [#43609489138](https://github.com/spartakdubov059/fam-website/actions/runs/43609489138), Reporter PostgreSQL [#43609489169](https://github.com/spartakdubov059/fam-website/actions/runs/43609489169), Coder QA PostgreSQL [#43609489140](https://github.com/spartakdubov059/fam-website/actions/runs/43609489140) и telemetry PostgreSQL [#43609489147](https://github.com/spartakdubov059/fam-website/actions/runs/43609489147).
+- Production очередь, функции, миграции и данные отчётов не менялись; полный queue → model → QA → PR production run остаётся недоказанным.
