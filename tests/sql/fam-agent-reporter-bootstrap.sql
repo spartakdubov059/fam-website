@@ -64,10 +64,14 @@ insert into private.fam_agent_tasks (agent_key, task_type, status, updated_at) v
   ('orchestrator', 'daily_report_digest', 'completed', now());
 
 insert into cron.job (jobid, jobname, schedule, active)
-values (1, 'fam-agent-worker-every-5-minutes', '*/5 * * * *', true);
+values
+  (1, 'fam-agent-worker-every-5-minutes', '*/5 * * * *', true),
+  (2, 'fam-listing-image-moderation-every-minute', '* * * * *', true);
 
 insert into cron.job_run_details (jobid, status, start_time)
-values (1, 'succeeded', now());
+values
+  (1, 'succeeded', now()),
+  (2, 'failed', now());
 
 
 insert into net._http_response (id,status_code,content,created) values
