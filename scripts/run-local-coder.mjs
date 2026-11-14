@@ -4,7 +4,10 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
-import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
+import {
+  frameSingleFileHunkDiff,
+  normalizeUnifiedDiffHunkCounts,
+} from "./local-model-patch.mjs";
 
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
 const MODEL_ID = (process.env.FAM_MODEL_ID || "JetBrains/Mellum2.1-12B-A2.5B-Thinking").slice(0, 120);
@@ -298,6 +301,7 @@ const patchMessages = [
       "В evidence укажи точный путь и строку/фрагмент из переданных данных; если доказательства недостаточны, выбери needs_research и оставь diff пустым.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
       "unified_diff должен быть применим git apply и содержать заголовки diff --git a/path b/path.",
+      "Для одного выбранного файла включай diff --git, --- a/path, +++ b/path и все @@ hunks; не возвращай одиночный hunk без заголовков.",
       "Если не можешь достоверно выполнить задачу по предоставленным фрагментам, верни пустой diff.",
       "Укажи risk=low и requires_approval=false только для ясного, обратимого и строго ограниченного изменения пользовательского интерфейса или документации/тестов.",
       "Верни только JSON по заданной схеме.",
@@ -340,11 +344,17 @@ let patch = String(result.unified_diff || "").trim();
 let patchCheckError = "";
 
 if (patch) {
-  if (!patch.startsWith("diff --git ")) {
-    patchCheckError = "Patch is missing the required diff --git header.";
-  } else if (patch.length > 120000) {
+  if (!patch.startsWith("diff --git ") && selected.length === 1) {
+    try {
+      patch = frameSingleFileHunkDiff(patch, selected[0]);
+    } catch (error) {
+      patchCheckError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  if (!patchCheckError && patch.length > 120000) {
     patchCheckError = "Patch exceeds the 120 KB safety limit.";
-  } else {
+  } else if (!patchCheckError) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         patch = normalizeUnifiedDiffHunkCounts(patch);
