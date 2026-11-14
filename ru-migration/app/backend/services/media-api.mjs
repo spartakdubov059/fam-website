@@ -1,10 +1,31 @@
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IDEA_IMAGE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function createMediaApi({ authenticate, resolveActor, pendingImages, repository }) {
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    const ideaPhotoMatch = pathname.match(/^\/api\/v1\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images\/([0-2])$/i);
+    if (req.method === 'GET' && ideaPhotoMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !UUID.test(actor.id || '')) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.getSchoolIdeaImage !== 'function' || typeof pendingImages?.get !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      try {
+        const image = await repository.getSchoolIdeaImage(ideaPhotoMatch[1], Number(ideaPhotoMatch[2]));
+        if (!image || !UUID.test(image.user_id || '') || (typeof image.school_id !== 'string' || !image.school_id)
+            || !/^pending\/[0-9a-f-]{36}\/[0-9a-f-]{8}-[0-9a-f-]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(image.image_key)) {
+          return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
+        }
+        const owner = actor.id === image.user_id;
+        const schoolModerator = ['school_admin', 'council_member'].includes(actor.role) && actor.school_id === image.school_id;
+        if (!owner && !schoolModerator) return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
+        const bytes = await pendingImages.get(image.image_key);
+        return { status: 200, body: bytes, headers: { 'content-type': 'image/webp', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } };
+      } catch { return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } }; }
+    }
     const avatarMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/photo$/i);
     if (req.method === 'GET' && avatarMatch) {
       let review;
@@ -91,7 +112,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         return { status: 503, body: { ok: false, error: 'media_unavailable' } };
       }
     }
-    if (req.method !== 'POST' || pathname !== '/api/v1/media/pending') {
+    const ideaImageUpload = pathname === '/api/v1/ideas/media/pending';
+    if (req.method !== 'POST' || (!ideaImageUpload && pathname !== '/api/v1/media/pending')) {
       return { status: 404, body: { ok: false, error: 'not_found' } };
     }
     if (!pendingImages || typeof pendingImages.put !== 'function') {
@@ -106,8 +128,9 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
 
     const contentType = String(req.headers?.['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
     if (!ALLOWED_IMAGE_TYPES.has(contentType)) return { status: 415, body: { ok: false, error: 'unsupported_image_type' } };
+    const imageByteLimit = ideaImageUpload ? MAX_IDEA_IMAGE_BYTES : MAX_IMAGE_BYTES;
     const statedLength = Number(req.headers?.['content-length'] || 0);
-    if (Number.isFinite(statedLength) && statedLength > MAX_IMAGE_BYTES) {
+    if (Number.isFinite(statedLength) && statedLength > imageByteLimit) {
       return { status: 413, body: { ok: false, error: 'image_too_large' } };
     }
 
@@ -116,7 +139,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
     try {
       for await (const chunk of req) {
         bytes += chunk.length;
-        if (bytes > MAX_IMAGE_BYTES) return { status: 413, body: { ok: false, error: 'image_too_large' } };
+        if (bytes > imageByteLimit) return { status: 413, body: { ok: false, error: 'image_too_large' } };
         chunks.push(chunk);
       }
     } catch {
@@ -126,11 +149,19 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
     if (typeof repository?.registerPendingImage !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
 
     try {
-      const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType });
+      const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType, maxBytes: imageByteLimit });
       const keyPattern = new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i');
       if (!result || typeof result.key !== 'string' || !keyPattern.test(result.key)
           || result.contentType !== 'image/webp' || !Number.isInteger(result.bytes) || result.bytes < 1 || result.bytes > MAX_IMAGE_BYTES) {
+        if (result?.key && typeof pendingImages.delete === 'function' && keyPattern.test(result.key)) {
+          try { await pendingImages.delete(result.key); } catch { /* account inventory can remove an unregistered object later */ }
+        }
         return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      }
+      if (result.bytes > imageByteLimit) {
+        try { await pendingImages.delete(result.key); }
+        catch { try { await repository.registerPendingImage(actor.id, result.key); } catch { /* account inventory can remove an unregistered object later */ } }
+        return { status: 413, body: { ok: false, error: 'image_too_large' } };
       }
       try {
         await repository.registerPendingImage(actor.id, result.key);
@@ -140,6 +171,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       }
       return { status: 201, body: { ok: true, image: { key: result.key, content_type: result.contentType, bytes: result.bytes } } };
     } catch (error) {
+      if (error?.code === 'image_too_large') return { status: 413, body: { ok: false, error: 'image_too_large' } };
       if (error instanceof TypeError) return { status: 400, body: { ok: false, error: 'invalid_image' } };
       return { status: 503, body: { ok: false, error: 'media_unavailable' } };
     }

@@ -940,18 +940,71 @@ export function createYdbListingsRepository(sql) {
     },
 
     async createIdea(record) {
+      const imageKeys = Array.isArray(record?.image_keys) ? record.image_keys : [];
+      const imageStatus = imageKeys.length ? 'pending' : 'none';
       if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
+          || imageKeys.length > 3 || imageKeys.some(key => typeof key !== 'string')
+          || new Set(imageKeys).size !== imageKeys.length || (record.image_status && record.image_status !== imageStatus)
           || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {
         throw new TypeError('invalid idea submission');
       }
       const id = randomUUID();
-      const statement = sql`INSERT INTO fam_ideas
-        (id, user_id, school_id, text, ai_status, ai_summary, ai_reason, admin_status, created_at)
-        VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.text}, ${record.ai_status},
-          ${record.ai_summary ?? ''}, ${record.ai_reason ?? ''}, ${record.admin_status}, CurrentUtcTimestamp());`;
+      return sql.begin(async tx => {
+        for (const key of imageKeys) {
+          const owned = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${key} AND user_id = ${record.user_id} LIMIT 1;`;
+          if (owned?.[0]?.[0]?.status !== 'pending') throw new TypeError('idea image unavailable');
+        }
+        await tx`INSERT INTO fam_ideas
+          (id, user_id, school_id, text, image_keys, image_status, ai_status, ai_summary, ai_reason, admin_status, created_at)
+          VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.text}, ${imageKeys}, ${imageStatus}, ${record.ai_status},
+            ${record.ai_summary ?? ''}, ${record.ai_reason ?? ''}, ${record.admin_status}, CurrentUtcTimestamp());`;
+        for (const key of imageKeys) {
+          await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '', claim_until = NULL
+            WHERE object_key = ${key} AND user_id = ${record.user_id} AND status = 'pending';`;
+        }
+        return { id };
+      });
+    },
+
+    async listPendingSchoolIdeas(schoolId, reviewerId) {
+      if (!schoolId || !reviewerId) throw new TypeError('invalid idea review school');
+      const statement = sql`SELECT id, school_id, text, image_keys, image_status, created_at
+        FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new'
+        ORDER BY created_at ASC LIMIT 50;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
-      await statement;
-      return { id };
+      return (await statement)?.[0] ?? [];
+    },
+
+    async getSchoolIdeaImage(ideaId, imageIndex) {
+      if (!UUID.test(ideaId || '') || !Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > 2) throw new TypeError('invalid idea image lookup');
+      const statement = sql`SELECT user_id, school_id, image_keys, image_status FROM fam_ideas WHERE id = ${ideaId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const row = (await statement)?.[0]?.[0];
+      const key = Array.isArray(row?.image_keys) ? row.image_keys[imageIndex] : null;
+      if (!row || !key || !['pending', 'approved'].includes(row.image_status)) return null;
+      return { user_id: row.user_id, school_id: row.school_id, image_key: key, image_status: row.image_status };
+    },
+
+    async reviewSchoolIdeaImages({ ideaId, schoolId, reviewerId, decision }) {
+      if (!UUID.test(ideaId || '') || !schoolId || !UUID.test(reviewerId || '') || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid idea image review');
+      return sql.begin(async tx => {
+        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewers?.[0]?.[0];
+        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
+        const rows = await tx`SELECT user_id, image_keys, image_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
+        const idea = rows?.[0]?.[0];
+        if (!idea || idea.user_id === reviewerId || idea.image_status !== 'pending' || !Array.isArray(idea.image_keys) || !idea.image_keys.length) return false;
+        if (decision === 'approve') {
+          await tx`UPDATE fam_ideas SET image_status = 'approved' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
+        } else {
+          for (const key of idea.image_keys) {
+            await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = NULL
+              WHERE object_key = ${key} AND user_id = ${idea.user_id} AND status = 'linked';`;
+          }
+          await tx`UPDATE fam_ideas SET image_keys = [], image_status = 'rejected' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
+        }
+        return true;
+      });
     },
 
     async createMessage(record) {

@@ -106,6 +106,25 @@ test('authenticated students can submit a school idea through the moderated Russ
   assert.match(ideaForm.children[1].textContent, /ждёт проверки безопасности/);
 });
 
+test('idea attachments use the bounded private upload route and are sent with the school proposal', async () => {
+  const f = fixture(null); const calls = [];
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111', role: 'student' } }) };
+    if (url === '/api/v1/ideas/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key } }) };
+    if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true, status: 'pending', image_status: 'pending' }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren.find(item => item['aria-label'] === 'Предложить школьную идею');
+  const ideaForm = section.children[2];
+  ideaForm.elements = { idea: { value: 'Открыть школьную мастерскую' }, idea_images: { files: [{ type: 'image/webp', size: 128 }] } };
+  await ideaForm.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/ideas/media/pending', '/api/v1/ideas']);
+  assert.deepEqual(JSON.parse(calls[2].init.body), { text: 'Открыть школьную мастерскую', image_keys: [key] });
+  assert.match(ideaForm.children[1].textContent, /закрыты для просмотра до школьной проверки/);
+});
+
 test('school council can create a dated limited event while students cannot select event category', async () => {
   const organizer = fixture(null);
   organizer.values.category = 'Мероприятия';

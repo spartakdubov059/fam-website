@@ -754,3 +754,23 @@ test('event occupancy is a public count with no registration identity details', 
   const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
 });
+
+test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
+  let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
+  let listedSchool; let listedReviewer; let reviewed;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
+    repository: { listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
+      reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === actor.school_id; } } });
+  const list = req({}, 'GET'); list.url = '/api/v1/school/ideas';
+  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', image_status: 'pending' }] } });
+  assert.equal(listedSchool, 'school-a');
+  assert.equal(listedReviewer, actor.id);
+  const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images';
+  assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, image_status: 'approved' } });
+  assert.equal(reviewed.ideaId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  assert.equal(reviewed.reviewerId, actor.id);
+  actor = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-b', role: 'council_member' };
+  assert.equal((await handler(approve)).status, 404, 'the repository rejects cross-school reviews');
+  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
+  assert.equal((await handler(list)).status, 403);
+});

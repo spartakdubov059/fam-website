@@ -4,6 +4,8 @@ CREATE TABLE fam_ideas (
   user_id Utf8 NOT NULL,
   school_id Utf8 NOT NULL,
   text Utf8 NOT NULL,
+  image_keys List<Utf8> NOT NULL,
+  image_status Utf8 NOT NULL,
   ai_status Utf8 NOT NULL,
   ai_summary Utf8 NOT NULL,
   ai_reason Utf8 NOT NULL,

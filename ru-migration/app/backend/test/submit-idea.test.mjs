@@ -30,3 +30,21 @@ test('idea submission requires a school and bounded text', async () => {
   assert.equal((await submitIdea({ actor, input: { text: 'x' }, repository: {} })).code, 'invalid_idea');
   assert.equal((await submitIdea({ actor, input: { text: 'a'.repeat(1001) }, repository: {} })).code, 'invalid_idea');
 });
+
+test('idea images accept at most three own pending WebP keys and remain pending for school review', async () => {
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const keys = [1, 2, 3].map((_, index) => `pending/${userId}/${index + 1}1111111-1111-4111-8111-111111111111.webp`);
+  let saved;
+  const result = await submitIdea({ actor: { ...actor, id: userId }, input: { text: 'Оформим библиотеку школы', image_keys: keys },
+    review: async () => ({ action: 'ok' }), repository: { createIdea: async value => { saved = value; return { id: 'idea-with-images' }; } } });
+  assert.equal(result.ok, true);
+  assert.equal(result.image_status, 'pending');
+  assert.deepEqual(saved.image_keys, keys);
+  assert.equal(saved.image_status, 'pending');
+  for (const image_keys of [keys.slice(0, 2).concat(keys[0]), [...keys, keys[0]], ['pending/other-user/11111111-1111-4111-8111-111111111111.webp']]) {
+    const invalid = await submitIdea({ actor: { ...actor, id: userId }, input: { text: 'Идея школы', image_keys }, repository: {} });
+    assert.equal(invalid.code, 'invalid_idea');
+  }
+  const invalidActor = await submitIdea({ actor, input: { text: 'Идея школы', image_keys: [keys[0]] }, repository: {} });
+  assert.equal(invalidActor.code, 'invalid_idea', 'image ownership path requires a UUID account id');
+});

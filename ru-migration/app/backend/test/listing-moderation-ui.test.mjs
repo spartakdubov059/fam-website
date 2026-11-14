@@ -44,6 +44,7 @@ test('school moderators review same-school pending photos and publish only after
     if (url === '/api/v1/listings/moderation' && calls.filter(call => call.url === url).length === 1) {
       return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: '<script>unsafe</script>', description: 'Текст', category: 'Учёба', photo_status: 'pending', photo_url: `/api/v1/listings/${id}/photo` }] }) };
     }
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
     if (url === `/api/v1/listings/${id}/photo`) return { ok: true, json: async () => ({ ok: true }) };
     return { ok: true, json: async () => ({ ok: true, listings: [] }) };
   } });
@@ -58,6 +59,42 @@ test('school moderators review same-school pending photos and publish only after
   assert.equal(decision.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
   assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+});
+
+test('school moderators can inspect and decide idea photos without rendering user text as HTML', async () => {
+  const f = fixture(); const calls = [];
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const key = 'pending/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
+  let imageStatus = 'pending';
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: imageStatus === 'pending'
+      ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status }] : [] }) };
+    if (url === `/api/v1/school/ideas/${id}/images` && init.method === 'PATCH') { imageStatus = 'approved'; return { ok: true, json: async () => ({ ok: true, image_status }) }; }
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/suspensions' || url === '/api/v1/suspensions/targets' || url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, suspensions: [], targets: [] }) };
+    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
+    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
+    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, alerts: [] }) };
+    if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) };
+    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  const card = f.queue.children.find(item => item.children?.[0]?.textContent === 'Школьные идеи и фотографии')?.children[1];
+  assert.ok(card);
+  assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
+  assert.equal(card.children[1].tagName, 'img');
+  assert.equal(card.children[1].src, `/api/v1/ideas/${id}/images/0`);
+  assert.equal(card.children[1].alt, 'Фото к школьной идее 1');
+  const actions = card.children[2].children;
+  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить фото', 'Отклонить фото']);
+  await actions[0].listeners.click();
+  const decision = calls.find(call => call.url === `/api/v1/school/ideas/${id}/images` && call.init.method === 'PATCH');
+  assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
+  assert.equal(imageStatus, 'approved');
 });
 
 test('student profiles do not receive the school moderation queue', async () => {
@@ -268,6 +305,7 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
     if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
     if (url === `/api/v1/role-requests/${id}`) { state = init.body.includes('start_review') ? 'reviewing' : 'approved'; return { ok: true, json: async () => ({ ok: true }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
   } });

@@ -568,18 +568,61 @@ try {
   })), { status: 200, body: { ok: true } });
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'))).body.reports.some(row => row.fingerprint === safetyFingerprint), false,
     'acknowledged safety clusters leave the unreviewed queue');
+  const adminIdeaImageKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-0000-4000-8000-000000000001.webp';
+  await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', adminIdeaImageKey);
+  const adminOwnIdea = await repo.createIdea({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    text: 'Идея администратора для самопроверки', image_keys: [adminIdeaImageKey], image_status: 'pending',
+    ai_status: 'approved', admin_status: 'new' });
+  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '33333333-3333-4333-8333-333333333333'))
+    .some(idea => idea.id === adminOwnIdea.id), false, 'review queue omits the reviewer own submission');
+  assert.equal(await repo.reviewSchoolIdeaImages({ ideaId: adminOwnIdea.id, schoolId: 'synthetic-school',
+    reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'approve' }), false,
+  'school staff cannot approve their own idea photo');
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
+  const attachedIdeaImageKey = `pending/${deletingUserId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
+  const rejectedIdeaImageKey = `pending/${deletingUserId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
   accountMediaKeys.add(deletingImageKey);
   await repo.registerPendingImage(deletingUserId, deletingImageKey);
+  accountMediaKeys.add(attachedIdeaImageKey);
+  await repo.registerPendingImage(deletingUserId, attachedIdeaImageKey);
+  const ideaSubmission = await listingsApi(apiRequest('POST', '/api/v1/ideas', 'synthetic-registrant', {
+    text: 'Добавить синтетическую книжную полку в школьную библиотеку', image_keys: [attachedIdeaImageKey],
+  }));
+  assert.equal(ideaSubmission.status, 201);
+  assert.equal(ideaSubmission.body.image_status, 'pending');
+  const ideaQueue = await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-admin'));
+  const submittedIdea = ideaQueue.body.ideas.find(idea => idea.id === ideaSubmission.body.id);
+  assert.equal(submittedIdea.image_status, 'pending');
+  assert.deepEqual(submittedIdea.image_keys, [attachedIdeaImageKey]);
+  assert.equal(Object.hasOwn(submittedIdea, 'user_id'), false, 'school review queue omits the submitter identity');
+  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-lyceum-admin'))).body.ideas, [],
+    'school idea queue is isolated by school');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${ideaSubmission.body.id}/images`, 'synthetic-admin', { decision: 'approve' })),
+    { status: 200, body: { ok: true, image_status: 'approved' } });
+  assert.equal((await repo.getSchoolIdeaImage(ideaSubmission.body.id, 0)).image_status, 'approved');
+  accountMediaKeys.add(rejectedIdeaImageKey);
+  await repo.registerPendingImage(deletingUserId, rejectedIdeaImageKey);
+  const rejectedIdea = await listingsApi(apiRequest('POST', '/api/v1/ideas', 'synthetic-registrant', {
+    text: 'Проверка безопасного отклонения фото', image_keys: [rejectedIdeaImageKey],
+  }));
+  assert.equal(rejectedIdea.status, 201);
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedIdea.body.id}/images`, 'synthetic-admin', { decision: 'reject' })),
+    { status: 200, body: { ok: true, image_status: 'rejected' } });
+  const rejectedIdeaRow = await sql`SELECT image_keys, image_status FROM fam_ideas WHERE id = ${rejectedIdea.body.id};`;
+  assert.deepEqual(rejectedIdeaRow[0][0], { image_keys: [], image_status: 'rejected' });
+  assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedIdeaImageKey};`)[0][0].status, 'pending',
+    'rejected school idea image returns to the bounded orphan cleanup queue');
   const deletingListing = await repo.createListing({ user_id: deletingUserId, school_id: 'synthetic-school',
     title: 'Собственное объявление для удаления аккаунта', description: 'Удаление проверяется только на синтетической базе', category: 'Учёба',
     price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletingImageKey, photo_status: 'pending', status: 'pending' });
   const accountDeletion = await listingsApi(apiRequest('DELETE', '/api/v1/me/account', 'synthetic-recent-registrant', {
     confirmation: 'УДАЛИТЬ МОЙ АККАУНТ',
   }));
-  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 3 } });
   assert.ok(deletedMediaKeys.includes(deletingImageKey), 'account deletion removes all private objects under its owner prefix');
+  assert.ok(deletedMediaKeys.includes(attachedIdeaImageKey), 'account deletion removes linked idea photos');
+  assert.ok(deletedMediaKeys.includes(rejectedIdeaImageKey), 'account deletion removes rejected idea photos awaiting orphan cleanup');
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-2' }), null,
     'account deletion removes the identity mapping after cleanup');
   assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${deletingListing.id};`)?.[0]?.length ?? 0, 0);

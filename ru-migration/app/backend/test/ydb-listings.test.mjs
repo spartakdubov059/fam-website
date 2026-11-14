@@ -117,6 +117,50 @@ test('school admin overview binds every projection to its school and returns no 
   await assert.rejects(createYdbListingsRepository(sql).getSchoolAdminOverview(''), TypeError);
 });
 
+test('idea image keys are atomically linked to the synthetic idea from only their uploader', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_pending_media')) return [[{ status: 'pending' }]];
+    return [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const key = `pending/${userId}/11111111-1111-4111-8111-111111111111.webp`;
+  const result = await repo.createIdea({ user_id: userId, school_id: 'school-a', text: 'Тестовая идея',
+    image_keys: [key], image_status: 'pending', ai_status: 'approved', ai_summary: 'Тест', ai_reason: '', admin_status: 'new' });
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && call.values.includes(key)));
+  assert.ok(calls.some(call => call.text.includes("SET status = 'linked'") && call.values.includes(key) && call.values.includes(userId)));
+});
+
+test('idea image linkage rejects an object owned by another account before inserting the idea', async () => {
+  let inserted = false;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('FROM fam_pending_media')) return values.includes('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') ? [[]] : [[{ status: 'pending' }]];
+    if (text.includes('INSERT INTO fam_ideas')) inserted = true;
+    return [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const key = 'pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/11111111-1111-4111-8111-111111111111.webp';
+  await assert.rejects(repo.createIdea({ user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-a',
+    text: 'Чужая картинка', image_keys: [key], image_status: 'pending', ai_status: 'approved', admin_status: 'new' }), /idea image unavailable/);
+  assert.equal(inserted, false);
+});
+
+test('school idea review listing excludes the current reviewer own submission', async () => {
+  let call;
+  const sql = async (strings, ...values) => { call = { text: strings.join('?'), values }; return [[]]; };
+  const reviewerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  assert.deepEqual(await createYdbListingsRepository(sql).listPendingSchoolIdeas('school-a', reviewerId), []);
+  assert.match(call.text, /user_id != \?/);
+  assert.ok(call.values.includes('school-a'));
+  assert.ok(call.values.includes(reviewerId));
+});
+
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

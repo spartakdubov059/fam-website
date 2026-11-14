@@ -1,6 +1,7 @@
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PENDING_KEY = /^pending\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i;
+const IDEA_MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 async function readJson(response) {
   try { return await response.json(); } catch { return null; }
@@ -47,27 +48,46 @@ export async function initializeListingSubmission({ document = globalThis.docume
     event.preventDefault();
     const submit = ideaForm.querySelector('button[type="submit"]');
     const text = String(ideaForm.elements.idea?.value || '').trim();
+    const files = Array.from(ideaForm.elements.idea_images?.files || []);
+    if (files.length > 3 || files.some(file => !IMAGE_TYPES.has(file.type) || file.size < 1 || file.size > IDEA_MAX_IMAGE_BYTES)) {
+      ideaForm.querySelector('[role="status"]').textContent = 'Добавьте не более 3 файлов JPEG, PNG или WebP размером до 2 МБ каждый.';
+      return;
+    }
     if (submit) submit.disabled = true;
     const ideaStatus = ideaForm.querySelector('[role="status"]');
     ideaStatus.textContent = 'Передаём предложение на проверку…';
+    const uploadedKeys = [];
     try {
+      for (const file of files) {
+        const upload = await fetchImpl('/api/v1/ideas/media/pending', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+          headers: { 'content-type': file.type }, body: file });
+        const uploaded = await readJson(upload);
+        if (!upload.ok || typeof uploaded?.image?.key !== 'string' || !PENDING_KEY.test(uploaded.image.key)) throw new Error('image_upload_failed');
+        uploadedKeys.push(uploaded.image.key);
+      }
       const response = await fetchImpl('/api/v1/ideas', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ text }),
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ text, image_keys: uploadedKeys }),
       });
       const result = await readJson(response);
       if (!response.ok || !result?.ok) {
-        ideaStatus.textContent = result?.error === 'rejected'
+        throw new Error(result?.error === 'rejected' ? 'rejected' : 'idea_submission_failed');
+      }
+      uploadedKeys.length = 0; // YDB linked these keys atomically to the idea.
+      ideaForm.reset();
+      ideaStatus.textContent = result.image_status === 'pending'
+        ? 'Идея отправлена. Фото закрыты для просмотра до школьной проверки.'
+        : result.status === 'pending'
+          ? 'Предложение сохранено и ждёт проверки безопасности.'
+          : 'Предложение отправлено школьной команде.';
+    } catch (error) {
+      ideaStatus.textContent = error?.message === 'rejected'
           ? 'Предложение не принято. Уберите личные данные и попробуйте снова.'
           : 'Не удалось отправить предложение. Проверьте текст и подключение.';
-        return;
+      for (const key of uploadedKeys) {
+        const match = key.match(/\/([0-9a-f-]{36})\.webp$/i);
+        if (match) try { await fetchImpl(`/api/v1/media/pending/${match[1]}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' }); } catch { /* expiry cleanup can retry */ }
       }
-      ideaForm.reset();
-      ideaStatus.textContent = result.status === 'pending'
-        ? 'Предложение сохранено и ждёт проверки безопасности.'
-        : 'Предложение отправлено школьной команде.';
-    } catch {
-      ideaStatus.textContent = 'Не удалось отправить предложение. Проверьте подключение и попробуйте позже.';
     } finally { if (submit) submit.disabled = false; }
   });
 
@@ -266,9 +286,13 @@ function createIdeaForm(document, listingForm) {
   const label = document.createElement('label'); label.textContent = 'Предложение';
   const input = document.createElement('textarea'); input.name = 'idea'; input.maxLength = 1000; input.required = true;
   label.append(input);
+  const imageLabel = document.createElement('label'); imageLabel.textContent = 'Фото (необязательно, до 3)';
+  const images = document.createElement('input'); images.type = 'file'; images.name = 'idea_images'; images.accept = 'image/jpeg,image/png,image/webp'; images.multiple = true;
+  imageLabel.append(images);
+  const imageNote = document.createElement('p'); imageNote.className = 'ru-note'; imageNote.textContent = 'До 3 JPEG, PNG или WebP по 2 МБ. Фото остаются закрытыми и ожидают ручной проверки школы.';
   const status = document.createElement('p'); status.className = 'ru-note'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit'; submit.textContent = 'Отправить идею';
-  form.append(label, status, submit);
+  form.append(label, imageLabel, imageNote, status, submit);
   section.append(heading, note, form);
   shell.append(section);
   return form;

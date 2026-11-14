@@ -56,6 +56,19 @@ test('pending media upload enforces byte limits and fails closed when storage is
   assert.equal((await unconfigured(request())).status, 503);
 });
 
+test('idea image uploads enforce the smaller 2 MB source limit before storage', async () => {
+  let writes = 0;
+  let saved;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: '33333333-3333-4333-8333-333333333333' }),
+    repository: { registerPendingImage: async () => {} },
+    pendingImages: { put: async input => { writes++; saved = input; return { key: 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 12 }; } } });
+  const path = '/api/v1/ideas/media/pending';
+  assert.equal((await api(request({ path, body: Buffer.alloc(2 * 1024 * 1024 + 1) }))).status, 413);
+  assert.equal(writes, 0);
+  assert.equal((await api(request({ path }))).status, 201);
+  assert.equal(saved.maxBytes, 2 * 1024 * 1024);
+});
+
 test('pending media upload rejects storage keys that do not belong to the authenticated user', async () => {
   const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
     pendingImages: { put: async () => ({ key: 'pending/22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 10 }) } });
@@ -141,4 +154,23 @@ test('failed pending-image delete releases its database lease for a later retry'
   assert.deepEqual(finalized, [[
     'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', 'claim-1', false,
   ]]);
+});
+
+test('idea images use private no-store responses for their owner and same-school staff', async () => {
+  let actor = { id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'school_admin' };
+  const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'verified' }), resolveActor: async () => actor,
+    repository: { getSchoolIdeaImage: async () => ({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', image_key: imageKey, image_status: 'pending' }) },
+    pendingImages: { get: async key => { assert.equal(key, imageKey); return Buffer.from('synthetic-webp'); } } });
+  const req = request({ method: 'GET', path: '/api/v1/ideas/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/images/0', body: Buffer.alloc(0) });
+  const result = await api(req);
+  assert.equal(result.status, 200);
+  assert.equal(result.headers['cache-control'], 'private, no-store');
+  assert.equal(result.headers['content-type'], 'image/webp');
+  actor = { ...actor, school_id: 'school-b' };
+  assert.equal((await api(req)).status, 404);
+  actor = { id: '11111111-1111-4111-8111-111111111111', role: 'student', school_id: 'other-school' };
+  assert.equal((await api(req)).status, 200, 'the image owner can read their own school idea attachment');
+  actor = { ...actor, id: '44444444-4444-4444-8444-444444444444', school_id: 'school-a' };
+  assert.equal((await api(req)).status, 404, 'other students cannot read schoolmates’ attachments');
 });

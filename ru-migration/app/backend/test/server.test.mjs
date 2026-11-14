@@ -97,6 +97,28 @@ test('unconfigured isolated server fails closed for health and user API routes',
   });
 });
 
+test('isolated server dispatches private idea-image reads through the media API', async () => {
+  const paths = [];
+  const listingPaths = [];
+  await withServer({
+    mediaApi: async request => { paths.push(request.url); return { status: 200, body: Buffer.from('synthetic'), headers: { 'content-type': 'image/webp' } }; },
+    listingsApi: async request => { listingPaths.push(`${request.method} ${request.url}`); return { status: 200, body: { ok: true } }; },
+  }, async origin => {
+    const response = await fetch(new URL('/api/v1/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images/2', origin));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(await response.text(), 'synthetic');
+    const upload = await fetch(new URL('/api/v1/ideas/media/pending', origin), { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'synthetic' });
+    assert.equal(upload.status, 200);
+    assert.deepEqual(paths, ['/api/v1/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images/2', '/api/v1/ideas/media/pending']);
+    assert.equal((await fetch(new URL('/api/v1/school/ideas', origin))).status, 200);
+    assert.equal((await fetch(new URL('/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images', origin), {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'approve' }),
+    })).status, 200);
+    assert.deepEqual(listingPaths, ['GET /api/v1/school/ideas', 'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images']);
+  });
+});
+
 test('self account deletion routes through the configured Russian backend', async () => {
   let method;
   await withServer({ listingsApi: async req => {
