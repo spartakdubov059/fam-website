@@ -36,7 +36,7 @@ function workflowStepScript(marker) {
   assert.notEqual(start, -1, `Missing workflow step: ${marker}`);
   const next = workflow.indexOf("\n      - name: ", start + marker.length);
   const section = workflow.slice(start, next < 0 ? undefined : next);
-  const block = section.match(/^        run: \|\n((?:          .*\n)+)/m)?.[1];
+  const block = section.match(/^        run: \|\n([\s\S]*)$/m)?.[1];
   assert.ok(block, `Missing shell script in workflow step: ${marker}`);
   return block.split("\n").map((line) => line.startsWith("          ") ? line.slice(10) : line).join("\n");
 }
