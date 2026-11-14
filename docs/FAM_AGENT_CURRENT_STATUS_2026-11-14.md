@@ -38,3 +38,11 @@ Production, `main`, миграции, Cron, Auth/RLS, secrets, очередь и
 - Эти данные подтверждают работоспособность расписания и ежедневной агрегированной отчётности, но не production запуск coder-модели: очередь не выдала новых заданий после 11 ноября. Worker v17 и production finish RPC остаются без изменений; исправления PR не действуют в production.
 
 Все запросы в этой сверке были read-only; production, `main`, конфигурация GitHub и пользовательские данные не менялись.
+
+## Подтверждение правил защиты main через GitHub API — 14 ноября 2026, 12:10 UTC
+
+- Анонимный read-only GitHub REST API вернул активный repository ruleset `FAM — защита main` (ID `27066766`), применённый только к `refs/heads/main`.
+- Он запрещает удаление и non-fast-forward, разрешает только squash merge, требует status check `Russian content safety tests` и не задаёт bypass actors.
+- Параметры pull request: `required_approving_review_count=0`, stale approvals не dismiss-ятся, code-owner review и approval последнего push выключены. Следовательно, обязательная проверка статуса сама по себе не требует review для всех PR.
+- Встроенная workflow-проверка дополнительно требует актуальное одобрение владельца только для веток `codex/fam-run-*`; она не заменяет общее серверное правило branch protection.
+- Подключённый GitHub API credential не имеет доступной операции обновления ruleset, а GitHub web app в доступной UI-сессии не открыл страницу настроек. Конфигурацию не менял. Требуется отдельный authorized write path для установки хотя бы одного обязательного approving review; пользователь ранее разрешил выбрать рациональное усиление.
