@@ -281,7 +281,7 @@ function safePendingIdeaPath(task) {
   const userId = String(task.user_id || "");
   const path = String(task.image_path || "");
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return false;
-  return new RegExp("^" + userId + "/idea_[a-z0-9-]{1,50}\\\\.(?:jpg|png|webp)$", "i").test(path);
+  return new RegExp("^" + userId + "/idea_[a-z0-9-]{1,50}\\.(?:jpg|png|webp)$", "i").test(path);
 }
 
 async function createSignedIdeaUrl(path) {
@@ -368,7 +368,7 @@ async function scheduleIdeaRetryOrReview(task, result) {
   if (isRetryableModerationFailure(result)) {
     await finishIdea(task, "retry", {
       reason_code: reasonCode, reason,
-      retry_seconds: reasonCode === "image_review_quota_exceeded" ? 86400 : retryDelaySeconds(task.attempts),
+      retry_seconds: reasonCode === "image_review_quota_exceeded" ? 7 * 24 * 60 * 60 : retryDelaySeconds(task.attempts),
     });
     return "retry";
   }
