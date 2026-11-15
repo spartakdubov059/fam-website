@@ -780,7 +780,6 @@ Deno.serve(async (req: Request) => {
       const textModeration = moderation;
       const stagedImagePaths: string[] = [];
       let pendingImageReview = false;
-      let rejectedImage = false;
 
       try {
         for (const imageUrl of imageUrls) {
@@ -809,7 +808,7 @@ Deno.serve(async (req: Request) => {
         school_id: profile.school_id,
         text,
         image_paths: stagedImagePaths,
-        ai_status: moderation.action === "pending" ? "pending" : pendingImageReview ? "pending" : "approved",
+        ai_status: stagedImagePaths.length ? "pending" : moderation.action === "pending" ? "pending" : "approved",
         ai_summary: text.slice(0, 60),
         ai_reason: pendingImageReview ? "Фото сохранено приватно и ожидает проверки." : (textModeration.reason ?? null),
         admin_status: "new",
