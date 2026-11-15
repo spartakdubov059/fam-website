@@ -64,6 +64,17 @@ test("quota failures keep the listing image private and retry after text-only pu
   assert.match(migration, /status='active' and moderation_status='approved' and image_url is null/);
 });
 
+test("idea photo quota failures keep attachments private and retry slowly without dropping the idea", () => {
+  assert.match(submit, /stagePendingIdeaImage/);
+  assert.match(submit, /enqueue_idea_image_moderation_task/);
+  assert.match(submit, /ai_status: stagedImagePaths\.length \? "pending"/);
+  assert.match(worker, /claim_idea_image_moderation_tasks/);
+  assert.match(worker, /image_purpose: "idea"/);
+  assert.ok(worker.includes('reasonCode === "image_review_quota_exceeded" ? 7 * 24 * 60 * 60'));
+  assert.match(worker, /manual_review/);
+  assert.match(moderate, /imagePurpose === "idea" \? "idea-images"/);
+});
+
 test("missing private source files stop retrying without hiding the approved listing text or replacing the old avatar", () => {
   assert.match(worker, /function isMissingStorageObject\(response, data\)/);
   assert.match(worker, /response\?\.status === 404/);

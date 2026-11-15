@@ -20,7 +20,7 @@ test("idea photos are limited, staged privately, checked before server-side publ
  assert.match(moderator,/if \(ideaReview\.action !== "ok" \|\| !imageUrl\)/);
  assert.match(moderator,/clean idea with a photo continues through the shared visual image checks/);
  assert.match(submit,/publishPendingIdeaImage/);
- assert.match(submit,/image_paths: publishedImagePaths/);
+ assert.match(submit,/image_paths: stagedImagePaths/);
  assert.match(migration,/values \('idea-images',[\s\S]*?false, 2097152/i);
  assert.match(migration,/FAM idea authors and same-school staff read idea images/);
  assert.doesNotMatch(migration,/create policy[^;]+for insert to authenticated/is);
