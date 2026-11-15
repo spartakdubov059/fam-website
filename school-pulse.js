@@ -71,7 +71,36 @@
     const status=document.getElementById("pulseStatus");
     let loading=false,epoch=0;
     const alertUser=message=>(typeof notify==="function"?notify(message):window.alert(message));
-    const insertFeatured=cards=>{announcementTrack?.querySelectorAll(".pulse-generated").forEach(card=>card.remove());if(announcementTrack&&cards.length)announcementTrack.insertAdjacentHTML("afterbegin",cards.map(card=>'<div class="hero-slide hero-pulse-slide pulse-generated">'+card+'</div>').join(""));document.getElementById("heroDots")?.replaceChildren(...Array.from(announcementTrack?.children||[]).map((_,i)=>{const b=document.createElement("button");b.className="hero-dot"+(i===0?" active":"");b.dataset.action="scroll-to-slide";b.dataset.idx=String(i);b.setAttribute("aria-label","Слайд "+(i+1));return b;}));};
+    // All content types share one full-bleed hero stage; no inset card frames.
+    const insertFeatured=cards=>{
+      if(!announcementTrack)return;
+      announcementTrack.querySelectorAll(".pulse-generated").forEach(card=>card.remove());
+      const allowedKinds=new Set(["event","important","announcement","poll"]);
+      if(cards.length){
+        const slides=cards.map(html=>{
+          // Classify only the fixed generated markup prefix; user-provided
+          // text remains escaped inside the card body and cannot set a type.
+          const kind=html.startsWith('<article class="pulse-card pulse-poll')
+            ? "poll"
+            : html.startsWith('<article class="pulse-card pulse-announcement is-open-event')
+              ? "event"
+              : html.startsWith('<article class="pulse-card pulse-announcement is-important')
+                ? "important" : "announcement";
+          const type=allowedKinds.has(kind)?kind:"announcement";
+          return '<div class="hero-slide hero-pulse-slide pulse-generated hero-pulse-'+type+'">'+html+'</div>';
+        }).join("");
+        announcementTrack.insertAdjacentHTML("afterbegin",slides);
+      }
+      document.getElementById("heroDots")?.replaceChildren(...Array.from(announcementTrack.children).map((_,i)=>{
+        const b=document.createElement("button");
+        b.className="hero-dot"+(i===0?" active":"");
+        b.dataset.action="scroll-to-slide";
+        b.dataset.idx=String(i);
+        b.setAttribute("aria-label","Слайд "+(i+1));
+        return b;
+      }));
+      announcementTrack.dispatchEvent(new Event("scroll"));
+    };
     async function refresh(){
       const iteration=++epoch;
       const viewer=getViewer();

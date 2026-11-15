@@ -936,49 +936,280 @@
 }
 
 
-/* Keep photo and school-update cards equal in the phone carousel.
-   A soft backdrop from the same picture fills portrait-shaped space,
-   while the original 16:9 photo, including all lettering, stays intact. */
-@media (max-width: 767px) {
+/* FAM unified full-bleed banners: real photographs remain 16:9 without
+   blur borders, and school announcements get the same edge-to-edge stage. */
+#bannerCarousel { align-items: stretch; }
+#bannerCarousel > .hero-slide.hero-pulse-slide {
+  --fam-slide-background: linear-gradient(125deg,#2b1b52,#201937 48%,#14282a);
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #201937;
+}
+#bannerCarousel > .hero-pulse-event {
+  --fam-slide-background: linear-gradient(120deg,#19392f,#30245b 55%,#13242e);
+}
+#bannerCarousel > .hero-pulse-important {
+  --fam-slide-background: linear-gradient(123deg,#333011,#4a2166 55%,#211938);
+}
+#bannerCarousel > .hero-pulse-poll {
+  --fam-slide-background: linear-gradient(120deg,#241e55,#3b2072 50%,#19283b);
+}
+#bannerCarousel > .hero-pulse-slide::before {
+  content: "";
+  position: absolute;
+  inset: -15%;
+  z-index: -2;
+  pointer-events: none;
+  background: var(--fam-slide-background);
+  background-size: 170% 170%;
+  animation: famFeaturedGradient 12s ease-in-out infinite alternate;
+}
+#bannerCarousel > .hero-pulse-slide::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -14%;
+  top: -53%;
+  width: 62%;
+  aspect-ratio: 1;
+  border: clamp(18px,4vw,42px) solid rgba(200,245,66,.17);
+  border-radius: 43%;
+  pointer-events: none;
+  animation: famFeaturedOrbit 12s ease-in-out infinite alternate;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(18px,3.7vw,36px);
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+  background: transparent !important;
+  color: #fff;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: none;
+  animation: none;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-card:hover { transform:none; border-color:transparent; }
+#bannerCarousel > .hero-pulse-slide .pulse-card::before {
+  content:"";
+  position:absolute;
+  inset:-45%;
+  z-index:0;
+  pointer-events:none;
+  background: linear-gradient(105deg,transparent 41%,rgba(255,255,255,.09) 49%,transparent 57%);
+  transform: translateX(-90%) rotate(-8deg);
+  animation: famFeaturedSweep 9s ease-in-out infinite;
+  transition: none;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-card::after {
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:-8%;
+  top:-35%;
+  width:60%;
+  height:150%;
+  border:0;
+  border-radius:50%;
+  background: radial-gradient(ellipse,rgba(139,92,246,.26),transparent 70%);
+  pointer-events:none;
+  animation: famFeaturedGlow 8s ease-in-out infinite alternate;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-card > * { position:relative; z-index:1; }
+#bannerCarousel > .hero-pulse-slide .pulse-card-overline {
+  width: min(100%,600px);
+  color: #dfff84;
+  font-size: clamp(9px,1.25vw,12px);
+  text-shadow: 0 2px 9px rgba(0,0,0,.2);
+}
+#bannerCarousel > .hero-pulse-slide .pulse-symbol {
+  color: #f2ffd1;
+  background: rgba(200,245,66,.18);
+  border-radius: 9px;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-date { color: rgba(255,255,255,.84); }
+#bannerCarousel > .hero-pulse-slide .pulse-card h3 {
+  margin: 11px 0 7px;
+  max-width: 84%;
+  color:#fff;
+  font-size: clamp(24px,3.65vw,43px);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: -.043em;
+  text-shadow: 0 3px 16px rgba(0,0,0,.3);
+}
+#bannerCarousel > .hero-pulse-slide .pulse-card p {
+  max-width: 76%;
+  color: rgba(255,255,255,.89);
+  font-size: clamp(12px,1.6vw,16px);
+  line-height: 1.48;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-open-foot {
+  width:min(100%,630px);
+  border-top-color:rgba(255,255,255,.22);
+}
+#bannerCarousel > .hero-pulse-slide .pulse-poll h3 { max-width:95%;font-size:clamp(19px,3vw,29px); }
+#bannerCarousel > .hero-pulse-slide .pulse-options {
+  width:min(100%,610px);
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:10px 0;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-option,
+#bannerCarousel > .hero-pulse-slide .pulse-result {
+  min-width:0;
+  color:#fff;
+  background:rgba(13,14,26,.27);
+  border-color:rgba(255,255,255,.25);
+  backdrop-filter:blur(5px);
+}
+#bannerCarousel > .hero-pulse-slide .pulse-option:hover:not(:disabled) {
+  background:rgba(200,245,66,.18);
+  border-color:var(--lime);
+}
+#bannerCarousel > .hero-pulse-slide .pulse-option span:first-child,
+#bannerCarousel > .hero-pulse-slide .pulse-result span:first-child {
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+#bannerCarousel > .hero-pulse-slide .pulse-poll-foot { color:rgba(255,255,255,.84); }
+#bannerCarousel > .hero-pulse-slide.is-active .pulse-card-overline,
+#bannerCarousel > .hero-pulse-slide.is-active .pulse-card h3,
+#bannerCarousel > .hero-pulse-slide.is-active .pulse-card p {
+  animation: famFeaturedTextIn .65s cubic-bezier(.2,.82,.2,1) both;
+}
+#bannerCarousel > .hero-pulse-slide.is-active .pulse-card h3 { animation-delay:.08s; }
+#bannerCarousel > .hero-pulse-slide.is-active .pulse-card p { animation-delay:.16s; }
+@keyframes famFeaturedGradient {
+  0%{background-position:0% 45%;transform:scale(1)}
+  100%{background-position:100% 55%;transform:scale(1.055)}
+}
+@keyframes famFeaturedOrbit {
+  0%{transform:translate(-6%,4%) rotate(-12deg)}
+  100%{transform:translate(5%,-4%) rotate(24deg)}
+}
+@keyframes famFeaturedGlow {
+  from{transform:translate(-7%,1%) scale(.94);opacity:.7}
+  to{transform:translate(6%,-3%) scale(1.08);opacity:1}
+}
+@keyframes famFeaturedSweep {
+  0%,25%{transform:translateX(-95%) rotate(-8deg)}
+  65%,100%{transform:translateX(95%) rotate(-8deg)}
+}
+@keyframes famFeaturedTextIn {
+  from{opacity:.25;transform:translateY(9px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@media (max-width:767px) {
+  /* The source banner artworks are all 1200x675: match their aspect ratio
+     rather than stretching the stage and introducing top/bottom bands. */
   #bannerCarousel {
-    height: clamp(245px, 72vw, 300px);
-    align-items: stretch;
+    height:auto;
+    aspect-ratio:16 / 9;
   }
   #bannerCarousel > .hero-slide {
-    height: 100%;
-    min-height: 0;
-    box-sizing: border-box;
+    height:100%;
+    min-height:0;
+    box-sizing:border-box;
+    border-radius:20px;
   }
   #bannerCarousel > .hero-slide.hero-img {
-    height: 100%;
-    min-height: 0;
-    isolation: isolate;
-    border-radius: 20px;
+    height:100%;
+    min-height:0;
+    padding:0;
+    border:0;
+    background:transparent;
   }
-  #bannerCarousel > .hero-slide.hero-img::before {
-    content: "";
-    position: absolute;
-    inset: -12px;
-    z-index: -1;
-    pointer-events: none;
-    background: var(--fam-banner-image, none) center / cover no-repeat;
-    filter: blur(14px) brightness(.68);
-  }
+  #bannerCarousel > .hero-slide.hero-img::before { content:none; }
   #bannerCarousel > .hero-slide.hero-img > img {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 0;
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    object-position:center;
+    border-radius:inherit;
+    transform:none;
+    animation:none;
   }
-  #bannerCarousel > .hero-slide.hero-pulse-slide {
-    padding: 12px;
-    justify-content: center;
+  #bannerCarousel > .hero-slide.hero-pulse-slide { padding:0; }
+  #bannerCarousel > .hero-pulse-slide .pulse-card {
+    justify-content:flex-start;
+    padding:clamp(11px,3.6vw,17px);
+    -webkit-overflow-scrolling:touch;
   }
-  #bannerCarousel > .hero-slide.hero-pulse-slide .pulse-card {
-    max-height: 100%;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+  #bannerCarousel > .hero-pulse-slide .pulse-card-overline {
+    width:100%;
+    font-size:9px;
+    gap:6px;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-symbol {
+    width:23px;height:23px;font-size:14px;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-card h3 {
+    max-width:90%;
+    margin:7px 0 5px;
+    font-size:clamp(18px,5vw,23px);
+    line-height:1.14;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-card p {
+    max-width:88%;
+    font-size:11px;
+    line-height:1.38;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-open-foot {
+    width:100%;
+    margin-top:auto;
+    padding-top:6px;
+    gap:5px;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-open-label { font-size:9px; }
+  #bannerCarousel > .hero-pulse-slide .pulse-open-foot time { font-size:10px; }
+  #bannerCarousel > .hero-pulse-slide .pulse-poll h3 {
+    max-width:100%;
+    font-size:clamp(16px,4.4vw,20px);
+    margin:5px 0 2px;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-poll .pulse-options {
+    width:100%;
+    gap:5px;
+    margin:5px 0;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-option,
+  #bannerCarousel > .hero-pulse-slide .pulse-result {
+    min-height:40px;
+    padding:5px 7px;
+    font-size:10px;
+    line-height:1.22;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-poll-foot {
+    width:100%;
+    font-size:9px;
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  #bannerCarousel > .hero-pulse-slide::before,
+  #bannerCarousel > .hero-pulse-slide::after,
+  #bannerCarousel > .hero-pulse-slide .pulse-card::before,
+  #bannerCarousel > .hero-pulse-slide .pulse-card::after,
+  #bannerCarousel > .hero-pulse-slide.is-active .pulse-card-overline,
+  #bannerCarousel > .hero-pulse-slide.is-active .pulse-card h3,
+  #bannerCarousel > .hero-pulse-slide.is-active .pulse-card p {
+    animation:none!important;
   }
 }
 
@@ -2491,10 +2722,18 @@ window.onunhandledrejection = function() {
     if (currentTab !== "board" || document.hidden) return;
     const box = $("bannerCarousel");
     if (!box || !box.children.length) return;
+    let lastIdx = -1, heldFeatured = false;
     carTimer = setInterval(() => {
-      if (currentTab !== "board" || document.hidden || box.matches(":hover") || !box.children.length) return;
+      if (currentTab !== "board" || document.hidden || box.matches(":hover") || box.matches(":focus-within") || !box.children.length) return;
       const cardW = box.children[0].offsetWidth + 14;
       const idx = Math.round(box.scrollLeft / cardW);
+      if (idx !== lastIdx) { lastIdx = idx; heldFeatured = false; }
+      // Give interactive polls and announcements two rotations to read or vote.
+      if (box.children[idx]?.classList.contains("hero-pulse-slide") && !heldFeatured) {
+        heldFeatured = true;
+        return;
+      }
+      heldFeatured = false;
       if (idx >= box.children.length - 1) box.scrollTo({ left: 0, behavior: "smooth" });
       else box.scrollBy({ left: cardW, behavior: "smooth" });
     }, 4200);
@@ -2523,7 +2762,7 @@ window.onunhandledrejection = function() {
       { src: "banner-clean-6", alt: "Ученический совет: команда волонтёров." }
     ];
     banners.forEach(({ src, alt }, index) => {
-      html.push(`<div class="hero-slide hero-img" style="--fam-banner-image:url('${src}.webp')">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
+      html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
     box.innerHTML = html.join("");
     // Keep error handling outside HTML attributes for a stricter Content Security Policy.
@@ -2542,7 +2781,9 @@ window.onunhandledrejection = function() {
       const cardW = box.children[0] ? box.children[0].offsetWidth + 14 : 1;
       const idx = Math.round(box.scrollLeft / cardW);
       document.querySelectorAll('.hero-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+      Array.from(box.children).forEach((slide, i) => slide.classList.toggle('is-active', i === idx));
     };
+    box.dispatchEvent(new Event("scroll"));
   }
 
   function syncHeroDots() {

@@ -187,6 +187,23 @@ try {
   await page.locator('[data-action="close-description-helper"]').click();
   await page.locator('[data-action="close-listing-modal"]').click();
 
+  // setContent() has no base URL, so relative artwork URLs intentionally fail.
+  // Add a valid inline artwork fixture to test the real banner CSS geometry.
+  await page.evaluate(() => {
+    const stage = document.getElementById("bannerCarousel");
+    if (!stage || stage.querySelector(".hero-img")) return;
+    const slide = document.createElement("div");
+    slide.className = "hero-slide hero-img";
+    slide.setAttribute("aria-hidden", "true");
+    const img = document.createElement("img");
+    img.width = 1200;
+    img.height = 675;
+    img.alt = "Тестовый баннер";
+    img.src = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675"></svg>');
+    slide.appendChild(img);
+    stage.appendChild(slide);
+  });
+
   const widths = [
     { width: 360, height: 844, columns: 2 },
     { width: 360, height: 640, columns: 2 },
@@ -238,6 +255,29 @@ try {
     assert.ok(metrics.bodyWidth <= size.width + 1, `body has horizontal overflow at ${size.width}px: ${metrics.bodyWidth}px`);
     assert.ok(metrics.mainScrollWidth <= metrics.mainClientWidth + 1, `main content overflows horizontally at ${size.width}px`);
     assert.equal(metrics.columns, size.columns, `unexpected card column count at ${size.width}px`);
+
+    // Photo artwork is authored at 16:9. It must fill the banner without
+    // letterboxing, blurred top/bottom edges, or cropping on mobile devices.
+    if (size.width <= 767) {
+      const bannerMetrics = await page.locator("#bannerCarousel .hero-img").first().evaluate(slide => {
+        const image = slide.querySelector("img");
+        const box = slide.getBoundingClientRect();
+        const photo = image.getBoundingClientRect();
+        return {
+          frameHeight: box.height,
+          imageHeight: photo.height,
+          frameWidth: box.width,
+          imageWidth: photo.width,
+          fit: getComputedStyle(image).objectFit,
+          background: getComputedStyle(slide, "::before").content
+        };
+      });
+      assert.ok(Math.abs(bannerMetrics.frameHeight - bannerMetrics.imageHeight) < 2, "banner has vertical bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth - bannerMetrics.imageWidth) < 2, "banner has horizontal bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth / bannerMetrics.frameHeight - 16 / 9) < .035, "banner aspect is wrong at " + size.width);
+      assert.equal(bannerMetrics.fit, "cover", "mobile banner photo must fill its frame");
+      assert.equal(bannerMetrics.background, "none", "old blurred banner background must be absent");
+    }
 
     for (const [name, box] of Object.entries(metrics)) {
       if (!box || typeof box !== "object" || !("right" in box)) continue;
