@@ -277,6 +277,10 @@ function hasImageSignature(bytes: Uint8Array, mime: string): boolean {
   return false;
 }
 
+async function publishPendingIdeaImage(imageUrl: string, userId: string): Promise<string> {
+  return await stagePendingIdeaImage(imageUrl, userId);
+}
+
 async function stagePendingIdeaImage(
   imageUrl: string,
   userId: string,
