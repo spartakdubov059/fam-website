@@ -44,6 +44,10 @@ try{
     assert.equal(await page.locator("#pulseGrid .pulse-card").count(),0,"poll cards are moved into the hero carousel");
     assert.equal(await page.locator("#bannerCarousel .pulse-card").count(),4,"announcements and polls render in the top carousel");
     assert.equal(await page.locator(".pulse-card.is-open-event").count(),1,"open event renders in the carousel");
+    assert.equal(await page.locator("#bannerCarousel > .hero-pulse-event").count(),1,"open event is a native hero slide");
+    assert.equal(await page.locator("#bannerCarousel > .hero-pulse-important").count(),1,"important announcement is a native hero slide");
+    assert.equal(await page.locator("#bannerCarousel > .hero-pulse-announcement").count(),1,"news announcement is a native hero slide");
+    assert.equal(await page.locator("#bannerCarousel > .hero-pulse-poll").count(),1,"poll is a native hero slide");
     assert.match(await page.locator(".pulse-open-foot").innerText(),/Без записи/);
     assert.equal(await page.locator("#bannerCarousel").isVisible(),true,"announcement cards are in the hero carousel");
     if(width>600){
