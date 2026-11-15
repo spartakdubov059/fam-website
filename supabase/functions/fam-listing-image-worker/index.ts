@@ -252,6 +252,31 @@ async function scheduleRetryOrManual(task, result) {
   return "manual_review";
 }
 
+async function callIdeaModeration(task, imageUrl) {
+  const response = await fetch(SUPABASE_URL + "/functions/v1/moderate", {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_SECRET_KEY,
+      "Content-Type": "application/json",
+      "x-fam-internal-key": SUPABASE_SECRET_KEY,
+    },
+    body: JSON.stringify({
+      text: task.idea_text || "",
+      image_url: imageUrl,
+      image_purpose: "idea",
+      context: { kind: "idea", sender_id: task.user_id, school_id: task.school_id },
+    }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data || !["ok", "pending", "reject"].includes(data.action)) {
+    return {
+      action: "pending", degraded: true, diagnostic_code: "moderation_internal_error",
+      reason: "Внутренняя проверка временно недоступна.",
+    };
+  }
+  return data;
+}
+
 function safePendingIdeaPath(task) {
   const userId = String(task.user_id || "");
   const path = String(task.image_path || "");
@@ -297,10 +322,7 @@ async function processIdeaTask(task) {
   let publishedPath = null;
   try {
     const signedUrl = await createSignedIdeaUrl(task.image_path);
-    const moderation = await callModeration({
-      user_id: task.user_id, school_id: task.school_id,
-      title: "Идея из Почты идей", description: task.idea_text || "", price_text: "",
-    }, signedUrl);
+    const moderation = await callIdeaModeration(task, signedUrl);
     if (moderation.action === "reject") {
       await finishIdea(task, "rejected", {
         reason_code: moderation.reason_code || "unsafe_image",
