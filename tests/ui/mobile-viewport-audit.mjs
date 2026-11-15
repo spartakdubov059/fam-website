@@ -187,6 +187,23 @@ try {
   await page.locator('[data-action="close-description-helper"]').click();
   await page.locator('[data-action="close-listing-modal"]').click();
 
+  // setContent() has no base URL, so relative artwork URLs intentionally fail.
+  // Add a valid inline artwork fixture to test the real banner CSS geometry.
+  await page.evaluate(() => {
+    const stage = document.getElementById("bannerCarousel");
+    if (!stage || stage.querySelector(".hero-img")) return;
+    const slide = document.createElement("div");
+    slide.className = "hero-slide hero-img";
+    slide.setAttribute("aria-hidden", "true");
+    const img = document.createElement("img");
+    img.width = 1200;
+    img.height = 675;
+    img.alt = "Тестовый баннер";
+    img.src = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675"></svg>');
+    slide.appendChild(img);
+    stage.appendChild(slide);
+  });
+
   const widths = [
     { width: 360, height: 844, columns: 2 },
     { width: 360, height: 640, columns: 2 },
