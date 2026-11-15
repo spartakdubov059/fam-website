@@ -70,7 +70,7 @@ test("idea photo quota failures keep attachments private and retry slowly withou
   assert.match(submit, /ai_status: stagedImagePaths\.length \? "pending"/);
   assert.match(worker, /claim_idea_image_moderation_tasks/);
   assert.match(worker, /image_purpose: "idea"/);
-  assert.match(worker, /reasonCode === "image_review_quota_exceeded".{0,100}7 \\* 24/s);
+  assert.ok(worker.includes('reasonCode === "image_review_quota_exceeded" ? 7 * 24 * 60 * 60'));
   assert.match(worker, /manual_review/);
   assert.match(moderate, /imagePurpose === "idea" \? "idea-images"/);
 });
