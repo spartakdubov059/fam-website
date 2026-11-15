@@ -258,9 +258,9 @@ serve(async (req: Request) => {
       safetyContext.source_origin = req.headers.get("origin");
       safetyContext.evidence_excerpt = imageUrl ? null : value;
     }
-    const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : "listing";
-    const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : "listing-images-pending";
-    const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : "listing_";
+    const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : payload?.image_purpose === "idea" ? "idea" : "listing";
+    const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : imagePurpose === "idea" ? "idea-images" : "listing-images-pending";
+    const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : imagePurpose === "idea" ? "idea_" : "listing_";
     const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/sign/" + pendingImageBucket + "/";
     const expectedImagePrefix = safetyContext?.sender_id
       ? allowedImagePrefix + safetyContext.sender_id + "/" + pendingImagePrefix + safetyContext.sender_id + "_"
