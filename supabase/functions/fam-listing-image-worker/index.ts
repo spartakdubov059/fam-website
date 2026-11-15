@@ -252,6 +252,108 @@ async function scheduleRetryOrManual(task, result) {
   return "manual_review";
 }
 
+function safePendingIdeaPath(task) {
+  const userId = String(task.user_id || "");
+  const path = String(task.image_path || "");
+  if (!/^[0-9a-f-]{36}$/i.test(userId)) return false;
+  return new RegExp("^" + userId + "/idea_[a-z0-9-]{1,50}\\\\.(?:jpg|png|webp)$", "i").test(path);
+}
+
+async function createSignedIdeaUrl(path) {
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(
+    SUPABASE_URL + "/storage/v1/object/sign/idea-images/" + encodedPath,
+    { method: "POST", headers: adminHeaders("application/json"), body: JSON.stringify({ expiresIn: 600 }) },
+  );
+  const data = await response.json().catch(() => null);
+  if (!response.ok || typeof data?.signedURL !== "string") {
+    if (isMissingStorageObject(response, data)) throw new Error("staged_media_missing");
+    throw new Error("pending_idea_sign_failed");
+  }
+  if (data.signedURL.startsWith("http")) return data.signedURL;
+  if (data.signedURL.startsWith("/storage/v1/")) return SUPABASE_URL + data.signedURL;
+  return SUPABASE_URL + "/storage/v1" + (data.signedURL.startsWith("/") ? "" : "/") + data.signedURL;
+}
+
+async function finishIdea(task, state, details = {}) {
+  const result = await rpc("finish_idea_image_moderation_task", {
+    p_queue_id: task.queue_id,
+    p_state: state,
+    p_reason_code: details.reason_code || null,
+    p_reason: details.reason || null,
+    p_retry_seconds: details.retry_seconds || null,
+  });
+  if (result !== true) throw new Error("idea_moderation_queue_finish_not_applied");
+}
+
+async function processIdeaTask(task) {
+  if (!safePendingIdeaPath(task) || !task.queue_id) {
+    if (task?.queue_id) await finishIdea(task, "failed", {
+      reason_code: "invalid_pending_idea_path", reason: "Не удалось подтвердить временный файл фотографии.",
+    });
+    return "failed";
+  }
+
+  let publishedPath = null;
+  try {
+    const signedUrl = await createSignedIdeaUrl(task.image_path);
+    const moderation = await callModeration({
+      user_id: task.user_id, school_id: task.school_id,
+      title: "Идея из Почты идей", description: task.idea_text || "", price_text: "",
+    }, signedUrl);
+    if (moderation.action === "reject") {
+      await finishIdea(task, "rejected", {
+        reason_code: moderation.reason_code || "unsafe_image",
+        reason: moderation.reason || "Фото не прошло проверку безопасности.",
+      });
+      await removeObject("idea-images", task.image_path);
+      return "rejected";
+    }
+    if (moderation.action === "pending") return await scheduleIdeaRetryOrReview(task, moderation);
+
+    const { bytes, mime, extension } = await fetchImageBytes(signedUrl);
+    const approvedPath = task.user_id + "/idea_" + crypto.randomUUID() + "." + extension;
+    const uploaded = await fetch(
+      SUPABASE_URL + "/storage/v1/object/idea-images/" + approvedPath,
+      { method: "POST", headers: { ...adminHeaders(mime), "x-upsert": "false" }, body: bytes },
+    );
+    if (!uploaded.ok) throw new Error("approved_idea_publish_failed_" + uploaded.status);
+    publishedPath = approvedPath;
+
+    await finishIdea(task, "approved", {
+      reason_code: "image_review_approved",
+      reason: "Фото прошло автоматическую проверку.",
+    });
+    if (publishedPath !== task.image_path) await removeObject("idea-images", task.image_path);
+    return "approved";
+  } catch (error) {
+    if (error instanceof Error && error.message === "staged_media_missing") {
+      await finishIdea(task, "failed", {
+        reason_code: "pending_idea_missing", reason: "Временный файл фото предложения больше не найден.",
+      });
+      return "failed";
+    }
+    return await scheduleIdeaRetryOrReview(task, {
+      action: "pending", degraded: true, diagnostic_code: "moderation_internal_error",
+      reason: "Сервис проверки фотографии временно недоступен.",
+    });
+  }
+}
+
+async function scheduleIdeaRetryOrReview(task, result) {
+  const reasonCode = String(result.reason_code || result.diagnostic_code || "provider_unavailable").slice(0, 80);
+  const reason = String(result.reason || "Проверка фотографии временно недоступна.").slice(0, 180);
+  if (isRetryableModerationFailure(result)) {
+    await finishIdea(task, "retry", {
+      reason_code: reasonCode, reason,
+      retry_seconds: reasonCode === "image_review_quota_exceeded" ? 86400 : retryDelaySeconds(task.attempts),
+    });
+    return "retry";
+  }
+  await finishIdea(task, "manual_review", { reason_code: reasonCode, reason });
+  return "manual_review";
+}
+
 function safePendingAvatarPath(task) {
   const userId = String(task.user_id || "");
   const path = String(task.image_path || "");
@@ -577,6 +679,17 @@ Deno.serve(async (req) => {
     });
     if (!Array.isArray(tasks)) return json({ ok: false, error: "invalid_queue_response" }, 502);
 
+    let ideaTasks = [];
+    try {
+      const claimedIdeas = await rpc("claim_idea_image_moderation_tasks", {
+        p_limit: Math.max(1, Math.min(2, limit)),
+        p_lease_seconds: 120,
+      });
+      if (Array.isArray(claimedIdeas)) ideaTasks = claimedIdeas;
+    } catch (error) {
+      console.warn("fam_idea_queue_claim_failed", error instanceof Error ? error.name : "unknown");
+    }
+
     let avatarTasks = [];
     try {
       const claimedAvatars = await rpc("claim_avatar_image_moderation_tasks", {
@@ -597,6 +710,13 @@ Deno.serve(async (req) => {
       manual_review: 0,
       failed: 0,
       blocked: 0,
+      idea_claimed: ideaTasks.length,
+      idea_approved: 0,
+      idea_rejected: 0,
+      idea_retry: 0,
+      idea_manual_review: 0,
+      idea_failed: 0,
+      idea_blocked: 0,
       avatar_claimed: avatarTasks.length,
       avatar_approved: 0,
       avatar_rejected: 0,
@@ -609,6 +729,16 @@ Deno.serve(async (req) => {
       const state = await processTask(task);
       if (Object.hasOwn(counts, state)) counts[state]++;
       else counts.blocked++;
+    }
+    for (const task of ideaTasks) {
+      const state = await processIdeaTask(task);
+      const key = state === "approved" ? "idea_approved"
+        : state === "rejected" ? "idea_rejected"
+        : state === "retry" ? "idea_retry"
+        : state === "manual_review" ? "idea_manual_review"
+        : state === "failed" ? "idea_failed"
+        : "idea_blocked";
+      counts[key]++;
     }
     for (const task of avatarTasks) {
       const state = await processAvatarTask(task);
