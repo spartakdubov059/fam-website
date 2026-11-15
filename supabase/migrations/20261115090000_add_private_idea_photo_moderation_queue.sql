@@ -23,6 +23,7 @@ create index if not exists idea_image_moderation_queue_due_idx
 create index if not exists idea_image_moderation_queue_lease_idx
   on private.idea_image_moderation_queue (locked_until)
   where status = 'processing';
+create index if not exists idea_image_moderation_queue_user_idx on private.idea_image_moderation_queue(user_id);
 create index if not exists idea_image_moderation_queue_user_idx
   on private.idea_image_moderation_queue (user_id);
 alter table private.idea_image_moderation_queue enable row level security;
