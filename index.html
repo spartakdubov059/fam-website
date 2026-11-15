@@ -1041,6 +1041,24 @@
   border-radius: 9px;
 }
 #bannerCarousel > .hero-pulse-slide .pulse-date { color: rgba(255,255,255,.84); }
+ /* Clear, compact schedule labels; banner layouts and motion remain unchanged. */
+ #bannerCarousel > .hero-pulse-slide:is(.hero-pulse-event,.hero-pulse-announcement,.hero-pulse-important) .pulse-date {
+   display: inline-flex;
+   align-items: center;
+   gap: 3px;
+   padding: 5px 9px;
+   border: 1px solid rgba(200,245,66,.34);
+   border-radius: 10px;
+   background: rgba(12,15,27,.53);
+   color: #fff;
+   font-size: clamp(12px,1.6vw,15px);
+   line-height: 1.25;
+   font-weight: 800;
+   letter-spacing: 0;
+   white-space: nowrap;
+   box-shadow: 0 3px 12px rgba(0,0,0,.16);
+ }
+ #bannerCarousel > .hero-pulse-event .pulse-event-clock { color: #dfff84; font-weight: 900; }
 #bannerCarousel > .hero-pulse-slide .pulse-card h3 {
   margin: 11px 0 7px;
   max-width: 84%;
@@ -1155,6 +1173,11 @@
     width:100%;
     font-size:9px;
     gap:6px;
+  }
+  #bannerCarousel > .hero-pulse-slide .pulse-card-overline { flex-wrap: wrap; }
+  #bannerCarousel > .hero-pulse-slide:is(.hero-pulse-event,.hero-pulse-announcement,.hero-pulse-important) .pulse-date {
+    padding:4px 7px;
+    font-size:clamp(11px,3.1vw,13px);
   }
   #bannerCarousel > .hero-pulse-slide .pulse-symbol {
     width:23px;height:23px;font-size:14px;
