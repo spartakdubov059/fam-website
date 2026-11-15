@@ -1,55 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import {
-  boundedRetryDelayMs,
-  isExhaustedImageReviewQuota,
-  shouldRetryImageReviewRateLimit,
-} from "../../supabase/functions/moderate/image-reviewer-utils.js";
 
-const reviewer = readFileSync(
-  new URL("../../supabase/functions/moderate/image-reviewer.ts", import.meta.url),
-  "utf8",
-);
-const moderator = readFileSync(
-  new URL("../../supabase/functions/moderate/index.ts", import.meta.url),
-  "utf8",
-);
+const moderator = readFileSync(new URL("../../supabase/functions/moderate/index.ts", import.meta.url), "utf8");
+const reviewer = readFileSync(new URL("../../supabase/functions/moderate/image-reviewer.ts", import.meta.url), "utf8");
 
-test("retries one transient image-review rate limit but not exhausted provider quota", () => {
-  assert.equal(shouldRetryImageReviewRateLimit(429, "rate_limit_exceeded", 0), true);
-  assert.equal(shouldRetryImageReviewRateLimit(429, null, 0), true);
-  assert.equal(shouldRetryImageReviewRateLimit(429, "insufficient_quota", 0), false);
-  assert.equal(shouldRetryImageReviewRateLimit(429, "billing_hard_limit_reached", 0), false);
-  assert.equal(shouldRetryImageReviewRateLimit(429, "credit_balance_exhausted", 0), false);
-  assert.equal(isExhaustedImageReviewQuota("credit_balance_exhausted"), true);
-  assert.equal(isExhaustedImageReviewQuota("rate_limit_exceeded"), false);
-  assert.equal(shouldRetryImageReviewRateLimit(429, "rate_limit_exceeded", 1), false);
-  assert.equal(shouldRetryImageReviewRateLimit(500, "rate_limit_exceeded", 0), false);
+test("photo submissions use one free multimodal moderation request, not a paid image model", () => {
+  assert.match(moderator, /https:\/\/api\.openai\.com\/v1\/moderations/);
+  assert.match(moderator, /\{ type: "image_url", image_url: \{ url: imageUrl \} \}/);
+  assert.doesNotMatch(moderator, /reviewListingImage/);
+  assert.match(moderator, /provider: "openai_moderation"/);
+  assert.match(moderator, /fam-openai-moderation-v3/);
+  assert.match(reviewer, /https:\/\/api\.openai\.com\/v1\/moderations/);
+  assert.doesNotMatch(reviewer, /gpt-5-mini|v1\/chat\/completions/);
 });
 
-test("Retry-After is honored within a short bounded window", () => {
-  assert.equal(boundedRetryDelayMs(null), 800);
-  assert.equal(boundedRetryDelayMs("1"), 1000);
-  assert.equal(boundedRetryDelayMs("0"), 250);
-  assert.equal(boundedRetryDelayMs("60"), 5000);
-  assert.equal(boundedRetryDelayMs("not-a-date"), 800);
-  assert.equal(boundedRetryDelayMs("2026-11-10T17:00:02.000Z", Date.parse("2026-11-10T17:00:00.000Z")), 2000);
-});
-
-test("photo-review rate limits are reported as a provider problem, not a prohibited photo", () => {
-  assert.match(reviewer, /Фото не признано запрещённым/);
-  assert.match(reviewer, /image_review_quota_exceeded/);
-  assert.match(reviewer, /shouldRetryImageReviewRateLimit/);
-  assert.match(reviewer, /isExhaustedImageReviewQuota/);
-  assert.match(moderator, /image_review_rate_limited: \{ category: "unclear_safety_signal"/);
-  assert.match(moderator, /image_review_quota_exceeded: \{ category: "unclear_safety_signal"/);
-  assert.match(moderator, /Provider rate limits, quota, or outages are service failures, not user safety violations/);
-});
-
-test("real personal-data findings and unsafe image findings still create safety signals", () => {
-  assert.match(moderator, /personal_information", "private_document/);
-  assert.match(moderator, /imageReview\.action === "reject"/);
-  assert.match(moderator, /writeSafetySignal\(safetyContext, "unsafe_image", "high"\)/);
-  assert.match(moderator, /image_requires_review/,);
+test("flagged image categories stay hidden for human review", () => {
+  assert.match(moderator, /flaggedByInput\.image\.length > 0 \|\| flaggedByInput\.unresolved\.length > 0/);
+  assert.match(moderator, /reason_code: "image_requires_human_review"/);
+  assert.match(moderator, /Материал скрыт и требует проверки/);
 });
