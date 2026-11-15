@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <script>
+    // Temporary public-domain handoff: GitHub Pages -> Netlify FAM.
+    // Only activate on GitHub Pages, never on Netlify or future hosting.
+    (function () {
+      if (window.location.hostname !== "spartakdubov059.github.io") return;
+      var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
+      if (!match) return;
+      var path = match[1] || "/";
+      window.location.replace("https://famru.netlify.app" + path + window.location.search + window.location.hash);
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FAM — Свои рядом</title>
