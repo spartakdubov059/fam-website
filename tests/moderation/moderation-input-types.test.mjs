@@ -44,7 +44,7 @@ test("missing type information for unknown categories stays fail-closed", () => 
   });
 });
 
-test("cleared text still goes through a separate image review", () => {
+test("text and image use one moderation request without a second paid visual model", () => {
   assert.match(moderator, /category_applied_input_types/);
   assert.match(moderator, /requiresImageHumanReview/);
   assert.match(moderator, /text_only_flags: flaggedByInput\.text/);
