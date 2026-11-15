@@ -331,7 +331,14 @@ async function processIdeaTask(task) {
       await removeObject("idea-images", task.image_path);
       return "rejected";
     }
-    if (moderation.action === "pending") return await scheduleIdeaRetryOrReview(task, moderation);
+    if (moderation.action === "pending") {
+      if (isRetryableModerationFailure(moderation)) return await scheduleIdeaRetryOrReview(task, moderation);
+      await finishIdea(task, "manual_review", {
+        reason_code: moderation.reason_code || "image_requires_human_review",
+        reason: moderation.reason || "Фото ожидает ручной проверки Совета.",
+      });
+      return "manual_review";
+    }
 
     const { bytes, mime, extension } = await fetchImageBytes(signedUrl);
     const approvedPath = task.user_id + "/idea_" + crypto.randomUUID() + "." + extension;
