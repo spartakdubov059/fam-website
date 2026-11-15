@@ -43,6 +43,6 @@ test("retry policy is intentionally allowlisted rather than retrying every degra
   assert.equal(isRetryableModerationFailure({ action: "pending", reason_code: "image_review_quota_exceeded" }), true);
 });
 
-test("retry schedule backs off and continues at a six-hour ceiling until the provider recovers", () => {
+test("transient retries continue at a six-hour ceiling until the provider recovers", () => {
   assert.deepEqual([1, 2, 3, 4, 5, 6, 10].map(retryDelaySeconds), [60, 180, 600, 1800, 3600, 21600, 21600]);
 });
