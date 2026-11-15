@@ -935,6 +935,53 @@
   .hero-slide.hero-img:not(.hero-event-photo)::after { animation: none !important; }
 }
 
+
+/* Keep photo and school-update cards equal in the phone carousel.
+   A soft backdrop from the same picture fills portrait-shaped space,
+   while the original 16:9 photo, including all lettering, stays intact. */
+@media (max-width: 767px) {
+  #bannerCarousel {
+    height: clamp(245px, 72vw, 300px);
+    align-items: stretch;
+  }
+  #bannerCarousel > .hero-slide {
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+  }
+  #bannerCarousel > .hero-slide.hero-img {
+    height: 100%;
+    min-height: 0;
+    isolation: isolate;
+    border-radius: 20px;
+  }
+  #bannerCarousel > .hero-slide.hero-img::before {
+    content: "";
+    position: absolute;
+    inset: -12px;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--fam-banner-image, none) center / cover no-repeat;
+    filter: blur(14px) brightness(.68);
+  }
+  #bannerCarousel > .hero-slide.hero-img > img {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 0;
+  }
+  #bannerCarousel > .hero-slide.hero-pulse-slide {
+    padding: 12px;
+    justify-content: center;
+  }
+  #bannerCarousel > .hero-slide.hero-pulse-slide .pulse-card {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2476,7 +2523,7 @@ window.onunhandledrejection = function() {
       { src: "banner-clean-6", alt: "Ученический совет: команда волонтёров." }
     ];
     banners.forEach(({ src, alt }, index) => {
-      html.push(`<div class="hero-slide hero-img">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
+      html.push(`<div class="hero-slide hero-img" style="--fam-banner-image:url('${src}.webp')">${index === 0 ? '<h1 class="hero-script">Найди своих.</h1>' : ''}<img src="${src}.webp" width="1200" height="675" loading="lazy" decoding="async" alt="${alt}"></div>`);
     });
     box.innerHTML = html.join("");
     // Keep error handling outside HTML attributes for a stricter Content Security Policy.
@@ -3078,7 +3125,7 @@ window.onunhandledrejection = function() {
       $("ideaImagesPreview").textContent = "";
       $("ideaUploadStatus").textContent = "";
       notice(submission.degraded
-        ? "⚠️ " + (submission.reason || "Проверка временно недоступна. Идея не отправлена.")
+        ? "⚠️ " + (submission.reason || "Идея сохранена. Проверка части вложений временно недоступна.")
         : submission.status === "pending"
           ? "Идея сохранена на дополнительную проверку безопасности. Пока проверка не завершена, Совет её не увидит."
           : "Идея прошла автоматическую проверку и отправлена Совету!");
