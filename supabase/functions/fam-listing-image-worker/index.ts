@@ -375,7 +375,7 @@ async function scheduleIdeaRetryOrReview(task, result) {
   if (isRetryableModerationFailure(result)) {
     await finishIdea(task, "retry", {
       reason_code: reasonCode, reason,
-      retry_seconds: retryDelaySeconds(task.attempts),
+      retry_seconds: reasonCode === "image_review_quota_exceeded" ? 7 * 24 * 60 * 60 : retryDelaySeconds(task.attempts),
     });
     return "retry";
   }
