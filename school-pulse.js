@@ -25,14 +25,14 @@
     const rawTime=typeof item?.event_time==="string" ? item.event_time.slice(0,5) : "";
     const eventTime=rawTime || (item?.event_starts_at
       ? new Date(item.event_starts_at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) : "");
-    return {kind: openEvent ? "event" : important ? "important" : "announcement", html: '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+(openEvent?' is-open-event':'')+'">' +
+    return '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+(openEvent?' is-open-event':'')+'">' +
       '<div class="pulse-card-overline"><span class="pulse-symbol" aria-hidden="true">'+(openEvent?'↗':important?'✦':'◈')+'</span>'+
         '<span>'+(openEvent?'СОБЫТИЕ ДЛЯ ВСЕХ':important?'ВАЖНОЕ':'АНОНС')+'</span>'+
         '<span class="pulse-date">'+escapeHtml(openEvent?eventLabel:timeLabel(item?.published_at))+'</span></div>'+
       '<h3>'+escapeHtml(clamp(item?.title,90))+'</h3>'+
       '<p>'+escapeHtml(clamp(item?.body,450))+'</p>'+
       (openEvent?'<div class="pulse-open-foot"><span class="pulse-open-label"><span class="pulse-open-dot" aria-hidden="true"></span>Без записи · Нет лимита мест</span>'+
-        (eventTime?'<time>'+escapeHtml(eventTime)+'</time>':'')+'</div>':'')+'</article>'};
+        (eventTime?'<time>'+escapeHtml(eventTime)+'</time>':'')+'</div>':'')+'</article>';
   }
   function pollCard(poll){
     const options=Array.isArray(poll?.options)?poll.options.slice(0,4):[];
@@ -54,10 +54,10 @@
         (voted||closed?'disabled':'')+'><span>'+safeLabel+'</span><span aria-hidden="true">'+(selected?'✓':'○')+'</span></button>';
     }).join("");
     const message=closed?'Опрос завершён':voted?(showResults?'Спасибо за голос!':'Спасибо! Итоги появятся после 5 голосов'):'Один голос от одного участника';
-    return {kind:"poll", html:'<article class="pulse-card pulse-poll"><div class="pulse-card-overline">'+
+    return '<article class="pulse-card pulse-poll"><div class="pulse-card-overline">'+
       '<span class="pulse-symbol" aria-hidden="true">✧</span><span>ОПРОС</span><span class="pulse-date">'+escapeHtml(timeLabel(poll?.closes_at))+'</span></div>'+
       '<h3>'+escapeHtml(clamp(poll?.question,140))+'</h3><div class="pulse-options">'+content+'</div>'+
-      '<div class="pulse-poll-foot"><span>'+escapeHtml(message)+'</span><span>'+total+' голосов</span></div></article>'};
+      '<div class="pulse-poll-foot"><span>'+escapeHtml(message)+'</span><span>'+total+' голосов</span></div></article>';
   }
   function mount({sb,getViewer,getListings=()=>[],notify}){
     const rootNode=document.getElementById("schoolPulse");
@@ -77,9 +77,17 @@
       announcementTrack.querySelectorAll(".pulse-generated").forEach(card=>card.remove());
       const allowedKinds=new Set(["event","important","announcement","poll"]);
       if(cards.length){
-        const slides=cards.map(({html,kind})=>{
+        const slides=cards.map(html=>{
+          // Classify only the fixed generated markup prefix; user-provided
+          // text remains escaped inside the card body and cannot set a type.
+          const kind=html.startsWith('<article class="pulse-card pulse-poll')
+            ? "poll"
+            : html.startsWith('<article class="pulse-card pulse-announcement is-open-event')
+              ? "event"
+              : html.startsWith('<article class="pulse-card pulse-announcement is-important')
+                ? "important" : "announcement";
           const type=allowedKinds.has(kind)?kind:"announcement";
-          return '<div class="hero-slide hero-pulse-slide hero-pulse-'+type+' pulse-generated">'+html+'</div>';
+          return '<div class="hero-slide hero-pulse-slide pulse-generated hero-pulse-'+type+'">'+html+'</div>';
         }).join("");
         announcementTrack.insertAdjacentHTML("afterbegin",slides);
       }
