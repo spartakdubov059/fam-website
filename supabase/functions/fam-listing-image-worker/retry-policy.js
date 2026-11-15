@@ -29,13 +29,8 @@ export function isRetryableModerationFailure(result = {}) {
 
 export function retryDelaySeconds(attempt) {
   const delays = [60, 180, 600, 1800, 3600, 21600];
-  const normalizedAttempt = Number(attempt) || 1;
-  // A hard billing/quota exhaustion needs a low-frequency probe, not repeated daily calls.
-  if (normalizedAttempt >= 2) return 7 * 24 * 60 * 60;
-  // Quota exhaustion is billing state, not a transient rate limit. Keep photo private and probe weekly.
-  if (normalizedAttempt >= 2) return 7 * 24 * 60 * 60;
-  const index = Math.max(0, Math.min(delays.length - 1, normalizedAttempt - 1));
+  const index = Math.max(0, Math.min(delays.length - 1, Number(attempt) - 1 || 0));
   return delays[index];
 }
 
-// Retryable service failures are retried indefinitely with a weekly ceiling after repeated failures.
+// Retryable service failures are retried indefinitely with a six-hour ceiling.
