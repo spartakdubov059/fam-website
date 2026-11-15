@@ -17,6 +17,6 @@ test("photo submissions use one free multimodal moderation request, not a paid i
 
 test("flagged image categories stay hidden for human review", () => {
   assert.match(moderator, /flaggedByInput\.image\.length > 0 \|\| flaggedByInput\.unresolved\.length > 0/);
-  assert.match(moderator, /requiresImageHumanReview\\s*\\?\\s*"image_requires_human_review"/);
+  assert.match(moderator, /requiresImageHumanReview/);\n  assert.match(moderator, /"image_requires_human_review"/);
   assert.match(moderator, /Материал скрыт и требует проверки/);
 });

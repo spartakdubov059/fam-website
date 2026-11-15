@@ -48,6 +48,8 @@ test("text and image use one moderation request without a second paid visual mod
   assert.match(moderator, /category_applied_input_types/);
   assert.match(moderator, /requiresImageHumanReview/);
   assert.match(moderator, /text_only_flags: flaggedByInput\.text/);
-  assert.match(moderator, /if \(!imageUrl\)[\s\S]*?return cacheAndRespond[\s\S]*?if \(imageUrl\)/);
+  assert.match(moderator, /input: imageUrl/);
+  assert.match(moderator, /image_review: "moderation_clear"/);
+  assert.doesNotMatch(moderator, /reviewListingImage/);
   assert.match(moderator, /categories_applied_to_image/);
 });
