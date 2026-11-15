@@ -48,6 +48,9 @@ test("Open events behave as announcements with no bookings, attendee cap or publ
  const markup=api.announcementCard({id:"any",kind:"open_event",title:"Открытый квиз",body:"Встречаемся вместе!",event_starts_at:"2099-05-03T16:00:00Z"});
  assert.match(markup,/СОБЫТИЕ ДЛЯ ВСЕХ/);
  assert.match(markup,/Без записи · Нет лимита мест/);
+ assert.match(markup,/pulse-event-clock"> · 16:00<\/span>/,"event schedule is prominent in the top banner");
+ const plainAnnouncement=api.announcementCard({kind:"news",title:"Новость",body:"Объявление",published_at:"2026-11-15T10:00:00Z"});
+ assert.doesNotMatch(plainAnnouncement,/pulse-event-clock/,"announcements do not invent a scheduled event time");
  assert.doesNotMatch(markup,/data-action="handle-event"|event_registrations|max_seats/);
  const hostile=api.announcementCard({kind:"open_event",title:"<svg onload=alert(1)>",body:"<script>run()</script>",event_starts_at:"2099-05-03T16:00:00Z"});
  assert.ok(hostile.includes("&lt;script&gt;"));
