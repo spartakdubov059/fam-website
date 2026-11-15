@@ -82,11 +82,7 @@ begin
      ai_reason=coalesce(nullif(p_reason,''),'Фото не прошло проверку безопасности.')
    where id=v_idea_id and ai_status='pending';
  elsif p_state='manual_review' then
-   update public.ideas set ai_reason='Фото сохранено приватно и ожидает проверки Совета.'
-   where id=v_idea_id and ai_status='pending';
- elsif p_state='failed' then
-   update public.ideas set image_paths=array_remove(image_paths,v_image_path),
-     ai_reason='Не удалось проверить фото; оно удалено из предложения.'
+   update public.ideas set ai_reason='Фото ожидает ручной проверки Совета.'
    where id=v_idea_id and ai_status='pending';
  elsif p_state='retry' then
    update public.ideas set ai_reason='Фото сохранено приватно; проверка будет повторена автоматически.'
@@ -97,7 +93,7 @@ begin
  end if;
  select cardinality(image_paths) into v_remaining from public.ideas where id=v_idea_id;
  select count(*) into v_pending from private.idea_image_moderation_queue
-   where idea_id=v_idea_id and id<>p_queue_id and status in('queued','processing','retry');
+   where idea_id=v_idea_id and id<>p_queue_id and status in('queued','processing','retry','manual_review');
  if coalesce(v_remaining,0)=0 then
    update public.ideas set ai_status='approved' where id=v_idea_id and ai_status='pending';
  elsif p_state='approved' and coalesce(v_pending,0)=0 then
