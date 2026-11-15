@@ -239,6 +239,29 @@ try {
     assert.ok(metrics.mainScrollWidth <= metrics.mainClientWidth + 1, `main content overflows horizontally at ${size.width}px`);
     assert.equal(metrics.columns, size.columns, `unexpected card column count at ${size.width}px`);
 
+    // Photo artwork is authored at 16:9. It must fill the banner without
+    // letterboxing, blurred top/bottom edges, or cropping on mobile devices.
+    if (size.width <= 767) {
+      const bannerMetrics = await page.locator("#bannerCarousel .hero-img").first().evaluate(slide => {
+        const image = slide.querySelector("img");
+        const box = slide.getBoundingClientRect();
+        const photo = image.getBoundingClientRect();
+        return {
+          frameHeight: box.height,
+          imageHeight: photo.height,
+          frameWidth: box.width,
+          imageWidth: photo.width,
+          fit: getComputedStyle(image).objectFit,
+          background: getComputedStyle(slide, "::before").content
+        };
+      });
+      assert.ok(Math.abs(bannerMetrics.frameHeight - bannerMetrics.imageHeight) < 2, "banner has vertical bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth - bannerMetrics.imageWidth) < 2, "banner has horizontal bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth / bannerMetrics.frameHeight - 16 / 9) < .035, "banner aspect is wrong at " + size.width);
+      assert.equal(bannerMetrics.fit, "cover", "mobile banner photo must fill its frame");
+      assert.equal(bannerMetrics.background, "none", "old blurred banner background must be absent");
+    }
+
     for (const [name, box] of Object.entries(metrics)) {
       if (!box || typeof box !== "object" || !("right" in box)) continue;
       assert.ok(box.left >= -1 && box.right <= size.width + 1, `${name} escapes viewport at ${size.width}px`);
