@@ -109,15 +109,19 @@ test("a provider outage does not block a locally clean idea, while local risk st
   assert.match(contentSafety, /serious_hate_or_threat/);
 });
 
-test("student identity fields are gathered at registration and editable in the user's own profile", () => {
+test("person types collect the right registration data and remain editable only in the user's own profile", () => {
   assert.match(html, /id="authFirstName"/);
   assert.match(html, /id="authLastName"/);
+  assert.match(html, /id="authPersonType"/);
   assert.match(html, /id="authClassName"/);
-  assert.match(html, /first_name: firstName/);
-  assert.match(html, /last_name: lastName/);
-  assert.match(html, /class_name: className/);
+  assert.match(html, /id="authStaffPosition"/);
+  assert.match(html, /person_type: personType/);
+  assert.match(html, /class_name: className \|\| null/);
+  assert.match(html, /staff_position: staffPosition \|\| null/);
   assert.match(html, /id="profileStudentIdentityForm"/);
-  assert.match(html, /\.update\(\{ first_name, last_name, class_name \}\)/);
+  assert.match(html, /id="profilePersonType"/);
+  assert.match(html, /\.update\(\{ first_name, last_name, person_type, class_name, staff_position \}\)/);
+  assert.match(html, /staff_verification_status/);
 });
 
 test("student identity is visible to school admins only through same-school admin queries", () => {
