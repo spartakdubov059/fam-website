@@ -48,7 +48,7 @@ function harness(items, options = {}) {
           upsert(rows, config) {
             operations.push({
               kind: "dismissals",
-              rows: rows.map(row => ({ ...row })),
+              rows: Array.from(rows, row => ({ ...row })),
               onConflict: config.onConflict,
             });
             options.duringUpsert?.(context);
@@ -116,7 +116,7 @@ test("notifications arriving while dismissals save remain visible", async () => 
     duringUpsert: context => context.notificationsCache.push({ id: "message:new", kind: "message", recordId: "new" }),
   });
   await h.run();
-  assert.deepEqual(h.context.notificationsCache.map(note => note.id), ["message:new"]);
+  assert.deepEqual(Array.from(h.context.notificationsCache, note => note.id), ["message:new"]);
 });
 
 test("account switch during network request cannot clear another account's feed", async () => {
@@ -127,6 +127,6 @@ test("account switch during network request cannot clear another account's feed"
     },
   });
   await h.run();
-  assert.deepEqual(h.context.notificationsCache.map(note => note.id), ["another:notification"]);
+  assert.deepEqual(Array.from(h.context.notificationsCache, note => note.id), ["another:notification"]);
   assert.equal(h.operations.filter(op => op.kind === "dismissals").length, 0);
 });
