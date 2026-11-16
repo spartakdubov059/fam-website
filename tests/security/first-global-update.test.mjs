@@ -7,6 +7,8 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),"../..");
 const html=readFileSync(resolve(root,"index.html"),"utf8");
 const submit=readFileSync(resolve(root,"supabase/functions/submit-content/index.ts"),"utf8");
 const moderator=readFileSync(resolve(root,"supabase/functions/moderate/index.ts"),"utf8");
+const worker=readFileSync(resolve(root,"supabase/functions/fam-listing-image-worker/index.ts"),"utf8");
+const queueMigration=readFileSync(resolve(root,"supabase/migrations/20261117120000_remove_orphan_idea_image_worker_cron.sql"),"utf8");
 const migration=readFileSync(resolve(root,"supabase/migrations/20261113090000_idea_image_attachments.sql"),"utf8");
 const pulse=readFileSync(resolve(root,"school-pulse.js"),"utf8");
 
@@ -19,8 +21,15 @@ test("idea photos are limited, staged privately, checked before server-side publ
  assert.match(submit,/moderate\(text, authorization, origin, true, imageUrl, safetyContext\)/);
  assert.match(moderator,/if \(ideaReview\.action !== "ok" \|\| !imageUrl\)/);
  assert.match(moderator,/clean idea with a photo continues through the shared visual image checks/);
- assert.match(submit,/publishPendingIdeaImage/);
- assert.match(submit,/image_paths: publishedImagePaths/);
+ assert.match(submit,/if \(imageReview\.action === "pending"\) pendingImageReview = true/);
+ assert.match(submit,/stagePendingIdeaImage\(imageUrl, userId\)/);
+ assert.match(submit,/image_paths: stagedImagePaths/);
+ assert.match(submit,/enqueueIdeaImageModerationTask\(idea\.id, userId, profile\.school_id, imagePath\)/);
+ assert.match(worker,/claim_idea_image_moderation_tasks/);
+ assert.match(worker,/processIdeaTask\(task\)/);
+ assert.match(moderator,/pendingImageBucket = imagePurpose === "avatar" \? "avatars-pending" : imagePurpose === "idea" \? "idea-images"/);
+ assert.match(queueMigration,/cron\.unschedule/);
+ assert.match(queueMigration,/fam-idea-image-moderation-every-minute/);
  assert.match(migration,/values \('idea-images',[\s\S]*?false, 2097152/i);
  assert.match(migration,/FAM idea authors and same-school staff read idea images/);
  assert.doesNotMatch(migration,/create policy[^;]+for insert to authenticated/is);

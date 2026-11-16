@@ -277,7 +277,11 @@ function hasImageSignature(bytes: Uint8Array, mime: string): boolean {
   return false;
 }
 
-async function publishPendingIdeaImage(
+async function publishPendingIdeaImage(imageUrl: string, userId: string): Promise<string> {
+  return await stagePendingIdeaImage(imageUrl, userId);
+}
+
+async function stagePendingIdeaImage(
   imageUrl: string,
   userId: string,
 ): Promise<string> {
@@ -298,9 +302,16 @@ async function publishPendingIdeaImage(
   const uploaded = await fetch(SUPABASE_URL + "/storage/v1/object/idea-images/" + path, {
     method: "POST", headers: { ...storageHeaders(mime), "x-upsert": "false" }, body: bytes,
   });
-  if (!uploaded.ok) throw new Error("Не удалось сохранить проверенное фото предложения.");
+  if (!uploaded.ok) throw new Error("Не удалось сохранить фото предложения.");
   await removePendingListingImage(imageUrl, userId);
   return path;
+}
+
+async function enqueueIdeaImageModerationTask(ideaId: string, userId: string, schoolId: string, imagePath: string): Promise<void> {
+  const result = await adminRequest("rpc/enqueue_idea_image_moderation_task", "POST", {
+    p_idea_id: ideaId, p_user_id: userId, p_school_id: schoolId, p_image_path: imagePath,
+  });
+  if (!result.ok || result.data !== true) throw new Error("Не удалось поставить фото в очередь проверки.");
 }
 
 async function removePublishedIdeaImage(path: string): Promise<void> {
@@ -771,35 +782,27 @@ Deno.serve(async (req: Request) => {
       }
 
       const textModeration = moderation;
-      let photoUnavailable = false;
-      for (const imageUrl of imageUrls) {
-        moderation = await moderate(text, authorization, origin, true, imageUrl, safetyContext);
-        if (moderation.action === "pending") {
-          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
-          photoUnavailable = true;
-          moderation = textModeration;
-          break;
-        }
-        if (moderation.action !== "ok") {
-          await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
-          return respond({
-            ok: false,
-            status: moderation.action,
-            reason: moderation.action === "pending"
-              ? "Фото не удалось проверить. Идея не отправлена; попробуйте позже или отправьте её без фото."
-              : moderation.reason ?? "Фото не прошло проверку безопасности.",
-            reason_code: moderation.reason_code ?? null,
-          }, 200, headers);
-        }
-      }
+      const stagedImagePaths: string[] = [];
+      let pendingImageReview = false;
 
-      const publishedImagePaths: string[] = [];
       try {
-        for (const imageUrl of (photoUnavailable ? [] : imageUrls)) {
-          publishedImagePaths.push(await publishPendingIdeaImage(imageUrl, userId));
+        for (const imageUrl of imageUrls) {
+          const imageReview = await moderate(text, authorization, origin, true, imageUrl, safetyContext);
+          if (imageReview.action === "reject") {
+            await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
+            return respond({
+              ok: false,
+              status: "rejected",
+              reason: imageReview.reason ?? "Фото не прошло проверку безопасности.",
+              reason_code: imageReview.reason_code ?? null,
+            }, 200, headers);
+          }
+          if (imageReview.action === "pending") pendingImageReview = true;
+          const stagedPath = await stagePendingIdeaImage(imageUrl, userId);
+          stagedImagePaths.push(stagedPath);
         }
       } catch (error) {
-        await Promise.all(publishedImagePaths.map((path) => removePublishedIdeaImage(path)));
+        await Promise.all(stagedImagePaths.map((path) => removePublishedIdeaImage(path)));
         await Promise.all(imageUrls.map((url) => removePendingListingImage(url, userId)));
         return fail(error instanceof Error ? error.message : "Не удалось сохранить фотографии.", 503, headers);
       }
@@ -808,27 +811,44 @@ Deno.serve(async (req: Request) => {
         user_id: userId,
         school_id: profile.school_id,
         text,
-        image_paths: publishedImagePaths,
-        ai_status: moderation.action === "pending" ? "pending" : "approved",
+        image_paths: stagedImagePaths,
+        ai_status: stagedImagePaths.length ? "pending" : moderation.action === "pending" ? "pending" : "approved",
         ai_summary: text.slice(0, 60),
-        ai_reason: moderation.reason ?? null,
+        ai_reason: pendingImageReview ? "Фото сохранено приватно и ожидает проверки." : (textModeration.reason ?? null),
         admin_status: "new",
       });
       const idea = Array.isArray(insertResult.data) ? insertResult.data[0] : null;
 
       if (!insertResult.ok || !idea) {
-        await Promise.all(publishedImagePaths.map((path) => removePublishedIdeaImage(path)));
+        await Promise.all(stagedImagePaths.map((path) => removePublishedIdeaImage(path)));
         console.error("Idea insert failed:", insertResult.status);
         return fail("Не удалось сохранить идею.", 500, headers);
       }
 
+      try {
+        for (const imagePath of stagedImagePaths) {
+          await enqueueIdeaImageModerationTask(idea.id, userId, profile.school_id, imagePath);
+        }
+      } catch (error) {
+        console.error("idea_image_moderation_enqueue_failed", error instanceof Error ? error.message : "unknown");
+        return respond({
+          ok: true,
+          status: "pending",
+          degraded: true,
+          idea,
+          reason: "Идея сохранена. Фото остаётся в закрытом хранилище и ожидает проверки Советом.",
+        }, 200, headers);
+      }
+
       return respond({
         ok: true,
-        status: moderation.action,
-        degraded: photoUnavailable || moderation.degraded === true,
+        status: pendingImageReview || moderation.action === "pending" ? "pending" : "approved",
+        degraded: pendingImageReview || moderation.degraded === true,
         diagnostic_code: moderation.diagnostic_code ?? null,
         idea,
-        reason: photoUnavailable ? "Идея отправлена без фото: фотографию не удалось проверить." : (moderation.reason ?? null),
+        reason: pendingImageReview
+          ? "Идея сохранена. Фото ожидает проверки; до одобрения его видят только вы и сотрудники школы."
+          : (textModeration.reason ?? null),
       }, 200, headers);
     }
 
