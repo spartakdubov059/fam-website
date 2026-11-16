@@ -34,8 +34,11 @@ test("profile shows the student's name with a neutral fallback and keeps email i
  assert.doesNotMatch(html,/\$\("profEmail"\)\.textContent = user\.email/);
 });
 
-test("chat titles use listing names and dialogs retain listing identity",()=>{
- assert.match(html,/Переписка по поводу «/);
+test("chat subjects identify listings and events while dialogs retain listing identity",()=>{
+ assert.match(html,/select\("id,title,is_event"\)/);
+ assert.match(html,/relatedListing\.is_event \? "Переписка по мероприятию «" : "Переписка по объявлению «"/);
+ assert.match(html,/listingIsEvent\.get\(listingId\) \? "Переписка по мероприятию «"/);
+ assert.match(html,/window\.startChat\(ev\.user_id, "Переписка по мероприятию «"/);
  assert.ok(html.includes('data-listing-id="${esc(d.listingId || "")}"'));
 });
 
