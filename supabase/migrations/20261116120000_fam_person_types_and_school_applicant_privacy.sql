@@ -95,7 +95,7 @@ $function$;
 create or replace function public.guard_profile_identity_update()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = pg_catalog, public, auth
 as $function$
 begin
@@ -127,6 +127,7 @@ create trigger profiles_guard_identity_update
 before update
 on public.profiles
 for each row execute function public.guard_profile_identity_update();
+revoke all on function public.guard_profile_identity_update() from public, anon, authenticated;
 
 create or replace function public.list_school_event_applicants()
 returns table(
