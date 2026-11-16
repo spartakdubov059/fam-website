@@ -1475,11 +1475,11 @@
       <details class="profile-box profile-disclosure" id="profileStudentIdentityPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🪪</span><span><b>Мои данные</b><small>Имя, фамилия и класс для администрации школы</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
         <div class="profile-disclosure-body">
-          <p class="profile-section-copy">Эти данные помогут администратору вашей школы понимать, кто отправляет идеи и публикует объявления. Их увидят только администраторы вашей школы.</p>
+          <p class="profile-section-copy">Эти данные помогают администрации и Ученическому совету разбирать заявки и обращения. Между участниками они не показываются.</p>
           <form id="profileStudentIdentityForm">
             <div class="form-group"><label for="profileFirstName">Имя</label><input id="profileFirstName" class="form-control" maxlength="60" required autocomplete="given-name"></div>
             <div class="form-group"><label for="profileLastName">Фамилия</label><input id="profileLastName" class="form-control" maxlength="60" required autocomplete="family-name"></div>
-            <div class="form-group"><label for="profileClassName">Класс</label><select id="profileClassName" class="form-control" required><option value="">Выберите класс</option></select></div>
+            <div class="form-group"><label for="profilePersonType">Кто вы?</label><select id="profilePersonType" class="form-control"><option value="student">Ученик</option><option value="school_staff">Учитель или другой сотрудник школы</option><option value="parent">Родитель или законный представитель</option></select></div><div class="form-group" id="profileClassGroup"><label for="profileClassName">Класс</label><select id="profileClassName" class="form-control"><option value="">Выберите класс</option></select></div><div class="form-group hidden" id="profileStaffPositionGroup"><label for="profileStaffPosition">Должность в школе</label><input id="profileStaffPosition" class="form-control" maxlength="100" placeholder="Например, учитель математики"></div><div id="profileStaffVerificationNote" class="hidden" aria-live="polite" style="font-size:10px;color:var(--muted);margin:7px 0;"></div>
             <button type="submit" class="button button-secondary" style="width:100%;">Сохранить данные</button>
             <div id="profileStudentIdentityStatus" aria-live="polite" style="font-size:10px;color:var(--muted);margin-top:7px;"></div>
           </form>
@@ -1510,7 +1510,7 @@
       </details>
       <details id="adminRequests" class="hidden profile-box profile-disclosure">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">🎟️</span><span><b>Заявки на мои мероприятия</b><small>Участники и статусы регистрации</small></span></span><span class="profile-disclosure-arrow">⌄</span></summary>
-        <div class="profile-disclosure-body"><div id="adminReqList"></div></div>
+        <div class="profile-disclosure-body"><div id="adminReqList"></div><div id="staffVerificationPanel" class="hidden" style="margin-top:14px;"><h3 style="font-size:12px;margin:0 0 8px;">Проверка должностей школы</h3><div id="staffVerificationList" aria-live="polite"></div></div></div>
       </details>
       <details class="profile-box profile-disclosure" id="profileListingsPanel">
         <summary><span class="profile-disclosure-title"><span class="profile-shortcut-icon">📦</span><span><b>Мои объявления</b><small>Просмотр и управление своими публикациями</small></span></span><span class="profile-disclosure-count" id="myListingsCount">0</span><span class="profile-disclosure-arrow">⌄</span></summary>
@@ -1561,11 +1561,11 @@
 <div id="identityCompletionGate" class="hidden" style="position:fixed;inset:0;z-index:9999;background:var(--bg);padding:16px;overflow:auto;">
   <div class="modal-content" style="max-width:460px;margin:10vh auto;">
     <h2 style="font-size:18px;">Заполните данные профиля</h2>
-    <p style="font-size:12px;color:var(--muted);">Укажите имя, фамилию и класс, чтобы продолжить работу в FAM.</p>
+    <p style="font-size:12px;color:var(--muted);">Укажите имя и фамилию; ученикам также нужно выбрать класс, а учителям и сотрудникам — должность.</p>
     <form id="identityCompletionForm">
       <div class="form-group"><label for="gateFirstName">Имя</label><input id="gateFirstName" class="form-control" maxlength="60" required autocomplete="given-name"></div>
       <div class="form-group"><label for="gateLastName">Фамилия</label><input id="gateLastName" class="form-control" maxlength="60" required autocomplete="family-name"></div>
-      <div class="form-group"><label for="gateClassName">Класс</label><select id="gateClassName" class="form-control" required><option value="">Выберите класс</option></select></div>
+      <div class="form-group"><label for="gatePersonType">Кто вы?</label><select id="gatePersonType" class="form-control"><option value="student">Ученик</option><option value="school_staff">Учитель или другой сотрудник школы</option><option value="parent">Родитель или законный представитель</option></select></div><div class="form-group" id="gateClassGroup"><label for="gateClassName">Класс</label><select id="gateClassName" class="form-control"><option value="">Выберите класс</option></select></div><div class="form-group hidden" id="gateStaffPositionGroup"><label for="gateStaffPosition">Должность в школе</label><input id="gateStaffPosition" class="form-control" maxlength="100" placeholder="Например, учитель математики"></div>
       <div id="identityCompletionStatus" role="alert" style="font-size:11px;color:var(--danger);margin:8px 0;"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Сохранить и продолжить</button>
     </form>
@@ -1594,7 +1594,7 @@
       <div id="registerIdentityFields" class="hidden">
         <div class="form-group"><label for="authFirstName">Имя</label><input id="authFirstName" class="form-control" maxlength="60" autocomplete="given-name" disabled></div>
         <div class="form-group"><label for="authLastName">Фамилия</label><input id="authLastName" class="form-control" maxlength="60" autocomplete="family-name" disabled></div>
-        <div class="form-group"><label for="authClassName">Класс</label><select id="authClassName" class="form-control" required disabled><option value="">Выберите класс</option></select></div>
+        <div class="form-group"><label for="authPersonType">Кто вы?</label><select id="authPersonType" class="form-control" disabled><option value="student">Ученик</option><option value="school_staff">Учитель или другой сотрудник школы</option><option value="parent">Родитель или законный представитель</option></select></div><div class="form-group" id="authClassGroup"><label for="authClassName">Класс</label><select id="authClassName" class="form-control" disabled><option value="">Выберите класс</option></select></div><div class="form-group hidden" id="authStaffPositionGroup"><label for="authStaffPosition">Должность в школе</label><input id="authStaffPosition" class="form-control" maxlength="100" disabled placeholder="Например, учитель математики"></div>
       </div>
       <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
       <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
@@ -1743,7 +1743,28 @@ window.onunhandledrejection = function() {
   let user = null, profile = null;
   let listings = [], regs = [], occupancy = [], ideas = [], favorites = [];
   const FAM_CLASSES = Array.from({ length: 7 }, (_, i) => String(i + 5)).flatMap(grade => ["А", "Б", "В", "Г", "К"].map(letter => grade + letter));
-  function profileIdentityIsComplete() { return !!profile && typeof profile.first_name === "string" && !!profile.first_name.trim() && typeof profile.last_name === "string" && !!profile.last_name.trim() && FAM_CLASSES.includes(profile.class_name); }
+  function profileIdentityIsComplete() {
+    if (!profile || !String(profile.first_name || "").trim() || !String(profile.last_name || "").trim()) return false;
+    const type = profile.person_type || "student";
+    if (type === "school_staff") return !!String(profile.staff_position || "").trim();
+    if (type === "parent") return true;
+    return FAM_CLASSES.includes(profile.class_name);
+  }
+  function syncPersonTypeFields(prefix, active = true) {
+    const type = $(prefix + "PersonType");
+    const classGroup = $(prefix + "ClassGroup");
+    const classField = $(prefix + "ClassName");
+    const positionGroup = $(prefix + "StaffPositionGroup");
+    const positionField = $(prefix + "StaffPosition");
+    const kind = type?.value || "student";
+    const student = kind === "student";
+    const staff = kind === "school_staff";
+    if (classGroup) classGroup.classList.toggle("hidden", !student);
+    if (classField) { classField.required = active && student; classField.disabled = !active || !student; }
+    if (positionGroup) positionGroup.classList.toggle("hidden", !staff);
+    if (positionField) { positionField.required = active && staff; positionField.disabled = !active || !staff; }
+    if (type) { type.disabled = !active; type.required = active; }
+  }
   function populateClassSelect(select) { if (!select) return; const current = select.value; select.innerHTML = '<option value="">Выберите класс</option>' + FAM_CLASSES.map(value => `<option value="${value}">${value}</option>`).join(""); if (FAM_CLASSES.includes(current)) select.value = current; }
   let selectedIdeaImages = [];
   let curCat = "Все", curChat = null, carTimer = null, chatInterval = null;
@@ -2626,8 +2647,9 @@ window.onunhandledrejection = function() {
         unreadByOther.set(key, (unreadByOther.get(key) || 0) + 1);
       });
       const listingIds = Array.from(new Set(allMsgs.map(m => m.listing_id).filter(id => typeof id === "string")));
-      const titlesResult = listingIds.length ? await sb.from("listings").select("id,title").in("id", listingIds.slice(0, 200)) : { data: [], error: null };
+      const titlesResult = listingIds.length ? await sb.from("listings").select("id,title,is_event").in("id", listingIds.slice(0, 200)) : { data: [], error: null };
       const titleByListing = new Map((titlesResult.data || []).map(item => [item.id, item.title]));
+      const listingIsEvent = new Map((titlesResult.data || []).map(item => [item.id, !!item.is_event]));
       const dialogs = {};
       allMsgs.forEach(m => {
         if (!m.sender_id || !m.receiver_id) return;
@@ -2637,7 +2659,7 @@ window.onunhandledrejection = function() {
         if (!dialogs[key]) dialogs[key] = {
           otherId,
           listingId,
-          subject: titleByListing.get(listingId) ? "Переписка по объявлению «" + titleByListing.get(listingId) + "»" : "Переписка в FAM",
+          subject: titleByListing.get(listingId) ? (listingIsEvent.get(listingId) ? "Переписка по мероприятию «" : "Переписка по объявлению «") + titleByListing.get(listingId) + "»" : "Переписка в FAM",
           text: m.body,
           created_at: m.created_at,
           unreadCount: unreadByOther.get(key) || 0
@@ -2650,7 +2672,7 @@ window.onunhandledrejection = function() {
         dialogs[key] = {
           otherId,
           listingId,
-          subject: titleByListing.get(listingId) ? "Переписка по объявлению «" + titleByListing.get(listingId) + "»" : "Переписка в FAM",
+          subject: titleByListing.get(listingId) ? (listingIsEvent.get(listingId) ? "Переписка по мероприятию «" : "Переписка по объявлению «") + titleByListing.get(listingId) + "»" : "Переписка в FAM",
           text: "Есть непрочитанные сообщения",
           created_at: null,
           unreadCount
@@ -3006,7 +3028,7 @@ window.onunhandledrejection = function() {
     showTab('messages');
     const relatedListing = listingId ? listings.find(item => item.id === listingId) : null;
     const chatSubject = relatedListing?.title
-      ? "Переписка по поводу «" + relatedListing.title + "»"
+      ? (relatedListing.is_event ? "Переписка по мероприятию «" : "Переписка по объявлению «") + relatedListing.title + "»"
       : (title || "Переписка в FAM");
     chatOpenTimeout = setTimeout(() => {
       chatOpenTimeout = null;
@@ -3143,7 +3165,7 @@ window.onunhandledrejection = function() {
       if (data) regs.push(data);
 
       if (status === 'pending') {
-        window.startChat(ev.user_id, "Переписка по объявлению «" + ev.title + "»", `Здравствуйте! Я хочу участвовать в мероприятии «${ev.title}». Заявка на рассмотрении.`, ev.id);
+        window.startChat(ev.user_id, "Переписка по мероприятию «" + ev.title + "»", `Здравствуйте! Я хочу участвовать в мероприятии «${ev.title}». Заявка на рассмотрении.`, ev.id);
         notice("Заявка отправлена организатору на рассмотрение.");
       } else {
         notice("Вы записаны! 🎉");
@@ -4471,6 +4493,38 @@ window.onunhandledrejection = function() {
     }
   }
 
+  async function loadStaffVerificationQueue() {
+    const panel = $("staffVerificationPanel");
+    if (!panel) return;
+    const isSchoolAdmin = profile?.role === "school_admin";
+    panel.classList.toggle("hidden", !isSchoolAdmin);
+    if (!isSchoolAdmin) return;
+    const target = $("staffVerificationList");
+    target.innerHTML = '<p style="font-size:10px;color:var(--muted);">Загрузка…</p>';
+    try {
+      const { data, error } = await sb.rpc("list_pending_school_staff_verifications");
+      if (error) throw error;
+      target.innerHTML = data?.length ? data.map(person => {
+        const fullName = [person.first_name, person.last_name].filter(Boolean).join(" ") || "Без имени";
+        return '<div class="idea-card"><b style="font-size:11px;">' + esc(fullName) + '</b><div style="font-size:10px;color:var(--muted);margin:4px 0 7px;">' + esc(person.staff_position || "Должность не указана") + '</div><div style="display:flex;gap:6px;"><button type="button" class="button button-success button-small" data-action="review-school-staff" data-id="' + esc(person.user_id) + '" data-decision="approved">Подтвердить</button><button type="button" class="button button-danger button-small" data-action="review-school-staff" data-id="' + esc(person.user_id) + '" data-decision="rejected">Отклонить</button></div></div>';
+      }).join("") : '<p style="font-size:10px;color:var(--muted);">Нет должностей на проверке.</p>';
+    } catch (error) {
+      target.innerHTML = '<p style="font-size:10px;color:var(--danger);">Не удалось загрузить очередь.</p>';
+    }
+  }
+
+  async function reviewSchoolStaff(userId, decision) {
+    if (profile?.role !== "school_admin" || !userId || !["approved", "rejected"].includes(decision)) return;
+    try {
+      const { error } = await sb.rpc("review_school_staff_verification", { p_user_id: userId, p_decision: decision });
+      if (error) throw error;
+      notice(decision === "approved" ? "Должность подтверждена." : "Должность не подтверждена.");
+      await loadStaffVerificationQueue();
+    } catch (error) {
+      notice(error?.message || "Не удалось сохранить решение.");
+    }
+  }
+
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
@@ -4480,6 +4534,18 @@ window.onunhandledrejection = function() {
     if ($("profileFirstName")) $("profileFirstName").value = profile?.first_name || "";
     if ($("profileLastName")) $("profileLastName").value = profile?.last_name || "";
     if ($("profileClassName")) $("profileClassName").value = profile?.class_name || "";
+    if ($("profilePersonType")) $("profilePersonType").value = profile?.person_type || "student";
+    if ($("profileStaffPosition")) $("profileStaffPosition").value = profile?.staff_position || "";
+    syncPersonTypeFields("profile", true);
+    if ($("profileStaffVerificationNote")) {
+      const staff = profile?.person_type === "school_staff";
+      $("profileStaffVerificationNote").classList.toggle("hidden", !staff);
+      $("profileStaffVerificationNote").textContent = staff
+        ? (profile.staff_verification_status === "approved" ? "Должность подтверждена администратором школы."
+          : profile.staff_verification_status === "rejected" ? "Должность пока не подтверждена. Проверьте запись и сохраните данные для повторной проверки."
+          : "Должность отправлена на подтверждение администратору школы.")
+        : "";
+    }
     if (profile?.avatar_url) {
       $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
       if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
@@ -4518,26 +4584,31 @@ window.onunhandledrejection = function() {
       if (profile.role === "council_member") await loadCouncilDeletionRequestPanel();
       updateIdeaCounters(); renderIdeaFolderContent();
       $("adminRequests").classList.remove("hidden");
-      let myEvs = listings.filter(l => l.user_id === user.id && l.is_event && l.status === "active").map(l => l.id);
-      if (myEvs.length > 0) {
-        try {
-          const res = await sb.from("event_registrations").select("*").in("event_id", myEvs).eq("status", "pending");
-          if (res.error) throw res.error;
-          let pending = res.data || [];
-          $("adminReqList").innerHTML = pending.length ? pending.map(r => {
-            let ev = listings.find(l => l.id === r.event_id);
-            return `<div class="idea-card"><b style="font-size:12px;">${esc(ev?.title || 'Мероприятие')}</b><div style="font-size:10px; color:var(--muted); margin-bottom:6px;">${esc(r.profiles?.email || (r.user_id || '').slice(0,8))}</div><div style="display:flex; gap:6px;"><button class="button button-success button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="approve">Одобрить</button><button class="button button-danger button-small" data-action="confirm-reg" data-id="${esc(r.id)}" data-evid="${esc(r.event_id)}" data-action-type="reject">Отклонить</button></div></div>`;
-          }).join("") : '<p style="color:var(--muted);font-size:11px;">Нет новых заявок.</p>';
-        } catch(e) { $("adminReqList").innerHTML = '<p style="color:var(--danger);font-size:11px;">Ошибка загрузки</p>'; }
-      } else {
-        $("adminReqList").innerHTML = '<p style="color:var(--muted);font-size:11px;">Создайте мероприятие, чтобы получать заявки.</p>';
+      try {
+        const res = await sb.rpc("list_school_event_applicants");
+        if (res.error) throw res.error;
+        const pending = res.data || [];
+        $("adminReqList").innerHTML = pending.length ? pending.map(r => {
+          const applicantName = [r.applicant_first_name, r.applicant_last_name].filter(Boolean).join(" ") || "Участник FAM";
+          const applicantKind = r.applicant_person_type === "student" ? (r.applicant_class || "Ученик")
+            : r.applicant_person_type === "school_staff" ? "Учитель или сотрудник школы" + (r.applicant_staff_position ? " · " + r.applicant_staff_position : "")
+            : "Родитель или законный представитель";
+          const controls = r.is_my_event
+            ? '<div style="display:flex;gap:6px;"><button class="button button-success button-small" data-action="confirm-reg" data-id="' + esc(r.registration_id) + '" data-evid="' + esc(r.event_id) + '" data-action-type="approve">Одобрить</button><button class="button button-danger button-small" data-action="confirm-reg" data-id="' + esc(r.registration_id) + '" data-evid="' + esc(r.event_id) + '" data-action-type="reject">Отклонить</button></div>'
+            : '<div style="font-size:10px;color:var(--muted);">Заявка на мероприятие вашей школы</div>';
+          return '<div class="idea-card"><b style="font-size:12px;">' + esc(r.event_title || "Мероприятие") + '</b><div style="font-size:11px;margin:5px 0 2px;">' + esc(applicantName) + '</div><div style="font-size:10px;color:var(--muted);margin-bottom:6px;">' + esc(applicantKind) + '</div>' + controls + '</div>';
+        }).join("") : '<p style="color:var(--muted);font-size:11px;">Нет новых заявок.</p>';
+      } catch (error) {
+        $("adminReqList").innerHTML = '<p style="color:var(--danger);font-size:11px;">Не удалось загрузить заявки.</p>';
       }
+      await loadStaffVerificationQueue();
     } else {
       $("adminIdeasDash").classList.add("hidden");
       $("adminRequests").classList.add("hidden");
       $("councilAdminTools").classList.add("hidden");
       $("councilDeletionRequestPanel").classList.add("hidden");
       $("userSafetyReports").classList.add("hidden");
+      $("staffVerificationPanel")?.classList.add("hidden");
     }
   }
 
@@ -4546,15 +4617,21 @@ window.onunhandledrejection = function() {
     if (!user || !profile) return;
     const first_name = $("gateFirstName").value.trim();
     const last_name = $("gateLastName").value.trim();
-    const class_name = $("gateClassName").value;
+    const person_type = $("gatePersonType").value;
+    const class_name = person_type === "student" ? $("gateClassName").value : null;
+    const staff_position = person_type === "school_staff" ? $("gateStaffPosition").value.trim() : null;
     const status = $("identityCompletionStatus");
-    if (!first_name || !last_name || !FAM_CLASSES.includes(class_name)) {
-      status.textContent = "Заполните имя, фамилию и выберите класс.";
+    const validIdentity = first_name && last_name
+      && (person_type === "student" ? FAM_CLASSES.includes(class_name)
+        : person_type === "parent" || (person_type === "school_staff" && !!staff_position));
+    if (!validIdentity) {
+      status.textContent = person_type === "student" ? "Заполните имя, фамилию и выберите класс."
+        : person_type === "school_staff" ? "Заполните имя, фамилию и должность в школе." : "Заполните имя и фамилию.";
       return;
     }
     try {
-      const { data, error } = await sb.from("profiles").update({ first_name, last_name, class_name })
-        .eq("id", user.id).select("first_name,last_name,class_name").single();
+      const { data, error } = await sb.from("profiles").update({ first_name, last_name, person_type, class_name, staff_position })
+        .eq("id", user.id).select("first_name,last_name,class_name,person_type,staff_position,staff_verification_status").single();
       if (error) throw error;
       Object.assign(profile, data);
       $("identityCompletionGate").classList.add("hidden");
@@ -4590,10 +4667,16 @@ window.onunhandledrejection = function() {
     if (!user || !profile) return;
     const first_name = $("profileFirstName").value.trim();
     const last_name = $("profileLastName").value.trim();
-    const class_name = $("profileClassName").value.trim().toUpperCase().replace(/\s+/g, "");
+    const person_type = $("profilePersonType").value;
+    const class_name = person_type === "student" ? $("profileClassName").value.trim().toUpperCase().replace(/\s+/g, "") : null;
+    const staff_position = person_type === "school_staff" ? $("profileStaffPosition").value.trim() : null;
     const status = $("profileStudentIdentityStatus");
-    if (!first_name || !last_name || !FAM_CLASSES.includes(class_name)) {
-      if (status) status.textContent = "Проверьте имя, фамилию и класс (например, 8А).";
+    const validIdentity = first_name && last_name
+      && (person_type === "student" ? FAM_CLASSES.includes(class_name)
+        : person_type === "parent" || (person_type === "school_staff" && !!staff_position));
+    if (!validIdentity) {
+      if (status) status.textContent = person_type === "student" ? "Проверьте имя, фамилию и класс."
+        : person_type === "school_staff" ? "Укажите должность в школе." : "Проверьте имя и фамилию.";
       return;
     }
     const button = e.target.querySelector('button[type="submit"]');
@@ -4601,13 +4684,13 @@ window.onunhandledrejection = function() {
     if (status) status.textContent = "";
     try {
       const { data, error } = await sb.from("profiles")
-        .update({ first_name, last_name, class_name })
+        .update({ first_name, last_name, person_type, class_name, staff_position })
         .eq("id", user.id)
-        .select("first_name,last_name,class_name")
+        .select("first_name,last_name,class_name,person_type,staff_position,staff_verification_status")
         .single();
       if (error) throw error;
       Object.assign(profile, data);
-      if (status) status.textContent = "Данные сохранены.";
+      if (status) status.textContent = person_type === "school_staff" && data.staff_verification_status !== "approved" ? "Данные сохранены. Должность отправлена на проверку администратору школы." : "Данные сохранены.";
       notice("Данные профиля обновлены.");
     } catch (error) {
       if (status) status.textContent = error?.message || "Не удалось сохранить данные.";
@@ -4673,16 +4756,19 @@ window.onunhandledrejection = function() {
     $("schoolGroup").classList.toggle("hidden", !isRegistration);
     const identityFields = $("registerIdentityFields");
     identityFields?.classList.toggle("hidden", !isRegistration);
-    for (const id of ["authFirstName","authLastName","authClassName"]) {
+    for (const id of ["authFirstName","authLastName","authPersonType","authClassName","authStaffPosition"]) {
       const field = $(id);
       if (!field) continue;
       field.disabled = !isRegistration;
       field.required = isRegistration;
     }
+    syncPersonTypeFields("auth", isRegistration);
     $("switchAuthBtn").textContent = isRegistration ? "У меня есть аккаунт" : "Создать аккаунт";
   };
 
   ["authClassName","profileClassName","gateClassName"].forEach(id => populateClassSelect($(id)));
+  ["authPersonType","profilePersonType","gatePersonType"].forEach(id => { const field = $(id); if (field) field.addEventListener("change", () => syncPersonTypeFields(id.replace("PersonType", ""), true)); });
+  syncPersonTypeFields("auth", false);
 
   $("authForm").onsubmit = async e => {
     e.preventDefault();
@@ -4699,16 +4785,21 @@ window.onunhandledrejection = function() {
       if (isReg) {
         const firstName = $("authFirstName").value.trim();
         const lastName = $("authLastName").value.trim();
-        const className = $("authClassName").value.trim().toUpperCase().replace(/\s+/g, "");
-        if (!firstName || !lastName || !FAM_CLASSES.includes(className)) {
-          $("authMsg").textContent = "Укажите имя, фамилию и корректный класс, например 8А.";
+        const personType = $("authPersonType").value;
+        const className = personType === "student" ? $("authClassName").value.trim().toUpperCase().replace(/\s+/g, "") : "";
+        const staffPosition = personType === "school_staff" ? $("authStaffPosition").value.trim() : "";
+        const validIdentity = firstName && lastName
+          && (personType === "student" ? FAM_CLASSES.includes(className)
+            : personType === "parent" || (personType === "school_staff" && !!staffPosition));
+        if (!validIdentity) {
+          $("authMsg").textContent = personType === "student"
+            ? "Укажите имя, фамилию и выберите класс."
+            : personType === "school_staff" ? "Укажите имя, фамилию и должность в школе." : "Укажите имя и фамилию.";
           return;
         }
         res = await sb.auth.signUp({ email, password: pass, options: { data: {
-          school_id: school,
-          first_name: firstName,
-          last_name: lastName,
-          class_name: className
+          school_id: school, first_name: firstName, last_name: lastName,
+          person_type: personType, class_name: className || null, staff_position: staffPosition || null
         }, emailRedirectTo: "https://spartakdubov059.github.io/fam-website/" } });
         if (res.error) throw res.error;
         if (!res.data.session) {
@@ -4720,7 +4811,7 @@ window.onunhandledrejection = function() {
         res = await sb.auth.signInWithPassword({ email, password: pass });
         if (res.error) throw res.error;
         const { data: pd, error: profileReadError } = await sb.from("profiles")
-          .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name")
+          .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name,person_type,staff_position,staff_verification_status")
           .eq("id", res.data.user.id).maybeSingle();
         if (profileReadError) throw profileReadError;
         if (!pd) throw new Error("Профиль не найден. Обратитесь к администратору FAM.");
@@ -4919,7 +5010,7 @@ window.onunhandledrejection = function() {
     else if (action === 'delete-own-listing') { deleteOwnListing(btn.dataset.id); }
     else if (action === 'cancel-reg') { cancelRegAction(btn.dataset.id); }
     else if (action === 'start-chat') { window.startChat(btn.dataset.userId, "Переписка по объявлению «" + btn.dataset.title + "»", null, btn.dataset.id || null); }
-    else if (action === 'open-dialog') { window.startChat(btn.dataset.userId, btn.dataset.listingId ? "Переписка по объявлению «" + (listings.find(item => item.id === btn.dataset.listingId)?.title || "объявлению") + "»" : "Переписка в FAM", null, btn.dataset.listingId || null); }
+    else if (action === 'open-dialog') { const item = listings.find(row => row.id === btn.dataset.listingId); window.startChat(btn.dataset.userId, item?.title ? (item.is_event ? "Переписка по мероприятию «" : "Переписка по объявлению «") + item.title + "»" : "Переписка в FAM", null, btn.dataset.listingId || null); }
     else if (action === 'handle-event') { window.handleEventBtn(btn.dataset.id); }
     else if (action === 'chat-back') {
       stopChatSession(true);
@@ -4945,6 +5036,7 @@ window.onunhandledrejection = function() {
     else if (action === 'clear-folder') { window.clearFolderIdeas(btn.dataset.folder); }
     else if (action === 'update-idea') { window.updateIdea(btn.dataset.id, btn.dataset.status); }
     else if (action === 'confirm-reg') { window.confirmReg(btn.dataset.id, btn.dataset.evid, btn.dataset.actionType); }
+    else if (action === 'review-school-staff') { reviewSchoolStaff(btn.dataset.id, btn.dataset.decision); }
     else if (action === 'logout') {
       btn.disabled = true;
       btn.textContent = "Выход...";
@@ -5136,7 +5228,7 @@ window.onunhandledrejection = function() {
   sb.auth.getSession().then(res => {
     user = res.data?.session?.user || null;
     if(user) return sb.from("profiles")
-      .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name")
+      .select("id,avatar_url,created_at,city,school_id,role,first_name,last_name,class_name,person_type,staff_position,staff_verification_status")
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
@@ -5148,7 +5240,10 @@ window.onunhandledrejection = function() {
       if (!complete) {
         $("gateFirstName").value = profile.first_name || "";
         $("gateLastName").value = profile.last_name || "";
+        $("gatePersonType").value = profile.person_type || "student";
         $("gateClassName").value = FAM_CLASSES.includes(profile.class_name) ? profile.class_name : "";
+        $("gateStaffPosition").value = profile.staff_position || "";
+        syncPersonTypeFields("gate", true);
       }
     }
     updateAuthUI();
