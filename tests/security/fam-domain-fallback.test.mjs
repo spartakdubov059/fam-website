@@ -67,6 +67,7 @@ test("both frontend entry points have working relative assets", () => {
   assert.match(html, /<script src="\.\/school-pulse\.js"><\/script>/);
   assert.match(html, /<link rel="stylesheet" href="\.\/school-pulse\.css">/);
   assert.match(html, /cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\.119\.0/);
+  assert.match(html, /onerror="this\.onerror=null;this\.src='https:\/\/unpkg\.com\/@supabase\/supabase-js@2\.119\.0';"/);
 });
 
 test("existing server-side CORS allows both real FAM hosts", () => {
