@@ -14,7 +14,7 @@
       var timeoutId = setTimeout(function () {
         if (controller) controller.abort();
       }, 4000);
-      var healthUrl = "https://famru.netlify.app/.well-known/fam-domain-health.json?t=" + Date.now();
+      var healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now();
       try {
         fetch(healthUrl, {
           mode: "cors",
