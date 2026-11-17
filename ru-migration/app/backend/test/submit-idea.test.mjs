@@ -48,3 +48,9 @@ test('idea images accept at most three own pending WebP keys and remain pending 
   const invalidActor = await submitIdea({ actor, input: { text: 'Идея школы', image_keys: [keys[0]] }, repository: {} });
   assert.equal(invalidActor.code, 'invalid_idea', 'image ownership path requires a UUID account id');
 });
+
+test('surfaces persistent idea quotas as a rate limit instead of a database failure', async () => {
+  const result = await submitIdea({ actor, input: { text: 'Школьный книжный клуб' },
+    repository: { createIdea: async () => { const error = new Error('limited'); error.code = 'rate_limited'; throw error; } } });
+  assert.deepEqual(result, { ok: false, code: 'rate_limited' });
+});

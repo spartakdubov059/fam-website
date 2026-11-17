@@ -776,7 +776,24 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  const quotaUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
+  const quotaListing = { user_id: quotaUserId, school_id: 'synthetic-school', title: 'Синтетическое объявление',
+    description: 'Проверка ограничения количества', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
+    max_seats: 0, status: 'pending' };
+  for (let i = 0; i < 5; i++) await repo.createListing(quotaListing);
+  await assert.rejects(repo.createListing(quotaListing), error => error.code === 'rate_limited',
+    'the sixth listing in one hour is rejected for this synthetic account');
+  const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Синтетическая идея',
+    ai_status: 'pending', ai_summary: 'Идея', ai_reason: 'review_unavailable', admin_status: 'new' };
+  for (let i = 0; i < 10; i++) await repo.createIdea(quotaIdea);
+  await assert.rejects(repo.createIdea(quotaIdea), error => error.code === 'rate_limited',
+    'the eleventh idea in one hour is rejected for this synthetic account');
+  for (let i = 0; i < 5; i++) await repo.reserveImageUpload(quotaUserId);
+  await assert.rejects(repo.reserveImageUpload(quotaUserId), error => error.code === 'rate_limited',
+    'a sixth image decode reservation in one hour is rejected for this synthetic account');
+  const quotaRows = await sql`SELECT action, submission_count FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
+  assert.deepEqual(Object.fromEntries(quotaRows[0].map(row => [row.action, Number(row.submission_count)])), { idea: 10, image_upload: 5, listing: 5 });
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, persistent hourly listing/idea/image-upload quotas, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

@@ -16,7 +16,8 @@ test('pending media upload requires an authenticated database profile and binds 
   const api = createMediaApi({
     authenticate: async () => ({ subject: 'verified-subject' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', role: 'student' }),
-    repository: { registerPendingImage: async (userId, key) => { assert.equal(userId, '11111111-1111-4111-8111-111111111111'); assert.match(key, /^pending\//); } },
+    repository: { reserveImageUpload: async userId => assert.equal(userId, '11111111-1111-4111-8111-111111111111'),
+      registerPendingImage: async (userId, key) => { assert.equal(userId, '11111111-1111-4111-8111-111111111111'); assert.match(key, /^pending\//); } },
     pendingImages: { put: async input => { saved = input; return { key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 42 }; } },
   });
   const req = request();
@@ -61,7 +62,7 @@ test('idea image uploads enforce the smaller 2 MB source limit before storage', 
   let writes = 0;
   let saved;
   const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: '33333333-3333-4333-8333-333333333333' }),
-    repository: { registerPendingImage: async () => {} },
+    repository: { reserveImageUpload: async () => true, registerPendingImage: async () => {} },
     pendingImages: { put: async input => { writes++; saved = input; return { key: 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 12 }; } } });
   const path = '/api/v1/ideas/media/pending';
   assert.equal((await api(request({ path, body: Buffer.alloc(2 * 1024 * 1024 + 1) }))).status, 413);
@@ -72,6 +73,7 @@ test('idea image uploads enforce the smaller 2 MB source limit before storage', 
 
 test('pending media upload rejects storage keys that do not belong to the authenticated user', async () => {
   const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+    repository: { reserveImageUpload: async () => true, registerPendingImage: async () => true },
     pendingImages: { put: async () => ({ key: 'pending/22222222-2222-4222-8222-222222222222/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 10 }) } });
   assert.equal((await api(request())).status, 503);
 });
@@ -81,12 +83,25 @@ test('pending media upload removes the object and returns no key when YDB cannot
   const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
   const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
-    repository: { registerPendingImage: async () => { throw new Error('db offline'); } },
+    repository: { reserveImageUpload: async () => true, registerPendingImage: async () => { throw new Error('db offline'); } },
     pendingImages: { put: async () => ({ key, contentType: 'image/webp', bytes: 10 }), delete: async objectKey => removed.push(objectKey) } });
   const result = await api(request());
   assert.equal(result.status, 503);
   assert.deepEqual(result.body, { ok: false, error: 'media_unavailable' });
   assert.deepEqual(removed, [key]);
+});
+
+test('upload quota is reserved before image decoding and returns 429 when exhausted', async () => {
+  let reservations = 0;
+  let decodes = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }),
+    resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
+    repository: { reserveImageUpload: async () => { reservations++; const error = new Error('quota'); error.code = 'rate_limited'; throw error; },
+      registerPendingImage: async () => {} },
+    pendingImages: { put: async () => { decodes++; throw new Error('must not decode'); } } });
+  assert.deepEqual(await api(request()), { status: 429, body: { ok: false, error: 'rate_limited' } });
+  assert.equal(reservations, 1);
+  assert.equal(decodes, 0);
 });
 
 test('pending photo preview is limited to moderators from the listing school', async () => {

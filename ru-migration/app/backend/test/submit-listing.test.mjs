@@ -42,3 +42,9 @@ test('price participates in privacy checks and is preserved', async () => {
   await submitListing({ actor, input: { ...input, price_text: '100 ₽' }, repository, review: approve });
   assert.equal(record.price_text, '100 ₽'); assert.equal(record.school_id, actor.school_id);
 });
+
+test('surfaces persistent submission quotas as a rate limit instead of a database failure', async () => {
+  const result = await submitListing({ actor, input, review: approve,
+    repository: { createListing: async () => { const error = new Error('limited'); error.code = 'rate_limited'; throw error; } } });
+  assert.deepEqual(result, { ok: false, code: 'rate_limited' });
+});

@@ -1,0 +1,9 @@
+-- Durable per-account hourly caps for user-generated content submissions.
+-- Expired buckets are removed after two days; they contain no user content.
+CREATE TABLE fam_submission_quotas (
+  user_id Utf8 NOT NULL,
+  action Utf8 NOT NULL,
+  window_start Timestamp NOT NULL,
+  submission_count Uint32 NOT NULL,
+  PRIMARY KEY (user_id, action, window_start)
+) WITH (TTL = Interval("P2D") ON window_start);

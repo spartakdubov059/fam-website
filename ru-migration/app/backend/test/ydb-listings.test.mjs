@@ -397,18 +397,37 @@ test('school role approval requires same-school review ownership and promotes on
   await assert.rejects(repo.reviewSchoolRoleRequest('id', 'school-a', 'admin-id', 'school_admin'), TypeError);
 });
 test('listing insert binds user content as data and writes only pending status', async () => {
-  let query;
-  const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; };
+  const calls = [];
+  const tx = async (strings, ...values) => { calls.push({ text: strings.join('?'), values }); return [[]]; };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
   const repo = createYdbListingsRepository(sql);
   const payload = "Книга'); DELETE FROM fam_listings; --";
   const row = { user_id: 'u1', school_id: 's1', title: payload, description: 'text', category: 'Учёба', price_text: '100 ₽', is_event: false, event_date: null, event_time: null, event_type: null, max_seats: 0, image_key: null, photo_status: 'none', status: 'pending' };
   const result = await repo.createListing(row);
   assert.match(result.id, /^[0-9a-f-]{36}$/);
+  const query = calls.find(call => call.text.includes('INSERT INTO fam_listings'));
   assert.equal(query.text.includes(payload), false);
   assert.ok(query.values.includes(payload));
   assert.ok(query.values.includes(''));
   assert.ok(query.values.includes('none'));
   await assert.rejects(repo.createListing({ ...row, status: 'active' }));
+});
+
+test('listing submissions enforce a durable per-user hourly quota before insertion', async () => {
+  let count = 0;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('SELECT submission_count FROM fam_submission_quotas')) return count ? [[{ submission_count: count }]] : [[]];
+    if (text.includes('UPSERT INTO fam_submission_quotas')) { count = values.find(Number.isInteger); return [[]]; }
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const row = { user_id: 'synthetic-user', school_id: 'synthetic-school', title: 'Книга', description: 'Учебник',
+    category: 'Учёба', price_text: 'Бесплатно', is_event: false, max_seats: 0, status: 'pending' };
+  for (let i = 0; i < 5; i++) await repo.createListing(row);
+  await assert.rejects(repo.createListing(row), error => error.code === 'rate_limited');
+  assert.equal(count, 5);
 });
 
 test('photo listing creation atomically links only a fresh pending upload owned by the listing author', async () => {

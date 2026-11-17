@@ -2,6 +2,18 @@ import { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+async function consumeSubmissionQuota(tx, userId, action, limit) {
+  const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
+  const rows = await tx`SELECT submission_count FROM fam_submission_quotas
+    WHERE user_id = ${userId} AND action = ${action} AND window_start = ${hour} LIMIT 1;`;
+  const current = Number(rows?.[0]?.[0]?.submission_count ?? 0);
+  if (!Number.isSafeInteger(current) || current < 0 || current >= limit) {
+    const error = new Error('submission quota exceeded'); error.code = 'rate_limited'; throw error;
+  }
+  await tx`UPSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
+    VALUES (${userId}, ${action}, ${hour}, Unwrap(CAST(${current + 1} AS Uint32)));`;
+}
+
 const isIsoDate = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -782,8 +794,9 @@ export function createYdbListingsRepository(sql) {
             ${record.event_time ?? ''}, ${record.event_type ?? ''}, Unwrap(CAST(${record.max_seats} AS Uint32)),
             ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
             ${record.status}, CurrentUtcTimestamp());`;
-      if (record.image_key) {
-        return sql.begin(async tx => {
+      return sql.begin(async tx => {
+        await consumeSubmissionQuota(tx, record.user_id, 'listing', 5);
+        if (record.image_key) {
           const pending = await tx`SELECT user_id, status FROM fam_pending_media
             WHERE object_key = ${record.image_key} AND created_at > CurrentUtcTimestamp() - Interval('P7D') LIMIT 1;`;
           const upload = pending?.[0]?.[0];
@@ -793,13 +806,11 @@ export function createYdbListingsRepository(sql) {
           await insertListing(tx);
           await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${record.image_key}
             AND user_id = ${record.user_id} AND status = 'pending';`;
-          return { id };
-        });
-      }
-      const statement = insertListing(sql);
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      await statement;
-      return { id };
+        } else {
+          await insertListing(tx);
+        }
+        return { id };
+      });
     },
 
     async registerPendingImage(userId, objectKey) {
@@ -812,6 +823,14 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return true;
+    },
+
+    async reserveImageUpload(userId) {
+      if (typeof userId !== 'string' || !UUID.test(userId)) throw new TypeError('invalid image uploader');
+      return sql.begin(async tx => {
+        await consumeSubmissionQuota(tx, userId, 'image_upload', 5);
+        return true;
+      });
     },
 
     async claimPendingImageDeletion(userId, objectKey) {
@@ -1013,6 +1032,7 @@ export function createYdbListingsRepository(sql) {
       }
       const id = randomUUID();
       return sql.begin(async tx => {
+        await consumeSubmissionQuota(tx, record.user_id, 'idea', 10);
         for (const key of imageKeys) {
           const owned = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${key} AND user_id = ${record.user_id} LIMIT 1;`;
           if (owned?.[0]?.[0]?.status !== 'pending') throw new TypeError('idea image unavailable');

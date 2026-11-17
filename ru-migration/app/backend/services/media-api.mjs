@@ -146,9 +146,13 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       return { status: 400, body: { ok: false, error: 'invalid_image' } };
     }
     if (bytes === 0) return { status: 400, body: { ok: false, error: 'empty_image' } };
-    if (typeof repository?.registerPendingImage !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+    if (typeof repository?.registerPendingImage !== 'function' || typeof repository?.reserveImageUpload !== 'function') {
+      return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+    }
 
     try {
+      // Reserve before Sharp decodes the supplied bytes so repeated invalid files are bounded too.
+      await repository.reserveImageUpload(actor.id);
       const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType, maxBytes: imageByteLimit });
       const keyPattern = new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i');
       if (!result || typeof result.key !== 'string' || !keyPattern.test(result.key)
@@ -171,6 +175,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       }
       return { status: 201, body: { ok: true, image: { key: result.key, content_type: result.contentType, bytes: result.bytes } } };
     } catch (error) {
+      if (error?.code === 'rate_limited') return { status: 429, body: { ok: false, error: 'rate_limited' } };
       if (error?.code === 'image_too_large') return { status: 413, body: { ok: false, error: 'image_too_large' } };
       if (error instanceof TypeError) return { status: 400, body: { ok: false, error: 'invalid_image' } };
       return { status: 503, body: { ok: false, error: 'media_unavailable' } };

@@ -36,7 +36,8 @@ export async function submitIdea({ actor, input, repository, review, safetyKey }
     });
     if (!idea || typeof idea.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: decision.action === 'pending' ? 'pending' : 'approved', image_status: imageKeys.length ? 'pending' : 'none', id: idea.id };
-  } catch {
+  } catch (error) {
+    if (error?.code === 'rate_limited') return { ok: false, code: 'rate_limited' };
     return { ok: false, code: 'database_unavailable' };
   }
 }

@@ -42,7 +42,8 @@ export async function submitListing({ actor, input, repository, review, safetyKe
     const listing = await repository.createListing({ user_id: actor.id, school_id: actor.school_id, title, description, category: input.category, price_text: price || 'Бесплатно', is_event: isEvent, event_date: eventDate, event_time: eventTime, event_type: eventType, max_seats: maxSeats, image_key: imageKey, photo_status: imageKey ? 'pending' : 'none', status: 'pending' });
     if (!listing || typeof listing.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: 'pending', id: listing.id };
-  } catch {
+  } catch (error) {
+    if (error?.code === 'rate_limited') return { ok: false, code: 'rate_limited' };
     return { ok: false, code: 'database_unavailable' };
   }
 }
