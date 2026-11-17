@@ -126,7 +126,7 @@ test('school admins see active suspensions returned by the same-school endpoint 
     throw new Error(`unexpected route ${url}`);
   } });
   assert.ok(calls.some(call => call.url === '/api/v1/suspensions' && call.init.credentials === 'same-origin'));
-  const card = f.queue.children[0];
+  const card = f.queue.children.find(item => item.children?.[1]?.textContent?.startsWith('ID аккаунта:'));
   assert.equal(card.children[1].textContent, 'ID аккаунта: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   assert.equal(card.children[2].textContent, 'Причина: <script>unsafe</script>');
   assert.equal(card.children[2].tagName, 'p');
@@ -316,11 +316,11 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === `/api/v1/role-requests/${id}`) { state = init.body.includes('start_review') ? 'reviewing' : 'approved'; return { ok: true, json: async () => ({ ok: true }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
   } });
-  let card = f.queue.children[0];
+  let card = f.queue.children.find(item => item.children?.[0]?.textContent?.startsWith('Запрос:'));
   let actions = card.children.at(-1).children;
   assert.deepEqual(actions.map(button => button.textContent), ['Начать рассмотрение']);
   await actions[0].listeners.click();
-  card = f.queue.children[0]; actions = card.children.at(-1).children;
+  card = f.queue.children.find(item => item.children?.[0]?.textContent?.startsWith('Запрос:')); actions = card.children.at(-1).children;
   assert.deepEqual(actions.map(button => button.textContent), ['Одобрить роль', 'Отклонить']);
   await actions[0].listeners.click();
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);

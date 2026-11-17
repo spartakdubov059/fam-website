@@ -702,7 +702,7 @@ export function createYdbListingsRepository(sql) {
     async listPendingSchoolStaffVerifications(schoolId) {
       if (!schoolId) throw new TypeError('invalid staff verification school');
       const statement = sql`SELECT user_id AS user_id, first_name AS first_name, last_name AS last_name,
-          staff_position AS staff_position, created_at AS created_at
+          staff_position AS staff_position
         FROM fam_user_profiles WHERE school_id = ${schoolId} AND person_type = 'school_staff'
           AND staff_verification_status = 'pending' AND active = true
         ORDER BY first_name ASC LIMIT 100;`;

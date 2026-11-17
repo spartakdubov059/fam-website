@@ -111,6 +111,8 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests/review')
+      || (req.method === 'GET' && url.pathname === '/api/v1/staff-verifications')
+      || (req.method === 'PATCH' && /^\/api\/v1\/staff-verifications\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (req.method === 'GET' && url.pathname === '/api/v1/suspensions')
       || (req.method === 'GET' && url.pathname === '/api/v1/suspensions/targets')
       || (req.method === 'PATCH' && /^\/api\/v1\/suspensions\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
