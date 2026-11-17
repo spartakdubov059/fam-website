@@ -30,7 +30,7 @@
 
 # Allow the GitHub Pages fallback to verify that the primary host is ready.
 [[headers]]
-  for = "/.well-known/fam-domain-health.json"
+  for = "/fam-domain-health.json"
   [headers.values]
     Access-Control-Allow-Origin = "https://spartakdubov059.github.io"
     Cache-Control = "no-store"
