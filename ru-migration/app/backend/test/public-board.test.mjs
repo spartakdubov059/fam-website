@@ -49,7 +49,7 @@ test('public board filters the approved result set by Russian category and text 
   } });
   const toolbar = root.children[0];
   const search = toolbar.children[0];
-  const filters = toolbar.children[1];
+  const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
   const cards = root.children.filter(node => node.className === 'ru-listing-card');
   const study = filters.children.find(button => button.textContent === 'Учёба');
   study.listeners.click();
@@ -59,12 +59,42 @@ test('public board filters the approved result set by Russian category and text 
   search.value = 'настольная'; search.listeners.input();
   assert.equal(cards[0].hidden, true);
   assert.equal(cards[1].hidden, true, 'category and text filters are combined');
-  assert.match(toolbar.children[2].textContent, /Ничего не найдено/);
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Ничего не найдено/);
   const all = filters.children.find(button => button.textContent === 'Все');
   all.listeners.click();
   assert.equal(cards[0].hidden, true);
   assert.equal(cards[1].hidden, false);
   assert.equal(listingRequests, 1, 'filters operate only on the already-authorized public response');
+});
+
+test('authenticated board opens the saved favorites view and removes an item from it immediately', async () => {
+  const root = new FakeNode('section');
+  const favoriteId = '11111111-1111-4111-8111-111111111111';
+  const otherId = '22222222-2222-4222-8222-222222222222';
+  const calls = [];
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+    calls.push({ url, options });
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: favoriteId, title: 'Сохранённая книга', description: 'В избранном', category: 'Учёба' },
+      { id: otherId, title: 'Другая вещь', description: 'Обычное объявление', category: 'Вещи' },
+    ] }) };
+    if (url === '/api/v1/favorites') return { ok: true, json: async () => ({ ok: true, favorite_ids: [favoriteId] }) };
+    if (url === '/api/v1/me/listings') return { ok: false, status: 401, json: async () => ({}) };
+    if (url === `/api/v1/listings/${favoriteId}/favorite` && options.method === 'DELETE') return { ok: true, json: async () => ({ ok: true, favorited: false }) };
+    throw new Error(`unexpected request ${url}`);
+  } });
+  const toolbar = root.children[0];
+  const viewButtons = toolbar.children.find(node => node.className === 'ru-board-views');
+  const favoriteView = viewButtons.children.find(button => button.textContent === 'Избранное');
+  const cards = root.children.filter(node => node.className === 'ru-listing-card');
+  favoriteView.listeners.click();
+  assert.equal(cards[0].hidden, false);
+  assert.equal(cards[1].hidden, true);
+  const toggle = cards[0].children.find(node => node.className === 'ru-favorite-actions').children[0];
+  await toggle.listeners.click();
+  assert.equal(cards[0].hidden, true, 'removing a favorite immediately removes it from the saved view');
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /пока нет объявлений/);
+  assert.equal(calls.some(call => call.options.method === 'DELETE'), true);
 });
 
 test('guest board renders a useful empty state when there are no approved listings', async () => {
@@ -101,7 +131,7 @@ test('event card reads only the user own registrations and supports reservation 
     throw new Error(`unexpected request ${url}`);
   } });
   const card = boardCard(root);
-  const eventCategory = root.children[0].children[1].children.find(button => button.textContent === 'Афиша');
+  const eventCategory = root.children[0].children.find(node => node.className === 'ru-board-categories').children.find(button => button.textContent === 'Афиша');
   assert.ok(eventCategory, 'categories returned by public listings are available as filters');
   const actions = card.children.find(node => node.className === 'ru-event-actions');
   const [register, cancel] = actions.children;

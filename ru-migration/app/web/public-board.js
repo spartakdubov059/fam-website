@@ -88,7 +88,7 @@ function addOwnListingDeleteControl({ card, listing, document, fetchImpl, ownLis
   card.append(actions);
 }
 
-function addFavoriteControl({ card, listing, document, fetchImpl, favorites, location }) {
+function addFavoriteControl({ card, listing, document, fetchImpl, favorites, location, onChange = () => {} }) {
   if (!UUID.test(listing.id)) return;
   const actions = element(document, 'div', 'ru-favorite-actions');
   const button = element(document, 'button', 'ru-favorite-toggle', '');
@@ -121,6 +121,7 @@ function addFavoriteControl({ card, listing, document, fetchImpl, favorites, loc
       } else {
         if (favorited) favorites.ids.add(listing.id); else favorites.ids.delete(listing.id);
         status.textContent = favorited ? 'Добавлено в избранное.' : 'Удалено из избранного.';
+        onChange();
       }
     } catch { status.textContent = 'Нет связи с сервером. Попробуйте ещё раз.'; }
     finally { busy = false; update(); }
@@ -318,6 +319,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     const favorites = await loadMyFavorites(fetchImpl);
     const ownListingIds = await loadMyActiveListingIds(fetchImpl);
     const cards = [];
+    let updateResults = () => {};
     for (const listing of result.listings) {
       if (!listing || typeof listing.id !== 'string' || typeof listing.title !== 'string'
           || typeof listing.description !== 'string' || typeof listing.category !== 'string') continue;
@@ -336,7 +338,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
       addOwnListingDeleteControl({ card, listing, document, fetchImpl, ownListingIds, confirmImpl });
-      addFavoriteControl({ card, listing, document, fetchImpl, favorites, location });
+      addFavoriteControl({ card, listing, document, fetchImpl, favorites, location, onChange: () => updateResults() });
       addListingContactForm({ card, listing, document, fetchImpl, favorites, location });
       if (listing.is_event === true) {
         card.append(element(document, 'p', 'ru-listing-event', 'Мероприятие'));
@@ -352,23 +354,39 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     search.setAttribute('aria-label', 'Поиск по объявлениям');
     const filters = element(document, 'div', 'ru-board-categories');
     filters.setAttribute('role', 'group'); filters.setAttribute('aria-label', 'Категории объявлений');
+    const views = element(document, 'div', 'ru-board-views');
+    views.setAttribute('role', 'group'); views.setAttribute('aria-label', 'Раздел доски');
     const count = element(document, 'p', 'ru-board-count', ''); count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite');
     let category = 'Все';
+    let boardView = 'all';
     const filterButtons = new Map();
-    const updateResults = () => {
+    const viewButtons = new Map();
+    updateResults = () => {
       const query = String(search.value || '').trim().toLocaleLowerCase('ru');
       let visible = 0;
       for (const { card, listing } of cards) {
         const categoryMatches = category === 'Все' || listing.category === category;
+        const viewMatches = boardView !== 'favorites' || favorites.ids.has(listing.id);
         const searchable = [listing.title, listing.description, listing.category, listing.price_text]
           .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
         const textMatches = !query || searchable.includes(query);
-        card.hidden = !categoryMatches || !textMatches;
+        card.hidden = !viewMatches || !categoryMatches || !textMatches;
         if (!card.hidden) visible++;
       }
       for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
-      count.textContent = visible === 0 ? 'Ничего не найдено. Измените запрос или категорию.' : `Показано ${visible} из ${cards.length} объявлений.`;
+      for (const [name, button] of viewButtons) button.setAttribute('aria-pressed', String(name === boardView));
+      count.textContent = visible === 0
+        ? boardView === 'favorites' && favorites.state !== 'authenticated'
+          ? 'Войдите через Яндекс ID, чтобы открыть избранное.'
+          : boardView === 'favorites' ? 'В избранном пока нет объявлений.' : 'Ничего не найдено. Измените запрос или категорию.'
+        : `Показано ${visible} объявлений.`;
     };
+    for (const [name, label] of [['all', 'Все объявления'], ['favorites', 'Избранное']]) {
+      const button = element(document, 'button', 'ru-board-category', label);
+      button.type = 'button'; button.setAttribute('aria-pressed', String(name === boardView));
+      button.addEventListener('click', () => { boardView = name; updateResults(); });
+      viewButtons.set(name, button); views.append(button);
+    }
     const categories = [...BOARD_CATEGORIES];
     for (const { listing } of cards) {
       if (typeof listing.category === 'string' && listing.category.length <= 40
@@ -381,7 +399,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       filterButtons.set(name, button); filters.append(button);
     }
     search.addEventListener('input', updateResults);
-    toolbar.append(search, filters, count);
+    toolbar.append(search, views, filters, count);
     root.replaceChildren(toolbar, ...cards.map(item => item.card));
     updateResults();
   } catch {
