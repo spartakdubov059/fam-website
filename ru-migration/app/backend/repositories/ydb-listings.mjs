@@ -1716,8 +1716,8 @@ export function createYdbListingsRepository(sql) {
           || task.status === 'claimed' && task.lease_expired === true;
         if (!due) return null;
         const claimToken = randomUUID();
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = CAST('claimed' AS Utf8),
-            attempt_count = Unwrap(CAST(attempt_count + 1 AS Uint32)),
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
+            attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
             claimed_by = ${workerId}, claim_token = ${claimToken},
             lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'),
             last_error_code = CAST(NULL AS Utf8?), updated_at = CurrentUtcTimestamp()
@@ -1752,7 +1752,7 @@ export function createYdbListingsRepository(sql) {
           FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
         const current = rows?.[0]?.[0];
         if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = CAST('completed' AS Utf8), generated_at = CurrentUtcTimestamp(),
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('completed' AS Utf8)), generated_at = CurrentUtcTimestamp(),
             metrics_json = ${JSON.stringify(metrics)}, summary = ${summary}, claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
             lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
           WHERE report_date = ${reportDate};`;
@@ -1769,7 +1769,7 @@ export function createYdbListingsRepository(sql) {
           FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
         const current = rows?.[0]?.[0];
         if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = CAST('failed' AS Utf8), available_at = CurrentUtcTimestamp() + Interval('PT5M'),
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('failed' AS Utf8)), available_at = CurrentUtcTimestamp() + Interval('PT5M'),
             last_error_code = ${errorCode}, claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
             lease_expires_at = CAST(NULL AS Timestamp?),
             updated_at = CurrentUtcTimestamp()
