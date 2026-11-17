@@ -7,6 +7,7 @@ const submit = readFileSync(new URL("../../supabase/functions/submit-content/ind
 const moderate = readFileSync(new URL("../../supabase/functions/moderate/index.ts", import.meta.url), "utf8");
 const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
 const healthMarker = readFileSync(new URL("../../.well-known/fam-domain-health.json", import.meta.url), "utf8");
+const sdkFallback = readFileSync(new URL("../../supabase-cdn-fallback.js", import.meta.url), "utf8");
 
 const fallbackOrigin = "https://spartakdubov059.github.io";
 const primaryOrigin = "https://famru.netlify.app";
@@ -66,8 +67,11 @@ test("both frontend entry points have working relative assets", () => {
   assert.match(html, /<script src="price-format\.js"><\/script>/);
   assert.match(html, /<script src="\.\/school-pulse\.js"><\/script>/);
   assert.match(html, /<link rel="stylesheet" href="\.\/school-pulse\.css">/);
-  assert.match(html, /cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\.119\.0/);
-  assert.match(html, /onerror="this\.onerror=null;this\.src='https:\/\/unpkg\.com\/@supabase\/supabase-js@2\.119\.0';"/);
+  assert.match(html, /<script src="\.\/supabase-cdn-fallback\.js"><\/script>/);
+  assert.match(html, /<script id="famSupabaseSdk" src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\.119\.0"><\/script>/);
+  assert.ok(sdkFallback.includes("document.write("));
+  assert.ok(sdkFallback.includes("https://unpkg.com/@supabase/supabase-js@2.119.0"));
+  assert.ok(sdkFallback.includes("Не удалось загрузить модуль FAM"));
 });
 
 test("existing server-side CORS allows both real FAM hosts", () => {
