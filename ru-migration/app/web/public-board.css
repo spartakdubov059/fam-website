@@ -71,6 +71,9 @@ body {
 .ru-moderation { max-width: 56rem; margin: 2rem auto; }
 .ru-moderation-card { display: grid; gap: 0.55rem; margin: 1rem 0; padding: 1rem; border: 1px solid #d9d6e8; border-radius: 0.85rem; background: #fff; }
 .ru-moderation-card h3, .ru-moderation-card p { margin: 0; overflow-wrap: anywhere; }
+.ru-school-account-list { display: grid; gap: 0.65rem; margin-top: 0.8rem; }
+.ru-school-account-card { display: grid; gap: 0.4rem; padding: 0.8rem; border: 1px solid #e3e0ed; border-radius: 0.7rem; overflow-wrap: anywhere; }
+.ru-school-account-card p { margin: 0; }
 .ru-moderation-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.5rem; }
 .ru-suspension-form { display: grid; gap: 0.6rem; }
 .ru-suspension-form select, .ru-suspension-form textarea { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #aaa5bb; border-radius: 0.5rem; font: inherit; }

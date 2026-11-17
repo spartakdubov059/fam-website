@@ -12,7 +12,9 @@ async function json(response) {
   try { return await response.json(); } catch { return null; }
 }
 
-export async function initializeListingModeration({ document = globalThis.document, fetchImpl = globalThis.fetch } = {}) {
+export async function initializeListingModeration({ document = globalThis.document, fetchImpl = globalThis.fetch,
+  confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message),
+  promptImpl = message => typeof globalThis.prompt === 'function' ? globalThis.prompt(message) : null } = {}) {
   if (!document || typeof fetchImpl !== 'function') return;
   const panel = document.getElementById('ruModeration');
   const status = document.getElementById('ruModerationStatus');
@@ -27,6 +29,41 @@ export async function initializeListingModeration({ document = globalThis.docume
   } catch { return; }
   if (!me?.ok || !STAFF_ROLES.has(me.profile?.role)) return;
   panel.hidden = false;
+
+  async function deleteSchoolAccount(account) {
+    if (me.profile.role !== 'school_admin' || !account || !UUID.test(account.id || '')
+        || !['student', 'council_member'].includes(account.role)
+        || account.id.toLowerCase() === String(me.profile.id || '').toLowerCase()) return;
+    const accountCode = account.id.slice(-6).toUpperCase();
+    const displayName = [account.first_name, account.last_name]
+      .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || 'Аккаунт участника';
+    if (!confirmImpl(`Удалить аккаунт #${accountCode} (${displayName})? Будут удалены связанные публикации, переписки и файлы.`)) return;
+    const confirmation = 'УДАЛИТЬ АККАУНТ УЧАСТНИКА';
+    if (promptImpl(`Для окончательного удаления введите точно: ${confirmation}`) !== confirmation) {
+      status.textContent = 'Удаление отменено: фраза подтверждения не совпала.';
+      return;
+    }
+    status.textContent = 'Проверяем свежесть входа и удаляем аккаунт…';
+    try {
+      const response = await fetchImpl(`/api/v1/school/accounts/${encodeURIComponent(account.id)}`, {
+        method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ confirmation }),
+      });
+      const result = await json(response);
+      if (result?.error === 'recent_yandex_login_required') {
+        status.replaceChildren(node(document, 'span', '', 'Войдите через Яндекс ID ещё раз, затем повторите удаление. '));
+        const link = node(document, 'a', '', 'Подтвердить вход'); link.href = '/auth/yandex/start?reauth=1';
+        status.append(link);
+        return;
+      }
+      if (!response.ok || result?.ok !== true) throw new Error('account_deletion_failed');
+      await load();
+      status.textContent = 'Аккаунт и связанные данные удалены.';
+    } catch {
+      status.textContent = 'Не удалось удалить аккаунт. Проверьте очередь и состояние аккаунта перед повтором.';
+    }
+  }
 
   async function load() {
     status.textContent = 'Загружаем очередь…';
@@ -277,6 +314,25 @@ export async function initializeListingModeration({ document = globalThis.docume
           && ['student', 'council_member'].includes(item.target_role));
         overview.append(node(document, 'p', '', `В выборке: активных профилей — ${users.length}, активных публикаций — ${listings.filter(item => item.status === 'active').length}, ожидают проверки — ${listings.filter(item => item.status === 'pending').length}, заявок на удаление — ${deletionRequests.length}, ограничений — ${suspensions.length}.`));
         overview.append(node(document, 'p', '', 'Список ограничен последними 100 профилями и публикациями, 50 заявками и 100 ограничениями.'));
+        const accounts = node(document, 'section', 'ru-school-account-list');
+        accounts.append(node(document, 'h4', '', 'Аккаунты школы'));
+        accounts.append(node(document, 'p', 'ru-note', 'Список показывает до 100 активных профилей. Удалить можно аккаунт ученика или Совета; для подтверждения потребуется свежий вход через Яндекс ID.'));
+        const roleNames = { student: 'Ученик', council_member: 'Участник Ученического совета', school_admin: 'Администратор школы' };
+        for (const account of users) {
+          const card = node(document, 'article', 'ru-school-account-card');
+          const name = [account.first_name, account.last_name]
+            .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || 'Аккаунт участника';
+          card.append(node(document, 'b', '', name));
+          card.append(node(document, 'p', '', `Класс: ${typeof account.class_name === 'string' && account.class_name.trim() ? account.class_name.trim() : 'не указан'} · ${roleNames[account.role]} · аккаунт #${account.id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', 'ru-note', `Публикаций в выборке: ${listings.filter(item => item.user_id === account.id).length}.`));
+          if (['student', 'council_member'].includes(account.role)
+              && account.id.toLowerCase() !== String(me.profile.id || '').toLowerCase()) {
+            card.append(actionButton(document, 'Удалить аккаунт', () => deleteSchoolAccount(account)));
+          }
+          accounts.append(card);
+        }
+        if (!users.length) accounts.append(node(document, 'p', '', 'Активные профили школы не найдены.'));
+        overview.append(accounts);
         const actionNames = { role_revoked: 'Снята школьная роль', account_deleted: 'Удалён аккаунт по решению школы',
           account_deleted_by_admin: 'Удалён аккаунт администратором', listing_deleted: 'Удалено объявление',
           issued: 'Выдано временное ограничение', lifted: 'Снято временное ограничение',

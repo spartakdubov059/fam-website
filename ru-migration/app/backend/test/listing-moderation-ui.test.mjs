@@ -203,6 +203,67 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   assert.equal(overview.textContent.includes('<unsafe>'), false);
 });
 
+test('school account management deletes only an identified student or council account after exact confirmation', async () => {
+  const f = fixture(); const calls = []; const confirmations = []; const prompts = [];
+  const adminId = '11111111-1111-4111-8111-111111111111';
+  const studentId = '22222222-2222-4222-8222-222222222222';
+  const councilId = '33333333-3333-4333-8333-333333333333';
+  const otherAdminId = '44444444-4444-4444-8444-444444444444';
+  const removed = new Set();
+  let needsFreshLogin = true;
+  const accounts = [
+    { id: adminId, role: 'school_admin', first_name: 'Главный', last_name: 'Администратор' },
+    { id: studentId, role: 'student', first_name: 'Иван', last_name: 'Ученик', class_name: '7А' },
+    { id: councilId, role: 'council_member', first_name: 'Мария', last_name: 'Совет' },
+    { id: otherAdminId, role: 'school_admin', first_name: 'Другой', last_name: 'Администратор' },
+  ];
+  const confirmation = 'УДАЛИТЬ АККАУНТ УЧАСТНИКА';
+  await initializeListingModeration({ ...f,
+    confirmImpl: message => { confirmations.push(message); return true; },
+    promptImpl: message => { prompts.push(message); return confirmation; },
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, init });
+      if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: adminId, role: 'school_admin' } }) };
+      if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+      if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+      if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
+      if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true,
+        users: accounts.filter(account => !removed.has(account.id)), listings: [], audit: [], deletion_requests: [], suspensions: [] }) };
+      if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
+      if (url === `/api/v1/school/accounts/${studentId}` && init.method === 'DELETE') {
+        if (needsFreshLogin) {
+          needsFreshLogin = false;
+          return { ok: false, status: 403, json: async () => ({ ok: false, error: 'recent_yandex_login_required' }) };
+        }
+        removed.add(studentId);
+        return { ok: true, json: async () => ({ ok: true, deleted: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true, requests: [], targets: [], suspensions: [], reports: [], messages: [], alerts: [] }) };
+    },
+  });
+
+  const overview = f.queue.children.find(item => item.children?.[0]?.textContent === 'Обзор школы');
+  const accountPanel = overview.children.find(item => item.tagName === 'section' && item.children?.[0]?.textContent === 'Аккаунты школы');
+  const cards = accountPanel.children.filter(item => item.tagName === 'article');
+  assert.equal(cards.length, 4);
+  const deleteButtons = cards.flatMap(card => card.children.filter(child => child.tagName === 'button'));
+  assert.equal(deleteButtons.length, 2);
+  assert.deepEqual(deleteButtons.map(button => button.textContent), ['Удалить аккаунт', 'Удалить аккаунт']);
+  await deleteButtons[0].listeners.click();
+  assert.equal(f.status.children[1].href, '/auth/yandex/start?reauth=1');
+  await deleteButtons[0].listeners.click();
+
+  const deletion = calls.find(call => call.url === `/api/v1/school/accounts/${studentId}` && call.init.method === 'DELETE');
+  assert.ok(deletion);
+  assert.equal(deletion.init.credentials, 'same-origin');
+  assert.deepEqual(JSON.parse(deletion.init.body), { confirmation });
+  assert.equal(confirmations.length, 2);
+  assert.match(confirmations[0], /#222222 \(Иван Ученик\)/);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[0], /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
+  assert.equal(f.status.textContent, 'Аккаунт и связанные данные удалены.');
+});
+
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
   const f = fixture(); const calls = [];
   const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
