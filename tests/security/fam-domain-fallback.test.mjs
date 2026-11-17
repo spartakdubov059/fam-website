@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const submit = readFileSync(new URL("../../supabase/functions/submit-content/index.ts", import.meta.url), "utf8");
 const moderate = readFileSync(new URL("../../supabase/functions/moderate/index.ts", import.meta.url), "utf8");
+const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
+const healthMarker = readFileSync(new URL("../../.well-known/fam-domain-health.json", import.meta.url), "utf8");
 
 const fallbackOrigin = "https://spartakdubov059.github.io";
 const primaryOrigin = "https://famru.netlify.app";
@@ -19,11 +21,34 @@ function signupRedirect(origin, pathname) {
   });
 }
 
-test("GitHub Pages is independent, never forcibly redirected to Netlify", () => {
+test("GitHub Pages prefers the primary Netlify host only after its health probe succeeds", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
-  assert.doesNotMatch(head, /location\.(?:replace|assign)|window\.location|http-equiv=["']refresh/);
-  assert.doesNotMatch(head, /<script/);
+  assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
+  assert.ok(head.includes('https://famru.netlify.app/.well-known/fam-domain-health.json?t='));
+  assert.ok(head.includes('mode: "cors"'));
+  assert.ok(head.includes('cache: "no-store"'));
+  assert.ok(head.includes('health && health.site === "famru"'));
+  assert.ok(head.includes('window.location.replace(target)'));
+  assert.ok(head.includes("}, 4000);"));
+  assert.ok(head.includes("Keep the current FAM page usable"));
+  assert.ok(head.includes("window.location.search + window.location.hash"));
+});
+
+test("Supabase HTTP 401 confirms the API answered but does not claim login was tested", async () => {
+  const { summarizeNodeResult, TARGETS } = await import("../../scripts/check-fam-russia-reachability.mjs");
+  const result = summarizeNodeResult([[1, "42ms", "Unauthorized", "401"]]);
+  assert.equal(result.state, "auth-required");
+  assert.equal(result.status, "401");
+  assert.match(result.info, /дошёл до API/);
+  assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
+    target.url === "https://famru.netlify.app/.well-known/fam-domain-health.json"));
+});
+
+test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
+  assert.ok(healthMarker.includes('"site":"famru"'));
+  assert.ok(netlify.includes('Access-Control-Allow-Origin = "https://spartakdubov059.github.io"'));
+  assert.ok(netlify.includes('Cache-Control = "no-store"'));
 });
 
 test("signup confirmation on GitHub Pages remains on that same fallback host", () => {
