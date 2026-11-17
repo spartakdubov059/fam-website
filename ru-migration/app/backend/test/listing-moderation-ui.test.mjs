@@ -66,11 +66,15 @@ test('school moderators can inspect and decide idea photos without rendering use
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const key = 'pending/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
   let imageStatus = 'pending';
+  let ideasPayload;
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
-    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: imageStatus === 'pending'
-      ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status }] : [] }) };
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
+    if (url === '/api/v1/school/ideas') {
+      ideasPayload = { ok: true, ideas: imageStatus === 'pending'
+        ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status }] : [] };
+      return { ok: true, json: async () => ideasPayload };
+    }
     if (url === `/api/v1/school/ideas/${id}/images` && init.method === 'PATCH') { imageStatus = 'approved'; return { ok: true, json: async () => ({ ok: true, image_status }) }; }
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
@@ -87,7 +91,7 @@ test('school moderators can inspect and decide idea photos without rendering use
   const card = panel?.children.find(item => item.tagName === 'article');
   assert.ok(card, JSON.stringify({ panel: panel?.children?.map(item => ({ tag: item.tagName, text: item.textContent,
     children: item.children?.map(child => child.tagName) })), queue: f.queue.children?.map(item => item.children?.[0]?.textContent),
-    calls: calls.map(call => call.url) }));
+    calls: calls.map(call => call.url), ideasPayload }));
   assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
   assert.equal(card.children[1].tagName, 'img');
   assert.equal(card.children[1].src, `/api/v1/ideas/${id}/images/0`);

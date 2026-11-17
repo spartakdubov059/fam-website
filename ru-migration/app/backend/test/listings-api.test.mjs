@@ -88,6 +88,7 @@ test('school administrator overview is private to the active administrator and b
 test('school agent dashboard and idea decisions are school-admin-only and school scoped', async () => {
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' }; let saved; let reviewed;
   const ideaId = 'a'.repeat(64);
+  const ideaSchoolId = 'school-a';
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'user' }), resolveActor: async () => actor,
     repository: {
       getSchoolAgentDashboard: async schoolId => { saved = schoolId; return { report: null, ideas: [] }; },
@@ -760,7 +761,7 @@ test('idea image review queue and decisions are limited to school staff and the 
   let listedSchool; let listedReviewer; let reviewed;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
     repository: { listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
-      reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === actor.school_id; } } });
+      reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === ideaSchoolId; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/school/ideas';
   assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', image_status: 'pending' }] } });
   assert.equal(listedSchool, 'school-a');
