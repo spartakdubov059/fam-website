@@ -686,7 +686,7 @@ try {
     'rejected school idea image is no longer readable');
   assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedIdeaImageKey};`)[0][0].status, 'pending',
     'rejected school idea image returns to the bounded orphan cleanup queue');
-  const rejectedTextImageKey = `pending/${deletingUserId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
+  const rejectedTextImageKey = `pending/${deletingUserId}/12345678-1234-4234-8234-123456789012.webp`;
   await repo.registerPendingImage(deletingUserId, rejectedTextImageKey);
   const rejectedTextIdea = await repo.createIdea({ user_id: deletingUserId, school_id: 'synthetic-school',
     text: 'Идея отклоняется модератором школы', image_keys: [rejectedTextImageKey], image_status: 'pending',
