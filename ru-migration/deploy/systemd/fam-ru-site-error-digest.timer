@@ -6,7 +6,7 @@ OnCalendar=*-*-* *:00:00 UTC
 OnCalendar=*-*-* *:15:00 UTC
 OnCalendar=*-*-* *:30:00 UTC
 OnCalendar=*-*-* *:45:00 UTC
-Persistent=true
+Persistent=false
 Unit=fam-ru-site-error-digest.service
 
 [Install]
