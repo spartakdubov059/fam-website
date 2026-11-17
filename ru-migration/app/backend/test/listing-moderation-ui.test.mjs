@@ -86,7 +86,8 @@ test('school moderators can inspect and decide idea photos without rendering use
   const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Школьные идеи и фотографии');
   const card = panel?.children.find(item => item.tagName === 'article');
   assert.ok(card, JSON.stringify({ panel: panel?.children?.map(item => ({ tag: item.tagName, text: item.textContent,
-    children: item.children?.map(child => child.tagName) })), queue: f.queue.children?.map(item => item.children?.[0]?.textContent) }));
+    children: item.children?.map(child => child.tagName) })), queue: f.queue.children?.map(item => item.children?.[0]?.textContent),
+    calls: calls.map(call => call.url) }));
   assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
   assert.equal(card.children[1].tagName, 'img');
   assert.equal(card.children[1].src, `/api/v1/ideas/${id}/images/0`);

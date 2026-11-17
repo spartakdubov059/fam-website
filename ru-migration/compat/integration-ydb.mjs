@@ -581,7 +581,7 @@ try {
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
   const attachedIdeaImageKey = `pending/${deletingUserId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
-  const rejectedIdeaImageKey = `pending/${deletingUserId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
+  const rejectedIdeaImageKey = `pending/${deletingUserId}/ffffffff-ffff-4fff-8fff-ffffffffffff.webp`;
   accountMediaKeys.add(deletingImageKey);
   await repo.registerPendingImage(deletingUserId, deletingImageKey);
   accountMediaKeys.add(attachedIdeaImageKey);
@@ -631,6 +631,8 @@ try {
     'account deletion removes the identity mapping after cleanup');
   assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${deletingListing.id};`)?.[0]?.length ?? 0, 0);
   assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletingImageKey};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT idea_id FROM fam_idea_images WHERE user_id = ${deletingUserId};`)?.[0]?.length ?? 0, 0,
+    'account deletion removes private idea image references');
   const requestedTargetId = '99999999-9999-4999-8999-999999999999';
   const requestedImageKey = `pending/${requestedTargetId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
   accountMediaKeys.add(requestedImageKey);
