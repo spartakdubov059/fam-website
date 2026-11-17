@@ -17,4 +17,16 @@ CI подтверждает совместимость с SDK и интегра�
 Текущий проверенный коммит: [a715c9732714206f4a4ba27db91b439bdd924755](https://github.com/spartakdubov059/fam-website/commit/a715c9732714206f4a4ba27db91b439bdd924755), ветка `migration/yandex-cloud`.
 
 - [SDK/Sharp workflow #44124977713](https://github.com/spartakdubov059/fam-website/actions/runs/44124977713) завершился успешно: `261/261` backend-тест, установка закреплённых YDB/AWS SDK и Sharp, smoke-проверка SDK и нативного WebP.
-- [Одноразовая YDB интеграция #44124977918](https://github.com/spartakdubov059/fam-website/actions/runs/44124977918) завершилась успешно. Применена схема до `25_agent_dai
+- [Одноразовая YDB интеграция #44124977918](https://github.com/spartakdubov059/fam-website/actions/runs/44124977918) завершилась успешно. Применена схема до `25_agent_daily_digest_queue.yql`; проверены очередь, lease, идемпотентность, синтетические агрегаты, запрет stale lease на запись. Маркер `YDB_LOCAL_INTEGRATION_PASS`; временный контейнер удалён.
+- Добавлена только очередь ежедневной сводки по разрешённым агрегатам. Она не хранит произвольное тело задач, не читает переписки/имена/идентификаторы и не вызывает внешнюю модель. systemd timer подготовлен, но не установлен и выключен.
+- Это CI с локальной одноразовой YDB, а не облачный Yandex Cloud staging. Реальные данные не использовались; `main`, production и платные ресурсы не затронуты.
+
+
+## Исправление статуса готовности OIDC-only — 17 ноября 2026
+
+Проверенный коммит: [8b61a48d18974cf4db59c610a0856d2918155782](https://github.com/spartakdubov059/fam-website/commit/8b61a48d18974cf4db59c610a0856d2918155782), ветка `migration/yandex-cloud`.
+
+- `getReadiness` теперь считает runtime готовым при настроенной Yandex ID или OIDC bearer authentication; для OIDC выдаётся отдельное сообщение. Добавлены проверки обоих auth-сценариев.
+- [SDK/Sharp CI, run 44130259860](https://github.com/spartakdubov059/fam-website/actions/runs/44130259860) завершился успешно: `264/264` backend-теста, pinned SDK/Sharp и нативная проверка WebP.
+- [Одноразовая YDB интеграция, run 44130259874](https://github.com/spartakdubov059/fam-website/actions/runs/44130259874) прошла на синтетических данных; disposable local YDB контейнер удалён.
+- Это устраняет ошибочное сообщение о незапущенном auth при поддерживаемой конфигурации OIDC. Российский cloud staging всё ещё отсутствует; независимый обзор безопасности ещё неполный.
