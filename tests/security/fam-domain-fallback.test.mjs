@@ -36,11 +36,13 @@ test("GitHub Pages prefers the primary Netlify host only after its health probe 
 });
 
 test("Supabase HTTP 401 confirms the API answered but does not claim login was tested", async () => {
-  const { summarizeNodeResult } = await import("../../scripts/check-fam-russia-reachability.mjs");
+  const { summarizeNodeResult, TARGETS } = await import("../../scripts/check-fam-russia-reachability.mjs");
   const result = summarizeNodeResult([[1, "42ms", "Unauthorized", "401"]]);
   assert.equal(result.state, "auth-required");
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
+  assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
+    target.url === "https://famru.netlify.app/.well-known/fam-domain-health.json"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
