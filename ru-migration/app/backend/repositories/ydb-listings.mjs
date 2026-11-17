@@ -8,10 +8,11 @@ async function consumeSubmissionQuota(tx, userId, action, limit) {
     WHERE user_id = ${userId} AND action = ${action} AND window_start = ${hour} LIMIT 1;`;
   const current = Number(rows?.[0]?.[0]?.submission_count ?? 0);
   if (!Number.isSafeInteger(current) || current < 0 || current >= limit) {
-    const error = new Error('submission quota exceeded'); error.code = 'rate_limited'; throw error;
+    return false;
   }
   await tx`UPSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
     VALUES (${userId}, ${action}, ${hour}, Unwrap(CAST(${current + 1} AS Uint32)));`;
+  return true;
 }
 
 const isIsoDate = value => {
@@ -795,7 +796,7 @@ export function createYdbListingsRepository(sql) {
             ${record.image_key ?? ''}, ${record.photo_status ?? 'none'},
             ${record.status}, CurrentUtcTimestamp());`;
       return sql.begin(async tx => {
-        await consumeSubmissionQuota(tx, record.user_id, 'listing', 5);
+        if (!await consumeSubmissionQuota(tx, record.user_id, 'listing', 5)) return { ok: false, code: 'rate_limited' };
         if (record.image_key) {
           const pending = await tx`SELECT user_id, status FROM fam_pending_media
             WHERE object_key = ${record.image_key} AND created_at > CurrentUtcTimestamp() - Interval('P7D') LIMIT 1;`;
@@ -828,8 +829,7 @@ export function createYdbListingsRepository(sql) {
     async reserveImageUpload(userId) {
       if (typeof userId !== 'string' || !UUID.test(userId)) throw new TypeError('invalid image uploader');
       return sql.begin(async tx => {
-        await consumeSubmissionQuota(tx, userId, 'image_upload', 5);
-        return true;
+        return consumeSubmissionQuota(tx, userId, 'image_upload', 5);
       });
     },
 
@@ -1032,7 +1032,7 @@ export function createYdbListingsRepository(sql) {
       }
       const id = randomUUID();
       return sql.begin(async tx => {
-        await consumeSubmissionQuota(tx, record.user_id, 'idea', 10);
+        if (!await consumeSubmissionQuota(tx, record.user_id, 'idea', 10)) return { ok: false, code: 'rate_limited' };
         for (const key of imageKeys) {
           const owned = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${key} AND user_id = ${record.user_id} LIMIT 1;`;
           if (owned?.[0]?.[0]?.status !== 'pending') throw new TypeError('idea image unavailable');

@@ -782,19 +782,17 @@ try {
     max_seats: 0, status: 'pending' };
   for (let i = 0; i < 5; i++) await repo.createListing(quotaListing);
   const listingQuotaState = await sql`SELECT action, submission_count, window_start FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
-  console.log('SYNTHETIC_QUOTA_STATE', inspect(listingQuotaState, { depth: null }));
-  await assert.rejects(repo.createListing(quotaListing), error => {
-    console.log('SYNTHETIC_QUOTA_REJECTION', inspect({ name: error?.name, message: error?.message, code: error?.code }, { depth: null }));
-    return error?.code === 'rate_limited';
-  },
+  assert.equal(Number(listingQuotaState[0].find(row => row.action === 'listing')?.submission_count), 5,
+    'the serializable counter records the five allowed listings');
+  assert.deepEqual(await repo.createListing(quotaListing), { ok: false, code: 'rate_limited' },
     'the sixth listing in one hour is rejected for this synthetic account');
   const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Синтетическая идея',
     ai_status: 'pending', ai_summary: 'Идея', ai_reason: 'review_unavailable', admin_status: 'new' };
   for (let i = 0; i < 10; i++) await repo.createIdea(quotaIdea);
-  await assert.rejects(repo.createIdea(quotaIdea), error => error.code === 'rate_limited',
+  assert.deepEqual(await repo.createIdea(quotaIdea), { ok: false, code: 'rate_limited' },
     'the eleventh idea in one hour is rejected for this synthetic account');
   for (let i = 0; i < 5; i++) await repo.reserveImageUpload(quotaUserId);
-  await assert.rejects(repo.reserveImageUpload(quotaUserId), error => error.code === 'rate_limited',
+  assert.equal(await repo.reserveImageUpload(quotaUserId), false,
     'a sixth image decode reservation in one hour is rejected for this synthetic account');
   const quotaRows = await sql`SELECT action, submission_count FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
   assert.deepEqual(Object.fromEntries(quotaRows[0].map(row => [row.action, Number(row.submission_count)])), { idea: 10, image_upload: 5, listing: 5 });

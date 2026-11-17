@@ -426,7 +426,7 @@ test('listing submissions enforce a durable per-user hourly quota before inserti
   const row = { user_id: 'synthetic-user', school_id: 'synthetic-school', title: 'Книга', description: 'Учебник',
     category: 'Учёба', price_text: 'Бесплатно', is_event: false, max_seats: 0, status: 'pending' };
   for (let i = 0; i < 5; i++) await repo.createListing(row);
-  await assert.rejects(repo.createListing(row), error => error.code === 'rate_limited');
+  assert.deepEqual(await repo.createListing(row), { ok: false, code: 'rate_limited' });
   assert.equal(count, 5);
 });
 

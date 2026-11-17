@@ -51,6 +51,6 @@ test('idea images accept at most three own pending WebP keys and remain pending 
 
 test('surfaces persistent idea quotas as a rate limit instead of a database failure', async () => {
   const result = await submitIdea({ actor, input: { text: 'Школьный книжный клуб' },
-    repository: { createIdea: async () => { const error = new Error('limited'); error.code = 'rate_limited'; throw error; } } });
+    repository: { createIdea: async () => ({ ok: false, code: 'rate_limited' }) } });
   assert.deepEqual(result, { ok: false, code: 'rate_limited' });
 });

@@ -45,6 +45,6 @@ test('price participates in privacy checks and is preserved', async () => {
 
 test('surfaces persistent submission quotas as a rate limit instead of a database failure', async () => {
   const result = await submitListing({ actor, input, review: approve,
-    repository: { createListing: async () => { const error = new Error('limited'); error.code = 'rate_limited'; throw error; } } });
+    repository: { createListing: async () => ({ ok: false, code: 'rate_limited' }) } });
   assert.deepEqual(result, { ok: false, code: 'rate_limited' });
 });

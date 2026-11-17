@@ -152,7 +152,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
 
     try {
       // Reserve before Sharp decodes the supplied bytes so repeated invalid files are bounded too.
-      await repository.reserveImageUpload(actor.id);
+      if (!await repository.reserveImageUpload(actor.id)) return { status: 429, body: { ok: false, error: 'rate_limited' } };
       const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType, maxBytes: imageByteLimit });
       const keyPattern = new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i');
       if (!result || typeof result.key !== 'string' || !keyPattern.test(result.key)

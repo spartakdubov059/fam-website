@@ -16,7 +16,7 @@ test('pending media upload requires an authenticated database profile and binds 
   const api = createMediaApi({
     authenticate: async () => ({ subject: 'verified-subject' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', role: 'student' }),
-    repository: { reserveImageUpload: async userId => assert.equal(userId, '11111111-1111-4111-8111-111111111111'),
+    repository: { reserveImageUpload: async userId => { assert.equal(userId, '11111111-1111-4111-8111-111111111111'); return true; },
       registerPendingImage: async (userId, key) => { assert.equal(userId, '11111111-1111-4111-8111-111111111111'); assert.match(key, /^pending\//); } },
     pendingImages: { put: async input => { saved = input; return { key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', contentType: 'image/webp', bytes: 42 }; } },
   });
@@ -96,7 +96,7 @@ test('upload quota is reserved before image decoding and returns 429 when exhaus
   let decodes = 0;
   const api = createMediaApi({ authenticate: async () => ({ subject: 'x' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111' }),
-    repository: { reserveImageUpload: async () => { reservations++; const error = new Error('quota'); error.code = 'rate_limited'; throw error; },
+    repository: { reserveImageUpload: async () => { reservations++; return false; },
       registerPendingImage: async () => {} },
     pendingImages: { put: async () => { decodes++; throw new Error('must not decode'); } } });
   assert.deepEqual(await api(request()), { status: 429, body: { ok: false, error: 'rate_limited' } });

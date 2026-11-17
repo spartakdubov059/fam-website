@@ -34,6 +34,7 @@ export async function submitIdea({ actor, input, repository, review, safetyKey }
       ai_reason: decision.reason_code || '',
       admin_status: 'new',
     });
+    if (idea?.code === 'rate_limited') return { ok: false, code: 'rate_limited' };
     if (!idea || typeof idea.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: decision.action === 'pending' ? 'pending' : 'approved', image_status: imageKeys.length ? 'pending' : 'none', id: idea.id };
   } catch (error) {
