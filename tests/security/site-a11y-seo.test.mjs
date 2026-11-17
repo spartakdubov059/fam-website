@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 const frontend = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const robots = readFileSync(new URL("../../robots.txt", import.meta.url), "utf8");
 const sitemap = readFileSync(new URL("../../sitemap.xml", import.meta.url), "utf8");
+const netlifyConfig = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
+const domainHealth = readFileSync(new URL("../../.well-known/fam-domain-health.json", import.meta.url), "utf8");
 
 test("the homepage has one semantic H1 and a continuous heading hierarchy", () => {
   assert.equal((frontend.match(/<h1\b/gi) || []).length, 1);
@@ -44,6 +46,16 @@ test("social previews and crawler metadata are complete for the public homepage"
   assert.ok(frontend.includes('emailRedirectTo: "https://famru.netlify.app/"'));
   assert.ok(robots.includes("Sitemap: https://famru.netlify.app/sitemap.xml"));
   assert.ok(sitemap.includes("<loc>https://famru.netlify.app/</loc>"));
+});
+
+test("the old domain falls back to the same app when Netlify is unreachable", () => {
+  assert.ok(frontend.includes('var healthUrl = "https://famru.netlify.app/.well-known/fam-domain-health.json?t="'));
+  assert.ok(frontend.includes('mode: "cors"'));
+  assert.ok(frontend.includes('health.site === "famru"'));
+  assert.ok(frontend.includes('emailRedirectTo: window.location.origin + window.location.pathname'));
+  assert.ok(netlifyConfig.includes('Access-Control-Allow-Origin = "https://spartakdubov059.github.io"'));
+  assert.ok(domainHealth.includes('"site":"famru"'));
+  assert.ok(frontend.includes("Netlify may be unavailable on this network"));
 });
 
 test("the photo form does not claim moderation is disabled", () => {
