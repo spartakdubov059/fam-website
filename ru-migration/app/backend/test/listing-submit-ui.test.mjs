@@ -216,13 +216,17 @@ test('authenticated unprovisioned Yandex users can request a staff profile witho
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: false, status: 403, json: async () => ({ ok: false, error: 'profile_unavailable' }) };
     if (url === '/api/v1/profile-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, request: null }) };
-    if (url === '/api/v1/schools') return { ok: true, json: async () => ({ ok: true, schools: [{ id: 'lyceum_3', name: 'Лицей № 3' }] }) };
+    if (url === '/api/v1/schools') return { ok: true, json: async () => ({ ok: true, schools: [
+      { id: 'lyceum_3', name: 'Лицей № 3' }, { id: 'gymnasium_4', name: 'Гимназия № 4' },
+    ] }) };
     if (url === '/api/v1/profile-requests') return { ok: true, status: 202, json: async () => ({ ok: true, status: 'pending' }) };
     throw new Error(`unexpected route ${url}`);
   } });
   assert.equal(f.login.hidden, true);
   assert.equal(f.logout.hidden, false);
   const form = f.shellChildren[0].children[2];
+  const schoolSelect = form.children.find(item => item.textContent === 'Школа').children[0];
+  assert.deepEqual(schoolSelect.children.map(option => option.value), ['lyceum_3', 'gymnasium_4']);
   const personType = form.children.find(item => item.children?.[0]?.name === 'person_type').children[0];
   personType.value = 'school_staff'; personType.listeners.change();
   const classLabel = form.children.find(item => item.textContent === 'Класс, например 8А');

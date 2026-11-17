@@ -452,9 +452,11 @@ test('only an active school administrator can list and decide staff verification
 
 test('school catalog is a minimal public projection and needs no auth', async () => {
   const handler = createListingsApi({ authenticate: async () => { throw new Error('school catalog is public'); },
-    schools: [{ id: 'lyceum_3', name: 'Лицей № 3', secret: 'hidden' }] });
+    schools: [{ id: 'lyceum_3', name: 'Лицей № 3', secret: 'hidden' }, { id: 'gymnasium_4', name: 'Гимназия № 4', secret: 'hidden' }] });
   const request = req({}, 'GET'); request.url = '/api/v1/schools';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, schools: [{ id: 'lyceum_3', name: 'Лицей № 3' }] } });
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, schools: [
+    { id: 'lyceum_3', name: 'Лицей № 3' }, { id: 'gymnasium_4', name: 'Гимназия № 4' },
+  ] } });
 });
 
 test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
