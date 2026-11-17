@@ -43,12 +43,29 @@ export function summarizeNodeResult(raw) {
 }
 
 async function getJSON(url, timeoutMs = 15000) {
-  const response = await fetch(url, {
-    headers: { "Accept": "application/json", "User-Agent": "FAM-Public-Network-Audit/1.0" },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) throw new Error("Check-Host API HTTP " + response.status);
-  return await response.json();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await fetch(url, {
+      headers: { "Accept": "application/json", "User-Agent": "FAM-Public-Network-Audit/1.0" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status === 429 && attempt === 0) {
+      const seconds = Number(response.headers?.get?.("retry-after"));
+      const delayMs = Number.isFinite(seconds) && seconds > 0
+        ? Math.min(seconds * 1000, 60000) : 15000;
+      await sleep(delayMs);
+      continue;
+    }
+    if (!response.ok) throw new Error("Check-Host API HTTP " + response.status);
+    return await response.json();
+  }
+  throw new Error("Check-Host request could not be completed");
+}
+
+// A service check is complete only when every requested node finished;
+// API rate limits or missing nodes must never count as success.
+export function diagnosticCoverage(completedTargets, requiredTargets = TARGETS.length) {
+  return Number.isInteger(completedTargets) && requiredTargets > 0 &&
+    completedTargets === requiredTargets ? "complete" : "inconclusive";
 }
 
 export async function checkHost(target) {
@@ -92,7 +109,7 @@ async function main() {
   for (const target of TARGETS) {
     try {
       const result = await checkHost(target);
-      checks++;
+      if (result.nodes.length && result.nodes.every(node => node.state !== "unknown")) checks++;
       for (const node of result.nodes) {
         lines.push("| " + target.name + " | " + node.node.replace(".node.check-host.net", "") +
           " | " + node.info + " | " + node.status + " | [Источник](" + result.report + ") |");
@@ -104,7 +121,12 @@ async function main() {
       console.warn(target.name + ": diagnostic unavailable (" + String(error?.message || "unknown") + ")");
     }
   }
-  lines.push("", "Успешно запрошено целей: " + checks + "/" + TARGETS.length + ".");
+  lines.push("", "Полностью проверено целей: " + checks + "/" + TARGETS.length + ".");
+  if (diagnosticCoverage(checks) !== "complete") {
+    lines.push("⚠️ Диагностика неполная: это НЕ подтверждение доступности всех доменов.");
+    console.warn("::warning::FAM reachability diagnostic incomplete; do not claim all hosts are healthy.");
+    process.exitCode = 2;
+  }
   const summary = lines.join("\n") + "\n";
   console.log(summary);
   if (process.env.GITHUB_STEP_SUMMARY) {
