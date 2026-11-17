@@ -8,6 +8,24 @@
       if (window.location.hostname !== "spartakdubov059.github.io") return;
       var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
       if (!match) return;
+      // Browser auth storage is isolated by hostname. Never bounce a signed-in
+      // fallback user to a host where the session may be missing or different.
+      // Likewise, complete email/OAuth callbacks on their requested origin.
+      function keepFallbackAuthContext() {
+        var params = window.location.search + "&" + window.location.hash;
+        if (/(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error_code)=/i.test(params)) return true;
+        try {
+          var raw = window.localStorage && window.localStorage.getItem("sb-tfacqpljrvfpcrhdovbu-auth-token");
+          if (raw) {
+            var session = JSON.parse(raw);
+            if (session && (session.access_token || session.refresh_token)) return true;
+          }
+        } catch (_) {
+          // Storage may be disabled; the normal health-checked fallback still works.
+        }
+        return false;
+      }
+      if (keepFallbackAuthContext()) return;
       var path = match[1] || "/";
       var target = "https://famru.netlify.app" + path + window.location.search + window.location.hash;
       var controller = window.AbortController ? new AbortController() : null;
@@ -24,7 +42,7 @@
         }).then(function (response) {
           return response.ok ? response.json() : null;
         }).then(function (health) {
-          if (health && health.site === "famru") window.location.replace(target);
+          if (health && health.site === "famru" && !keepFallbackAuthContext()) window.location.replace(target);
         }).catch(function () {
           // Keep the current FAM page usable if Netlify is slow, blocked, or offline.
         }).finally(function () {
