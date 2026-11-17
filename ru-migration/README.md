@@ -1,6 +1,6 @@
 # FAM RU — изолированная миграция на российскую инфраструктуру
 
-**Последняя проверка кода — commit `4409142ff8a675aeb07296b05c55f136b1aed552` (17 ноября 2026):** локально прошли `288/288` backend-тестов; [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44165112113) и [одноразовая YDB интеграция](https://github.com/spartakdubov059/fam-website/actions/runs/44165112216) прошли на синтетических данных. Readiness проверяет реальную доступность YDB и кэширует ответ на 5 секунд, объединяя параллельные запросы. Это не российский облачный staging; бесплатная облачная среда и production OAuth не настроены. Независимый security audit не завершён. `main`, production и реальные данные учеников не затронуты.
+**Последняя проверка кода — commit `143b21e1eaf13af7d0da3761e2311e41a956d0ce` (18 ноября 2026):** SDK/Sharp CI прошёл `292/292` backend-теста, а [одноразовая YDB интеграция](https://github.com/spartakdubov059/fam-website/actions/runs/44194126592) проверила новые постоянные лимиты на синтетических данных; [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44194126505) также прошёл. Объявления ограничены 5, идеи 10, загрузки изображений 5 на аккаунт за час; резерв изображения учитывается до Sharp. Это локальная одноразовая YDB, не российское облачное staging. Бесплатный хост, облачные credentials и production OAuth не настроены; независимый security audit не завершён. `main`, production и реальные данные учеников не затронуты.
 
 
 
