@@ -6,7 +6,7 @@ const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const submit = readFileSync(new URL("../../supabase/functions/submit-content/index.ts", import.meta.url), "utf8");
 const moderate = readFileSync(new URL("../../supabase/functions/moderate/index.ts", import.meta.url), "utf8");
 const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
-const healthMarker = readFileSync(new URL("../../.well-known/fam-domain-health.json", import.meta.url), "utf8");
+const healthMarker = readFileSync(new URL("../../fam-domain-health.json", import.meta.url), "utf8");
 const sdkFallback = readFileSync(new URL("../../supabase-cdn-fallback.js", import.meta.url), "utf8");
 
 const fallbackOrigin = "https://spartakdubov059.github.io";
@@ -26,7 +26,7 @@ test("GitHub Pages prefers the primary Netlify host only after its health probe 
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
-  assert.ok(head.includes('https://famru.netlify.app/.well-known/fam-domain-health.json?t='));
+  assert.ok(head.includes('https://famru.netlify.app/fam-domain-health.json?t='));
   assert.ok(head.includes('mode: "cors"'));
   assert.ok(head.includes('cache: "no-store"'));
   assert.ok(head.includes('health && health.site === "famru"'));
@@ -43,7 +43,7 @@ test("Supabase HTTP 401 confirms the API answered but does not claim login was t
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
   assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
-    target.url === "https://famru.netlify.app/.well-known/fam-domain-health.json"));
+    target.url === "https://famru.netlify.app/fam-domain-health.json"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {

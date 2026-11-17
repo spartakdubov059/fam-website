@@ -14,7 +14,7 @@ export const NODES = [
 
 export const TARGETS = [
   { name: "FAM Netlify", url: "https://famru.netlify.app/" },
-  { name: "FAM redirect health marker", url: "https://famru.netlify.app/.well-known/fam-domain-health.json" },
+  { name: "FAM redirect health marker", url: "https://famru.netlify.app/fam-domain-health.json" },
   { name: "FAM GitHub Pages", url: "https://spartakdubov059.github.io/fam-website/" },
   { name: "FAM Supabase API", url: "https://tfacqpljrvfpcrhdovbu.supabase.co/auth/v1/health" },
   { name: "FAM Supabase JS CDN", url: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0" },
