@@ -14,6 +14,38 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
   const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    if (pathname === '/api/v1/notification-reads' && (req.method === 'GET' || req.method === 'POST')) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (req.method === 'GET') {
+        if (typeof repository?.listNotificationReadStates !== 'function') return { status: 503, body: { ok: false, error: 'notification_state_unavailable' } };
+        try {
+          const notificationKeys = await repository.listNotificationReadStates(actor.id);
+          if (!Array.isArray(notificationKeys) || notificationKeys.length > 10_000) {
+            return { status: 503, body: { ok: false, error: 'notification_state_incomplete' } };
+          }
+          return { status: 200, body: { ok: true, notification_keys: notificationKeys.map(row => row.notification_key) } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const keys = input?.notification_keys;
+      if (!Array.isArray(keys) || keys.length > 100 || keys.some(key => typeof key !== 'string'
+          || key.length < 1 || key.length > 220 || /[\u0000-\u001f\u007f]/u.test(key))) {
+        return { status: 400, body: { ok: false, error: 'invalid_notification_keys' } };
+      }
+      if (typeof repository?.saveNotificationReadStates !== 'function') return { status: 503, body: { ok: false, error: 'notification_state_unavailable' } };
+      try {
+        await repository.saveNotificationReadStates(actor.id, [...new Set(keys)]);
+        return { status: 200, body: { ok: true } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (pathname === '/api/v1/site-errors') return siteErrorTelemetry(req);
     if (pathname === '/api/v1/me/account') return accountDeletionApi(req);
     if (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
@@ -602,6 +634,28 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try {
         const updated = await repository.moderateListing(moderationMatch[1], actor.school_id, status);
         return updated ? { status: 200, body: { ok: true, status } } : { status: 404, body: { ok: false, error: 'listing_not_found' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/messages/read') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 12 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const ids = input?.message_ids;
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!Array.isArray(ids) || ids.length > 100 || ids.some(id => typeof id !== 'string' || !uuid.test(id))) {
+        return { status: 400, body: { ok: false, error: 'invalid_message_ids' } };
+      }
+      if (typeof repository?.markMessagesRead !== 'function') return { status: 503, body: { ok: false, error: 'message_read_unavailable' } };
+      try {
+        const count = await repository.markMessagesRead(actor.id, actor.school_id, [...new Set(ids)]);
+        return { status: 200, body: { ok: true, updated: count } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'PATCH' && readMessageMatch) {

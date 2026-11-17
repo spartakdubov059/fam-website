@@ -59,6 +59,14 @@ try {
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;
   };
+  const savedNotificationState = await listingsApi(apiRequest('POST', '/api/v1/notification-reads', 'synthetic-new-student', {
+    notification_keys: ['release:synthetic', 'dismissed:school-listing:synthetic-id'],
+  }));
+  assert.deepEqual(savedNotificationState, { status: 200, body: { ok: true } });
+  const ownNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-new-student'));
+  assert.deepEqual(new Set(ownNotificationState.body.notification_keys), new Set(['release:synthetic', 'dismissed:school-listing:synthetic-id']));
+  const isolatedNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-other-school'));
+  assert.deepEqual(isolatedNotificationState.body.notification_keys, [], 'notification read state is isolated by authenticated account');
   const agentMetrics = await repo.getSchoolAgentMetrics('synthetic-school');
   assert.ok(Number.isInteger(agentMetrics.listings.active));
   const globalAgentMetrics = await repo.getGlobalAgentDailyMetrics();

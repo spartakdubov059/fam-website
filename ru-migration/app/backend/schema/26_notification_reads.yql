@@ -1,0 +1,8 @@
+-- Persistent, per-account notification read/dismiss state for the RU shell.
+-- The API derives user_id from the authenticated YDB profile; clients never choose it.
+CREATE TABLE fam_notification_reads (
+  user_id Utf8 NOT NULL,
+  notification_key Utf8 NOT NULL,
+  read_at Timestamp NOT NULL,
+  PRIMARY KEY (user_id, notification_key)
+);

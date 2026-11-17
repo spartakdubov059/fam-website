@@ -711,6 +711,19 @@ test('only the authenticated recipient can mark a message read', async () => {
   assert.equal(response.body.is_read, true);
 });
 
+test('bulk message read accepts bounded UUIDs and scopes every update to the verified profile', async () => {
+  let call;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
+    repository: { markMessagesRead: async (...args) => { call = args; return 1; } } });
+  const request = req({ message_ids: ['11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'] });
+  request.url = '/api/v1/messages/read';
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, updated: 1 } });
+  assert.deepEqual(call, ['synthetic-user', 'synthetic-school', ['11111111-1111-4111-8111-111111111111']]);
+  const invalid = req({ message_ids: ['not-a-uuid'] }); invalid.url = request.url;
+  assert.equal((await handler(invalid)).status, 400);
+});
+
 test('listing moderation trusts database role and school scope, not token claims or request fields', async () => {
   let call;
   const id = '11111111-1111-4111-8111-111111111111';
@@ -817,4 +830,26 @@ test('idea image review queue and decisions are limited to school staff and the 
   assert.equal((await handler(crossSchoolApprove)).status, 404, 'the repository rejects cross-school reviews');
   actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
   assert.equal((await handler(list)).status, 403);
+});
+
+test('notification read state is always owned by the authenticated profile and bounded', async () => {
+  const actor = { id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' };
+  const saved = [];
+  let listedOwner;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'student' }), resolveActor: async () => actor,
+    repository: {
+      listNotificationReadStates: async owner => { listedOwner = owner; return [{ notification_key: 'release:test' }]; },
+      saveNotificationReadStates: async (owner, keys) => { saved.push({ owner, keys }); return true; },
+    } });
+  const list = req({}, 'GET'); list.url = '/api/v1/notification-reads';
+  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, notification_keys: ['release:test'] } });
+  assert.equal(listedOwner, actor.id);
+  const save = req({ notification_keys: ['school-listing:abc', 'dismissed:release:test', 'school-listing:abc'] });
+  save.url = '/api/v1/notification-reads';
+  assert.deepEqual(await handler(save), { status: 200, body: { ok: true } });
+  assert.deepEqual(saved, [{ owner: actor.id, keys: ['school-listing:abc', 'dismissed:release:test'] }]);
+  const invalid = req({ notification_keys: ['bad\nkey'] }); invalid.url = save.url;
+  assert.equal((await handler(invalid)).status, 400);
+  const oversized = req({ notification_keys: Array.from({ length: 101 }, (_, i) => `key:${i}`) }); oversized.url = save.url;
+  assert.equal((await handler(oversized)).status, 400);
 });

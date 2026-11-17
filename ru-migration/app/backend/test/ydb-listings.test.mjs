@@ -18,6 +18,25 @@ test('technical alert query applies the source thresholds and derives severity w
   assert.doesNotMatch(query.text, /message|description|user_id|email/i);
 });
 
+test('notification state queries and writes are scoped to one verified user', async () => {
+  const operations = [];
+  const tx = async (strings, ...values) => { operations.push({ text: strings.join('?'), values }); return [[]]; };
+  const sql = Object.assign(async (strings, ...values) => {
+    operations.push({ text: strings.join('?'), values });
+    return [[{ notification_key: 'release:test', read_at: new Date('2026-11-17T00:00:00Z') }]];
+  }, { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const states = await repo.listNotificationReadStates('verified-user');
+  assert.equal(states[0].notification_key, 'release:test');
+  assert.ok(operations[0].values.includes('verified-user'));
+  assert.match(operations[0].text, /ORDER BY notification_key LIMIT 10001/);
+  await repo.saveNotificationReadStates('verified-user', ['release:test', 'dismissed:release:test']);
+  const writes = operations.slice(1);
+  assert.equal(writes.length, 2);
+  assert.ok(writes.every(write => write.text.includes('UPSERT INTO fam_notification_reads') && write.values.includes('verified-user')));
+  await assert.rejects(repo.saveNotificationReadStates('verified-user', Array(101).fill('key')), TypeError);
+});
+
 test('active suspension lookup is bounded to the actor school and ignores expired records', async () => {
   let query;
   const repo = createYdbListingsRepository((strings, ...values) => {

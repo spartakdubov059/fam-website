@@ -1028,9 +1028,9 @@ export function createYdbListingsRepository(sql) {
 
     async listPendingSchoolIdeas(schoolId, reviewerId) {
       if (!schoolId || !reviewerId) throw new TypeError('invalid idea review school');
-      const statement = sql`SELECT id, school_id, text, image_status, created_at
+      const statement = sql`SELECT id, school_id, text, image_status, ai_status, created_at
         FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new'
-        ORDER BY created_at ASC LIMIT 50;`;
+        ORDER BY created_at DESC LIMIT 50;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const ideas = (await statement)?.[0] ?? [];
       return Promise.all(ideas.map(async idea => {
@@ -1193,6 +1193,23 @@ export function createYdbListingsRepository(sql) {
       if (typeof update?.on === 'function') update.on('error', () => {});
       await update;
       return true;
+    },
+
+    async markMessagesRead(userId, schoolId, messageIds) {
+      if (!userId || !schoolId || !Array.isArray(messageIds) || messageIds.length > 100
+          || messageIds.some(id => !UUID.test(id || ''))) throw new TypeError('invalid message read batch');
+      const ids = [...new Set(messageIds)];
+      return sql.begin(async tx => {
+        let updated = 0;
+        for (const id of ids) {
+          const owned = await tx`SELECT receiver_id, school_id FROM fam_messages WHERE id = ${id} LIMIT 1;`;
+          const message = owned?.[0]?.[0];
+          if (message?.receiver_id !== userId || message?.school_id !== schoolId) continue;
+          await tx`UPDATE fam_messages SET is_read = true WHERE id = ${id} AND receiver_id = ${userId} AND school_id = ${schoolId};`;
+          updated += 1;
+        }
+        return updated;
+      });
     },
 
     async listFavoriteIds(userId) {
@@ -1832,6 +1849,28 @@ export function createYdbListingsRepository(sql) {
         if (rows?.[0]?.[0]?.status !== 'pending') return false;
         await tx`UPDATE fam_agent_ideas SET status = ${decision}, reviewed_by = ${reviewerId}, reviewed_at = CurrentUtcTimestamp()
           WHERE id = ${id} AND school_id = ${schoolId} AND status = 'pending';`;
+        return true;
+      });
+    },
+
+    async listNotificationReadStates(userId) {
+      if (!userId) throw new TypeError('invalid notification state owner');
+      const result = await sql`SELECT notification_key, read_at FROM fam_notification_reads
+        WHERE user_id = ${userId} ORDER BY notification_key LIMIT 10001;`;
+      return result?.[0] ?? [];
+    },
+
+    async saveNotificationReadStates(userId, notificationKeys) {
+      if (!userId || !Array.isArray(notificationKeys) || notificationKeys.length > 100
+          || notificationKeys.some(key => typeof key !== 'string' || key.length < 1 || key.length > 220 || /[\u0000-\u001f\u007f]/u.test(key))) {
+        throw new TypeError('invalid notification read states');
+      }
+      const keys = [...new Set(notificationKeys)];
+      return sql.begin(async tx => {
+        for (const key of keys) {
+          await tx`UPSERT INTO fam_notification_reads (user_id, notification_key, read_at)
+            VALUES (${userId}, ${key}, CurrentUtcTimestamp());`;
+        }
         return true;
       });
     },
