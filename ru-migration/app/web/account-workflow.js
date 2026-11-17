@@ -1,3 +1,5 @@
+import './profile-settings.js';
+
 const CONFIRMATION = 'УДАЛИТЬ МОЙ АККАУНТ';
 
 function node(document, tag, className, text = '') {
