@@ -1,0 +1,30 @@
+[Unit]
+Description=FAM RU isolated backend and web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fam-ru
+Group=fam-ru
+WorkingDirectory=/opt/fam-ru/app/backend
+EnvironmentFile=/etc/fam-ru/backend.env
+ExecStart=/usr/bin/node /opt/fam-ru/app/backend/server.mjs
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

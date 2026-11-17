@@ -1,0 +1,25 @@
+[Unit]
+Description=FAM RU local runtime readiness check
+After=network-online.target fam-ru.service
+Wants=network-online.target fam-ru.service
+
+[Service]
+Type=oneshot
+User=fam-ru
+Group=fam-ru
+WorkingDirectory=/opt/fam-ru/app/backend
+Environment=FAM_RU_HEALTH_URL=http://127.0.0.1:4178/api/health
+ExecStart=/usr/bin/node /opt/fam-ru/app/backend/check-runtime-health.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+TimeoutStartSec=15s
