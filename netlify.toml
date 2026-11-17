@@ -26,3 +26,10 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Frame-Options = "DENY"
+
+# Allow the GitHub Pages copy to confirm Netlify reachability before redirecting.
+[[headers]]
+  for = "/.well-known/fam-domain-health.json"
+  [headers.values]
+    Access-Control-Allow-Origin = "https://spartakdubov059.github.io"
+    Cache-Control = "no-store"
