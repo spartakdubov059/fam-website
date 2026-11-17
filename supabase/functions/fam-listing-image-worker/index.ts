@@ -319,7 +319,6 @@ async function processIdeaTask(task) {
     return "failed";
   }
 
-  let publishedPath = null;
   try {
     const signedUrl = await createSignedIdeaUrl(task.image_path);
     const moderation = await callIdeaModeration(task, signedUrl);
@@ -340,20 +339,14 @@ async function processIdeaTask(task) {
       return "manual_review";
     }
 
-    const { bytes, mime, extension } = await fetchImageBytes(signedUrl);
-    const approvedPath = task.user_id + "/idea_" + crypto.randomUUID() + "." + extension;
-    const uploaded = await fetch(
-      SUPABASE_URL + "/storage/v1/object/idea-images/" + approvedPath,
-      { method: "POST", headers: { ...adminHeaders(mime), "x-upsert": "false" }, body: bytes },
-    );
-    if (!uploaded.ok) throw new Error("approved_idea_publish_failed_" + uploaded.status);
-    publishedPath = approvedPath;
-
+    // The upload was already type/size/signature validated by submit-content.
+    // This is a private bucket: approving the idea must not copy or delete its file.
+    // ideas.image_paths and the queue both reference task.image_path, and
+    // finish_idea_image_moderation_task changes status without rewriting that path.
     await finishIdea(task, "approved", {
       reason_code: "image_review_approved",
       reason: "Фото прошло автоматическую проверку.",
     });
-    if (publishedPath !== task.image_path) await removeObject("idea-images", task.image_path);
     return "approved";
   } catch (error) {
     if (error instanceof Error && error.message === "staged_media_missing") {
