@@ -59,11 +59,11 @@ try {
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;
   };
-  const savedNotificationState = await listingsApi(apiRequest('POST', '/api/v1/notification-reads', 'synthetic-new-student', {
+  const savedNotificationState = await listingsApi(apiRequest('POST', '/api/v1/notification-reads', 'synthetic-registrant', {
     notification_keys: ['release:synthetic', 'dismissed:school-listing:synthetic-id'],
   }));
   assert.deepEqual(savedNotificationState, { status: 200, body: { ok: true } });
-  const ownNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-new-student'));
+  const ownNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-registrant'));
   assert.deepEqual(new Set(ownNotificationState.body.notification_keys), new Set(['release:synthetic', 'dismissed:school-listing:synthetic-id']));
   const isolatedNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-other-school'));
   assert.deepEqual(isolatedNotificationState.body.notification_keys, [], 'notification read state is isolated by authenticated account');
