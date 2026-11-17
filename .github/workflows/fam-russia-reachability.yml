@@ -1,0 +1,28 @@
+name: FAM Russian reachability (public-only)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/check-fam-russia-reachability.mjs"
+      - "tests/security/fam-domain-fallback.test.mjs"
+      - ".github/workflows/fam-russia-reachability.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-russian-reachability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  http-from-russian-nodes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check public FAM hosts via Russia-based test nodes
+        run: node scripts/check-fam-russia-reachability.mjs

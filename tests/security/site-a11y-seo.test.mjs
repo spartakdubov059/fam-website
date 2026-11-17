@@ -41,7 +41,7 @@ test("social previews and crawler metadata are complete for the public homepage"
   assert.ok(frontend.includes("https://famru.netlify.app/banner-1.jpg"));
   assert.ok(frontend.includes('rel="canonical" href="https://famru.netlify.app/"'));
   assert.ok(frontend.includes('property="og:url" content="https://famru.netlify.app/"'));
-  assert.ok(frontend.includes('emailRedirectTo: "https://famru.netlify.app/"'));
+  assert.ok(frontend.includes("emailRedirectTo: famSignupRedirectUrl()"));
   assert.ok(robots.includes("Sitemap: https://famru.netlify.app/sitemap.xml"));
   assert.ok(sitemap.includes("<loc>https://famru.netlify.app/</loc>"));
 });
