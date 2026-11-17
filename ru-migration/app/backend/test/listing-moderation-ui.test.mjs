@@ -198,7 +198,8 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   assert.ok(overview);
   assert.equal(overview.children[1].textContent, 'В выборке: активных профилей — 1, активных публикаций — 1, ожидают проверки — 1, заявок на удаление — 0, ограничений — 0.');
   assert.match(overview.children[2].textContent, /последними 100 профилями и публикациями/);
-  assert.equal(overview.children.at(-1).textContent, 'Удалено объявление · 15.11.2026, 12:00:00');
+  assert.equal(overview.children.at(-1).textContent,
+    `Удалено объявление · ${new Date('2026-11-15T12:00:00Z').toLocaleString('ru-RU')}`);
   assert.equal(overview.textContent.includes('<unsafe>'), false);
 });
 
