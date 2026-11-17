@@ -5,4 +5,4 @@ CREATE TABLE fam_notification_reads (
   notification_key Utf8 NOT NULL,
   read_at Timestamp NOT NULL,
   PRIMARY KEY (user_id, notification_key)
-);
+) WITH (TTL = Interval("P180D") ON read_at);
