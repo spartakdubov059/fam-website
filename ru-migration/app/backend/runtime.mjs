@@ -15,6 +15,20 @@ import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
+export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, mediaConfigured }) {
+  const authConfigured = Boolean(yandexConfigured || oidcConfigured);
+  return {
+    mode: 'isolated-copy',
+    ready: authConfigured,
+    services: { auth: authConfigured, database: true, objectStorage: Boolean(mediaConfigured) },
+    message: yandexConfigured
+      ? 'Russian backend is configured; optional media storage is reported separately.'
+      : oidcConfigured
+        ? 'Russian backend is configured with OIDC bearer authentication; optional media storage is reported separately.'
+        : 'Yandex ID web authentication or OIDC bearer authentication is not configured.',
+  };
+}
+
 export async function createRuntime(env = process.env) {
   const databaseUrl = env.FAM_RU_DATABASE_URL;
   const issuer = env.FAM_RU_AUTH_ISSUER;
@@ -46,14 +60,7 @@ export async function createRuntime(env = process.env) {
   return {
     listingsApi,
     mediaApi,
-    getReadiness: () => ({
-      mode: 'isolated-copy',
-      ready: Boolean(yandexAuth),
-      services: { auth: Boolean(yandexAuth), database: true, objectStorage: mediaConfigured },
-      message: yandexAuth
-        ? 'Russian backend is configured; optional media storage is reported separately.'
-        : 'Yandex ID web authentication is not configured.',
-    }),
+    getReadiness: () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured, mediaConfigured }),
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
