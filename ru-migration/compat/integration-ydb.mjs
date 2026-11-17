@@ -781,7 +781,12 @@ try {
     description: 'Проверка ограничения количества', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
     max_seats: 0, status: 'pending' };
   for (let i = 0; i < 5; i++) await repo.createListing(quotaListing);
-  await assert.rejects(repo.createListing(quotaListing), error => error.code === 'rate_limited',
+  const listingQuotaState = await sql`SELECT action, submission_count, window_start FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
+  console.log('SYNTHETIC_QUOTA_STATE', inspect(listingQuotaState, { depth: null }));
+  await assert.rejects(repo.createListing(quotaListing), error => {
+    console.log('SYNTHETIC_QUOTA_REJECTION', inspect({ name: error?.name, message: error?.message, code: error?.code }, { depth: null }));
+    return error?.code === 'rate_limited';
+  },
     'the sixth listing in one hour is rejected for this synthetic account');
   const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Синтетическая идея',
     ai_status: 'pending', ai_summary: 'Идея', ai_reason: 'review_unavailable', admin_status: 'new' };
