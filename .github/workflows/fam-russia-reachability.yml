@@ -2,9 +2,13 @@ name: FAM Russian reachability (public-only)
 
 on:
   workflow_dispatch:
+  schedule:
+    # 07:17 Moscow time (UTC+3), daily, without paid uptime services.
+    - cron: "17 4 * * *"
   pull_request:
     paths:
       - "scripts/check-fam-russia-reachability.mjs"
+      - "tests/security/fam-russia-reachability.test.mjs"
       - "tests/security/fam-domain-fallback.test.mjs"
       - ".github/workflows/fam-russia-reachability.yml"
 
@@ -16,7 +20,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unit-tests:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check public-network diagnostic logic
+        run: node --test tests/security/fam-russia-reachability.test.mjs
   http-from-russian-nodes:
+    # The upstream Check-Host API can rate-limit callers (429). Avoid blocking
+    # PRs on an external service; report incomplete results from real scheduled
+    # or manually requested diagnostics instead of masking them as successes.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
