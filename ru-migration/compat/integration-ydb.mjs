@@ -70,6 +70,28 @@ try {
   const savedGlobalAgentReport = await sql`SELECT report_date, summary, metrics_json FROM fam_agent_daily_reports WHERE report_date = '2026-11-14';`;
   assert.equal(savedGlobalAgentReport?.[0]?.[0]?.summary, 'Синтетическая внутренняя сводка');
   assert.deepEqual(JSON.parse(savedGlobalAgentReport[0][0].metrics_json), globalAgentMetrics);
+  const digestDate = new Date().toISOString().slice(0, 10);
+  assert.deepEqual(await repo.enqueueAgentDailyDigestTask(digestDate), { created: true, status: 'queued' });
+  assert.deepEqual(await repo.enqueueAgentDailyDigestTask(digestDate), { created: false, status: 'queued' },
+    'one durable aggregate digest task is created per UTC date');
+  const digestClaim = await repo.claimAgentDailyDigestTask('synthetic-digest-worker', digestDate);
+  assert.equal(digestClaim?.report_date, digestDate);
+  assert.match(digestClaim?.claim_token ?? '', /^[0-9a-f-]{36}$/i);
+  assert.equal(await repo.claimAgentDailyDigestTask('second-synthetic-worker', digestDate), null,
+    'a live lease prevents a second worker from claiming the task');
+  const digestMetrics = await repo.getAgentDailyDigestMetrics();
+  assert.deepEqual(Object.keys(digestMetrics).sort(), ['active_listings', 'blocked_tasks_24h', 'completed_tasks_24h',
+    'failed_tasks_24h', 'new_listings_24h', 'pending_ideas', 'queued_tasks'].sort());
+  assert.ok(Object.values(digestMetrics).every(Number.isSafeInteger));
+  assert.equal(await repo.completeAgentDailyDigestTask({ reportDate: digestDate, claimToken: digestClaim.claim_token,
+    metrics: digestMetrics, summary: 'Синтетический агрегированный digest.' }), true);
+  assert.equal(await repo.completeAgentDailyDigestTask({ reportDate: digestDate, claimToken: digestClaim.claim_token,
+    metrics: digestMetrics, summary: 'Повторное завершение запрещено.' }), false,
+  'a completed task cannot be completed again with a stale lease token');
+  const savedDigest = await sql`SELECT status, metrics_json, summary FROM fam_agent_daily_digest_tasks WHERE report_date = ${digestDate};`;
+  assert.equal(savedDigest?.[0]?.[0]?.status, 'completed');
+  assert.deepEqual(JSON.parse(savedDigest[0][0].metrics_json), digestMetrics);
+  assert.equal(savedDigest[0][0].summary, 'Синтетический агрегированный digest.');
   assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:34:00.000Z') }), 1);
   assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:59:00.000Z') }), 2);
   assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T13:00:00.000Z') }), 1);

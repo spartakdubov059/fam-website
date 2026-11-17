@@ -1,0 +1,12 @@
+[Unit]
+Description=Run and retry the FAM RU aggregate daily digest at 06:05 UTC
+
+[Timer]
+OnCalendar=*-*-* 06:05:00 UTC
+OnCalendar=*-*-* 06:20:00 UTC
+OnCalendar=*-*-* 06:35:00 UTC
+Persistent=true
+Unit=fam-ru-orchestrator-daily-digest.service
+
+[Install]
+WantedBy=timers.target

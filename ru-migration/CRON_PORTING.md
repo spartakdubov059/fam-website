@@ -5,7 +5,7 @@
 | Задание | UTC cron | Исходная процедура/вызов | Исходная миграция | Статус переноса |
 |---|---:|---|---|---|
 | `fam-agent-coder-task-producer` | `10 3 * * *` | `private.enqueue_fam_agent_coder_task()` | `20261111153059_fam_agent_coder_queue_bridge.sql` | Не перенесено |
-| `fam-agent-orchestrator-daily-digest` | `5 6 * * *` | `private.refresh_and_enqueue_fam_agent_daily_digest()` | `20261110170529_route_daily_operational_report_to_orchestrator.sql` | Не перенесено |
+| `fam-agent-orchestrator-daily-digest` | `5 6 * * *` | `private.refresh_and_enqueue_fam_agent_daily_digest()` | `20261110170529_route_daily_operational_report_to_orchestrator.sql` | Перенесён ограниченный RU worker для агрегатов: отдельная очередь с идемпотентностью, lease и повторами; без общей очереди задач и внешней модели. systemd unit/timer подготовлены, выключены |
 | `fam-agent-technical-system-health` | `10 6 * * *` | `private.enqueue_fam_agent_system_health_check()` | `20261110171353_add_read_only_fam_technical_health_agent.sql` | Не перенесено |
 | `fam-agent-site-error-audit` | `*/15 * * * *` | `private.enqueue_fam_agent_site_error_digest()` | `20261110173255_fam_site_error_monitoring.sql` | Приём и агрегирование RU кодов ошибок, read-only предупреждения школьному администратору перенесены; фоновая очередь и digest не перенесены |
 | `fam-agent-school-daily-report` | `0 6 * * *` | `private.refresh_fam_agent_school_daily_reports()` | `20261109152842_school_scoped_agent_reports_and_free_analysts.sql` | Перенесено для каталога школ RU; unit/timer подготовлены, не установлены и не включены |
@@ -14,7 +14,7 @@
 
 ## Безопасная очистка загрузок
 
-Российский backend содержит реестр `fam_pending_media` и CLI `ru-migration/app/backend/cleanup-pending-media.mjs`: он удаляет только неподвязанные загрузки старше семи дней, предварительно получив для каждой lease в YDB. Привязка загрузки к объявлению выполняется транзакционно; ошибку удаления можно повторить после lease. Также перенесены школьный и глобальный агрегированные отчёты без внешней модели и с нулевой стоимостью API; они не сохраняют текст переписок или идентификаторы пользователей. Для обоих добавлены CLI и systemd unit/timer на 06:00 UTC (09:00 МСК). Оба задания подготовлены, но не установлены и не включены: бесплатная среда не настроена. Пять других исходных расписаний остаются неперенесёнными и выключенными; очистка медиа не запланирована к запуску.
+Российский backend содержит реестр `fam_pending_media` и CLI `ru-migration/app/backend/cleanup-pending-media.mjs`: он удаляет только неподвязанные загрузки старше семи дней, предварительно получив для каждой lease в YDB. Привязка загрузки к объявлению выполняется транзакционно; ошибку удаления можно повторить после lease. Школьный, глобальный и RU orchestrator daily digest используют только агрегаты и не вызывают внешнюю модель. Отчёты не читают переписки или личные поля. Для школьного и глобального отчётов подготовлены systemd unit/timer на 06:00 UTC (09:00 МСК); для digest — на 06:05 UTC (09:05 МСК). Все задания подготовлены, но не установлены и не включены: бесплатная среда не настроена. Четыре исходных расписания остаются неперенесёнными и выключенными; таймер очистки медиа также не установлен.
 
 ## Условия переноса
 

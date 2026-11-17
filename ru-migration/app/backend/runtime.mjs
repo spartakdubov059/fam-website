@@ -12,6 +12,7 @@ import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
 import { createPendingMediaCleanupOperation } from './services/cleanup-pending-media.mjs';
 import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
+import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export async function createRuntime(env = process.env) {
@@ -56,6 +57,7 @@ export async function createRuntime(env = process.env) {
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
+    processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

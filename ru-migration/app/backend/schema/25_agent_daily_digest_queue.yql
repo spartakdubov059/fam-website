@@ -1,0 +1,19 @@
+-- Dedicated safe subset of the source agent queue for aggregate daily digests.
+-- No arbitrary task payload, student identifiers, or user supplied text is stored.
+CREATE TABLE fam_agent_daily_digest_tasks (
+  report_date Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  attempt_count Uint32 NOT NULL,
+  max_attempts Uint32 NOT NULL,
+  available_at Timestamp NOT NULL,
+  claimed_by Utf8?,
+  claim_token Utf8?,
+  lease_expires_at Timestamp?,
+  generated_at Timestamp?,
+  metrics_json Utf8?,
+  summary Utf8?,
+  last_error_code Utf8?,
+  created_at Timestamp NOT NULL,
+  updated_at Timestamp NOT NULL,
+  PRIMARY KEY (report_date)
+);

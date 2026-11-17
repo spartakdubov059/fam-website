@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const isIsoDate = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
 // The caller owns the connection and injects a @ydbjs/query tagged client.
 // Dynamic values are bound by the SDK, never concatenated into YQL.
 export function createYdbListingsRepository(sql) {
@@ -1672,6 +1678,102 @@ export function createYdbListingsRepository(sql) {
       }
       await sql`UPSERT INTO fam_agent_daily_reports (report_date, generated_at, summary, metrics_json)
         VALUES (${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
+    },
+
+    async enqueueAgentDailyDigestTask(reportDate) {
+      if (!isIsoDate(reportDate)) {
+        throw new TypeError('invalid agent digest date');
+      }
+      return sql.begin(async tx => {
+        const prior = await tx`SELECT status, attempt_count FROM fam_agent_daily_digest_tasks
+          WHERE report_date = ${reportDate} LIMIT 1;`;
+        if (prior?.[0]?.length) return { created: false, status: prior[0][0].status };
+        await tx`INSERT INTO fam_agent_daily_digest_tasks
+          (report_date, status, attempt_count, max_attempts, available_at, claimed_by, claim_token,
+            lease_expires_at, generated_at, metrics_json, summary, last_error_code, created_at, updated_at)
+          VALUES (${reportDate}, 'queued', Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(3 AS Uint32)),
+            CurrentUtcTimestamp(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+        return { created: true, status: 'queued' };
+      });
+    },
+
+    async claimAgentDailyDigestTask(workerId, reportDate) {
+      if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 80 || !isIsoDate(reportDate)) {
+        throw new TypeError('invalid agent digest claim');
+      }
+      return sql.begin(async tx => {
+        const candidates = await tx`SELECT report_date, status, attempt_count, max_attempts,
+            CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
+            CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
+          FROM fam_agent_daily_digest_tasks
+          WHERE report_date = ${reportDate} AND attempt_count < max_attempts
+            AND ((status IN ('queued', 'failed') AND available_at <= CurrentUtcTimestamp())
+              OR (status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp()))
+          ORDER BY report_date ASC LIMIT 1;`;
+        const task = candidates?.[0]?.[0];
+        if (!task) return null;
+        const due = task.available === true && ['queued', 'failed'].includes(task.status)
+          || task.status === 'claimed' && task.lease_expired === true;
+        if (!due) return null;
+        const claimToken = randomUUID();
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = 'claimed', attempt_count = attempt_count + 1,
+            claimed_by = ${workerId}, claim_token = ${claimToken},
+            lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'),
+            last_error_code = NULL, updated_at = CurrentUtcTimestamp()
+          WHERE report_date = ${task.report_date};`;
+        return { report_date: task.report_date, claim_token: claimToken };
+      });
+    },
+
+    async getAgentDailyDigestMetrics() {
+      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
+      const [activeListings, newListings, pendingIdeas, queuedTasks, completedTasks, blockedTasks, failedTasks] = await Promise.all([
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE status = 'active';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'pending';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'queued';`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'completed' AND generated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'blocked' AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'failed' AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
+      ]);
+      return { active_listings: activeListings, new_listings_24h: newListings, pending_ideas: pendingIdeas,
+        queued_tasks: queuedTasks, completed_tasks_24h: completedTasks, blocked_tasks_24h: blockedTasks, failed_tasks_24h: failedTasks };
+    },
+
+    async completeAgentDailyDigestTask({ reportDate, claimToken, metrics, summary }) {
+      const keys = ['active_listings', 'new_listings_24h', 'pending_ideas', 'queued_tasks', 'completed_tasks_24h', 'blocked_tasks_24h', 'failed_tasks_24h'];
+      if (!isIsoDate(reportDate) || !UUID.test(claimToken || '')
+          || !metrics || keys.some(key => !Number.isSafeInteger(metrics[key]) || metrics[key] < 0)
+          || typeof summary !== 'string' || summary.length > 1000) throw new TypeError('invalid agent digest result');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = 'completed', generated_at = CurrentUtcTimestamp(),
+            metrics_json = ${JSON.stringify(metrics)}, summary = ${summary}, claimed_by = NULL, claim_token = NULL,
+            lease_expires_at = NULL, updated_at = CurrentUtcTimestamp()
+          WHERE report_date = ${reportDate};`;
+        return true;
+      });
+    },
+
+    async retryAgentDailyDigestTask({ reportDate, claimToken, errorCode = 'digest_failed' }) {
+      if (!isIsoDate(reportDate) || !UUID.test(claimToken || '')
+          || !['digest_failed', 'database_unavailable', 'invalid_metrics'].includes(errorCode)) throw new TypeError('invalid agent digest retry');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
+        await tx`UPDATE fam_agent_daily_digest_tasks SET status = 'failed', available_at = CurrentUtcTimestamp() + Interval('PT5M'),
+            last_error_code = ${errorCode}, claimed_by = NULL, claim_token = NULL, lease_expires_at = NULL,
+            updated_at = CurrentUtcTimestamp()
+          WHERE report_date = ${reportDate};`;
+        return true;
+      });
     },
 
     async recordSiteError({ eventCode, pageArea, occurredAt = new Date() }) {
