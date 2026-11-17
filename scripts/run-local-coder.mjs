@@ -7,9 +7,9 @@ import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
 
 const MODEL_URL =
-  "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
+  "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
-const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
+const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen3.8-27B-IQ2_XS").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
