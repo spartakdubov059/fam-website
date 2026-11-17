@@ -79,6 +79,8 @@ jobs:
           schema+="$(cat ru-migration/app/backend/schema/26_notification_reads.yql)"
           schema+=$'\n'
           schema+="$(cat ru-migration/app/backend/schema/27_site_error_digest_queue.yql)"
+          schema+=$'\n'
+          schema+="$(cat ru-migration/app/backend/schema/28_submission_quotas.yql)"
           for i in $(seq 1 120); do
             if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
             if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi
