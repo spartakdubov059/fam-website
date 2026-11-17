@@ -1,6 +1,6 @@
 # FAM RU — изолированная миграция на российскую инфраструктуру
 
-**Последняя проверка кода — commit `20a97bf553b1144edb3ecbcc13e7c2228f2a70d8` (17 ноября 2026):** локально прошли `287/287` backend-тестов; [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44164138498) и [одноразовая YDB интеграция](https://github.com/spartakdubov059/fam-website/actions/runs/44164138700) прошли на синтетических данных. Readiness теперь выполняет реальный минимальный YDB query и сообщает недоступность БД, а не подставляет готовность по умолчанию. Это не российский облачный staging; бесплатная облачная среда и production OAuth не настроены. Независимый security audit не завершён. `main`, production и реальные данные учеников не затронуты.
+**Последняя проверка кода — commit `4409142ff8a675aeb07296b05c55f136b1aed552` (17 ноября 2026):** локально прошли `288/288` backend-тестов; [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44165112113) и [одноразовая YDB интеграция](https://github.com/spartakdubov059/fam-website/actions/runs/44165112216) прошли на синтетических данных. Readiness проверяет реальную доступность YDB и кэширует ответ на 5 секунд, объединяя параллельные запросы. Это не российский облачный staging; бесплатная облачная среда и production OAuth не настроены. Независимый security audit не завершён. `main`, production и реальные данные учеников не затронуты.
 
 
 

@@ -198,3 +198,8 @@
 ## Проверка доступности YDB в readiness (17 ноября 2026)
 
 Runtime readiness выполняет короткий `SELECT 1 AS ready;` и больше не сообщает `database: true` по умолчанию; при отказе возвращаются `database: false` и HTTP 503. На commit `20a97bf553b1144edb3ecbcc13e7c2228f2a70d8` backend suite прошёл `287/287`, [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44164138498) и [одноразовая YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/44164138700) успешны. Это подтверждает временную тестовую YDB, не облачное staging.
+
+
+## Ограничение частоты YDB health probe (17 ноября 2026)
+
+Публичный `/api/health` объединяет параллельные проверки YDB и кэширует true/false не более 5 секунд, чтобы не создавать запрос к базе на каждый внешний hit. Кэш не скрывает отказ дольше 5 секунд; состояние и ошибка запроса не раскрываются. На commit `4409142ff8a675aeb07296b05c55f136b1aed552` прошли `288/288` backend-тестов, [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44165112113) и [одноразовая YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/44165112216).
