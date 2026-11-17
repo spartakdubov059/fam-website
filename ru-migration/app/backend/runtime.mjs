@@ -41,6 +41,25 @@ export async function checkYdbReadiness(sql) {
   }
 }
 
+export function createYdbReadinessProbe(sql, { cacheMs = 5000, now = () => Date.now() } = {}) {
+  if (typeof sql !== 'function' || !Number.isSafeInteger(cacheMs) || cacheMs < 1000 || cacheMs > 30_000
+      || typeof now !== 'function') throw new TypeError('invalid YDB readiness probe configuration');
+  let cachedAt = 0;
+  let cachedValue = null;
+  let inFlight = null;
+  return async function probeYdbReadiness() {
+    const current = now();
+    if (cachedValue !== null && current >= cachedAt && current - cachedAt < cacheMs) return cachedValue;
+    if (inFlight) return inFlight;
+    inFlight = (async () => {
+      cachedValue = await checkYdbReadiness(sql);
+      cachedAt = now();
+      return cachedValue;
+    })();
+    try { return await inFlight; } finally { inFlight = null; }
+  };
+}
+
 export async function createRuntime(env = process.env) {
   const databaseUrl = env.FAM_RU_DATABASE_URL;
   const issuer = env.FAM_RU_AUTH_ISSUER;
@@ -64,6 +83,7 @@ export async function createRuntime(env = process.env) {
   const driver = new Driver(databaseUrl, { credentialsProvider });
   await driver.ready();
   const sql = query(driver);
+  const probeYdbReadiness = createYdbReadinessProbe(sql);
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
@@ -73,7 +93,7 @@ export async function createRuntime(env = process.env) {
     listingsApi,
     mediaApi,
     getReadiness: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
-      databaseReady: await checkYdbReadiness(sql), mediaConfigured }),
+      databaseReady: await probeYdbReadiness(), mediaConfigured }),
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
