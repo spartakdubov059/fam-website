@@ -83,7 +83,8 @@ test('school moderators can inspect and decide idea photos without rendering use
     if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
     return { ok: true, json: async () => ({ ok: true }) };
   } });
-  const card = f.queue.children.find(item => item.children?.[0]?.textContent === 'Школьные идеи и фотографии')?.children[1];
+  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Школьные идеи и фотографии');
+  const card = panel?.children.find(item => item.tagName === 'article');
   assert.ok(card);
   assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
   assert.equal(card.children[1].tagName, 'img');

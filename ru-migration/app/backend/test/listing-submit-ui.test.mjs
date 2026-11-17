@@ -103,7 +103,7 @@ test('authenticated students can submit a school idea through the moderated Russ
   assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/ideas']);
   assert.equal(JSON.parse(calls[1].init.body).text, 'Открыть школьный книжный обмен');
   assert.equal(ideaForm.wasReset, true);
-  assert.match(ideaForm.children[1].textContent, /ждёт проверки безопасности/);
+  assert.match(ideaForm.children.find(child => child.role === 'status').textContent, /ждёт проверки безопасности/);
 });
 
 test('idea attachments use the bounded private upload route and are sent with the school proposal', async () => {
@@ -112,6 +112,7 @@ test('idea attachments use the bounded private upload route and are sent with th
   await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111', role: 'student' } }) };
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, role: 'student', request: null }) };
     if (url === '/api/v1/ideas/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key } }) };
     if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true, status: 'pending', image_status: 'pending' }) };
     throw new Error(`unexpected route ${url}`);
@@ -120,9 +121,9 @@ test('idea attachments use the bounded private upload route and are sent with th
   const ideaForm = section.children[2];
   ideaForm.elements = { idea: { value: 'Открыть школьную мастерскую' }, idea_images: { files: [{ type: 'image/webp', size: 128 }] } };
   await ideaForm.listeners.submit({ preventDefault() {} });
-  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/ideas/media/pending', '/api/v1/ideas']);
-  assert.deepEqual(JSON.parse(calls[2].init.body), { text: 'Открыть школьную мастерскую', image_keys: [key] });
-  assert.match(ideaForm.children[1].textContent, /закрыты для просмотра до школьной проверки/);
+  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/role-requests', '/api/v1/ideas/media/pending', '/api/v1/ideas']);
+  assert.deepEqual(JSON.parse(calls.find(call => call.url === '/api/v1/ideas').init.body), { text: 'Открыть школьную мастерскую', image_keys: [key] });
+  assert.match(ideaForm.children.find(child => child.role === 'status').textContent, /закрыты для просмотра до школьной проверки/);
 });
 
 test('school council can create a dated limited event while students cannot select event category', async () => {

@@ -27,6 +27,7 @@ test('pending media upload requires an authenticated database profile and binds 
     userId: '11111111-1111-4111-8111-111111111111',
     bytes: Buffer.from('synthetic-image-bytes'),
     contentType: 'image/png',
+    maxBytes: 5 * 1024 * 1024,
   });
   assert.deepEqual(result.body, { ok: true, image: { key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp', content_type: 'image/webp', bytes: 42 } });
 });

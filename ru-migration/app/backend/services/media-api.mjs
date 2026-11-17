@@ -152,7 +152,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       const result = await pendingImages.put({ userId: actor.id, bytes: Buffer.concat(chunks), contentType, maxBytes: imageByteLimit });
       const keyPattern = new RegExp(`^pending/${actor.id}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webp$`, 'i');
       if (!result || typeof result.key !== 'string' || !keyPattern.test(result.key)
-          || result.contentType !== 'image/webp' || !Number.isInteger(result.bytes) || result.bytes < 1 || result.bytes > MAX_IMAGE_BYTES) {
+          || result.contentType !== 'image/webp' || !Number.isInteger(result.bytes) || result.bytes < 1) {
         if (result?.key && typeof pendingImages.delete === 'function' && keyPattern.test(result.key)) {
           try { await pendingImages.delete(result.key); } catch { /* account inventory can remove an unregistered object later */ }
         }

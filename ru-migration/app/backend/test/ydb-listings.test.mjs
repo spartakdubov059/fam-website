@@ -131,7 +131,7 @@ test('idea image keys are atomically linked to the synthetic idea from only thei
   const result = await repo.createIdea({ user_id: userId, school_id: 'school-a', text: 'Тестовая идея',
     image_keys: [key], image_status: 'pending', ai_status: 'approved', ai_summary: 'Тест', ai_reason: '', admin_status: 'new' });
   assert.match(result.id, /^[0-9a-f-]{36}$/);
-  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && call.values.includes(key)));
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && call.values.some(value => Array.isArray(value) && value.includes(key))));
   assert.ok(calls.some(call => call.text.includes("SET status = 'linked'") && call.values.includes(key) && call.values.includes(userId)));
 });
 

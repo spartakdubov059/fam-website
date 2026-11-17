@@ -1,8 +1,0 @@
--- Internal aggregate operations report. No personal data, free text, or model output.
-CREATE TABLE fam_agent_daily_reports (
-  report_date Utf8 NOT NULL,
-  generated_at Timestamp NOT NULL,
-  summary Utf8 NOT NULL,
-  metrics_json Utf8 NOT NULL,
-  PRIMARY KEY (report_date)
-);
