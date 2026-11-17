@@ -45,6 +45,14 @@ export async function createRuntime(env = process.env) {
   return {
     listingsApi,
     mediaApi,
+    getReadiness: () => ({
+      mode: 'isolated-copy',
+      ready: Boolean(yandexAuth),
+      services: { auth: Boolean(yandexAuth), database: true, objectStorage: mediaConfigured },
+      message: yandexAuth
+        ? 'Russian backend is configured; optional media storage is reported separately.'
+        : 'Yandex ID web authentication is not configured.',
+    }),
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),

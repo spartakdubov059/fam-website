@@ -97,6 +97,34 @@ test('unconfigured isolated server fails closed for health and user API routes',
   });
 });
 
+test('configured server reports ready after runtime initialization and reports optional media separately', async () => {
+  const state = {
+    mode: 'isolated-copy', ready: true,
+    services: { auth: true, database: true, objectStorage: false },
+    message: 'Russian backend is configured; optional media storage is reported separately.',
+  };
+  await withServer({ getReadiness: () => state }, async origin => {
+    for (const path of ['/api/health', '/api/v1/status']) {
+      const response = await fetch(new URL(path, origin));
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), state);
+    }
+  });
+});
+
+test('health endpoint fails closed when runtime readiness is malformed or unavailable', async () => {
+  await withServer({ getReadiness: async () => { throw new Error('synthetic unavailable'); } }, async origin => {
+    const response = await fetch(new URL('/api/health', origin));
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).ready, false);
+  });
+  await withServer({ getReadiness: () => ({ ready: 'yes' }) }, async origin => {
+    const response = await fetch(new URL('/api/health', origin));
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).ready, false);
+  });
+});
+
 test('isolated server dispatches private idea-image reads through the media API', async () => {
   const paths = [];
   const listingPaths = [];

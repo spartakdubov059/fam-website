@@ -15,7 +15,7 @@ const mime = new Map([
   ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.ico', 'image/x-icon'],
 ]);
 
-function readiness() {
+function defaultReadiness() {
   return {
     mode: 'isolated-copy',
     ready: false,
@@ -49,7 +49,7 @@ function sendMediaResult(res, result) {
   return sendJson(res, result.status, result.body);
 }
 
-export function createServer({ listingsApi = null, authApi = null, mediaApi = null } = {}) {
+export function createServer({ listingsApi = null, authApi = null, mediaApi = null, getReadiness = defaultReadiness } = {}) {
   return http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (['/auth/yandex/start', '/auth/yandex/callback', '/auth/yandex/logout'].includes(url.pathname)) {
@@ -66,7 +66,9 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
     }
   }
   if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname === '/api/v1/status')) {
-    const state = readiness();
+    let state;
+    try { state = await getReadiness(); } catch { state = defaultReadiness(); }
+    if (!state || typeof state.ready !== 'boolean') state = defaultReadiness();
     return sendJson(res, state.ready ? 200 : 503, state);
   }
   if ((req.method === 'POST' && url.pathname === '/api/v1/media/pending')
@@ -185,7 +187,8 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runtime = await (await import('./runtime.mjs')).createRuntime();
-  createServer({ listingsApi: runtime?.listingsApi, authApi: runtime?.authApi, mediaApi: runtime?.mediaApi }).listen(port, host, () => {
+  createServer({ listingsApi: runtime?.listingsApi, authApi: runtime?.authApi, mediaApi: runtime?.mediaApi,
+    getReadiness: runtime?.getReadiness }).listen(port, host, () => {
     console.log(`FAM RU isolated copy listening on http://${host}:${port}`);
   });
   if (runtime) {
