@@ -122,6 +122,7 @@ test('school admins see active suspensions returned by the same-school endpoint 
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/staff-verifications') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     throw new Error(`unexpected route ${url}`);
   } });
   assert.ok(calls.some(call => call.url === '/api/v1/suspensions' && call.init.credentials === 'same-origin'));
@@ -259,6 +260,7 @@ test('staff can confirm or reject a pending event application using safe text re
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>Событие</b>', user_id: userId, status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student' }] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    if (url === '/api/v1/staff-verifications') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     return { ok: true, json: async () => ({ ok: true }) };
   } });

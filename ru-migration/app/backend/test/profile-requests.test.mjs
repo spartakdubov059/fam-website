@@ -40,7 +40,7 @@ test('profile request repository is idempotent and binds Yandex identity values'
   assert.equal(created.status, 'pending');
   assert.match(created.request_id, /^[0-9a-f-]{36}$/);
   assert.equal(calls.some(call => call.text.includes('UPSERT INTO fam_profile_requests')), true);
-  for (const value of Object.values(input)) assert.equal(calls.some(call => call.text.includes(value)), false, 'user fields stay bound parameters');
+  for (const value of Object.values(input).filter(value => value !== '')) assert.equal(calls.some(call => call.text.includes(value)), false, 'user fields stay bound parameters');
   const duplicate = await repo.createSchoolProfileRequest(input);
   assert.deepEqual(duplicate, { ok: true, status: 'pending', request_id: 'existing-request' });
   assert.equal(calls.some(call => call.text.includes('UPSERT INTO fam_profile_requests') && call.values.includes('existing-request')), false);
