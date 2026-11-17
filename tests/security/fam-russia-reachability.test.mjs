@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NODES, TARGETS, summarizeNodeResult } from "../../scripts/check-fam-russia-reachability.mjs";
+import { NODES, TARGETS, summarizeNodeResult, diagnosticCoverage } from "../../scripts/check-fam-russia-reachability.mjs";
 
 test("public diagnostic uses bounded approved endpoints and Russian + EU controls", () => {
   assert.equal(NODES.length, 4);
@@ -26,4 +26,12 @@ test("missing and unknown results never masquerade as successes", () => {
   assert.equal(summarizeNodeResult({ status: "success" }).state, "unknown");
   assert.equal(summarizeNodeResult([]).state, "unknown");
   assert.equal(summarizeNodeResult([[1, 0.1, "unknown", "503"]]).state, "failed");
+});
+
+test("incomplete Russian network diagnostics never report full coverage", () => {
+  assert.equal(diagnosticCoverage(5, 5), "complete");
+  assert.equal(diagnosticCoverage(1, 5), "inconclusive");
+  assert.equal(diagnosticCoverage(0, 5), "inconclusive");
+  assert.equal(diagnosticCoverage(6, 5), "inconclusive");
+  assert.equal(diagnosticCoverage(0, 0), "inconclusive");
 });
