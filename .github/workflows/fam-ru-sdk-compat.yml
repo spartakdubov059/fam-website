@@ -7,6 +7,7 @@ on:
       - "ru-migration/compat/**"
       - "ru-migration/app/backend/**"
       - "ru-migration/app/web/**"
+      - "ru-migration/deploy/systemd/**"
       - ".github/workflows/fam-ru-sdk-compat.yml"
   workflow_dispatch:
 
@@ -31,6 +32,8 @@ jobs:
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Install and test isolated FAM RU backend
         run: npm ci --prefix ru-migration/app/backend --no-audit --no-fund && npm test --prefix ru-migration/app/backend
+      - name: Validate systemd timer schedules and service references
+        run: node ru-migration/compat/verify-systemd-timers.mjs
       - name: Test actual native image processing and SDK exports
         run: npm run --prefix ru-migration/compat check
       - name: Save compatibility lockfile for review
