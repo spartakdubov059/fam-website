@@ -1,6 +1,40 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <script>
+    // Netlify is the primary FAM address. Probe it before leaving this fallback copy.
+    // If the phone's network cannot reach Netlify, keep the GitHub Pages app open.
+    (function () {
+      if (window.location.hostname !== "spartakdubov059.github.io") return;
+      var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
+      if (!match) return;
+      var path = match[1] || "/";
+      var target = "https://famru.netlify.app" + path + window.location.search + window.location.hash;
+      var controller = window.AbortController ? new AbortController() : null;
+      var timeoutId = setTimeout(function () {
+        if (controller) controller.abort();
+      }, 4000);
+      var healthUrl = "https://famru.netlify.app/.well-known/fam-domain-health.json?t=" + Date.now();
+      try {
+        fetch(healthUrl, {
+          mode: "cors",
+          cache: "no-store",
+          credentials: "omit",
+          ...(controller ? { signal: controller.signal } : {})
+        }).then(function (response) {
+          return response.ok ? response.json() : null;
+        }).then(function (health) {
+          if (health && health.site === "famru") window.location.replace(target);
+        }).catch(function () {
+          // Keep the current FAM page usable if Netlify is slow, blocked, or offline.
+        }).finally(function () {
+          clearTimeout(timeoutId);
+        });
+      } catch (_) {
+        clearTimeout(timeoutId);
+      }
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FAM — Свои рядом</title>
