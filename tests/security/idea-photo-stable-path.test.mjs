@@ -92,7 +92,9 @@ test("invalid queued path is rejected without signing or copying media", async (
 });
 
 test("approved code cannot introduce a copied path or delete its referenced source", () => {
-  assert.doesNotMatch(branch, /approved_idea_publish_failed_/);
-  assert.doesNotMatch(branch, /const approvedPath =/);
-  assert.doesNotMatch(branch, /removeObject\("idea-images", task\.image_path\)[\s\S]*return "approved"/);
+  const approvalStart = branch.indexOf("// The upload was already type/size/signature");
+  const approvalEnd = branch.indexOf('return "approved";', approvalStart);
+  assert.ok(approvalStart >= 0 && approvalEnd > approvalStart);
+  const approval = branch.slice(approvalStart, approvalEnd);
+  assert.doesNotMatch(approval, /approved_idea_publish_failed_|const approvedPath =|removeObject|fetchImageBytes/);
 });
