@@ -1766,6 +1766,7 @@ window.onunhandledrejection = function() {
 
   let user = null, profile = null;
   let listings = [], regs = [], occupancy = [], ideas = [], favorites = [];
+  let listingsLoadFailed = false; // Keep the last valid board on transient backend errors.
   // FAM intentionally keeps GitHub Pages as a standalone fallback for users who
   // cannot reach Netlify. Never send confirmation links to a different host.
   // Both exact URLs must be allowlisted in Supabase Auth -> URL Configuration.
@@ -2778,17 +2779,21 @@ window.onunhandledrejection = function() {
         promises.push(sb.from("favorites").select("*").eq("user_id", user.id));
       }
       const results = await Promise.all(promises);
-      if (results[0]?.error) reportFamSiteError("listings_load_failed", "listings");
+      listingsLoadFailed = Boolean(results[0]?.error);
+      if (listingsLoadFailed) reportFamSiteError("listings_load_failed", "listings");
       if (results[1]?.error || results.slice(2).some(result => result?.error)) {
         reportFamSiteError("database_request_failed", "database");
       }
       if (!results[0].error) listings = results[0].data || [];
       if (!results[1].error) occupancy = results[1].data || [];
       if (user && user.id) {
-        regs = (!results[2].error && results[2].data) || [];
-        ideas = (!results[3].error && results[3].data) || [];
-        void hydrateIdeaImages(ideas);
-        favorites = (!results[4].error && results[4].data) || [];
+        // A single failed request must not erase already-loaded account data.
+        if (!results[2].error) regs = results[2].data || [];
+        if (!results[3].error) {
+          ideas = results[3].data || [];
+          void hydrateIdeaImages(ideas);
+        }
+        if (!results[4].error) favorites = results[4].data || [];
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
@@ -2797,6 +2802,8 @@ window.onunhandledrejection = function() {
     } catch (e) {
       console.error("Ошибка загрузки данных FAM");
       reportFamSiteError("database_request_failed", "database");
+      listingsLoadFailed = true;
+      if ($("listingsGrid")) renderListings();
     }
   }
 
@@ -2992,7 +2999,15 @@ window.onunhandledrejection = function() {
     );
     let html = filtered.map((l, i) => listingCard(l, i)).join("");
     html += `<div class="promo-card" data-action="open-listing"><span class="promo-gift">🎁</span><div class="promo-script">Размести объявление <b>бесплатно!</b></div><button class="promo-cta">Создать ${ARROW}</button></div>`;
-    grid.innerHTML = filtered.length ? html : '<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">Ничего не найдено 🔍</p>';
+    const loadError = listingsLoadFailed
+      ? '<div role="alert" style="grid-column:1/-1;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);">'
+        + 'Не удалось обновить объявления. Проверьте подключение. Ранее загруженные объявления сохранены. '
+        + '<button type="button" class="button button-small" id="retryListingsLoad">Повторить</button></div>'
+      : '';
+    grid.innerHTML = loadError + (filtered.length ? html : (listingsLoadFailed ? '' : '<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">Ничего не найдено 🔍</p>'));
+    if (listingsLoadFailed) {
+      grid.querySelector("#retryListingsLoad")?.addEventListener("click", () => { void loadAll(); }, { once: true });
+    }
   }
 
   function renderFavorites() {
