@@ -757,6 +757,7 @@ test('event occupancy is a public count with no registration identity details', 
 });
 
 test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
+  const ideaSchoolId = 'school-a';
   let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
   let listedSchool; let listedReviewer; let reviewed;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
