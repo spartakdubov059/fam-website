@@ -609,8 +609,12 @@ try {
   assert.equal(rejectedIdea.status, 201);
   assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedIdea.body.id}/images`, 'synthetic-admin', { decision: 'reject' })),
     { status: 200, body: { ok: true, image_status: 'rejected' } });
-  const rejectedIdeaRow = await sql`SELECT image_keys, image_status FROM fam_ideas WHERE id = ${rejectedIdea.body.id};`;
-  assert.deepEqual(rejectedIdeaRow[0][0], { image_keys: [], image_status: 'rejected' });
+  const rejectedIdeaRow = await sql`SELECT image_status FROM fam_ideas WHERE id = ${rejectedIdea.body.id};`;
+  assert.deepEqual(rejectedIdeaRow[0][0], { image_status: 'rejected' });
+  assert.deepEqual(await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666')
+    .then(rows => rows.find(row => row.id === rejectedIdea.body.id)?.image_keys), []);
+  assert.equal(await repo.getSchoolIdeaImage(rejectedIdea.body.id, 0), null,
+    'rejected school idea image is no longer readable');
   assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedIdeaImageKey};`)[0][0].status, 'pending',
     'rejected school idea image returns to the bounded orphan cleanup queue');
   const deletingListing = await repo.createListing({ user_id: deletingUserId, school_id: 'synthetic-school',

@@ -22,7 +22,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const avatarReviewMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
-    const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{12})\/images$/i);
+    const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);

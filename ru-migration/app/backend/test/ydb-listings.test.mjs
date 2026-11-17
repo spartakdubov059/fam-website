@@ -131,7 +131,8 @@ test('idea image keys are atomically linked to the synthetic idea from only thei
   const result = await repo.createIdea({ user_id: userId, school_id: 'school-a', text: 'Тестовая идея',
     image_keys: [key], image_status: 'pending', ai_status: 'approved', ai_summary: 'Тест', ai_reason: '', admin_status: 'new' });
   assert.match(result.id, /^[0-9a-f-]{36}$/);
-  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && call.values.some(value => Array.isArray(value) && value.includes(key))));
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && !call.text.includes('image_keys')));
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_idea_images') && call.values.includes(key)));
   assert.ok(calls.some(call => call.text.includes("SET status = 'linked'") && call.values.includes(key) && call.values.includes(userId)));
 });
 
@@ -152,13 +153,22 @@ test('idea image linkage rejects an object owned by another account before inser
 });
 
 test('school idea review listing excludes the current reviewer own submission', async () => {
-  let call;
-  const sql = async (strings, ...values) => { call = { text: strings.join('?'), values }; return [[]]; };
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея', image_status: 'pending' }]];
+    if (text.includes('FROM fam_idea_images')) return [[{ object_key: 'pending/user-id/photo.webp' }]];
+    return [[]];
+  };
   const reviewerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  assert.deepEqual(await createYdbListingsRepository(sql).listPendingSchoolIdeas('school-a', reviewerId), []);
-  assert.match(call.text, /user_id != \?/);
-  assert.ok(call.values.includes('school-a'));
-  assert.ok(call.values.includes(reviewerId));
+  const ideas = await createYdbListingsRepository(sql).listPendingSchoolIdeas('school-a', reviewerId);
+  assert.deepEqual(ideas, [{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея',
+    image_status: 'pending', image_keys: ['pending/user-id/photo.webp'] }]);
+  const queue = calls.find(call => call.text.includes('FROM fam_ideas'));
+  assert.match(queue.text, /user_id != \?/);
+  assert.ok(queue.values.includes('school-a'));
+  assert.ok(queue.values.includes(reviewerId));
+  assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images') && call.values.includes('idea-a')));
 });
 
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {

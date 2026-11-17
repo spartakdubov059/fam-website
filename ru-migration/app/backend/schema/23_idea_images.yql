@@ -1,0 +1,11 @@
+-- Private school-idea images use rows because YDB table columns do not accept
+-- List values. Keys link transactionally to an idea and stay private on review.
+CREATE TABLE fam_idea_images (
+  idea_id Utf8 NOT NULL,
+  image_index Uint32 NOT NULL,
+  object_key Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (idea_id, image_index)
+);
