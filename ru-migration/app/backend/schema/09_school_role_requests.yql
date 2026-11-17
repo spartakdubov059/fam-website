@@ -1,0 +1,31 @@
+-- Requests for additional school roles. The student's school and identity are
+-- loaded from fam_user_profiles; the browser cannot supply either value.
+CREATE TABLE fam_school_role_requests (
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  request_id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  requested_role Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  review_started_by Utf8,
+  review_started_at Timestamp,
+  reviewed_by Utf8,
+  reviewed_at Timestamp,
+  review_note Utf8,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (issuer, subject)
+);
+
+-- Retain immutable transition records when a rejected request is replaced.
+CREATE TABLE fam_school_role_request_audit (
+  event_id Utf8 NOT NULL,
+  request_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  actor_id Utf8 NOT NULL,
+  requested_role Utf8 NOT NULL,
+  action Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id)
+);

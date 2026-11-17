@@ -1,0 +1,15 @@
+-- Minimal administrative audit for temporary account restrictions.
+-- The event is inserted atomically with issue/lift and is never exposed to students.
+CREATE TABLE fam_account_suspension_audit (
+  event_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  target_id Utf8 NOT NULL,
+  actor_id Utf8 NOT NULL,
+  suspension_id Utf8 NOT NULL,
+  action Utf8 NOT NULL,
+  duration_hours Uint32?,
+  reason Utf8?,
+  expires_at Timestamp?,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id)
+);

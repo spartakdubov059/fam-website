@@ -1,0 +1,12 @@
+-- Avatar uploads remain private until a moderator of the same school approves them.
+CREATE TABLE fam_avatar_reviews (
+  id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  image_key Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  reviewed_by Utf8 NOT NULL,
+  reviewed_at Timestamp,
+  PRIMARY KEY (id)
+);

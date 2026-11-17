@@ -1,0 +1,45 @@
+--- a/backend/src/ydb-image-moderation-repository.mjs
++++ b/backend/src/ydb-image-moderation-repository.mjs
+@@ -147 +147,2 @@
+-          WHERE id = $queueId AND lease_token = $claimToken AND status = "processing"
++          WHERE id = $queueId AND lease_token = $claimToken
++            AND status = "processing" AND locked_until > CurrentUtcTimestamp()
+@@ -178 +179,2 @@
+-          WHERE id = $queueId AND lease_token = $claimToken AND status = "processing";
++          WHERE id = $queueId AND lease_token = $claimToken
++            AND status = "processing" AND locked_until > CurrentUtcTimestamp();
+--- a/tests/ydb-image-moderation-repository.test.mjs
++++ b/tests/ydb-image-moderation-repository.test.mjs
+@@ -160,0 +161,32 @@
++
++test('finishTask checks lease expiry using YDB server clock before any queue/listing writes', async () => {
++  // The fake database refuses to return a live claim unless the query enforces
++  // the lease-expiry condition. The actual comparison happens in YDB, not in
++  // this process, so a worker with a skewed local clock cannot extend its lease.
++  const { sql, calls } = fakeSql(async (queryText) => {
++    if (queryText.includes('SELECT id FROM fam_priv_listing_image_moderation_queue')) {
++      return queryText.includes('locked_until > CurrentUtcTimestamp()') ? [[]] : [[{ id: queueId }]];
++    }
++    if (queryText.includes('SELECT id FROM fam_pub_listings')) return [[{ id: listingId }]];
++    return [[]];
++  });
++  const repository = createYdbImageModerationRepository({ sql });
++  assert.equal(await repository.finishTask({ task: task(), status: 'approved', imageUrl: 'https://media.example.test/safe.webp' }), false);
++  const claimSelect = calls.find((call) => call.queryText?.includes('SELECT id FROM fam_priv_listing_image_moderation_queue'));
++  assert.match(claimSelect.queryText, /locked_until > CurrentUtcTimestamp\(\)/);
++  assert.equal(calls.some((call) => call.queryText?.includes('UPDATE fam_priv_listing_image_moderation_queue')), false);
++  assert.equal(calls.some((call) => call.queryText?.includes('UPDATE fam_pub_listings')), false);
++});
++
++test('finishTask double-checks lease expiry on the update, not only on the preceding read', async () => {
++  const { sql, calls } = fakeSql(async (queryText) => {
++    if (queryText.includes('SELECT id FROM fam_priv_listing_image_moderation_queue')) return [[{ id: queueId }]];
++    if (queryText.includes('SELECT id FROM fam_pub_listings')) return [[{ id: listingId }]];
++    return [[]];
++  });
++  const repository = createYdbImageModerationRepository({ sql });
++  assert.equal(await repository.finishTask({ task: task(), status: 'manual_review' }), true);
++  const update = calls.find((call) => call.queryText?.includes('UPDATE fam_priv_listing_image_moderation_queue'));
++  assert.match(update.queryText, /locked_until > CurrentUtcTimestamp\(\)/);
++  assert.match(update.queryText, /lease_token = \$claimToken/);
++});

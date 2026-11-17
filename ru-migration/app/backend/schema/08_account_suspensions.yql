@@ -1,0 +1,17 @@
+-- Suspension records retain each issue/lift event. The target-first key lets
+-- active-status reads remain bounded to one account while preserving history.
+CREATE TABLE fam_account_suspensions (
+  school_id Utf8 NOT NULL,
+  target_id Utf8 NOT NULL,
+  suspension_id Utf8 NOT NULL,
+  target_role Utf8 NOT NULL,
+  duration_hours Uint32 NOT NULL,
+  reason Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  issued_by Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  expires_at Timestamp NOT NULL,
+  lifted_by Utf8,
+  lifted_at Timestamp,
+  PRIMARY KEY (target_id, suspension_id)
+);

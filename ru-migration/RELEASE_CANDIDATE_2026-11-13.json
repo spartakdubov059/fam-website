@@ -1,0 +1,66 @@
+{
+  "project": "FAM RU staging migration",
+  "archive": "FAM_RU_Migration_Starter_2026-11-13_220tests.zip",
+  "sha256": "993bbf697ba6b24e377653a32419458a600d985aeaab3e28ac09e9cd7be31524",
+  "bytes": 197950,
+  "included_files": 112,
+  "checked_at": "2026-11-14",
+  "local_tests": {
+    "historical_report_claimed_passed": 220,
+    "reproduced_in_current_workspace": false,
+    "current_backend_tests": {
+      "passed": 223,
+      "failed": 0,
+      "source": "GitHub Actions SDK compatibility workflow run 43634929634 on commit cddfb9582bfb9f8bacf69af6691b7e749f7c9c34 (Node 22.23.4)"
+    },
+    "command": "npm test --prefix ru-migration/app/backend",
+    "reproduction": "PASS — current backend tests (223/223) in GitHub Actions; historical ZIP remains unavailable and its integrity/report are not independently reproduced"
+  },
+  "sdk_gate": "PASS — workflow 43634929634 installed locked backend SDKs and Sharp 0.35.5, passed 223 backend tests and native image processing checks",
+  "cloud_staging": "NOT DEPLOYED",
+  "production": "UNCHANGED",
+  "release_blockers": [
+    "Full source archive unavailable; historical archive integrity and 220-test report not independently reproduced",
+    "Full FAM transfer remains incomplete: only part of the seven source Edge Functions and 72 SQL migrations has been mapped and implemented; scheduled jobs, agent workflows, and automatic image classification remain unported",
+    "Cloud YDB, object storage, real OAuth, and reviewed moderation provider are not configured; only synthetic local YDB integration passed",
+    "School catalog remains incomplete; verify cloud backup retention against profile-request TTL and complete privacy/legal review",
+    "No free-only school-controlled cloud staging has been provisioned; strict zero-ruble cost cannot be guaranteed with quota-based free tiers",
+    "Orphaned private image cleanup after browser/network loss is not automatically scheduled",
+    "Full auth, moderation, account-migration and safe access policy/legal review before real students join",
+    "Message submission remains fail closed until a reviewed moderation provider is configured and verified",
+    "Account deletion is available only through reviewed RU API flows; cloud OAuth, YDB, object storage and school approval processes still need deployment-level verification before real users"
+  ],
+  "archive_status": "UNAVAILABLE in current workspace; historical integrity/test claims not independently reproduced",
+  "sdk_compatibility_check": {
+    "node": "24.22.1 local runtime; GitHub Actions Node 22.23.4",
+    "command": "GitHub Actions run 43634929634: npm ci, backend tests (223/223), pinned YDB/AWS SDK + Sharp checks and native image processing",
+    "result": "PASS in CI on commit cddfb9582bfb9f8bacf69af6691b7e749f7c9c34; historical ZIP remains unavailable",
+    "sharp": "0.35.5",
+    "lockfile_sha256": "9fd900a210eb2afc24aa817e76f6f71c4379cbba942811c52dd985163e77315b"
+  },
+  "github_actions": {
+    "sdk_run_id": 43634929634,
+    "sdk_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43634929634",
+    "ydb_run_id": 43634929657,
+    "ydb_url": "https://github.com/spartakdubov059/fam-website/actions/runs/43634929657",
+    "result": "success",
+    "tested_commit": "cddfb9582bfb9f8bacf69af6691b7e749f7c9c34 for SDK/backend and disposable YDB integration"
+  },
+  "local_ydb_integration": "NOT AVAILABLE locally: Docker is not installed. Disposable YDB integration passed in GitHub Actions run 43634929657 with synthetic fixtures, including school-scoped avatar review and requested account deletion; no cloud instance or user data was used.",
+  "idea_submission_ui": "PASS — existing CI test covers authenticated UI submission to moderated API and pending status feedback",
+  "event_signup_ui": "PASS — public-board unit tests cover guest Yandex login redirect, same-origin registration, cancellation, and disabled actions when backend is unavailable",
+  "media_upload_api": "PASS — authenticated listing and avatar images are validated, normalized to WebP, and stored privately; the Russian shell now includes profile upload and same-school manual review. Approved avatars are served only while current. Orphan cleanup after browser/network loss is not automatically scheduled.",
+  "free_only_policy": "No cloud resources created. Yandex Cloud free-tier quotas are monthly and billable usage starts after quota exhaustion; budget thresholds notify but do not stop consumption. Strict 0 RUB requires no cloud provisioning until an enforceable zero-spend mechanism is verified.",
+  "pricing_evidence": [
+    {
+      "topic": "Free tier has usage limits and billable overages",
+      "url": "https://yandex.cloud/ru/docs/billing/concepts/serverless-free-tier"
+    },
+    {
+      "topic": "Budget threshold does not stop further consumption",
+      "url": "https://yandex.cloud/ru/docs/billing/concepts/budget"
+    }
+  ],
+  "account_deletion_requests": "IMPLEMENTED — school-scoped requests support admin rejection or approved deletion with fresh authentication, profile deactivation, private-object cleanup, and YDB finalization; synthetic CI only, no real student data",
+  "self_account_deletion_ui": "PASS — Russian shell requires browser confirmation and exact phrase, calls the fresh-authenticated YDB/S3 deletion route, then logs out; UI behavior covered by 2 tests"
+}

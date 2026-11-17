@@ -1,0 +1,10 @@
+[Unit]
+Description=Run FAM RU aggregate daily report at 06:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 06:00:00 UTC
+Persistent=true
+Unit=fam-ru-agent-daily-report.service
+
+[Install]
+WantedBy=timers.target

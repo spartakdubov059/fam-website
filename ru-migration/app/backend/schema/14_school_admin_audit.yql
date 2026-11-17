@@ -1,0 +1,11 @@
+-- Audit of school administrator role changes. No external-auth or contact fields are retained.
+CREATE TABLE fam_school_admin_audit (
+  event_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  actor_id Utf8 NOT NULL,
+  target_id Utf8 NOT NULL,
+  action Utf8 NOT NULL,
+  previous_role Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id)
+);

@@ -1,0 +1,16 @@
+-- Provision synthetic or approved identities through an operator-controlled process.
+-- Never derive roles from OIDC claims or browser submitted fields.
+CREATE TABLE fam_user_profiles (
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  role Utf8 NOT NULL,
+  active Bool NOT NULL,
+  first_name Utf8,
+  last_name Utf8,
+  class_name Utf8,
+  city Utf8,
+  avatar_url Utf8,
+  PRIMARY KEY (issuer, subject)
+);

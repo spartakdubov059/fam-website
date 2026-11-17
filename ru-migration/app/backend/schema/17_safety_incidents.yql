@@ -1,0 +1,18 @@
+-- Minimal school-scoped safety signals. Never store raw content, IPs, emails or OAuth subjects.
+-- The pair fingerprint is a one-way digest; excerpts must already be sanitized before insertion.
+CREATE TABLE fam_safety_incidents (
+  school_id Utf8 NOT NULL,
+  pair_fingerprint Utf8 NOT NULL,
+  source_kind Utf8 NOT NULL,
+  category Utf8 NOT NULL,
+  incident_id Utf8 NOT NULL,
+  severity Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  reviewed_at Timestamp?,
+  reviewed_by Utf8?,
+  actor_id Utf8?,
+  target_id Utf8?,
+  source_origin Utf8?,
+  evidence_excerpt Utf8?,
+  PRIMARY KEY (school_id, pair_fingerprint, source_kind, category, incident_id)
+);

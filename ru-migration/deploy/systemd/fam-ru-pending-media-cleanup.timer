@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the FAM RU private image cleanup every six hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:17:00 UTC
+RandomizedDelaySec=2min
+Persistent=true
+Unit=fam-ru-pending-media-cleanup.service
+
+[Install]
+WantedBy=timers.target
+
