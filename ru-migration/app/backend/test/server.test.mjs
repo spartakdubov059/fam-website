@@ -54,18 +54,21 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(await pulse.text(), /api\/v1\/pulse/);
     assert.match(html, /id="ruPulse"/);
     assert.match(html, /pulseScript\.src = '\/pulse\.js'/);
-    assert.match(html, /href="\/auth\/yandex\/start\?reauth=1"/);
-    assert.match(html, /fetch\("\/api\/v1\/me\/account"/);
-    assert.match(html, /api\/v1\/school\/accounts\/\$\{encodeURIComponent\(targetId\)\}/);
-    assert.match(html, /api\/v1\/school\/admin\/overview/);
-    assert.match(html, /api\/v1\/school\/admin\/safety-reports/);
-    assert.match(html, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
     assert.doesNotMatch(html, /selfDeletePassword/);
 
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
     assert.equal(moderation.status, 200);
     assert.match(moderation.headers.get('content-type'), /javascript/);
-    assert.match(await moderation.text(), /api\/v1\/listings\/moderation/);
+    const moderationSource = await moderation.text();
+    assert.match(moderationSource, /api\/v1\/listings\/moderation/);
+    assert.match(moderationSource, /link\.href = '\/auth\/yandex\/start\?reauth=1'/);
+    assert.match(moderationSource, /api\/v1\/school\/admin\/overview/);
+    assert.match(moderationSource, /api\/v1\/school\/admin\/safety-reports/);
+    assert.match(moderationSource, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
+
+    const account = await fetch(new URL('/account-workflow.js', origin));
+    assert.equal(account.status, 200);
+    assert.match(await account.text(), /fetchImpl\('\/api\/v1\/me\/account'/);
 
     const boardStyles = await fetch(new URL('/public-board.css', origin));
     assert.equal(boardStyles.status, 200);
