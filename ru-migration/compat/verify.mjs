@@ -1,8 +1,3 @@
-/**
- * Real native/SDK import compatibility smoke test; no credentials or cloud calls.
- * Run from this directory after npm install. Does not validate the actual YDB
- * database, runtime IAM, cloud pricing, or security of a live deployment.
- */
 import assert from 'node:assert/strict';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
@@ -35,18 +30,24 @@ assert.equal(typeof offlineStatement.timeout, 'function', 'FAM adapters require 
 // The wrapper deliberately does not execute the resulting statement.
 let constructed = false;
 const sentinel = "not-sql'); DELETE FROM fam_listings; --";
-const repository = createYdbListingsRepository((strings, ...values) => {
-  assert.equal(strings.join('').includes(sentinel), false);
-  assert.ok(values.includes(sentinel));
+let sentinelBound = false;
+const offlineTx = (strings, ...values) => {
+  if (values.includes(sentinel)) {
+    assert.equal(strings.join('').includes(sentinel), false);
+    sentinelBound = true;
+  }
   const statement = offlineSql(strings, ...values);
   assert.equal(typeof statement.parameter, 'function');
-  constructed = true;
-  return Promise.resolve();
-});
+  if (strings.join('').includes('INSERT INTO fam_listings')) constructed = true;
+  return Promise.resolve([[]]);
+};
+const offlineSqlWithTransactions = Object.assign(offlineTx, { begin: callback => callback(offlineTx) });
+const repository = createYdbListingsRepository(offlineSqlWithTransactions);
 await repository.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title: sentinel,
   description: 'Synthetic text', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
   event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' });
 assert.equal(constructed, true);
+assert.equal(sentinelBound, true, 'listing text must remain a bound value through the transactional query client');
 
 
 assert.equal(sharp.versions.sharp, '0.35.5', 'Installed native Sharp must match the pinned dependency');
