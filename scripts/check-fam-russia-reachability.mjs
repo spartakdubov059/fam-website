@@ -31,6 +31,9 @@ export function summarizeNodeResult(raw) {
   if (result[0] === 1 && /^3\d\d$/.test(status)) {
     return { state: "redirect", status, info: "HTTP перенаправление" };
   }
+  if (result[0] === 1 && status === "401") {
+    return { state: "auth-required", status, info: "Узел дошёл до API; endpoint требует авторизацию" };
+  }
   return {
     state: "failed",
     status,
