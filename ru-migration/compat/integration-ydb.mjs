@@ -123,6 +123,31 @@ try {
     { hour_bucket: alertBucket, event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning' },
     { hour_bucket: alertBucket, event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
   ]);
+  const digestSlot = new Date(); digestSlot.setUTCMinutes(Math.floor(digestSlot.getUTCMinutes() / 15) * 15, 0, 0);
+  const digestSlotKey = digestSlot.toISOString().slice(0, 16);
+  assert.deepEqual(await repo.enqueueSiteErrorDigestTask(digestSlotKey), { created: true, status: 'queued' });
+  assert.deepEqual(await repo.enqueueSiteErrorDigestTask(digestSlotKey), { created: false, status: 'queued' },
+    'only one aggregate site error digest task is queued per UTC quarter-hour');
+  const siteErrorClaim = await repo.claimSiteErrorDigestTask('synthetic-site-error-worker');
+  assert.equal(siteErrorClaim.digest_slot, digestSlotKey);
+  assert.match(siteErrorClaim.claim_token, /^[0-9a-f-]{36}$/i);
+  assert.equal(await repo.claimSiteErrorDigestTask('second-site-error-worker'), null,
+    'a live lease prevents another worker from claiming the digest');
+  const siteErrorMetrics = await repo.getSiteErrorDigestMetrics();
+  assert.equal(siteErrorMetrics.total_events_24h, 13);
+  assert.equal(siteErrorMetrics.events_last_hour, 13);
+  assert.deepEqual(siteErrorMetrics.events, [
+    { event_code: 'unhandled_rejection', page_area: 'other', occurrences: 10 },
+    { event_code: 'database_request_failed', page_area: 'database', occurrences: 3 },
+  ]);
+  assert.equal(await repo.completeSiteErrorDigestTask({ digestSlot: digestSlotKey, claimToken: siteErrorClaim.claim_token,
+    metrics: siteErrorMetrics, summary: 'Синтетическая агрегированная сводка ошибок.' }), true);
+  assert.equal(await repo.completeSiteErrorDigestTask({ digestSlot: digestSlotKey, claimToken: siteErrorClaim.claim_token,
+    metrics: siteErrorMetrics, summary: 'Повторная запись запрещена.' }), false, 'a completed task rejects a stale lease token');
+  const savedSiteErrorDigest = await sql`SELECT status, metrics_json, summary FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlotKey};`;
+  assert.equal(savedSiteErrorDigest?.[0]?.[0]?.status, 'completed');
+  assert.deepEqual(JSON.parse(savedSiteErrorDigest[0][0].metrics_json), siteErrorMetrics);
+  assert.doesNotMatch(savedSiteErrorDigest[0][0].summary, /student|user_id|https?:|stack|телефон|почта/i);
   await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);

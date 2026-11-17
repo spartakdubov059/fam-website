@@ -72,8 +72,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      if (typeof repository?.listSiteErrorAlerts !== 'function') return { status: 503, body: { ok: false, error: 'technical_alerts_unavailable' } };
-      try { return { status: 200, body: { ok: true, alerts: await repository.listSiteErrorAlerts() } }; }
+      if (typeof repository?.listSiteErrorAlerts !== 'function' || typeof repository?.getLatestSiteErrorDigest !== 'function') return { status: 503, body: { ok: false, error: 'technical_alerts_unavailable' } };
+      try { return { status: 200, body: { ok: true, alerts: await repository.listSiteErrorAlerts(), digest: await repository.getLatestSiteErrorDigest() } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if ((req.method === 'GET' || req.method === 'PATCH') && pathname === '/api/v1/school/admin/safety-reports') {

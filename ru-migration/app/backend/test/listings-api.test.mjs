@@ -13,11 +13,14 @@ test('technical alerts are read-only, administrator-only, and contain only aggre
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
     resolveActor: async () => actor,
-    repository: { listSiteErrorAlerts: async () => { reads++; return [{ event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' }]; } } });
+    repository: {
+      listSiteErrorAlerts: async () => { reads++; return [{ event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' }]; },
+      getLatestSiteErrorDigest: async () => null,
+    } });
   const list = req({}, 'GET'); list.url = '/api/v1/school/admin/technical-alerts';
   assert.deepEqual(await handler(list), { status: 200, body: { ok: true, alerts: [
     { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
-  ] } });
+  ], digest: null } });
   actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
   assert.equal((await handler(list)).status, 403);
   assert.equal(reads, 1);

@@ -146,6 +146,13 @@ export async function initializeListingModeration({ document = globalThis.docume
           && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
           && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
           && Number.isFinite(Date.parse(item.hour_bucket))) : [];
+      const siteErrorDigest = me.profile.role === 'school_admin' && technicalAlertsAvailable
+        ? technicalAlertsResult.digest && typeof technicalAlertsResult.digest.summary === 'string'
+          && technicalAlertsResult.digest.summary.length <= 1000
+          && typeof technicalAlertsResult.digest.digest_slot === 'string'
+          && Number.isFinite(Date.parse(`${technicalAlertsResult.digest.digest_slot}:00Z`))
+          && Number.isFinite(Date.parse(technicalAlertsResult.digest.generated_at || ''))
+          ? technicalAlertsResult.digest : null : null;
       const schoolOverviewAvailable = me.profile.role !== 'school_admin'
         || (schoolOverviewResponse.ok && schoolOverviewResult?.ok
           && ['users', 'listings', 'audit', 'deletion_requests', 'suspensions'].every(key => Array.isArray(schoolOverviewResult[key])));
@@ -290,6 +297,11 @@ export async function initializeListingModeration({ document = globalThis.docume
         alertsPanel.append(node(document, 'h3', '', 'Технические предупреждения FAM за сутки'));
         alertsPanel.append(node(document, 'p', '', 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.'));
         if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Не удалось загрузить технические предупреждения.'));
+        if (siteErrorDigest) {
+          alertsPanel.append(node(document, 'h4', '', 'Последняя фоновая сводка'));
+          alertsPanel.append(node(document, 'p', '', siteErrorDigest.summary));
+          alertsPanel.append(node(document, 'p', 'ru-note', `Интервал UTC: ${siteErrorDigest.digest_slot} · создано ${new Date(siteErrorDigest.generated_at).toLocaleString('ru-RU')}`));
+        }
         if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Пороговых повторяющихся сбоев не обнаружено.'));
         const codeNames = { js_runtime: 'Ошибка интерфейса', unhandled_rejection: 'Сбой фоновой операции', supabase_sdk_unavailable: 'Служба данных недоступна',
           listings_load_failed: 'Не загрузились объявления', notifications_load_failed: 'Не загрузились уведомления',
@@ -354,7 +366,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} · ${new Date(item.created_at).toLocaleString('ru-RU')}`));
         queue.append(overview);
       };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && schoolIdeas.length === 0) {
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0) {
         renderPendingMessagesPanel();
         renderSchoolIdeasPanel();
         renderSafetyPanel();

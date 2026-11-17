@@ -13,6 +13,7 @@ import { createPendingMediaCleanupOperation } from './services/cleanup-pending-m
 import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
+import { createSiteErrorDigest } from './services/site-error-digest.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, mediaConfigured }) {
@@ -65,6 +66,7 @@ export async function createRuntime(env = process.env) {
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
+    processSiteErrorDigest: createSiteErrorDigest({ repository }),
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

@@ -189,7 +189,10 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
-    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, alerts: [
+    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, digest: {
+      digest_slot: '2026-11-15T12:00', generated_at: '2026-11-15T12:01:00Z',
+      summary: '<script>unsafe</script>', metrics: { total_events_24h: 3, events_last_hour: 1, events: [] },
+    }, alerts: [
       { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
       { event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning', hour_bucket: '2026-11-15T12:00:00Z' },
       { event_code: '<script>x</script>', page_area: 'other', event_count: 999, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
@@ -212,12 +215,13 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Технические предупреждения FAM за сутки');
   assert.ok(panel);
   assert.equal(panel.children[1].textContent, 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.');
+  assert.equal(panel.children[3].textContent, '<script>unsafe</script>', 'digest summary is rendered as inert text');
   const alert = panel.children.find(item => item.tagName === 'article');
   assert.equal(alert.children[0].textContent, 'Критический сбой · Ошибка базы данных');
   assert.equal(alert.children[1].textContent, 'Раздел: база данных · Событий за час: 3');
   const rejectionAlert = panel.children.filter(item => item.tagName === 'article')[1];
   assert.equal(rejectionAlert.children[0].textContent, 'Предупреждение · Сбой фоновой операции');
-  assert.equal(panel.children.some(item => item.textContent.includes('<script>')), false);
+  assert.equal(panel.children.some(item => item.tagName === 'script'), false, 'untrusted digest text does not create markup');
   const overview = f.queue.children.find(item => item.children?.[0]?.textContent === 'Обзор школы');
   assert.ok(overview);
   assert.equal(overview.children[1].textContent, 'В выборке: активных профилей — 1, активных публикаций — 1, ожидают проверки — 1, заявок на удаление — 0, ограничений — 0.');

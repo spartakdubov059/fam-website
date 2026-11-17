@@ -1,6 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createYdbListingsRepository } from '../repositories/ydb-listings.mjs';
+import { getSiteErrorDigestSlot } from '../services/site-error-digest.mjs';
+
+test('site error digest slot uses UTC quarter hours and rejects invalid dates', () => {
+  assert.equal(getSiteErrorDigestSlot(new Date('2026-11-18T06:29:59.999Z')), '2026-11-18T06:15');
+  assert.equal(getSiteErrorDigestSlot(new Date('2026-11-18T06:30:00.000Z')), '2026-11-18T06:30');
+  assert.throws(() => getSiteErrorDigestSlot(new Date('invalid')), /invalid site error digest time/);
+});
+
+test('site error digest aggregation reads only bounded aggregate counters and returns top categories', async () => {
+  let query;
+  const rows = [
+    { event_code: 'js_runtime', page_area: 'other', event_count: 4, last_hour: true },
+    { event_code: 'database_request_failed', page_area: 'database', event_count: 2, last_hour: false },
+    { event_code: 'js_runtime', page_area: 'other', event_count: 3, last_hour: false },
+  ];
+  const repo = createYdbListingsRepository((strings) => { query = strings.join('?'); return Promise.resolve([rows]); });
+  assert.deepEqual(await repo.getSiteErrorDigestMetrics(), {
+    total_events_24h: 9, events_last_hour: 4,
+    events: [{ event_code: 'js_runtime', page_area: 'other', occurrences: 7 },
+      { event_code: 'database_request_failed', page_area: 'database', occurrences: 2 }],
+  });
+  assert.match(query, /Interval\('PT24H'\)/);
+  assert.match(query, /Interval\('PT1H'\)/);
+  assert.match(query, /LIMIT 1000/);
+  assert.doesNotMatch(query, /body|text|url|user_id|email|stack/i);
+});
+
+test('latest completed site error digest is projected from bounded aggregate fields only', async () => {
+  const slot = '2026-11-18T06:15';
+  const summary = 'Проверка ошибок FAM: агрегированные данные.';
+  const metrics = { total_events_24h: 9, events_last_hour: 2,
+    events: [{ event_code: 'js_runtime', page_area: 'other', occurrences: 9 }] };
+  const repo = createYdbListingsRepository(async () => [[{ digest_slot: slot,
+    generated_at: new Date('2026-11-18T06:16:00.000Z'), metrics_json: JSON.stringify(metrics), summary }]]);
+  assert.deepEqual(await repo.getLatestSiteErrorDigest(), { digest_slot: slot,
+    generated_at: new Date('2026-11-18T06:16:00.000Z'), metrics, summary });
+});
 test('technical alert query applies the source thresholds and derives severity without raw diagnostics', async () => {
   let query;
   const repo = createYdbListingsRepository((strings, ...values) => {

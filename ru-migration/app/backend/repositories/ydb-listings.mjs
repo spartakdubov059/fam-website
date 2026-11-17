@@ -8,6 +8,12 @@ const isIsoDate = value => {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
+const isQuarterHourSlot = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(value)) return false;
+  const date = new Date(`${value}:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value;
+};
+
 // The caller owns the connection and injects a @ydbjs/query tagged client.
 // Dynamic values are bound by the SDK, never concatenated into YQL.
 export function createYdbListingsRepository(sql) {
@@ -1819,6 +1825,124 @@ export function createYdbListingsRepository(sql) {
             lease_expires_at = CAST(NULL AS Timestamp?),
             updated_at = CurrentUtcTimestamp()
           WHERE report_date = ${reportDate};`;
+        return true;
+      });
+    },
+
+    async enqueueSiteErrorDigestTask(digestSlot) {
+      if (!isQuarterHourSlot(digestSlot)) throw new TypeError('invalid site error digest slot');
+      return sql.begin(async tx => {
+        const prior = await tx`SELECT status, attempt_count FROM fam_site_error_digest_tasks
+          WHERE digest_slot = ${digestSlot} LIMIT 1;`;
+        if (prior?.[0]?.length) return { created: false, status: prior[0][0].status };
+        await tx`INSERT INTO fam_site_error_digest_tasks
+          (digest_slot, status, attempt_count, max_attempts, available_at, claimed_by, claim_token, lease_expires_at,
+            generated_at, metrics_json, summary, last_error_code, created_at, updated_at)
+          VALUES (${digestSlot}, 'queued', Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(),
+            NULL, NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+        return { created: true, status: 'queued' };
+      });
+    },
+
+    async claimSiteErrorDigestTask(workerId) {
+      if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 80) {
+        throw new TypeError('invalid site error digest claim');
+      }
+      return sql.begin(async tx => {
+        const candidates = await tx`SELECT digest_slot, status, attempt_count, max_attempts,
+            CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
+            CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
+          FROM fam_site_error_digest_tasks WHERE attempt_count < max_attempts
+            AND ((status IN ('queued', 'failed') AND available_at <= CurrentUtcTimestamp())
+              OR (status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp()))
+          ORDER BY digest_slot ASC LIMIT 1;`;
+        const task = candidates?.[0]?.[0];
+        if (!task) return null;
+        if (!isQuarterHourSlot(task.digest_slot)) throw new Error('invalid stored site error digest slot');
+        const due = task.available === true && ['queued', 'failed'].includes(task.status)
+          || task.status === 'claimed' && task.lease_expired === true;
+        if (!due) return null;
+        const claimToken = randomUUID();
+        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
+            attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
+            claimed_by = ${workerId}, claim_token = ${claimToken}, lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'),
+            last_error_code = CAST(NULL AS Utf8?), updated_at = CurrentUtcTimestamp()
+          WHERE digest_slot = ${task.digest_slot};`;
+        return { digest_slot: task.digest_slot, claim_token: claimToken };
+      });
+    },
+
+    async getSiteErrorDigestMetrics() {
+      const statement = sql`SELECT event_code, page_area, event_count,
+          CASE WHEN hour_bucket >= CurrentUtcTimestamp() - Interval('PT1H') THEN true ELSE false END AS last_hour
+        FROM fam_site_error_counts WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
+        ORDER BY hour_bucket DESC LIMIT 1000;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const rows = (await statement)?.[0] ?? [];
+      let total = 0; let lastHour = 0;
+      const grouped = new Map();
+      for (const row of rows) {
+        const occurrences = Number(row.event_count);
+        if (!Number.isSafeInteger(occurrences) || occurrences < 0) throw new Error('invalid site error counter');
+        total += occurrences;
+        if (row.last_hour === true) lastHour += occurrences;
+        const key = `${row.event_code}/${row.page_area}`;
+        const prior = grouped.get(key);
+        grouped.set(key, { event_code: row.event_code, page_area: row.page_area, occurrences: (prior?.occurrences ?? 0) + occurrences });
+      }
+      const events = [...grouped.values()].sort((a, b) => b.occurrences - a.occurrences
+        || a.event_code.localeCompare(b.event_code) || a.page_area.localeCompare(b.page_area)).slice(0, 6);
+      return { total_events_24h: total, events_last_hour: lastHour, events };
+    },
+
+    async getLatestSiteErrorDigest() {
+      const statement = sql`SELECT digest_slot, generated_at, metrics_json, summary FROM fam_site_error_digest_tasks
+        WHERE status = 'completed' ORDER BY digest_slot DESC LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const row = (await statement)?.[0]?.[0];
+      if (!row || !isQuarterHourSlot(row.digest_slot) || typeof row.summary !== 'string' || row.summary.length > 1000) return null;
+      let metrics;
+      try { metrics = JSON.parse(row.metrics_json); } catch { return null; }
+      if (!Number.isSafeInteger(metrics?.total_events_24h) || metrics.total_events_24h < 0
+          || !Number.isSafeInteger(metrics?.events_last_hour) || metrics.events_last_hour < 0
+          || !Array.isArray(metrics.events) || metrics.events.length > 6
+          || metrics.events.some(event => typeof event.event_code !== 'string' || typeof event.page_area !== 'string'
+            || !Number.isSafeInteger(event.occurrences) || event.occurrences < 0)) return null;
+      return { digest_slot: row.digest_slot, generated_at: row.generated_at, summary: row.summary, metrics };
+    },
+
+    async completeSiteErrorDigestTask({ digestSlot, claimToken, metrics, summary }) {
+      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '') || !metrics
+          || !Number.isSafeInteger(metrics.total_events_24h) || metrics.total_events_24h < 0
+          || !Number.isSafeInteger(metrics.events_last_hour) || metrics.events_last_hour < 0
+          || !Array.isArray(metrics.events) || metrics.events.length > 6
+          || typeof summary !== 'string' || summary.length > 1000) throw new TypeError('invalid site error digest result');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claim_token, lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlot} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
+        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('completed' AS Utf8)), generated_at = CurrentUtcTimestamp(),
+            metrics_json = ${JSON.stringify(metrics)}, summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
+            claim_token = CAST(NULL AS Utf8?), lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
+          WHERE digest_slot = ${digestSlot};`;
+        return true;
+      });
+    },
+
+    async retrySiteErrorDigestTask({ digestSlot, claimToken, errorCode = 'digest_failed' }) {
+      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '')
+          || !['digest_failed', 'invalid_metrics'].includes(errorCode)) throw new TypeError('invalid site error digest retry');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claim_token, lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlot} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
+        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('failed' AS Utf8)),
+            available_at = CurrentUtcTimestamp() + Interval('PT5M'), last_error_code = ${errorCode},
+            claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
+            lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
+          WHERE digest_slot = ${digestSlot};`;
         return true;
       });
     },
