@@ -72,7 +72,7 @@ test('school moderators can inspect and decide idea photos without rendering use
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
     if (url === '/api/v1/school/ideas') {
       ideasPayload = { ok: true, ideas: imageStatus === 'pending'
-        ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status: imageStatus }] : [] };
+        ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status: imageStatus, ai_status: 'pending' }] : [] };
       return { ok: true, json: async () => ideasPayload };
     }
     if (url === `/api/v1/school/ideas/${id}/images` && init.method === 'PATCH') { imageStatus = 'approved'; return { ok: true, json: async () => ({ ok: true, image_status }) }; }
@@ -91,15 +91,39 @@ test('school moderators can inspect and decide idea photos without rendering use
   const card = panel?.children.find(item => item.tagName === 'article');
   assert.ok(card);
   assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
-  assert.equal(card.children[1].tagName, 'img');
-  assert.equal(card.children[1].src, `/api/v1/ideas/${id}/images/0`);
-  assert.equal(card.children[1].alt, 'Фото к школьной идее 1');
-  const actions = card.children[2].children;
+  assert.equal(card.children[1].textContent, 'Текст ожидает решения школы.');
+  assert.deepEqual(card.children[2].children.map(button => button.textContent), ['Одобрить текст', 'Отклонить текст']);
+  assert.equal(card.children[3].tagName, 'img');
+  assert.equal(card.children[3].src, `/api/v1/ideas/${id}/images/0`);
+  assert.equal(card.children[3].alt, 'Фото к школьной идее 1');
+  const actions = card.children[4].children;
   assert.deepEqual(actions.map(button => button.textContent), ['Одобрить фото', 'Отклонить фото']);
   await actions[0].listeners.click();
   const decision = calls.find(call => call.url === `/api/v1/school/ideas/${id}/images` && call.init.method === 'PATCH');
   assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
   assert.equal(imageStatus, 'approved');
+});
+
+test('pending school idea text can be approved with a separate same-origin moderation decision', async () => {
+  const f = fixture(); const calls = [];
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [
+      { id, text: 'Синтетическая идея', image_keys: [], image_status: 'none', ai_status: 'pending' },
+    ] }) };
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    return { ok: true, json: async () => ({ ok: true }) };
+  } });
+  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Школьные идеи и фотографии');
+  const card = panel.children.find(item => item.tagName === 'article');
+  await card.children[2].children[0].listeners.click();
+  const call = calls.find(item => item.url === `/api/v1/school/ideas/${id}/moderation`);
+  assert.equal(call.init.method, 'PATCH');
+  assert.deepEqual(JSON.parse(call.init.body), { decision: 'approve' });
 });
 
 test('student profiles do not receive the school moderation queue', async () => {

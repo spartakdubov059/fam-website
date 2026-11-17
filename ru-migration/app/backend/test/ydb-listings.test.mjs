@@ -190,6 +190,27 @@ test('school idea review listing excludes the current reviewer own submission', 
   assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images') && call.values.includes('idea-a')));
 });
 
+test('school idea text review is same-school, excludes self review and audits a bounded decision', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('FROM fam_ideas')) return [[{ user_id: 'student-id', ai_status: 'pending', image_status: 'pending' }]];
+    if (text.includes('FROM fam_idea_images')) return [[{ image_index: 0, object_key: 'pending/student-id/photo.webp' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.reviewSchoolIdeaText({ ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', decision: 'reject' }), true);
+  const updates = calls.filter(call => call.text.includes('UPDATE fam_pending_media') || call.text.includes('UPDATE fam_ideas'));
+  assert.equal(updates.length, 2);
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')));
+  const audit = calls.find(call => call.text.includes('INSERT INTO fam_school_content_audit'));
+  assert.ok(audit);
+  assert.ok(audit.values.includes('idea_text_rejected'));
+  assert.ok(!audit.values.includes('Синтетическая идея'));
+});
+
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

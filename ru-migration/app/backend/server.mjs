@@ -88,7 +88,7 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
   if ((((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings')
       || (req.method === 'POST' && url.pathname === '/api/v1/ideas')
       || (req.method === 'GET' && url.pathname === '/api/v1/school/ideas')
-      || (req.method === 'PATCH' && /^\/api\/v1\/school\/ideas\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/images$/i.test(url.pathname))
+      || (req.method === 'PATCH' && /^\/api\/v1\/school\/ideas\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:images|moderation)$/i.test(url.pathname))
       || (req.method === 'POST' && url.pathname === '/api/v1/site-errors')
       || (req.method === 'POST' && url.pathname === '/api/v1/messages')
       || ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/notification-reads')

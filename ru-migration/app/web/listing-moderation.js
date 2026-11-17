@@ -152,6 +152,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       const schoolIdeasAvailable = schoolIdeasResponse.ok && schoolIdeasResult?.ok && Array.isArray(schoolIdeasResult.ideas);
       const schoolIdeas = schoolIdeasAvailable ? schoolIdeasResult.ideas.filter(item => item && UUID.test(item.id || '')
         && typeof item.text === 'string' && item.text.length <= 1000
+        && ['pending', 'approved', 'rejected'].includes(item.ai_status)
         && Array.isArray(item.image_keys) && item.image_keys.length <= 3
         && ['none', 'pending', 'approved', 'rejected'].includes(item.image_status)) : [];
       const renderSchoolIdeasPanel = () => {
@@ -162,6 +163,14 @@ export async function initializeListingModeration({ document = globalThis.docume
         for (const idea of schoolIdeas) {
           const card = node(document, 'article', 'ru-moderation-card');
           card.append(node(document, 'p', '', idea.text));
+          card.append(node(document, 'p', 'ru-note', idea.ai_status === 'pending' ? 'Текст ожидает решения школы.'
+            : idea.ai_status === 'approved' ? 'Текст одобрен школой.' : 'Текст отклонён школой.'));
+          if (idea.ai_status === 'pending') {
+            const textActions = node(document, 'div', 'ru-moderation-actions');
+            textActions.append(actionButton(document, 'Одобрить текст', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'approve' })));
+            textActions.append(actionButton(document, 'Отклонить текст', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'reject' })));
+            card.append(textActions);
+          }
           const validKeys = idea.image_keys.every(key => typeof key === 'string'
             && /^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(key));
           if (idea.image_status === 'pending' && validKeys && idea.image_keys.length) {
@@ -336,6 +345,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         const actionNames = { role_revoked: 'Снята школьная роль', account_deleted: 'Удалён аккаунт по решению школы',
           account_deleted_by_admin: 'Удалён аккаунт администратором', listing_deleted: 'Удалено объявление',
           issued: 'Выдано временное ограничение', lifted: 'Снято временное ограничение',
+          idea_text_approved: 'Одобрен текст школьной идеи', idea_text_rejected: 'Отклонён текст школьной идеи',
           message_approved: 'Одобрена доставка сообщения', message_rejected: 'Отклонено сообщение' };
         const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
           && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);

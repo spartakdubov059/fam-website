@@ -834,6 +834,18 @@ test('idea image review queue and decisions are limited to school staff and the 
   assert.equal((await handler(list)).status, 403);
 });
 
+test('idea text moderation requires school staff and records a decision only through the scoped repository', async () => {
+  let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
+  let review;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
+    repository: { reviewSchoolIdeaText: async value => { review = value; return value.schoolId === actor.school_id; } } });
+  const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation';
+  assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, ai_status: 'approved' } });
+  assert.deepEqual(review, { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: actor.id, decision: 'approve' });
+  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
+  assert.equal((await handler(approve)).status, 403);
+});
+
 test('notification read state is always owned by the authenticated profile and bounded', async () => {
   const actor = { id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' };
   const saved = [];

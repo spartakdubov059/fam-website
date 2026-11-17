@@ -56,6 +56,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const staffVerificationMatch = pathname.match(/^\/api\/v1\/staff-verifications\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images$/i);
+    const schoolIdeaTextReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
@@ -523,6 +524,22 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try {
         const changed = await repository.reviewSchoolIdeaImages({ ideaId: schoolIdeaImageReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
         return changed ? { status: 200, body: { ok: true, image_status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && schoolIdeaTextReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolIdeaText !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const changed = await repository.reviewSchoolIdeaText({ ideaId: schoolIdeaTextReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return changed ? { status: 200, body: { ok: true, ai_status: input.decision === 'approve' ? 'approved' : 'rejected' } }
           : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }

@@ -420,6 +420,12 @@ try {
   assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
   assert.equal(ideaRows[0][0].ai_status, 'pending');
   assert.equal(ideaRows[0][0].admin_status, 'new');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-admin', { decision: 'approve' })),
+    { status: 200, body: { ok: true, ai_status: 'approved' } });
+  const reviewedIdeaRows = await sql`SELECT ai_status FROM fam_ideas WHERE id = ${idea.id};`;
+  assert.equal(reviewedIdeaRows[0][0].ai_status, 'approved', 'school review publishes only an explicitly approved pending idea');
+  assert.equal((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0][0].action,
+    'idea_text_approved', 'school text decisions are auditable without recording the idea text');
   const linkedListingId = '99999999-9999-4999-8999-999999999999';
   const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
   const messageRows = await sql`SELECT sender_id, receiver_id, school_id, listing_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
@@ -680,6 +686,18 @@ try {
     'rejected school idea image is no longer readable');
   assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedIdeaImageKey};`)[0][0].status, 'pending',
     'rejected school idea image returns to the bounded orphan cleanup queue');
+  const rejectedTextImageKey = `pending/${deletingUserId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
+  await repo.registerPendingImage(deletingUserId, rejectedTextImageKey);
+  const rejectedTextIdea = await repo.createIdea({ user_id: deletingUserId, school_id: 'synthetic-school',
+    text: 'Идея отклоняется модератором школы', image_keys: [rejectedTextImageKey], image_status: 'pending',
+    ai_status: 'pending', admin_status: 'new' });
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedTextIdea.id}/moderation`, 'synthetic-admin', { decision: 'reject' })),
+    { status: 200, body: { ok: true, ai_status: 'rejected' } });
+  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666'))
+    .some(row => row.id === rejectedTextIdea.id), false, 'rejected idea text leaves the school review queue');
+  assert.equal(await repo.getSchoolIdeaImage(rejectedTextIdea.id, 0), null, 'text rejection prevents reading its attached photo');
+  assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedTextImageKey};`)[0][0].status, 'pending',
+    'text rejection safely releases its photo to the bounded orphan cleanup queue');
   const deletingListing = await repo.createListing({ user_id: deletingUserId, school_id: 'synthetic-school',
     title: 'Собственное объявление для удаления аккаунта', description: 'Удаление проверяется только на синтетической базе', category: 'Учёба',
     price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletingImageKey, photo_status: 'pending', status: 'pending' });
