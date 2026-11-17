@@ -40,6 +40,27 @@ test('site error API remains anonymous while passing only enumerated data to the
   assert.deepEqual(Object.keys(records[0]).sort(), ['eventCode', 'occurredAt', 'pageArea']);
 });
 
+test('site error telemetry caps database writes per process and minute', async () => {
+  const records = [];
+  let clock = new Date('2026-11-15T12:34:10Z');
+  const report = createSiteErrorTelemetry({
+    repository: { recordSiteError: async row => records.push(row) },
+    now: () => clock,
+    maxPerMinute: 2,
+  });
+  const valid = { event_code: 'js_runtime', page_area: 'other' };
+  const withoutOrigin = request(valid);
+  delete withoutOrigin.headers.origin;
+  assert.equal((await report(withoutOrigin)).status, 202);
+  assert.equal((await report(request(valid))).status, 202);
+  assert.deepEqual(await report(request(valid)),
+    { status: 429, body: { ok: false, error: 'rate_limited' } });
+  assert.equal(records.length, 2);
+  clock = new Date('2026-11-15T12:35:00Z');
+  assert.equal((await report(request(valid))).status, 202);
+  assert.equal(records.length, 3);
+});
+
 test('site error telemetry rejects cross-origin, malformed, oversized and unavailable requests', async () => {
   const report = createSiteErrorTelemetry({ repository: { recordSiteError: async () => {} } });
   assert.equal((await report(request({}, { origin: 'https://evil.example' }))).status, 403);

@@ -5,7 +5,9 @@ export const SITE_ERROR_CODES = Object.freeze([
 ]);
 export const SITE_ERROR_AREAS = Object.freeze(['auth', 'listings', 'notifications', 'database', 'other']);
 
-export function createSiteErrorTelemetry({ repository, now = () => new Date() }) {
+export function createSiteErrorTelemetry({ repository, now = () => new Date(), maxPerMinute = 60 }) {
+  let windowStart = 0;
+  let acceptedInWindow = 0;
   return async function report(req) {
     if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
     const origin = req.headers?.origin;
@@ -38,8 +40,19 @@ export function createSiteErrorTelemetry({ repository, now = () => new Date() })
     if (typeof repository?.recordSiteError !== 'function') {
       return { status: 503, body: { ok: false, error: 'telemetry_unavailable' } };
     }
+    const timestamp = new Date(now()).getTime();
+    if (!Number.isFinite(timestamp)) return { status: 503, body: { ok: false, error: 'telemetry_unavailable' } };
+    const minute = Math.floor(timestamp / 60_000);
+    if (minute !== windowStart) {
+      windowStart = minute;
+      acceptedInWindow = 0;
+    }
+    if (acceptedInWindow >= maxPerMinute) {
+      return { status: 429, body: { ok: false, error: 'rate_limited' } };
+    }
+    acceptedInWindow += 1;
     try {
-      await repository.recordSiteError({ eventCode: input.event_code, pageArea: input.page_area, occurredAt: now() });
+      await repository.recordSiteError({ eventCode: input.event_code, pageArea: input.page_area, occurredAt: new Date(timestamp) });
       return { status: 202, body: { ok: true } };
     } catch {
       return { status: 503, body: { ok: false, error: 'telemetry_unavailable' } };
