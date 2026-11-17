@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { createYdbListingsRepository } from '../repositories/ydb-listings.mjs';
 import { requestSchoolProfile } from '../services/request-school-profile.mjs';
 
-test('school profile request accepts only catalog schools and bounded student fields', async () => {
+test('school profile request accepts catalog schools and enforces participant-specific fields', async () => {
   let record;
   const repository = { createSchoolProfileRequest: async value => { record = value; return { ok: true, status: 'pending', request_id: 'request-id' }; } };
   const result = await requestSchoolProfile({ identity: { issuer: 'https://login.yandex.ru', subject: '123456' },
     input: { school_id: 'lyceum_3', first_name: ' Аня ', last_name: 'Иванова', class_name: '8 а', role: 'school_admin' }, repository });
   assert.deepEqual(result, { ok: true, status: 'pending', request_id: 'request-id' });
-  assert.deepEqual(record, { issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.deepEqual(record, { issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
   assert.equal(Object.hasOwn(record, 'role'), false);
   assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'made-up', first_name: 'А', last_name: 'Б', class_name: '8А' }, repository })).code, 'invalid_profile_request');
   assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'lyceum_3', first_name: 'А', last_name: 'Б', class_name: '999А' }, repository })).code, 'invalid_profile_request');
@@ -19,6 +19,10 @@ test('school profile request accepts only catalog schools and bounded student fi
   for (const class_name of ['5А', '9К', '10Б', '11Г']) {
     assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 's' }, input: { school_id: 'lyceum_3', first_name: 'А', last_name: 'Б', class_name }, repository })).ok, true);
   }
+  assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 'parent' }, input: { school_id: 'lyceum_3', first_name: 'Анна', last_name: 'Иванова', person_type: 'parent' }, repository })).ok, true);
+  assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 'staff' }, input: { school_id: 'lyceum_3', first_name: 'Анна', last_name: 'Иванова', person_type: 'school_staff', staff_position: 'Учитель математики' }, repository })).ok, true);
+  assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 'bad-staff' }, input: { school_id: 'lyceum_3', first_name: 'Анна', last_name: 'Иванова', person_type: 'school_staff' }, repository })).code, 'invalid_profile_request');
+  assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 'bad-parent' }, input: { school_id: 'lyceum_3', first_name: 'Анна', last_name: 'Иванова', person_type: 'parent', class_name: '8А' }, repository })).code, 'invalid_profile_request');
 });
 
 test('profile request repository is idempotent and binds Yandex identity values', async () => {
@@ -31,7 +35,7 @@ test('profile request repository is idempotent and binds Yandex identity values'
   };
   const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
   const repo = createYdbListingsRepository(sql);
-  const input = { issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' };
+  const input = { issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' };
   const created = await repo.createSchoolProfileRequest(input);
   assert.equal(created.status, 'pending');
   assert.match(created.request_id, /^[0-9a-f-]{36}$/);
@@ -42,12 +46,12 @@ test('profile request repository is idempotent and binds Yandex identity values'
   assert.equal(calls.some(call => call.text.includes('UPSERT INTO fam_profile_requests') && call.values.includes('existing-request')), false);
 });
 
-test('profile approval creates only a student profile and clears request PII after school-scoped review', async () => {
+test('profile approval keeps app role student, applies participant type, and clears request PII after school-scoped review', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); calls.push({ text, values });
     if (text.includes('SELECT status FROM fam_profile_requests')) return [[{ status: 'approved' }]];
-    if (text.includes('FROM fam_profile_requests') && text.includes('request_id =')) return [[{ issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', status: 'pending' }]];
+    if (text.includes('FROM fam_profile_requests') && text.includes('request_id =')) return [[{ issuer: 'https://login.yandex.ru', subject: '123456', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'school_staff', staff_position: 'Учитель', status: 'pending' }]];
     if (text.includes('FROM fam_user_profiles')) return [[]];
     return [[]];
   };
@@ -56,6 +60,7 @@ test('profile approval creates only a student profile and clears request PII aft
   assert.equal(await repo.reviewSchoolProfileRequest(id, 'lyceum_3', 'admin-id', 'approve'), true);
   const insert = calls.find(call => call.text.includes('INSERT INTO fam_user_profiles'));
   assert.match(insert.text, /'student'/);
+  assert.match(insert.text, /staff_verification_status/);
   assert.doesNotMatch(insert.text, /school_admin/);
   const reviewUpdate = calls.find(call => call.text.includes('UPDATE fam_profile_requests'));
   assert.ok(reviewUpdate.text.includes("first_name = ''") && reviewUpdate.text.includes('status = ?'));

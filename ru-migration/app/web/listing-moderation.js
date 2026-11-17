@@ -32,10 +32,12 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/staff-verifications', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-requests/review', options)
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
@@ -55,7 +57,7 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
         fetchImpl('/api/v1/school/ideas', options).catch(() => ({ ok: false, json: async () => null })),
       ]);
-      const [result, eventResult, profileResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse)]);
+      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -66,7 +68,13 @@ export async function initializeListingModeration({ document = globalThis.docume
         && application.status === 'pending' && typeof application.event_title === 'string');
       const profileRequests = profileResult.requests.filter(request => request && UUID.test(request.request_id)
         && typeof request.first_name === 'string' && typeof request.last_name === 'string'
-        && typeof request.class_name === 'string');
+        && typeof request.class_name === 'string' && ['student', 'school_staff', 'parent'].includes(request.person_type));
+      const staffVerificationsAvailable = me.profile.role !== 'school_admin'
+        || (staffVerificationResponse.ok && staffVerificationResult?.ok && Array.isArray(staffVerificationResult.requests));
+      const staffVerifications = me.profile.role === 'school_admin' && staffVerificationsAvailable
+        ? staffVerificationResult.requests.filter(request => request && UUID.test(request.user_id)
+          && typeof request.first_name === 'string' && typeof request.last_name === 'string'
+          && typeof request.staff_position === 'string' && request.staff_position.length <= 100) : [];
       const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
         && ['council_member', 'school_admin'].includes(request.requested_role)
         && ['pending', 'reviewing'].includes(request.status));
@@ -327,7 +335,10 @@ export async function initializeListingModeration({ document = globalThis.docume
         const card = node(document, 'article', 'ru-moderation-card');
         card.append(node(document, 'h3', '', application.event_title));
         const name = [application.first_name, application.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
-        card.append(node(document, 'p', '', `Заявка: ${name || 'Ученик'}${application.class_name ? ` · ${application.class_name}` : ''}`));
+        const personType = application.person_type === 'school_staff' ? 'сотрудник школы'
+          : application.person_type === 'parent' ? 'родитель' : 'ученик';
+        const details = [personType, application.class_name, application.staff_position].filter(value => typeof value === 'string' && value.trim()).join(' · ');
+        card.append(node(document, 'p', '', `Заявка: ${name || personType} · ${details}`));
         const actions = node(document, 'div', 'ru-moderation-actions');
         const path = `/api/v1/listings/${application.event_id}/registrations/${application.user_id}`;
         actions.append(actionButton(document, 'Подтвердить заявку', () => decide(path, 'approve')));
@@ -338,12 +349,29 @@ export async function initializeListingModeration({ document = globalThis.docume
       for (const request of profileRequests) {
         const card = node(document, 'article', 'ru-moderation-card');
         card.append(node(document, 'h3', '', `${request.first_name} ${request.last_name}`));
-        card.append(node(document, 'p', '', `Заявка на ученический профиль · ${request.class_name}`));
+        const typeName = request.person_type === 'school_staff' ? 'сотрудник школы'
+          : request.person_type === 'parent' ? 'родитель' : 'ученик';
+        card.append(node(document, 'p', '', `Заявка: ${typeName}${request.class_name ? ` · класс ${request.class_name}` : ''}${request.staff_position ? ` · ${request.staff_position}` : ''}`));
         const actions = node(document, 'div', 'ru-moderation-actions');
         const path = `/api/v1/profile-requests/${request.request_id}`;
-        actions.append(actionButton(document, 'Одобрить ученика', () => decide(path, 'approve')));
+        actions.append(actionButton(document, 'Одобрить профиль', () => decide(path, 'approve')));
         actions.append(actionButton(document, 'Отклонить заявку', () => decide(path, 'reject')));
         card.append(actions); queue.append(card);
+      }
+      if (me.profile.role === 'school_admin') {
+        const panel = node(document, 'section', 'ru-moderation-card');
+        panel.append(node(document, 'h3', '', 'Проверка сотрудников школы'));
+        if (!staffVerificationsAvailable) panel.append(node(document, 'p', '', 'Не удалось загрузить заявки сотрудников.'));
+        else if (!staffVerifications.length) panel.append(node(document, 'p', '', 'Новых заявок на подтверждение должности нет.'));
+        for (const request of staffVerifications) {
+          const row = node(document, 'article', 'ru-moderation-card');
+          row.append(node(document, 'p', '', `${request.first_name} ${request.last_name} · ${request.staff_position}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          actions.append(actionButton(document, 'Подтвердить должность', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'approved' })));
+          actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'rejected' })));
+          row.append(actions); panel.append(row);
+        }
+        queue.append(panel);
       }
       for (const request of roleRequests) {
         const card = node(document, 'article', 'ru-moderation-card');

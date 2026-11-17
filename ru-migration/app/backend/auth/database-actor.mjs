@@ -2,7 +2,8 @@ export function createDatabaseActorResolver(sql) {
   if (typeof sql !== 'function') throw new TypeError('database query client is required');
   return async function resolveActor(identity) {
     if (!identity?.issuer || !identity?.subject) return null;
-    const sets = await sql`SELECT user_id, school_id, role, active, first_name, last_name, class_name, city, avatar_url
+    const sets = await sql`SELECT user_id, school_id, role, active, first_name, last_name, class_name, city, avatar_url,
+        person_type, staff_position, staff_verification_status
       FROM fam_user_profiles WHERE issuer = ${identity.issuer} AND subject = ${identity.subject} LIMIT 1;`;
     const profile = sets?.[0]?.[0];
     if (!profile || profile.active !== true || !profile.user_id || !profile.school_id) return null;
@@ -11,6 +12,8 @@ export function createDatabaseActorResolver(sql) {
       first_name: profile.first_name ?? null, last_name: profile.last_name ?? null,
       class_name: profile.class_name ?? null, city: profile.city ?? null,
       avatar_url: profile.avatar_url ?? null,
+      person_type: profile.person_type ?? 'student', staff_position: profile.staff_position ?? null,
+      staff_verification_status: profile.staff_verification_status ?? 'not_required',
     });
   };
 }

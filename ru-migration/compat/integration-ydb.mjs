@@ -37,6 +37,7 @@ try {
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
+          : req.headers.authorization === 'Bearer synthetic-new-staff' ? 'subject-new-staff'
           : req.headers.authorization === 'Bearer synthetic-other-school' ? 'subject-3'
           : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin'
             : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1',
@@ -284,6 +285,24 @@ try {
   const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
   assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
+  const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
+  }));
+  assert.equal(staffProfileSubmission.status, 202);
+  const staffRequest = (await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-lyceum-admin')))
+    .body.requests.find(row => row.first_name === 'Тест' && row.last_name === 'Сотрудник');
+  assert.equal(staffRequest.person_type, 'school_staff');
+  assert.equal(staffRequest.staff_position, 'Учитель');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${staffRequest.request_id}`, 'synthetic-lyceum-admin', { decision: 'approve' }))).status, 200);
+  const pendingStaff = await listingsApi(apiRequest('GET', '/api/v1/staff-verifications', 'synthetic-lyceum-admin'));
+  assert.equal(pendingStaff.status, 200);
+  const staffToVerify = pendingStaff.body.requests.find(row => row.first_name === 'Тест' && row.last_name === 'Сотрудник');
+  assert.ok(staffToVerify);
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/staff-verifications/${staffToVerify.user_id}`, 'synthetic-lyceum-admin', { decision: 'approved' }))).status, 200);
+  const verifiedStaff = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new-staff' });
+  assert.equal(verifiedStaff.person_type, 'school_staff');
+  assert.equal(verifiedStaff.staff_position, 'Учитель');
+  assert.equal(verifiedStaff.staff_verification_status, 'approved');
   const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
     title: 'Обмен учебниками', description: 'Синтетическое объявление для интеграционной проверки', category: 'Учёба',
   }));

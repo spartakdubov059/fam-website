@@ -209,7 +209,7 @@ test('profile settings update only the visible identity fields through the authe
   assert.match(section.children[1].textContent, /сохранены/);
 });
 
-test('authenticated unprovisioned Yandex users can request a school profile without receiving a role', async () => {
+test('authenticated unprovisioned Yandex users can request a staff profile without receiving an app role', async () => {
   const f = fixture(null);
   const calls = [];
   await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
@@ -223,10 +223,16 @@ test('authenticated unprovisioned Yandex users can request a school profile with
   assert.equal(f.login.hidden, true);
   assert.equal(f.logout.hidden, false);
   const form = f.shellChildren[0].children[2];
-  form.elements = { school_id: { value: 'lyceum_3' }, first_name: { value: 'Аня' }, last_name: { value: 'Иванова' }, class_name: { value: '8А' } };
+  const personType = form.children.find(item => item.children?.[0]?.name === 'person_type').children[0];
+  personType.value = 'school_staff'; personType.listeners.change();
+  const classLabel = form.children.find(item => item.textContent === 'Класс, например 8А');
+  const staffLabel = form.children.find(item => item.textContent === 'Должность в школе');
+  assert.equal(classLabel.hidden, true); assert.equal(staffLabel.hidden, false);
+  form.elements = { school_id: { value: 'lyceum_3' }, first_name: { value: 'Аня' }, last_name: { value: 'Иванова' },
+    person_type: { value: 'school_staff' }, class_name: { value: '' }, staff_position: { value: 'Учитель математики' } };
   await form.listeners.submit({ preventDefault() {} });
   const request = calls.find(call => call.url === '/api/v1/profile-requests' && call.init.method === 'POST');
-  assert.deepEqual(JSON.parse(request.init.body), { school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.deepEqual(JSON.parse(request.init.body), { school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', person_type: 'school_staff', class_name: '', staff_position: 'Учитель математики' });
   assert.equal(request.init.credentials, 'same-origin');
   assert.match(f.status.textContent, /после одобрения/);
 });

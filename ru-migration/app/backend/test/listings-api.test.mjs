@@ -381,7 +381,7 @@ test('event review queue is school-scoped, staff-only, and does not query for st
   assert.equal(reads, 0);
 });
 
-test('unprovisioned Yandex identities can request student access but cannot choose a role', async () => {
+test('unprovisioned Yandex identities can request a participant profile but cannot choose an app role', async () => {
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
     resolveActor: async () => null,
@@ -390,7 +390,7 @@ test('unprovisioned Yandex identities can request student access but cannot choo
   request.url = '/api/v1/profile-requests';
   const response = await handler(request);
   assert.equal(response.status, 202);
-  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
   assert.equal(Object.hasOwn(saved, 'role'), false);
 
   let writes = 0;
@@ -426,6 +426,30 @@ test('only same-school administrators can read or decide profile access requests
   assert.equal(reads, 0);
 });
 
+test('only an active school administrator can list and decide staff verification requests', async () => {
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let decision;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
+    resolveActor: async () => ({ id: 'admin-a', school_id: 'school-a', role: 'school_admin' }),
+    repository: {
+      listPendingSchoolStaffVerifications: async schoolId => { assert.equal(schoolId, 'school-a'); return [{ user_id: userId, staff_position: 'Учитель' }]; },
+      reviewSchoolStaffVerification: async input => { decision = input; return true; },
+    } });
+  const list = req({}, 'GET'); list.url = '/api/v1/staff-verifications';
+  assert.equal((await handler(list)).body.requests[0].user_id, userId);
+  const patch = req({ decision: 'approved' }, 'PATCH'); patch.url = `/api/v1/staff-verifications/${userId}`;
+  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true, status: 'approved' } });
+  assert.deepEqual(decision, { userId, schoolId: 'school-a', reviewerId: 'admin-a', decision: 'approved' });
+
+  let reads = 0;
+  const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
+    resolveActor: async () => ({ id: 'student-a', school_id: 'school-a', role: 'student' }),
+    repository: { listPendingSchoolStaffVerifications: async () => { reads++; return []; }, reviewSchoolStaffVerification: async () => { reads++; return true; } } });
+  assert.equal((await student(list)).status, 403);
+  assert.equal((await student(patch)).status, 403);
+  assert.equal(reads, 0);
+});
+
 test('school catalog is a minimal public projection and needs no auth', async () => {
   const handler = createListingsApi({ authenticate: async () => { throw new Error('school catalog is public'); },
     schools: [{ id: 'lyceum_3', name: 'Лицей № 3', secret: 'hidden' }] });
@@ -454,8 +478,19 @@ test('profile identity update binds to the authenticated subject and ignores rol
   request.url = '/api/v1/me';
   const response = await handler(request);
   assert.equal(response.status, 200);
-  assert.deepEqual(saved, { issuer: 'https://issuer.example', subject: 'own-subject', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  assert.deepEqual(saved, { issuer: 'https://issuer.example', subject: 'own-subject', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
   assert.equal(response.body.profile.role, 'student');
+});
+
+test('legacy profile edit preserves a nonstudent category and staff position', async () => {
+  let saved;
+  const identity = { issuer: 'https://issuer.example', subject: 'own-subject' };
+  const handler = createListingsApi({ authenticate: async () => identity,
+    resolveActor: async () => ({ id: 'own-id', school_id: 'school-a', role: 'student', person_type: 'school_staff', staff_position: 'Учитель', class_name: null }),
+    repository: { updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
+  const request = req({ first_name: 'Анна', last_name: 'Иванова' }, 'PATCH'); request.url = '/api/v1/me';
+  assert.equal((await handler(request)).status, 200);
+  assert.deepEqual(saved, { first_name: 'Анна', last_name: 'Иванова', class_name: '', person_type: 'school_staff', staff_position: 'Учитель' });
 });
 
 test('profile identity update rejects invalid values before touching the repository', async () => {
@@ -480,6 +515,12 @@ test('profile identity update enforces the current FAM school class format', asy
     assert.equal((await handler(request)).status, 200, class_name);
     assert.equal(saved.class_name, class_name);
   }
+  const parent = req({ first_name: 'Анна', last_name: 'Иванова', person_type: 'parent', class_name: '' }, 'PATCH'); parent.url = '/api/v1/me';
+  assert.equal((await handler(parent)).status, 200);
+  assert.equal(saved.person_type, 'parent');
+  const staff = req({ first_name: 'Анна', last_name: 'Иванова', person_type: 'school_staff', staff_position: 'Учитель математики', class_name: '' }, 'PATCH'); staff.url = '/api/v1/me';
+  assert.equal((await handler(staff)).status, 200);
+  assert.equal(saved.staff_position, 'Учитель математики');
 });
 
 test('favorites are scoped to the authenticated database actor', async () => {
@@ -757,7 +798,6 @@ test('event occupancy is a public count with no registration identity details', 
 });
 
 test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
-  const ideaSchoolId = 'school-a';
   let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
   let listedSchool; let listedReviewer; let reviewed;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,

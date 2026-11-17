@@ -261,17 +261,18 @@ test('profile identity update changes only first name, last name, and class for 
   const calls = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); calls.push({ text, values });
-    if (text.includes('SELECT user_id, active FROM fam_user_profiles')) return [[{ user_id: 'synthetic-user', active: true }]];
+    if (text.includes('SELECT user_id, active, person_type, staff_position')) return [[{ user_id: 'synthetic-user', active: true, person_type: 'student', staff_position: '', staff_verification_status: 'not_required' }]];
     if (text.includes('SELECT user_id AS id, school_id')) return [[{ id: 'synthetic-user', school_id: 'school-a', role: 'student', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }]];
     return [[]];
   };
   const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
   const repo = createYdbListingsRepository(sql);
-  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', { first_name: 'Аня', last_name: 'Иванова', class_name: '8А' });
+  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', { first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
   assert.equal(result.first_name, 'Аня');
   const update = calls.find(call => call.text.includes('UPDATE fam_user_profiles'));
   assert.ok(update.values.includes('Аня')); assert.ok(update.values.includes('Иванова')); assert.ok(update.values.includes('8А'));
   assert.ok(update.values.includes('https://issuer.test')); assert.ok(update.values.includes('student-sub'));
+  assert.ok(update.values.includes('student'));
   assert.match(update.text, /user_id = \? AND active = true/);
   await assert.rejects(repo.updateOwnProfileIdentity('issuer', 'subject', { first_name: 'x', last_name: 'y' }), TypeError);
 });

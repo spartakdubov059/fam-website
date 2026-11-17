@@ -1,0 +1,7 @@
+-- Additive migration for descriptive participant categories. App roles remain
+-- separately controlled by school-admin workflows and are never user-selected.
+ALTER TABLE fam_user_profiles ADD COLUMN person_type Utf8 NOT NULL DEFAULT "student";
+ALTER TABLE fam_user_profiles ADD COLUMN staff_position Utf8;
+ALTER TABLE fam_user_profiles ADD COLUMN staff_verification_status Utf8 NOT NULL DEFAULT "not_required";
+ALTER TABLE fam_profile_requests ADD COLUMN person_type Utf8 NOT NULL DEFAULT "student";
+ALTER TABLE fam_profile_requests ADD COLUMN staff_position Utf8;

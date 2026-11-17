@@ -257,14 +257,14 @@ test('staff can confirm or reject a pending event application using safe text re
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>Событие</b>', user_id: userId, status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>Событие</b>', user_id: userId, status: 'pending', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student' }] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     return { ok: true, json: async () => ({ ok: true }) };
   } });
   const card = f.queue.children[0];
   assert.equal(card.children[0].textContent, '<b>Событие</b>');
-  assert.equal(card.children[1].textContent, 'Заявка: Аня Иванова · 8А');
+  assert.equal(card.children[1].textContent, 'Заявка: Аня Иванова · ученик · 8А');
   const actions = card.children[2].children;
   assert.deepEqual(actions.map(button => button.textContent), ['Подтвердить заявку', 'Отклонить заявку']);
   await actions[1].listeners.click();
@@ -283,7 +283,7 @@ test('only school admins see profile access requests and approve them as student
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, first_name: '<Аня>', last_name: 'Иванова', class_name: '8А' }] : [] }) };
+    if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: pending ? [{ request_id: requestId, first_name: '<Аня>', last_name: 'Иванова', class_name: '8А', person_type: 'student' }] : [] }) };
     if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
     if (url === `/api/v1/profile-requests/${requestId}`) { pending = false; return { ok: true, json: async () => ({ ok: true, status: 'approved' }) }; }
     return { ok: true, json: async () => ({ ok: true }) };
@@ -291,7 +291,7 @@ test('only school admins see profile access requests and approve them as student
   const card = f.queue.children[0];
   assert.equal(card.children[0].textContent, '<Аня> Иванова');
   const actions = card.children.at(-1).children;
-  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить ученика', 'Отклонить заявку']);
+  assert.deepEqual(actions.map(button => button.textContent), ['Одобрить профиль', 'Отклонить заявку']);
   await actions[0].listeners.click();
   const patch = calls.find(call => call.url === `/api/v1/profile-requests/${requestId}`);
   assert.equal(patch.init.method, 'PATCH');

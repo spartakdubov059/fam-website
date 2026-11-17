@@ -8,16 +8,27 @@ export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
     async updateOwnProfileIdentity(issuer, subject, fields) {
-      if (!issuer || !subject || !fields || typeof fields.first_name !== 'string' || typeof fields.last_name !== 'string' || typeof fields.class_name !== 'string') {
+      if (!issuer || !subject || !fields || typeof fields.first_name !== 'string' || typeof fields.last_name !== 'string'
+          || typeof fields.class_name !== 'string' || !['student', 'school_staff', 'parent'].includes(fields.person_type)
+          || typeof fields.staff_position !== 'string') {
         throw new TypeError('invalid profile identity update');
       }
       return sql.begin(async tx => {
-        const rows = await tx`SELECT user_id, active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const rows = await tx`SELECT user_id, active, person_type, staff_position, staff_verification_status
+          FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
         const current = rows?.[0]?.[0];
         if (!current?.active || !current.user_id) return null;
-        await tx`UPDATE fam_user_profiles SET first_name = ${fields.first_name}, last_name = ${fields.last_name}, class_name = ${fields.class_name}
+        const staffPosition = fields.person_type === 'school_staff' ? fields.staff_position : '';
+        const verificationStatus = fields.person_type !== 'school_staff' ? 'not_required'
+          : current.person_type !== 'school_staff' || current.staff_position !== staffPosition ? 'pending'
+            : current.staff_verification_status;
+        const className = fields.person_type === 'student' ? fields.class_name : '';
+        await tx`UPDATE fam_user_profiles SET first_name = ${fields.first_name}, last_name = ${fields.last_name},
+            class_name = ${className}, person_type = ${fields.person_type}, staff_position = ${staffPosition},
+            staff_verification_status = ${verificationStatus}
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${current.user_id} AND active = true;`;
-        const updated = await tx`SELECT user_id AS id, school_id, role, first_name, last_name, class_name, city, avatar_url
+        const updated = await tx`SELECT user_id AS id, school_id, role, first_name, last_name, class_name, city, avatar_url,
+            person_type, staff_position, staff_verification_status
           FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
         return updated?.[0]?.[0] ?? null;
       });
@@ -644,7 +655,12 @@ export function createYdbListingsRepository(sql) {
     },
 
     async createSchoolProfileRequest(record) {
-      if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name || !record?.class_name) {
+      const personType = record?.person_type ?? 'student';
+      const staffPosition = record?.staff_position ?? '';
+      if (!record?.issuer || !record?.subject || !record?.school_id || !record?.first_name || !record?.last_name
+          || !['student', 'school_staff', 'parent'].includes(personType)
+          || (personType === 'student' && !record.class_name)
+          || (personType === 'school_staff' && !staffPosition)) {
         throw new TypeError('invalid school profile request');
       }
       const requestId = randomUUID();
@@ -657,8 +673,8 @@ export function createYdbListingsRepository(sql) {
         const current = existingRequest?.[0]?.[0];
         if (current?.status === 'pending') return { ok: true, status: 'pending', request_id: current.request_id };
         await tx`UPSERT INTO fam_profile_requests
-          (issuer, subject, request_id, school_id, first_name, last_name, class_name, status, reviewed_by, created_at)
-          VALUES (${record.issuer}, ${record.subject}, ${requestId}, ${record.school_id}, ${record.first_name}, ${record.last_name}, ${record.class_name}, 'pending', '', CurrentUtcTimestamp());`;
+          (issuer, subject, request_id, school_id, first_name, last_name, class_name, person_type, staff_position, status, reviewed_by, created_at)
+          VALUES (${record.issuer}, ${record.subject}, ${requestId}, ${record.school_id}, ${record.first_name}, ${record.last_name}, ${record.class_name ?? ''}, ${personType}, ${staffPosition}, 'pending', '', CurrentUtcTimestamp());`;
         return { ok: true, status: 'pending', request_id: requestId };
       });
     },
@@ -675,17 +691,49 @@ export function createYdbListingsRepository(sql) {
     async listPendingSchoolProfileRequests(schoolId) {
       if (!schoolId) throw new TypeError('invalid profile request school');
       const statement = sql`SELECT request_id AS request_id, school_id AS school_id,
-          first_name AS first_name, last_name AS last_name, class_name AS class_name, created_at AS created_at
+          first_name AS first_name, last_name AS last_name, class_name AS class_name,
+          person_type AS person_type, staff_position AS staff_position, created_at AS created_at
         FROM fam_profile_requests WHERE school_id = ${schoolId} AND status = 'pending'
         ORDER BY created_at ASC LIMIT 100;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
 
+    async listPendingSchoolStaffVerifications(schoolId) {
+      if (!schoolId) throw new TypeError('invalid staff verification school');
+      const statement = sql`SELECT user_id AS user_id, first_name AS first_name, last_name AS last_name,
+          staff_position AS staff_position, created_at AS created_at
+        FROM fam_user_profiles WHERE school_id = ${schoolId} AND person_type = 'school_staff'
+          AND staff_verification_status = 'pending' AND active = true
+        ORDER BY first_name ASC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async reviewSchoolStaffVerification({ userId, schoolId, reviewerId, decision }) {
+      if (!userId || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid staff verification decision');
+      return sql.begin(async tx => {
+        const admins = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const admin = admins?.[0]?.[0];
+        if (!admin || !admin.active || admin.role !== 'school_admin' || admin.school_id !== schoolId) return false;
+        const targets = await tx`SELECT school_id, person_type, staff_verification_status FROM fam_user_profiles
+          WHERE user_id = ${userId} AND active = true LIMIT 1;`;
+        const target = targets?.[0]?.[0];
+        if (!target || target.school_id !== schoolId || target.person_type !== 'school_staff'
+            || target.staff_verification_status !== 'pending') return false;
+        await tx`UPDATE fam_user_profiles SET staff_verification_status = ${decision}
+          WHERE user_id = ${userId} AND school_id = ${schoolId} AND person_type = 'school_staff'
+            AND staff_verification_status = 'pending' AND active = true;`;
+        await tx`INSERT INTO fam_school_admin_audit (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${userId}, ${decision === 'approved' ? 'staff_verification_approved' : 'staff_verification_rejected'}, 'pending', CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
     async reviewSchoolProfileRequest(requestId, schoolId, reviewerId, decision) {
       if (!requestId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid profile request decision');
       return sql.begin(async tx => {
-        const requests = await tx`SELECT issuer, subject, school_id, first_name, last_name, class_name, status
+        const requests = await tx`SELECT issuer, subject, school_id, first_name, last_name, class_name, person_type, staff_position, status
           FROM fam_profile_requests WHERE request_id = ${requestId} LIMIT 1;`;
         const request = requests?.[0]?.[0];
         if (!request || request.school_id !== schoolId || request.status !== 'pending') return false;
@@ -694,13 +742,15 @@ export function createYdbListingsRepository(sql) {
             WHERE issuer = ${request.issuer} AND subject = ${request.subject} LIMIT 1;`;
           if (profile?.[0]?.length) return false;
           await tx`INSERT INTO fam_user_profiles
-            (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)
+            (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name,
+             person_type, staff_position, staff_verification_status)
             VALUES (${request.issuer}, ${request.subject}, ${randomUUID()}, ${schoolId}, 'student', true,
-              ${request.first_name}, ${request.last_name}, ${request.class_name});`;
+              ${request.first_name}, ${request.last_name}, ${request.class_name}, ${request.person_type},
+              ${request.staff_position}, ${request.person_type === 'school_staff' ? 'pending' : 'not_required'});`;
         }
         const status = decision === 'approve' ? 'approved' : 'rejected';
         await tx`UPDATE fam_profile_requests SET status = ${status}, reviewed_by = ${reviewerId}, first_name = '',
-            last_name = '', class_name = '' WHERE issuer = ${request.issuer} AND subject = ${request.subject}
+            last_name = '', class_name = '', staff_position = '' WHERE issuer = ${request.issuer} AND subject = ${request.subject}
             AND request_id = ${requestId} AND school_id = ${schoolId} AND status = 'pending';`;
         const confirmed = await tx`SELECT status FROM fam_profile_requests WHERE issuer = ${request.issuer}
           AND subject = ${request.subject} AND request_id = ${requestId} LIMIT 1;`;
@@ -1340,7 +1390,8 @@ export function createYdbListingsRepository(sql) {
       if (!eventId || !schoolId) throw new TypeError('invalid event applicant scope');
       const statement = sql`SELECT r.user_id AS user_id, r.status AS status,
           r.created_at AS created_at, p.first_name AS first_name,
-          p.last_name AS last_name, p.class_name AS class_name
+          p.last_name AS last_name, p.class_name AS class_name,
+          p.person_type AS person_type, p.staff_position AS staff_position
         FROM fam_event_registrations AS r
         INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
         INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
@@ -1355,7 +1406,8 @@ export function createYdbListingsRepository(sql) {
       if (!schoolId) throw new TypeError('invalid event review school');
       const statement = sql`SELECT r.event_id AS event_id, l.title AS event_title,
           r.user_id AS user_id, r.status AS status, r.created_at AS created_at,
-          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name
+          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name,
+          p.person_type AS person_type, p.staff_position AS staff_position
         FROM fam_event_registrations AS r
         INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
         INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id

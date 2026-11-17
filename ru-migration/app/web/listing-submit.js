@@ -364,15 +364,31 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
   for (const item of schools) { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; school.append(option); }
   schoolLabel.append(school);
   const fields = [];
-  for (const [name, labelText, maxLength, pattern] of [['first_name', 'Имя', 80, null], ['last_name', 'Фамилия', 80, null], ['class_name', 'Класс, например 8А', 4, '(?:[5-9]|1[01])[АБВГКабвгк]']]) {
+  for (const [name, labelText, maxLength] of [['first_name', 'Имя', 60], ['last_name', 'Фамилия', 60]]) {
     const label = document.createElement('label'); label.textContent = labelText;
     const input = document.createElement('input'); input.name = name; input.maxLength = maxLength; input.required = true;
-    if (pattern) { input.pattern = pattern; input.autocomplete = 'off'; }
     label.append(input); fields.push(label);
   }
+  const personTypeLabel = document.createElement('label'); personTypeLabel.textContent = 'Кто вы';
+  const personType = document.createElement('select'); personType.name = 'person_type'; personType.required = true;
+  for (const [value, title] of [['student', 'Ученик'], ['school_staff', 'Сотрудник школы'], ['parent', 'Родитель']]) {
+    const option = document.createElement('option'); option.value = value; option.textContent = title; personType.append(option);
+  }
+  personTypeLabel.append(personType);
+  const classLabel = document.createElement('label'); classLabel.textContent = 'Класс, например 8А';
+  const className = document.createElement('input'); className.name = 'class_name'; className.maxLength = 8;
+  className.pattern = '(?:[5-9]|1[01])[АБВГКабвгк]'; className.autocomplete = 'off'; classLabel.append(className);
+  const staffLabel = document.createElement('label'); staffLabel.textContent = 'Должность в школе';
+  const staffPosition = document.createElement('input'); staffPosition.name = 'staff_position'; staffPosition.maxLength = 100;
+  staffPosition.autocomplete = 'organization-title'; staffLabel.append(staffPosition);
+  const updateParticipantFields = () => {
+    classLabel.hidden = personType.value !== 'student'; className.required = personType.value === 'student';
+    staffLabel.hidden = personType.value !== 'school_staff'; staffPosition.required = personType.value === 'school_staff';
+  };
+  personType.addEventListener('change', updateParticipantFields); updateParticipantFields();
   const result = document.createElement('p'); result.className = 'ru-note'; result.setAttribute('role', 'status'); result.setAttribute('aria-live', 'polite');
   const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit'; submit.textContent = 'Отправить заявку';
-  form.append(schoolLabel, ...fields, result, submit);
+  form.append(schoolLabel, ...fields, personTypeLabel, classLabel, staffLabel, result, submit);
   section.append(heading, note, form); shell.append(section);
   form.addEventListener('submit', async event => {
     event.preventDefault(); submit.disabled = true; result.textContent = 'Отправляем заявку…';
@@ -381,7 +397,9 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ school_id: form.elements.school_id.value, first_name: form.elements.first_name.value,
-          last_name: form.elements.last_name.value, class_name: form.elements.class_name.value }),
+          last_name: form.elements.last_name.value, person_type: form.elements.person_type.value,
+          class_name: form.elements.person_type.value === 'student' ? form.elements.class_name.value : '',
+          staff_position: form.elements.person_type.value === 'school_staff' ? form.elements.staff_position.value : '' }),
       });
       const reply = await readJson(response);
       if (!response.ok || !reply?.ok) throw new Error(reply?.error || 'request_failed');

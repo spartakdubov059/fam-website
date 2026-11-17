@@ -22,6 +22,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
     const avatarReviewMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const staffVerificationMatch = pathname.match(/^\/api\/v1\/staff-verifications\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
@@ -416,6 +417,31 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolProfileRequests(actor.school_id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/staff-verifications') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listPendingSchoolStaffVerifications !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolStaffVerifications(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && staffVerificationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approved', 'rejected'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolStaffVerification !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
+      try {
+        const changed = await repository.reviewSchoolStaffVerification({ userId: staffVerificationMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return changed ? { status: 200, body: { ok: true, status: input.decision } }
+          : { status: 404, body: { ok: false, error: 'staff_verification_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (req.method === 'PATCH' && profileRequestMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
@@ -743,14 +769,26 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
       const first_name = typeof input?.first_name === 'string' ? input.first_name.trim() : '';
       const last_name = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
-      const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '') : '';
+      let currentProfile;
+      if (input?.person_type == null || input?.staff_position == null || input?.class_name == null) {
+        try { currentProfile = await resolveActor(identity); } catch { currentProfile = null; }
+      }
+      const person_type = input?.person_type ?? currentProfile?.person_type ?? 'student';
+      const staff_position = typeof input?.staff_position === 'string' ? input.staff_position.trim() : (currentProfile?.staff_position ?? '');
+      const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '')
+        : (currentProfile?.class_name ?? '');
       const validName = value => value.length >= 1 && value.length <= 60 && !/[<>\u0000-\u001f]/u.test(value);
-      if (!validName(first_name) || !validName(last_name) || !isSchoolClassName(class_name)) {
+      if (!validName(first_name) || !validName(last_name) || !['student', 'school_staff', 'parent'].includes(person_type)
+          || (person_type === 'student' && !isSchoolClassName(class_name))
+          || (person_type !== 'student' && class_name !== '')
+          || (person_type === 'school_staff' && (staff_position.length < 1 || staff_position.length > 100 || /[<>\u0000-\u001f]/u.test(staff_position)))
+          || (person_type !== 'school_staff' && staff_position !== '')) {
         return { status: 400, body: { ok: false, error: 'invalid_profile_identity' } };
       }
       if (typeof repository?.updateOwnProfileIdentity !== 'function') return { status: 503, body: { ok: false, error: 'profile_update_unavailable' } };
       try {
-        const profile = await repository.updateOwnProfileIdentity(identity.issuer, identity.subject, { first_name, last_name, class_name });
+        const profile = await repository.updateOwnProfileIdentity(identity.issuer, identity.subject,
+          { first_name, last_name, class_name, person_type, staff_position });
         return profile ? { status: 200, body: { ok: true, profile } } : { status: 403, body: { ok: false, error: 'profile_unavailable' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
