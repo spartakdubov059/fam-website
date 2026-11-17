@@ -303,6 +303,20 @@ try {
   assert.equal(verifiedStaff.person_type, 'school_staff');
   assert.equal(verifiedStaff.staff_position, 'Учитель');
   assert.equal(verifiedStaff.staff_verification_status, 'approved');
+  const legacyStaffEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
+    first_name: 'Тест', last_name: 'Сотрудник после правки',
+  }));
+  assert.equal(legacyStaffEdit.status, 200);
+  assert.equal(legacyStaffEdit.body.profile.person_type, 'school_staff');
+  assert.equal(legacyStaffEdit.body.profile.staff_position, 'Учитель');
+  assert.equal(legacyStaffEdit.body.profile.staff_verification_status, 'approved',
+    'an older profile form that omits category fields preserves verified staff status');
+  const changedStaffPosition = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
+    first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Директор', class_name: '',
+  }));
+  assert.equal(changedStaffPosition.status, 200);
+  assert.equal(changedStaffPosition.body.profile.staff_verification_status, 'pending',
+    'changing a verified staff position requires school administrator review again');
   const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
     title: 'Обмен учебниками', description: 'Синтетическое объявление для интеграционной проверки', category: 'Учёба',
   }));
