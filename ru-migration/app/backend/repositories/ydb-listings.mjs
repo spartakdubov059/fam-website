@@ -930,7 +930,7 @@ export function createYdbListingsRepository(sql) {
               AND user_id = ${review.user_id} AND school_id = ${schoolId} AND active = true;`;
         } else {
           // Return rejected media to the existing bounded orphan-cleanup queue.
-          await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = NULL
+          await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
             WHERE object_key = ${review.image_key} AND user_id = ${review.user_id} AND status = 'linked';`;
         }
         await tx`UPDATE fam_avatar_reviews SET status = ${decision}, reviewed_by = ${reviewerId},
@@ -963,7 +963,7 @@ export function createYdbListingsRepository(sql) {
           await tx`INSERT INTO fam_idea_images
             (idea_id, image_index, object_key, user_id, school_id, created_at)
             VALUES (${id}, Unwrap(CAST(${imageIndex} AS Uint32)), ${key}, ${record.user_id}, ${record.school_id}, CurrentUtcTimestamp());`;
-          await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '', claim_until = NULL
+          await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '', claim_until = CurrentUtcTimestamp()
             WHERE object_key = ${key} AND user_id = ${record.user_id} AND status = 'pending';`;
         }
         return { id };
@@ -1015,7 +1015,7 @@ export function createYdbListingsRepository(sql) {
           await tx`UPDATE fam_ideas SET image_status = 'approved' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
         } else {
           for (const image of images) {
-            await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = NULL
+            await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
               WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
             await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId}
               AND image_index = ${image.image_index};`;

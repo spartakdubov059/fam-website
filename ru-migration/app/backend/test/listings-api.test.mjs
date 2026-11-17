@@ -770,7 +770,9 @@ test('idea image review queue and decisions are limited to school staff and the 
   assert.equal(reviewed.ideaId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   assert.equal(reviewed.reviewerId, actor.id);
   actor = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-b', role: 'council_member' };
-  assert.equal((await handler(approve)).status, 404, 'the repository rejects cross-school reviews');
+  const crossSchoolApprove = req({ decision: 'approve' }, 'PATCH');
+  crossSchoolApprove.url = approve.url;
+  assert.equal((await handler(crossSchoolApprove)).status, 404, 'the repository rejects cross-school reviews');
   actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
   assert.equal((await handler(list)).status, 403);
 });
