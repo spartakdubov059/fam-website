@@ -26,6 +26,7 @@ function simulate({ session = null, search = "", hash = "", deferHealth = false 
       fetchCount++;
       return deferHealth ? new Promise(resolve => { resolveHealth = resolve; }) : Promise.resolve(response);
     },
+    AbortController: class { abort() {} },
     setTimeout: () => 1,
     clearTimeout: () => {},
   };
