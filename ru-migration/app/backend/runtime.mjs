@@ -16,18 +16,29 @@ import { createOrchestratorDailyDigest } from './services/orchestrator-daily-dig
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
-export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, mediaConfigured }) {
+export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
   const authConfigured = Boolean(yandexConfigured || oidcConfigured);
+  const databaseAvailable = databaseReady === true;
   return {
     mode: 'isolated-copy',
-    ready: authConfigured,
-    services: { auth: authConfigured, database: true, objectStorage: Boolean(mediaConfigured) },
+    ready: authConfigured && databaseAvailable,
+    services: { auth: authConfigured, database: databaseAvailable, objectStorage: Boolean(mediaConfigured) },
     message: yandexConfigured
       ? 'Russian backend is configured; optional media storage is reported separately.'
       : oidcConfigured
         ? 'Russian backend is configured with OIDC bearer authentication; optional media storage is reported separately.'
         : 'Yandex ID web authentication or OIDC bearer authentication is not configured.',
   };
+}
+
+export async function checkYdbReadiness(sql) {
+  if (typeof sql !== 'function') return false;
+  try {
+    await sql`SELECT 1 AS ready;`;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function createRuntime(env = process.env) {
@@ -61,7 +72,8 @@ export async function createRuntime(env = process.env) {
   return {
     listingsApi,
     mediaApi,
-    getReadiness: () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured, mediaConfigured }),
+    getReadiness: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
+      databaseReady: await checkYdbReadiness(sql), mediaConfigured }),
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
