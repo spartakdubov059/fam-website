@@ -24,15 +24,15 @@ function signupRedirect(origin, pathname) {
 test("GitHub Pages prefers the primary Netlify host only after its health probe succeeds", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
-  assert.match(head, /hostname !== "spartakdubov059\\.github\\.io"/);
-  assert.match(head, /famru\\.netlify\\.app\\/\.well-known\\/fam-domain-health\\.json/);
-  assert.match(head, /mode: "cors"/);
-  assert.match(head, /cache: "no-store"/);
-  assert.match(head, /health && health\\.site === "famru"/);
-  assert.match(head, /window\\.location\\.replace\\(target\\)/);
+  assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
+  assert.ok(head.includes('https://famru.netlify.app/.well-known/fam-domain-health.json?t='));
+  assert.ok(head.includes('mode: "cors"'));
+  assert.ok(head.includes('cache: "no-store"'));
+  assert.ok(head.includes('health && health.site === "famru"'));
+  assert.ok(head.includes('window.location.replace(target)'));
   assert.match(head, /setTimeout[\\s\\S]*?4000/);
-  assert.match(head, /Keep the current FAM page usable/);
-  assert.match(head, /window\\.location\\.search \\+ window\\.location\\.hash/);
+  assert.ok(head.includes("Keep the current FAM page usable"));
+  assert.ok(head.includes("window.location.search + window.location.hash"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
