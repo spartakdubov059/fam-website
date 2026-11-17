@@ -68,6 +68,10 @@ export function diagnosticCoverage(completedTargets, requiredTargets = TARGETS.l
     completedTargets === requiredTargets ? "complete" : "inconclusive";
 }
 
+export function hasFailedNodes(nodes) {
+  return Array.isArray(nodes) && nodes.some(node => node.state === "failed");
+}
+
 export async function checkHost(target) {
   const url = new URL("https://check-host.net/check-http");
   url.searchParams.set("host", target.url);
@@ -106,10 +110,12 @@ async function main() {
     "|---|---|---|---|---|",
   ];
   let checks = 0;
+  let failedTargets = 0;
   for (const target of TARGETS) {
     try {
       const result = await checkHost(target);
       if (result.nodes.length && result.nodes.every(node => node.state !== "unknown")) checks++;
+      if (hasFailedNodes(result.nodes)) failedTargets++;
       for (const node of result.nodes) {
         lines.push("| " + target.name + " | " + node.node.replace(".node.check-host.net", "") +
           " | " + node.info + " | " + node.status + " | [Источник](" + result.report + ") |");
@@ -122,6 +128,11 @@ async function main() {
     }
   }
   lines.push("", "Полностью проверено целей: " + checks + "/" + TARGETS.length + ".");
+  if (failedTargets) {
+    lines.push("❌ Проблемные HTTP-проверки: " + failedTargets + ". Проверьте источники и повторите диагностику.");
+    console.warn("::warning::FAM reachability detected failed host checks; inspect diagnostic report.");
+    process.exitCode = 1;
+  }
   if (diagnosticCoverage(checks) !== "complete") {
     lines.push("⚠️ Диагностика неполная: это НЕ подтверждение доступности всех доменов.");
     console.warn("::warning::FAM reachability diagnostic incomplete; do not claim all hosts are healthy.");
@@ -138,5 +149,6 @@ async function main() {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   main().catch(error => {
     console.warn("Network diagnostic inconclusive:", String(error?.message || error));
+    process.exitCode = 2;
   });
 }
