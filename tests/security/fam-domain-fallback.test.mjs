@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const submit = readFileSync(new URL("../../supabase/functions/submit-content/index.ts", import.meta.url), "utf8");
 const moderate = readFileSync(new URL("../../supabase/functions/moderate/index.ts", import.meta.url), "utf8");
+const netlify = readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8");
+const healthMarker = readFileSync(new URL("../../.well-known/fam-domain-health.json", import.meta.url), "utf8");
 
 const fallbackOrigin = "https://spartakdubov059.github.io";
 const primaryOrigin = "https://famru.netlify.app";
@@ -19,11 +21,24 @@ function signupRedirect(origin, pathname) {
   });
 }
 
-test("GitHub Pages is independent, never forcibly redirected to Netlify", () => {
+test("GitHub Pages prefers the primary Netlify host only after its health probe succeeds", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
-  assert.doesNotMatch(head, /location\.(?:replace|assign)|window\.location|http-equiv=["']refresh/);
-  assert.doesNotMatch(head, /<script/);
+  assert.match(head, /hostname !== "spartakdubov059\\.github\\.io"/);
+  assert.match(head, /famru\\.netlify\\.app\\/\.well-known\\/fam-domain-health\\.json/);
+  assert.match(head, /mode: "cors"/);
+  assert.match(head, /cache: "no-store"/);
+  assert.match(head, /health && health\\.site === "famru"/);
+  assert.match(head, /window\\.location\\.replace\\(target\\)/);
+  assert.match(head, /setTimeout[\\s\\S]*?4000/);
+  assert.match(head, /Keep the current FAM page usable/);
+  assert.match(head, /window\\.location\\.search \\+ window\\.location\\.hash/);
+});
+
+test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
+  assert.ok(healthMarker.includes('"site":"famru"'));
+  assert.ok(netlify.includes('Access-Control-Allow-Origin = "https://spartakdubov059.github.io"'));
+  assert.ok(netlify.includes('Cache-Control = "no-store"'));
 });
 
 test("signup confirmation on GitHub Pages remains on that same fallback host", () => {
