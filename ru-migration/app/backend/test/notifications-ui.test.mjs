@@ -42,7 +42,7 @@ test('Russian fallback notification center reads only the signed-in user inbox',
   assert.equal(values.ruNotificationList.children.length, 1);
   assert.equal(values.ruNotificationList.children[0].children[1].textContent, '<unsafe>');
   assert.equal(values.ruNotificationList.children[0].children[1].tagName, 'p');
-  await values.ruNotificationList.children[0].children[2].listeners.click();
+  await values.ruNotificationList.children[0].children[3].listeners.click();
   assert.equal(calls.some(call => call.url === `/api/v1/messages/${messageId}/read` && call.options.method === 'PATCH'), true);
 });
 

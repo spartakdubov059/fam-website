@@ -8,12 +8,45 @@ function node(document, tag, className, text = '') {
 }
 
 export async function initializeNotifications({ document = globalThis.document, fetchImpl = globalThis.fetch } = {}) {
-  const open = document?.getElementById('ruOpenNotifications');
-  const panel = document?.getElementById('ruNotifications');
-  const status = document?.getElementById('ruNotificationStatus');
-  const list = document?.getElementById('ruNotificationList');
-  const badge = document?.getElementById('ruNotificationBadge');
-  const refreshButton = document?.getElementById('ruNotificationRefresh');
+  let open = document?.getElementById('ruOpenNotifications');
+  let panel = document?.getElementById('ruNotifications');
+  let status = document?.getElementById('ruNotificationStatus');
+  let list = document?.getElementById('ruNotificationList');
+  let badge = document?.getElementById('ruNotificationBadge');
+  let refreshButton = document?.getElementById('ruNotificationRefresh');
+  if (!open || !panel || !status || !list || !badge || !refreshButton) {
+    const messagesButton = document?.getElementById('ruOpenMessages');
+    const shell = messagesButton?.parentElement;
+    if (!shell) return;
+    open = node(document, 'button', 'ru-button', 'Уведомления');
+    open.id = 'ruOpenNotifications';
+    open.type = 'button';
+    open.setAttribute('aria-expanded', 'false');
+    panel = node(document, 'section', 'ru-messages');
+    panel.id = 'ruNotifications';
+    panel.hidden = true;
+    panel.setAttribute('aria-label', 'Уведомления');
+    badge = node(document, 'span', '', '');
+    badge.id = 'ruNotificationBadge';
+    badge.hidden = true;
+    open.append(badge);
+    const heading = node(document, 'div', 'ru-messages-heading');
+    heading.append(node(document, 'h2', '', 'Уведомления'));
+    refreshButton = node(document, 'button', 'ru-button', 'Обновить');
+    refreshButton.id = 'ruNotificationRefresh';
+    refreshButton.type = 'button';
+    heading.append(refreshButton);
+    status = node(document, 'p', 'ru-note', '');
+    status.id = 'ruNotificationStatus';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    list = node(document, 'div', 'ru-message-list');
+    list.id = 'ruNotificationList';
+    list.setAttribute('aria-live', 'polite');
+    panel.append(heading, status, list);
+    if (typeof messagesButton.before === 'function') messagesButton.before(open, panel);
+    else shell.append(open, panel);
+  }
   if (!open || !panel || !status || !list || !badge || !refreshButton || typeof fetchImpl !== 'function') return;
 
   const request = async (url, init = {}) => {
