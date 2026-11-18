@@ -265,11 +265,11 @@ if (selected.length > 4 || selected.some((path) => !tracked.includes(path) || !a
 const excerpts = selected.map((path) => {
   let body;
   if (narrowTimeAgo && path === "index.html") {
-    const lines = readFileSync(path, "utf8").split(/\\r?\\n/);
-    const start = lines.findIndex((line) => /\\bfunction\\s+timeAgo\\s*\\(/.test(line));
+    const lines = readFileSync(path, "utf8").split(/\r?\n/);
+    const start = lines.findIndex((line) => /\bfunction\s+timeAgo\s*\(/.test(line));
     if (start < 0) throw new Error("timeAgo function not found; aborting narrow benchmark");
     body = lines.slice(Math.max(0, start - 5), Math.min(lines.length, start + 65))
-      .map((line, i) => String(Math.max(0, start - 5) + i + 1) + ": " + line).join("\\n");
+      .map((line, i) => String(Math.max(0, start - 5) + i + 1) + ": " + line).join("\n");
   } else {
     body = sourceContext(path, plan.keywords || [], task);
   }
