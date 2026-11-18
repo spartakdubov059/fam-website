@@ -32,7 +32,7 @@ test("GitHub Pages redirects only after the exact primary readiness marker confi
   assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
   assert.ok(head.includes('window.location.replace(target)'));
   assert.ok(head.includes("}, 4000);"));
-  assert.ok(head.includes("Keep GitHub Pages usable"));
+  assert.ok(head.includes("stay on GitHub Pages"));
   assert.ok(!head.includes("probePrimaryAsset()"));
   assert.ok(!head.includes("banner-1.webp?probe="));
   assert.ok(head.includes("stay on GitHub Pages"));
