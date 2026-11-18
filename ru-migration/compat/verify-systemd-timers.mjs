@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const timerDirectory = resolve(scriptDirectory, '../deploy/systemd');
 const validateCalendars = !process.argv.includes('--structure-only');
+const expectedCalendars = new Map([
+  ['fam-ru-runtime-health.timer', ['*-*-* 03:40:00 UTC']],
+]);
 const timerNames = (await readdir(timerDirectory))
   .filter((name) => name.endsWith('.timer'))
   .sort();
@@ -28,6 +31,10 @@ for (const timerName of timerNames) {
   const calendars = [...timerSection.matchAll(/^OnCalendar=(.+)$/gm)].map((match) => match[1].trim());
   if (calendars.length === 0 || calendars.some((calendar) => calendar.length === 0)) {
     throw new Error(`${timerName}: expected at least one non-empty OnCalendar value.`);
+  }
+  const expected = expectedCalendars.get(timerName);
+  if (expected && (calendars.length !== expected.length || expected.some((calendar) => !calendars.includes(calendar)))) {
+    throw new Error(`${timerName}: expected OnCalendar=${expected.join(' and OnCalendar=')}, got ${calendars.join(', ')}.`);
   }
 
   const serviceUnit = timerSection.match(/^Unit=(.+\.service)$/m)?.[1]?.trim();
