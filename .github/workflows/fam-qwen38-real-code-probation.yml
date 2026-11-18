@@ -73,7 +73,7 @@ jobs:
         env:
           FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
           FAM_NARROW_TIMEAGO_BENCHMARK: "1"
-          FAM_TASK: "Исправь воспроизводимый дефект функции timeAgo в index.html: невалидные даты сейчас отображаются некорректно, а числовой Unix timestamp 0 считается пустым значением. Для null, undefined, пустой строки, NaN, Infinity и невалидных дат возвращай пустую строку; временная метка 0 должна быть корректной датой. Сохрани прежние русские подписи для валидных дат. Правь только функцию timeAgo в index.html. Проверки находятся в tests/agent-benchmark/time-ago.test.mjs, тест изменять запрещено. Подготовь минимальный patch с доказательством причины."
+          FAM_TASK: "Исправь воспроизводимый дефект функции timeAgo в index.html: невалидные даты сейчас отображаются некорректно, а числовой Unix timestamp 0 считается пустым значением. Для null, undefined, пустой строки, NaN, Infinity и невалидных дат возвращай пустую строку; временная метка 0 должна быть корректной датой. Сохрани прежние русские подписи для валидных дат. Правь только функцию timeAgo в index.html. Проверки находятся в tests/agent-benchmark/time-ago.test.mjs, тест изменять запрещено. Подготовь минимальный patch с доказательством причины. Поле unified_diff ОБЯЗАТЕЛЬНО должно начинаться буквально с diff --git a/index.html b/index.html, далее строки --- a/index.html, +++ b/index.html и корректный @@ -старые_строки +новые_строки @@; это полный git unified diff, а не только @@-hunk или фрагмент JavaScript. Не добавляй Markdown fences."
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/fam-candidate-benchmark"
