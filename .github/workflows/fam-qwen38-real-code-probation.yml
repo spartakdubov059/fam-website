@@ -68,6 +68,7 @@ jobs:
       - name: Run one real FAM timeAgo bug-fix task
         env:
           FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
+          FAM_NARROW_TIMEAGO_BENCHMARK: "1"
           FAM_TASK: "Исправь воспроизводимый дефект функции timeAgo в index.html: невалидные даты сейчас отображаются некорректно, а числовой Unix timestamp 0 считается пустым значением. Для null, undefined, пустой строки, NaN, Infinity и невалидных дат возвращай пустую строку; временная метка 0 должна быть корректной датой. Сохрани прежние русские подписи для валидных дат. Правь только функцию timeAgo в index.html. Проверки находятся в tests/agent-benchmark/time-ago.test.mjs, тест изменять запрещено. Подготовь минимальный patch с доказательством причины."
         run: |
           set -euo pipefail
@@ -89,8 +90,21 @@ jobs:
             HAS_PATCH="$(node -e "const s=require(process.argv[1]);process.stdout.write(String(s.patch_available===true))" "$SUMMARY")"
             if [[ "$HAS_PATCH" == true && -s "$PATCH" ]]; then
               if node scripts/validate-local-agent-patch.mjs "$PATCH" "$SUMMARY" >/dev/null && git apply --check "$PATCH"; then
-                git apply "$PATCH"
-                if node --test tests/agent-benchmark/time-ago.test.mjs && node --test tests/moderation/*.test.mjs tests/security/*.test.mjs && git diff --check; then QA="passed"; else QA="tests_failed"; fi
+                # The benchmark allows exactly index.html and no other tracked changes.
+                PATCH_PATHS="$(git apply --numstat "$PATCH" | awk '{print $3}' | sort -u)"
+                if [[ "$PATCH_PATHS" != "index.html" ]]; then
+                  QA="forbidden_patch_paths"
+                else
+                  git apply "$PATCH"
+                  CHANGED="$(git diff --name-only | sort -u)"
+                  if [[ "$CHANGED" != "index.html" ]]; then
+                    QA="forbidden_changed_files"
+                  elif node --test tests/agent-benchmark/time-ago.test.mjs && node --test tests/moderation/*.test.mjs tests/security/*.test.mjs && git diff --check; then
+                    QA="passed"
+                  else
+                    QA="tests_failed"
+                  fi
+                fi
               else
                 QA="patch_invalid_or_not_applicable"
               fi
