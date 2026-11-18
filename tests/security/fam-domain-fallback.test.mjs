@@ -22,19 +22,20 @@ function signupRedirect(origin, pathname) {
   });
 }
 
-test("GitHub Pages prefers the primary Netlify host only after its health probe succeeds", () => {
+test("GitHub Pages redirects only after the exact primary readiness marker confirms health", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
   assert.ok(head.includes('https://famru.netlify.app/fam-domain-health.json?t='));
   assert.ok(head.includes('mode: "cors"'));
   assert.ok(head.includes('cache: "no-store"'));
-  assert.ok(head.includes('health && health.site === "famru"'));
+  assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
   assert.ok(head.includes('window.location.replace(target)'));
   assert.ok(head.includes("}, 4000);"));
   assert.ok(head.includes("Keep GitHub Pages usable"));
-  assert.ok(head.includes("probePrimaryAsset()"));
-  assert.ok(head.includes("banner-1.webp?probe="));
+  assert.ok(!head.includes("probePrimaryAsset()"));
+  assert.ok(!head.includes("banner-1.webp?probe="));
+  assert.ok(head.includes("stay on GitHub Pages"));
   assert.ok(head.includes("window.location.search + window.location.hash"));
 });
 
