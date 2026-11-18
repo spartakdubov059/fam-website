@@ -84,6 +84,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     }
 
     let deactivated = false;
+    let destructiveStorageAttempted = false;
     let target;
     try {
       const begun = selfDeletion
@@ -104,7 +105,10 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       const keys = await pendingImages.listUserObjects(target.id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
           || key.split('/')[1].toLowerCase() !== target.id.toLowerCase())) throw new Error('invalid_storage_inventory');
-      for (const key of new Set(keys)) await pendingImages.delete(key);
+      for (const key of new Set(keys)) {
+        destructiveStorageAttempted = true;
+        await pendingImages.delete(key);
+      }
       const deleted = await repository.finishAccountDeletion({
         issuer: target.issuer, subject: target.subject, userId: target.id, schoolId: target.school_id,
         preserveRequestId: target.request_id, reviewerId: target.reviewer_id,
@@ -114,7 +118,9 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       if (!deleted?.ok) throw new Error('database_deletion_failed');
       return { status: 200, body: { ok: true, deleted: true, removed_images: new Set(keys).size } };
     } catch {
-      if (deactivated) {
+      // Once object deletion has started, restoring an account could expose a
+      // partially emptied profile. Keep it inactive for operator recovery.
+      if (deactivated && !destructiveStorageAttempted) {
         try {
           if (selfDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id });
           else if (adminDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: target?.issuer, subject: target?.subject, userId: target?.id });

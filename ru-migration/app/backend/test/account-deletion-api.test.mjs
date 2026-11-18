@@ -73,16 +73,33 @@ test('last school administrator cannot delete the account', async () => {
   assert.deepEqual(await handler(request()), { status: 409, body: { ok: false, error: 'last_school_admin' } });
 });
 
-test('incomplete object cleanup fails closed and restores the profile', async () => {
+test('inventory failure before storage deletion restores the profile', async () => {
   const calls = [];
   const handler = api({ repository: {
     beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id }),
     finishAccountDeletion: async () => { throw new Error('must not finalize'); },
     restoreAccountAfterDeletionFailure: async input => { calls.push(input); return true; },
-  }, pendingImages: { listUserObjects: async () => [key], delete: async () => { throw new Error('storage offline'); } } });
+  }, pendingImages: { listUserObjects: async () => { throw new Error('storage offline'); }, delete: async () => {} } });
   assert.equal((await handler(request())).status, 503);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].userId, actor.id);
+});
+
+test('partial object cleanup never reactivates the account', async () => {
+  const calls = [];
+  let deleted = 0;
+  const secondKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
+  const handler = api({ repository: {
+    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id }),
+    finishAccountDeletion: async () => { throw new Error('database unavailable'); },
+    restoreAccountAfterDeletionFailure: async input => { calls.push(input); return true; },
+  }, pendingImages: {
+    listUserObjects: async () => [key, secondKey],
+    delete: async () => { deleted++; if (deleted === 2) throw new Error('storage offline'); },
+  } });
+  assert.equal((await handler(request())).status, 503);
+  assert.equal(deleted, 2);
+  assert.equal(calls.length, 0, 'profile remains inactive after destructive cleanup begins');
 });
 
 test('unexpected keys in the account storage inventory are never deleted', async () => {
@@ -130,7 +147,7 @@ test('request approval rejects stale authentication and restores both request an
     restoreRequestedAccountDeletion: async input => { restored.push(input); return true; },
   }, pendingImages: { listUserObjects: async () => { throw new Error('storage offline'); }, delete: async () => {} } })(reviewRequest());
   assert.equal(response.status, 503);
-  assert.equal(restored.length, 1);
+  assert.equal(restored.length, 1, 'inventory failure before deletion restores the target and request');
   assert.equal(restored[0].targetId, targetId);
 });
 
