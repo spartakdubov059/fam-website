@@ -1,0 +1,17 @@
+-- Durable intent for account deletion. A failed storage/database operation
+-- leaves the profile inactive and can be resumed after the lease expires.
+CREATE TABLE fam_account_deletion_jobs (
+  user_id Utf8 NOT NULL,
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  school_id Utf8 NOT NULL,
+  source Utf8 NOT NULL,
+  actor_id Utf8 NOT NULL,
+  request_id Utf8 NOT NULL,
+  target_role Utf8 NOT NULL,
+  review_note Utf8 NOT NULL,
+  claim_token Utf8 NOT NULL,
+  claim_until Timestamp NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (user_id)
+);

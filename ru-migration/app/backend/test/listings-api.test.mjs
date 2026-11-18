@@ -266,7 +266,7 @@ test('direct same-origin school-account deletion is dispatched to the Russian de
     authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin-subject', authenticated_at: Math.floor(now / 1000) }),
     resolveActor: async () => admin,
     repository: {
-      beginAdminAccountDeletion: async input => ({ ok: true, id: targetId, issuer: 'https://issuer.example', subject: 'target-subject', school_id: input.schoolId, role: 'student' }),
+      beginAdminAccountDeletion: async input => ({ ok: true, id: targetId, issuer: 'https://issuer.example', subject: 'target-subject', school_id: input.schoolId, role: 'student', claim_token: 'claim-a' }),
       finishAccountDeletion: async input => { finalized = input; return { ok: true, deleted: true }; },
       restoreAccountAfterDeletionFailure: async () => true,
     },
@@ -277,7 +277,7 @@ test('direct same-origin school-account deletion is dispatched to the Russian de
   const response = await handler(request);
   assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 0 } });
   assert.equal(finalized.userId, targetId);
-  assert.deepEqual(finalized.adminAudit, { actorId: admin.id, schoolId: admin.school_id, targetRole: 'student' });
+  assert.equal(finalized.claimToken, 'claim-a');
 });
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;

@@ -500,8 +500,9 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
-    async beginRequestedAccountDeletion({ requestId, schoolId, reviewerId }) {
+    async beginRequestedAccountDeletion({ requestId, schoolId, reviewerId, reviewNote = '' }) {
       if (!requestId || !schoolId || !reviewerId) throw new TypeError('invalid requested account deletion');
+      if (typeof reviewNote !== 'string' || reviewNote.length > 240) throw new TypeError('invalid deletion review note');
       return sql.begin(async tx => {
         const reviewerRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
         const reviewer = reviewerRows?.[0]?.[0];
@@ -523,13 +524,23 @@ export function createYdbListingsRepository(sql) {
         const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${target.user_id} LIMIT 1;`;
         const claimed = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
         if (confirmed?.[0]?.[0]?.active !== false || claimed?.[0]?.[0]?.status !== 'processing') return { ok: false, code: 'request_unavailable' };
-        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id };
+        const claimToken = randomUUID();
+        await tx`INSERT INTO fam_account_deletion_jobs
+          (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
+            claim_token, claim_until, created_at)
+          VALUES (${target.user_id}, ${target.issuer}, ${target.subject}, ${schoolId}, 'council_request', ${reviewerId},
+            ${requestId}, ${target.role}, ${reviewNote}, ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id, claim_token: claimToken };
       });
     },
 
-    async restoreRequestedAccountDeletion({ requestId, schoolId, reviewerId, targetId }) {
-      if (!requestId || !schoolId || !reviewerId || !targetId) return false;
+    async restoreRequestedAccountDeletion({ requestId, schoolId, reviewerId, targetId, claimToken }) {
+      if (!requestId || !schoolId || !reviewerId || !targetId || !claimToken) return false;
       return sql.begin(async tx => {
+        const jobs = await tx`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${targetId}
+          AND request_id = ${requestId} AND actor_id = ${reviewerId} AND claim_token = ${claimToken}
+          AND claim_until > CurrentUtcTimestamp() LIMIT 1;`;
+        if (!jobs?.[0]?.length) return false;
         const requests = await tx`SELECT target_id, status, reviewed_by FROM fam_account_deletion_requests
           WHERE request_id = ${requestId} AND school_id = ${schoolId} LIMIT 1;`;
         const request = requests?.[0]?.[0];
@@ -539,7 +550,9 @@ export function createYdbListingsRepository(sql) {
           WHERE request_id = ${requestId} AND school_id = ${schoolId} AND status = 'processing' AND reviewed_by = ${reviewerId};`;
         const profile = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} LIMIT 1;`;
         const restored = await tx`SELECT status FROM fam_account_deletion_requests WHERE request_id = ${requestId} LIMIT 1;`;
-        return profile?.[0]?.[0]?.active === true && restored?.[0]?.[0]?.status === 'pending';
+        if (profile?.[0]?.[0]?.active !== true || restored?.[0]?.[0]?.status !== 'pending') return false;
+        await tx`DELETE FROM fam_account_deletion_jobs WHERE user_id = ${targetId} AND claim_token = ${claimToken};`;
+        return true;
       });
     },
 
@@ -557,7 +570,14 @@ export function createYdbListingsRepository(sql) {
           AND role IN ('student', 'council_member') AND active = true;`;
         const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE user_id = ${targetId} AND school_id = ${schoolId} LIMIT 1;`;
         if (confirmed?.[0]?.[0]?.active !== false) return { ok: false, code: 'target_unavailable' };
-        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id, role: target.role };
+        const claimToken = randomUUID();
+        await tx`INSERT INTO fam_account_deletion_jobs
+          (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
+            claim_token, claim_until, created_at)
+          VALUES (${target.user_id}, ${target.issuer}, ${target.subject}, ${schoolId}, 'school_admin', ${reviewerId},
+            '', ${target.role}, '', ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+        return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject,
+          school_id: target.school_id, role: target.role, claim_token: claimToken };
       });
     },
 
@@ -577,25 +597,70 @@ export function createYdbListingsRepository(sql) {
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = true;`;
         const inactive = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
         if (inactive?.[0]?.[0]?.active !== false) return { ok: false, code: 'profile_unavailable' };
-        return { ok: true, school_id: profile.school_id, role: profile.role };
+        const claimToken = randomUUID();
+        await tx`INSERT INTO fam_account_deletion_jobs
+          (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
+            claim_token, claim_until, created_at)
+          VALUES (${userId}, ${issuer}, ${subject}, ${profile.school_id}, 'self', ${userId}, '',
+            ${profile.role}, '', ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+        return { ok: true, school_id: profile.school_id, role: profile.role, claim_token: claimToken };
       });
     },
 
-    async restoreAccountAfterDeletionFailure({ issuer, subject, userId }) {
-      if (!issuer || !subject || !userId) return false;
+    async restoreAccountAfterDeletionFailure({ issuer, subject, userId, claimToken }) {
+      if (!issuer || !subject || !userId || !claimToken) return false;
       return sql.begin(async tx => {
+        const jobs = await tx`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${userId}
+          AND issuer = ${issuer} AND subject = ${subject} AND claim_token = ${claimToken}
+          AND claim_until > CurrentUtcTimestamp() LIMIT 1;`;
+        if (!jobs?.[0]?.length) return false;
         const rows = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
         if (!rows?.[0]?.length || rows[0][0].active !== false) return false;
         await tx`UPDATE fam_user_profiles SET active = true
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
         const confirmed = await tx`SELECT active FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
-        return confirmed?.[0]?.[0]?.active === true;
+        if (confirmed?.[0]?.[0]?.active !== true) return false;
+        await tx`DELETE FROM fam_account_deletion_jobs WHERE user_id = ${userId} AND claim_token = ${claimToken};`;
+        return true;
       });
     },
 
-    async finishAccountDeletion({ issuer, subject, userId, schoolId, preserveRequestId = null, reviewerId = null, reviewNote = '', adminAudit = null }) {
-      if (!issuer || !subject || !userId || !schoolId) throw new TypeError('invalid account deletion');
+    async claimIncompleteAccountDeletions(limit = 10) {
+      if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new TypeError('invalid account deletion recovery limit');
       return sql.begin(async tx => {
+        const expired = await tx`SELECT user_id FROM fam_account_deletion_jobs
+          WHERE claim_until <= CurrentUtcTimestamp() ORDER BY created_at ASC LIMIT ${limit};`;
+        const claims = [];
+        for (const row of expired?.[0] ?? []) {
+          const claimToken = randomUUID();
+          await tx`UPDATE fam_account_deletion_jobs SET claim_token = ${claimToken},
+              claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+            WHERE user_id = ${row.user_id} AND claim_until <= CurrentUtcTimestamp();`;
+          const claimed = await tx`SELECT user_id, issuer, subject, school_id, source, actor_id,
+              request_id, target_role, review_note, claim_token
+            FROM fam_account_deletion_jobs WHERE user_id = ${row.user_id} AND claim_token = ${claimToken}
+              AND claim_until > CurrentUtcTimestamp() LIMIT 1;`;
+          if (claimed?.[0]?.[0]) claims.push(claimed[0][0]);
+        }
+        return claims;
+      });
+    },
+
+    async finishAccountDeletion({ issuer, subject, userId, schoolId, claimToken }) {
+      if (!issuer || !subject || !userId || !schoolId || !claimToken) throw new TypeError('invalid account deletion');
+      return sql.begin(async tx => {
+        const jobRows = await tx`SELECT issuer, subject, school_id, source, actor_id, request_id,
+            target_role, review_note, claim_until > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_account_deletion_jobs WHERE user_id = ${userId} AND claim_token = ${claimToken} LIMIT 1;`;
+        const job = jobRows?.[0]?.[0];
+        if (!job || job.lease_valid !== true || job.issuer !== issuer || job.subject !== subject || job.school_id !== schoolId) {
+          return { ok: false, code: 'deletion_job_unavailable' };
+        }
+        const preserveRequestId = job.request_id || null;
+        const reviewerId = job.source === 'self' ? null : job.actor_id;
+        const reviewNote = job.review_note;
+        const adminAudit = job.source === 'school_admin'
+          ? { actorId: job.actor_id, schoolId: job.school_id, targetRole: job.target_role } : null;
         const profileRows = await tx`SELECT active, school_id FROM fam_user_profiles
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} LIMIT 1;`;
         const profile = profileRows?.[0]?.[0];
@@ -675,6 +740,7 @@ export function createYdbListingsRepository(sql) {
           (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
           VALUES (${randomUUID()}, ${schoolId}, ${adminAudit.actorId}, ${userId}, 'account_deleted', ${adminAudit.targetRole}, CurrentUtcTimestamp());`;
         await tx`DELETE FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId} AND active = false;`;
+        await tx`DELETE FROM fam_account_deletion_jobs WHERE user_id = ${userId} AND claim_token = ${claimToken};`;
         return { ok: true, deleted: true };
       });
     },

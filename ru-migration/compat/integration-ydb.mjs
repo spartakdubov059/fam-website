@@ -7,6 +7,7 @@ import { createYdbListingsRepository } from '../app/backend/repositories/ydb-lis
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
+import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -26,6 +27,7 @@ try {
     ('https://issuer.synthetic', 'subject-role-target', '77777777-7777-4777-8777-777777777777', 'synthetic-school', 'council_member', true),
     ('https://issuer.synthetic', 'subject-admin-target', '88888888-8888-4888-8888-888888888888', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-delete-target', '99999999-9999-4999-8999-999999999999', 'synthetic-school', 'council_member', true),
+    ('https://issuer.synthetic', 'subject-recovery', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac', 'synthetic-school', 'student', true),
     ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true);`;
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)    VALUES ('https://issuer.synthetic', 'subject-safety-actor', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'synthetic-school', 'student', true, 'Тест', 'Нарушитель', '8Б');`;
   const resolveActor = createDatabaseActorResolver(sql);
@@ -751,6 +753,22 @@ try {
   const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
   assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
     'administrator deletion is preserved in the audit after the profile is removed');
+  const recoveryUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
+  const recoveryImageKey = `pending/${recoveryUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
+  accountMediaKeys.add(recoveryImageKey);
+  await repo.registerPendingImage(recoveryUserId, recoveryImageKey);
+  const startedRecovery = await repo.beginAccountDeletion({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery', userId: recoveryUserId });
+  assert.equal(startedRecovery.ok, true);
+  await sql`UPDATE fam_account_deletion_jobs SET claim_until = CurrentUtcTimestamp() - Interval('PT1M') WHERE user_id = ${recoveryUserId};`;
+  const recoverAccountDeletions = createAccountDeletionRecoveryOperation({ repository: repo, pendingImages: {
+    listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
+    delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
+  } });
+  assert.deepEqual(await recoverAccountDeletions(10), { claimed: 1, completed: 1, failed: 0 },
+    'a durable account deletion job can be resumed after its lease expires');
+  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery' }), null,
+    'manual recovery removes the synthetic account identity after deleting private media');
+  assert.equal((await sql`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${recoveryUserId};`)?.[0]?.length ?? 0, 0);
   const quotaUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
   const quotaListing = { user_id: quotaUserId, school_id: 'synthetic-school', title: 'Синтетическое объявление',    description: 'Проверка ограничения количества', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
     max_seats: 0, status: 'pending' };

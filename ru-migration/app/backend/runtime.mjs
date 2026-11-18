@@ -10,6 +10,7 @@ import { createListingsApi } from './services/listings-api.mjs';
 import { createMediaApi } from './services/media-api.mjs';
 import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
 import { createPendingMediaCleanupOperation } from './services/cleanup-pending-media.mjs';
+import { createAccountDeletionRecoveryOperation } from './services/recover-account-deletions.mjs';
 import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
@@ -95,6 +96,7 @@ export async function createRuntime(env = process.env) {
     getReadiness: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
       databaseReady: await probeYdbReadiness(), mediaConfigured }),
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
+    recoverAccountDeletions: createAccountDeletionRecoveryOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),

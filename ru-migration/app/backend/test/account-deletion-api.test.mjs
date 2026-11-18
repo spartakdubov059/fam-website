@@ -48,7 +48,7 @@ test('account deletion deactivates first, removes every listed object, then clea
   const calls = [];
   const handler = api({
     repository: {
-      beginAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, school_id: actor.school_id }; },
+      beginAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, school_id: actor.school_id, claim_token: 'claim-a' }; },
       finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true, deleted: true }; },
       restoreAccountAfterDeletionFailure: async input => { calls.push(['restore', input]); return true; },
     },
@@ -76,7 +76,7 @@ test('last school administrator cannot delete the account', async () => {
 test('inventory failure before storage deletion restores the profile', async () => {
   const calls = [];
   const handler = api({ repository: {
-    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id }),
+    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id, claim_token: 'claim-a' }),
     finishAccountDeletion: async () => { throw new Error('must not finalize'); },
     restoreAccountAfterDeletionFailure: async input => { calls.push(input); return true; },
   }, pendingImages: { listUserObjects: async () => { throw new Error('storage offline'); }, delete: async () => {} } });
@@ -90,7 +90,7 @@ test('partial object cleanup never reactivates the account', async () => {
   let deleted = 0;
   const secondKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
   const handler = api({ repository: {
-    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id }),
+    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id, claim_token: 'claim-a' }),
     finishAccountDeletion: async () => { throw new Error('database unavailable'); },
     restoreAccountAfterDeletionFailure: async input => { calls.push(input); return true; },
   }, pendingImages: {
@@ -105,7 +105,7 @@ test('partial object cleanup never reactivates the account', async () => {
 test('unexpected keys in the account storage inventory are never deleted', async () => {
   let deleted = false; let restored = false;
   const handler = api({ repository: {
-    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id }),
+    beginAccountDeletion: async () => ({ ok: true, school_id: actor.school_id, claim_token: 'claim-a' }),
     finishAccountDeletion: async () => ({ ok: true }),
     restoreAccountAfterDeletionFailure: async () => { restored = true; },
   }, pendingImages: { listUserObjects: async () => ['pending/22222222-2222-4222-8222-222222222222/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp'], delete: async () => { deleted = true; } } });
@@ -119,7 +119,7 @@ test('school administrator approval freshly authenticates, deactivates, cleans s
   const targetKey = `pending/${targetId}/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp`;
   const calls = [];
   const handler = api({ resolvedActor: { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' }, repository: {
-    beginRequestedAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id }; },
+    beginRequestedAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, claim_token: 'claim-a' }; },
     finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true, deleted: true }; },
     restoreRequestedAccountDeletion: async input => { calls.push(['restore', input]); return true; },
   }, pendingImages: {
@@ -130,7 +130,7 @@ test('school administrator approval freshly authenticates, deactivates, cleans s
   assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
   assert.deepEqual(calls.map(call => call[0]), ['begin', 'list', 'delete', 'finish']);
   assert.equal(calls[0][1].reviewerId, '33333333-3333-4333-8333-333333333333');
-  assert.equal(calls[3][1].preserveRequestId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  assert.equal(calls[3][1].claimToken, 'claim-a');
 });
 
 test('request approval rejects stale authentication and restores both request and profile after storage failure', async () => {
@@ -142,7 +142,7 @@ test('request approval rejects stale authentication and restores both request an
   assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } });
 
   const response = await api({ resolvedActor: admin, repository: {
-    beginRequestedAccountDeletion: async () => ({ ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id }),
+    beginRequestedAccountDeletion: async () => ({ ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, claim_token: 'claim-a' }),
     finishAccountDeletion: async () => { throw new Error('must not finalize'); },
     restoreRequestedAccountDeletion: async input => { restored.push(input); return true; },
   }, pendingImages: { listUserObjects: async () => { throw new Error('storage offline'); }, delete: async () => {} } })(reviewRequest());
@@ -168,7 +168,7 @@ test('direct school-admin deletion deactivates only the eligible same-school acc
   const admin = { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' };
   const calls = [];
   const response = await api({ resolvedActor: admin, repository: {
-    beginAdminAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, role: 'student' }; },
+    beginAdminAccountDeletion: async input => { calls.push(['begin', input]); return { ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, role: 'student', claim_token: 'claim-a' }; },
     finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true, deleted: true }; },
     restoreAccountAfterDeletionFailure: async input => { calls.push(['restore', input]); return true; },
   }, pendingImages: {
@@ -177,5 +177,5 @@ test('direct school-admin deletion deactivates only the eligible same-school acc
   } })(adminDeleteRequest());
   assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
   assert.deepEqual(calls.map(call => call[0]), ['begin', 'list', 'delete', 'finish']);
-  assert.deepEqual(calls[3][1].adminAudit, { actorId: admin.id, schoolId: actor.school_id, targetRole: 'student' });
+  assert.equal(calls[3][1].claimToken, 'claim-a');
 });

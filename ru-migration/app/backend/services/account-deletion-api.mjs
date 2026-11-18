@@ -91,17 +91,19 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
         ? await repository.beginAccountDeletion({ issuer: identity.issuer, subject: identity.subject, userId: actor.id })
         : adminDeletion
           ? await repository.beginAdminAccountDeletion({ schoolId: actor.school_id, reviewerId: actor.id, targetId: adminDeleteMatch[1] })
-          : await repository.beginRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id });
+          : await repository.beginRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id,
+            reviewerId: actor.id, reviewNote: typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '' });
       if (!begun?.ok) {
         const code = begun?.code || 'profile_unavailable';
         const status = code === 'last_school_admin' ? 409 : code === 'target_unavailable' ? 404 : 403;
         return { status, body: { ok: false, error: code } };
       }
       deactivated = true;
-      target = selfDeletion ? { id: actor.id, issuer: identity.issuer, subject: identity.subject, school_id: actor.school_id }
+      target = selfDeletion ? { id: actor.id, issuer: identity.issuer, subject: identity.subject, school_id: actor.school_id, claim_token: begun.claim_token }
         : adminDeletion ? { ...begun, reviewer_id: actor.id, direct_admin_deletion: true }
           : { ...begun, request_id: reviewMatch[1], reviewer_id: actor.id };
       if (!target.id || !USER_ID.test(target.id) || !target.issuer || !target.subject) throw new Error('invalid deletion target');
+      if (typeof begun.claim_token !== 'string' || !begun.claim_token) throw new Error('invalid deletion claim');
       const keys = await pendingImages.listUserObjects(target.id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
           || key.split('/')[1].toLowerCase() !== target.id.toLowerCase())) throw new Error('invalid_storage_inventory');
@@ -110,10 +112,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
         await pendingImages.delete(key);
       }
       const deleted = await repository.finishAccountDeletion({
-        issuer: target.issuer, subject: target.subject, userId: target.id, schoolId: target.school_id,
-        preserveRequestId: target.request_id, reviewerId: target.reviewer_id,
-        adminAudit: target.direct_admin_deletion ? { actorId: actor.id, schoolId: actor.school_id, targetRole: target.role } : null,
-        reviewNote: typeof parsed.value.review_note === 'string' ? parsed.value.review_note.trim().slice(0, 240) : '',
+        issuer: target.issuer, subject: target.subject, userId: target.id, schoolId: target.school_id, claimToken: begun.claim_token,
       });
       if (!deleted?.ok) throw new Error('database_deletion_failed');
       return { status: 200, body: { ok: true, deleted: true, removed_images: new Set(keys).size } };
@@ -122,9 +121,10 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
       // partially emptied profile. Keep it inactive for operator recovery.
       if (deactivated && !destructiveStorageAttempted) {
         try {
-          if (selfDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id });
-          else if (adminDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: target?.issuer, subject: target?.subject, userId: target?.id });
-          else await repository.restoreRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, targetId: target?.id });
+          if (selfDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: identity.issuer, subject: identity.subject, userId: actor.id, claimToken: target?.claim_token });
+          else if (adminDeletion) await repository.restoreAccountAfterDeletionFailure({ issuer: target?.issuer, subject: target?.subject, userId: target?.id, claimToken: target?.claim_token });
+          else await repository.restoreRequestedAccountDeletion({ requestId: reviewMatch[1], schoolId: actor.school_id,
+            reviewerId: actor.id, targetId: target?.id, claimToken: target?.claim_token });
         }
         catch { /* failed cleanup remains inactive until an operator repairs the isolated staging database */ }
       }

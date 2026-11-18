@@ -4,7 +4,6 @@ on:
     branches: ["migration/yandex-cloud"]
     paths:
       - "ru-migration/app/backend/**"
-      - "ru-migration/app/backend/schema/**"
       - "ru-migration/compat/**"
       - ".github/workflows/fam-ru-ydb-local.yml"
   workflow_dispatch:
@@ -83,6 +82,8 @@ jobs:
           schema+="$(cat ru-migration/app/backend/schema/28_submission_quotas.yql)"
           schema+=$'\n'
           schema+="$(cat ru-migration/app/backend/schema/29_fk_lookup_indexes.yql)"
+          schema+=$'\n'
+          schema+="$(cat ru-migration/app/backend/schema/30_account_deletion_jobs.yql)"
           for i in $(seq 1 120); do
             if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
             if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi

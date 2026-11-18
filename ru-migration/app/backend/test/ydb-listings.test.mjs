@@ -311,9 +311,14 @@ test('approved account deletion claims only an active same-school request and it
   const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
   const repo = createYdbListingsRepository(sql);
   const result = await repo.beginRequestedAccountDeletion({ requestId: 'request-a', schoolId: 'school-a', reviewerId: 'admin-a' });
-  assert.deepEqual(result, { ok: true, id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a' });
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'target-a');
+  assert.match(result.claim_token, /^[0-9a-f-]{36}$/i);
   assert.ok(calls.some(call => call.text.includes("SET status = 'processing'") && call.values.includes('request-a')));
   assert.ok(calls.some(call => call.text.includes('SET active = false') && call.values.includes('school-a')));
+  const durableJob = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_jobs'));
+  assert.ok(durableJob);
+  assert.ok(durableJob.values.includes(result.claim_token));
 });
 test('direct account deletion requires an active same-school administrator and student or council target', async () => {
   const calls = [];
@@ -327,7 +332,10 @@ test('direct account deletion requires an active same-school administrator and s
   const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
   const repo = createYdbListingsRepository(sql);
   const result = await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'admin-a', targetId: 'target-a' });
-  assert.deepEqual(result, { ok: true, id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'council_member' });
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'target-a');
+  assert.equal(result.role, 'council_member');
+  assert.match(result.claim_token, /^[0-9a-f-]{36}$/i);
   const scopedDeactivate = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET active = false'));
   assert.ok(scopedDeactivate);
   assert.ok(scopedDeactivate.values.includes('school-a'));
