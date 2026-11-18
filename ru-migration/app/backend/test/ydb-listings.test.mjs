@@ -28,6 +28,30 @@ test('site error digest aggregation reads only bounded aggregate counters and re
   assert.doesNotMatch(query, /body|text|url|user_id|email|stack/i);
 });
 
+test('RU background queue health reads only aggregate statuses, expired leases and queue age', async () => {
+  const calls = [];
+  const now = () => Date.parse('2026-11-18T12:00:00.000Z');
+  const sql = strings => {
+    const text = strings.join('?');
+    calls.push(text);
+    if (text.includes('GROUP BY status')) return Promise.resolve([[{ status: 'queued', count: 2 }, { status: 'claimed', count: 1 }]]);
+    if (text.includes('lease_expires_at')) return Promise.resolve([[{ count: 1 }]]);
+    if (text.includes("status IN ('failed', 'blocked')")) return Promise.resolve([[{ count: 3 }]]);
+    if (text.includes('MIN(available_at)')) return Promise.resolve([[{ oldest_queued_at: new Date('2026-11-18T11:40:00.000Z') }]]);
+    throw new Error('unexpected query');
+  };
+  const report = await createYdbListingsRepository(sql).getRuBackgroundQueueHealth(now);
+  assert.equal(report.checked_at, '2026-11-18T12:00:00.000Z');
+  assert.equal(report.content_read, false);
+  assert.deepEqual(report.queues.daily_reports, {
+    statuses: { queued: 2, claimed: 1 }, expired_leases: 1, failed_last_24h: 3, oldest_queued_minutes: 20,
+  });
+  assert.deepEqual(report.queues.site_error_digests, report.queues.daily_reports);
+  assert.equal(calls.length, 8);
+  assert.ok(calls.every(query => /COUNT\(\*\)|MIN\(available_at\)/.test(query)));
+  assert.ok(calls.every(query => !/payload|summary|user_id|text|email|body/i.test(query)));
+});
+
 test('latest completed site error digest is projected from bounded aggregate fields only', async () => {
   const slot = '2026-11-18T06:15';
   const summary = 'Проверка ошибок FAM: агрегированные данные.';

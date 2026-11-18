@@ -101,6 +101,7 @@ export async function createRuntime(env = process.env) {
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
     processSiteErrorDigest: createSiteErrorDigest({ repository }),
+    getRuBackgroundQueueHealth: () => repository.getRuBackgroundQueueHealth(),
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

@@ -167,7 +167,14 @@ try {
   const savedSiteErrorDigest = await sql`SELECT status, metrics_json, summary FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlotKey};`;
   assert.equal(savedSiteErrorDigest?.[0]?.[0]?.status, 'completed');
   assert.deepEqual(JSON.parse(savedSiteErrorDigest[0][0].metrics_json), siteErrorMetrics);
-  assert.doesNotMatch(savedSiteErrorDigest[0][0].summary, /student|user_id|https?:|stack|телефон|почта/i);  await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
+  assert.doesNotMatch(savedSiteErrorDigest[0][0].summary, /student|user_id|https?:|stack|телефон|почта/i);
+  const backgroundQueueHealth = await repo.getRuBackgroundQueueHealth();
+  assert.equal(backgroundQueueHealth.content_read, false);
+  assert.equal(backgroundQueueHealth.queues.daily_reports.statuses.completed, 1);
+  assert.equal(backgroundQueueHealth.queues.site_error_digests.statuses.completed, 1);
+  assert.equal(backgroundQueueHealth.queues.daily_reports.expired_leases, 0);
+  assert.equal(backgroundQueueHealth.queues.site_error_digests.expired_leases, 0);
+  await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);
   const insertedSyntheticAgentIdea = await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
