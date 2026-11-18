@@ -781,7 +781,7 @@ try {
   await repo.registerPendingImage(recoveryUserId, recoveryImageKey);
   const startedRecovery = await repo.beginAccountDeletion({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery', userId: recoveryUserId });
   assert.equal(startedRecovery.ok, true);
-  await sql`UPDATE fam_account_deletion_jobs SET claim_until = CurrentUtcTimestamp() - Interval('PT1M') WHERE user_id = ${recoveryUserId};`;
+  await sql`UPDATE fam_account_deletion_jobs SET claim_until = Unwrap(CurrentUtcTimestamp() - Interval('PT1M')) WHERE user_id = ${recoveryUserId};`;
   const recoverAccountDeletions = createAccountDeletionRecoveryOperation({ repository: repo, pendingImages: {
     listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
     delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },

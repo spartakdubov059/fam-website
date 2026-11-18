@@ -529,7 +529,7 @@ export function createYdbListingsRepository(sql) {
           (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
             claim_token, claim_until, created_at)
           VALUES (${target.user_id}, ${target.issuer}, ${target.subject}, ${schoolId}, 'council_request', ${reviewerId},
-            ${requestId}, ${target.role}, ${reviewNote}, ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+            ${requestId}, ${target.role}, ${reviewNote}, ${claimToken}, Unwrap(CurrentUtcTimestamp() + Interval('PT5M')), CurrentUtcTimestamp());`;
         return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject, school_id: target.school_id, claim_token: claimToken };
       });
     },
@@ -575,7 +575,7 @@ export function createYdbListingsRepository(sql) {
           (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
             claim_token, claim_until, created_at)
           VALUES (${target.user_id}, ${target.issuer}, ${target.subject}, ${schoolId}, 'school_admin', ${reviewerId},
-            '', ${target.role}, '', ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+            '', ${target.role}, '', ${claimToken}, Unwrap(CurrentUtcTimestamp() + Interval('PT5M')), CurrentUtcTimestamp());`;
         return { ok: true, id: target.user_id, issuer: target.issuer, subject: target.subject,
           school_id: target.school_id, role: target.role, claim_token: claimToken };
       });
@@ -602,7 +602,7 @@ export function createYdbListingsRepository(sql) {
           (user_id, issuer, subject, school_id, source, actor_id, request_id, target_role, review_note,
             claim_token, claim_until, created_at)
           VALUES (${userId}, ${issuer}, ${subject}, ${profile.school_id}, 'self', ${userId}, '',
-            ${profile.role}, '', ${claimToken}, CurrentUtcTimestamp() + Interval('PT5M'), CurrentUtcTimestamp());`;
+            ${profile.role}, '', ${claimToken}, Unwrap(CurrentUtcTimestamp() + Interval('PT5M')), CurrentUtcTimestamp());`;
         return { ok: true, school_id: profile.school_id, role: profile.role, claim_token: claimToken };
       });
     },
@@ -634,7 +634,7 @@ export function createYdbListingsRepository(sql) {
         for (const row of expired?.[0] ?? []) {
           const claimToken = randomUUID();
           await tx`UPDATE fam_account_deletion_jobs SET claim_token = ${claimToken},
-              claim_until = CurrentUtcTimestamp() + Interval('PT5M')
+              claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
             WHERE user_id = ${row.user_id} AND claim_until <= CurrentUtcTimestamp();`;
           const claimed = await tx`SELECT user_id, issuer, subject, school_id, source, actor_id,
               request_id, target_role, review_note, claim_token
