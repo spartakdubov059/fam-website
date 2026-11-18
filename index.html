@@ -33,28 +33,9 @@
         if (controller) controller.abort();
       }, 4000);
       var healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now();
-      // Some Netlify deployments do not contain the health marker yet. A real
-      // image load is a fallback reachability check, not a proof of app health.
-      // Keep this fallback page if the asset is blocked, missing, or times out.
-      function probePrimaryAsset() {
-        if (keepFallbackAuthContext() || typeof Image !== "function") return;
-        var probe = new Image();
-        var settled = false;
-        var assetTimeout = setTimeout(function () {
-          settled = true;
-          probe.onload = probe.onerror = null;
-        }, 4000);
-        function finishProbe(ok) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(assetTimeout);
-          probe.onload = probe.onerror = null;
-          if (ok && !keepFallbackAuthContext()) window.location.replace(target);
-        }
-        probe.onload = function () { finishProbe(probe.naturalWidth > 0); };
-        probe.onerror = function () { finishProbe(false); };
-        probe.src = "https://famru.netlify.app/banner-1.webp?probe=" + Date.now();
-      }
+      // Do not mistake a working image for a healthy deployment. The marker
+      // must exist, return 200 with CORS, and explicitly report readiness.
+      // On failure we stay on the standalone GitHub Pages copy.
       try {
         fetch(healthUrl, {
           mode: "cors",
@@ -64,14 +45,11 @@
         }).then(function (response) {
           return response.ok ? response.json() : null;
         }).then(function (health) {
-          if (health && health.site === "famru" && !keepFallbackAuthContext()) {
+          if (health && health.site === "famru" && health.ok === true && !keepFallbackAuthContext()) {
             window.location.replace(target);
-          } else {
-            probePrimaryAsset();
           }
         }).catch(function () {
-          // Keep GitHub Pages usable when Netlify is offline or its asset is blocked.
-          probePrimaryAsset();
+          // The primary host or readiness marker is unavailable; stay on GitHub Pages.
         }).finally(function () {
           clearTimeout(timeoutId);
         });
@@ -4623,6 +4601,13 @@ window.onunhandledrejection = function() {
   async function renderProfile() {
     updateAuthUI();
     if(!user) return;
+    if (!profile) {
+      // A failed profile request does NOT mean the account was reset.
+      $("profEmail").textContent = "Профиль временно недоступен";
+      $("profMeta").textContent = "Данные сохранены. Проверьте интернет и обновите страницу.";
+      $("avatarPreview").textContent = "!";
+      return;
+    }
     $("accountEmail").value = user.email || "";
     const displayName = [profile?.first_name, profile?.last_name].filter(value => typeof value === "string" && value.trim()).map(value => value.trim()).join(" ");
     $("profEmail").textContent = displayName || "Участник FAM";
@@ -5135,7 +5120,7 @@ window.onunhandledrejection = function() {
     else if (action === 'logout') {
       btn.disabled = true;
       btn.textContent = "Выход...";
-      sb.auth.signOut().then(({ error }) => {
+      sb.auth.signOut({ scope: "local" }).then(({ error }) => {
         if (error) throw error;
         location.reload();
       }).catch(err => {
@@ -5327,7 +5312,11 @@ window.onunhandledrejection = function() {
       .eq("id", user.id).maybeSingle();
     return null;
   }).then(res => {
-    if(res && res.data) profile = res.data;
+    if (res && res.data) profile = res.data;
+    if (user && !profile) {
+      console.warn("FAM: own profile could not be loaded; account data are not reset.");
+      reportFamSiteError("database_request_failed", "database");
+    }
     if (user && profile) {
       const complete = profileIdentityIsComplete();
       $("identityCompletionGate").classList.toggle("hidden", complete);

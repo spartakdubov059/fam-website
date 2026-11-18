@@ -7,13 +7,13 @@ const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const script = html.match(/<head>\s*<script>([\s\S]*?)<\/script>/i)?.[1];
 assert.ok(script, "fallback redirect must have an inline startup script");
 
-function simulate({ session = null, search = "", hash = "", deferHealth = false, healthOk = true } = {}) {
+function simulate({ session = null, search = "", hash = "", deferHealth = false, healthOk = true, markerReady = true } = {}) {
   const navigations = [];
   const images = [];
   let fetchCount = 0;
   let storedSession = session;
   let resolveHealth;
-  const response = { ok: healthOk, json: async () => ({ site: "famru" }) };
+  const response = { ok: healthOk, json: async () => ({ site: "famru", ok: markerReady }) };
   const context = {
     window: {
       location: {
@@ -85,27 +85,24 @@ test("login appearing during a slow health request prevents late redirect", asyn
 });
 
 
-test("missing Netlify health marker falls back to a real image before redirect", async () => {
+test("missing Netlify readiness marker never redirects even if its assets might load", async () => {
   const page = simulate({ healthOk: false });
   await page.settle();
-  assert.equal(page.imageCount, 1);
-  assert.match(page.imageUrl, /^https:\/\/famru\.netlify\.app\/banner-1\.webp\?probe=/);
-  assert.deepEqual(page.navigations, []);
-  page.resolveImage(true);
-  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
-});
-
-test("missing Netlify marker and broken image retain GitHub Pages as fallback", async () => {
-  const page = simulate({ healthOk: false });
-  await page.settle();
-  page.resolveImage(false);
+  assert.equal(page.fetchCount, 1);
+  assert.equal(page.imageCount, 0, "image reachability is not application readiness");
   assert.deepEqual(page.navigations, []);
 });
 
-test("a newly established session blocks redirect after image probe began", async () => {
-  const page = simulate({ healthOk: false });
+test("a 200 response without an explicit ready flag keeps the independent fallback", async () => {
+  const page = simulate({ markerReady: false });
   await page.settle();
+  assert.deepEqual(page.navigations, []);
+});
+
+test("valid marker does not redirect after a login appears during slow response", async () => {
+  const page = simulate({ deferHealth: true });
   page.setSession(signedIn);
-  page.resolveImage(true);
+  page.respond();
+  await page.settle();
   assert.deepEqual(page.navigations, []);
 });
