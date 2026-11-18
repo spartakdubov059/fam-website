@@ -32,7 +32,9 @@ export function summarizeNodeResult(raw) {
   if (result[0] === 1 && /^3\d\d$/.test(status)) {
     return { state: "redirect", status, info: "HTTP перенаправление" };
   }
-  if (result[0] === 1 && status === "401") {
+  // Check-Host marks 4xx responses as failed HTTP probes even when the
+  // remote server answered. A 401 from the auth health endpoint proves reachability.
+  if (status === "401") {
     return { state: "auth-required", status, info: "Узел дошёл до API; endpoint требует авторизацию" };
   }
   return {

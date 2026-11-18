@@ -7,12 +7,13 @@ const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
 const script = html.match(/<head>\s*<script>([\s\S]*?)<\/script>/i)?.[1];
 assert.ok(script, "fallback redirect must have an inline startup script");
 
-function simulate({ session = null, search = "", hash = "", deferHealth = false } = {}) {
+function simulate({ session = null, search = "", hash = "", deferHealth = false, healthOk = true } = {}) {
   const navigations = [];
+  const images = [];
   let fetchCount = 0;
   let storedSession = session;
   let resolveHealth;
-  const response = { ok: true, json: async () => ({ site: "famru" }) };
+  const response = { ok: healthOk, json: async () => ({ site: "famru" }) };
   const context = {
     window: {
       location: {
@@ -26,6 +27,10 @@ function simulate({ session = null, search = "", hash = "", deferHealth = false 
       fetchCount++;
       return deferHealth ? new Promise(resolve => { resolveHealth = resolve; }) : Promise.resolve(response);
     },
+    Image: class {
+      naturalWidth = 0;
+      set src(url) { images.push({ url, element: this }); }
+    },
     AbortController: class { abort() {} },
     setTimeout: () => 1,
     clearTimeout: () => {},
@@ -33,6 +38,14 @@ function simulate({ session = null, search = "", hash = "", deferHealth = false 
   runInNewContext(script, context, { timeout: 1000 });
   return {
     navigations, get fetchCount() { return fetchCount; },
+    get imageCount() { return images.length; },
+    get imageUrl() { return images[0]?.url; },
+    resolveImage(ok) {
+      const image = images[images.length - 1]?.element;
+      assert.ok(image, "an image reachability probe must exist");
+      image.naturalWidth = ok ? 1200 : 0;
+      if (ok) image.onload?.(); else image.onerror?.();
+    },
     setSession(value) { storedSession = value; },
     respond() { if (resolveHealth) resolveHealth(response); },
     settle: () => new Promise(resolve => setImmediate(resolve)),
@@ -68,5 +81,31 @@ test("login appearing during a slow health request prevents late redirect", asyn
   page.setSession(signedIn);
   page.respond();
   await page.settle();
+  assert.deepEqual(page.navigations, []);
+});
+
+
+test("missing Netlify health marker falls back to a real image before redirect", async () => {
+  const page = simulate({ healthOk: false });
+  await page.settle();
+  assert.equal(page.imageCount, 1);
+  assert.match(page.imageUrl, /^https:\/\/famru\.netlify\.app\/banner-1\.webp\?probe=/);
+  assert.deepEqual(page.navigations, []);
+  page.resolveImage(true);
+  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
+});
+
+test("missing Netlify marker and broken image retain GitHub Pages as fallback", async () => {
+  const page = simulate({ healthOk: false });
+  await page.settle();
+  page.resolveImage(false);
+  assert.deepEqual(page.navigations, []);
+});
+
+test("a newly established session blocks redirect after image probe began", async () => {
+  const page = simulate({ healthOk: false });
+  await page.settle();
+  page.setSession(signedIn);
+  page.resolveImage(true);
   assert.deepEqual(page.navigations, []);
 });
