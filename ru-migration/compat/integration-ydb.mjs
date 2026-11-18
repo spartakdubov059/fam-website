@@ -17,6 +17,17 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
+  const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
+  repo.beginAccountDeletion = async input => {
+    try {
+      const result = await beginAccountDeletion(input);
+      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_BEGIN_RESULT:', JSON.stringify({ ok: result?.ok, code: result?.code, hasClaimToken: Boolean(result?.claim_token) }));
+      return result;
+    } catch (error) {
+      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_BEGIN_ERROR:', error?.message || 'unknown');
+      throw error;
+    }
+  };
   const finishAccountDeletion = repo.finishAccountDeletion.bind(repo);
   repo.finishAccountDeletion = async input => {
     try {
