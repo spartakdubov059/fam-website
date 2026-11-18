@@ -17,6 +17,17 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
+  const finishAccountDeletion = repo.finishAccountDeletion.bind(repo);
+  repo.finishAccountDeletion = async input => {
+    try {
+      const result = await finishAccountDeletion(input);
+      if (!result?.ok) console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_FINALIZE_REJECTED:', result?.code || 'unknown');
+      return result;
+    } catch (error) {
+      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_FINALIZE_ERROR:', error?.message || 'unknown');
+      throw error;
+    }
+  };
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true, 'Тест', 'Ученик', '8А', 'Казань');`;
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
     ('https://issuer.synthetic', 'subject-2', '11111111-1111-4111-8111-111111111111', 'synthetic-school', 'student', true),
