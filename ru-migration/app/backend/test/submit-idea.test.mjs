@@ -4,16 +4,34 @@ import { submitIdea } from '../services/submit-idea.mjs';
 
 const actor = { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' };
 
-test('idea with unavailable moderation is stored only as pending for the authenticated school profile', async () => {
+test('benign idea uses the free local fallback and enters the existing school review for its authenticated profile', async () => {
   let saved;
   const result = await submitIdea({ actor, input: { text: 'Нужен школьный книжный обмен', user_id: 'forged' },
     repository: { createIdea: async value => { saved = value; return { id: 'synthetic-idea' }; } } });
   assert.equal(result.ok, true);
-  assert.equal(result.status, 'pending');
+  assert.equal(result.status, 'approved');
   assert.equal(saved.user_id, actor.id);
   assert.equal(saved.school_id, actor.school_id);
+  assert.equal(saved.ai_status, 'approved');
+  assert.equal(saved.admin_status, 'new');
+});
+
+test('serious local safety flags stay pending while other locally flagged ideas are rejected', async () => {
+  let saved;
+  const safetyActor = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: actor.school_id, role: 'student' };
+  const pending = await submitIdea({ actor: safetyActor, safetyKey: 'synthetic-test-secret-key-at-least-32-bytes', input: { text: 'В адрес ученика поступили угрозы.' },
+    repository: { createIdea: async value => { saved = value; return { id: 'safety-idea' }; }, recordSafetySignal: async () => true } });
+  assert.equal(pending.ok, true);
+  assert.equal(pending.status, 'pending');
   assert.equal(saved.ai_status, 'pending');
   assert.equal(saved.admin_status, 'new');
+
+  let writes = 0;
+  const rejected = await submitIdea({ actor, input: { text: 'Обсудим продажу вейпов.' },
+    repository: { createIdea: async () => { writes++; return { id: 'unexpected' }; } } });
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.code, 'unsafe_content');
+  assert.equal(writes, 0);
 });
 
 test('idea submission rejects personal contact data before database storage', async () => {

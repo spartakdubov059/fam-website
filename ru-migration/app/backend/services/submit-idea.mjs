@@ -1,4 +1,4 @@
-import { reviewText } from '../policies/review-text.mjs';
+import { reviewIdeaText, reviewText } from '../policies/review-text.mjs';
 import { recordLocalSafetySignal } from '../policies/safety-signal.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,7 +15,9 @@ export async function submitIdea({ actor, input, repository, review, safetyKey }
       || (imageKeys.length > 0 && !UUID.test(actor.id))
       || imageKeys.some(key => typeof key !== 'string' || !imageKeyPattern.test(key))
       || new Set(imageKeys).size !== imageKeys.length) return { ok: false, code: 'invalid_idea' };
-  const decision = await reviewText(text, { review });
+  const decision = typeof review === 'function'
+    ? await reviewText(text, { review })
+    : reviewIdeaText(text);
   try {
     await recordLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
       localFlag: decision.local_flag, text, safetyKey, repository });

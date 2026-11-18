@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewText } from '../policies/review-text.mjs';
+import { reviewIdeaText, reviewText } from '../policies/review-text.mjs';
 
 test('personal contact data is rejected before invoking any reviewer', async () => {
   let called = false;
@@ -27,4 +27,15 @@ test('serious local flags remain available to the Russian incident writer after 
 test('empty and oversized input is rejected', async () => {
   assert.equal((await reviewText('   ')).reason_code, 'invalid_text');
   assert.equal((await reviewText('a'.repeat(10001))).reason_code, 'invalid_text');
+});
+
+test('idea fallback approves only unflagged text and preserves the source high-risk manual-review path', () => {
+  assert.deepEqual(reviewIdeaText('Нужен школьный книжный обмен'),
+    { action: 'ok', reason_code: 'safe_local_fallback', local_flag: null });
+  assert.deepEqual(reviewIdeaText('В адрес ученика поступили угрозы.'),
+    { action: 'pending', reason_code: 'serious_hate_or_threat', local_flag: 'serious_hate_or_threat' });
+  assert.deepEqual(reviewIdeaText('Продажа вейпов у школы.'),
+    { action: 'reject', reason_code: 'unsafe_content', local_flag: 'nicotine_or_alcohol' });
+  assert.deepEqual(reviewIdeaText('Пишите test@example.ru'),
+    { action: 'reject', reason_code: 'personal_contact_data', local_flag: null });
 });
