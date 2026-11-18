@@ -33,6 +33,28 @@
         if (controller) controller.abort();
       }, 4000);
       var healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now();
+      // Some Netlify deployments do not contain the health marker yet. A real
+      // image load is a fallback reachability check, not a proof of app health.
+      // Keep this fallback page if the asset is blocked, missing, or times out.
+      function probePrimaryAsset() {
+        if (keepFallbackAuthContext() || typeof Image !== "function") return;
+        var probe = new Image();
+        var settled = false;
+        var assetTimeout = setTimeout(function () {
+          settled = true;
+          probe.onload = probe.onerror = null;
+        }, 4000);
+        function finishProbe(ok) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(assetTimeout);
+          probe.onload = probe.onerror = null;
+          if (ok && !keepFallbackAuthContext()) window.location.replace(target);
+        }
+        probe.onload = function () { finishProbe(probe.naturalWidth > 0); };
+        probe.onerror = function () { finishProbe(false); };
+        probe.src = "https://famru.netlify.app/banner-1.webp?probe=" + Date.now();
+      }
       try {
         fetch(healthUrl, {
           mode: "cors",
@@ -42,9 +64,14 @@
         }).then(function (response) {
           return response.ok ? response.json() : null;
         }).then(function (health) {
-          if (health && health.site === "famru" && !keepFallbackAuthContext()) window.location.replace(target);
+          if (health && health.site === "famru" && !keepFallbackAuthContext()) {
+            window.location.replace(target);
+          } else {
+            probePrimaryAsset();
+          }
         }).catch(function () {
-          // Keep the current FAM page usable if Netlify is slow, blocked, or offline.
+          // Keep GitHub Pages usable when Netlify is offline or its asset is blocked.
+          probePrimaryAsset();
         }).finally(function () {
           clearTimeout(timeoutId);
         });
