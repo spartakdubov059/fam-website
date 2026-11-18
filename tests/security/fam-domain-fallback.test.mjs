@@ -32,7 +32,9 @@ test("GitHub Pages prefers the primary Netlify host only after its health probe 
   assert.ok(head.includes('health && health.site === "famru"'));
   assert.ok(head.includes('window.location.replace(target)'));
   assert.ok(head.includes("}, 4000);"));
-  assert.ok(head.includes("Keep the current FAM page usable"));
+  assert.ok(head.includes("Keep GitHub Pages usable"));
+  assert.ok(head.includes("probePrimaryAsset()"));
+  assert.ok(head.includes("banner-1.webp?probe="));
   assert.ok(head.includes("window.location.search + window.location.hash"));
 });
 
