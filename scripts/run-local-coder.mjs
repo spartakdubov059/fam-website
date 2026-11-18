@@ -330,11 +330,74 @@ const patchMessages = [
   },
 ];
 
-let result = await askModel(patchMessages, patchSchema, 7000);
+
+ // For this isolated benchmark, request only the model-written diff and root cause.
+ // All other report fields are supplied by the test harness, not as model claims.
+ // No code change is prefilled: the independent workflow still validates the model's diff.
+const narrowPatchSchema = {
+  name: "fam_timeago_minimal_patch",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      unified_diff: { type: "string" },
+      root_cause: { type: "string" },
+    },
+    required: ["unified_diff", "root_cause"],
+  },
+};
+
+const narrowMessages = [
+  {
+    role: "system",
+    content: [
+      DEVELOPER_POLICY,
+      "Ты локально работающий ИИ-программист FAM. Платные и внешние API недоступны.",
+      "Используй только переданный фрагмент index.html и исправляй только функцию timeAgo.",
+      "Не меняй тесты, безопасность, роли, Supabase, конфигурацию или другой код.",
+      "Самостоятельно сформируй минимальный применимый git unified diff.",
+      "Строка unified_diff должна начинаться с diff --git a/index.html b/index.html, затем --- a/index.html, +++ b/index.html, @@ и реальные строки с префиксами пробел/+/−.",
+      "Возвращай только JSON из двух строковых полей: unified_diff и root_cause. Без Markdown.",
+      "Если исправление не можешь подтвердить по исходнику, верни пустой unified_diff.",
+    ].join("\n"),
+  },
+  {
+    role: "user",
+    content: JSON.stringify({ task, source_context: excerpts }),
+  },
+];
+
+function normalizeNarrowPatchResult(response) {
+  if (!narrowTimeAgo) return response;
+  const diff = String(response.unified_diff || "").trim();
+  return {
+    finding_status: diff ? "issue_found" : "blocked",
+    problem_summary: "Reproducible timeAgo invalid-date and Unix epoch handling",
+    root_cause: String(response.root_cause || ""),
+    evidence: ["index.html: timeAgo source, independently checked by time-ago.test.mjs"],
+    unified_diff: diff,
+    summary: "Unverified candidate from isolated local Qwen benchmark; independent QA required",
+    proposed_change: "Modify only the timeAgo function in index.html",
+    risk: "low",
+    requires_approval: true,
+    tests: ["tests/agent-benchmark/time-ago.test.mjs", "tests/security/*.test.mjs"],
+  };
+}
+
+async function requestPatch(messages) {
+  const response = await askModel(
+    messages,
+    narrowTimeAgo ? narrowPatchSchema : patchSchema,
+    narrowTimeAgo ? 2800 : 7000,
+  );
+  return normalizeNarrowPatchResult(response);
+}
+
+let result = await requestPatch(narrowTimeAgo ? narrowMessages : patchMessages);
 if (result.finding_status === "issue_found" && !String(result.unified_diff || "").trim()) {
   console.warn("Model confirmed a concrete issue but returned an empty diff; requesting one focused patch retry.");
-  result = await askModel([
-    ...patchMessages,
+  result = await requestPatch([
+    ...(narrowTimeAgo ? narrowMessages : patchMessages),
     { role: "assistant", content: JSON.stringify(result) },
     {
       role: "user",
@@ -345,7 +408,7 @@ if (result.finding_status === "issue_found" && !String(result.unified_diff || ""
         "Если исправление действительно невозможно, объясни конкретное техническое препятствие в summary и root_cause; не оставляй пустой diff без объяснения.",
       ].join("\\n"),
     },
-  ], patchSchema, 7000);
+  ]);
 }
 
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
@@ -385,8 +448,8 @@ if (patch) {
 
         if (attempt === 0) {
           console.warn("Git rejected the model patch; requesting one focused repair:", patchCheckError);
-          result = await askModel([
-            ...patchMessages,
+          result = await requestPatch([
+            ...(narrowTimeAgo ? narrowMessages : patchMessages),
             { role: "assistant", content: JSON.stringify({ ...result, unified_diff: patch }) },
             {
               role: "user",
@@ -399,7 +462,7 @@ if (patch) {
                 "Верни полный исправленный unified_diff, который применим к переданному исходному файлу.",
               ].join("\n"),
             },
-          ], patchSchema, 7000);
+          ]);
           patch = String(result.unified_diff || "").trim();
           if (!patch) {
             patchCheckError = "Model returned an empty patch during the repair attempt.";
