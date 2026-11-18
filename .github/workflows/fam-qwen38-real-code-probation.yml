@@ -103,6 +103,23 @@ jobs:
                   CHANGED="$(git diff --name-only | sort -u)"
                   if [[ "$CHANGED" != "index.html" ]]; then
                     QA="forbidden_changed_files"
+                  elif ! node --input-type=commonjs -e '
+                    const fs = require("node:fs");
+                    const cp = require("node:child_process");
+                    const before = cp.execFileSync("git", ["show", "HEAD:index.html"], {encoding:"utf8"});
+                    const after = fs.readFileSync("index.html", "utf8");
+                    const pattern = /^  function timeAgo\(isoOrMs\) \{[^]*?^  \}/m;
+                    const a = before.match(pattern);
+                    const b = after.match(pattern);
+                    if (!a || !b || before.match(/  function timeAgo\(isoOrMs\)/g)?.length !== 1 ||
+                        after.match(/  function timeAgo\(isoOrMs\)/g)?.length !== 1 ||
+                        a[0] === b[0] ||
+                        before.replace(pattern, "__TIMEAGO__") !== after.replace(pattern, "__TIMEAGO__")) {
+                      console.error("Patch must modify only the existing timeAgo function body");
+                      process.exit(1);
+                    }
+                  '; then
+                    QA="forbidden_changes_outside_timeago"
                   elif node --test tests/agent-benchmark/time-ago.test.mjs && node --test tests/moderation/*.test.mjs tests/security/*.test.mjs && git diff --check; then
                     QA="passed"
                   else
