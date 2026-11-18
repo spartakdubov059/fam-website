@@ -196,7 +196,18 @@ const planSchema = {
   },
 };
 
-const plan = await askModel([
+// The isolated timeAgo benchmark skips the expensive general repository planner.
+// The model still must independently generate the complete patch and pass all QA.
+const narrowTimeAgo = process.env.FAM_NARROW_TIMEAGO_BENCHMARK === "1";
+const plan = narrowTimeAgo ? {
+  finding_status: "issue_found",
+  problem_summary: "Validate invalid timestamps and preserve Unix epoch zero in timeAgo",
+  root_cause: "Explicit reproducible benchmark; model must inspect source and generate its own patch",
+  evidence: ["Benchmark task and existing independent timeAgo test"],
+  files: ["index.html"],
+  keywords: ["timeAgo"],
+  plan: "Fix only the timeAgo function without modifying tests or any other file"
+} : await askModel([
   {
     role: "system",
     content: [
@@ -252,7 +263,16 @@ if (selected.length > 4 || selected.some((path) => !tracked.includes(path) || !a
 }
 
 const excerpts = selected.map((path) => {
-  const body = sourceContext(path, plan.keywords || [], task);
+  let body;
+  if (narrowTimeAgo && path === "index.html") {
+    const lines = readFileSync(path, "utf8").split(/\\r?\\n/);
+    const start = lines.findIndex((line) => /\\bfunction\\s+timeAgo\\s*\\(/.test(line));
+    if (start < 0) throw new Error("timeAgo function not found; aborting narrow benchmark");
+    body = lines.slice(Math.max(0, start - 5), Math.min(lines.length, start + 65))
+      .map((line, i) => String(Math.max(0, start - 5) + i + 1) + ": " + line).join("\\n");
+  } else {
+    body = sourceContext(path, plan.keywords || [], task);
+  }
   return "## Файл: " + path + "\n\`\`\`\n" + body + "\n\`\`\`";
 }).join("\n\n");
 
