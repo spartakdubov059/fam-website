@@ -2,7 +2,11 @@ name: FAM Qwen3.8 candidate real-code probation
 on:
   push:
     branches: [test/qwen38-fam-time-ago-probation]
-    paths: [".github/workflows/fam-qwen38-real-code-probation.yml"]
+    paths:
+      - ".github/workflows/fam-qwen38-real-code-probation.yml"
+      - "scripts/run-local-coder.mjs"
+      - "tests/agent-benchmark/time-ago.test.mjs"
+      - "index.html"
 permissions:
   contents: read
 concurrency:
