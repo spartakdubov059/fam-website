@@ -17,6 +17,8 @@ test("check-host HTTP success and redirects are interpreted separately", () => {
   assert.equal(summarizeNodeResult([[1, 0.15, "OK", "200"]]).state, "ok");
   assert.equal(summarizeNodeResult([[1, 0.15, "Moved", "301"]]).state, "redirect");
   assert.equal(summarizeNodeResult([[1, 0.15, "Unauthorized", "401"]]).state, "auth-required");
+  // Check-Host's first tuple element is often 0 for HTTP 401 despite a real reply.
+  assert.equal(summarizeNodeResult([[0, 0.15, "Unauthorized", "401"]]).state, "auth-required");
   assert.equal(summarizeNodeResult([[0, 10, "Timeout", null]]).state, "failed");
   assert.equal(summarizeNodeResult([[0, 0.1, "Forbidden", "403"]]).state, "failed");
 });
