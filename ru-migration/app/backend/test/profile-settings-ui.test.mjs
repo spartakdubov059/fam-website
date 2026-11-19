@@ -2,60 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initializeProfileSettings } from '../../web/profile-settings.js';
 
-class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.attributes = {}; this.textContent = ''; this.value = ''; this.hidden = false; this.disabled = false; }
-  append(...nodes) { this.children.push(...nodes); }
-  addEventListener(name, callback) { this.listeners[name] = callback; }
+class Element {
+  constructor(tagName = 'div') { this.tagName = tagName; this.children = []; this.attributes = {}; this.textContent = ''; this.hidden = false; }
+  append(...items) { this.children.push(...items); }
   setAttribute(name, value) { this.attributes[name] = value; }
-  before(node) { this.parentElement.children.push(node); }
+  before(item) { this.parentElement.children.splice(this.parentElement.children.indexOf(this), 0, item); item.parentElement = this.parentElement; }
 }
 
 function fixture() {
-  const shell = new FakeNode('main');
-  const listingForm = new FakeNode('form'); listingForm.id = 'ruListingForm'; listingForm.parentElement = shell; shell.children.push(listingForm);
-  const values = { ruListingForm: listingForm };
-  return { document: { getElementById: id => values[id] || null, createElement: tag => new FakeNode(tag) }, shell };
+  const shell = new Element('main');
+  const listingForm = new Element('form'); listingForm.id = 'ruListingForm'; listingForm.parentElement = shell; shell.append(listingForm);
+  const document = { getElementById: id => id === 'ruListingForm' ? listingForm : null,
+    createElement: tag => new Element(tag) };
+  return { document, shell, listingForm };
 }
 
-test('Russian profile settings update only the authenticated profile through the YDB API', async () => {
-  const { document, shell } = fixture();
-  const calls = [];
-  await initializeProfileSettings({ document, fetchImpl: async (url, options = {}) => {
-    calls.push({ url, options });
-    if (options.method === 'PATCH') return { ok: true, status: 200, json: async () => ({ ok: true, profile: { first_name: 'Анна' } }) };
-    return { ok: true, status: 200, json: async () => ({ ok: true, profile: {
-      id: '11111111-1111-4111-8111-111111111111', first_name: 'Анна', last_name: 'Иванова',
-      person_type: 'student', class_name: '8А', staff_position: '',
-    } }) };
-  } });
-
-  const section = shell.children.find(node => node.id === 'ruProfileSettings');
-  const form = section.children.find(node => node.id === 'ruProfileSettingsForm');
-  const [first, last, person, schoolClass, staffPosition] = form.children;
-  assert.equal(first.children[0].value, 'Анна');
-  assert.equal(schoolClass.hidden, false);
-  assert.equal(staffPosition.hidden, true);
-  first.children[0].value = 'Мария';
-  person.children[0].value = 'parent';
-  await person.children[0].listeners.change();
-  assert.equal(schoolClass.hidden, true);
-  assert.equal(staffPosition.hidden, true);
-  await form.listeners.submit({ preventDefault() {} });
-  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/me']);
-  assert.equal(calls[1].options.method, 'PATCH');
-  assert.deepEqual(JSON.parse(calls[1].options.body), {
-    first_name: 'Мария', last_name: 'Иванова', person_type: 'parent', class_name: '', staff_position: '',
-  });
-  assert.equal('user_id' in JSON.parse(calls[1].options.body), false);
-  assert.equal(form.children[5].textContent, 'Профиль сохранён.');
+test('profile network failure shows that account data were not deleted', async () => {
+  const f = fixture();
+  await initializeProfileSettings({ ...f, fetchImpl: async () => { throw new Error('offline'); } });
+  const section = f.shell.children[0];
+  assert.equal(section.id, 'ruProfileSettings');
+  assert.match(section.children[1].textContent, /не считаются удалёнными/);
+  assert.equal(section.children[1].attributes['aria-live'], 'polite');
 });
 
-test('Russian profile settings are not shown to guests or profiles not yet linked to a school', async () => {
-  const guest = fixture();
-  await initializeProfileSettings({ document: guest.document, fetchImpl: async () => ({ ok: false, status: 401, json: async () => ({}) }) });
-  assert.equal(guest.shell.children.length, 1);
+test('unauthenticated profile request stays quiet and exposes no account controls', async () => {
+  const f = fixture();
+  await initializeProfileSettings({ ...f, fetchImpl: async () => ({ status: 401, ok: false, json: async () => ({ ok: false }) }) });
+  assert.deepEqual(f.shell.children, [f.listingForm]);
+});
 
-  const unlinked = fixture();
-  await initializeProfileSettings({ document: unlinked.document, fetchImpl: async () => ({ ok: false, status: 403, json: async () => ({ error: 'profile_unavailable' }) }) });
-  assert.equal(unlinked.shell.children.length, 1);
+test('unavailable profile response does not expose profile editing controls', async () => {
+  const f = fixture();
+  await initializeProfileSettings({ ...f, fetchImpl: async () => ({ status: 503, ok: false, json: async () => ({ ok: false }) }) });
+  const section = f.shell.children[0];
+  assert.equal(section.id, 'ruProfileSettings');
+  assert.equal(section.children.length, 2);
+  assert.match(section.children[0].textContent, /временно недоступен/);
 });

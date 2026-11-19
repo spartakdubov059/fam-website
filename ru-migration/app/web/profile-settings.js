@@ -13,13 +13,34 @@ export async function initializeProfileSettings({ document = globalThis.document
   const shell = listingForm?.parentElement;
   if (!shell) return;
 
+  const showUnavailable = message => {
+    const section = node(document, 'section', 'ru-account-workflow');
+    section.id = 'ruProfileSettings';
+    section.setAttribute('aria-label', 'Настройки профиля');
+    section.append(node(document, 'h2', '', 'Профиль временно недоступен'));
+    const status = node(document, 'p', 'ru-note', message);
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    section.append(status);
+    if (typeof listingForm.before === 'function') listingForm.before(section);
+    else shell.append(section);
+  };
+
   let response;
   let data;
   try {
     response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
     data = await readJson(response);
-  } catch { return; }
-  if (!response.ok || !data?.ok || !data.profile?.id) return;
+  } catch {
+    showUnavailable('Не удалось загрузить профиль. Данные аккаунта не считаются удалёнными. Проверьте соединение и попробуйте позже.');
+    return;
+  }
+  if (!response.ok || !data?.ok || !data.profile?.id) {
+    if (response.status !== 401) showUnavailable(response.status === 403
+      ? 'Сервис не смог подтвердить профиль. Данные аккаунта не считаются удалёнными; попробуйте позже или обратитесь к администратору школы.'
+      : 'Не удалось загрузить профиль. Данные аккаунта не считаются удалёнными. Проверьте соединение и попробуйте позже.');
+    return;
+  }
 
   const profile = data.profile;
   const section = node(document, 'section', 'ru-account-workflow');
