@@ -44,3 +44,36 @@ export function normalizeUnifiedDiffHunkCounts(patch) {
 
   return lines.join("\n");
 }
+
+export function frameSingleFileHunkDiff(patch, path) {
+  if (typeof patch !== "string" || typeof path !== "string") {
+    throw new TypeError("Patch and path must be strings.");
+  }
+
+  const normalized = patch.replace(/\r\n?/g, "\n").trim();
+  if (!/^(?:index\.html|(?:css|js|assets|docs|tests)\/[A-Za-z0-9._/-]+)$/.test(path) ||
+      path.split("/").some((part) => part === ".." || part === ".")) {
+    throw new Error("Cannot frame a patch for a disallowed path.");
+  }
+
+  let body = normalized;
+  if (normalized.startsWith("--- ")) {
+    const lines = normalized.split("\n");
+    if (lines[0] !== `--- a/${path}` || lines[1] !== `+++ b/${path}` || !lines[2]?.startsWith("@@ ")) {
+      throw new Error("File-labelled patch must name only the selected path and contain a unified diff hunk.");
+    }
+    if (lines.slice(2).some((line) => /^(?:--- [ab]\/|\+\+\+ [ab]\/)/.test(line))) {
+      throw new Error("File-labelled patch contains additional file headers.");
+    }
+    body = lines.slice(2).join("\n");
+  } else if (!normalized.startsWith("@@ ")) {
+    throw new Error("Unframed patch must start with a unified diff hunk or selected-file headers.");
+  }
+
+  return [
+    `diff --git a/${path} b/${path}`,
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    body,
+  ].join("\n");
+}

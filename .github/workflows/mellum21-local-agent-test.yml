@@ -1,0 +1,223 @@
+name: FAM Mellum2.1 free CPU model verification
+
+on:
+  push:
+    branches:
+      - ai/mellum21-free-cpu-rollout
+    paths:
+      - ".github/workflows/mellum21-local-agent-test.yml"
+      - "scripts/local-model-patch.mjs"
+      - "scripts/local-model-plan.mjs"
+      - "scripts/run-local-coder.mjs"
+      - "tests/security/local-model-patch.test.mjs"
+      - "tests/security/local-model-plan.test.mjs"
+      - "tests/security/fam-codex-developer-workflow.test.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-mellum21-cpu-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-model:
+    name: Mellum2.1 Thinking — real FAM coding task
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+
+      - name: Test JSON and patch safety helpers
+        run: |
+          set -euo pipefail
+          node --test tests/security/local-model-json.test.mjs
+          node --test tests/security/local-model-patch.test.mjs
+          node --test tests/security/local-model-plan.test.mjs
+
+      - name: Restore the free model weights cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/fam-model/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+          key: fam-mellum21-12b-a2.5b-thinking-q4km-v1
+
+      - name: Download and verify official JetBrains model weights
+        env:
+          MODEL_SHA256: ecc4d5b8107fc219e23c494b2d107552137637b6c6002ee713e0ba8af7fa2755
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          MODEL="$RUNNER_TEMP/fam-model/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf"
+          if [[ ! -s "$MODEL" ]]; then
+            curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              "https://huggingface.co/JetBrains/Mellum2.1-12B-A2.5B-Thinking-GGUF/resolve/150a3d83b95bbe8a8b0cf803a06b7245af9f56fd/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf" \
+              --output "$MODEL"
+          fi
+          actual_size="$(stat -c '%s' "$MODEL")"
+          actual_sha="$(sha256sum "$MODEL" | awk '{print $1}')"
+          if (( actual_size < 7500000000 )) || [[ "$actual_sha" != "$MODEL_SHA256" ]]; then
+            rm -f "$MODEL"
+            echo "::error::Mellum2.1 model size or SHA-256 verification failed."
+            exit 1
+          fi
+          echo "Verified Mellum2.1 Q4_K_M: $actual_size bytes"
+          df -h "$RUNNER_TEMP"
+
+      - name: Cache verified model weights for later runs
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/fam-model/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf
+          key: fam-mellum21-12b-a2.5b-thinking-q4km-v1
+
+      - name: Build pinned llama.cpp with CPU support
+        env:
+          LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_AVX2=ON \
+            -DGGML_FMA=ON \
+            -DGGML_CUDA=OFF \
+            -DGGML_VULKAN=OFF \
+            -DGGML_METAL=OFF \
+            -DGGML_OPENMP=ON
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+
+      - name: Start Mellum2.1 locally on CPU
+        run: |
+          set -euo pipefail
+          MODEL="$RUNNER_TEMP/fam-model/Mellum2.1-12B-A2.5B-Thinking-Q4_K_M.gguf"
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          "$SERVER" -m "$MODEL" \
+            --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 \
+            --reasoning-budget 1024 \
+            --reasoning-budget-message "Stop reasoning and return the required final JSON object now." \
+            --temp 0.6 --top-p 0.95 --top-k 20 \
+            > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/fam-llama-server.pid"
+          READY=false
+          for attempt in $(seq 1 180); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then
+              READY=true
+              break
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/fam-llama-server.pid")" 2>/dev/null; then
+              echo "::error::llama-server stopped before becoming ready."
+              tail -n 100 "$RUNNER_TEMP/fam-llama-server.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          if [[ "$READY" != "true" ]]; then
+            echo "::error::Mellum2.1 did not start within 15 minutes."
+            tail -n 100 "$RUNNER_TEMP/fam-llama-server.log"
+            exit 1
+          fi
+
+      - name: Run the same isolated FAM coding task
+        env:
+          FAM_MODEL_ID: JetBrains/Mellum2.1-12B-A2.5B-Thinking
+          FAM_MODEL_TEMPERATURE: "0.6"
+          FAM_MODEL_TOP_P: "0.95"
+          FAM_MODEL_TOP_K: "20"
+          FAM_DEBUG_MODEL_RESPONSES: "1"
+          FAM_TASK: "Исправь воспроизводимый дефект функции normalizeSearchInput в tests/fixtures/qwen-model-benchmark.mjs. Сейчас она приводит строку к нижнему регистру и обрезает края, но оставляет повторные пробелы, табуляции и переводы строк внутри. Сверни любую последовательность Unicode whitespace в один обычный пробел, сохрани нижний регистр, trim и сигнатуру функции. Регрессионные тесты находятся в tests/fixtures/qwen-model-benchmark.test.mjs. Измени только tests/fixtures/qwen-model-benchmark.mjs, не меняй тест и остальные файлы. Подготовь минимальный patch с доказательством причины."
+        run: |
+          set -euo pipefail
+          OUTPUT_ROOT="$RUNNER_TEMP/fam-mellum21-output"
+          mkdir -p "$OUTPUT_ROOT"
+          START_TIME="$(date +%s)"
+          GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+          RUNNER_TEMP="$OUTPUT_ROOT" \
+          FAM_MODEL_ID="$FAM_MODEL_ID" \
+          FAM_MODEL_TEMPERATURE="$FAM_MODEL_TEMPERATURE" \
+          FAM_MODEL_TOP_P="$FAM_MODEL_TOP_P" \
+          FAM_MODEL_TOP_K="$FAM_MODEL_TOP_K" \
+          FAM_TASK="$FAM_TASK" \
+            node scripts/run-local-coder.mjs
+          END_TIME="$(date +%s)"
+          echo "$((END_TIME - START_TIME))" > "$OUTPUT_ROOT/inference-seconds.txt"
+          test -s "$OUTPUT_ROOT/fam-agent/summary.json"
+
+      - name: Validate the patch and run independent FAM regression tests
+        if: always()
+        env:
+          OUTPUT_ROOT: ${{ runner.temp }}/fam-mellum21-output
+        run: |
+          set -euo pipefail
+          SUMMARY="$OUTPUT_ROOT/fam-agent/summary.json"
+          PATCH="$OUTPUT_ROOT/fam-agent/fam-agent.patch"
+          QA_STATUS="not_run_no_patch"
+          if [[ ! -s "$SUMMARY" ]]; then
+            QA_STATUS="model_or_inference_failed"
+          else
+            PATCH_AVAILABLE="$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available === true))" "$SUMMARY")"
+            if [[ "$PATCH_AVAILABLE" == "true" && -s "$PATCH" ]]; then
+              node scripts/validate-local-agent-patch.mjs "$PATCH" "$SUMMARY"
+              node --input-type=module - "$PATCH" <<'NODE'
+          import { readFileSync } from "node:fs";
+          const patch = readFileSync(process.argv[2], "utf8");
+          const paths = [...patch.matchAll(/^diff --git a\/(.+?) b\/(.+?)\s*$/gm)].map((m) => m[1]);
+          if (paths.length !== 1 || paths[0] !== "tests/fixtures/qwen-model-benchmark.mjs") {
+            throw new Error("Patch changed an unexpected path: " + paths.join(", "));
+          }
+          NODE
+              git apply --check "$PATCH"
+              git apply "$PATCH"
+              if node --test tests/fixtures/qwen-model-benchmark.test.mjs && \
+                 node --test tests/moderation/*.test.mjs tests/security/*.test.mjs; then
+                QA_STATUS="passed"
+              else
+                QA_STATUS="failed"
+              fi
+            fi
+          fi
+          echo "QA_STATUS=$QA_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          echo "qa_status=$QA_STATUS" >> "$GITHUB_OUTPUT"
+          if [[ -s "$SUMMARY" ]]; then
+            SUMMARY_PATH="$SUMMARY" QA_VALUE="$QA_STATUS" node --input-type=module - <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const path = process.env.SUMMARY_PATH;
+          const summary = JSON.parse(readFileSync(path, "utf8"));
+          summary.verification_status = process.env.QA_VALUE;
+          summary.independent_test_suites = process.env.QA_VALUE === "passed"
+            ? ["tests/fixtures/qwen-model-benchmark.test.mjs", "tests/moderation/*.test.mjs", "tests/security/*.test.mjs"]
+            : [];
+          writeFileSync(path, `${JSON.stringify(summary, null, 2)}\n`);
+          NODE
+          fi
+          if [[ "$QA_STATUS" != "passed" ]]; then
+            echo "::error::Mellum2.1 must generate an applicable patch that passes independent tests; QA=$QA_STATUS."
+            exit 1
+          fi
+
+      - name: Stop local model server
+        if: always()
+        run: |
+          if [[ -s "$RUNNER_TEMP/fam-llama-server.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/fam-llama-server.pid")" 2>/dev/null || true
+          fi
+
+      - name: Save Mellum2.1 report and patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
+        with:
+          name: fam-mellum21-agent-verification
+          path: ${{ runner.temp }}/fam-mellum21-output/
+          if-no-files-found: warn
+          retention-days: 3
