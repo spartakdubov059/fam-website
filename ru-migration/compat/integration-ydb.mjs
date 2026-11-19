@@ -173,8 +173,7 @@ try {
   assert.equal(backgroundQueueHealth.queues.daily_reports.statuses.completed, 1);
   assert.equal(backgroundQueueHealth.queues.site_error_digests.statuses.completed, 1);
   assert.equal(backgroundQueueHealth.queues.daily_reports.expired_leases, 0);
-  assert.equal(backgroundQueueHealth.queues.site_error_digests.expired_leases, 0);
-  await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
+  assert.equal(backgroundQueueHealth.queues.site_error_digests.expired_leases, 0);  await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
     summary: 'Синтетическая сводка без пользовательских данных', metrics: agentMetrics });
   const syntheticIdeaId = 'a'.repeat(64);
   const insertedSyntheticAgentIdea = await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
