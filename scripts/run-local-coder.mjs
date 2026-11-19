@@ -268,8 +268,14 @@ const excerpts = selected.map((path) => {
     const lines = readFileSync(path, "utf8").split(/\r?\n/);
     const start = lines.findIndex((line) => /\bfunction\s+timeAgo\s*\(/.test(line));
     if (start < 0) throw new Error("timeAgo function not found; aborting narrow benchmark");
-    body = lines.slice(Math.max(0, start - 5), Math.min(lines.length, start + 65))
-      .join("\n");
+    const contextStart = Math.max(0, start - 5);
+    const contextEnd = Math.min(lines.length, start + 65);
+    // Line numbers are metadata for hunk offsets, not part of the source code.
+    // Qwen must still generate every changed line of its own patch.
+    body = "[Original file index.html; excerpt begins at line " + (contextStart + 1) +
+      "; function timeAgo begins at line " + (start + 1) +
+      ". Use original file line numbers in @@ headers, never assume line 1.]\n" +
+      lines.slice(contextStart, contextEnd).join("\n");
   } else {
     body = sourceContext(path, plan.keywords || [], task);
   }
@@ -356,6 +362,8 @@ const narrowMessages = [
       "Используй только переданный фрагмент index.html и исправляй только функцию timeAgo.",
       "Не меняй тесты, безопасность, роли, Supabase, конфигурацию или другой код.",
       "Самостоятельно сформируй минимальный применимый git unified diff.",
+      "Контекст является выдержкой из большого index.html, а не началом файла. В заголовке @@ укажи реальный номер строки функции, сообщённый в метаданных выдержки; @@ -1 недопустим, если функция находится ниже первой строки.",
+      "Контекстные и удаляемые строки должны точно совпадать с переданным исходником, включая пробелы и отступы.",
       "Строка unified_diff должна начинаться с diff --git a/index.html b/index.html, затем --- a/index.html, +++ b/index.html, @@ и реальные строки с префиксами пробел/+/−.",
       "Возвращай только JSON из двух строковых полей: unified_diff и root_cause. Без Markdown.",
       "Если исправление не можешь подтвердить по исходнику, верни пустой unified_diff.",
