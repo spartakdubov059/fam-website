@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { postJson } from "../../scripts/local-model-http.mjs";
+import { postJson, LocalInferenceTimeoutError } from "../../scripts/local-model-http.mjs";
 
 async function withServer(handler, run) {
   const server = createServer(handler);
@@ -44,7 +44,7 @@ test("local model HTTP client enforces its explicit socket timeout", async () =>
   }, async (url) => {
     await assert.rejects(
       postJson(url, { prompt: "timeout test" }, { timeoutMs: 25 }),
-      /timed out after 0 minutes/,
+      LocalInferenceTimeoutError,
     );
   });
 });
@@ -58,5 +58,20 @@ test("local model HTTP client rejects non-JSON and non-success responses", async
       postJson(url, {}),
       /Local inference failed with HTTP 503/,
     );
+  });
+});
+
+test("a real inference timeout selects the retry code while other errors do not", async () => {
+  const { chooseResultCode } = await import("../../scripts/fam-agent-bridge.mjs");
+  await withServer(() => {}, async (url) => {
+    let reason = "";
+    try {
+      await postJson(url, {}, { timeoutMs: 25 });
+      assert.fail("request unexpectedly succeeded");
+    } catch (error) {
+      if (error instanceof LocalInferenceTimeoutError) reason = "timeout";
+    }
+    assert.equal(chooseResultCode(null, false, reason), "model_timeout");
+    assert.equal(chooseResultCode(null, false, ""), "model_failed");
   });
 });

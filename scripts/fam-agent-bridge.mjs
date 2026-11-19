@@ -52,8 +52,8 @@ export async function readTaskSummary(filePath) {
   }
 }
 
-export function chooseResultCode(summary, executionSucceeded = true) {
-  if (!executionSucceeded) return "model_failed";
+export function chooseResultCode(summary, executionSucceeded = true, failureReason = "") {
+  if (!executionSucceeded) return failureReason === "timeout" ? "model_timeout" : "model_failed";
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
@@ -115,7 +115,7 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
     const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
-    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
+    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success", process.env.FAM_MODEL_FAILURE_REASON);
     const result = await bridgeRequest({
       url, token, body: { action: "finish", task_id: taskId, result_code: code },
     });
