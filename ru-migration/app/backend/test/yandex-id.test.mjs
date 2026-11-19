@@ -41,7 +41,7 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.match(sessionCookie, /SameSite=Lax/);
   assert.equal(sessionCookie.includes('temporary-yandex-access-token'), false);
   const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } });
-  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789', authenticated_at: 1_800_000_000 });
+  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789', authenticated_at: null, session_issued_at: 1_800_000_000 });
   assert.deepEqual(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://fam.example' } }), identity);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://attacker.example' } }), null);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie) } }), null, 'unsafe cookie requests require an Origin header');
@@ -50,11 +50,19 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
 });
 
 test('sensitive-action reauthentication requests explicit Yandex account confirmation', async () => {
-  const auth = createYandexIdAuth({ clientId: 'client', redirectUri: 'https://fam.example/auth/yandex/callback', sessionSecret: 'test-session-secret-with-32-bytes-minimum' });
+  const auth = createYandexIdAuth({ clientId: 'client', redirectUri: 'https://fam.example/auth/yandex/callback', sessionSecret: 'test-session-secret-with-32-bytes-minimum',
+    fetchImpl: async url => String(url) === 'https://oauth.yandex.ru/token'
+      ? { ok: true, json: async () => ({ token_type: 'bearer', access_token: 'token' }) }
+      : { ok: true, json: async () => ({ id: '123456789', client_id: 'client' }) } });
   const start = await auth.handle({ method: 'GET', url: '/auth/yandex/start?reauth=1', headers: {} });
   const authorize = new URL(start.headers.location);
   assert.equal(authorize.searchParams.get('force_confirm'), 'yes');
   assert.match(start.headers['set-cookie'], /HttpOnly/);
+  const callback = await auth.handle(callbackRequest(authorize.searchParams.get('state'), cookiePair(start.headers['set-cookie'])));
+  const session = callback.headers['set-cookie'].find(value => value.startsWith('fam_ru_session='));
+  const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(session) } });
+  assert.equal(identity.authenticated_at, null, 'a consent prompt is not an authentication timestamp');
+  assert.equal(identity.step_up_confirmed_at, Math.floor(Date.now() / 1000));
 });
 
 test('Yandex logout rejects missing and cross-origin requests', async () => {

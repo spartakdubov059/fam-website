@@ -10,9 +10,9 @@ function request(method, url, body = null) {
   req.method = method; req.url = url; req.headers = {};
   return req;
 }
-function api({ authenticatedAt = Math.floor(Date.now() / 1000), role = 'school_admin', repository = {} } = {}) {
+function api({ authenticatedAt = Math.floor(Date.now() / 1000), stepUpConfirmedAt = null, role = 'school_admin', repository = {} } = {}) {
   return createListingsApi({
-    authenticate: async () => authenticatedAt === null ? null : ({ issuer: 'https://issuer.test', subject: 'admin', authenticated_at: authenticatedAt }),
+    authenticate: async () => ({ issuer: 'https://issuer.test', subject: 'admin', authenticated_at: authenticatedAt, step_up_confirmed_at: stepUpConfirmedAt }),
     resolveActor: async () => role ? ({ ...admin, role }) : null,
     repository,
   });
@@ -39,6 +39,10 @@ test('stale authentication, other roles, self action, invalid duration and conta
   const repository = { issueAccountSuspension: async () => { mutations++; return { ok: true }; } };
   const old = api({ authenticatedAt: Math.floor(Date.now() / 1000) - 601, repository });
   assert.equal((await old(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_auth_required');
+  const normalSession = api({ authenticatedAt: null, repository });
+  assert.equal((await normalSession(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_auth_required');
+  const confirmed = api({ authenticatedAt: null, stepUpConfirmedAt: Math.floor(Date.now() / 1000), role: 'student', repository });
+  assert.equal((await confirmed(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 403, 'fresh consent cannot bypass the administrator role check');
   const student = api({ role: 'student', repository });
   assert.equal((await student(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 403);
   const fresh = api({ repository });

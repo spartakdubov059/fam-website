@@ -44,6 +44,13 @@ test('account deletion requires fresh Yandex authentication and the exact confir
   assert.equal(calls, 0);
 });
 
+test('ordinary Yandex sessions do not satisfy fresh confirmation; signed step-up consent does', async () => {
+  const ordinary = api({ authenticated: { ...identity, authenticated_at: null, session_issued_at: Math.floor(now / 1000) } });
+  assert.equal((await ordinary(request())).body.error, 'recent_yandex_login_required');
+  const confirmed = api({ authenticated: { ...identity, authenticated_at: null, step_up_confirmed_at: Math.floor(now / 1000) } });
+  assert.equal((await confirmed(request())).body.error, 'account_deletion_unavailable', 'confirmation passed; the incomplete fake repository blocks deletion');
+});
+
 test('account deletion deactivates first, removes every listed object, then clears YDB records', async () => {
   const calls = [];
   const handler = api({

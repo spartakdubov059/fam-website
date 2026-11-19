@@ -49,7 +49,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
       return;
     }
     button.disabled = true;
-    status.textContent = 'Проверяем свежесть входа и удаляем данные аккаунта…';
+    status.textContent = 'Проверяем подтверждение Яндекс ID и удаляем данные аккаунта…';
     try {
       const response = await fetchImpl('/api/v1/me/account', {
         method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
@@ -59,7 +59,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
       const result = await json(response);
       if (!response.ok || !result?.ok || !result.deleted) {
         if (result?.error === 'recent_yandex_login_required') {
-          status.textContent = 'Для удаления войдите через Яндекс ID повторно. Аккаунт не изменён.';
+          status.textContent = 'Для удаления подтвердите действие через Яндекс ID. Аккаунт не изменён.';
           return;
         }
         if (result?.error === 'last_school_admin') {

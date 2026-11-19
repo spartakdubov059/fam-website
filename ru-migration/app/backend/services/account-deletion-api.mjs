@@ -1,3 +1,5 @@
+import { hasFreshConfirmation } from '../auth/fresh-confirmation.mjs';
+
 const CONFIRMATION = 'УДАЛИТЬ МОЙ АККАУНТ';
 const UUID_SOURCE = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const USER_ID = new RegExp(`^${UUID_SOURCE}$`, 'i');
@@ -37,9 +39,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     if (parsed.error) return { status: parsed.error === 'request_too_large' ? 413 : 400, body: { ok: false, error: parsed.error } };
     if (adminDeletion) {
       if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const currentSeconds = Math.floor(now() / 1000);
-      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
-          || identity.authenticated_at < currentSeconds - 600) {
+      if (!hasFreshConfirmation(identity, now())) {
         return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
       }
       if (adminDeleteMatch[1].toLowerCase() === actor.id.toLowerCase()) return { status: 403, body: { ok: false, error: 'cannot_delete_self' } };
@@ -55,18 +55,14 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
             : { status: 409, body: { ok: false, error: 'request_unavailable' } };
         } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       }
-      const currentSeconds = Math.floor(now() / 1000);
-      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
-          || identity.authenticated_at < currentSeconds - 600) {
+      if (!hasFreshConfirmation(identity, now())) {
         return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
       }
       if (parsed.value.decision !== 'approve' || parsed.value.confirmation !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') {
         return { status: 400, body: { ok: false, error: 'confirmation_required' } };
       }
     } else {
-      const currentSeconds = Math.floor(now() / 1000);
-      if (!Number.isInteger(identity.authenticated_at) || identity.authenticated_at > currentSeconds + 5
-          || identity.authenticated_at < currentSeconds - 600) {
+      if (!hasFreshConfirmation(identity, now())) {
         return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
       }
       if (parsed.value.confirmation !== CONFIRMATION) return { status: 400, body: { ok: false, error: 'confirmation_required' } };

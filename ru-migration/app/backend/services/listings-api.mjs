@@ -7,6 +7,7 @@ import { createSchoolPulseApi } from './school-pulse-api.mjs';
 import { createAccountDeletionApi } from './account-deletion-api.mjs';
 import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
 import { createSiteErrorTelemetry } from './site-error-telemetry.mjs';
+import { hasFreshConfirmation } from '../auth/fresh-confirmation.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review, safetyKey, schools = SCHOOL_CATALOG, pendingImages = null, now = Date.now }) {
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
@@ -242,9 +243,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'PATCH' && roleManagementTarget) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      const authenticatedAt = Number(identity.authenticated_at);
-      const ageSeconds = now() / 1000 - authenticatedAt;
-      if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
+      if (!hasFreshConfirmation(identity, now())) return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
       if (typeof repository?.revokeSchoolRole !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
@@ -282,9 +281,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'PATCH' && suspensionAction) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      const authenticatedAt = Number(identity.authenticated_at);
-      const ageSeconds = now() / 1000 - authenticatedAt;
-      if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) {
+      if (!hasFreshConfirmation(identity, now())) {
         return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
       }
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
@@ -760,9 +757,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       if (!context) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
       if (context.user_id !== actor.id) {
-        const authenticatedAt = Number(identity.authenticated_at);
-        const ageSeconds = now() / 1000 - authenticatedAt;
-        if (!Number.isFinite(authenticatedAt) || ageSeconds < 0 || ageSeconds > 600) {
+        if (!hasFreshConfirmation(identity, now())) {
           return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
         }
       }

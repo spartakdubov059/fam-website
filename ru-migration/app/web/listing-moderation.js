@@ -43,7 +43,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       status.textContent = 'Удаление отменено: фраза подтверждения не совпала.';
       return;
     }
-    status.textContent = 'Проверяем свежесть входа и удаляем аккаунт…';
+    status.textContent = 'Проверяем подтверждение Яндекс ID и удаляем аккаунт…';
     try {
       const response = await fetchImpl(`/api/v1/school/accounts/${encodeURIComponent(account.id)}`, {
         method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
@@ -52,8 +52,8 @@ export async function initializeListingModeration({ document = globalThis.docume
       });
       const result = await json(response);
       if (result?.error === 'recent_yandex_login_required') {
-        status.replaceChildren(node(document, 'span', '', 'Войдите через Яндекс ID ещё раз, затем повторите удаление. '));
-        const link = node(document, 'a', '', 'Подтвердить вход'); link.href = '/auth/yandex/start?reauth=1';
+        status.replaceChildren(node(document, 'span', '', 'Подтвердите действие через Яндекс ID, затем повторите удаление. '));
+        const link = node(document, 'a', '', 'Подтвердить действие'); link.href = '/auth/yandex/start?reauth=1';
         status.append(link);
         return;
       }
@@ -208,7 +208,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (targets.length) {
           const panel = node(document, 'section', 'ru-moderation-card');
           panel.append(node(document, 'h3', '', 'Временное ограничение действий аккаунта'));
-          const note = node(document, 'p', '', 'Доступно администраторам этой школы после повторного подтверждения входа. Выберите срок и укажите фактическую причину без личных данных.');
+          const note = node(document, 'p', '', 'Доступно администраторам этой школы после явного подтверждения через Яндекс ID. Выберите срок и укажите фактическую причину без личных данных.');
           const form = document.createElement('form'); form.className = 'ru-suspension-form';
           const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', 'Аккаунт');
           const prompt = node(document, 'option', '', 'Выберите аккаунт'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);
@@ -337,7 +337,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         overview.append(node(document, 'p', '', 'Список ограничен последними 100 профилями и публикациями, 50 заявками и 100 ограничениями.'));
         const accounts = node(document, 'section', 'ru-school-account-list');
         accounts.append(node(document, 'h4', '', 'Аккаунты школы'));
-        accounts.append(node(document, 'p', 'ru-note', 'Список показывает до 100 активных профилей. Удалить можно аккаунт ученика или Совета; для подтверждения потребуется свежий вход через Яндекс ID.'));
+        accounts.append(node(document, 'p', 'ru-note', 'Список показывает до 100 активных профилей. Удалить можно аккаунт ученика или Совета; перед удалением нужно подтвердить действие через Яндекс ID.'));
         const roleNames = { student: 'Ученик', council_member: 'Участник Ученического совета', school_admin: 'Администратор школы' };
         for (const account of users) {
           const card = node(document, 'article', 'ru-school-account-card');
@@ -526,8 +526,8 @@ export async function initializeListingModeration({ document = globalThis.docume
       const result = await json(response);
       if (!response.ok) {
         if (result?.error === 'fresh_auth_required') {
-          status.replaceChildren(node(document, 'span', '', 'Для этого действия повторно войдите через Яндекс ID. '));
-          const link = node(document, 'a', '', 'Подтвердить вход'); link.href = '/auth/yandex/start?reauth=1';
+          status.replaceChildren(node(document, 'span', '', 'Для этого действия подтвердите аккаунт через Яндекс ID. '));
+          const link = node(document, 'a', '', 'Подтвердить действие'); link.href = '/auth/yandex/start?reauth=1';
           status.append(link);
           return;
         }
@@ -653,7 +653,7 @@ export async function initializeListingModeration({ document = globalThis.docume
             requestStatus.textContent = 'Фраза не совпала. Обращение и аккаунт не изменены.';
             return;
           }
-          requestStatus.textContent = 'Проверяем свежесть входа и удаляем аккаунт…';
+          requestStatus.textContent = 'Проверяем подтверждение Яндекс ID и удаляем аккаунт…';
           try {
             const decision = await fetchImpl(`/api/v1/deletion-requests/${item.request_id}`, {
               method: 'PATCH', credentials: 'same-origin', cache: 'no-store',

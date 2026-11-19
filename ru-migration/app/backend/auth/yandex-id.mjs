@@ -75,12 +75,13 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
       const nowValue = nowSeconds();
-      const stateToken = encodeSigned({ kind: 'oauth_state', state, verifier, exp: nowValue + STATE_SECONDS }, secret);
+      const stepUpConfirmation = url.searchParams.get('reauth') === '1';
+      const stateToken = encodeSigned({ kind: 'oauth_state', state, verifier, stepUpConfirmation, exp: nowValue + STATE_SECONDS }, secret);
       const authorize = new URL(AUTHORIZATION_ENDPOINT);
       authorize.search = new URLSearchParams({
         response_type: 'code', client_id: clientId, redirect_uri: callback.toString(),
         scope: 'login:info', state, code_challenge: challenge, code_challenge_method: 'S256',
-        ...(url.searchParams.get('reauth') === '1' ? { force_confirm: 'yes' } : {}),
+        ...(stepUpConfirmation ? { force_confirm: 'yes' } : {}),
       }).toString();
       return { status: 302, headers: {
         location: authorize.toString(),
@@ -114,7 +115,8 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
         const profile = await profileResponse.json();
         if (profile?.client_id !== clientId || typeof profile.id !== 'string' || !/^\d{1,40}$/.test(profile.id)) throw new Error('invalid_yandex_profile');
         const issued = nowSeconds();
-        const session = encodeSigned({ kind: 'session', iss: YANDEX_ISSUER, sub: profile.id, iat: issued, exp: issued + SESSION_SECONDS }, secret);
+        const session = encodeSigned({ kind: 'session', iss: YANDEX_ISSUER, sub: profile.id, iat: issued,
+          ...(stateToken.stepUpConfirmation === true ? { step_up_confirmed_at: issued } : {}), exp: issued + SESSION_SECONDS }, secret);
         return { status: 303, headers: {
           location: '/',
           'set-cookie': [clearState, cookie(SESSION_COOKIE, session, { path: '/', maxAge: SESSION_SECONDS, secure })],
@@ -133,7 +135,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
     const session = decodeSigned(getCookie(req, SESSION_COOKIE), secret, nowSeconds());
     if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string'
         || !Number.isInteger(session.iat) || session.iat > nowSeconds()) return null;
-    return { issuer: YANDEX_ISSUER, subject: session.sub, authenticated_at: session.iat };
+    return { issuer: YANDEX_ISSUER, subject: session.sub, authenticated_at: null,
+      session_issued_at: session.iat,
+      ...(Number.isInteger(session.step_up_confirmed_at) ? { step_up_confirmed_at: session.step_up_confirmed_at } : {}) };
   }
 
   return Object.freeze({ handle, authenticate });
