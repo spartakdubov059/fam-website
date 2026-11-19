@@ -2586,8 +2586,43 @@ window.onunhandledrejection = function() {
   }
 
   async function clearNotifications() {
-    const ids = notificationsCache.map(item => item.id);
-    for (const id of ids) await dismissNotification(id);
+    const accountId = user?.id;
+    if (!accountId || !notificationsCache.length) return;
+    // Persist one snapshot: new notifications arriving during the request must remain visible.
+    const snapshot = notificationsCache.filter(item => typeof item?.id === "string");
+    const ids = [...new Set(snapshot.map(item => item.id))];
+    if (!ids.length) return;
+    const messageIds = [...new Set(snapshot
+      .filter(item => item.kind === "message" && typeof item.recordId === "string")
+      .map(item => item.recordId))];
+
+    if (messageIds.length) {
+      const { error } = await sb.from("messages").update({ is_read: true })
+        .eq("receiver_id", accountId).in("id", messageIds);
+      if (error) {
+        notice("Не удалось отметить сообщения прочитанными. Попробуйте ещё раз.");
+        return;
+      }
+    }
+    if (user?.id !== accountId) return;
+
+    const readAt = new Date().toISOString();
+    const rows = ids.map(id => ({
+      user_id: accountId, notification_key: "dismissed:" + id, read_at: readAt
+    }));
+    const { error } = await sb.from("notification_reads")
+      .upsert(rows, { onConflict: "user_id,notification_key" });
+    if (error) {
+      notice("Не удалось сохранить удаление уведомлений. Попробуйте ещё раз.");
+      return;
+    }
+    if (user?.id !== accountId) return;
+
+    const dismissed = new Set(ids);
+    notificationsCache = notificationsCache.filter(item => !dismissed.has(item.id));
+    updateBellBadge();
+    renderNotifPanel();
+    await updateChatBadge();
   }
 
   window.closeNotifPanel = () => {
