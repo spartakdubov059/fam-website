@@ -1,0 +1,10 @@
+# Сверка FAM source → RU на 2026-11-20
+
+Исходный FAM проверен на `main` commit [`7532820`](https://github.com/spartakdubov059/fam-website/commit/75328206895898ab99c1ac3098de6deceda09459), российский порт — на ветке `migration/yandex-cloud` commit [`b13adbb`](https://github.com/spartakdubov059/fam-website/commit/b13adbbae8638074f3c5f9906f7562453bfc5f0a).
+
+- В исходном `main` — **77 SQL migration-файлов** и **7 Edge Functions**: `council-management`, `fam-agent-coder-bridge`, `fam-agent-worker`, `fam-listing-image-worker`, `moderate`, `school-admin-access`, `submit-content`.
+- Между исходными снимками `7fd4182` и `7532820` добавлена одна миграция: `20261118212000_restore_own_profile_identity_field_grants.sql`. Она восстанавливает для `authenticated` только column-level SELECT для `person_type`, `staff_position`, `staff_verification_status` и UPDATE для двух редактируемых полей; полных grants на таблицу и grants роли `anon` нет.
+- Этот Supabase grant не является YDB DDL и не должен копироваться в RU базу. RU shell использует серверный `GET /api/v1/me`, а профиль backend разрешает по активной identity. В [`b13adbb`](https://github.com/spartakdubov059/fam-website/commit/b13adbbae8638074f3c5f9906f7562453bfc5f0a) RU UI также получил явное сообщение о недоступном профиле; редактирование и удаление остаются скрытыми, пока backend не подтвердит профиль.
+- Полная сверка всех 77 миграций и семи функций по поведенческим инвариантам остаётся незавершённой. Общий agent worker, coder bridge и автоматический image worker требуют отдельного переноса и security review; их вызовы не включены.
+
+Последняя проверка кода `b13adbb`: **299/299** backend/UI тестов и SDK verifier прошли локально; [SDK/Sharp CI #44634598312](https://github.com/spartakdubov059/fam-website/actions/runs/44634598312) и [одноразовая YDB CI #44634598613](https://github.com/spartakdubov059/fam-website/actions/runs/44634598613) завершились успешно на синтетических данных. Это не облачный Yandex Cloud staging. Бесплатная облачная среда с гарантированным потолком **0 ₽** не подтверждена.
