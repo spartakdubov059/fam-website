@@ -26,7 +26,7 @@ function api({ authenticated = identity, resolvedActor = actor, repository = {},
   return createAccountDeletionApi({
     authenticate: async () => authenticated,
     resolveActor: async () => resolvedActor,
-    repository: { getActiveAccountSuspension: async () => null, ...repository },
+    repository: { getActiveAccountSuspension: async () => null, listAccountMediaKeys: async () => [], ...repository },
     pendingImages,
     now: () => clock,
   });
