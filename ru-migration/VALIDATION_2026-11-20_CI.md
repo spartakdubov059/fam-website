@@ -189,4 +189,4 @@
 
 - Кодовый commit [64e4512](https://github.com/spartakdubov059/fam-website/commit/64e4512c0b89bc5f8c8927d859c3f5f6224888da) добавил синтетическую интеграционную проверку общего suspension guard с Media API: блокируются POST объявления/аватара, PATCH модерации изображения и DELETE pending-фото; репозиторий и объектное хранилище не вызываются.
 - Точный [SDK/Sharp CI #44794320383](https://github.com/spartakdubov059/fam-website/actions/runs/44794320383) успешен: **383/383 backend-теста**, 8 systemd timer-файлов, YDB/AWS SDK compatibility и реальная Sharp/WebP обработка.
-- Disposable YDB CI #44794320445 на том же commit ожидался во время фиксации этой записи; облачный staging не создавался. Облачные настройки YDB и S3, бюджет и IAM права остаются непроверенными.
+- Точный [Disposable YDB CI #44794320445](https://github.com/spartakdubov059/fam-website/actions/runs/44794320445) успешен на том же commit: схема применена, synthetic integration выполнена, временная база удалена cleanup-шагом. Облачный staging не создавался; облачные настройки YDB и S3, бюджет и IAM права остаются непроверенными.
