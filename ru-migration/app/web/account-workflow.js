@@ -30,7 +30,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
   section.hidden = false;
   section.append(node(document, 'h2', '', 'Удаление аккаунта'));
   section.append(node(document, 'p', 'ru-note', 'Удалятся профиль, ваши объявления, идеи, избранное, сообщения, записи на события и принадлежащие аккаунту фотографии. Действие необратимо. Последнего администратора школы удалить нельзя.'));
-  const status = node(document, 'p', 'ru-note', 'Для удаления потребуется повторный вход через Яндекс ID и точное подтверждение.');
+  const status = node(document, 'p', 'ru-note', 'Для удаления потребуется подтверждённый Яндекс ID повторный вход и точное подтверждение. Сейчас провайдер не передаёт приложению надёжное время повторной аутентификации, поэтому удаление останется недоступным, пока это ограничение не устранено.');
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   section.append(status);
   try {

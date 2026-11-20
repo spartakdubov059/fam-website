@@ -66,6 +66,17 @@ test('RU account deletion explains when the provider cannot attest fresh authent
   assert.equal(calls.some(call => call.url === '/auth/yandex/logout'), false);
 });
 
+test('RU account deletion explains the current provider limitation before a user attempts deletion', async () => {
+  const f = fixture();
+  await initializeAccountWorkflow({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111' } }) };
+    if (url === '/api/v1/me/suspension') return { ok: true, json: async () => ({ ok: true, suspended: false, suspension: null }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /провайдер не передаёт приложению надёжное время/);
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /удаление останется недоступным/);
+});
+
 test('RU account page shows a safe notice for the users active suspension', async () => {
   const f = fixture();
   await initializeAccountWorkflow({ ...f, fetchImpl: async url => {
