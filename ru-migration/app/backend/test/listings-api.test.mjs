@@ -902,12 +902,17 @@ test('event registration review requires council role and delegates event-owner 
   assert.deepEqual(await makeHandler('council_member')(request), { status: 200, body: { ok: true, status: 'confirmed' } });
 });
 
-test('event occupancy is a public count with no registration identity details', async () => {
+test('event occupancy is a public count for active events without registration identities', async () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
+  let active = true;
   const handler = createListingsApi({ authenticate: async () => { throw new Error('public occupancy must not authenticate'); },
-    repository: { getActiveAccountSuspension: async () => null, getEventOccupancy: async id => { assert.equal(id, eventId); return 3; } } });
+    repository: { getActiveAccountSuspension: async () => null, getPublicEventOccupancy: async id => {
+      assert.equal(id, eventId); return active ? 3 : null;
+    } } });
   const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
+  active = false;
+  assert.deepEqual(await handler(request), { status: 404, body: { ok: false, error: 'event_unavailable' } });
 });
 
 test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
