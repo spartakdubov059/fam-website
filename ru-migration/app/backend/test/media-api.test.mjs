@@ -159,6 +159,46 @@ test('pending photo access fails closed when suspension status cannot be verifie
   assert.equal(imageReads, 0);
 });
 
+test('suspended school moderators cannot read pending avatar or idea images by direct URL', async () => {
+  const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'school_admin', school_id: 'school-a' };
+  const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const avatarId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  let imageReads = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: {
+      getSchoolIdeaImage: async () => ({ user_id: '22222222-2222-4222-8222-222222222222', school_id: actor.school_id, image_key: 'pending/22222222-2222-4222-8222-222222222222/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp', image_status: 'pending' }),
+      getAvatarReview: async () => ({ id: avatarId, user_id: '22222222-2222-4222-8222-222222222222', school_id: actor.school_id, image_key: 'pending/22222222-2222-4222-8222-222222222222/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp', status: 'pending' }),
+      getActiveAccountSuspension: async (schoolId, userId) => {
+        assert.equal(schoolId, actor.school_id); assert.equal(userId, actor.id);
+        return { suspension_id: 'synthetic-suspension' };
+      },
+    },
+    pendingImages: { get: async () => { imageReads++; return Buffer.from('private-image'); } },
+  });
+  const idea = await api(request({ method: 'GET', path: `/api/v1/ideas/${ideaId}/images/0` }));
+  const avatar = await api(request({ method: 'GET', path: `/api/v1/avatars/${avatarId}/photo` }));
+  assert.deepEqual(idea, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(avatar, idea);
+  assert.equal(imageReads, 0);
+});
+
+test('a suspended school-role owner retains access to their own idea attachment', async () => {
+  const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'school_admin', school_id: 'school-a' };
+  let imageReads = 0;
+  let suspensionChecks = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: {
+      getSchoolIdeaImage: async () => ({ user_id: actor.id, school_id: actor.school_id, image_key: `pending/${actor.id}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`, image_status: 'pending' }),
+      getActiveAccountSuspension: async () => { suspensionChecks++; return { suspension_id: 'synthetic-suspension' }; },
+    },
+    pendingImages: { get: async () => { imageReads++; return Buffer.from('private-image'); } },
+  });
+  const result = await api(request({ method: 'GET', path: '/api/v1/ideas/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/images/0' }));
+  assert.equal(result.status, 200);
+  assert.equal(imageReads, 1);
+  assert.equal(suspensionChecks, 0);
+});
+
 test('only approved photos on active listings are public and rejected photos remain unavailable', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const listing = { school_id: 'school-a', status: 'active', image_key: 'pending/key.webp', photo_status: 'approved' };
@@ -222,7 +262,8 @@ test('idea images use private no-store responses for their owner and same-school
   let actor = { id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'school_admin' };
   const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
   const api = createMediaApi({ authenticate: async () => ({ subject: 'verified' }), resolveActor: async () => actor,
-    repository: { getSchoolIdeaImage: async () => ({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', image_key: imageKey, image_status: 'pending' }) },
+    repository: { getActiveAccountSuspension: async () => null,
+      getSchoolIdeaImage: async () => ({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', image_key: imageKey, image_status: 'pending' }) },
     pendingImages: { get: async key => { assert.equal(key, imageKey); return Buffer.from('synthetic-webp'); } } });
   const req = request({ method: 'GET', path: '/api/v1/ideas/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/images/0', body: Buffer.alloc(0) });
   const result = await api(req);
