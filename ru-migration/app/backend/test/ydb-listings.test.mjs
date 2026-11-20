@@ -15,6 +15,8 @@ test('school role review queue joins only the same-school profile projection', a
     status: 'pending', first_name: 'Тест', last_name: 'Ученик', class_name: '8А' };
   const repository = createYdbListingsRepository(strings => { query = strings.join('?'); return Promise.resolve([[row]]); });
   assert.deepEqual(await repository.listPendingSchoolRoleRequests('school-a'), [row]);
+  assert.match(query, /r\.request_id AS request_id, r\.user_id AS user_id/);
+  assert.match(query, /p\.first_name AS first_name, p\.last_name AS last_name, p\.class_name AS class_name/);
   assert.match(query, /INNER JOIN fam_user_profiles AS p ON p\.user_id = r\.user_id AND p\.school_id = r\.school_id/);
   assert.match(query, /r\.school_id = \?/);
   assert.match(query, /r\.status IN \('pending', 'reviewing'\)/);
