@@ -27,7 +27,7 @@
       ? new Date(item.event_starts_at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) : "");
     return '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+(openEvent?' is-open-event':'')+'">' +
       '<div class="pulse-card-overline"><span class="pulse-symbol" aria-hidden="true">'+(openEvent?'↗':important?'✦':'◈')+'</span>'+
-        '<span>'+(openEvent?'СОБЫТИЕ ДЛЯ ВСЕХ':important?'ВАЖНОЕ':'АНОНС')+'</span>'+
+        '<span>'+(openEvent?'МЕРОПРИЯТИЕ · АФИША':important?'‼ ВАЖНОЕ ОБЪЯВЛЕНИЕ':'АНОНС · АФИША')+'</span>'+
         '<span class="pulse-date">'+escapeHtml(openEvent?eventLabel:timeLabel(item?.published_at))+
           (openEvent&&eventTime?'<span class="pulse-event-clock"> · '+escapeHtml(eventTime)+'</span>':'')+'</span></div>'+
       '<h3>'+escapeHtml(clamp(item?.title,90))+'</h3>'+
@@ -70,7 +70,7 @@
     const announcer=document.getElementById("pulseAnnouncementForm");
     const poller=document.getElementById("pulsePollForm");
     const status=document.getElementById("pulseStatus");
-    let loading=false,epoch=0;
+    let loading=false,epoch=0,cachedAfishaItems=[];
     const alertUser=message=>(typeof notify==="function"?notify(message):window.alert(message));
     // All content types share one full-bleed hero stage; no inset card frames.
     const insertFeatured=cards=>{
@@ -113,13 +113,22 @@
       }));
       announcementTrack.dispatchEvent(new Event("scroll"));
     };
+    function getAfishaMarkup(query=""){
+      const needle=String(query||"").trim().toLocaleLowerCase("ru-RU");
+      return cachedAfishaItems.filter(entry=>{
+        const item=entry.item||{};
+        const text=entry.type==="poll"?item.question:[item.title,item.body].join(" ");
+        return !needle||String(text||"").toLocaleLowerCase("ru-RU").includes(needle);
+      }).map(entry=>entry.type==="poll"?pollCard(entry.item):announcementCard(entry.item)).join("");
+    }
     async function refresh(){
       const iteration=++epoch;
       const viewer=getViewer();
       if(!viewer?.id||!viewer?.school_id){
         rootNode.classList.add("hidden");
         grid.textContent="";
-        const events=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&Number(item.max_seats||0)===0&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
+        const events=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
+        cachedAfishaItems=events.map(item=>({type:"announcement",item:{...item,body:item.description,kind:"open_event"}}));
         const cards=events.map(item=>announcementCard({...item,body:item.description,kind:"open_event"}));
         insertFeatured(cards);
         carousel?.classList.toggle("hidden",cards.length===0);
@@ -137,10 +146,15 @@
         return;
       }
       const allNews=data.announcements.filter(item=>item&&typeof item.title==="string");
-      const priorityNews=allNews.filter(item=>item.kind==="open_event"||item.kind==="important").slice(0,6);
+      const importantNews=allNews.filter(item=>item.kind==="important").slice(0,6);
+      const eventNews=allNews.filter(item=>item.kind==="open_event").slice(0,6);
       const otherNews=allNews.filter(item=>item.kind!=="open_event"&&item.kind!=="important").slice(0,6);
-      const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,3);
-      const featured=priorityNews.map(announcementCard).concat(polls.map(pollCard),otherNews.map(announcementCard));
+      const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,6);
+      const legacyEvents=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
+      const featured=importantNews.map(announcementCard)
+        .concat(eventNews.map(announcementCard),legacyEvents.map(item=>announcementCard({...item,body:item.description,kind:"open_event"})),polls.map(pollCard),otherNews.map(announcementCard));
+      cachedAfishaItems=importantNews.map(item=>({type:"announcement",item}))
+        .concat(eventNews.map(item=>({type:"announcement",item})),polls.map(item=>({type:"poll",item})),otherNews.map(item=>({type:"announcement",item})));
       insertFeatured(featured);
       carousel?.classList.toggle("hidden",featured.length===0);
       grid.innerHTML="";
@@ -161,7 +175,7 @@
       if(!viewer?.id||!viewer?.school_id)return alertUser("Войдите в школьный аккаунт.");
       const id=button.getAttribute("data-pulse-vote");
       const index=Number(button.getAttribute("data-option-index"));
-      if(!/^[a-f0-9-]{36}$/i.test(id)||!Number.isInteger(index)||index<0||index>3)return;
+      if(!/^[a-f0-9-]{36}$/i.test(id)||!Number.isInteger(index)||index<0||index>7)return;
       loading=true;
       button.disabled=true;
       try{
@@ -226,7 +240,7 @@
       void createRpc(poller,"fam_publish_school_poll",{p_question:question,p_options:options});
     });
     document.getElementById("pulseRefreshBtn")?.addEventListener("click",()=>{void refresh()});
-    return {refresh};
+    return {refresh,getAfishaMarkup};
   }
   const api=Object.freeze({mount,announcementCard,pollCard,validFeed});
   if(typeof module==="object"&&module.exports)module.exports=api;
