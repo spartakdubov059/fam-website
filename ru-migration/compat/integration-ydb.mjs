@@ -341,7 +341,7 @@ try {
     WHERE user_id = '55555555-5555-4555-8555-555555555555';`;
   const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
   assert.equal(roleQueue.status, 200);
-  console.log('YDB_ROLE_REVIEW_DIAGNOSTIC:', JSON.stringify({ submitted_id: String(roleSubmission.body.request_id), queue: roleQueue.body.requests.map(row => ({ request_id_type: typeof row.request_id, request_id: String(row.request_id), requested_role: row.requested_role })) }));
+  console.log('YDB_ROLE_REVIEW_DIAGNOSTIC:', JSON.stringify({ submitted_id: String(roleSubmission.body.request_id), queue: roleQueue.body.requests.map(row => ({ is_array: Array.isArray(row), keys: Object.keys(row), row })) }));
   const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
   assert.ok(roleRequest);
   assert.equal(roleRequest.requested_role, 'council_member');
