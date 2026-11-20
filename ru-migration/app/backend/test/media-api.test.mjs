@@ -119,6 +119,46 @@ test('pending photo preview is limited to moderators from the listing school', a
   assert.equal(reads, 0);
 });
 
+test('suspended same-school moderators cannot read pending listing photos or submit photo decisions', async () => {
+  const listing = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' };
+  const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'school_admin', school_id: 'school-a' };
+  let imageReads = 0;
+  let decisions = 0;
+  let suspensionChecks = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: {
+      getListingPhoto: async () => listing,
+      getActiveAccountSuspension: async (schoolId, userId) => {
+        suspensionChecks++;
+        assert.equal(schoolId, actor.school_id); assert.equal(userId, actor.id);
+        return { suspension_id: 'synthetic-suspension' };
+      },
+      moderateListingPhoto: async () => { decisions++; return true; },
+    },
+    pendingImages: { get: async () => { imageReads++; return Buffer.from('private-image'); } },
+  });
+  const preview = await api(request({ method: 'GET', path: `/api/v1/listings/${listing.id}/photo` }));
+  const decision = await api(request({ method: 'PATCH', path: `/api/v1/listings/${listing.id}/photo`, body: Buffer.from('{"decision":"approve"}'), contentType: 'application/json' }));
+  assert.deepEqual(preview, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(decision, preview);
+  assert.equal(suspensionChecks, 2);
+  assert.equal(imageReads, 0);
+  assert.equal(decisions, 0);
+});
+
+test('pending photo access fails closed when suspension status cannot be verified', async () => {
+  const listing = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' };
+  let imageReads = 0;
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', role: 'council_member', school_id: 'school-a' }),
+    repository: { getListingPhoto: async () => listing, getActiveAccountSuspension: async () => { throw new Error('synthetic database failure'); } },
+    pendingImages: { get: async () => { imageReads++; return Buffer.from('private-image'); } },
+  });
+  const result = await api(request({ method: 'GET', path: `/api/v1/listings/${listing.id}/photo` }));
+  assert.deepEqual(result, { status: 503, body: { ok: false, error: 'database_unavailable' } });
+  assert.equal(imageReads, 0);
+});
+
 test('only approved photos on active listings are public and rejected photos remain unavailable', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const listing = { school_id: 'school-a', status: 'active', image_key: 'pending/key.webp', photo_status: 'approved' };
@@ -136,7 +176,8 @@ test('photo approval requires a moderator from the owning school', async () => {
   let updates = 0;
   const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
     resolveActor: async () => ({ role: 'school_admin', school_id: 'school-b' }),
-    repository: { getListingPhoto: async () => ({ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }),
+    repository: { getActiveAccountSuspension: async () => null,
+      getListingPhoto: async () => ({ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }),
       moderateListingPhoto: async () => { updates++; return true; } }, pendingImages: null });
   const result = await api(request({ method: 'PATCH', path: `/api/v1/listings/${id}/photo`, body: Buffer.from('{"decision":"approve"}'), contentType: 'application/json' }));
   assert.equal(result.status, 404);
