@@ -69,6 +69,11 @@ test('idea image uploads enforce the smaller 2 MB source limit before storage', 
   assert.equal(writes, 0);
   assert.equal((await api(request({ path }))).status, 201);
   assert.equal(saved.maxBytes, 2 * 1024 * 1024);
+  const avatarPath = '/api/v1/avatars/media/pending';
+  assert.equal((await api(request({ path: avatarPath, body: Buffer.alloc(2 * 1024 * 1024 + 1) }))).status, 413);
+  assert.equal(writes, 1);
+  assert.equal((await api(request({ path: avatarPath }))).status, 201);
+  assert.equal(saved.maxBytes, 2 * 1024 * 1024);
 });
 
 test('pending media upload rejects storage keys that do not belong to the authenticated user', async () => {
