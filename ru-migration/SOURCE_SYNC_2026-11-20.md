@@ -2,22 +2,20 @@
 
 ## Проверенные ревизии
 
-- Исходный FAM: [`main` `7fd418246653f92b53f66bc29fa224d95d04d5cf`](https://github.com/spartakdubov059/fam-website/commit/7fd418246653f92b53f66bc29fa224d95d04d5cf).
-- Российская копия: [`migration/yandex-cloud` `cf628fef557701e81d1d9cd06462c4f7fc1f9dd3`](https://github.com/spartakdubov059/fam-website/commit/cf628fef557701e81d1d9cd06462c4f7fc1f9dd3).
-- В source `main` на этой ревизии — 76 файлов `supabase/migrations` и 7 Edge Functions. Между прошлым snapshot `75328206895898ab99c1ac3098de6deceda09459` и текущей ревизией удалена одна migration (`20261118212000_restore_own_profile_identity_field_grants.sql`); остальные изменения диапазона — корректировки root UI/fallback и диагностических проверок.
+- Исходный FAM: [`main` `75328206895898ab99c1ac3098de6deceda09459`](https://github.com/spartakdubov059/fam-website/commit/75328206895898ab99c1ac3098de6deceda09459).
+- Российская копия: [`migration/yandex-cloud` `bbb1644d1da8614597570655d10c62b4030a2146`](https://github.com/spartakdubov059/fam-website/commit/bbb1644d1da8614597570655d10c62b4030a2146).
+- В актуальном `main` 77 SQL migration-файлов и 7 Edge Functions; число файлов проверено через GitHub API. Предыдущий source snapshot `7fd418246653f92b53f66bc29fa224d95d04d5cf` содержал 76 migrations.
 
-## Delta после прошлой сверки
+## Delta исходного main после snapshot `7fd4182`
 
-- `index.html` уточнил переход с GitHub Pages на Netlify и поведение при недоступности основного хоста; также изменились отображение профиля при недоступных данных и scope выхода из Supabase. Это часть исходного Supabase/Netlify сайта. Она не меняет YDB backend, серверную Яндекс ID авторизацию или RU shell.
-- `scripts/check-fam-russia-reachability.mjs` теперь распознаёт HTTP 401 как достижимый защищённый API только при успешном флаге probe. Это исправляет диагностику и не является переносом API.
-- Удалённая migration восстанавливала ограниченные Postgres column grants профиля. Эти grants не имеют прямого YDB DDL эквивалента; российский backend разрешает чтение и изменение профиля отдельными server-side маршрутами и параметризованными запросами.
-- В проверенном диапазоне не добавлено новых Edge Functions или миграций данных, требующих немедленного переноса в RU-копию. Поведенческое соответствие всех 76 migrations/RLS/RPC/triggers и семи Edge Functions всё ещё требует полного аудита.
-- В RU-копии bootstrap перенесён из inline `<script>` в same-origin `shell-bootstrap.js`; CSS также вынесен в `shell.css`. Серверный CSP ограничивает `script-src` и `style-src` значением `'self'`, без `unsafe-inline`; оба файла и заголовок CSP покрыты backend/UI тестами. Это локальное security hardening российского интерфейса, а не изменение исходного FAM.
+- Commit `b5b3773` исправил определение доступности Supabase/Netlify и безопасный fallback на GitHub Pages. Commit `7532820` не разрешает переход на Netlify без явного `health.ok === true`, сохраняет локальную auth-сессию при выходе и показывает состояние «профиль временно недоступен», если чтение профиля завершилось ошибкой. Эти изменения относятся к исходной Supabase/Netlify оболочке и не добавляют YDB backend endpoint.
+- Добавлена migration `20261118212000_restore_own_profile_identity_field_grants.sql`. Она требует включённый RLS, возвращает authenticated `SELECT` только на `person_type`, `staff_position`, `staff_verification_status` и `UPDATE` только на `person_type`, `staff_position`; поля роли и статуса проверки остаются серверными. В RU-копии изменение профиля разрешено только через `/api/v1/me`: сервер связывает запрос с проверенной Яндекс/OIDC личностью, проверяет активность профиля и в транзакции переводит изменённые сведения сотрудника в `pending` проверку. Это функциональный эквивалент в YDB backend, а не перенос Postgres grants.
+- В диапазоне не добавились Edge Functions и расписания. Полное поведенческое соответствие 77 migrations/RLS/RPC/triggers и семи Edge Functions ещё не подтверждено.
 
-## Текущие проверки RU-копии
+## Проверки RU-копии на ревизии `bbb1644`
 
-- Локально на Node `v22.15.0`: `npm ci` по backend lockfile, затем `npm test` — **300/300**.
-- `npm ci` по compat lockfile и `node ru-migration/compat/verify.mjs` прошли: закреплённые Sharp/WebP, YDB query-client методы и AWS SDK exports. Cloud integration verifier не подключался к облаку.
-- YDB CI [`101faf22`](https://github.com/spartakdubov059/fam-website/actions/runs/44656608418) успешно применила схемы 01–31, прошла синтетические интеграционные сценарии и удалила одноразовую базу. После CI backend/schema в `809f11e` не менялись.
-- SDK/Sharp CI на кодовой базе [`a260f405`](https://github.com/spartakdubov059/fam-website/actions/runs/44654421824) завершилась успешно.
-- Это локальная и ephemeral YDB проверка, не российский облачный staging. Полный security scan остаётся незавершённым; бесплатный облачный стенд с гарантированным пределом 0 ₽ не подтверждён. `main`, production и реальные школьные данные не использовались.
+- GitHub Actions SDK/Sharp успешно выполнил закреплённые установки, backend suite, проверку systemd расписаний и нативную Sharp/WebP проверку: [run 44667460743](https://github.com/spartakdubov059/fam-website/actions/runs/44667460743).
+- Одноразовая YDB интеграция успешно применила схемы 01–31, выполнила синтетические сценарии и удалила тестовую базу: [run 44667460572](https://github.com/spartakdubov059/fam-website/actions/runs/44667460572).
+- Backend suite на предыдущем кодовом snapshot `cf628fe` прошёл локально `300/300`; в ревизии `bbb1644` кодовый тестовый набор изменён только временем fixture ежедневного digest, и соответствующая CI ступень завершилась успешно. Облачного staging, реального OAuth и S3 не было.
+
+Это не российское облачное staging. Бесплатный хост и способ гарантировать предел расходов 0 ₽ не подтверждены; реальные данные пользователей не использовались.
