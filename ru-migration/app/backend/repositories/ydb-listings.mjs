@@ -749,7 +749,14 @@ export function createYdbListingsRepository(sql) {
         await tx`DELETE FROM fam_school_admin_audit WHERE target_id = ${userId} OR actor_id = ${userId};`;
         await tx`DELETE FROM fam_school_announcements WHERE author_id = ${userId};`;
         await tx`DELETE FROM fam_school_poll_votes WHERE voter_id = ${userId};`;
+        await tx`DELETE FROM fam_avatar_reviews WHERE user_id = ${userId};`;
         await tx`DELETE FROM fam_pending_media WHERE user_id = ${userId};`;
+        await tx`DELETE FROM fam_notification_reads WHERE user_id = ${userId};`;
+        await tx`DELETE FROM fam_submission_quotas WHERE user_id = ${userId};`;
+        await tx`UPDATE fam_school_content_audit SET actor_id = 'deleted-account' WHERE actor_id = ${userId};`;
+        await tx`UPDATE fam_safety_incidents SET actor_id = CAST(NULL AS Utf8?), target_id = CAST(NULL AS Utf8?),
+          source_origin = CAST(NULL AS Utf8?), evidence_excerpt = CAST(NULL AS Utf8?)
+          WHERE actor_id = ${userId} OR target_id = ${userId};`;
         if (adminAudit) await tx`INSERT INTO fam_school_admin_audit
           (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
           VALUES (${randomUUID()}, ${schoolId}, ${adminAudit.actorId}, ${userId}, 'account_deleted', ${adminAudit.targetRole}, CurrentUtcTimestamp());`;
