@@ -1,11 +1,8 @@
 [Unit]
-Description=Run the aggregate FAM RU site error digest every 15 minutes
+Description=Run the aggregate FAM RU site error audit hourly at minute 30
 
 [Timer]
-OnCalendar=*-*-* *:00:00 UTC
-OnCalendar=*-*-* *:15:00 UTC
 OnCalendar=*-*-* *:30:00 UTC
-OnCalendar=*-*-* *:45:00 UTC
 Persistent=false
 Unit=fam-ru-site-error-digest.service
 

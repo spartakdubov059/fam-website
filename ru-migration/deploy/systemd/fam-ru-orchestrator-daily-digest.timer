@@ -1,10 +1,8 @@
 [Unit]
-Description=Run and retry the FAM RU aggregate daily digest at 06:05 UTC
+Description=Run the FAM RU aggregate daily digest at 04:00 UTC (07:00 MSK)
 
 [Timer]
-OnCalendar=*-*-* 06:05:00 UTC
-OnCalendar=*-*-* 06:20:00 UTC
-OnCalendar=*-*-* 06:35:00 UTC
+OnCalendar=*-*-* 04:00:00 UTC
 Persistent=true
 Unit=fam-ru-orchestrator-daily-digest.service
 

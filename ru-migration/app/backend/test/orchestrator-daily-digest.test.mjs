@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOrchestratorDailyDigest } from '../services/orchestrator-daily-digest.mjs';
 
-const date = new Date('2026-11-18T06:05:00.000Z');
+const date = new Date('2026-11-18T04:00:00.000Z');
 const metrics = { active_listings: 8, new_listings_24h: 2, pending_ideas: 1, queued_tasks: 0,
   completed_tasks_24h: 3, blocked_tasks_24h: 0, failed_tasks_24h: 0 };
 

@@ -1,8 +1,8 @@
 [Unit]
-Description=Run FAM RU aggregate school report daily at 06:00 UTC
+Description=Run FAM RU aggregate school report daily at 03:30 UTC (06:30 MSK)
 
 [Timer]
-OnCalendar=*-*-* 06:00:00 UTC
+OnCalendar=*-*-* 03:30:00 UTC
 Persistent=true
 Unit=fam-ru-school-agent-report.service
 
