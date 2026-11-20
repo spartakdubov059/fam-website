@@ -3,7 +3,7 @@
 ## Проверенные ревизии
 
 - Исходный FAM: [`main` `7fd418246653f92b53f66bc29fa224d95d04d5cf`](https://github.com/spartakdubov059/fam-website/commit/7fd418246653f92b53f66bc29fa224d95d04d5cf).
-- Российская копия: [`migration/yandex-cloud` `809f11e535dc318c8fd302bb101575f58f0a66e0`](https://github.com/spartakdubov059/fam-website/commit/809f11e535dc318c8fd302bb101575f58f0a66e0).
+- Российская копия: [`migration/yandex-cloud` `cf628fef557701e81d1d9cd06462c4f7fc1f9dd3`](https://github.com/spartakdubov059/fam-website/commit/cf628fef557701e81d1d9cd06462c4f7fc1f9dd3).
 - В source `main` на этой ревизии — 76 файлов `supabase/migrations` и 7 Edge Functions. Между прошлым snapshot `75328206895898ab99c1ac3098de6deceda09459` и текущей ревизией удалена одна migration (`20261118212000_restore_own_profile_identity_field_grants.sql`); остальные изменения диапазона — корректировки root UI/fallback и диагностических проверок.
 
 ## Delta после прошлой сверки
@@ -12,6 +12,7 @@
 - `scripts/check-fam-russia-reachability.mjs` теперь распознаёт HTTP 401 как достижимый защищённый API только при успешном флаге probe. Это исправляет диагностику и не является переносом API.
 - Удалённая migration восстанавливала ограниченные Postgres column grants профиля. Эти grants не имеют прямого YDB DDL эквивалента; российский backend разрешает чтение и изменение профиля отдельными server-side маршрутами и параметризованными запросами.
 - В проверенном диапазоне не добавлено новых Edge Functions или миграций данных, требующих немедленного переноса в RU-копию. Поведенческое соответствие всех 76 migrations/RLS/RPC/triggers и семи Edge Functions всё ещё требует полного аудита.
+- В RU-копии bootstrap перенесён из inline `<script>` в same-origin `shell-bootstrap.js`; CSS также вынесен в `shell.css`. Серверный CSP ограничивает `script-src` и `style-src` значением `'self'`, без `unsafe-inline`; оба файла и заголовок CSP покрыты backend/UI тестами. Это локальное security hardening российского интерфейса, а не изменение исходного FAM.
 
 ## Текущие проверки RU-копии
 
