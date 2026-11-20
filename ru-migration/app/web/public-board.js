@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6787)
-Total output lines: 446
-
 import { initializeMessages } from './messages.js';
 
 const MAX_PUBLIC_LISTINGS = 100;
@@ -202,7 +199,67 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
           method: 'GET', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' },
         });
         const result = await response.json().catch(() => null);
-        if (response.status === 404) capacityStatus.textContent = 'Мероприятие больше недост…787 tokens truncated…lse if (response.status === 409 && result.error === 'already_registered') {
+        if (response.status === 404) capacityStatus.textContent = 'Мероприятие больше недоступно.';
+        else if (!response.ok || result?.ok !== true || !Number.isSafeInteger(result.taken) || result.taken < 0 || result.taken > listing.max_seats) {
+          capacityStatus.textContent = 'Не удалось проверить свободные места.';
+        } else {
+          capacityStatus.textContent = `Свободно: ${listing.max_seats - result.taken} из ${listing.max_seats} мест.`;
+        }
+      } catch { capacityStatus.textContent = 'Нет связи с сервером. Число свободных мест не подтверждено.'; }
+      finally { checkingCapacity = false; capacityButton.disabled = false; }
+    });
+    card.append(capacityButton, capacityStatus);
+  }
+
+  const actions = element(document, 'div', 'ru-event-actions');
+  const status = element(document, 'p', 'ru-event-action-status', '');
+  status.setAttribute('role', 'status');
+  const register = element(document, 'button', 'ru-event-register', '');
+  register.type = 'button';
+  const cancel = element(document, 'button', 'ru-event-cancel', 'Отменить запись');
+  cancel.type = 'button';
+  let busy = false;
+
+  const current = () => session.registrations.get(listing.id);
+  const updateControls = () => {
+    const registration = current();
+    cancel.hidden = !registration || !['pending', 'confirmed'].includes(registration.status);
+    if (session.state === 'unavailable') {
+      register.textContent = 'Запись недоступна'; register.disabled = true;
+    } else if (registration?.status === 'pending') {
+      register.textContent = 'Заявка отправлена'; register.disabled = true;
+    } else if (registration?.status === 'confirmed') {
+      register.textContent = 'Вы записаны'; register.disabled = true;
+    } else if (session.state === 'guest') {
+      register.textContent = 'Войти и записаться'; register.disabled = false;
+    } else {
+      register.textContent = listing.event_type === 'request' ? 'Подать заявку' : 'Записаться';
+      register.disabled = false;
+    }
+    cancel.disabled = busy;
+    if (busy) register.disabled = true;
+  };
+
+  register.addEventListener('click', async () => {
+    if (busy) return;
+    if (session.state === 'guest') {
+      location?.assign?.('/auth/yandex/start');
+      return;
+    }
+    if (session.state !== 'authenticated') return;
+    busy = true; status.textContent = ''; updateControls();
+    try {
+      const response = await fetchImpl(`/api/v1/listings/${listing.id}/registrations`, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
+      });
+      let result = {};
+      try { result = await response.json(); } catch { /* use the HTTP status */ }
+      if (response.status === 401) {
+        session.state = 'guest';
+        status.textContent = 'Сеанс завершён. Войдите, чтобы продолжить.';
+      } else if (response.status === 409 && result.error === 'no_seats_available') {
+        status.textContent = 'Свободных мест больше нет.';
+      } else if (response.status === 409 && result.error === 'already_registered') {
         status.textContent = 'Вы уже записаны на это мероприятие.';
       } else if (response.status === 403 && result.error === 'organizer_cannot_register') {
         status.textContent = 'Организатор не может записаться на своё мероприятие.';
@@ -326,7 +383,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     views.setAttribute('role', 'group'); views.setAttribute('aria-label', 'Раздел доски');
     const count = element(document, 'p', 'ru-board-count', ''); count.setAttribute('role', 'status'); count.setAttribute('aria-live', 'polite');
     let category = 'Все';
-    let boardView = 'all';
+    let boardView = root.getAttribute?.('data-ru-board-view') === 'favorites' ? 'favorites' : 'all';
     const filterButtons = new Map();
     const viewButtons = new Map();
     updateResults = () => {
@@ -352,7 +409,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     for (const [name, label] of [['all', 'Все объявления'], ['favorites', 'Избранное']]) {
       const button = element(document, 'button', 'ru-board-category', label);
       button.type = 'button'; button.setAttribute('data-view', name); button.setAttribute('aria-pressed', String(name === boardView));
-      button.addEventListener('click', () => { boardView = name; updateResults(); });
+      button.addEventListener('click', () => { boardView = name; root.setAttribute?.('data-ru-board-view', name); updateResults(); });
       viewButtons.set(name, button); views.append(button);
     }
     const categories = [...BOARD_CATEGORIES];
