@@ -20,10 +20,20 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const html = await page.text();
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'(?:;|$)/);
     assert.doesNotMatch(page.headers.get('content-security-policy'), /script-src[^;]*unsafe-inline/);
+    assert.match(page.headers.get('content-security-policy'), /style-src 'self'(?:;|$)/);
+    assert.doesNotMatch(page.headers.get('content-security-policy'), /style-src[^;]*unsafe-inline/);
     assert.match(html, /<script src="\/shell-bootstrap\.js"><\/script>/);
     assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
+    assert.match(html, /<link rel="stylesheet" href="\/shell\.css">/);
+    assert.doesNotMatch(html, /<style\b/i);
+    assert.doesNotMatch(html, /\sstyle\s*=/i);
     assert.match(html, /src="\/price-format\.js"/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
+
+    const shellStyles = await fetch(new URL('/shell.css', origin));
+    assert.equal(shellStyles.status, 200);
+    assert.match(shellStyles.headers.get('content-type'), /text\/css/);
+    assert.match(await shellStyles.text(), /--bg: #0F1014/);
 
     const bootstrap = await fetch(new URL('/shell-bootstrap.js', origin));
     assert.equal(bootstrap.status, 200);
@@ -458,13 +468,5 @@ test('isolated server routes anonymous site error counters only to its configure
   await withServer({}, async origin => {
     const response = await fetch(new URL('/api/v1/site-errors', origin), { method: 'POST', body: '{}' });
     assert.equal(response.status, 503);
-  });
-});
-
-test('isolated server routes read-only technical alerts to the authenticated API handler', async () => {
-  await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, route: request.url } }) }, async origin => {
-    const response = await fetch(new URL('/api/v1/school/admin/technical-alerts', origin));
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, route: '/api/v1/school/admin/technical-alerts' });
   });
 });

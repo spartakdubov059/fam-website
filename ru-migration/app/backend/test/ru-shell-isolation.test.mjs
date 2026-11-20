@@ -28,5 +28,8 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
   assert.match(shell, /Российская копия работает отдельно от основного FAM/);
   assert.match(html, /<script src="\/shell-bootstrap\.js"><\/script>/);
   assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
+  assert.match(html, /<link rel="stylesheet" href="\/shell\.css">/);
+  assert.doesNotMatch(html, /<style\b/i);
+  assert.doesNotMatch(html, /\sstyle\s*=/i);
   assert.match(bootstrap, /document\.body\.innerHTML\s*=/);
 });
