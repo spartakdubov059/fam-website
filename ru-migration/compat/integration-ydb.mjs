@@ -906,14 +906,14 @@ try {
     'the sixth listing in one hour is rejected for this synthetic account');
   const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Синтетическая идея',
     ai_status: 'pending', ai_summary: 'Идея', ai_reason: 'review_unavailable', admin_status: 'new' };
-  for (let i = 0; i < 10; i++) await repo.createIdea(quotaIdea);
+  for (let i = 0; i < 5; i++) await repo.createIdea(quotaIdea);
   assert.deepEqual(await repo.createIdea(quotaIdea), { ok: false, code: 'rate_limited' },
-    'the eleventh idea in one hour is rejected for this synthetic account');
+    'the sixth idea in one hour is rejected for this synthetic account');
   for (let i = 0; i < 5; i++) await repo.reserveImageUpload(quotaUserId);
   assert.equal(await repo.reserveImageUpload(quotaUserId), false,
     'a sixth image decode reservation in one hour is rejected for this synthetic account');
   const quotaRows = await sql`SELECT action, submission_count FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
-  assert.deepEqual(Object.fromEntries(quotaRows[0].map(row => [row.action, Number(row.submission_count)])), { idea: 10, image_upload: 5, listing: 5 });
+  assert.deepEqual(Object.fromEntries(quotaRows[0].map(row => [row.action, Number(row.submission_count)])), { idea: 5, image_upload: 5, listing: 5 });
   const indexProbes = await Promise.all([
     sql`SELECT id FROM fam_avatar_reviews VIEW fam_avatar_reviews_user_id_idx WHERE user_id = ${quotaUserId};`,
     sql`SELECT announcement_id FROM fam_school_announcements VIEW fam_school_announcements_author_id_idx WHERE author_id = ${quotaUserId};`,
