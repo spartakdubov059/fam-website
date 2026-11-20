@@ -35,6 +35,9 @@ export async function submitMessage({ actor, input, repository, review, safetyKe
   if (!repository || typeof repository.createMessage !== 'function') return { ok: false, code: 'database_unavailable' };
   try {
     const message = await repository.createMessage({ sender_id: actor.id, receiver_id: receiverId, school_id: actor.school_id, listing_id: listingId, body });
+    if (message?.code === 'recipient_unavailable' || message?.code === 'rate_limited') {
+      return { ok: false, code: message.code };
+    }
     if (!message || typeof message.id !== 'string') return { ok: false, code: 'database_unavailable' };
     return { ok: true, status: 'approved', id: message.id };
   } catch (error) {
