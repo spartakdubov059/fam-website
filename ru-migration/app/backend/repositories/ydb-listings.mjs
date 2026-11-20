@@ -1119,7 +1119,7 @@ export function createYdbListingsRepository(sql) {
       }
       const id = randomUUID();
       return sql.begin(async tx => {
-        if (!await consumeSubmissionQuota(tx, record.user_id, 'idea', 10)) return { ok: false, code: 'rate_limited' };
+        if (!await consumeSubmissionQuota(tx, record.user_id, 'idea', 5)) return { ok: false, code: 'rate_limited' };
         for (const key of imageKeys) {
           const owned = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${key} AND user_id = ${record.user_id} LIMIT 1;`;
           if (owned?.[0]?.[0]?.status !== 'pending') throw new TypeError('idea image unavailable');
