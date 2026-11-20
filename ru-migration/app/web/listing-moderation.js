@@ -1,27 +1,456 @@
-Y™Áäx-ÆÈ‹j◊ù¢Îi∫⁄+äßj[hëÈ‹¢ÈÌ€Mu’:-jZ.∂õ≠ñ)ﬁ≥V6ˆÁ7BUTîB“ıÂ≥”ñ÷e◊≥á“’≥”ñ÷e◊≥G“’≥”Ö’≥”ñ÷e◊≥7“’≥Éñ%’≥”ñ÷e◊≥7“’≥”ñ÷e◊≥'“Bˆì∞¶6ˆÁ7B5Ddeı$ÙƒU2“ÊWr6WBÖ≤w66Üˆˆ≈ˆF÷ñ‚r¬v6˜VÊ6ñ≈ˆ÷V÷&W"u“ì∞†¶gVÊ7Fñˆ‚ÊˆFRÜFˆ7V÷VÁB¬Fr¬6∆74Ê÷R¬FWáB“rrí∞¢6ˆÁ7B&W7V«B“Fˆ7V÷VÁBÊ7&VFTV∆V÷VÁBáFrì∞¢ñbÜ6∆74Ê÷Rí&W7V«BÊ6∆74Ê÷R“6∆74Ê÷S∞¢&W7V«BÁFWáD6ˆÁFVÁB“FWáC∞¢&WGW&‚&W7V«C∞ß–†¶7ñÊ2gVÊ7Fñˆ‚ß6ˆ‚á&W7ˆÁ6Rí∞¢G'í≤&WGW&‚vóB&W7ˆÁ6RÊß6ˆ‚Çì≤“6F6Ç≤&WGW&‚ÁV∆√≤–ß–†¶Wá˜'B7ñÊ2gVÊ7Fñˆ‚ñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤Fˆ7V÷VÁB“v∆ˆ&≈FÜó2ÊFˆ7V÷VÁB¬fWF6Ññ◊¬“v∆ˆ&≈FÜó2ÊfWF6Ç¿¢6ˆÊfó&‘ñ◊¬“÷W76vR”‚GóVˆbv∆ˆ&≈FÜó2Ê6ˆÊfó&“””“vgVÊ7Fñˆ‚rbbv∆ˆ&≈FÜó2Ê6ˆÊfó&“Ü÷W76vRí¿¢&ˆ◊Dñ◊¬“÷W76vR”‚GóVˆbv∆ˆ&≈FÜó2Á&ˆ◊B””“vgVÊ7Fñˆ‚rÚv∆ˆ&≈FÜó2Á&ˆ◊BÜ÷W76vRí¢ÁV∆¬““∑“í∞¢ñbÇFˆ7V÷VÁB«¬GóVˆbfWF6Ññ◊¬”“vgVÊ7Fñˆ‚rí&WGW&„∞¢6ˆÁ7BÊV¬“Fˆ7V÷VÁBÊvWDV∆V÷VÁD'îñBÇw'T÷ˆFW&Fñˆ‚rì∞¢6ˆÁ7B7FGW2“Fˆ7V÷VÁBÊvWDV∆V÷VÁD'îñBÇw'T÷ˆFW&FñˆÂ7FGW2rì∞¢6ˆÁ7BVWVR“Fˆ7V÷VÁBÊvWDV∆V÷VÁD'îñBÇw'T÷ˆFW&FñˆÂVWVRrì∞¢ñbÇÊV¬«¬7FGW2«¬VWVRí&WGW&„∞†¢∆WB÷S∞¢G'í∞¢6ˆÁ7B&W7ˆÁ6R“vóBfWF6Ññ◊¬Çrˆí˜cˆ÷Rr¬≤÷WFÜˆC¢ttUBr¬7&VFVÁFñ«3¢w6÷R÷˜&ñvñ‚r¬66ÜS¢vÊÚ◊7F˜&Rr¬ÜVFW'3¢≤66WC¢v∆ñ6Fñˆ‚ˆß6ˆ‚r““ì∞¢ñbÇ&W7ˆÁ6RÊˆ≤í&WGW&„∞¢÷R“vóBß6ˆ‚á&W7ˆÁ6Rì∞¢“6F6Ç≤&WGW&„≤–¢ñbÇ÷SÚÊˆ≤«¬5Ddeı$ÙƒU2ÊÜ2Ü÷RÁ&ˆfñ∆SÚÁ&ˆ∆Ríí&WGW&„∞¢ÊV¬ÊÜñFFV‚“f«6S∞†¢7ñÊ2gVÊ7Fñˆ‚FV∆WFU66Üˆˆƒ66˜VÁBÜ66˜VÁBí∞¢ñbÜ÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚r«¬66˜VÁB«¬UTîBÁFW7BÜ66˜VÁBÊñB«¬rrê¢«¬≤w7GVFVÁBr¬v6˜VÊ6ñ≈ˆ÷V÷&W"u“ÊñÊ6«VFW2Ü66˜VÁBÁ&ˆ∆Rê¢«¬66˜VÁBÊñBÁFÙ∆˜vW$66RÇí””“7G&ñÊrÜ÷RÁ&ˆfñ∆RÊñB«¬rríÁFÙ∆˜vW$66RÇíí&WGW&„∞¢6ˆÁ7B66˜VÁD6ˆFR“66˜VÁBÊñBÁ6∆ñ6RÇ”bíÁFıWW$66RÇì∞¢6ˆÁ7BFó7∆îÊ÷R“∂66˜VÁBÊfó'7EˆÊ÷R¬66˜VÁBÊ∆7EˆÊ÷U–¢Êfñ«FW"áf«VR”‚GóVˆbf«VR””“w7G&ñÊrrbbf«VRÁG&ñ“ÇííÊ÷áf«VR”‚f«VRÁG&ñ“ÇííÊ¶ˆñ‚Çrrí«¬}	≠≠=›"=}-›ç≠s∞¢ñbÇ6ˆÊfó&‘ñ◊¬Ü
-=MΩç-¬≠≠=›"2G∂66˜VÁD6ˆFW“ÇG∂Fó7∆îÊ÷W“ìÚ	=M="=MΩ]›≤-˝}››ΩR˝=Ωç≠mçÇ¬˝]]˝ç≠ÇÇMùΩ≤Êíí&WGW&„∞¢6ˆÁ7B6ˆÊfó&÷Fñˆ‚“}
-=	M		Ω	ç
--
-¬		≠	≠	
-=	›
-"
-=
-}	
-
--	›	ç	≠	s∞¢ñbá&ˆ◊Dñ◊¬Ü	MΩÚÌ≠Ì›}-]ΩÕ›Ì=‚=MΩ]›çÚ--]Mç-R-Ì}›„¢G∂6ˆÊfó&÷FñˆÁ÷í”“6ˆÊfó&÷Fñˆ‚í∞¢7FGW2ÁFWáD6ˆÁFVÁB“}
-=MΩ]›çRÌ-Õ]›]›„¢M}˝ÌM--]mM]›çÚ›RÌ-˝Ω‚s∞¢&WGW&„∞¢–¢7FGW2ÁFWáD6ˆÁFVÁB“}	˝Ì-]˝]¬˝ÌM--]mM]›çR
-˝›M]≠îBÇ=MΩ˝]¬≠≠=›.(
-bs∞¢G'í∞¢6ˆÁ7B&W7ˆÁ6R“vóBfWF6Ññ◊¬Üˆí˜c˜66Üˆˆ¬ˆ66˜VÁG2ÚG∂VÊ6ˆFUU$î6ˆ◊ˆÊVÁBÜ66˜VÁBÊñBó÷¬∞¢÷WFÜˆC¢tDTƒUDRr¬7&VFVÁFñ«3¢w6÷R÷˜&ñvñ‚r¬66ÜS¢vÊÚ◊7F˜&Rr¿¢ÜVFW'3¢≤v6ˆÁFVÁB◊GóRs¢v∆ñ6Fñˆ‚ˆß6ˆ‚r¬66WC¢v∆ñ6Fñˆ‚ˆß6ˆ‚r“¿¢&ˆGì¢•4Ù‚Á7G&ñÊvñgíá≤6ˆÊfó&÷Fñˆ‚“í¿¢“ì∞¢6ˆÁ7B&W7V«B“vóBß6ˆ‚á&W7ˆÁ6Rì∞¢ñbá&W7V«CÚÊW'&˜"””“w&V6VÁE˜ñÊFWÖˆ∆ˆvñÂ˜&WVó&VBrí∞¢7FGW2Á&W∆6T6Üñ∆G&V‚ÜÊˆFRÜFˆ7V÷VÁB¬w7‚r¬rr¬}	˝ÌM--]Mç-RM]ù--çR}]]r
-˝›M]≠îB¬}-]¬˝Ì--Ìç-R=MΩ]›çR‚ríì∞¢6ˆÁ7B∆ñÊ≤“ÊˆFRÜFˆ7V÷VÁB¬vr¬rr¬}	˝ÌM--]Mç-¬M]ù--çRrì≤∆ñÊ≤Êá&Vb“rˆWFÇ˜ñÊFWÇ˜7F'C˜&VWFÉ”s∞¢7FGW2ÊVÊBÜ∆ñÊ≤ì∞¢&WGW&„∞¢–¢ñbÇ&W7ˆÁ6RÊˆ≤«¬&W7V«CÚÊˆ≤”“G'VRíFá&˜rÊWrW'&˜"Çv66˜VÁEˆFV∆WFñˆÂˆfñ∆VBrì∞¢vóB∆ˆBÇì∞¢7FGW2ÁFWáD6ˆÁFVÁB“}	≠≠=›"Ç-˝}››ΩRM››ΩR=MΩ]›≤‚s∞¢“6F6Ç∞¢7FGW2ÁFWáD6ˆÁFVÁB“}	›R=MΩÌ¬=MΩç-¬≠≠=›"‚	˝Ì-]Õ-RÌ}]]M¬ÇÌ-Ì˝›çR≠≠=›-˝]]B˝Ì--ÌÌ¬‚s∞¢–¢–†¢7ñÊ2gVÊ7Fñˆ‚∆ˆBÇí∞¢7FGW2ÁFWáD6ˆÁFVÁB“}	}==m]¬Ì}]]MŒ(
-bs∞¢G'í∞¢6ˆÁ7B˜FñˆÁ2“≤÷WFÜˆC¢ttUBr¬7&VFVÁFñ«3¢w6÷R÷˜&ñvñ‚r¬66ÜS¢vÊÚ◊7F˜&Rr¬ÜVFW'3¢≤66WC¢v∆ñ6Fñˆ‚ˆß6ˆ‚r“”∞¢6ˆÁ7B∑&W7ˆÁ6R¬WfVÁE&W7ˆÁ6R¬&ˆfñ∆U&W7ˆÁ6R¬7FfefW&ñfñ6FñˆÂ&W7ˆÁ6R¬&ˆ∆U&W7ˆÁ6R¬7W7VÁ6ñˆÂ&W7ˆÁ6R¬7W7VÁ6ñˆÂF&vWG5&W7ˆÁ6R¬&ˆ∆T÷ÊvV÷VÁE&W7ˆÁ6R¬6fWGï&W7ˆÁ6R¬VÊFñÊt÷W76vW5&W7ˆÁ6R¬FV6ÜÊñ6ƒ∆W'G5&W7ˆÁ6R¬66Üˆˆƒ˜fW'fñWu&W7ˆÁ6R¬66ÜˆˆƒñFV5&W7ˆÁ6U““vóB&ˆ÷ó6RÊ∆¬Ö∞¢fWF6Ññ◊¬Çrˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚r¬˜FñˆÁ2í¿¢fWF6Ññ◊¬Çrˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrr¬˜FñˆÁ2í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜&ˆfñ∆R◊&WVW7G2˜&WfñWrr¬˜FñˆÁ2ê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜7Ffb◊fW&ñfñ6FñˆÁ2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜&ˆ∆R◊&WVW7G2˜&WfñWrr¬˜FñˆÁ2ê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜7W7VÁ6ñˆÁ2r¬˜FñˆÁ2ê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬7W7VÁ6ñˆÁ3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜7W7VÁ6ñˆÁ2˜F&vWG2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬F&vWG3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜&ˆ∆R÷÷ÊvV÷VÁB˜F&vWG2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬F&vWG3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜6fWGí◊&W˜'G2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&W˜'G3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜cˆ÷W76vW2ˆ÷ˆFW&Fñˆ‚r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬÷W76vW3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜FV6ÜÊñ6¬÷∆W'G2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆W'G3¢µ““í“í¿¢÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rÚfWF6Ññ◊¬Çrˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆ˜fW'fñWrr¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íê¢¢&ˆ÷ó6RÁ&W6ˆ«fRá≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬W6W'3¢µ“¬∆ó7FñÊw3¢µ“¬VFóC¢µ“¬FV∆WFñˆÂ˜&WVW7G3¢µ“¬7W7VÁ6ñˆÁ3¢µ““í“í¿¢fWF6Ññ◊¬Çrˆí˜c˜66Üˆˆ¬ˆñFV2r¬˜FñˆÁ2íÊ6F6ÇÇÇí”‚á≤ˆ≥¢f«6R¬ß6ˆ„¢7ñÊ2Çí”‚ÁV∆¬“íí¿¢“ì∞¢6ˆÁ7B∑&W7V«B¬WfVÁE&W7V«B¬&ˆfñ∆U&W7V«B¬7FfefW&ñfñ6FñˆÂ&W7V«B¬&ˆ∆U&W7V«B¬7W7VÁ6ñˆÂ&W7V«B¬7W7VÁ6ñˆÂF&vWG5&W7V«B¬&ˆ∆T÷ÊvV÷VÁE&W7V«B¬6fWGï&W7V«B¬VÊFñÊt÷W76vW5&W7V«B¬FV6ÜÊñ6ƒ∆W'G5&W7V«B¬66Üˆˆƒ˜fW'fñWu&W7V«B¬66ÜˆˆƒñFV5&W7V«E““vóB&ˆ÷ó6RÊ∆¬Ö∂ß6ˆ‚á&W7ˆÁ6Rí¬ß6ˆ‚ÜWfVÁE&W7ˆÁ6Rí¬ß6ˆ‚á&ˆfñ∆U&W7ˆÁ6Rí¬ß6ˆ‚á7FfefW&ñfñ6FñˆÂ&W7ˆÁ6Rí¬ß6ˆ‚á&ˆ∆U&W7ˆÁ6Rí¬ß6ˆ‚á7W7VÁ6ñˆÂ&W7ˆÁ6Rí¬ß6ˆ‚á7W7VÁ6ñˆÂF&vWG5&W7ˆÁ6Rí¬ß6ˆ‚á&ˆ∆T÷ÊvV÷VÁE&W7ˆÁ6Rí¬ß6ˆ‚á6fWGï&W7ˆÁ6Rí¬ß6ˆ‚áVÊFñÊt÷W76vW5&W7ˆÁ6Rí¬ß6ˆ‚áFV6ÜÊñ6ƒ∆W'G5&W7ˆÁ6Rí¬ß6ˆ‚á66Üˆˆƒ˜fW'fñWu&W7ˆÁ6Rí¬ß6ˆ‚á66ÜˆˆƒñFV5&W7ˆÁ6Rï“ì∞¢ñbÇ&W7ˆÁ6RÊˆ≤«¬&W7V«CÚÊˆ≤«¬'&íÊó4'&íá&W7V«BÊ∆ó7FñÊw2ê¢«¬WfVÁE&W7ˆÁ6RÊˆ≤«¬WfVÁE&W7V«CÚÊˆ≤«¬'&íÊó4'&íÜWfVÁE&W7V«BÊ∆ñ6FñˆÁ2ê¢«¬&ˆfñ∆U&W7ˆÁ6RÊˆ≤«¬&ˆfñ∆U&W7V«CÚÊˆ≤«¬'&íÊó4'&íá&ˆfñ∆U&W7V«BÁ&WVW7G2ê¢«¬&ˆ∆U&W7ˆÁ6RÊˆ≤«¬&ˆ∆U&W7V«CÚÊˆ≤«¬'&íÊó4'&íá&ˆ∆U&W7V«BÁ&WVW7G2ííFá&˜rÊWrW'&˜"ÇwVWVU˜VÊfñ∆&∆Rrì∞¢VWVRÁ&W∆6T6Üñ∆G&V‚Çì∞¢6ˆÁ7B∆ñ6FñˆÁ2“WfVÁE&W7V«BÊ∆ñ6FñˆÁ2Êfñ«FW"Ü∆ñ6Fñˆ‚”‚∆ñ6Fñˆ‡¢bbUTîBÁFW7BÜ∆ñ6Fñˆ‚ÊWfVÁEˆñBíbbUTîBÁFW7BÜ∆ñ6Fñˆ‚ÁW6W%ˆñBê¢bb∆ñ6Fñˆ‚Á7FGW2””“wVÊFñÊrrbbGóVˆb∆ñ6Fñˆ‚ÊWfVÁE˜FóF∆R””“w7G&ñÊrrì∞¢6ˆÁ7B&ˆfñ∆U&WVW7G2“&ˆfñ∆U&W7V«BÁ&WVW7G2Êfñ«FW"á&WVW7B”‚&WVW7BbbUTîBÁFW7Bá&WVW7BÁ&WVW7EˆñBê¢bbGóVˆb&WVW7BÊfó'7EˆÊ÷R””“w7G&ñÊrrbbGóVˆb&WVW7BÊ∆7EˆÊ÷R””“w7G&ñÊrp¢bbGóVˆb&WVW7BÊ6∆75ˆÊ÷R””“w7G&ñÊrrbb≤w7GVFVÁBr¬w66Üˆˆ≈˜7Ffbr¬w&VÁBu“ÊñÊ6«VFW2á&WVW7BÁW'6ˆÂ˜GóRíì∞¢6ˆÁ7B7FfefW&ñfñ6FñˆÁ4fñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬á7FfefW&ñfñ6FñˆÂ&W7ˆÁ6RÊˆ≤bb7FfefW&ñfñ6FñˆÂ&W7V«CÚÊˆ≤bb'&íÊó4'&íá7FfefW&ñfñ6FñˆÂ&W7V«BÁ&WVW7G2íì∞¢6ˆÁ7B7FfefW&ñfñ6FñˆÁ2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbb7FfefW&ñfñ6FñˆÁ4fñ∆&∆P¢Ú7FfefW&ñfñ6FñˆÂ&W7V«BÁ&WVW7G2Êfñ«FW"á&WVW7B”‚&WVW7BbbUTîBÁFW7Bá&WVW7BÁW6W%ˆñBê¢bbGóVˆb&WVW7BÊfó'7EˆÊ÷R””“w7G&ñÊrrbbGóVˆb&WVW7BÊ∆7EˆÊ÷R””“w7G&ñÊrp¢bbGóVˆb&WVW7BÁ7Ffe˜˜6óFñˆ‚””“w7G&ñÊrrbb&WVW7BÁ7Ffe˜˜6óFñˆ‚Ê∆VÊwFÇ√“í¢µ”∞¢6ˆÁ7B&ˆ∆U&WVW7G2“&ˆ∆U&W7V«BÁ&WVW7G2Êfñ«FW"á&WVW7B”‚&WVW7BbbUTîBÁFW7Bá&WVW7BÁ&WVW7EˆñBê¢bb≤v6˜VÊ6ñ≈ˆ÷V÷&W"r¬w66Üˆˆ≈ˆF÷ñ‚u“ÊñÊ6«VFW2á&WVW7BÁ&WVW7FVE˜&ˆ∆Rê¢bb≤wVÊFñÊrr¬w&WfñWvñÊru“ÊñÊ6«VFW2á&WVW7BÁ7FGW2íì∞¢6ˆÁ7B&ˆ∆T÷ÊvV÷VÁDfñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚r«¬á&ˆ∆T÷ÊvV÷VÁE&W7ˆÁ6RÊˆ≤bb&ˆ∆T÷ÊvV÷VÁE&W7V«CÚÊˆ≤bb'&íÊó4'&íá&ˆ∆T÷ÊvV÷VÁE&W7V«BÁF&vWG2íì∞¢6ˆÁ7B&ˆ∆T÷ÊvV÷VÁEF&vWG2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbb&ˆ∆T÷ÊvV÷VÁDfñ∆&∆P¢Ú&ˆ∆T÷ÊvV÷VÁE&W7V«BÁF&vWG2Êfñ«FW"ÜóFV“”‚óFV“bbUTîBÁFW7BÜóFV“ÊñBíbb≤v6˜VÊ6ñ≈ˆ÷V÷&W"r¬w66Üˆˆ≈ˆF÷ñ‚u“ÊñÊ6«VFW2ÜóFV“Á&ˆ∆Ríí¢µ”∞¢6ˆÁ7B7W7VÁ6ñˆÁ4fñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬á7W7VÁ6ñˆÂ&W7ˆÁ6RÊˆ≤bb7W7VÁ6ñˆÂ&W7V«CÚÊˆ≤bb'&íÊó4'&íá7W7VÁ6ñˆÂ&W7V«BÁ7W7VÁ6ñˆÁ2íì∞¢6ˆÁ7B7W7VÁ6ñˆÁ2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbb7W7VÁ6ñˆÁ4fñ∆&∆P¢Ú7W7VÁ6ñˆÂ&W7V«BÁ7W7VÁ6ñˆÁ2Êfñ«FW"ÜóFV“”‚óFV“bbUTîBÁFW7BÜóFV“ÁF&vWEˆñBê¢bb≤w7GVFVÁBr¬v6˜VÊ6ñ≈ˆ÷V÷&W"u“ÊñÊ6«VFW2ÜóFV“ÁF&vWE˜&ˆ∆RíbbGóVˆbóFV“Á&V6ˆ‚””“w7G&ñÊrp¢bbGóVˆbóFV“ÊWáó&W5ˆB””“w7G&ñÊrrí¢µ”∞¢6ˆÁ7B6fWGï&W˜'G4fñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬á6fWGï&W7ˆÁ6RÊˆ≤bb6fWGï&W7V«CÚÊˆ≤bb'&íÊó4'&íá6fWGï&W7V«BÁ&W˜'G2íì∞¢6ˆÁ7B6fWGï&W˜'G2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbb6fWGï&W˜'G4fñ∆&∆P¢Ú6fWGï&W7V«BÁ&W˜'G2Êfñ«FW"ÜóFV“”‚óFV“bbıÂ≥”ñ÷e◊≥cG“BÚÁFW7BÜóFV“ÊfñÊvW'&ñÁB«¬rrê¢bb≤v÷W76vRr¬vñFVr¬v∆ó7FñÊrr¬vñ÷vRu“ÊñÊ6«VFW2ÜóFV“Á6˜W&6Uˆ∂ñÊBê¢bb≤wF&vWFVEˆÜ&76÷VÁBr¬vÜFUˆ˜%ˆFó67&ñ÷ñÊFñˆ‚r¬wFá&VEˆ˜%ˆñÁFñ÷ñFFñˆ‚r¬vÊVvFófU˜W'6ˆÊ≈ˆ6∆¬r¿¢w7’ˆ˜%˜&WVFVEˆ'W6Rr¬wVÁ6fUˆñ÷vRr¬wW'6ˆÊ≈ˆFFˆñÂˆñ÷vRr¬wVÊ6∆V%˜6fWGï˜6ñvÊ¬u“ÊñÊ6«VFW2ÜóFV“Ê6FVv˜'íê¢bb≤v÷VFóV“r¬vÜñvÇu“ÊñÊ6«VFW2ÜóFV“Á6WfW&óGííbbÁV÷&W"Êó4ñÁFVvW"ÜóFV“Êˆ67W'&VÊ6W2íí¢µ”∞¢6ˆÁ7BVÊFñÊt÷W76vW4fñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬áVÊFñÊt÷W76vW5&W7ˆÁ6RÊˆ≤bbVÊFñÊt÷W76vW5&W7V«CÚÊˆ≤bb'&íÊó4'&íáVÊFñÊt÷W76vW5&W7V«BÊ÷W76vW2íì∞¢6ˆÁ7BVÊFñÊt÷W76vW2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbbVÊFñÊt÷W76vW4fñ∆&∆P¢ÚVÊFñÊt÷W76vW5&W7V«BÊ÷W76vW2Êfñ«FW"ÜóFV“”‚óFV“bbUTîBÁFW7BÜóFV“ÊñB«¬rríbbUTîBÁFW7BÜóFV“Á6VÊFW%ˆñB«¬rrê¢bbGóVˆbóFV“Ê&ˆGí””“w7G&ñÊrrbbóFV“Ê&ˆGíÊ∆VÊwFÇ‚bbóFV“Ê&ˆGíÊ∆VÊwFÇ√“í¢µ”∞¢6ˆÁ7BFV6ÜÊñ6ƒ∆W'G4fñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬áFV6ÜÊñ6ƒ∆W'G5&W7ˆÁ6RÊˆ≤bbFV6ÜÊñ6ƒ∆W'G5&W7V«CÚÊˆ≤bb'&íÊó4'&íáFV6ÜÊñ6ƒ∆W'G5&W7V«BÊ∆W'G2íì∞¢6ˆÁ7BFV6ÜÊñ6ƒ∆W'G2“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbbFV6ÜÊñ6ƒ∆W'G4fñ∆&∆P¢ÚFV6ÜÊñ6ƒ∆W'G5&W7V«BÊ∆W'G2Êfñ«FW"ÜóFV“”‚óFV–¢bb≤vß5˜'VÁFñ÷Rr¬wVÊÜÊF∆VE˜&V¶V7Fñˆ‚r¬w7W&6U˜6Fµ˜VÊfñ∆&∆Rr¬v∆ó7FñÊw5ˆ∆ˆEˆfñ∆VBr¬vÊ˜Fñfñ6FñˆÁ5ˆ∆ˆEˆfñ∆VBr¬vFF&6U˜&WVW7Eˆfñ∆VBr¬vWFÖˆ&6∂VÊEˆfñ∆VBu“ÊñÊ6«VFW2ÜóFV“ÊWfVÁEˆ6ˆFRê¢bb≤vWFÇr¬v∆ó7FñÊw2r¬vÊ˜Fñfñ6FñˆÁ2r¬vFF&6Rr¬v˜FÜW"u“ÊñÊ6«VFW2ÜóFV“ÁvUˆ&Vê¢bb≤v7&óFñ6¬r¬wv&ÊñÊru“ÊñÊ6«VFW2ÜóFV“Á6WfW&óGííbbÁV÷&W"Êó4ñÁFVvW"ÜóFV“ÊWfVÁEˆ6˜VÁBê¢bbóFV“ÊWfVÁEˆ6˜VÁB‚bbóFV“ÊWfVÁEˆ6˜VÁB√“bbGóVˆbóFV“ÊÜ˜W%ˆ'V6∂WB””“w7G&ñÊrp¢bbÁV÷&W"Êó4fñÊóFRÑFFRÁ'6RÜóFV“ÊÜ˜W%ˆ'V6∂WBííí¢µ”∞¢6ˆÁ7B6óFTW'&˜$FñvW7B“÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbbFV6ÜÊñ6ƒ∆W'G4fñ∆&∆P¢ÚFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BbbGóVˆbFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BÁ7V÷÷'í””“w7G&ñÊrp¢bbFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BÁ7V÷÷'íÊ∆VÊwFÇ√“ ¢bbGóVˆbFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BÊFñvW7E˜6∆˜B””“w7G&ñÊrp¢bbÁV÷&W"Êó4fñÊóFRÑFFRÁ'6RÜG∑FV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BÊFñvW7E˜6∆˜G”£¶íê¢bbÁV÷&W"Êó4fñÊóFRÑFFRÁ'6RáFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7BÊvVÊW&FVEˆB«¬rríê¢ÚFV6ÜÊñ6ƒ∆W'G5&W7V«BÊFñvW7B¢ÁV∆¬¢ÁV∆√∞¢6ˆÁ7B66Üˆˆƒ˜fW'fñWtfñ∆&∆R“÷RÁ&ˆfñ∆RÁ&ˆ∆R”“w66Üˆˆ≈ˆF÷ñ‚p¢«¬á66Üˆˆƒ˜fW'fñWu&W7ˆÁ6RÊˆ≤bb66Üˆˆƒ˜fW'fñWu&W7V«CÚÊˆ∞¢bb≤wW6W'2r¬v∆ó7FñÊw2r¬vVFóBr¬vFV∆WFñˆÂ˜&WVW7G2r¬w7W7VÁ6ñˆÁ2u“ÊWfW'íÜ∂Wí”‚'&íÊó4'&íá66Üˆˆƒ˜fW'fñWu&W7V«E∂∂Wï“ííì∞¢6ˆÁ7B66ÜˆˆƒñFV4fñ∆&∆R“66ÜˆˆƒñFV5&W7ˆÁ6RÊˆ≤bb66ÜˆˆƒñFV5&W7V«CÚÊˆ≤bb'&íÊó4'&íá66ÜˆˆƒñFV5&W7V«BÊñFV2ì∞¢6ˆÁ7B66ÜˆˆƒñFV2“66ÜˆˆƒñFV4fñ∆&∆RÚ66ÜˆˆƒñFV5&W7V«BÊñFV2Êfñ«FW"ÜóFV“”‚óFV“bbUTîBÁFW7BÜóFV“ÊñB«¬rrê¢bbGóVˆbóFV“ÁFWáB””“w7G&ñÊrrbbóFV“ÁFWáBÊ∆VÊwFÇ√“ ¢bb≤wVÊFñÊrr¬v&˜fVBr¬w&V¶V7FVBu“ÊñÊ6«VFW2ÜóFV“Êï˜7FGW2ê¢bb'&íÊó4'&íÜóFV“Êñ÷vUˆ∂Wó2íbbóFV“Êñ÷vUˆ∂Wó2Ê∆VÊwFÇ√“0¢bb≤vÊˆÊRr¬wVÊFñÊrr¬v&˜fVBr¬w&V¶V7FVBu“ÊñÊ6«VFW2ÜóFV“Êñ÷vU˜7FGW2íí¢µ”∞¢6ˆÁ7B&VÊFW%66ÜˆˆƒñFV5ÊV¬“Çí”‚∞¢6ˆÁ7BñFV5ÊV¬“ÊˆFRÜFˆ7V÷VÁB¬w6V7Fñˆ‚r¬w'R÷÷ˆFW&Fñˆ‚÷6&Brì∞¢ñFV5ÊV¬ÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬vÉ2r¬rr¬}
-ç≠ÌΩÕ›ΩRçM]ÇÇMÌ-Ì=MçÇríì∞¢ñbÇ66ÜˆˆƒñFV4fñ∆&∆RíñFV5ÊV¬ÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬}	›R=MΩÌ¬}==}ç-¬˝]MΩÌm]›çÚç≠ÌΩ≤‚ríì∞¢V«6RñbÇ66ÜˆˆƒñFV2Ê∆VÊwFÇíñFV5ÊV¬ÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬}	›Ì-ΩR˝]MΩÌm]›çí›]"‚ríì∞¢f˜"Ü6ˆÁ7BñFVˆb66ÜˆˆƒñFV2í∞¢6ˆÁ7B6&B“ÊˆFRÜFˆ7V÷VÁB¬v'Fñ6∆Rr¬w'R÷÷ˆFW&Fñˆ‚÷6&Brì∞¢6&BÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬ñFVÁFWáBíì∞¢6&BÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬w'R÷Ê˜FRr¬ñFVÊï˜7FGW2””“wVÊFñÊrrÚ}
--]≠"ÌmçM]"]ç]›çÚç≠ÌΩ≤‚p¢¢ñFVÊï˜7FGW2””“v&˜fVBrÚ}
--]≠"ÌMÌ]“ç≠ÌΩÌí‚r¢}
--]≠"Ì-≠ΩÌ›“ç≠ÌΩÌí‚ríì∞¢ñbÜñFVÊï˜7FGW2””“wVÊFñÊrrí∞¢6ˆÁ7BFWáD7FñˆÁ2“ÊˆFRÜFˆ7V÷VÁB¬vFóbr¬w'R÷÷ˆFW&Fñˆ‚÷7FñˆÁ2rì∞¢FWáD7FñˆÁ2ÊVÊBÜ7Fñˆ‰'WGFˆ‚ÜFˆ7V÷VÁB¬}	ÌMÌç-¬-]≠"r¬Çí”‚F6ÇÜˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñFVÊñG“ˆ÷ˆFW&FñˆÊ¬≤FV6ó6ñˆ„¢v&˜fRr“ííì∞¢FWáD7FñˆÁ2ÊVÊBÜ7Fñˆ‰'WGFˆ‚ÜFˆ7V÷VÁB¬}	Ì-≠ΩÌ›ç-¬-]≠"r¬Çí”‚F6ÇÜˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñFVÊñG“ˆ÷ˆFW&FñˆÊ¬≤FV6ó6ñˆ„¢w&V¶V7Br“ííì∞¢6&BÊVÊBáFWáD7FñˆÁ2ì∞¢–¢6ˆÁ7Bf∆ñD∂Wó2“ñFVÊñ÷vUˆ∂Wó2ÊWfW'íÜ∂Wí”‚GóVˆb∂Wí””“w7G&ñÊrp¢bbıÁVÊFñÊu¬ı≥”ñ÷b’◊≥3g’¬ı≥”ñ÷e◊≥á“’≥”ñ÷e◊≥G“’≥”Ö’≥”ñ÷e◊≥7“’≥Éñ%’≥”ñ÷e◊≥7“’≥”ñ÷e◊≥'’¬ÁvV'BˆíÁFW7BÜ∂Wííì∞¢ñbÜñFVÊñ÷vU˜7FGW2””“wVÊFñÊrrbbf∆ñD∂Wó2bbñFVÊñ÷vUˆ∂Wó2Ê∆VÊwFÇí∞¢ñFVÊñ÷vUˆ∂Wó2Êf˜$V6ÇÇÖÚ¬ñÊFWÇí”‚∞¢6ˆÁ7Bñ÷vR“Fˆ7V÷VÁBÊ7&VFTV∆V÷VÁBÇvñ÷rrì∞¢ñ÷vRÊ6∆74Ê÷R“w'R÷∆ó7FñÊr◊Ü˜FÚs∞¢ñ÷vRÁ7&2“ˆí˜cˆñFV2ÚG∂ñFVÊñG“ˆñ÷vW2ÚG∂ñÊFWá÷∞¢ñ÷vRÊ«B“
-MÌ-‚¢ç≠ÌΩÕ›ÌíçM]RG∂ñÊFWÇ≤÷∞¢ñ÷vRÊ∆ˆFñÊr“v∆ßís∞¢ñ÷vRÁ&VfW'&W%ˆ∆ñ7í“vÊÚ◊&VfW'&W"s∞¢6&BÊVÊBÜñ÷vRì∞¢“ì∞¢6ˆÁ7B7FñˆÁ2“ÊˆFRÜFˆ7V÷VÁB¬vFóbr¬w'R÷÷ˆFW&Fñˆ‚÷7FñˆÁ2rì∞¢7FñˆÁ2ÊVÊBÜ7Fñˆ‰'WGFˆ‚ÜFˆ7V÷VÁB¬}	ÌMÌç-¬MÌ-‚r¬Çí”‚F6ÇÜˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñFVÊñG“ˆñ÷vW6¬≤FV6ó6ñˆ„¢v&˜fRr“ííì∞¢7FñˆÁ2ÊVÊBÜ7Fñˆ‰'WGFˆ‚ÜFˆ7V÷VÁB¬}	Ì-≠ΩÌ›ç-¬MÌ-‚r¬Çí”‚F6ÇÜˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñFVÊñG“ˆñ÷vW6¬≤FV6ó6ñˆ„¢w&V¶V7Br“ííì∞¢6&BÊVÊBÜ7FñˆÁ2ì∞¢“V«6RñbÜñFVÊñ÷vU˜7FGW2””“v&˜fVBrí∞¢6&BÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬}
-MÌ-‚ÌMÌ]›≤ÇMÌ-=˝›≤ç≠ÌΩÕ›Ìí≠ÌÕ›MR‚ríì∞¢“V«6RñbÜñFVÊñ÷vU˜7FGW2””“w&V¶V7FVBrí∞¢6&BÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬}
-MÌ-‚Ì-≠ΩÌ›]›≤‚ríì∞¢–¢ñFV5ÊV¬ÊVÊBÜ6&Bì∞¢–¢VWVRÊVÊBÜñFV5ÊV¬ì∞¢”∞¢ñbÜ÷RÁ&ˆfñ∆RÁ&ˆ∆R””“w66Üˆˆ≈ˆF÷ñ‚rbb7W7VÁ6ñˆÂF&vWG5&W7ˆÁ6RÊˆ≤bb7W7VÁ6ñˆÂF&vWG5&W7V«CÚÊˆ≤bb'&íÊó4'&íá7W7VÁ6ñˆÂF&vWG5&W7V«BÁF&vWG2íí∞¢6ˆÁ7BF&vWG2“7W7VÁ6ñˆÂF&vWG5&W7V«BÁF&vWG2Êfñ«FW"ÜóFV“”‚óFV“bbUTîBÁFW7BÜóFV“ÊñBíbb≤w7GVFVÁBr¬v6˜VÊ6ñ≈ˆ÷V÷&W"u“ÊñÊ6«VFW2ÜóFV“Á&ˆ∆Ríì∞¢ñbáF&vWG2Ê∆VÊwFÇí∞¢6ˆÁ7BÊV¬“ÊˆFRÜFˆ7V÷VÁB¬w6V7Fñˆ‚r¬w'R÷÷ˆFW&Fñˆ‚÷6&Brì∞¢ÊV¬ÊVÊBÜÊˆFRÜFˆ7V÷VÁB¬vÉ2r¬rr¬}	-]Õ]››ÌRÌ=›ç}]›çRM]ù--çí≠≠=›-ríì∞¢6ˆÁ7BÊ˜FR“ÊˆFRÜFˆ7V÷VÁB¬wr¬rr¬}	MÌ-=˝›‚MÕç›ç--Ì¬›-Ìíç≠ÌΩ≤˝ÌΩR˝-›Ì=‚˝ÌM--]mM]›çÚ}]]r
-˝›M]≠îB‚	-Ω]ç-RÌ¢Ç=≠mç-RM≠-ç}]≠=‚˝ç}ç›2]rΩç}›ΩRM››ΩR‚rì∞¢6ˆÁ7Bf˜&““Fˆ7V÷VÁBÊ7&VFTV∆V÷VÁBÇvf˜&“rì≤f˜&“Ê6∆74Ê÷R“w'R◊7W7VÁ6ñˆ‚÷f˜&“s∞¢5◊[hëÈÏ∂ªßq´^u
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const STAFF_ROLES = new Set(['school_admin', 'council_member']);
+
+function node(document, tag, className, text = '') {
+  const result = document.createElement(tag);
+  if (className) result.className = className;
+  result.textContent = text;
+  return result;
+}
+
+async function json(response) {
+  try { return await response.json(); } catch { return null; }
+}
+
+export async function initializeListingModeration({ document = globalThis.document, fetchImpl = globalThis.fetch,
+  confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message),
+  promptImpl = message => typeof globalThis.prompt === 'function' ? globalThis.prompt(message) : null } = {}) {
+  if (!document || typeof fetchImpl !== 'function') return;
+  const panel = document.getElementById('ruModeration');
+  const status = document.getElementById('ruModerationStatus');
+  const queue = document.getElementById('ruModerationQueue');
+  if (!panel || !status || !queue) return;
+
+  let me;
+  try {
+    const response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    if (!response.ok) return;
+    me = await json(response);
+  } catch { return; }
+  if (!me?.ok || !STAFF_ROLES.has(me.profile?.role)) return;
+  panel.hidden = false;
+
+  async function deleteSchoolAccount(account) {
+    if (me.profile.role !== 'school_admin' || !account || !UUID.test(account.id || '')
+        || !['student', 'council_member'].includes(account.role)
+        || account.id.toLowerCase() === String(me.profile.id || '').toLowerCase()) return;
+    const accountCode = account.id.slice(-6).toUpperCase();
+    const displayName = [account.first_name, account.last_name]
+      .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || '–ê–∫–∫–∞—É–Ω—Ç —É—á–∞—Å—Ç–Ω–∏–∫–∞';
+    if (!confirmImpl(`–£–¥–∞–ª–∏—Ç—å –∞–∫–∫–∞—É–Ω—Ç #${accountCode} (${displayName})? –ë—É–¥—É—Ç —É–¥–∞–ª–µ–Ω—ã —Å–≤—è–∑–∞–Ω–Ω—ã–µ –ø—É–±–ª–∏–∫–∞—Ü–∏–∏, –ø–µ—Ä–µ–ø–∏—Å–∫–∏ –∏ —Ñ–∞–π–ª—ã.`)) return;
+    const confirmation = '–£–î–ê–õ–ò–¢–¨ –ê–ö–ö–ê–£–ù–¢ –£–ß–ê–°–¢–ù–ò–ö–ê';
+    if (promptImpl(`–î–ª—è –æ–∫–æ–Ω—á–∞—Ç–µ–ª—å–Ω–æ–≥–æ —É–¥–∞–ª–µ–Ω–∏—è –≤–≤–µ–¥–∏—Ç–µ —Ç–æ—á–Ω–æ: ${confirmation}`) !== confirmation) {
+      status.textContent = '–£–¥–∞–ª–µ–Ω–∏–µ –æ—Ç–º–µ–Ω–µ–Ω–æ: —Ñ—Ä–∞–∑–∞ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏—è –Ω–µ —Å–æ–≤–ø–∞–ª–∞.';
+      return;
+    }
+    status.textContent = '–ü—Ä–æ–≤–µ—Ä—è–µ–º –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏–µ –Ø–Ω–¥–µ–∫—Å ID –∏ —É–¥–∞–ª—è–µ–º –∞–∫–∫–∞—É–Ω—Ç‚Ä¶';
+    try {
+      const response = await fetchImpl(`/api/v1/school/accounts/${encodeURIComponent(account.id)}`, {
+        method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ confirmation }),
+      });
+      const result = await json(response);
+      if (result?.error === 'recent_yandex_login_required') {
+        status.replaceChildren(node(document, 'span', '', '–ü–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç–µ –¥–µ–π—Å—Ç–≤–∏–µ —á–µ—Ä–µ–∑ –Ø–Ω–¥–µ–∫—Å ID, –∑–∞—Ç–µ–º –ø–æ–≤—Ç–æ—Ä–∏—Ç–µ —É–¥–∞–ª–µ–Ω–∏–µ. '));
+        const link = node(document, 'a', '', '–ü–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç—å –¥–µ–π—Å—Ç–≤–∏–µ'); link.href = '/auth/yandex/start?reauth=1';
+        status.append(link);
+        return;
+      }
+      if (!response.ok || result?.ok !== true) throw new Error('account_deletion_failed');
+      await load();
+      status.textContent = '–ê–∫–∫–∞—É–Ω—Ç –∏ —Å–≤—è–∑–∞–Ω–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ —É–¥–∞–ª–µ–Ω—ã.';
+    } catch {
+      status.textContent = '–ù–µ —É–¥–∞–ª–æ—Å—å —É–¥–∞–ª–∏—Ç—å –∞–∫–∫–∞—É–Ω—Ç. –ü—Ä–æ–≤–µ—Ä—å—Ç–µ –æ—á–µ—Ä–µ–¥—å –∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ –∞–∫–∫–∞—É–Ω—Ç–∞ –ø–µ—Ä–µ–¥ –ø–æ–≤—Ç–æ—Ä–æ–º.';
+    }
+  }
+
+  async function load() {
+    status.textContent = '–ó–∞–≥—Ä—É–∂–∞–µ–º –æ—á–µ—Ä–µ–¥—å‚Ä¶';
+    try {
+      const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
+      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse] = await Promise.all([
+        fetchImpl('/api/v1/listings/moderation', options),
+        fetchImpl('/api/v1/event-registrations/review', options),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/staff-verifications', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-requests/review', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions', options)
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, suspensions: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions/targets', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-management/targets', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/safety-reports', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/messages/moderation', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/technical-alerts', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, alerts: [] }) }),
+        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/overview', options).catch(() => ({ ok: false, json: async () => null }))
+          : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
+        fetchImpl('/api/v1/school/ideas', options).catch(() => ({ ok: false, json: async () => null })),
+      ]);
+      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse)]);
+      if (!response.ok || !result?.ok || !Array.isArray(result.listings)
+        || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
+        || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
+        || !roleResponse.ok || !roleResult?.ok || !Array.isArray(roleResult.requests)) throw new Error('queue_unavailable');
+      queue.replaceChildren();
+      const applications = eventResult.applications.filter(application => application
+        && UUID.test(application.event_id) && UUID.test(application.user_id)
+        && application.status === 'pending' && typeof application.event_title === 'string');
+      const profileRequests = profileResult.requests.filter(request => request && UUID.test(request.request_id)
+        && typeof request.first_name === 'string' && typeof request.last_name === 'string'
+        && typeof request.class_name === 'string' && ['student', 'school_staff', 'parent'].includes(request.person_type));
+      const staffVerificationsAvailable = me.profile.role !== 'school_admin'
+        || (staffVerificationResponse.ok && staffVerificationResult?.ok && Array.isArray(staffVerificationResult.requests));
+      const staffVerifications = me.profile.role === 'school_admin' && staffVerificationsAvailable
+        ? staffVerificationResult.requests.filter(request => request && UUID.test(request.user_id)
+          && typeof request.first_name === 'string' && typeof request.last_name === 'string'
+          && typeof request.staff_position === 'string' && request.staff_position.length <= 100) : [];
+      const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
+        && ['council_member', 'school_admin'].includes(request.requested_role)
+        && ['pending', 'reviewing'].includes(request.status));
+      const roleManagementAvailable = me.profile.role !== 'school_admin' || (roleManagementResponse.ok && roleManagementResult?.ok && Array.isArray(roleManagementResult.targets));
+      const roleManagementTargets = me.profile.role === 'school_admin' && roleManagementAvailable
+        ? roleManagementResult.targets.filter(item => item && UUID.test(item.id) && ['council_member', 'school_admin'].includes(item.role)) : [];
+      const suspensionsAvailable = me.profile.role !== 'school_admin'
+        || (suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions));
+      const suspensions = me.profile.role === 'school_admin' && suspensionsAvailable
+        ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
+          && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
+          && typeof item.expires_at === 'string') : [];
+      const safetyReportsAvailable = me.profile.role !== 'school_admin'
+        || (safetyResponse.ok && safetyResult?.ok && Array.isArray(safetyResult.reports));
+      const safetyReports = me.profile.role === 'school_admin' && safetyReportsAvailable
+        ? safetyResult.reports.filter(item => item && /^[0-9a-f]{64}$/.test(item.fingerprint || '')
+          && ['message', 'idea', 'listing', 'image'].includes(item.source_kind)
+          && ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
+            'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(item.category)
+          && ['medium', 'high'].includes(item.severity) && Number.isInteger(item.occurrences)) : [];
+      const pendingMessagesAvailable = me.profile.role !== 'school_admin'
+        || (pendingMessagesResponse.ok && pendingMessagesResult?.ok && Array.isArray(pendingMessagesResult.messages));
+      const pendingMessages = me.profile.role === 'school_admin' && pendingMessagesAvailable
+        ? pendingMessagesResult.messages.filter(item => item && UUID.test(item.id || '') && UUID.test(item.sender_id || '')
+          && typeof item.body === 'string' && item.body.length > 0 && item.body.length <= 1000) : [];
+      const technicalAlertsAvailable = me.profile.role !== 'school_admin'
+        || (technicalAlertsResponse.ok && technicalAlertsResult?.ok && Array.isArray(technicalAlertsResult.alerts));
+      const technicalAlerts = me.profile.role === 'school_admin' && technicalAlertsAvailable
+        ? technicalAlertsResult.alerts.filter(item => item
+          && ['js_runtime', 'unhandled_rejection', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
+          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(item.page_area)
+          && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
+          && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
+          && Number.isFinite(Date.parse(item.hour_bucket))) : [];
+      const siteErrorDigest = me.profile.role === 'school_admin' && technicalAlertsAvailable
+        ? technicalAlertsResult.digest && typeof technicalAlertsResult.digest.summary === 'string'
+          && technicalAlertsResult.digest.summary.length <= 1000
+          && typeof technicalAlertsResult.digest.digest_slot === 'string'
+          && Number.isFinite(Date.parse(`${technicalAlertsResult.digest.digest_slot}:00Z`))
+          && Number.isFinite(Date.parse(technicalAlertsResult.digest.generated_at || ''))
+          ? technicalAlertsResult.digest : null : null;
+      const schoolOverviewAvailable = me.profile.role !== 'school_admin'
+        || (schoolOverviewResponse.ok && schoolOverviewResult?.ok
+          && ['users', 'listings', 'audit', 'deletion_requests', 'suspensions'].every(key => Array.isArray(schoolOverviewResult[key])));
+      const schoolIdeasAvailable = schoolIdeasResponse.ok && schoolIdeasResult?.ok && Array.isArray(schoolIdeasResult.ideas);
+      const schoolIdeas = schoolIdeasAvailable ? schoolIdeasResult.ideas.filter(item => item && UUID.test(item.id || '')
+        && typeof item.text === 'string' && item.text.length <= 1000
+        && ['pending', 'approved', 'rejected'].includes(item.ai_status)
+        && Array.isArray(item.image_keys) && item.image_keys.length <= 3
+        && ['none', 'pending', 'approved', 'rejected'].includes(item.image_status)) : [];
+      const renderSchoolIdeasPanel = () => {
+        const ideasPanel = node(document, 'section', 'ru-moderation-card');
+        ideasPanel.append(node(document, 'h3', '', '–®–∫–æ–ª—å–Ω—ã–µ –∏–¥–µ–∏ –∏ —Ñ–æ—Ç–æ–≥—Ä–∞—Ñ–∏–∏'));
+        if (!schoolIdeasAvailable) ideasPanel.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏—è —à–∫–æ–ª—ã.'));
+        else if (!schoolIdeas.length) ideasPanel.append(node(document, 'p', '', '–ù–æ–≤—ã—Ö –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏–π –Ω–µ—Ç.'));
+        for (const idea of schoolIdeas) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'p', '', idea.text));
+          card.append(node(document, 'p', 'ru-note', idea.ai_status === 'pending' ? '–¢–µ–∫—Å—Ç –æ–∂–∏–¥–∞–µ—Ç —Ä–µ—à–µ–Ω–∏—è —à–∫–æ–ª—ã.'
+            : idea.ai_status === 'approved' ? '–¢–µ–∫—Å—Ç –æ–¥–æ–±—Ä–µ–Ω —à–∫–æ–ª–æ–π.' : '–¢–µ–∫—Å—Ç –æ—Ç–∫–ª–æ–Ω—ë–Ω —à–∫–æ–ª–æ–π.'));
+          if (idea.ai_status === 'pending') {
+            const textActions = node(document, 'div', 'ru-moderation-actions');
+            textActions.append(actionButton(document, '–û–¥–æ–±—Ä–∏—Ç—å —Ç–µ–∫—Å—Ç', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'approve' })));
+            textActions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ç–µ–∫—Å—Ç', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'reject' })));
+            card.append(textActions);
+          }
+          const validKeys = idea.image_keys.every(key => typeof key === 'string'
+            && /^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(key));
+          if (idea.image_status === 'pending' && validKeys && idea.image_keys.length) {
+            idea.image_keys.forEach((_, index) => {
+              const image = document.createElement('img');
+              image.className = 'ru-listing-photo';
+              image.src = `/api/v1/ideas/${idea.id}/images/${index}`;
+              image.alt = `–§–æ—Ç–æ –∫ —à–∫–æ–ª—å–Ω–æ–π –∏–¥–µ–µ ${index + 1}`;
+              image.loading = 'lazy';
+              image.referrerPolicy = 'no-referrer';
+              card.append(image);
+            });
+            const actions = node(document, 'div', 'ru-moderation-actions');
+            actions.append(actionButton(document, '–û–¥–æ–±—Ä–∏—Ç—å —Ñ–æ—Ç–æ', () => patch(`/api/v1/school/ideas/${idea.id}/images`, { decision: 'approve' })));
+            actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ñ–æ—Ç–æ', () => patch(`/api/v1/school/ideas/${idea.id}/images`, { decision: 'reject' })));
+            card.append(actions);
+          } else if (idea.image_status === 'approved') {
+            card.append(node(document, 'p', '', '–§–æ—Ç–æ –æ–¥–æ–±—Ä–µ–Ω—ã –∏ –¥–æ—Å—Ç—É–ø–Ω—ã —à–∫–æ–ª—å–Ω–æ–π –∫–æ–º–∞–Ω–¥–µ.'));
+          } else if (idea.image_status === 'rejected') {
+            card.append(node(document, 'p', '', '–§–æ—Ç–æ –æ—Ç–∫–ª–æ–Ω–µ–Ω—ã.'));
+          }
+          ideasPanel.append(card);
+        }
+        queue.append(ideasPanel);
+      };
+      if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
+        const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
+        if (targets.length) {
+          const panel = node(document, 'section', 'ru-moderation-card');
+          panel.append(node(document, 'h3', '', '–í—Ä–µ–º–µ–Ω–Ω–æ–µ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ –¥–µ–π—Å—Ç–≤–∏–π –∞–∫–∫–∞—É–Ω—Ç–∞'));
+          const note = node(document, 'p', '', '–î–æ—Å—Ç—É–ø–Ω–æ –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞–º —ç—Ç–æ–π —à–∫–æ–ª—ã –ø–æ—Å–ª–µ —è–≤–Ω–æ–≥–æ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏—è —á–µ—Ä–µ–∑ –Ø–Ω–¥–µ–∫—Å ID. –í—ã–±–µ—Ä–∏—Ç–µ —Å—Ä–æ–∫ –∏ —É–∫–∞–∂–∏—Ç–µ —Ñ–∞–∫—Ç–∏—á–µ—Å–∫—É—é –ø—Ä–∏—á–∏–Ω—É –±–µ–∑ –ª–∏—á–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö.');
+          const form = document.createElement('form'); form.className = 'ru-suspension-form';
+          const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', '–ê–∫–∫–∞—É–Ω—Ç');
+          const prompt = node(document, 'option', '', '–í—ã–±–µ—Ä–∏—Ç–µ –∞–∫–∫–∞—É–Ω—Ç'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);
+          for (const target of targets) {
+            const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+            const option = node(document, 'option', '', `${name || '–£—á–µ–Ω–∏–∫'} ¬∑ ${target.role === 'student' ? '—É—á–µ–Ω–∏–∫' : '–°–æ–≤–µ—Ç'}`);
+            option.value = target.id; select.append(option);
+          }
+          const duration = document.createElement('select'); duration.required = true; duration.setAttribute('aria-label', '–°—Ä–æ–∫ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è');
+          for (const [hours, label] of [[24, '24 —á–∞—Å–∞'], [72, '3 –¥–Ω—è'], [168, '7 –¥–Ω–µ–π']]) { const option = node(document, 'option', '', label); option.value = String(hours); duration.append(option); }
+          const reason = document.createElement('textarea'); reason.required = true; reason.minLength = 15; reason.maxLength = 400; reason.placeholder = '–ü—Ä–∏—á–∏–Ω–∞ (15‚Äì400 —Å–∏–º–≤–æ–ª–æ–≤, –±–µ–∑ –∫–æ–Ω—Ç–∞–∫—Ç–æ–≤)';
+          const issueSuspension = async () => {
+            if (!UUID.test(select.value || '') || reason.value.trim().length < 15 || reason.value.trim().length > 400) { status.textContent = '–í—ã–±–µ—Ä–∏—Ç–µ –∞–∫–∫–∞—É–Ω—Ç –∏ —É–∫–∞–∂–∏—Ç–µ –ø—Ä–∏—á–∏–Ω—É –¥–ª–∏–Ω–æ–π 15‚Äì400 —Å–∏–º–≤–æ–ª–æ–≤.'; return; }
+            await patch(`/api/v1/suspensions/${select.value}`, { action: 'issue', duration_hours: Number(duration.value), reason: reason.value.trim() });
+          };
+          const submit = actionButton(document, '–£—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ', issueSuspension);
+          form.addEventListener('submit', async event => { event.preventDefault(); await issueSuspension(); });
+          form.append(select, duration, reason, submit); panel.append(note, form); queue.append(panel);
+        }
+      }
+      if (me.profile.role === 'school_admin' && roleManagementTargets.length) {
+        const panel = node(document, 'section', 'ru-moderation-card');
+        panel.append(node(document, 'h3', '', '–£–ø—Ä–∞–≤–ª–µ–Ω–∏–µ –ø–æ–ª–Ω–æ–º–æ—á–∏—è–º–∏ —à–∫–æ–ª—ã'));
+        panel.append(node(document, 'p', '', '–ü–æ—Å–ª–µ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏—è –ø–æ–ª–Ω–æ–º–æ—á–∏–π –∞–∫–∫–∞—É–Ω—Ç –æ—Å—Ç–∞–Ω–µ—Ç—Å—è –∞–∫—Ç–∏–≤–Ω—ã–º.'));
+        for (const target of roleManagementTargets) {
+          const row = node(document, 'div', 'ru-moderation-actions');
+          const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+          row.append(node(document, 'span', '', `${name || '–ü–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—å'} ¬∑ ${target.role === 'school_admin' ? '–∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä —à–∫–æ–ª—ã' : '—É—á–∞—Å—Ç–Ω–∏–∫ –°–æ–≤–µ—Ç–∞'}${target.class_name ? ` ¬∑ ${target.class_name}` : ''}`));
+          row.append(actionButton(document, '–°–Ω—è—Ç—å —Ä–æ–ª—å', async () => {
+            const confirmAction = document.defaultView?.confirm || globalThis.confirm;
+            if (!confirmAction || !confirmAction(`–°–Ω—è—Ç—å —Ä–æ–ª—å —É ${name || '–ø–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—è'}? –ê–∫–∫–∞—É–Ω—Ç –æ—Å—Ç–∞–Ω–µ—Ç—Å—è –∞–∫—Ç–∏–≤–Ω—ã–º.`)) return;
+            await patch(`/api/v1/role-management/${target.id}`, { action: 'revoke' });
+          }));
+          panel.append(row);
+        }
+        queue.append(panel);
+      }
+      const renderSafetyPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const safetyPanel = node(document, 'section', 'ru-moderation-card');
+        safetyPanel.append(node(document, 'h3', '', '–°–∏–≥–Ω–∞–ª—ã –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏'));
+        safetyPanel.append(node(document, 'p', '', '–°–≤–æ–¥–∫–∞ –Ω–µ–ø–æ–ª–Ω–∞—è: —Å–∏—Å—Ç–µ–º–∞ –∑–∞–ø–∏—Å—ã–≤–∞–µ—Ç –ª–æ–∫–∞–ª—å–Ω–æ –æ–±–Ω–∞—Ä—É–∂–µ–Ω–Ω—ã–µ —É–≥—Ä–æ–∑—ã –∏ –¥–∏—Å–∫—Ä–∏–º–∏–Ω–∞—Ü–∏—é; –¥—Ä—É–≥–∏–µ —Å–∏–≥–Ω–∞–ª—ã –ø–æ–∫–∞ –Ω–µ –ø–µ—Ä–µ–Ω–µ—Å–µ–Ω—ã.'));
+        if (!safetyReportsAvailable) safetyPanel.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã–µ —Å–∏–≥–Ω–∞–ª—ã.'));
+        const categoryNames = { targeted_harassment: '–¢—Ä–∞–≤–ª—è', hate_or_discrimination: '–ù–µ–Ω–∞–≤–∏—Å—Ç—å –∏–ª–∏ –¥–∏—Å–∫—Ä–∏–º–∏–Ω–∞—Ü–∏—è',
+          threat_or_intimidation: '–£–≥—Ä–æ–∑–∞ –∏–ª–∏ –∑–∞–ø—É–≥–∏–≤–∞–Ω–∏–µ', negative_personal_call: '–û—Å–∫–æ—Ä–±–ª–µ–Ω–∏–µ',
+          spam_or_repeated_abuse: '–°–ø–∞–º –∏–ª–∏ –ø–æ–≤—Ç–æ—Ä–Ω–æ–µ –Ω–∞—Ä—É—à–µ–Ω–∏–µ', unsafe_image: '–ù–µ–±–µ–∑–æ–ø–∞—Å–Ω–æ–µ –∏–∑–æ–±—Ä–∞–∂–µ–Ω–∏–µ',
+          personal_data_in_image: '–õ–∏—á–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ –Ω–∞ –∏–∑–æ–±—Ä–∞–∂–µ–Ω–∏–∏', unclear_safety_signal: '–î—Ä—É–≥–æ–π —Å–∏–≥–Ω–∞–ª –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏' };
+        const sourceNames = { message: '—Å–æ–æ–±—â–µ–Ω–∏–µ', idea: '–∏–¥–µ—è', listing: '–æ–±—ä—è–≤–ª–µ–Ω–∏–µ', image: '–∏–∑–æ–±—Ä–∞–∂–µ–Ω–∏–µ' };
+        for (const report of safetyReports) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'h4', '', `${report.severity === 'high' ? '–í—ã—Å–æ–∫–∞—è' : '–°—Ä–µ–¥–Ω—è—è'} –≤–∞–∂–Ω–æ—Å—Ç—å ¬∑ ${categoryNames[report.category]}`));
+          card.append(node(document, 'p', '', `–ò—Å—Ç–æ—á–Ω–∏–∫: ${sourceNames[report.source_kind]} ¬∑ –ü–æ–≤—Ç–æ—Ä–µ–Ω–∏–π: ${report.occurrences}`));
+          const personName = person => person ? [person.first_name, person.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ') || `–ê–∫–∫–∞—É–Ω—Ç ${person.account_code || ''}` : '–ù–µ–∏–∑–≤–µ—Å—Ç–Ω–æ';
+          card.append(node(document, 'p', '', `–£—á–∞—Å—Ç–Ω–∏–∫: ${personName(report.actor)} ¬∑ –ó–∞—Ç—Ä–æ–Ω—É—Ç: ${personName(report.target)}`));
+          if (typeof report.evidence_excerpt === 'string') card.append(node(document, 'p', '', `–§—Ä–∞–≥–º–µ–Ω—Ç: ${report.evidence_excerpt}`));
+          if (typeof report.source_origin === 'string') card.append(node(document, 'p', '', `–†–∞–∑–¥–µ–ª: ${report.source_origin}`));
+          if (typeof report.last_seen === 'string') card.append(node(document, 'p', '', `–ü–æ—Å–ª–µ–¥–Ω–∏–π —Å–∏–≥–Ω–∞–ª: ${new Date(report.last_seen).toLocaleString('ru-RU')}`));
+          card.append(actionButton(document, '–û—Ç–º–µ—Ç–∏—Ç—å –ø—Ä–æ—Å–º–æ—Ç—Ä–µ–Ω–Ω—ã–º', () => patch('/api/v1/school/admin/safety-reports', {
+            fingerprint: report.fingerprint, category: report.category, source_kind: report.source_kind,
+          })));
+          safetyPanel.append(card);
+        }
+        queue.append(safetyPanel);
+      };
+      const renderPendingMessagesPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const reviewPanel = node(document, 'section', 'ru-moderation-card');
+        reviewPanel.append(node(document, 'h3', '', '–°–æ–æ–±—â–µ–Ω–∏—è –Ω–∞ —à–∫–æ–ª—å–Ω–æ–π –ø—Ä–æ–≤–µ—Ä–∫–µ'));
+        if (!pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–æ–æ–±—â–µ–Ω–∏—è –Ω–∞ –ø—Ä–æ–≤–µ—Ä–∫—É.'));
+        if (!pendingMessages.length && pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', '–°–æ–æ–±—â–µ–Ω–∏–π –Ω–∞ –ø—Ä–æ–≤–µ—Ä–∫–µ –Ω–µ—Ç.'));
+        for (const message of pendingMessages) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'p', '', `–û—Ç–ø—Ä–∞–≤–∏—Ç–µ–ª—å ¬∑ ${message.sender_id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', '', message.body));
+          if (typeof message.created_at === 'string') card.append(node(document, 'p', '', `–ü–æ–ª—É—á–µ–Ω–æ: ${new Date(message.created_at).toLocaleString('ru-RU')}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          actions.append(actionButton(document, '–û–¥–æ–±—Ä–∏—Ç—å –∏ –¥–æ—Å—Ç–∞–≤–∏—Ç—å', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'approve' })));
+          actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'reject' })));
+          card.append(actions); reviewPanel.append(card);
+        }
+        queue.append(reviewPanel);
+      };
+      const renderTechnicalAlertsPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const alertsPanel = node(document, 'section', 'ru-moderation-card');
+        alertsPanel.append(node(document, 'h3', '', '–¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏—è FAM –∑–∞ —Å—É—Ç–∫–∏'));
+        alertsPanel.append(node(document, 'p', '', '–û–±—â–∏–µ —Å—á—ë—Ç—á–∏–∫–∏ –æ—à–∏–±–æ–∫ —Å–∞–π—Ç–∞. –í –Ω–∏—Ö –Ω–µ—Ç —Ç–µ–∫—Å—Ç–∞ –æ—à–∏–±–æ–∫ –∏–ª–∏ —Å–≤–µ–¥–µ–Ω–∏–π –æ–± –∞–∫–∫–∞—É–Ω—Ç–∞—Ö.'));
+        if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Ç–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏—è.'));
+        if (siteErrorDigest) {
+          alertsPanel.append(node(document, 'h4', '', '–ü–æ—Å–ª–µ–¥–Ω—è—è —Ñ–æ–Ω–æ–≤–∞—è —Å–≤–æ–¥–∫–∞'));
+          alertsPanel.append(node(document, 'p', '', siteErrorDigest.summary));
+          alertsPanel.append(node(document, 'p', 'ru-note', `–ò–Ω—Ç–µ—Ä–≤–∞–ª UTC: ${siteErrorDigest.digest_slot} ¬∑ —Å–æ–∑–¥–∞–Ω–æ ${new Date(siteErrorDigest.generated_at).toLocaleString('ru-RU')}`));
+        }
+        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', '–ü–æ—Ä–æ–≥–æ–≤—ã—Ö –ø–æ–≤—Ç–æ—Ä—è—é—â–∏—Ö—Å—è —Å–±–æ–µ–≤ –Ω–µ –æ–±–Ω–∞—Ä—É–∂–µ–Ω–æ.'));
+        const codeNames = { js_runtime: '–û—à–∏–±–∫–∞ –∏–Ω—Ç–µ—Ä—Ñ–µ–π—Å–∞', unhandled_rejection: '–°–±–æ–π —Ñ–æ–Ω–æ–≤–æ–π –æ–ø–µ—Ä–∞—Ü–∏–∏', supabase_sdk_unavailable: '–°–ª—É–∂–±–∞ –¥–∞–Ω–Ω—ã—Ö –Ω–µ–¥–æ—Å—Ç—É–ø–Ω–∞',
+          listings_load_failed: '–ù–µ –∑–∞–≥—Ä—É–∑–∏–ª–∏—Å—å –æ–±—ä—è–≤–ª–µ–Ω–∏—è', notifications_load_failed: '–ù–µ –∑–∞–≥—Ä—É–∑–∏–ª–∏—Å—å —É–≤–µ–¥–æ–º–ª–µ–Ω–∏—è',
+          database_request_failed: '–û—à–∏–±–∫–∞ –±–∞–∑—ã –¥–∞–Ω–Ω—ã—Ö', auth_backend_failed: '–û—à–∏–±–∫–∞ –≤—Ö–æ–¥–∞' };
+        const areaNames = { auth: '–≤—Ö–æ–¥', listings: '–æ–±—ä—è–≤–ª–µ–Ω–∏—è', notifications: '—É–≤–µ–¥–æ–º–ª–µ–Ω–∏—è', database: '–±–∞–∑–∞ –¥–∞–Ω–Ω—ã—Ö', other: '–¥—Ä—É–≥–æ–µ' };
+        for (const alert of technicalAlerts) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'h4', '', `${alert.severity === 'critical' ? '–ö—Ä–∏—Ç–∏—á–µ—Å–∫–∏–π —Å–±–æ–π' : '–ü—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–µ'} ¬∑ ${codeNames[alert.event_code]}`));
+          card.append(node(document, 'p', '', `–†–∞–∑–¥–µ–ª: ${areaNames[alert.page_area]} ¬∑ –°–æ–±—ã—Ç–∏–π –∑–∞ —á–∞—Å: ${alert.event_count}`));
+          card.append(node(document, 'p', '', `–ß–∞—Å UTC: ${new Date(alert.hour_bucket).toLocaleString('ru-RU', { timeZone: 'UTC' })}`));
+          alertsPanel.append(card);
+        }
+        queue.append(alertsPanel);
+      };
+      const renderSchoolOverviewPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const overview = node(document, 'section', 'ru-moderation-card');
+        overview.append(node(document, 'h3', '', '–û–±–∑–æ—Ä —à–∫–æ–ª—ã'));
+        if (!schoolOverviewAvailable) {
+          overview.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –æ–±–∑–æ—Ä —à–∫–æ–ª—ã. –ü–æ–≤—Ç–æ—Ä–∏—Ç–µ –ø–æ–ø—ã—Ç–∫—É –ø–æ–∑–∂–µ.'));
+          queue.append(overview);
+          return;
+        }
+        const users = schoolOverviewResult.users.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member', 'school_admin'].includes(item.role));
+        const listings = schoolOverviewResult.listings.filter(item => item && UUID.test(item.id || '')
+          && ['active', 'pending', 'rejected', 'removed'].includes(item.status));
+        const deletionRequests = schoolOverviewResult.deletion_requests.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member'].includes(item.target_role) && ['pending', 'processing'].includes(item.status));
+        const suspensions = schoolOverviewResult.suspensions.filter(item => item && UUID.test(item.target_id || '')
+          && ['student', 'council_member'].includes(item.target_role));
+        overview.append(node(document, 'p', '', `–í –≤—ã–±–æ—Ä–∫–µ: –∞–∫—Ç–∏–≤–Ω—ã—Ö –ø—Ä–æ—Ñ–∏–ª–µ–π ‚Äî ${users.length}, –∞–∫—Ç–∏–≤–Ω—ã—Ö –ø—É–±–ª–∏–∫–∞—Ü–∏–π ‚Äî ${listings.filter(item => item.status === 'active').length}, –æ–∂–∏–¥–∞—é—Ç –ø—Ä–æ–≤–µ—Ä–∫–∏ ‚Äî ${listings.filter(item => item.status === 'pending').length}, –∑–∞—è–≤–æ–∫ –Ω–∞ —É–¥–∞–ª–µ–Ω–∏–µ ‚Äî ${deletionRequests.length}, –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–π ‚Äî ${suspensions.length}.`));
+        overview.append(node(document, 'p', '', '–°–ø–∏—Å–æ–∫ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω –ø–æ—Å–ª–µ–¥–Ω–∏–º–∏ 100 –ø—Ä–æ—Ñ–∏–ª—è–º–∏ –∏ –ø—É–±–ª–∏–∫–∞—Ü–∏—è–º–∏, 50 –∑–∞—è–≤–∫–∞–º–∏ –∏ 100 –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è–º–∏.'));
+        const accounts = node(document, 'section', 'ru-school-account-list');
+        accounts.append(node(document, 'h4', '', '–ê–∫–∫–∞—É–Ω—Ç—ã —à–∫–æ–ª—ã'));
+        accounts.append(node(document, 'p', 'ru-note', '–°–ø–∏—Å–æ–∫ –ø–æ–∫–∞–∑—ã–≤–∞–µ—Ç –¥–æ 100 –∞–∫—Ç–∏–≤–Ω—ã—Ö –ø—Ä–æ—Ñ–∏–ª–µ–π. –£–¥–∞–ª–∏—Ç—å –º–æ–∂–Ω–æ –∞–∫–∫–∞—É–Ω—Ç —É—á–µ–Ω–∏–∫–∞ –∏–ª–∏ –°–æ–≤–µ—Ç–∞; –ø–µ—Ä–µ–¥ —É–¥–∞–ª–µ–Ω–∏–µ–º –Ω—É–∂–Ω–æ –ø–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç—å –¥–µ–π—Å—Ç–≤–∏–µ —á–µ—Ä–µ–∑ –Ø–Ω–¥–µ–∫—Å ID.'));
+        const roleNames = { student: '–£—á–µ–Ω–∏–∫', council_member: '–£—á–∞—Å—Ç–Ω–∏–∫ –£—á–µ–Ω–∏—á–µ—Å–∫–æ–≥–æ —Å–æ–≤–µ—Ç–∞', school_admin: '–ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä —à–∫–æ–ª—ã' };
+        for (const account of users) {
+          const card = node(document, 'article', 'ru-school-account-card');
+          const name = [account.first_name, account.last_name]
+            .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || '–ê–∫–∫–∞—É–Ω—Ç —É—á–∞—Å—Ç–Ω–∏–∫–∞';
+          card.append(node(document, 'b', '', name));
+          card.append(node(document, 'p', '', `–ö–ª–∞—Å—Å: ${typeof account.class_name === 'string' && account.class_name.trim() ? account.class_name.trim() : '–Ω–µ —É–∫–∞–∑–∞–Ω'} ¬∑ ${roleNames[account.role]} ¬∑ –∞–∫–∫–∞—É–Ω—Ç #${account.id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', 'ru-note', `–ü—É–±–ª–∏–∫–∞—Ü–∏–π –≤ –≤—ã–±–æ—Ä–∫–µ: ${listings.filter(item => item.user_id === account.id).length}.`));
+          if (['student', 'council_member'].includes(account.role)
+              && account.id.toLowerCase() !== String(me.profile.id || '').toLowerCase()) {
+            card.append(actionButton(document, '–£–¥–∞–ª–∏—Ç—å –∞–∫–∫–∞—É–Ω—Ç', () => deleteSchoolAccount(account)));
+          }
+          accounts.append(card);
+        }
+        if (!users.length) accounts.append(node(document, 'p', '', '–ê–∫—Ç–∏–≤–Ω—ã–µ –ø—Ä–æ—Ñ–∏–ª–∏ —à–∫–æ–ª—ã –Ω–µ –Ω–∞–π–¥–µ–Ω—ã.'));
+        overview.append(accounts);
+        const actionNames = { role_revoked: '–°–Ω—è—Ç–∞ —à–∫–æ–ª—å–Ω–∞—è —Ä–æ–ª—å', account_deleted: '–£–¥–∞–ª—ë–Ω –∞–∫–∫–∞—É–Ω—Ç –ø–æ —Ä–µ—à–µ–Ω–∏—é —à–∫–æ–ª—ã',
+          account_deleted_by_admin: '–£–¥–∞–ª—ë–Ω –∞–∫–∫–∞—É–Ω—Ç –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–æ–º', listing_deleted: '–£–¥–∞–ª–µ–Ω–æ –æ–±—ä—è–≤–ª–µ–Ω–∏–µ',
+          issued: '–í—ã–¥–∞–Ω–æ –≤—Ä–µ–º–µ–Ω–Ω–æ–µ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ', lifted: '–°–Ω—è—Ç–æ –≤—Ä–µ–º–µ–Ω–Ω–æ–µ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ',
+          idea_text_approved: '–û–¥–æ–±—Ä–µ–Ω —Ç–µ–∫—Å—Ç —à–∫–æ–ª—å–Ω–æ–π –∏–¥–µ–∏', idea_text_rejected: '–û—Ç–∫–ª–æ–Ω—ë–Ω —Ç–µ–∫—Å—Ç —à–∫–æ–ª—å–Ω–æ–π –∏–¥–µ–∏',
+          message_approved: '–û–¥–æ–±—Ä–µ–Ω–∞ –¥–æ—Å—Ç–∞–≤–∫–∞ —Å–æ–æ–±—â–µ–Ω–∏—è', message_rejected: '–û—Ç–∫–ª–æ–Ω–µ–Ω–æ —Å–æ–æ–±—â–µ–Ω–∏–µ' };
+        const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
+          && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);
+        overview.append(node(document, 'h4', '', '–ü–æ—Å–ª–µ–¥–Ω–∏–µ –¥–µ–π—Å—Ç–≤–∏—è —à–∫–æ–ª—ã'));
+        if (!audit.length) overview.append(node(document, 'p', '', '–ó–∞–ø–∏—Å–∞–Ω–Ω—ã—Ö –¥–µ–π—Å—Ç–≤–∏–π –ø–æ–∫–∞ –Ω–µ—Ç.'));
+        for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} ¬∑ ${new Date(item.created_at).toLocaleString('ru-RU')}`));
+        queue.append(overview);
+      };
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0) {
+        renderPendingMessagesPanel();
+        renderSchoolIdeasPanel();
+        renderSafetyPanel();
+        renderTechnicalAlertsPanel();
+        renderSchoolOverviewPanel();
+        if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
+        status.textContent = !suspensionsAvailable ? '–û—á–µ—Ä–µ–¥–∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã, –Ω–æ –Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –¥–µ–π—Å—Ç–≤—É—é—â–∏–µ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è. –û–±–Ω–æ–≤–∏—Ç–µ —Å–ø–∏—Å–æ–∫ –ø–æ–∑–∂–µ.'
+          : !pendingMessagesAvailable ? '–û—á–µ—Ä–µ–¥–∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã, –Ω–æ –Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–æ–æ–±—â–µ–Ω–∏—è –Ω–∞ —Ä—É—á–Ω—É—é –ø—Ä–æ–≤–µ—Ä–∫—É.'
+            : !safetyReportsAvailable ? '–û—á–µ—Ä–µ–¥–∏ —à–∫–æ–ª—å–Ω–æ–π –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã, –Ω–æ –Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–∏–≥–Ω–∞–ª—ã –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏.'
+                : !schoolIdeasAvailable ? '–û—á–µ—Ä–µ–¥–∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã, –Ω–æ –Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —à–∫–æ–ª—å–Ω—ã–µ –∏–¥–µ–∏.'
+              : !technicalAlertsAvailable ? '–û—á–µ—Ä–µ–¥–∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã, –Ω–æ –Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Ç–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏—è.'
+              : '–û—á–µ—Ä–µ–¥–∏ —à–∫–æ–ª—å–Ω–æ–π –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã.';
+        return;
+      }
+      status.textContent = `–û—á–µ—Ä–µ–¥–∏: –æ–±—ä—è–≤–ª–µ–Ω–∏–π ‚Äî ${result.listings.length}, –∑–∞—è–≤–æ–∫ –Ω–∞ –º–µ—Ä–æ–ø—Ä–∏—è—Ç–∏—è ‚Äî ${applications.length}, —à–∫–æ–ª—å–Ω—ã—Ö –ø—Ä–æ—Ñ–∏–ª–µ–π ‚Äî ${profileRequests.length}, –∑–∞–ø—Ä–æ—Å–æ–≤ —Ä–æ–ª–µ–π ‚Äî ${roleRequests.length}, –¥–µ–π—Å—Ç–≤—É—é—â–∏—Ö –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–π ‚Äî ${suspensions.length}, —Å–æ–æ–±—â–µ–Ω–∏–π –Ω–∞ –ø—Ä–æ–≤–µ—Ä–∫–µ ‚Äî ${pendingMessages.length}, —à–∫–æ–ª—å–Ω—ã—Ö –∏–¥–µ–π ‚Äî ${schoolIdeas.length}, —Å–∏–≥–Ω–∞–ª–æ–≤ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏ ‚Äî ${safetyReports.length}, —Ç–µ—Ö–Ω–∏—á–µ—Å–∫–∏—Ö –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–π ‚Äî ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable ? '' : ' –ù–µ –≤—Å–µ –æ—á–µ—Ä–µ–¥–∏ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å; —Å–ø–∏—Å–æ–∫ –Ω–µ–ø–æ–ª–Ω—ã–π.'}`;
+      for (const listing of result.listings) {
+        if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', listing.title));
+        card.append(node(document, 'p', '', `${listing.category || ''} ¬∑ ${listing.price_text || '–ë–µ—Å–ø–ª–∞—Ç–Ω–æ'}`));
+        card.append(node(document, 'p', '', listing.description));
+        if (listing.photo_url === `/api/v1/listings/${listing.id}/photo` && ['pending', 'approved'].includes(listing.photo_status)) {
+          const photo = document.createElement('img');
+          photo.className = 'ru-listing-photo';
+          photo.src = listing.photo_url;
+          photo.alt = `–§–æ—Ç–æ –Ω–∞ –ø—Ä–æ–≤–µ—Ä–∫–µ: ${listing.title}`;
+          photo.loading = 'lazy';
+          photo.referrerPolicy = 'no-referrer';
+          card.append(photo);
+        }
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        if (listing.photo_status === 'pending') {
+          actions.append(actionButton(document, '–û–¥–æ–±—Ä–∏—Ç—å —Ñ–æ—Ç–æ', () => decide(`/api/v1/listings/${listing.id}/photo`, 'approve')));
+          actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ñ–æ—Ç–æ', () => decide(`/api/v1/listings/${listing.id}/photo`, 'reject')));
+        }
+        if (['none', 'approved'].includes(listing.photo_status)) {
+          actions.append(actionButton(document, '–û–ø—É–±–ª–∏–∫–æ–≤–∞—Ç—å', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'approve')));
+        }
+        actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å –æ–±—ä—è–≤–ª–µ–Ω–∏–µ', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'reject')));
+        card.append(actions);
+        queue.append(card);
+      }
+      for (const application of applications) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', application.event_title));
+        const name = [application.first_name, application.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
+        const personType = application.person_type === 'school_staff' ? '—Å–æ—Ç—Ä—É–¥–Ω–∏–∫ —à–∫–æ–ª—ã'
+          : application.person_type === 'parent' ? '—Ä–æ–¥–∏—Ç–µ–ª—å' : '—É—á–µ–Ω–∏–∫';
+        const details = [personType, application.class_name, application.staff_position].filter(value => typeof value === 'string' && value.trim()).join(' ¬∑ ');
+        card.append(node(document, 'p', '', `–ó–∞—è–≤–∫–∞: ${name || personType} ¬∑ ${details}`));
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        const path = `/api/v1/listings/${application.event_id}/registrations/${application.user_id}`;
+        actions.append(actionButton(document, '–ü–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç—å –∑–∞—è–≤–∫—É', () => decide(path, 'approve')));
+        actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å –∑–∞—è–≤–∫—É', () => decide(path, 'reject')));
+        card.append(actions);
+        queue.append(card);
+      }
+      for (const request of profileRequests) {
+        const card = node(document, 'article', 'ru-moderation-card');
+        card.append(node(document, 'h3', '', `${request.first_name} ${request.last_name}`));
+        const typeName = request.person_type === 'school_staff' ? '—Å–æ—Ç—Ä—É–¥–Ω–∏–∫ —à–∫–æ–ª—ã'
+          : request.person_type === 'parent' ? '—Ä–æ–¥–∏—Ç–µ–ª—å' : '—É—á–µ–Ω–∏–∫';
+        card.append(node(document, 'p', '', `–ó–∞—è–≤–∫–∞: ${typeName}${request.class_name ? ` ¬∑ –∫–ª–∞—Å—Å ${request.class_name}` : ''}${request.staff_position ? ` ¬∑ ${request.staff_position}` : ''}`));
+        const actions = node(document, 'div', 'ru-moderation-actions');
+        const path = `/api/v1/profile-requests/${request.request_id}`;
+        actions.append(actionButton(document, '–û–¥–æ–±—Ä–∏—Ç—å –ø—Ä–æ—Ñ–∏–ª—å', () => decide(path, 'approve')));
+        actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å –∑–∞—è–≤–∫—É', () => decide(path, 'reject')));
+        card.append(actions); queue.append(card);
+      }
+      if (me.profile.role === 'school_admin') {
+        const panel = node(document, 'section', 'ru-moderation-card');
+        panel.append(node(document, 'h3', '', '–ü—Ä–æ–≤–µ—Ä–∫–∞ —Å–æ—Ç—Ä—É–¥–Ω–∏–∫–æ–≤ —à–∫–æ–ª—ã'));
+        if (!staffVerificationsAvailable) panel.append(node(document, 'p', '', '–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –∑–∞—è–≤–∫–∏ —Å–æ—Ç—Ä—É–¥–Ω–∏–∫–æ–≤.'));
+        else if (!staffVerifications.length) panel.append(node(document, 'p', '', '–ù–æ–≤—ã—Ö –∑–∞—è–≤–æ–∫ –Ω–∞ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏–µ –¥–æ–ª–∂–Ω–æ—Å—Ç–∏ –Ω–µ—Ç.'));
+        for (const request of staffVerifications) {
+          const row = node(document, 'article', 'ru-moderation-card');
+          row.append(node(document, 'p', '', `${request.first_name} ${request.last_name} ¬∑ ${request.staff_position}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          actions.append(actionButton(document, '–ü–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç—å –¥–æ–ª–∂–Ω–æ—Å—Ç—å', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'approved' })));
+          actions.append(actionButton(document, '–û—Ç–∫–ª–æ–Ω–∏—Ç—å', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'rejected' })));
+          row.append(actions); panel.append(row);
+        }
+        queue.append(panel);
+      }
       for (const request of roleRequests) {
         const card = node(document, 'article', 'ru-moderation-card');
         const roleName = request.requested_role === 'school_admin' ? '–ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä —à–∫–æ–ª—ã' : '–£—á–∞—Å—Ç–Ω–∏–∫ –£—á–µ–Ω–∏—á–µ—Å–∫–æ–≥–æ —Å–æ–≤–µ—Ç–∞';
