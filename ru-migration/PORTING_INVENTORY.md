@@ -4,7 +4,7 @@
 
 - Повторный fetch GitHub `main` указывает на commit [`7fd418246653f92b53f66bc29fa224d95d04d5cf`](https://github.com/spartakdubov059/fam-website/commit/7fd418246653f92b53f66bc29fa224d95d04d5cf): 76 файлов `supabase/migrations` и 7 Edge Functions. Commit [`5e749c56b9270efbfdf1f48cefe6e8d95a01c579`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579) по-прежнему доступен, но не является предком текущего `main`. Его изменения (в том числе опросы до 8 ответов) нельзя обозначать как текущие требования `main` без дополнительного подтверждения.
 - В RU реализован вариант опроса на 2–8 ответов. Это шире поведения текущего `main` snapshot, а не доказательство полного соответствия текущему исходнику. Изменение оставлено в изолированной ветке; его следует учитывать как RU-вариант при последующем продуктовом сопоставлении.
-- Последняя проверенная RU-ревизия [`e6044a0`](https://github.com/spartakdubov059/fam-website/commit/e6044a0489245ea755d7031b422d1f0c3f500b02): 315/315 backend-тестов, SDK/Sharp CI и одноразовая YDB CI успешны. Полный аудит 76 migrations/RLS/RPC/triggers, функций и облачный staging не завершены.
+- Последняя проверенная RU-ревизия [`d900cd1`](https://github.com/spartakdubov059/fam-website/commit/d900cd1377b5a3577050552daaaa371a5374ea50): 316/316 backend-тестов, SDK/Sharp CI и одноразовая YDB CI успешны. Полный аудит 76 migrations/RLS/RPC/triggers, функций и облачный staging не завершены.
 
 
 Обследование исходников ветки `migration/yandex-cloud`, 13 ноября 2026. Это перечень компонентов для самостоятельного переноса по коду текущего FAM; архив предыдущей сборки не требуется для этого этапа.

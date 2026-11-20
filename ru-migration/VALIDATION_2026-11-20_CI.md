@@ -1,11 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
-## Повторная проверка веток и CI (20 ноября 2026)
+## Актуальная проверка веток и CI (20 ноября 2026)
 
-- Повторно полученные refs: GitHub `main` — `7fd418246653f92b53f66bc29fa224d95d04d5cf` (76 migrations, 7 Edge Functions); `migration/yandex-cloud` — [`e6044a0489245ea755d7031b422d1f0c3f500b02`](https://github.com/spartakdubov059/fam-website/commit/e6044a0489245ea755d7031b422d1f0c3f500b02). Ранее использованный source commit `5e749c56b9270efbfdf1f48cefe6e8d95a01c579` существует, но не является предком текущего `main`; детали в [SOURCE_SYNC](SOURCE_SYNC_2026-11-20.md).
-- Для `e6044a0` [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44682742036) завершилась успешно. В логе подтверждены `315` тестов, `315` успешных, `0` ошибок, pinned `npm ci`, проверка systemd unit-ов и настоящая обработка Sharp/WebP.
-- [Одноразовая YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44682741980) завершилась успешно: закреплённые зависимости установлены, временная локальная база создана, схема применена, синтетические сценарии прошли, временная база удалена.
-- Это CI в GitHub Actions и локальная временная YDB, не облачный российский staging. В окружении не обнаружены `yc` CLI и каталог конфигурации Yandex Cloud; credentials, OAuth, S3 и бесплатный облачный хостинг не подтверждены.
+- Повторно полученные refs: GitHub `main` — `7fd418246653f92b53f66bc29fa224d95d04d5cf` (76 migrations, 7 Edge Functions); `migration/yandex-cloud` — [`d900cd1377b5a3577050552daaaa371a5374ea50`](https://github.com/spartakdubov059/fam-website/commit/d900cd1377b5a3577050552daaaa371a5374ea50). Commit `5e749c5` не является предком текущего `main`; детали — в [SOURCE_SYNC](SOURCE_SYNC_2026-11-20.md).
+- На `d900cd1` [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44684140252) завершилась успешно: `316/316` backend-тестов, `0` ошибок, pinned `npm ci`, проверка systemd unit-ов, Sharp/WebP и SDK verifier.
+- [Одноразовая YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44684140282) завершилась успешно: схема применена, синтетические сценарии прошли, временная локальная база удалена.
+- Новый регрессионный тест проверяет, что сводный health report отклоняет пустой, дублированный, повреждённый или противоречивый результат проверки таймеров даже при `ok: true` на верхнем уровне.
+- Это GitHub Actions и локальная временная YDB, не облачный российский staging. `yc` CLI и конфигурация Yandex Cloud в окружении не обнаружены; credentials, OAuth, S3 и бесплатный облачный хостинг не подтверждены.
 
 ## Актуальное уточнение (20 ноября 2026)
 
