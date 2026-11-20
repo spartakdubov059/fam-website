@@ -64,11 +64,12 @@ export function createYdbAgentTaskQueue(sql) {
           FROM fam_site_error_counts
           WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
             AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed')
-          GROUP BY event_code, page_area ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
+          GROUP BY event_code, page_area HAVING SUM(event_count) >= 3
+          ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
         const event = rows?.[0]?.[0];
         if (!event || !Object.hasOwn(CODER_EVENT_CODES, event.event_code)) return { created: false, reason: 'no_threshold_event' };
-        const occurrences = Math.min(1000, Math.max(0, Number(event.occurrences)));
-        if (!Number.isSafeInteger(occurrences) || occurrences < 3) return { created: false, reason: 'no_threshold_event' };
+        const occurrences = Number(event.occurrences);
+        if (!Number.isSafeInteger(occurrences) || occurrences < 3) throw new Error('invalid aggregate event count');
         await tx`INSERT INTO fam_agent_tasks
           (id, agent_key, task_type, title, description, priority, status, source, approval_required,
             payload_json, result_summary, attempt_count, max_attempts, available_at, claim_token,
