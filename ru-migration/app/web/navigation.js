@@ -12,8 +12,10 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
       let target = null;
       if (view === 'board') target = document.getElementById('publicListings');
       if (view === 'favorites') {
+        const listings = document.getElementById('publicListings');
+        listings?.setAttribute?.('data-ru-board-view', 'favorites');
         document.querySelector?.('#publicListings .ru-board-views button[data-view="favorites"]')?.click?.();
-        target = document.getElementById('publicListings');
+        target = listings;
       }
       if (view === 'afisha') {
         document.getElementById('ruBoardCategoryAfisha')?.click?.();
