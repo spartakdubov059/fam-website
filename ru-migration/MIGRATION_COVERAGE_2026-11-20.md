@@ -1,6 +1,11 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 21 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, код RU `migration/yandex-cloud` `df222311708bf4e253808ee26ee9ebe0f150d145`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 21 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, код RU `migration/yandex-cloud` `54276aa6685ae2a89c86c27f65d4150d5d530291`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+
+## Видимость проверки должности сотрудника школы (21 ноября 2026)
+
+- Профиль RU теперь показывает сотруднику состояние `pending`, `approved` или `rejected` из actor-bound `/api/v1/me` и обновляет его после сохранения. Для ученика/родителя это сообщение скрыто; приложение не назначает роль из выбора типа участника.
+- На RU commit [`54276aa`](https://github.com/spartakdubov059/fam-website/commit/54276aa6685ae2a89c86c27f65d4150d5d530291) локально прошли **409/409** backend/UI тестов, `ru-migration/compat/verify.mjs` и `git diff --check`. GitHub CI на точном code commit не подтверждён. Это закрывает только видимость статуса профиля; Yandex OAuth, YDB и облачная проверка не выполнялись.
 
 ## Удаление собственных и школьных идей (21 ноября 2026)
 
