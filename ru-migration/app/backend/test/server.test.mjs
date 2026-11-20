@@ -121,6 +121,22 @@ test('unconfigured isolated server fails closed for health and user API routes',
   });
 });
 
+test('server routes the internal coder bridge separately from public user APIs', async () => {
+  let calls = 0;
+  await withServer({ coderTaskBridge: async req => {
+    calls++;
+    assert.equal(req.method, 'POST');
+    return { status: 200, body: { ok: true, task: null } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/internal/coder-task', origin), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"claim"}',
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, task: null });
+    assert.equal(calls, 1);
+  });
+});
+
 test('configured server reports ready after runtime initialization and reports optional media separately', async () => {
   const state = {
     mode: 'isolated-copy', ready: true,

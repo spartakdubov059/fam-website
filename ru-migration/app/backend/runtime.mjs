@@ -18,6 +18,7 @@ import { createOrchestratorDailyDigest } from './services/orchestrator-daily-dig
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
 import { createSystemHealthTaskHandler } from './services/system-health-task.mjs';
 import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs';
+import { createCoderTaskBridge } from './services/coder-task-bridge.mjs';
 import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from './services/scheduled-safe-agent-runner.mjs';
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
@@ -93,6 +94,7 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const agentTaskQueue = createYdbAgentTaskQueue(sql);
+  const coderTaskBridge = createCoderTaskBridge({ queue: agentTaskQueue, token: env.FAM_RU_CODER_WORKER_TOKEN });
   const systemHealthTask = createSystemHealthTaskHandler({
     readinessCheck: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
       databaseReady: await probeYdbReadiness(), mediaConfigured }),
@@ -144,6 +146,7 @@ export async function createRuntime(env = process.env) {
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
     processSiteErrorDigest: createSiteErrorDigest({ repository }),
     agentTaskQueue,
+    coderTaskBridge,
     processSafeAgentTasks,
     runSafeAgentWorker,
     enqueueSafeCoderTask,

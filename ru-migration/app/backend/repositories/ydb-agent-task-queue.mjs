@@ -70,18 +70,82 @@ export function createYdbAgentTaskQueue(sql) {
         if (!event || !Object.hasOwn(CODER_EVENT_CODES, event.event_code)) return { created: false, reason: 'no_threshold_event' };
         const occurrences = Number(event.occurrences);
         if (!Number.isSafeInteger(occurrences) || occurrences < 3) throw new Error('invalid aggregate event count');
+        const payloadJson = JSON.stringify({ task_key: CODER_EVENT_CODES[event.event_code],
+          event_code: event.event_code, page_area: event.page_area, occurrences });
         await tx`INSERT INTO fam_agent_tasks
           (id, agent_key, task_type, title, description, priority, status, source, approval_required,
             payload_json, result_summary, attempt_count, max_attempts, available_at, claim_token,
             claimed_by, claimed_at, lease_expires_at, started_at, finished_at, created_at, updated_at)
           VALUES (${taskId}, 'technical', 'coder_patch_request', 'Безопасный анализ технического события FAM',
             'Автоматический анализ отключён. Требуется ручная проверка агрегированной категории.', 'normal', 'queued',
-            'scheduled_audit', false, '{}', NULL, Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(1 AS Uint32)),
+            'scheduled_audit', false, ${payloadJson}, NULL, Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(1 AS Uint32)),
             CurrentUtcTimestamp(), NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
         await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
           VALUES (${randomUUID()}, ${taskId}, 'created', ${WORKER_ID},
             'Создана задача ручной проверки по агрегированной категории; автоматические инструменты отключены.', CurrentUtcTimestamp());`;
         return { created: true, id: taskId, task_key: CODER_EVENT_CODES[event.event_code] };
+      });
+    },
+
+    async claimSafeCoderTask({ workerId, leaseSeconds = 7200 } = {}) {
+      if (workerId !== 'fam-agent-qwen-coder-v1' || leaseSeconds !== 7200) throw new TypeError('invalid coder worker claim');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT id, payload_json, status, attempt_count, max_attempts,
+            CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
+            CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
+          FROM fam_agent_tasks WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
+            AND approval_required = false AND attempt_count < max_attempts
+            AND ((status = 'queued' AND available_at <= CurrentUtcTimestamp())
+              OR (status IN ('claimed', 'in_progress') AND lease_expires_at <= CurrentUtcTimestamp()))
+          ORDER BY available_at ASC, created_at ASC LIMIT 1;`;
+        const row = rows?.[0]?.[0];
+        if (!row) return null;
+        let task;
+        try { task = JSON.parse(row.payload_json); } catch { return null; }
+        const valid = task && typeof task === 'object' && !Array.isArray(task)
+          && Object.keys(task).sort().join(',') === 'event_code,occurrences,page_area,task_key'
+          && Object.entries(CODER_EVENT_CODES).some(([eventCode, taskKey]) => eventCode === task.event_code && taskKey === task.task_key)
+          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(task.page_area)
+          && Number.isInteger(task.occurrences) && task.occurrences >= 0 && task.occurrences <= 1000;
+        if (!valid || row.available !== true && row.lease_expired !== true) return null;
+        const claimToken = randomUUID();
+        await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
+            attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
+            claimed_by = ${workerId}, claim_token = ${claimToken}, claimed_at = CurrentUtcTimestamp(),
+            lease_expires_at = CurrentUtcTimestamp() + Interval('PT2H'), finished_at = CAST(NULL AS Timestamp?),
+            updated_at = CurrentUtcTimestamp()
+          WHERE id = ${row.id} AND status = ${row.status};`;
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${row.id}, 'claimed', ${workerId}, 'Агрегированная техническая задача передана ограниченному анализатору.', CurrentUtcTimestamp());`;
+        return { id: row.id, ...task, claim_token: claimToken };
+      });
+    },
+
+    async finishSafeCoderTask({ id, workerId, claimToken, resultCode } = {}) {
+      const results = {
+        model_completed: ['completed', 'Локальный анализ завершён; любое изменение требует независимой проверки.'],
+        model_no_patch: ['completed', 'Подтверждённое исправление не предложено.'],
+        model_failed: ['failed', 'Локальный анализатор завершился с ошибкой.'],
+        model_blocked: ['blocked', 'Задача остановлена защитными ограничениями.'],
+      };
+      if (!UUID.test(id || '') || workerId !== 'fam-agent-qwen-coder-v1' || !UUID.test(claimToken || '')
+          || !Object.hasOwn(results, resultCode)) throw new TypeError('invalid coder task result');
+      const [status, summary] = results[resultCode];
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claimed_by, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_tasks WHERE id = ${id} AND task_type = 'coder_patch_request' LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (current?.status !== 'claimed' || current.claimed_by !== workerId
+            || current.claim_token !== claimToken || current.lease_valid !== true) return false;
+        await tx`UPDATE fam_agent_tasks SET status = ${status}, result_summary = ${summary},
+            finished_at = CASE WHEN ${status} = 'blocked' THEN CAST(NULL AS Timestamp?) ELSE CurrentUtcTimestamp() END,
+            claimed_by = CAST(NULL AS Utf8?),
+            claim_token = CAST(NULL AS Utf8?), lease_expires_at = CAST(NULL AS Timestamp?),
+            updated_at = CurrentUtcTimestamp() WHERE id = ${id};`;
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${id}, ${status}, ${workerId}, ${summary}, CurrentUtcTimestamp());`;
+        return true;
       });
     },
 
