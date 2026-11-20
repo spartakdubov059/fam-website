@@ -140,3 +140,12 @@
 - [SDK/Sharp CI #44789909380](https://github.com/spartakdubov059/fam-website/actions/runs/44789909380) — success, **371/371** backend tests, systemd timer validation и pinned SDK/Sharp/WebP checks.
 - [Disposable YDB CI #44789909334](https://github.com/spartakdubov059/fam-website/actions/runs/44789909334) — success; схема и synthetic integration на disposable local YDB, с cleanup.
 - Эти проверки не подтверждают полный паритет SPA и не являются cloud staging QA.
+
+
+## Проверка Афиши и занятости мест
+
+На кодовой ревизии [7fd8f02](https://github.com/spartakdubov059/fam-website/commit/7fd8f025f089fccbea321c86f9302316af69ac8d) добавлена проверка остатка мест для мероприятий с ограниченной вместимостью. Запрос выполняется только по нажатию пользователя, без массового fan-out при загрузке карточек; ответ строго проверяет диапазон счётчика и cache-control `no-store`.
+
+- [SDK/Sharp CI #44790532457](https://github.com/spartakdubov059/fam-website/actions/runs/44790532457) — success, **372/372** backend tests и SDK/Sharp/WebP/timer checks.
+- [Disposable YDB CI #44790532340](https://github.com/spartakdubov059/fam-website/actions/runs/44790532340) — success; synthetic repository integration прошла на одноразовой локальной YDB, cleanup выполнен.
+- Эти тесты подтверждают только UI/API сценарий занятости; полный frontend parity и облачный staging не подтверждены.
