@@ -16,11 +16,18 @@ function request(method, path, body = '') {
 test('avatar request accepts only an owned private upload and puts it in school review', async () => {
   let queued;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
-    repository: { createAvatarReview: async value => { queued = value; return { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }; } } });
+    repository: { createAvatarReview: async value => { queued = value; return { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }; } },
+    pendingImages: { get: async () => Buffer.from('synthetic-webp') } });
   const response = await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })));
   assert.equal(response.status, 202);
   assert.deepEqual(queued, { userId: student.id, schoolId: student.school_id, imageKey: key });
   assert.equal((await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: `pending/${moderator.id}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp` })))).status, 400);
+  let oversizedQueued = false;
+  const oversized = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
+    repository: { createAvatarReview: async () => { oversizedQueued = true; return { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }; } },
+    pendingImages: { get: async () => Buffer.alloc(2 * 1024 * 1024 + 1) } });
+  assert.equal((await oversized(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })))).status, 413);
+  assert.equal(oversizedQueued, false);
 });
 
 test('avatar moderation list and decisions require same-school school staff', async () => {
