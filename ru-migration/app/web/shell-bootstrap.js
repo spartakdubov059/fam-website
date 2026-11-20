@@ -98,6 +98,7 @@ window.onunhandledrejection = function() {
         <nav id="ruTabbar" class="ru-tabbar" aria-label="Основная навигация">
           <button type="button" data-ru-view="board" aria-pressed="true">Доска</button>
           <button type="button" data-ru-view="afisha" aria-pressed="false">Афиша</button>
+          <button type="button" data-ru-view="favorites" aria-pressed="false">Избранное</button>
           <button type="button" data-ru-view="messages" aria-pressed="false">Сообщения</button>
           <button type="button" data-ru-view="profile" aria-pressed="false">Профиль</button>
         </nav>
