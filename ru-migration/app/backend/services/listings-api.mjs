@@ -13,6 +13,17 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
   const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
+  const schoolRoleSuspensionGate = async (actor) => {
+    if (typeof repository?.getActiveAccountSuspension !== 'function') {
+      return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+    }
+    try {
+      const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
+      return suspension ? { status: 403, body: { ok: false, error: 'account_suspended' } } : null;
+    } catch {
+      return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+    }
+  };
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     if (pathname === '/api/v1/notification-reads' && (req.method === 'GET' || req.method === 'POST')) {
@@ -211,6 +222,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (!actor || actor.role !== 'student' || !actor.school_id) return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       const requested_role = input?.requested_role === 'Участник Ученического совета' ? 'council_member'
         : input?.requested_role === 'Администратор' ? 'school_admin' : null;
       if (!requested_role) return { status: 400, body: { ok: false, error: 'invalid_requested_role' } };
@@ -409,6 +422,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       let input;
       try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }

@@ -130,6 +130,7 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
     resolveActor: async () => actor,
     repository: {
+      getActiveAccountSuspension: async () => null,
       createSchoolRoleRequest: async request => { savedRole = request.requested_role; return { ok: true, status: 'pending', request_id: id }; },
       listPendingSchoolRoleRequests: async school => { reviewSchool = school; return [{ request_id: id, requested_role: 'council_member' }]; },
       startSchoolRoleRequestReview: async (requestId, school, reviewer) => { reviewAction = [requestId, school, reviewer]; return true; },
@@ -147,6 +148,45 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
   assert.equal((await handler(start)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id']);
   const approve = req({ decision: 'approve', review_note: 'Проверено школой' }, 'PATCH'); approve.url = `/api/v1/role-requests/${id}`;
   assert.equal((await handler(approve)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id', 'approve', 'Проверено школой']);
+});
+
+test('active suspension blocks school role request changes but allows status reads', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let suspended = true; let actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
+  let writes = 0; let lookups = 0;
+  const repository = {
+    getActiveAccountSuspension: async (schoolId, userId) => {
+      lookups++;
+      assert.equal(schoolId, 'school-a');
+      assert.equal(userId, actor.id);
+      return suspended ? { expires_at: '2099-01-01T00:00:00Z' } : null;
+    },
+    createSchoolRoleRequest: async () => { writes++; return { ok: true, status: 'pending', request_id: id }; },
+    getSchoolRoleRequest: async () => ({ request_id: id, status: 'pending' }),
+    startSchoolRoleRequestReview: async () => { writes++; return true; },
+  };
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
+    resolveActor: async () => actor, repository });
+  const status = req({}, 'GET'); status.url = '/api/v1/role-requests';
+  assert.equal((await handler(status)).status, 200);
+  assert.equal(lookups, 0, 'read-only request status remains available during suspension');
+
+  const submit = req({ requested_role: 'Администратор' }); submit.url = '/api/v1/role-requests';
+  assert.deepEqual(await handler(submit), { status: 403, body: { ok: false, error: 'account_suspended' } });
+  actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin', active: true };
+  const start = req({ action: 'start_review' }, 'PATCH'); start.url = `/api/v1/role-requests/${id}`;
+  assert.deepEqual(await handler(start), { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.equal(writes, 0, 'suspended users cannot create, claim, or review school role requests');
+
+  suspended = false;
+  actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
+  const allowed = req({ requested_role: 'Администратор' }); allowed.url = '/api/v1/role-requests';
+  assert.equal((await handler(allowed)).status, 202);
+  assert.equal(writes, 1);
+  repository.getActiveAccountSuspension = async () => { throw new Error('synthetic database failure'); };
+  const unavailable = req({ requested_role: 'Администратор' }); unavailable.url = '/api/v1/role-requests';
+  assert.equal((await handler(unavailable)).status, 503, 'suspension lookup errors fail closed');
+  assert.equal(writes, 1);
 });
 
 test('role request status includes the current database role for migrated school access UI', async () => {
