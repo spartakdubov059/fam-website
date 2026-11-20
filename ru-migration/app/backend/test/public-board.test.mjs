@@ -247,3 +247,26 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
   assert.equal(unavailableActions.children[0].disabled, true);
   assert.equal(unavailableActions.children[0].textContent, 'Запись недоступна');
 });
+
+
+test('Afisha filter selects event listings by event flag and excludes ordinary listings', async () => {
+  const root = new FakeNode('section');
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: 'event-a', title: 'Концерт', description: 'Школьный концерт', category: 'Мероприятия', is_event: true },
+      { id: 'listing-a', title: 'Обычное объявление', description: 'Текст', category: 'Мероприятия', is_event: false },
+      { id: 'listing-b', title: 'Книга', description: 'Для школы', category: 'Учёба', is_event: false },
+    ] }) };
+    return { ok: false, status: 401, json: async () => ({}) };
+  } });
+  const toolbar = root.children[0];
+  const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
+  const cards = root.children.filter(node => node.className === 'ru-listing-card');
+  const afisha = filters.children.find(button => button.textContent === 'Афиша');
+  assert.ok(afisha);
+  afisha.listeners.click();
+  assert.equal(cards[0].hidden, false);
+  assert.equal(cards[1].hidden, true);
+  assert.equal(cards[2].hidden, true);
+  assert.equal(afisha.getAttribute('aria-pressed'), 'true');
+});
