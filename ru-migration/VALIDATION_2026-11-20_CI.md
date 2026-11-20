@@ -190,3 +190,11 @@
 - Кодовый commit [64e4512](https://github.com/spartakdubov059/fam-website/commit/64e4512c0b89bc5f8c8927d859c3f5f6224888da) добавил синтетическую интеграционную проверку общего suspension guard с Media API: блокируются POST объявления/аватара, PATCH модерации изображения и DELETE pending-фото; репозиторий и объектное хранилище не вызываются.
 - Точный [SDK/Sharp CI #44794320383](https://github.com/spartakdubov059/fam-website/actions/runs/44794320383) успешен: **383/383 backend-теста**, 8 systemd timer-файлов, YDB/AWS SDK compatibility и реальная Sharp/WebP обработка.
 - Точный [Disposable YDB CI #44794320445](https://github.com/spartakdubov059/fam-website/actions/runs/44794320445) успешен на том же commit: схема применена, synthetic integration выполнена, временная база удалена cleanup-шагом. Облачный staging не создавался; облачные настройки YDB и S3, бюджет и IAM права остаются непроверенными.
+
+
+## Afisha navigation regression — 20 ноября 2026
+
+- Кодовый commit [84a8152](https://github.com/spartakdubov059/fam-website/commit/84a8152bf1eff4651737295d62061b9394c7c119) обновил мобильный переход «Афиша»: активируется фильтр событий и открывается начало школьной ленты; дальше располагается отфильтрованный список событий.
+- [SDK/Sharp CI #44795219430](https://github.com/spartakdubov059/fam-website/actions/runs/44795219430): success, **383/383 backend/UI tests**, pinned SDK/Sharp и 8 systemd timer-файлов.
+- [Disposable YDB CI #44795219480](https://github.com/spartakdubov059/fam-website/actions/runs/44795219480): success; synthetic integration и cleanup. Ни облачные ресурсы, ни реальные данные не использовались.
+- Визуальное объединение типов карточек в одну сетку исходной Afisha остаётся незавершённым.
