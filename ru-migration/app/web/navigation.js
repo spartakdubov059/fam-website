@@ -13,7 +13,7 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
       if (view === 'board') target = document.getElementById('publicListings');
       if (view === 'afisha') {
         document.getElementById('ruBoardCategoryAfisha')?.click?.();
-        target = document.getElementById('publicListings');
+        target = document.getElementById('ruPulse') || document.getElementById('publicListings');
       }
       if (view === 'messages') {
         document.getElementById('ruOpenMessages')?.click?.();
