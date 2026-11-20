@@ -44,6 +44,15 @@ test('S3 pending image deletion accepts only scoped image keys', async () => {
   await store.close();
 });
 
+test('S3 account inventory includes linked private media and rejects foreign keys', async () => {
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const linkedKey = `pending/${userId}/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp`;
+  const store = createS3PendingImageStore(env, { list: async () => ({ Contents: [], IsTruncated: false }) });
+  assert.deepEqual(await store.listAccountObjects(userId, [linkedKey]), [linkedKey]);
+  await assert.rejects(store.listAccountObjects(userId, ['pending/22222222-2222-4222-8222-222222222222/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp']), /unexpected account media key/);
+  await store.close();
+});
+
 test('S3 account inventory paginates only validated objects below the account prefix', async () => {
   const requests = [];
   const userId = '11111111-1111-4111-8111-111111111111';
