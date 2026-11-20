@@ -184,6 +184,31 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
   if (details) card.append(element(document, 'p', 'ru-listing-event-time', details));
   if (listing.event_type === 'limited' && Number.isInteger(listing.max_seats) && listing.max_seats > 0) {
     card.append(element(document, 'p', 'ru-listing-event-seats', `Мест всего: ${listing.max_seats}`));
+    const capacityStatus = element(document, 'p', 'ru-listing-event-occupancy', '');
+    capacityStatus.setAttribute('role', 'status');
+    capacityStatus.setAttribute('aria-live', 'polite');
+    const capacityButton = element(document, 'button', 'ru-event-capacity-check', 'Проверить свободные места');
+    capacityButton.type = 'button';
+    let checkingCapacity = false;
+    capacityButton.addEventListener('click', async () => {
+      if (checkingCapacity) return;
+      checkingCapacity = true; capacityButton.disabled = true;
+      capacityStatus.textContent = 'Проверяем занятость…';
+      try {
+        const response = await fetchImpl(`/api/v1/listings/${listing.id}/occupancy`, {
+          method: 'GET', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' },
+        });
+        const result = await response.json().catch(() => null);
+        if (response.status === 404) capacityStatus.textContent = 'Мероприятие больше недоступно.';
+        else if (!response.ok || result?.ok !== true || !Number.isSafeInteger(result.taken) || result.taken < 0 || result.taken > listing.max_seats) {
+          capacityStatus.textContent = 'Не удалось проверить свободные места.';
+        } else {
+          capacityStatus.textContent = `Свободно: ${listing.max_seats - result.taken} из ${listing.max_seats} мест.`;
+        }
+      } catch { capacityStatus.textContent = 'Нет связи с сервером. Число свободных мест не подтверждено.'; }
+      finally { checkingCapacity = false; capacityButton.disabled = false; }
+    });
+    card.append(capacityButton, capacityStatus);
   }
 
   const actions = element(document, 'div', 'ru-event-actions');
