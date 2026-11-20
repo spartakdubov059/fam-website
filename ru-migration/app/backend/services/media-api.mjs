@@ -33,6 +33,10 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         const owner = actor.id === image.user_id;
         const schoolModerator = ['school_admin', 'council_member'].includes(actor.role) && actor.school_id === image.school_id;
         if (!owner && !schoolModerator) return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
+        if (schoolModerator && !owner) {
+          const suspensionBlock = await suspendedModeratorGate(actor);
+          if (suspensionBlock) return suspensionBlock;
+        }
         const bytes = await pendingImages.get(image.image_key);
         return { status: 200, body: bytes, headers: { 'content-type': 'image/webp', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } };
       } catch { return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } }; }
@@ -51,6 +55,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
         let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
         if (!actor || !['school_admin', 'council_member'].includes(actor.role) || actor.school_id !== review.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+        const suspensionBlock = await suspendedModeratorGate(actor);
+        if (suspensionBlock) return suspensionBlock;
       } else {
         try {
           if (typeof repository?.isCurrentAvatar !== 'function' || !await repository.isCurrentAvatar(avatarMatch[1])) return { status: 404, body: { ok: false, error: 'avatar_unavailable' } };
