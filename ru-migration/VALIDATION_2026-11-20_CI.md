@@ -1,5 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Дополнение: удаление идей в YDB, 21 ноября 2026
+
+- Точный commit [`df22231`](https://github.com/spartakdubov059/fam-website/commit/df222311708bf4e253808ee26ee9ebe0f150d145) закрывает удаление своей идеи и same-school удаление администратором с подтверждением свежей аутентификации; приватные связанные фотографии получают cleanup lease.
+- Локально: **398/398** backend/UI тестов, SDK/Sharp verifier, синтаксис disposable YDB интеграции и `git diff --check` — success.
+- [SDK/Sharp CI #44821577532](https://github.com/spartakdubov059/fam-website/actions/runs/44821577532) и [disposable YDB CI #44821577519](https://github.com/spartakdubov059/fam-website/actions/runs/44821577519) — success. YDB CI создала временную локальную базу, проверила synthetic scenario и удалила контейнер.
+- Предыдущий YDB запуск показал несовместимость: запрос обращался к отсутствующему `school_id` в `fam_pending_media`. Исправление проверено на точном успешном commit выше. Cloud staging и реальные данные не использовались; полный parity/security sign-off не выполнен.
+
 ## CI для интерфейса удаления аккаунта
 
 - Коммит [`87a7693`](https://github.com/spartakdubov059/fam-website/commit/87a769348c522d7a33314234e30b6357cba994f1) заранее сообщает, что Яндекс ID не даёт приложению проверяемое время повторной аутентификации; backend fail-closed gate не ослаблен.

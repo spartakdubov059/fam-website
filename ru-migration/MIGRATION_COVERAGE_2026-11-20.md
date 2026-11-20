@@ -1,6 +1,12 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 20 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, код RU `migration/yandex-cloud` `ba44454d82cbf179f240940846bbc9e45ea0e7f2`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 21 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, код RU `migration/yandex-cloud` `df222311708bf4e253808ee26ee9ebe0f150d145`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+
+## Удаление собственных и школьных идей (21 ноября 2026)
+
+- На RU добавлено удаление своих идей участником и same-school идей школьным администратором. Администратор для чужой идеи должен пройти provider-attested свежую аутентификацию и подтвердить точную фразу; удаление оставляет запись метаданных школьного аудита. Связанные приватные фото сначала получают короткую cleanup lease и удаляются через закрытый media adapter.
+- На commit [`df22231`](https://github.com/spartakdubov059/fam-website/commit/df222311708bf4e253808ee26ee9ebe0f150d145) локально прошли **398/398** backend/UI тестов, compat verifier, синтаксическая проверка disposable YDB сценария и `git diff --check`. [SDK/Sharp CI #44821577532](https://github.com/spartakdubov059/fam-website/actions/runs/44821577532) и [disposable YDB CI #44821577519](https://github.com/spartakdubov059/fam-website/actions/runs/44821577519) завершились успешно; YDB использовала synthetic data и удалила disposable container.
+- Проверка нашла и исправила запрос к несуществующему `school_id` в `fam_pending_media`; точный успешный CI выполнен уже на исправленном коммите. Это закрывает только управление удалением идей, не полный UI или миграционный паритет. Российский облачный staging, бюджет `0 ₽` и независимый security review не подтверждены.
 
 ## Проверка школьного workflow идей (20 ноября 2026)
 
