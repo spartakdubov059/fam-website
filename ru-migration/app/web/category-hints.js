@@ -54,12 +54,29 @@ export function initializeCategoryHints({ document = globalThis.document } = {})
     if (!input) { hint.textContent = 'Начните вводить название и описание — FAM подскажет подходящую категорию.'; return; }
     const suggestions = suggestListingCategories(title.value, description.value, { allowEvents: !eventOption || !eventOption.disabled && !eventOption.hidden });
     if (!suggestions.length) { hint.textContent = 'Пока не могу уверенно определить категорию. Проверьте текст и выберите её вручную.'; return; }
-    hint.textContent = suggestions.length === 1 && category.value === suggestions[0]
-      ? `По тексту подходит категория «${suggestions[0]}».`
-      : `По тексту может подойти: ${suggestions.map(value => `«${value}»`).join(', ')}. Проверьте выбор.`;
+    if (suggestions.length === 1 && category.value === suggestions[0]) {
+      hint.textContent = `По тексту подходит категория «${suggestions[0]}».`;
+      return;
+    }
+    hint.textContent = '';
+    const intro = document.createElement('span');
+    intro.textContent = suggestions.length > 1 ? 'Похоже на несколько категорий. Выберите подходящую: ' : 'Больше всего подходит категория: ';
+    hint.append(intro);
+    for (const suggestion of suggestions) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ru-category-suggest';
+      button.textContent = suggestion;
+      button.addEventListener('click', () => {
+        category.value = suggestion;
+        category.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      hint.append(button, document.createTextNode(' '));
+    }
   };
   title.addEventListener('input', update);
   description.addEventListener('input', update);
+  category.addEventListener('change', update);
   update();
 }
 
