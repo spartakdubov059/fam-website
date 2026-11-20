@@ -19,7 +19,7 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
       }
       if (view === 'afisha') {
         document.getElementById('ruBoardCategoryAfisha')?.click?.();
-        target = document.getElementById('ruPulse') || document.getElementById('publicListings');
+        target = document.getElementById('ruAfishaFeed') || document.getElementById('ruPulse') || document.getElementById('publicListings');
       }
       if (view === 'messages') {
         document.getElementById('ruOpenMessages')?.click?.();
