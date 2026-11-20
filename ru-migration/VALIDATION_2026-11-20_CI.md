@@ -1,5 +1,13 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Актуальное уточнение (20 ноября 2026)
+
+- Удалённая `migration/yandex-cloud` сейчас указывает на документационный commit [`a729b6f`](https://github.com/spartakdubov059/fam-website/commit/a729b6f8ed7b80ef5dcb7f421e84412245d63885); его дерево совпадает с локальной копией. Истории Git локальной и удалённой веток расходятся, поэтому обычный push из этой копии не использовать.
+- Последний commit с изменённым кодом — [`bbb1644`](https://github.com/spartakdubov059/fam-website/commit/bbb1644d1da8614597570655d10c62b4030a2146). Для него завершились успешно [SDK/Sharp CI, run 44667460743](https://github.com/spartakdubov059/fam-website/actions/runs/44667460743) и [одноразовая YDB CI, run 44667460572](https://github.com/spartakdubov059/fam-website/actions/runs/44667460572). Первый workflow проверяет pinned SDK/Sharp и backend suite; второй — схемы и синтетические сценарии на локальной временной YDB с последующей очисткой.
+- Для `a729b6f` новых проверок нет: в нём менялась только документация; предыдущие зелёные workflow относятся к `bbb1644`, не к `a729b6f`.
+- Повторить Node suite локально в текущем checkout не удалось: shell сообщает `node: command not found`. Успехи выше — удалённые CI результаты, а не новый локальный запуск.
+- Это по-прежнему не российский cloud staging. Полный перенос фоновой очереди `fam-agent-worker`, автоматической модерации изображений и остальных исходных backend-функций не подтверждён; полный security review и QA остаются незавершёнными.
+
 - Обновлены только CI actions на изолированной ветке `migration/yandex-cloud`: checkout v7, setup-node v7, upload-artifact v6. Автоматическое кэширование npm отключено; зависимости продолжают устанавливаться через `npm ci` по lock-файлам.
 - [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44635841849) — успешно. Node 22; установленные YDB/AWS SDK, Sharp и весь backend suite.
 - [Disposable YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44635918742) — успешно. Схема и интеграционные сценарии проверены на синтетической локальной базе; контейнер удаляется шагом cleanup.
