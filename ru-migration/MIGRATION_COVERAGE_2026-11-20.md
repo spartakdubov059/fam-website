@@ -11,7 +11,7 @@
 
 ## Части, которые нельзя считать перенесёнными целиком
 
-- Политики доступа Supabase (RLS), grants и триггеры: в RU это серверная Node.js/YDB логика; соответствие каждого исходного разрешения и запрета пока не доказано.
+- Политики доступа Supabase (RLS), grants и триггеры: в RU это серверная Node.js/YDB логика; соответствие каждого исходного разрешения и запрета пока не доказано. Индексы из `20261109134755_add_missing_school_workflow_foreign_key_indexes.sql` добавлены в `schema/29_fk_lookup_indexes.yql` и применены в disposable YDB CI, но cloud query plans и индексная нагрузка не проверены.
 - RPC/functions: нужен построчный список исходных SQL-функций с указанием RU endpoint/repository, теста и оставшегося отличия.
 - Изменения исходной схемы после существующего crosswalk: нужно сопоставить каждую миграцию с RU схемой и поведением, а не только искать похожие названия таблиц.
 - Внешняя автоматическая модерация и модельные workers заменены ручными или агрегированными путями ради бесплатного режима; это функциональные отличия.
@@ -39,3 +39,9 @@
 - На commit [84a8152](https://github.com/spartakdubov059/fam-website/commit/84a8152bf1eff4651737295d62061b9394c7c119) вкладка Afisha включает категорию событий и переводит пользователя к школьной ленте, за которой следует список отфильтрованных событий. Это связывает уже существующие RU API новостей/опросов, событий и посещаемости в одном потоке навигации.
 - UI regression test прошёл в [SDK/Sharp CI #44795219430](https://github.com/spartakdubov059/fam-website/actions/runs/44795219430): **383/383 теста**. [Disposable YDB CI #44795219480](https://github.com/spartakdubov059/fam-website/actions/runs/44795219480) применил локальную схему и прошёл синтетическую интеграцию с cleanup.
 - Ограничение: карточки news/poll и event остаются в отдельных DOM-секциях, поэтому полная визуальная и интерактивная parity с исходной Afisha ещё не достигнута.
+
+
+## Индексы школьных workflow из SQL crosswalk
+
+- Перенос добавил индексы запросов удаления аккаунта (requester, reviewer, target), выдачи/снятия блокировки, школьного admin audit (actor/target) и проверки школьных ролей (review_started_by/reviewed_by). Source suspension target index покрывается ведущим полем RU composite primary key.
+- Синтетический YDB workflow [#44799171636](https://github.com/spartakdubov059/fam-website/actions/runs/44799171636) применил схему и прошёл integration. Применение DDL подтверждено; планировщик запросов на реальном RU workload и квоты облачных write/storage units ещё не измерялись.
