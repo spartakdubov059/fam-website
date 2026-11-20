@@ -78,3 +78,10 @@
 - Профильный Codex Security diff scan не стартовал: инструмент вернул «Review changes requires a non-bare Git worktree with a resolvable HEAD» даже для чистой отдельной worktree на точном диапазоне. Security review не считать завершённым.
 - Российский облачный staging, production, `main` и реальные данные не затрагивались. Бесплатная публичная среда с жёсткой защитой от списаний не подтверждена.
 
+
+## Дополнение: удаление связанных медиа, 20 ноября 2026
+
+- Сверено удаление аккаунта: инвентарь теперь объединяет безопасный owner-prefix S3 с приватными ключами идей и аватаров, выбранными из YDB; основной и recovery-путь используют общую проверку ключей. При ошибке YDB/S3 удаление остаётся fail-closed.
+- В точной вершине ветки `c090e0ae409afa7f794a173fb0aaba0b53561d75` GitHub Actions прошли: [SDK/Sharp #44773720085](https://github.com/spartakdubov059/fam-website/actions/runs/44773720085) и [одноразовая YDB #44773719757](https://github.com/spartakdubov059/fam-website/actions/runs/44773719757). Оба job — success; ресурсы staging не создавались.
+- Detached checkout этой точной вершины локально прошёл backend suite **364/364**, без пропусков; `git diff --check` прошёл в рабочей копии до публикации.
+- Это точечное покрытие удаления аккаунта, не полный security audit или parity всех Supabase RLS/RPC/triggers и Edge Functions.
