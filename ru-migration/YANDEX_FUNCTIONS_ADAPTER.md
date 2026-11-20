@@ -11,6 +11,18 @@
 - Расписание: portable parser проверил 8 systemd timer-файлов.
 - Реальный вызов функции, API Gateway, Yandex ID, YDB и S3 не выполнялся; CI и этот адаптер не доказывают облачную интеграцию.
 
+## Сборка пакета функции
+
+Сборщик `deploy/package-yandex-function.mjs` формирует ZIP с `index.handler`, Node.js backend, RU web assets, `package.json` и закреплённым lockfile. Он исключает `node_modules`, тесты, `.env` и ключевые файлы; отказывается перезаписывать существующий файл и останавливается при превышении лимита прямой загрузки. Порог `3.5 MB` указан в [официальной инструкции создания Cloud Function](https://yandex.cloud/ru/docs/functions/quickstart/create-function/node-function-quickstart); более крупный исходный архив инструкция предлагает загружать через Object Storage.
+
+Команда:
+
+```sh
+node ru-migration/deploy/package-yandex-function.mjs /tmp/fam-ru-yandex-function.zip
+```
+
+Пакет проверен локально: `976900` байт, 121 файл, после чистого `npm ci` в распакованной папке `index.handler` вернул `GET /` с HTTP 200 и интерфейсом FAM RU. Это только проверка содержимого/entrypoint ZIP, не реальный вызов Cloud Functions.
+
 ## Ограничения бесплатного размещения
 
 Yandex Cloud Functions предлагает месячную квоту бесплатных вызовов, но превышение квот тарифицируется. Квоты суммируются в рамках платёжного аккаунта. Бюджеты Yandex Cloud отправляют уведомления и сами не останавливают потребление. Поэтому наличие адаптера не разрешает создавать облачные ресурсы при требовании строго `0 ₽`. См. актуальные [условия free tier](https://yandex.cloud/ru/docs/billing/concepts/serverless-free-tier) и [поведение бюджета](https://yandex.cloud/ru/docs/billing/concepts/budget).
