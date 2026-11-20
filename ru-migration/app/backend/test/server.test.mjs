@@ -18,16 +18,28 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const page = await fetch(origin);
     assert.equal(page.status, 200);
     const html = await page.text();
-    assert.match(html, /ruListingForm/);
-    assert.match(html, /id="ruOpenMessages"/);
-    assert.match(html, /id="ruMessages"/);
-    assert.match(html, /messagesScript\.src = '\/messages\.js'/);
+    assert.match(page.headers.get('content-security-policy'), /script-src 'self'(?:;|$)/);
+    assert.doesNotMatch(page.headers.get('content-security-policy'), /script-src[^;]*unsafe-inline/);
+    assert.match(html, /<script src="\/shell-bootstrap\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
     assert.match(html, /src="\/price-format\.js"/);
-    assert.match(html, /auth\/yandex\/start/);
-    assert.match(html, /fetch\("\/api\/v1\/site-errors"/);
-    assert.match(html, /JSON\.stringify\(\{ event_code: eventCode, page_area: pageArea \}\)/);
-    assert.doesNotMatch(html, /body:\s*JSON\.stringify\(\{[^}]*\b(?:error|message|user_id):/);
     assert.doesNotMatch(html, /https:\/\/[^"']+\.supabase\.co/);
+
+    const bootstrap = await fetch(new URL('/shell-bootstrap.js', origin));
+    assert.equal(bootstrap.status, 200);
+    assert.match(bootstrap.headers.get('content-type'), /javascript/);
+    const bootstrapSource = await bootstrap.text();
+    assert.match(bootstrapSource, /document\.body\.innerHTML/);
+    assert.match(bootstrapSource, /ruListingForm/);
+    assert.match(bootstrapSource, /id="ruOpenMessages"/);
+    assert.match(bootstrapSource, /id="ruMessages"/);
+    assert.match(bootstrapSource, /messagesScript\.src = '\/messages\.js'/);
+    assert.match(bootstrapSource, /auth\/yandex\/start/);
+    assert.match(bootstrapSource, /Российская копия работает отдельно от основного FAM/);
+    assert.match(bootstrapSource, /id="ruPulse"/);
+    assert.match(bootstrapSource, /fetch\("\/api\/v1\/site-errors"/);
+    assert.match(bootstrapSource, /JSON\.stringify\(\{ event_code: eventCode, page_area: pageArea \}\)/);
+    assert.doesNotMatch(bootstrapSource, /body:\s*JSON\.stringify\(\{[^}]*\b(?:error|message|user_id):/);
 
     const formatter = await fetch(new URL('/price-format.js', origin));
     assert.equal(formatter.status, 200);
@@ -52,9 +64,8 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const pulse = await fetch(new URL('/pulse.js', origin));
     assert.equal(pulse.status, 200);
     assert.match(await pulse.text(), /api\/v1\/pulse/);
-    assert.match(html, /id="ruPulse"/);
-    assert.match(html, /pulseScript\.src = '\/pulse\.js'/);
-    assert.doesNotMatch(html, /selfDeletePassword/);
+    assert.match(bootstrapSource, /pulseScript\.src = '\/pulse\.js'/);
+    assert.doesNotMatch(bootstrapSource, /selfDeletePassword/);
 
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
     assert.equal(moderation.status, 200);

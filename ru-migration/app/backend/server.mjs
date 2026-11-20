@@ -178,7 +178,7 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
       'cache-control': path.extname(target) === '.html' ? 'no-store' : 'public, max-age=3600',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
-      'content-security-policy': "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      'content-security-policy': "default-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
     });
     return res.end(req.method === 'HEAD' ? undefined : body);
   } catch {

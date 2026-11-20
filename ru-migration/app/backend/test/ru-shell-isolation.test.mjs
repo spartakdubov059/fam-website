@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const html = await readFile(new URL('../../web/index.html', import.meta.url), 'utf8');
+const bootstrap = await readFile(new URL('../../web/shell-bootstrap.js', import.meta.url), 'utf8');
+const shell = `${html}\n${bootstrap}`;
 
 test('Russian shell has no dormant direct Supabase client path', () => {
-  assert.doesNotMatch(html, /window\.supabase|supabase\.createClient|\bsb\.(?:from|auth|functions|storage)\b/);
-  assert.doesNotMatch(html, /<script\b[^>]*\bsrc=["']https?:/i);
-  assert.match(html, /fetch\(["']\/api\/v1\/site-errors["']/);
+  assert.doesNotMatch(shell, /window\.supabase|supabase\.createClient|\bsb\.(?:from|auth|functions|storage)\b/);
+  assert.doesNotMatch(shell, /<script\b[^>]*\bsrc=["']https?:/i);
+  assert.match(bootstrap, /fetch\(["']\/api\/v1\/site-errors["']/);
 });
 
 test('Russian shell loads its user flows only from same-origin modules', () => {
@@ -20,8 +22,11 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
     '/account-workflow.js',
     '/pulse.js',
   ]) {
-    assert.ok(html.includes(path), `missing local module ${path}`);
+    assert.ok(shell.includes(path), `missing local module ${path}`);
   }
-  assert.match(html, /Войти через Яндекс ID/);
-  assert.match(html, /Российская копия работает отдельно от основного FAM/);
+  assert.match(shell, /Войти через Яндекс ID/);
+  assert.match(shell, /Российская копия работает отдельно от основного FAM/);
+  assert.match(html, /<script src="\/shell-bootstrap\.js"><\/script>/);
+  assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
+  assert.match(bootstrap, /document\.body\.innerHTML\s*=/);
 });
