@@ -105,3 +105,11 @@
 - [SDK/Sharp и backend suite #44780591200](https://github.com/spartakdubov059/fam-website/actions/runs/44780591200) — success; build Yandex Functions package, весь backend suite **369/369**, timers, нативный Sharp и SDK smoke checks.
 - [Disposable YDB #44780591234](https://github.com/spartakdubov059/fam-website/actions/runs/44780591234) — success; schema и synthetic integration прошли, в том числе 8 разрешённых сообщений/мин, отказ 9-го, 5 идей/час, отказ 6-й, ручная message queue и cross-school recipient отказ. Временная локальная CI база удалена.
 - Upstream источник лимитов: `20261108004943_enforce_server_side_content_moderation.sql` на `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`. Это подтверждает квоты и соответствующие сценарии, не полный перенос всех grants/policies этой миграции или всего Supabase.
+
+## Проверка rolling rate limit сообщений
+
+Точная кодовая ревизия `603dab5cd83e67f448d5ba218a1ae6721f9ca140` проверяет окно от последнего сообщения, как в upstream `private.can_send_message`: 8-е сообщение проходит, 9-е до истечения минуты возвращает `rate_limited`, после 60 секунд тишины счётчик сбрасывается.
+
+- [SDK/Sharp и backend suite #44781191006](https://github.com/spartakdubov059/fam-website/actions/runs/44781191006) — success, 369/369 backend-тестов, timers, SDK/Sharp.
+- [Disposable YDB #44781191568](https://github.com/spartakdubov059/fam-website/actions/runs/44781191568) — success; YDB schema и синтетическая интеграция прошли, ephemeral база удалена.
+- `main` остался на `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`; российская ветка изолирована.
