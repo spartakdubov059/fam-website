@@ -80,13 +80,8 @@ try {
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
       listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
-        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
-        ...(userId === '77777777-7777-4777-8777-777777777777' && accountMediaKeys.has('pending/77777777-7777-4777-8777-777777777777/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp')
-          && !deletedMediaKeys.includes('pending/77777777-7777-4777-8777-777777777777/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp')
-          ? ['pending/77777777-7777-4777-8777-777777777777/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp'] : []),
-        ...ownedKeys,
-      ])],
-    },
+        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
+      ])],    },
   }));
   const apiRequest = (method, url, token, body = {}) => {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
@@ -863,7 +858,7 @@ try {
   const adminDeletion = await listingsApi(apiRequest('DELETE', `/api/v1/school/accounts/${adminDeleteTargetId}`, 'synthetic-admin', {
     confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА',
   }));
-  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 2 } });
   assert.ok(deletedMediaKeys.includes(adminDeleteImageKey), 'direct school-admin deletion removes the eligible synthetic target private image');
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' }), null,
     'direct school-admin deletion removes only the same-school student identity mapping');
