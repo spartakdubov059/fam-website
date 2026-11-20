@@ -88,11 +88,11 @@ test('stale authentication, other roles, self action, invalid duration and conta
   let mutations = 0;
   const repository = { issueAccountSuspension: async () => { mutations++; return { ok: true }; } };
   const old = api({ authenticatedAt: Math.floor(Date.now() / 1000) - 601, repository });
-  assert.equal((await old(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_auth_required');
+  assert.equal((await old(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_authentication_required');
   const normalSession = api({ authenticatedAt: null, repository });
-  assert.equal((await normalSession(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_auth_required');
-  const confirmed = api({ authenticatedAt: null, stepUpConfirmedAt: Math.floor(Date.now() / 1000), role: 'student', repository });
-  assert.equal((await confirmed(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 403, 'fresh consent cannot bypass the administrator role check');
+  assert.equal((await normalSession(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_authentication_required');
+  const confirmed = api({ authenticatedAt: null, stepUpConfirmedAt: Math.floor(Date.now() / 1000), repository });
+  assert.equal((await confirmed(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_authentication_required', 'fresh OAuth consent is not fresh authentication');
   const student = api({ role: 'student', repository });
   assert.equal((await student(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 403);
   const fresh = api({ repository });

@@ -44,11 +44,11 @@ test('account deletion requires fresh Yandex authentication and the exact confir
   assert.equal(calls, 0);
 });
 
-test('ordinary Yandex sessions do not satisfy fresh confirmation; signed step-up consent does', async () => {
+test('ordinary Yandex sessions and OAuth consent refresh do not satisfy fresh authentication', async () => {
   const ordinary = api({ authenticated: { ...identity, authenticated_at: null, session_issued_at: Math.floor(now / 1000) } });
-  assert.equal((await ordinary(request())).body.error, 'recent_yandex_login_required');
+  assert.equal((await ordinary(request())).body.error, 'fresh_authentication_required');
   const confirmed = api({ authenticated: { ...identity, authenticated_at: null, step_up_confirmed_at: Math.floor(now / 1000) } });
-  assert.equal((await confirmed(request())).body.error, 'account_deletion_unavailable', 'confirmation passed; the incomplete fake repository blocks deletion');
+  assert.equal((await confirmed(request())).body.error, 'fresh_authentication_required', 'a local consent timestamp is not provider-authenticated time');
 });
 
 test('account deletion deactivates first, removes every listed object, then clears YDB records', async () => {
@@ -170,7 +170,7 @@ test('request approval rejects stale authentication and restores both request an
   const admin = { ...actor, role: 'school_admin', id: '33333333-3333-4333-8333-333333333333' };
   const stale = await api({ authenticated: { ...identity, authenticated_at: Math.floor(now / 1000) - 601 }, resolvedActor: admin,
     repository: { beginRequestedAccountDeletion: async () => { throw new Error('must not begin'); } } })(reviewRequest());
-  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } });
+  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'fresh_authentication_required' } });
 
   const response = await api({ resolvedActor: admin, repository: {
     beginRequestedAccountDeletion: async () => ({ ok: true, id: targetId, issuer: identity.issuer, subject: 'target-subject', school_id: actor.school_id, claim_token: 'claim-a' }),
@@ -187,7 +187,7 @@ test('direct school-admin deletion requires fresh authentication and never delet
   let begins = 0;
   const stale = await api({ authenticated: { ...identity, authenticated_at: Math.floor(now / 1000) - 601 }, resolvedActor: admin,
     repository: { beginAdminAccountDeletion: async () => { begins++; } } })(adminDeleteRequest());
-  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } });
+  assert.deepEqual(stale, { status: 403, body: { ok: false, error: 'fresh_authentication_required' } });
   const self = await api({ resolvedActor: admin, repository: { beginAdminAccountDeletion: async () => { begins++; } } })(adminDeleteRequest(admin.id));
   assert.deepEqual(self, { status: 403, body: { ok: false, error: 'cannot_delete_self' } });
   assert.equal(begins, 0);

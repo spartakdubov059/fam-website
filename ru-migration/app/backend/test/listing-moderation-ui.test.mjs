@@ -231,14 +231,14 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
   assert.equal(overview.textContent.includes('<unsafe>'), false);
 });
 
-test('school account management deletes only an identified student or council account after exact confirmation', async () => {
+test('school account deletion stays blocked when Yandex cannot attest fresh authentication', async () => {
   const f = fixture(); const calls = []; const confirmations = []; const prompts = [];
   const adminId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
   const councilId = '33333333-3333-4333-8333-333333333333';
   const otherAdminId = '44444444-4444-4444-8444-444444444444';
   const removed = new Set();
-  let needsFreshLogin = true;
+  let deletionRequests = 0;
   const accounts = [
     { id: adminId, role: 'school_admin', first_name: 'Главный', last_name: 'Администратор' },
     { id: studentId, role: 'student', first_name: 'Иван', last_name: 'Ученик', class_name: '7А' },
@@ -259,12 +259,8 @@ test('school account management deletes only an identified student or council ac
         users: accounts.filter(account => !removed.has(account.id)), listings: [], audit: [], deletion_requests: [], suspensions: [] }) };
       if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
       if (url === `/api/v1/school/accounts/${studentId}` && init.method === 'DELETE') {
-        if (needsFreshLogin) {
-          needsFreshLogin = false;
-          return { ok: false, status: 403, json: async () => ({ ok: false, error: 'recent_yandex_login_required' }) };
-        }
-        removed.add(studentId);
-        return { ok: true, json: async () => ({ ok: true, deleted: true }) };
+        deletionRequests++;
+        return { ok: false, status: 403, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
       }
       return { ok: true, json: async () => ({ ok: true, requests: [], targets: [], suspensions: [], reports: [], messages: [], alerts: [] }) };
     },
@@ -278,18 +274,19 @@ test('school account management deletes only an identified student or council ac
   assert.equal(deleteButtons.length, 2);
   assert.deepEqual(deleteButtons.map(button => button.textContent), ['Удалить аккаунт', 'Удалить аккаунт']);
   await deleteButtons[0].listeners.click();
-  assert.equal(f.status.children[1].href, '/auth/yandex/start?reauth=1');
-  await deleteButtons[0].listeners.click();
+  assert.match(f.status.textContent, /не сообщает приложению подтверждённое время/);
+  assert.equal(f.status.children.some(child => child.href), false, 'the UI does not imply an OAuth consent prompt proves reauthentication');
 
   const deletion = calls.find(call => call.url === `/api/v1/school/accounts/${studentId}` && call.init.method === 'DELETE');
   assert.ok(deletion);
   assert.equal(deletion.init.credentials, 'same-origin');
   assert.deepEqual(JSON.parse(deletion.init.body), { confirmation });
-  assert.equal(confirmations.length, 2);
+  assert.equal(deletionRequests, 1);
+  assert.equal(removed.has(studentId), false);
+  assert.equal(confirmations.length, 1);
   assert.match(confirmations[0], /#222222 \(Иван Ученик\)/);
-  assert.equal(prompts.length, 2);
+  assert.equal(prompts.length, 1);
   assert.match(prompts[0], /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
-  assert.equal(f.status.textContent, 'Аккаунт и связанные данные удалены.');
 });
 
 test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
@@ -304,7 +301,7 @@ test('school admins can issue and lift short account restrictions with safe text
     if (url === '/api/v1/event-registrations/review' || url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, applications: [], requests: [] }) };
     if (url === `/api/v1/suspensions/${target}` && init.method === 'PATCH') {
       const body = JSON.parse(init.body);
-      if (body.action === 'issue') return { ok: false, json: async () => ({ ok: false, error: 'fresh_auth_required' }) };
+      if (body.action === 'issue') return { ok: false, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
       if (body.action === 'lift') return { ok: true, json: async () => ({ ok: true, status: 'lifted' }) };
     }
     throw new Error(`unexpected route ${url}`);
@@ -318,7 +315,8 @@ test('school admins can issue and lift short account restrictions with safe text
   const issue = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'issue');
   assert.equal(issue.url, `/api/v1/suspensions/${target}`);
   assert.deepEqual(JSON.parse(issue.init.body), { action: 'issue', duration_hours: 72, reason: reason.value });
-  assert.equal(f.status.children.find(child => child.href)?.href, '/auth/yandex/start?reauth=1', JSON.stringify(f.status.children));
+  assert.match(f.status.textContent, /не подтверждает повторную аутентификацию/);
+  assert.equal(f.status.children.some(child => child.href), false);
   const activeCard = f.queue.children.find(card => card.children.some(child => child.textContent?.startsWith('Причина:')));
   const lift = activeCard.children.at(-1);
   await lift.listeners.click();

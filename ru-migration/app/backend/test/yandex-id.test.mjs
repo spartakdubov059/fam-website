@@ -62,7 +62,7 @@ test('sensitive-action reauthentication requests explicit Yandex account confirm
   const session = callback.headers['set-cookie'].find(value => value.startsWith('fam_ru_session='));
   const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(session) } });
   assert.equal(identity.authenticated_at, null, 'a consent prompt is not an authentication timestamp');
-  assert.equal(identity.step_up_confirmed_at, Math.floor(Date.now() / 1000));
+  assert.equal(Object.hasOwn(identity, 'step_up_confirmed_at'), false);
 });
 
 test('Yandex logout rejects missing and cross-origin requests', async () => {

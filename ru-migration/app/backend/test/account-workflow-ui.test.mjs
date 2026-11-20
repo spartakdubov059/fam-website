@@ -51,6 +51,21 @@ test('RU account deletion sends the exact confirmation, then logs out and refres
   assert.equal(f.elements.ruAccountWorkflow.children[0].textContent, 'Аккаунт удалён');
 });
 
+test('RU account deletion explains when the provider cannot attest fresh authentication', async () => {
+  const f = fixture(); const calls = [];
+  f.document.defaultView = { confirm: () => true, prompt: () => 'УДАЛИТЬ МОЙ АККАУНТ' };
+  await initializeAccountWorkflow({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111' } }) };
+    if (url === '/api/v1/me/suspension') return { ok: true, json: async () => ({ ok: true, suspended: false, suspension: null }) };
+    if (url === '/api/v1/me/account') return { ok: false, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  await f.elements.ruAccountWorkflow.children[3].listeners.click();
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /не сообщает приложению подтверждённое время/);
+  assert.equal(calls.some(call => call.url === '/auth/yandex/logout'), false);
+});
+
 test('RU account page shows a safe notice for the users active suspension', async () => {
   const f = fixture();
   await initializeAccountWorkflow({ ...f, fetchImpl: async url => {

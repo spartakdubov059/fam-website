@@ -50,7 +50,7 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     if (adminDeletion) {
       if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
       if (!hasFreshConfirmation(identity, now())) {
-        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+        return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
       }
       if (adminDeleteMatch[1].toLowerCase() === actor.id.toLowerCase()) return { status: 403, body: { ok: false, error: 'cannot_delete_self' } };
       if (parsed.value.confirmation !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
@@ -66,14 +66,14 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
         } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       }
       if (!hasFreshConfirmation(identity, now())) {
-        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+        return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
       }
       if (parsed.value.decision !== 'approve' || parsed.value.confirmation !== 'УДАЛИТЬ АККАУНТ УЧАСТНИКА') {
         return { status: 400, body: { ok: false, error: 'confirmation_required' } };
       }
     } else {
       if (!hasFreshConfirmation(identity, now())) {
-        return { status: 403, body: { ok: false, error: 'recent_yandex_login_required' } };
+        return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
       }
       if (parsed.value.confirmation !== CONFIRMATION) return { status: 400, body: { ok: false, error: 'confirmation_required' } };
     }

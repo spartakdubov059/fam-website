@@ -82,7 +82,8 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(moderation.headers.get('content-type'), /javascript/);
     const moderationSource = await moderation.text();
     assert.match(moderationSource, /api\/v1\/listings\/moderation/);
-    assert.match(moderationSource, /link\.href = '\/auth\/yandex\/start\?reauth=1'/);
+    assert.doesNotMatch(moderationSource, /link\.href = '\/auth\/yandex\/start\?reauth=1'/);
+    assert.match(moderationSource, /не сообщает приложению подтверждённое время повторной аутентификации/);
     assert.match(moderationSource, /api\/v1\/school\/admin\/overview/);
     assert.match(moderationSource, /api\/v1\/school\/admin\/safety-reports/);
     assert.match(moderationSource, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
