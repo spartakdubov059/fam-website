@@ -26,7 +26,7 @@ test('avatar request accepts only an owned private upload and puts it in school 
 test('avatar moderation list and decisions require same-school school staff', async () => {
   let listedSchool; let decisionArgs;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => moderator,
-    repository: { listPendingAvatarReviews: async schoolId => { listedSchool = schoolId; return [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]; },
+    repository: { getActiveAccountSuspension: async () => null, listPendingAvatarReviews: async schoolId => { listedSchool = schoolId; return [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]; },
       moderateAvatarReview: async (...args) => { decisionArgs = args; return true; } } });
   const list = await handler(request('GET', '/api/v1/avatars/moderation'));
   assert.equal(list.status, 200); assert.equal(listedSchool, 'school-a');

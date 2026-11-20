@@ -86,7 +86,7 @@ test('manual message review queue and decision are limited to the same school ad
   const messageId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
     resolveActor: async () => actor,
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       listPendingMessages: async schoolId => { selectedSchool = schoolId; return [{ id: messageId, sender_id: 'student-a', body: '<script>текст</script>' }]; },
       decidePendingMessage: async input => { decision = input; return input.schoolId === 'school-a'; },
     } });
@@ -144,7 +144,7 @@ test('school agent dashboard and idea decisions are school-admin-only and school
 test('school profile request status is private to the authenticated identity and omits submitted PII', async () => {
   let identity;
   const handler = createListingsApi({ authenticate: async () => identity,
-    repository: { getSchoolProfileRequest: async (issuer, subject) => ({
+    repository: { getActiveAccountSuspension: async () => null, getSchoolProfileRequest: async (issuer, subject) => ({
       request_id: 'request-id', school_id: 'lyceum_3', status: 'pending', created_at: '2099-01-01T00:00:00Z',
     }) } });
   const request = req({}, 'GET'); request.url = '/api/v1/profile-requests';
@@ -224,7 +224,7 @@ test('active suspension blocks school role request changes but allows status rea
 test('role request status includes the current database role for migrated school access UI', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
     resolveActor: async () => ({ id: 'student-id', role: 'council_member', school_id: 'school-a' }),
-    repository: { getSchoolRoleRequest: async (issuer, subject) => ({ request_id: 'request-a', status: 'approved', requested_role: 'council_member' }) } });
+    repository: { getActiveAccountSuspension: async () => null, getSchoolRoleRequest: async (issuer, subject) => ({ request_id: 'request-a', status: 'approved', requested_role: 'council_member' }) } });
   const request = req({}, 'GET'); request.url = '/api/v1/role-requests';
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, role: 'council_member',
     request: { request_id: 'request-a', status: 'approved', requested_role: 'council_member' } } });
@@ -234,7 +234,7 @@ test('role request submission and review fail closed for unprovisioned or non-ad
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
     resolveActor: async () => null,
-    repository: { createSchoolRoleRequest: async () => { writes++; return { ok: true }; }, listPendingSchoolRoleRequests: async () => { writes++; return []; } } });
+    repository: { getActiveAccountSuspension: async () => null, createSchoolRoleRequest: async () => { writes++; return { ok: true }; }, listPendingSchoolRoleRequests: async () => { writes++; return []; } } });
   const submit = req({ requested_role: 'Участник Ученического совета' }); submit.url = '/api/v1/role-requests';
   assert.equal((await handler(submit)).status, 403);
   const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
@@ -246,7 +246,7 @@ test('active suspensions are visible only to the authenticated school administra
   let requestedSchool; let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
     resolveActor: async () => actor,
-    repository: { listActiveAccountSuspensions: async schoolId => { requestedSchool = schoolId; return [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]; } } });
+    repository: { getActiveAccountSuspension: async () => null, listActiveAccountSuspensions: async schoolId => { requestedSchool = schoolId; return [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/suspensions';
   const response = await handler(request);
   assert.equal(response.status, 200); assert.equal(requestedSchool, 'school-a');
@@ -276,7 +276,7 @@ test('council deletion requests are same-school, bounded, and reject personal co
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
     resolveActor: async () => actor,
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       listAccountDeletionTargets: async (school, requester) => [{ id: targetId, role: 'student' }],
       createAccountDeletionRequest: async input => { saved = input; return { ok: true, request_id: 'synthetic-request', already_exists: false }; },
     } });
@@ -338,7 +338,7 @@ test('council members can read only their own school-scoped deletion request his
   let args;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'council' }),
     resolveActor: async () => ({ id: 'council-id', school_id: 'school-a', role: 'council_member' }),
-    repository: { listOwnAccountDeletionRequests: async (...values) => { args = values; return [{ request_id: 'synthetic', status: 'pending' }]; } } });
+    repository: { getActiveAccountSuspension: async () => null, listOwnAccountDeletionRequests: async (...values) => { args = values; return [{ request_id: 'synthetic', status: 'pending' }]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests';
   const response = await handler(request);
   assert.equal(response.status, 200);
@@ -369,13 +369,13 @@ test('direct same-origin school-account deletion is dispatched to the Russian de
 });
 test('API requires verified identity and database profile before writing', async () => {
   let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { createListing: async () => { writes++; } } });
+  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { getActiveAccountSuspension: async () => null, createListing: async () => { writes++; } } });
   const response = await handler(req({ title: 'x' }));
   assert.equal(response.status, 401); assert.equal(writes, 0);
 });
 test('API maps identity to database profile and persists unreviewed content as pending', async () => {
   let record;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }), resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { createListing: async (x) => { record = x; return { id: 'synthetic-listing' }; } } });
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }), resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null, createListing: async (x) => { record = x; return { id: 'synthetic-listing' }; } } });
   const response = await handler(req({ title: 'Book', description: 'School book', category: 'Учёба', user_id: 'forged' }));
   assert.equal(response.status, 201); assert.equal(record.user_id, 'synthetic-user'); assert.equal(record.status, 'pending');
 });
@@ -383,7 +383,7 @@ test('public listing read needs no student identity and returns only repository-
   const safeRow = { id: 'synthetic-listing', title: 'Book', status: 'active' };
   const handler = createListingsApi({ authenticate: async () => { throw new Error('public read must not authenticate'); },
     resolveActor: async () => { throw new Error('public read must not resolve a profile'); },
-    repository: { listActiveListings: async () => [safeRow] } });
+    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => [safeRow] } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings';
   const response = await handler(request);
   assert.equal(response.status, 200);
@@ -398,7 +398,7 @@ test('contacting a listing derives the recipient on the server and sends only re
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
     resolveActor: async () => ({ id: sender, school_id: 'school-a', role: 'student' }),
     review: async ({ text }) => ({ action: text === 'hello' ? 'ok' : 'pending', reason_code: 'review_pending' }),
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       getListingContactRecipient: async (id, actorId, schoolId) => id === listingId && actorId === sender && schoolId === 'school-a' ? recipient : null,
       createMessage: async record => { saved = record; return { id: '44444444-4444-4444-8444-444444444444' }; },
     } });
@@ -417,7 +417,7 @@ test('listing contact rejects unavailable or cross-school listing without storin
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
     resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' }),
-    repository: { getListingContactRecipient: async () => null, createMessage: async () => { writes++; } } });
+    repository: { getActiveAccountSuspension: async () => null, getListingContactRecipient: async () => null, createMessage: async () => { writes++; } } });
   const request = req({ body: 'hello' });
   request.url = '/api/v1/listings/33333333-3333-4333-8333-333333333333/contact';
   const response = await handler(request);
@@ -425,7 +425,7 @@ test('listing contact rejects unavailable or cross-school listing without storin
   assert.equal(writes, 0);
 });
 test('public listing read fails closed when the database is unavailable', async () => {
-  const handler = createListingsApi({ repository: { listActiveListings: async () => { throw new Error('offline'); } } });
+  const handler = createListingsApi({ repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { throw new Error('offline'); } } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings';
   const response = await handler(request);
   assert.equal(response.status, 503);
@@ -436,7 +436,7 @@ test('pending moderation queue is restricted to the authenticated school staff p
   let schoolScope;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
     resolveActor: async () => ({ id: 'staff-id', school_id: 'school-a', role: 'school_admin' }),
-    repository: { listPendingListings: async schoolId => { schoolScope = schoolId; return [{ id: 'pending-id', photo_status: 'pending' }]; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingListings: async schoolId => { schoolScope = schoolId; return [{ id: 'pending-id', photo_status: 'pending' }]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings/moderation';
   const response = await handler(request);
   assert.equal(response.status, 200);
@@ -446,7 +446,7 @@ test('pending moderation queue is restricted to the authenticated school staff p
   let reads = 0;
   const student = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
     resolveActor: async () => ({ id: 'student-id', school_id: 'school-a', role: 'student' }),
-    repository: { listPendingListings: async () => { reads++; return []; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingListings: async () => { reads++; return []; } } });
   const denied = req({}, 'GET'); denied.url = '/api/v1/listings/moderation';
   assert.equal((await student(denied)).status, 403);
   assert.equal(reads, 0);
@@ -456,7 +456,7 @@ test('event review queue is school-scoped, staff-only, and does not query for st
   let requestedSchool;
   const staff = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
     resolveActor: async () => ({ id: 'staff-id', school_id: 'school-a', role: 'council_member' }),
-    repository: { listPendingEventReviews: async schoolId => { requestedSchool = schoolId; return [{ event_id: 'event-a', user_id: 'student-a' }]; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingEventReviews: async schoolId => { requestedSchool = schoolId; return [{ event_id: 'event-a', user_id: 'student-a' }]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/event-registrations/review';
   const response = await staff(request);
   assert.equal(response.status, 200);
@@ -466,7 +466,7 @@ test('event review queue is school-scoped, staff-only, and does not query for st
   let reads = 0;
   const student = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
     resolveActor: async () => ({ id: 'student-id', school_id: 'school-a', role: 'student' }),
-    repository: { listPendingEventReviews: async () => { reads++; return []; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingEventReviews: async () => { reads++; return []; } } });
   const denied = req({}, 'GET'); denied.url = '/api/v1/event-registrations/review';
   assert.equal((await student(denied)).status, 403);
   assert.equal(reads, 0);
@@ -476,7 +476,7 @@ test('unprovisioned Yandex identities can request a participant profile but cann
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
     resolveActor: async () => null,
-    repository: { createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
   const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8а', role: 'school_admin', user_id: 'forged' });
   request.url = '/api/v1/profile-requests';
   const response = await handler(request);
@@ -486,7 +486,7 @@ test('unprovisioned Yandex identities can request a participant profile but cann
 
   let writes = 0;
   const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
-    repository: { createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
   const invalid = req({ school_id: 'unlisted-school', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); invalid.url = '/api/v1/profile-requests';
   assert.equal((await denied(invalid)).status, 400);
   assert.equal(writes, 0);
@@ -497,7 +497,7 @@ test('only same-school administrators can read or decide profile access requests
   let schoolId; let decision;
   const admin = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
     resolveActor: async () => ({ id: 'admin', school_id: 'lyceum_3', role: 'school_admin' }),
-    repository: { listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
       reviewSchoolProfileRequest: async (...args) => { [decision, schoolId] = [args[3], args[1]]; return true; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/profile-requests/review';
   assert.equal((await admin(list)).status, 200);
@@ -509,7 +509,7 @@ test('only same-school administrators can read or decide profile access requests
   let reads = 0;
   const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
     resolveActor: async () => ({ id: 'student', school_id: 'lyceum_3', role: 'student' }),
-    repository: { listPendingSchoolProfileRequests: async () => { reads++; return []; }, reviewSchoolProfileRequest: async () => { reads++; return true; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async () => { reads++; return []; }, reviewSchoolProfileRequest: async () => { reads++; return true; } } });
   const forbiddenList = req({}, 'GET'); forbiddenList.url = '/api/v1/profile-requests/review';
   const forbiddenDecision = req({ decision: 'approve' }, 'PATCH'); forbiddenDecision.url = `/api/v1/profile-requests/${requestId}`;
   assert.equal((await student(forbiddenList)).status, 403);
@@ -522,7 +522,7 @@ test('only an active school administrator can list and decide staff verification
   let decision;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
     resolveActor: async () => ({ id: 'admin-a', school_id: 'school-a', role: 'school_admin' }),
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       listPendingSchoolStaffVerifications: async schoolId => { assert.equal(schoolId, 'school-a'); return [{ user_id: userId, staff_position: 'Учитель' }]; },
       reviewSchoolStaffVerification: async input => { decision = input; return true; },
     } });
@@ -535,7 +535,7 @@ test('only an active school administrator can list and decide staff verification
   let reads = 0;
   const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
     resolveActor: async () => ({ id: 'student-a', school_id: 'school-a', role: 'student' }),
-    repository: { listPendingSchoolStaffVerifications: async () => { reads++; return []; }, reviewSchoolStaffVerification: async () => { reads++; return true; } } });
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolStaffVerifications: async () => { reads++; return []; }, reviewSchoolStaffVerification: async () => { reads++; return true; } } });
   assert.equal((await student(list)).status, 403);
   assert.equal((await student(patch)).status, 403);
   assert.equal(reads, 0);
@@ -552,21 +552,21 @@ test('school catalog is a minimal public projection and needs no auth', async ()
 
 test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'admin' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null,} });
   const request = req({}, 'GET'); request.url = '/api/v1/me';
   const response = await handler(request);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.profile, { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' });
 });
 test('profile endpoint rejects missing authentication', async () => {
-  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: {} });
+  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { getActiveAccountSuspension: async () => null,} });
   const request = req({}, 'GET'); request.url = '/api/v1/me';
   assert.equal((await handler(request)).status, 401);
 });
 test('profile identity update binds to the authenticated subject and ignores role or school fields', async () => {
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { updateOwnProfileIdentity: async (issuer, subject, fields) => { saved = { issuer, subject, ...fields }; return { id: 'own-id', role: 'student', school_id: 'school-a', ...fields }; } } });
+    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (issuer, subject, fields) => { saved = { issuer, subject, ...fields }; return { id: 'own-id', role: 'student', school_id: 'school-a', ...fields }; } } });
   const request = req({ first_name: '  Аня ', last_name: 'Иванова', class_name: ' 8а ', role: 'school_admin', school_id: 'other-school', user_id: 'other-id' }, 'PATCH');
   request.url = '/api/v1/me';
   const response = await handler(request);
@@ -580,7 +580,7 @@ test('legacy profile edit preserves a nonstudent category and staff position', a
   const identity = { issuer: 'https://issuer.example', subject: 'own-subject' };
   const handler = createListingsApi({ authenticate: async () => identity,
     resolveActor: async () => ({ id: 'own-id', school_id: 'school-a', role: 'student', person_type: 'school_staff', staff_position: 'Учитель', class_name: null }),
-    repository: { updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
+    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
   const request = req({ first_name: 'Анна', last_name: 'Иванова' }, 'PATCH'); request.url = '/api/v1/me';
   assert.equal((await handler(request)).status, 200);
   assert.deepEqual(saved, { first_name: 'Анна', last_name: 'Иванова', class_name: '', person_type: 'school_staff', staff_position: 'Учитель' });
@@ -589,7 +589,7 @@ test('legacy profile edit preserves a nonstudent category and staff position', a
 test('profile identity update rejects invalid values before touching the repository', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { updateOwnProfileIdentity: async () => { writes++; return {}; } } });
+    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async () => { writes++; return {}; } } });
   const request = req({ first_name: '<script>', last_name: 'Иванова', class_name: '0А' }, 'PATCH'); request.url = '/api/v1/me';
   assert.equal((await handler(request)).status, 400);
   assert.equal(writes, 0);
@@ -598,7 +598,7 @@ test('profile identity update rejects invalid values before touching the reposit
 test('profile identity update enforces the current FAM school class format', async () => {
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
+    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
   for (const class_name of ['4А', '12А', '8Д', '8A']) {
     const request = req({ first_name: 'Аня', last_name: 'Тест', class_name }, 'PATCH'); request.url = '/api/v1/me';
     assert.equal((await handler(request)).status, 400, class_name);
@@ -620,7 +620,7 @@ test('favorites are scoped to the authenticated database actor', async () => {
   let listedFor;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { listFavoriteIds: async (userId) => { listedFor = userId; return ['active-listing']; } } });
+    repository: { getActiveAccountSuspension: async () => null, listFavoriteIds: async (userId) => { listedFor = userId; return ['active-listing']; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/favorites';
   const response = await handler(request);
   assert.equal(listedFor, 'synthetic-user');
@@ -631,7 +631,7 @@ test('favorite writes use only the authenticated actor and return 404 for non-ac
   let call;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { setFavorite: async (...args) => { call = args; return args[1] === '11111111-1111-4111-8111-111111111111'; } } });
+    repository: { getActiveAccountSuspension: async () => null, setFavorite: async (...args) => { call = args; return args[1] === '11111111-1111-4111-8111-111111111111'; } } });
   const request = req({ user_id: 'forged-user' }, 'PUT'); request.url = '/api/v1/listings/11111111-1111-4111-8111-111111111111/favorite';
   const response = await handler(request);
   assert.deepEqual(call, ['synthetic-user', '11111111-1111-4111-8111-111111111111', true]);
@@ -648,7 +648,7 @@ test('ordinary students can delete only their own listing and media cleanup stay
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: actor.id }),
     resolveActor: async () => actor,
     pendingImages: { delete: async key => { calls.push(['delete-image', key]); } },
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       listOwnActiveListingIds: async id => id === userId ? [listingId] : [],
       deleteOwnListing: async (id, target) => {
         calls.push(['delete-listing', id, target]);
@@ -717,7 +717,7 @@ test('own listing identifiers are not exposed to staff or unprofiled identities'
   let actor = { id: 'staff-id', role: 'school_admin' };
   let queries = 0;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
-    repository: { listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
+    repository: { getActiveAccountSuspension: async () => null, listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [] } });
   assert.equal(queries, 0);
@@ -727,7 +727,7 @@ test('own listing identifiers are not exposed to staff or unprofiled identities'
 
 test('favorites fail closed when the database adapter is unavailable', async () => {
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: {} });
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null,} });
   const request = req({}, 'GET'); request.url = '/api/v1/favorites';
   assert.equal((await handler(request)).status, 503);
 });
@@ -736,7 +736,7 @@ test('idea submission is authenticated and bound to the database profile', async
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { createIdea: async record => { saved = record; return { id: 'synthetic-idea' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, createIdea: async record => { saved = record; return { id: 'synthetic-idea' }; } } });
   const request = req({ text: 'Было бы здорово открыть книжный обмен', user_id: 'forged-user' });
   request.url = '/api/v1/ideas';
   const response = await handler(request);
@@ -750,7 +750,7 @@ test('message API fails closed when moderation is unavailable', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', role: 'student' }),
-    repository: { createMessage: async () => { writes++; return { id: 'unexpected' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, createMessage: async () => { writes++; return { id: 'unexpected' }; } } });
   const request = req({ receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'Привет' });
   request.url = '/api/v1/messages';
   const response = await handler(request);
@@ -765,7 +765,7 @@ test('message API uses the verified sender profile after an explicit approval', 
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-sender' }),
     resolveActor: async () => ({ id: senderId, school_id: 'school-a', role: 'student' }),
     review: async () => ({ action: 'ok' }),
-    repository: { createMessage: async record => { saved = record; return { id: 'synthetic-message' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, createMessage: async record => { saved = record; return { id: 'synthetic-message' }; } } });
   const request = req({ sender_id: 'forged-sender', receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'Привет' });
   request.url = '/api/v1/messages';
   const response = await handler(request);
@@ -778,7 +778,7 @@ test('message read requires authentication and scopes data to the database profi
   let owner;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { listMessages: async (userId, schoolId) => { owner = [userId, schoolId]; return [{ id: 'owned-message' }]; } } });
+    repository: { getActiveAccountSuspension: async () => null, listMessages: async (userId, schoolId) => { owner = [userId, schoolId]; return [{ id: 'owned-message' }]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/messages';
   const response = await handler(request);
   assert.deepEqual(owner, ['synthetic-user', 'synthetic-school']);
@@ -788,7 +788,7 @@ test('message read requires authentication and scopes data to the database profi
 test('message read rejects missing identity before querying the database', async () => {
   let reads = 0;
   const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null,
-    repository: { listMessages: async () => { reads++; return []; } } });
+    repository: { getActiveAccountSuspension: async () => null, listMessages: async () => { reads++; return []; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/messages';
   assert.equal((await handler(request)).status, 401);
   assert.equal(reads, 0);
@@ -798,7 +798,7 @@ test('only the authenticated recipient can mark a message read', async () => {
   let args;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { markMessageRead: async (...values) => { args = values; return true; } } });
+    repository: { getActiveAccountSuspension: async () => null, markMessageRead: async (...values) => { args = values; return true; } } });
   const request = req({}, 'PATCH'); request.url = '/api/v1/messages/11111111-1111-4111-8111-111111111111/read';
   const response = await handler(request);
   assert.deepEqual(args, ['synthetic-user', 'synthetic-school', '11111111-1111-4111-8111-111111111111']);
@@ -809,7 +809,7 @@ test('bulk message read accepts bounded UUIDs and scopes every update to the ver
   let call;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
     resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { markMessagesRead: async (...args) => { call = args; return 1; } } });
+    repository: { getActiveAccountSuspension: async () => null, markMessagesRead: async (...args) => { call = args; return 1; } } });
   const request = req({ message_ids: ['11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'] });
   request.url = '/api/v1/messages/read';
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, updated: 1 } });
@@ -823,7 +823,7 @@ test('listing moderation trusts database role and school scope, not token claims
   const id = '11111111-1111-4111-8111-111111111111';
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
     resolveActor: async () => ({ id: 'admin-id', school_id: 'school-a', role: 'school_admin' }),
-    repository: { moderateListing: async (...args) => { call = args; return true; } } });
+    repository: { getActiveAccountSuspension: async () => null, moderateListing: async (...args) => { call = args; return true; } } });
   const request = req({ decision: 'approve', school_id: 'school-b', status: 'active' }, 'PATCH');
   request.url = `/api/v1/listings/${id}/moderation`;
   const response = await handler(request);
@@ -834,7 +834,7 @@ test('listing moderation trusts database role and school scope, not token claims
 test('listing moderation rejects student role and invalid decisions before repository access', async () => {
   let writes = 0;
   const base = { authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
-    repository: { moderateListing: async () => { writes++; return true; } } };
+    repository: { getActiveAccountSuspension: async () => null, moderateListing: async () => { writes++; return true; } } };
   const id = '11111111-1111-4111-8111-111111111111';
   const student = createListingsApi({ ...base, resolveActor: async () => ({ id: 'student', school_id: 'school-a', role: 'student' }) });
   const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${id}/moderation`;
@@ -853,14 +853,14 @@ test('event registration is bound to the authenticated profile and capacity erro
   let registeredAs;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'untrusted-subject' }),
     resolveActor: async () => ({ id: 'synthetic-registrant', school_id: 'school-a', role: 'student' }),
-    repository: { registerForEvent: async (...args) => { registeredAs = args; return { event_id: args[0], user_id: args[1], status: 'confirmed' }; } } });
+    repository: { getActiveAccountSuspension: async () => null, registerForEvent: async (...args) => { registeredAs = args; return { event_id: args[0], user_id: args[1], status: 'confirmed' }; } } });
   const request = registrationRequest();
   const response = await handler(request);
   assert.deepEqual(registeredAs, [eventId, 'synthetic-registrant']);
   assert.deepEqual(response, { status: 201, body: { ok: true, registration: { event_id: eventId, user_id: 'synthetic-registrant', status: 'confirmed' } } });
 
   const full = createListingsApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: 'u', role: 'student' }),
-    repository: { registerForEvent: async () => { throw Object.assign(new Error('full'), { code: 'no_seats_available' }); } } });
+    repository: { getActiveAccountSuspension: async () => null, registerForEvent: async () => { throw Object.assign(new Error('full'), { code: 'no_seats_available' }); } } });
   const fullResponse = await full(registrationRequest());
   assert.equal(fullResponse.status, 409);
   assert.equal(fullResponse.body.error, 'no_seats_available');
@@ -869,7 +869,7 @@ test('event registration is bound to the authenticated profile and capacity erro
 test('event applicant names are visible only to same-school council roles', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   let scope;
-  const repository = { listEventApplicants: async (...args) => { scope = args; return [{ first_name: 'Тест', class_name: '8А', status: 'pending' }]; } };
+  const repository = { getActiveAccountSuspension: async () => null, listEventApplicants: async (...args) => { scope = args; return [{ first_name: 'Тест', class_name: '8А', status: 'pending' }]; } };
   const student = createListingsApi({ authenticate: async () => ({ subject: 's' }),
     resolveActor: async () => ({ id: 'student', role: 'student', school_id: 'school-a' }), repository });
   const studentRequest = req({}, 'GET'); studentRequest.url = `/api/v1/listings/${id}/registrations`;
@@ -889,7 +889,7 @@ test('event registration review requires council role and delegates event-owner 
   let writes = 0;
   const makeHandler = role => createListingsApi({ authenticate: async () => ({ subject: 'x' }),
     resolveActor: async () => ({ id: 'organizer', school_id: 'school-a', role }),
-    repository: { moderateEventRegistration: async (...args) => { writes++; assert.deepEqual(args, [eventId, userId, 'organizer', 'school-a', 'confirmed']); return true; } } });
+    repository: { getActiveAccountSuspension: async () => null, moderateEventRegistration: async (...args) => { writes++; assert.deepEqual(args, [eventId, userId, 'organizer', 'school-a', 'confirmed']); return true; } } });
   const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${eventId}/registrations/${userId}`;
   assert.equal((await makeHandler('student')(request)).status, 403);
   assert.equal(writes, 0);
@@ -899,7 +899,7 @@ test('event registration review requires council role and delegates event-owner 
 test('event occupancy is a public count with no registration identity details', async () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
   const handler = createListingsApi({ authenticate: async () => { throw new Error('public occupancy must not authenticate'); },
-    repository: { getEventOccupancy: async id => { assert.equal(id, eventId); return 3; } } });
+    repository: { getActiveAccountSuspension: async () => null, getEventOccupancy: async id => { assert.equal(id, eventId); return 3; } } });
   const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
 });
@@ -908,7 +908,7 @@ test('idea image review queue and decisions are limited to school staff and the 
   let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
   let listedSchool; let listedReviewer; let reviewed;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
-    repository: { listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
       reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === 'school-a'; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/school/ideas';
   assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', image_status: 'pending' }] } });
@@ -930,7 +930,7 @@ test('idea text moderation requires school staff and records a decision only thr
   let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
   let review;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
-    repository: { reviewSchoolIdeaText: async value => { review = value; return value.schoolId === actor.school_id; } } });
+    repository: { getActiveAccountSuspension: async () => null, reviewSchoolIdeaText: async value => { review = value; return value.schoolId === actor.school_id; } } });
   const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation';
   assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, ai_status: 'approved' } });
   assert.deepEqual(review, { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: actor.id, decision: 'approve' });
@@ -943,7 +943,7 @@ test('notification read state is always owned by the authenticated profile and b
   const saved = [];
   let listedOwner;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'student' }), resolveActor: async () => actor,
-    repository: {
+    repository: { getActiveAccountSuspension: async () => null,
       listNotificationReadStates: async owner => { listedOwner = owner; return [{ notification_key: 'release:test' }]; },
       saveNotificationReadStates: async (owner, keys) => { saved.push({ owner, keys }); return true; },
     } });

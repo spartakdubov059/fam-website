@@ -69,6 +69,21 @@ test('a suspended administrator cannot read school administration data or revoke
   assert.equal(mutations, 0);
 });
 
+test('a suspended school moderator cannot open queues or decide school content', async () => {
+  let reads = 0; let writes = 0;
+  const handler = api({ repository: {
+    getActiveAccountSuspension: async () => ({ reason: 'synthetic restriction', expires_at: '2099-01-01T00:00:00Z' }),
+    listPendingListings: async () => { reads++; return []; },
+    moderateListing: async () => { writes++; return true; },
+  } });
+  const queue = await handler(request('GET', '/api/v1/listings/moderation'));
+  const decision = await handler(request('PATCH', `/api/v1/listings/${targetId}/moderation`, { decision: 'approve' }));
+  assert.deepEqual(queue, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(decision, queue);
+  assert.equal(reads, 0);
+  assert.equal(writes, 0);
+});
+
 test('stale authentication, other roles, self action, invalid duration and contact details are rejected', async () => {
   let mutations = 0;
   const repository = { issueAccountSuspension: async () => { mutations++; return { ok: true }; } };
