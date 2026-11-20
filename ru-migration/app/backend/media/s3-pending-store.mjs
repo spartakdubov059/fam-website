@@ -55,6 +55,18 @@ export function createS3PendingImageStore(env = process.env, { send, get, remove
       }
       throw new Error('account image inventory exceeds safe pagination limit');
     },
+    async listAccountObjects(userId, ownedKeys = []) {
+      const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+      if (typeof userId !== 'string' || !new RegExp(`^${uuid}$`, 'i').test(userId)) throw new TypeError('invalid image owner');
+      if (!Array.isArray(ownedKeys) || ownedKeys.length > 100_000) throw new TypeError('invalid account media inventory');
+      const keyPattern = new RegExp(`^pending/${userId}/${uuid}\\.webp$`, 'i');
+      const keys = new Set(await this.listUserObjects(userId));
+      for (const key of ownedKeys) {
+        if (typeof key !== 'string' || !keyPattern.test(key)) throw new Error('unexpected account media key');
+        keys.add(key);
+      }
+      return [...keys];
+    },
     close: () => client.destroy(),
   });
 }
