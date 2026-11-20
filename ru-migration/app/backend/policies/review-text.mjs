@@ -33,7 +33,8 @@ export function reviewIdeaText(value) {
     return { action: 'reject', reason_code: 'personal_contact_data', local_flag: null };
   }
   const flag = findLocalPolicyFlag(value);
-  if (flag?.code === 'serious_hate_or_threat' || flag?.code.endsWith('_safety_review')) {
+  if (flag?.code === 'serious_hate_or_threat' || flag?.code.endsWith('_safety_review')
+      || ['targeted_harassment', 'negative_personal_call'].includes(flag?.code)) {
     return { action: 'pending', reason_code: flag.code, local_flag: flag.code };
   }
   if (flag) {
