@@ -49,8 +49,8 @@ function sendMediaResult(res, result) {
   return sendJson(res, result.status, result.body);
 }
 
-export function createServer({ listingsApi = null, authApi = null, mediaApi = null, coderTaskBridge = null, getReadiness = defaultReadiness } = {}) {
-  return http.createServer(async (req, res) => {
+export function createRequestHandler({ listingsApi = null, authApi = null, mediaApi = null, coderTaskBridge = null, getReadiness = defaultReadiness } = {}) {
+  return async (req, res) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (['/auth/yandex/start', '/auth/yandex/callback', '/auth/yandex/logout'].includes(url.pathname)) {
     if (!authApi) return sendJson(res, 503, { ok: false, error: 'auth_not_configured' });
@@ -193,7 +193,11 @@ export function createServer({ listingsApi = null, authApi = null, mediaApi = nu
   } catch {
     return sendJson(res, 404, { error: 'not_found' });
   }
-  });
+  };
+}
+
+export function createServer(options = {}) {
+  return http.createServer(createRequestHandler(options));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
