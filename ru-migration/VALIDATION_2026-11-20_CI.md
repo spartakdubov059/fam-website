@@ -149,3 +149,12 @@
 - [SDK/Sharp CI #44790532457](https://github.com/spartakdubov059/fam-website/actions/runs/44790532457) — success, **372/372** backend tests и SDK/Sharp/WebP/timer checks.
 - [Disposable YDB CI #44790532340](https://github.com/spartakdubov059/fam-website/actions/runs/44790532340) — success; synthetic repository integration прошла на одноразовой локальной YDB, cleanup выполнен.
 - Эти тесты подтверждают только UI/API сценарий занятости; полный frontend parity и облачный staging не подтверждены.
+
+
+## Проверка мобильной навигации
+
+На ревизии [91d90e8](https://github.com/spartakdubov059/fam-website/commit/91d90e87f4435f4825e5e362f95751ce8b42c659) добавлена fixed bottom navigation с кнопками «Доска», «Афиша», «Сообщения», «Профиль». Переходы используют доступные same-origin UI/API; Афиша включает тот же event-only фильтр. Стили учитывают safe area и клавиатурную фокусировку.
+
+- [SDK/Sharp CI #44791312376](https://github.com/spartakdubov059/fam-website/actions/runs/44791312376) — success, **374/374** backend tests; SDK/Sharp/WebP и systemd timers проверены.
+- [Disposable YDB CI #44791312484](https://github.com/spartakdubov059/fam-website/actions/runs/44791312484) — success; disposable local YDB integration и cleanup завершились успешно.
+- Изменение покрыто unit-проверками навигации и source-level shell isolation test; это не полный browser/device QA.
