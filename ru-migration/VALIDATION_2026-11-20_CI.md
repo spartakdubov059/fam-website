@@ -2,6 +2,10 @@
 
 ## Актуальная проверка веток и CI (20 ноября 2026)
 
+- Последний кодовый commit [`a192e84`](https://github.com/spartakdubov059/fam-website/commit/a192e840affea8913035d21b2710d27752d28f19) прошёл [SDK/Sharp CI #44689197713](https://github.com/spartakdubov059/fam-website/actions/runs/44689197713): `327/327` тестов, без ошибок, SDK exports, Sharp/WebP и таймеры. [Одноразовая YDB CI #44689197677](https://github.com/spartakdubov059/fam-website/actions/runs/44689197677) успешно применила схемы 01–32 и выполнила synthetic integration, включая идемпотентную safe-agent очередь и lease. Инвентаризация этих изменений: [`33f902a`](https://github.com/spartakdubov059/fam-website/commit/33f902ab83f7d13edf790c549b72edeef2aa3914).
+- Свежие refs: GitHub `main` — [`5e749c5`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579) (78 migrations, 7 Edge Functions); `migration/yandex-cloud` — `33f902a` (код прошёл CI на его родителе `a192e84`). `main` не менялась.
+- CI использует GitHub-hosted runner и временную локальную YDB; это не российский облачный staging. `yc` CLI, Yandex Cloud credentials, OAuth, S3 и бесплатный облачный хост с гарантией 0 ₽ не подтверждены.
+
 - Повторно полученные refs: GitHub `main` — `7fd418246653f92b53f66bc29fa224d95d04d5cf` (76 migrations, 7 Edge Functions); `migration/yandex-cloud` — [`d900cd1377b5a3577050552daaaa371a5374ea50`](https://github.com/spartakdubov059/fam-website/commit/d900cd1377b5a3577050552daaaa371a5374ea50). Commit `5e749c5` не является предком текущего `main`; детали — в [SOURCE_SYNC](SOURCE_SYNC_2026-11-20.md).
 - На `d900cd1` [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44684140252) завершилась успешно: `316/316` backend-тестов, `0` ошибок, pinned `npm ci`, проверка systemd unit-ов, Sharp/WebP и SDK verifier.
 - [Одноразовая YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44684140282) завершилась успешно: схема применена, синтетические сценарии прошли, временная локальная база удалена.
