@@ -75,6 +75,21 @@ window.onunhandledrejection = function() {
             <div id="ruDeletionReviewQueue"></div>
           </section>
         </section>
+        <section class="hero-wrap ru-hero" aria-label="Баннеры FAM">
+          <div id="ruHeroTrack" class="hero" role="region" aria-label="Баннерная карусель" tabindex="0">
+            <div class="hero-slide hero-img"><img src="/assets/banner-1.webp" width="1200" height="675" alt="Друзья FAM проводят время вместе." fetchpriority="high"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-2.webp" width="1200" height="675" alt="Школьные идеи, проекты и творчество." loading="lazy"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-3.webp" width="1200" height="675" alt="Встречи, учёба и события рядом." loading="lazy"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-4.webp" width="1200" height="675" alt="Вещи и услуги для школьников." loading="lazy"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-5.webp" width="1200" height="675" alt="Учёба и новые знания." loading="lazy"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-6.webp" width="1200" height="675" alt="Концерты, квизы и встречи." loading="lazy"></div>
+          </div>
+          <div id="ruHeroDots" class="hero-dots" aria-label="Выбор баннера"></div>
+          <div class="hero-carousel-controls">
+            <button id="ruHeroPrevious" type="button" aria-label="Предыдущий баннер">‹</button>
+            <button id="ruHeroNext" type="button" aria-label="Следующий баннер">›</button>
+          </div>
+        </section>
         <section id="ruPulse" class="ru-pulse" aria-label="Новости и опросы школы"></section>
         <section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section>
         <nav id="ruTabbar" class="ru-tabbar" aria-label="Основная навигация">
@@ -116,6 +131,10 @@ window.onunhandledrejection = function() {
     accountScript.type = 'module';
     accountScript.src = '/account-workflow.js';
     document.body.append(accountScript);
+    const heroScript = document.createElement('script');
+    heroScript.type = 'module';
+    heroScript.src = '/hero-carousel.js';
+    document.body.append(heroScript);
     const navigationScript = document.createElement('script');
     navigationScript.type = 'module';
     navigationScript.src = '/navigation.js';
