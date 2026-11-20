@@ -1,4 +1,4 @@
-const VIEWS = new Set(['board', 'afisha', 'messages', 'profile']);
+const VIEWS = new Set(['board', 'afisha', 'favorites', 'messages', 'profile']);
 
 export function initializeNavigation({ document = globalThis.document } = {}) {
   const navigation = document?.getElementById?.('ruTabbar');
@@ -11,6 +11,10 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
       for (const item of buttons) item.setAttribute('aria-pressed', String(item === button));
       let target = null;
       if (view === 'board') target = document.getElementById('publicListings');
+      if (view === 'favorites') {
+        document.querySelector?.('#publicListings .ru-board-views button[data-view="favorites"]')?.click?.();
+        target = document.getElementById('publicListings');
+      }
       if (view === 'afisha') {
         document.getElementById('ruBoardCategoryAfisha')?.click?.();
         target = document.getElementById('ruPulse') || document.getElementById('publicListings');
