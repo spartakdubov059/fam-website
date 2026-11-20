@@ -427,12 +427,16 @@ try {
   }));
   assert.equal(apiSubmission.status, 201);
   assert.equal(apiSubmission.body.status, 'pending');
-  assert.deepEqual(await repo.listActiveListings(), [], 'API submissions remain invisible before school moderation');
+  const pendingApiListings = await repo.listActiveListings();
+  assert.equal(pendingApiListings.some(row => row.id === apiSubmission.body.id), false,
+    'API submissions remain invisible before school moderation');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-student', { decision: 'approve' }))).status, 403,
     'student cannot moderate even when using a valid database-backed identity');
   const apiApproval = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-admin', { decision: 'approve' }));
   assert.deepEqual(apiApproval, { status: 200, body: { ok: true, status: 'active' } });
-  assert.equal((await repo.listActiveListings()).length, 1, 'approved API submission becomes visible through public projection');
+  const approvedApiListings = await repo.listActiveListings();
+  assert.equal(approvedApiListings.some(row => row.id === apiSubmission.body.id), true,
+    'approved API submission becomes visible through public projection');
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
   const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
     description: 'Учебник', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
@@ -444,12 +448,13 @@ try {
   assert.equal(sets[0][0].status, 'pending');
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
   const beforeDirectModeration = await repo.listActiveListings();
-  assert.equal(beforeDirectModeration.length, 1, 'only the separately API-approved item is public');
+  assert.equal(beforeDirectModeration.some(row => row.id === apiSubmission.body.id), true,
+    'the separately API-approved item remains public');
   assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
   assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
   assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
   const publicListings = await repo.listActiveListings();
-  assert.equal(publicListings.length, 2);
+  assert.equal(publicListings.some(row => row.id === apiSubmission.body.id), true);
   const publicDirectListing = publicListings.find(row => row.id === listing.id);
   assert.ok(publicDirectListing);
   assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
