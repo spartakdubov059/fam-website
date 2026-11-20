@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 
 export const DOMAINS = Object.freeze([
   { name: "GitHub Pages", origin: "https://spartakdubov059.github.io", prefix: "/fam-website" },
@@ -35,10 +36,10 @@ export function isPublicAssetPath(value) {
 export function selectPublicPaths(changedPaths, root = process.cwd()) {
   const candidates = new Set((changedPaths ?? []).map(String));
   for (const core of ["index.html", "school-pulse.js", "school-pulse.css"]) {
-    if (existsSync(new URL(core, `file://${root.replace(/\\/?$/, "/")}`))) candidates.add(core);
+    if (existsSync(resolve(root, core))) candidates.add(core);
   }
   return [...candidates]
-    .filter(path => isPublicAssetPath(path) && existsSync(new URL(path, `file://${root.replace(/\\/?$/, "/")}`)))
+    .filter(path => isPublicAssetPath(path) && existsSync(resolve(root, path)))
     .sort();
 }
 
@@ -98,7 +99,7 @@ export async function verifyDomains({
   if (!selected.includes("index.html")) selected.unshift("index.html");
   if (!selected.length) throw new Error("No public files were selected for the domain sync check.");
 
-  const expected = new Map(selected.map(path => [path, sha256(readFileSync(new URL(path, `file://${root.replace(/\\/?$/, "/")}`)))]));
+  const expected = new Map(selected.map(path => [path, sha256(readFileSync(resolve(root, path)))]));
   const deadline = Date.now() + timeoutMs;
   let attempt = 0;
   let latest = [];
