@@ -43,7 +43,10 @@ test("local FAM coding agent has scheduled and owner-only manual triggers", () =
 });
 
 test("agent uses local open weights and never needs a paid API key", () => {
-  assert.match(workflow, /Qwen2\.5-Coder-7B-Instruct-GGUF/);
+  assert.match(workflow, /sammyblues\/Qwen3\.8-27B-IQ2_XS-GGUF\/resolve\/0466a972ecb7e0711efd814b6f2e3856b4b4027b/);
+  assert.match(workflow, /eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23/);
+  assert.match(workflow, /FAM_MODEL_ID: Qwen3\.8-27B-IQ2_XS/);
+  assert.match(workflow, /--reasoning off/);
   assert.match(workflow, /ggml-org\/llama\.cpp/);
   assert.match(workflow, /127\.0\.0\.1:8080/);
   assert.match(runner, /127\.0\.0\.1:8080\/v1\/chat\/completions/);
