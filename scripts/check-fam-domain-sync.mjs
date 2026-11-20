@@ -9,7 +9,7 @@ export const DOMAINS = Object.freeze([
   { name: "Netlify", origin: "https://famru.netlify.app", prefix: "" },
 ]);
 
-const STATIC_EXTENSIONS = /\.(?:html?|css|mjs?|js|json|xml|txt|webmanifest|svg|png|jpe?g|webp|gif|ico|woff2?|ttf|otf|pdf|mp4|webm|map)$/i;
+const STATIC_EXTENSIONS = /\.(?:html?|css|mjs?|js|json|xml|txt|webmanifest|svg|png|jpe?g|webp|avif|gif|ico|mp3|wav|ogg|woff2?|ttf|otf|pdf|mp4|webm|map)$/i;
 const EXCLUDED_PREFIXES = [
   ".github/",
   ".openai/",
@@ -35,7 +35,7 @@ export function isPublicAssetPath(value) {
 
 export function selectPublicPaths(changedPaths, root = process.cwd()) {
   const candidates = new Set((changedPaths ?? []).map(String));
-  for (const core of ["index.html", "school-pulse.js", "school-pulse.css"]) {
+  for (const core of ["index.html", "school-pulse.js", "school-pulse.css", "fam-domain-health.json"]) {
     if (existsSync(resolve(root, core))) candidates.add(core);
   }
   return [...candidates]
