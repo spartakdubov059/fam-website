@@ -20,7 +20,8 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
         target = document.getElementById('ruMessages');
       }
       if (view === 'profile') {
-        target = document.getElementById('ruProfileSettings')
+        const history = document.getElementById('ruIdeaHistory');
+        target = history && !history.hidden ? history : document.getElementById('ruProfileSettings')
           || document.getElementById('ruAvatarWorkflow')
           || document.getElementById('ruAccountWorkflow')
           || document.getElementById('ruListingForm')
