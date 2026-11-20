@@ -85,3 +85,9 @@
 - В точной вершине ветки `c090e0ae409afa7f794a173fb0aaba0b53561d75` GitHub Actions прошли: [SDK/Sharp #44773720085](https://github.com/spartakdubov059/fam-website/actions/runs/44773720085) и [одноразовая YDB #44773719757](https://github.com/spartakdubov059/fam-website/actions/runs/44773719757). Оба job — success; ресурсы staging не создавались.
 - Detached checkout этой точной вершины локально прошёл backend suite **364/364**, без пропусков; `git diff --check` прошёл в рабочей копии до публикации.
 - Это точечное покрытие удаления аккаунта, не полный security audit или parity всех Supabase RLS/RPC/triggers и Edge Functions.
+
+## Дополнение: анонимизация и очистка состояния аккаунта, 20 ноября 2026
+
+- При удалении аккаунта очищаются приватные строки очереди аватаров, уведомления и квоты. В школьном аудите ID автора заменяется постоянной меткой; в safety-записях удаляются actor/target, origin и выдержка текста, а агрегированный fingerprint остаётся для школьной статистики.
+- Точная ревизия `e64fbc23490ae665af06ef1b8a0e2b24e1070b50`: backend suite **365/365** в detached checkout; [SDK/Sharp CI #44775225474](https://github.com/spartakdubov059/fam-website/actions/runs/44775225474) и [одноразовая YDB CI #44775225712](https://github.com/spartakdubov059/fam-website/actions/runs/44775225712) — success.
+- Проверка охватывает этот путь удаления; полный аудит миграции, auth staging и паритет всех исходных функций по-прежнему не подтверждены.
