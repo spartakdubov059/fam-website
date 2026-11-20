@@ -270,3 +270,34 @@ test('Afisha filter selects event listings by event flag and excludes ordinary l
   assert.equal(cards[2].hidden, true);
   assert.equal(afisha.getAttribute('aria-pressed'), 'true');
 });
+
+
+test('limited event checks live seat availability only when requested', async () => {
+  const eventId = '11111111-1111-4111-8111-111111111111';
+  const root = new FakeNode('section');
+  let occupancyRequest;
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: eventId, title: 'Синтетическое мероприятие', description: 'Событие', category: 'Мероприятия',
+        is_event: true, event_type: 'limited', max_seats: 8 },
+    ] }) };
+    if (url === '/api/v1/event-registrations' || url === '/api/v1/favorites' || url === '/api/v1/me/listings') {
+      return { ok: false, status: 401, json: async () => ({}) };
+    }
+    if (url === `/api/v1/listings/${eventId}/occupancy`) {
+      occupancyRequest = { url, options };
+      return { ok: true, json: async () => ({ ok: true, taken: 3 }) };
+    }
+    throw new Error(`unexpected request ${url}`);
+  } });
+  const card = boardCard(root);
+  const check = card.children.find(node => node.className === 'ru-event-capacity-check');
+  const status = card.children.find(node => node.className === 'ru-listing-event-occupancy');
+  assert.ok(check);
+  assert.equal(occupancyRequest, undefined, 'occupancy is not fetched automatically for every event card');
+  await check.listeners.click();
+  assert.equal(occupancyRequest.url, `/api/v1/listings/${eventId}/occupancy`);
+  assert.equal(occupancyRequest.options.credentials, 'omit');
+  assert.equal(occupancyRequest.options.cache, 'no-store');
+  assert.equal(status.textContent, 'Свободно: 5 из 8 мест.');
+});
