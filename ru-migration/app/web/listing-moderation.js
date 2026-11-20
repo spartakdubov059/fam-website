@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 15067)
-Total output lines: 701
-
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STAFF_ROLES = new Set(['school_admin', 'council_member']);
 
@@ -265,7 +262,124 @@ export async function initializeListingModeration({ document = globalThis.docume
           const personName = person => person ? [person.first_name, person.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ') || `Аккаунт ${person.account_code || ''}` : 'Неизвестно';
           card.append(node(document, 'p', '', `Участник: ${personName(report.actor)} · Затронут: ${personName(report.target)}`));
           if (typeof report.evidence_excerpt === 'string') card.append(node(document, 'p', '', `Фрагмент: ${report.evidence_excerpt}`));
-          if (typeof report.source_origin === 'string') card.app…3067 tokens truncated…аничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
+          if (typeof report.source_origin === 'string') card.append(node(document, 'p', '', `Раздел: ${report.source_origin}`));
+          if (typeof report.last_seen === 'string') card.append(node(document, 'p', '', `Последний сигнал: ${new Date(report.last_seen).toLocaleString('ru-RU')}`));
+          card.append(actionButton(document, 'Отметить просмотренным', () => patch('/api/v1/school/admin/safety-reports', {
+            fingerprint: report.fingerprint, category: report.category, source_kind: report.source_kind,
+          })));
+          safetyPanel.append(card);
+        }
+        queue.append(safetyPanel);
+      };
+      const renderPendingMessagesPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const reviewPanel = node(document, 'section', 'ru-moderation-card');
+        reviewPanel.append(node(document, 'h3', '', 'Сообщения на школьной проверке'));
+        if (!pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'Не удалось загрузить сообщения на проверку.'));
+        if (!pendingMessages.length && pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'Сообщений на проверке нет.'));
+        for (const message of pendingMessages) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'p', '', `Отправитель · ${message.sender_id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', '', message.body));
+          if (typeof message.created_at === 'string') card.append(node(document, 'p', '', `Получено: ${new Date(message.created_at).toLocaleString('ru-RU')}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          actions.append(actionButton(document, 'Одобрить и доставить', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'approve' })));
+          actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'reject' })));
+          card.append(actions); reviewPanel.append(card);
+        }
+        queue.append(reviewPanel);
+      };
+      const renderTechnicalAlertsPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const alertsPanel = node(document, 'section', 'ru-moderation-card');
+        alertsPanel.append(node(document, 'h3', '', 'Технические предупреждения FAM за сутки'));
+        alertsPanel.append(node(document, 'p', '', 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.'));
+        if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Не удалось загрузить технические предупреждения.'));
+        if (siteErrorDigest) {
+          alertsPanel.append(node(document, 'h4', '', 'Последняя фоновая сводка'));
+          alertsPanel.append(node(document, 'p', '', siteErrorDigest.summary));
+          alertsPanel.append(node(document, 'p', 'ru-note', `Интервал UTC: ${siteErrorDigest.digest_slot} · создано ${new Date(siteErrorDigest.generated_at).toLocaleString('ru-RU')}`));
+        }
+        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Пороговых повторяющихся сбоев не обнаружено.'));
+        const codeNames = { js_runtime: 'Ошибка интерфейса', unhandled_rejection: 'Сбой фоновой операции', supabase_sdk_unavailable: 'Служба данных недоступна',
+          listings_load_failed: 'Не загрузились объявления', notifications_load_failed: 'Не загрузились уведомления',
+          database_request_failed: 'Ошибка базы данных', auth_backend_failed: 'Ошибка входа' };
+        const areaNames = { auth: 'вход', listings: 'объявления', notifications: 'уведомления', database: 'база данных', other: 'другое' };
+        for (const alert of technicalAlerts) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          card.append(node(document, 'h4', '', `${alert.severity === 'critical' ? 'Критический сбой' : 'Предупреждение'} · ${codeNames[alert.event_code]}`));
+          card.append(node(document, 'p', '', `Раздел: ${areaNames[alert.page_area]} · Событий за час: ${alert.event_count}`));
+          card.append(node(document, 'p', '', `Час UTC: ${new Date(alert.hour_bucket).toLocaleString('ru-RU', { timeZone: 'UTC' })}`));
+          alertsPanel.append(card);
+        }
+        queue.append(alertsPanel);
+      };
+      const renderSchoolOverviewPanel = () => {
+        if (me.profile.role !== 'school_admin') return;
+        const overview = node(document, 'section', 'ru-moderation-card');
+        overview.append(node(document, 'h3', '', 'Обзор школы'));
+        if (!schoolOverviewAvailable) {
+          overview.append(node(document, 'p', '', 'Не удалось загрузить обзор школы. Повторите попытку позже.'));
+          queue.append(overview);
+          return;
+        }
+        const users = schoolOverviewResult.users.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member', 'school_admin'].includes(item.role));
+        const listings = schoolOverviewResult.listings.filter(item => item && UUID.test(item.id || '')
+          && ['active', 'pending', 'rejected', 'removed'].includes(item.status));
+        const deletionRequests = schoolOverviewResult.deletion_requests.filter(item => item && UUID.test(item.id || '')
+          && ['student', 'council_member'].includes(item.target_role) && ['pending', 'processing'].includes(item.status));
+        const suspensions = schoolOverviewResult.suspensions.filter(item => item && UUID.test(item.target_id || '')
+          && ['student', 'council_member'].includes(item.target_role));
+        overview.append(node(document, 'p', '', `В выборке: активных профилей — ${users.length}, активных публикаций — ${listings.filter(item => item.status === 'active').length}, ожидают проверки — ${listings.filter(item => item.status === 'pending').length}, заявок на удаление — ${deletionRequests.length}, ограничений — ${suspensions.length}.`));
+        overview.append(node(document, 'p', '', 'Список ограничен последними 100 профилями и публикациями, 50 заявками и 100 ограничениями.'));
+        const accounts = node(document, 'section', 'ru-school-account-list');
+        accounts.append(node(document, 'h4', '', 'Аккаунты школы'));
+        accounts.append(node(document, 'p', 'ru-note', 'Список показывает до 100 активных профилей. Удалить можно аккаунт ученика или Совета; перед удалением нужно подтвердить действие через Яндекс ID.'));
+        const roleNames = { student: 'Ученик', council_member: 'Участник Ученического совета', school_admin: 'Администратор школы' };
+        for (const account of users) {
+          const card = node(document, 'article', 'ru-school-account-card');
+          const name = [account.first_name, account.last_name]
+            .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || 'Аккаунт участника';
+          card.append(node(document, 'b', '', name));
+          card.append(node(document, 'p', '', `Класс: ${typeof account.class_name === 'string' && account.class_name.trim() ? account.class_name.trim() : 'не указан'} · ${roleNames[account.role]} · аккаунт #${account.id.slice(-6).toUpperCase()}`));
+          card.append(node(document, 'p', 'ru-note', `Публикаций в выборке: ${listings.filter(item => item.user_id === account.id).length}.`));
+          if (['student', 'council_member'].includes(account.role)
+              && account.id.toLowerCase() !== String(me.profile.id || '').toLowerCase()) {
+            card.append(actionButton(document, 'Удалить аккаунт', () => deleteSchoolAccount(account)));
+          }
+          accounts.append(card);
+        }
+        if (!users.length) accounts.append(node(document, 'p', '', 'Активные профили школы не найдены.'));
+        overview.append(accounts);
+        const actionNames = { role_revoked: 'Снята школьная роль', account_deleted: 'Удалён аккаунт по решению школы',
+          account_deleted_by_admin: 'Удалён аккаунт администратором', listing_deleted: 'Удалено объявление',
+          issued: 'Выдано временное ограничение', lifted: 'Снято временное ограничение',
+          idea_text_approved: 'Одобрен текст школьной идеи', idea_text_rejected: 'Отклонён текст школьной идеи',
+          message_approved: 'Одобрена доставка сообщения', message_rejected: 'Отклонено сообщение' };
+        const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
+          && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);
+        overview.append(node(document, 'h4', '', 'Последние действия школы'));
+        if (!audit.length) overview.append(node(document, 'p', '', 'Записанных действий пока нет.'));
+        for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} · ${new Date(item.created_at).toLocaleString('ru-RU')}`));
+        queue.append(overview);
+      };
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0) {
+        renderPendingMessagesPanel();
+        renderSchoolIdeasPanel();
+        renderSafetyPanel();
+        renderTechnicalAlertsPanel();
+        renderSchoolOverviewPanel();
+        if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
+        status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
+          : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
+            : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
+                : !schoolIdeasAvailable ? 'Очереди проверки пусты, но не удалось загрузить школьные идеи.'
+              : !technicalAlertsAvailable ? 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.'
+              : 'Очереди школьной проверки пусты.';
+        return;
+      }
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
