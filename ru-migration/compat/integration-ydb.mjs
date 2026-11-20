@@ -512,8 +512,8 @@ try {
     await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
       school_id: 'synthetic-school', body: `Синтетическое сообщение ${index}` });
   }
-  await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-    school_id: 'synthetic-school', body: 'Девятое синтетическое сообщение' }), error => error.code === 'rate_limited');
+  assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+    school_id: 'synthetic-school', body: 'Девятое синтетическое сообщение' }), { ok: false, code: 'rate_limited' });
   const messageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
     WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
   assert.equal(messageQuota?.[0]?.[0]?.submission_count, 8, 'direct messages enforce the eight-per-minute bucket');
