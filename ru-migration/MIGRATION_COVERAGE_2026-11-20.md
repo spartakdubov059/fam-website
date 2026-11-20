@@ -8,7 +8,7 @@
 - В репозитории есть синтетический CI для YDB schema `01`–`33` и backend suite. Последние известные успешные CI записаны в [VALIDATION_2026-11-20_CI.md](VALIDATION_2026-11-20_CI.md); они доказывают только покрытые там сценарии.
 - Семь актуальных/заменённых cron-заданий разобраны отдельно в [CRON_PORTING.md](CRON_PORTING.md). Ни один RU timer не устанавливается автоматически.
 - Ограниченный SQL crosswalk последних 9 миграций находится в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md); актуальный инвентарь всех 7 Edge Function entrypoints и их различий — в [EDGE_FUNCTION_COVERAGE_2026-11-20.md](EDGE_FUNCTION_COVERAGE_2026-11-20.md). Эти документы не заменяют аудит полного исходного набора migrations и runtime parity.
-- Ещё 9 upstream migration-файлов, появившихся после базового RU снимка, сопоставлены с текущими schema/API/tests в [SOURCE_PARITY_UPDATE_2026-11-20.md](SOURCE_PARITY_UPDATE_2026-11-20.md); облачные роли, полный SQL/RLS audit и staging там отмечены как незакрытые.
+- Ещё 12 upstream migration-файлов, появившихся после базового RU снимка, сопоставлены с текущими schema/API/tests в [SOURCE_PARITY_UPDATE_2026-11-20.md](SOURCE_PARITY_UPDATE_2026-11-20.md); облачные роли, полный SQL/RLS audit и staging там отмечены как незакрытые.
 
 ## Части, которые нельзя считать перенесёнными целиком
 
