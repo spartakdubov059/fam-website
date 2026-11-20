@@ -30,6 +30,27 @@ test('safe task enqueue is idempotent and accepts only fixed task types and UTC 
   await assert.rejects(queue.enqueueSafeTask('queue_health_check', '2026-11-20T03:07'), /safe agent task/);
 });
 
+test('coder producer creates only one bounded task from allowlisted aggregate events', async () => {
+  let inserted = false;
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('SELECT status FROM fam_agent_tasks')) return inserted ? [[{ status: 'blocked' }]] : [[]];
+    if (query.includes("task_type = 'coder_patch_request'")) return inserted ? [[{ id: '33333333-3333-4333-8333-333333333333' }]] : [[]];
+    if (query.includes('SUM(event_count)')) return [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 4 }]];
+    if (query.includes('INSERT INTO fam_agent_tasks') && query.includes('VALUES')) inserted = true;
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  const first = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+  const second = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(first.task_key, 'audit_frontend_runtime');
+  const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks') && call.query.includes('VALUES'));
+  assert.ok(insert);
+  assert.match(insert.query, /payload_json/);
+  await assert.rejects(queue.enqueueSafeCoderTask('2026-11-20T03:11'), /coder slot/);
+});
+
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {
   const { sql, calls } = fakeSql(() => [[]]);
   const queue = createYdbAgentTaskQueue(sql);

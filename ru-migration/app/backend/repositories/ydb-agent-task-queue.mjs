@@ -6,6 +6,11 @@ const TASKS = Object.freeze({
   system_health_check: { agent: 'technical', title: 'Проверка состояния FAM', description: 'Проверить только служебное состояние backend и расписаний.' },
   site_error_digest: { agent: 'technical', title: 'Сводка технических ошибок FAM', description: 'Собрать только разрешённые агрегаты клиентских ошибок.' },
 });
+const CODER_EVENT_CODES = Object.freeze({
+  js_runtime: 'audit_frontend_runtime',
+  unhandled_rejection: 'audit_frontend_runtime',
+  listings_load_failed: 'audit_client_resilience',
+});
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = 'fam-ru-safe-worker-v1';
 
@@ -43,6 +48,39 @@ export function createYdbAgentTaskQueue(sql) {
         await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
           VALUES (${randomUUID()}, ${id}, 'created', ${WORKER_ID}, 'Создана безопасная задача с агрегированными данными.', CurrentUtcTimestamp());`;
         return { created: true, status: 'queued', id };
+      });
+    },
+
+    async enqueueSafeCoderTask(slot) {
+      if (!isUtcSlot(slot)) throw new TypeError('invalid safe coder slot');
+      return sql.begin(async tx => {
+        const taskId = deterministicId('coder_patch_request', slot);
+        const prior = await tx`SELECT status FROM fam_agent_tasks WHERE id = ${taskId} LIMIT 1;`;
+        if (prior?.[0]?.[0]) return { created: false, reason: 'already_processed', id: taskId };
+        const active = await tx`SELECT id FROM fam_agent_tasks WHERE agent_key = 'technical'
+          AND task_type = 'coder_patch_request' AND status IN ('queued', 'claimed', 'in_progress') LIMIT 1;`;
+        if (active?.[0]?.[0]) return { created: false, id: active[0][0].id };
+        const rows = await tx`SELECT event_code, page_area, SUM(event_count) AS occurrences
+          FROM fam_site_error_counts
+          WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
+            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed')
+          GROUP BY event_code, page_area ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
+        const event = rows?.[0]?.[0];
+        if (!event || !Object.hasOwn(CODER_EVENT_CODES, event.event_code)) return { created: false, reason: 'no_threshold_event' };
+        const occurrences = Math.min(1000, Math.max(0, Number(event.occurrences)));
+        if (!Number.isSafeInteger(occurrences) || occurrences < 3) return { created: false, reason: 'no_threshold_event' };
+        await tx`INSERT INTO fam_agent_tasks
+          (id, agent_key, task_type, title, description, priority, status, source, approval_required,
+            payload_json, result_summary, attempt_count, max_attempts, available_at, claim_token,
+            claimed_by, claimed_at, lease_expires_at, started_at, finished_at, created_at, updated_at)
+          VALUES (${taskId}, 'technical', 'coder_patch_request', 'Безопасный анализ технического события FAM',
+            'Автоматический анализ отключён. Требуется ручная проверка агрегированной категории.', 'normal', 'queued',
+            'scheduled_audit', false, '{}', NULL, Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(1 AS Uint32)),
+            CurrentUtcTimestamp(), NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${taskId}, 'created', ${WORKER_ID},
+            'Создана задача ручной проверки по агрегированной категории; автоматические инструменты отключены.', CurrentUtcTimestamp());`;
+        return { created: true, id: taskId, task_key: CODER_EVENT_CODES[event.event_code] };
       });
     },
 

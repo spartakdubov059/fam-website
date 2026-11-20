@@ -17,7 +17,7 @@ import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
 import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs';
-import { createScheduledSafeAgentRunner } from './services/scheduled-safe-agent-runner.mjs';
+import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from './services/scheduled-safe-agent-runner.mjs';
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
@@ -117,6 +117,9 @@ export async function createRuntime(env = process.env) {
     },
   } });
   const runSafeAgentWorker = createScheduledSafeAgentRunner({ queue: agentTaskQueue, worker: processSafeAgentTasks });
+  const enqueueSafeCoderTask = createScheduledCoderTaskProducer({ repository: {
+    enqueueSafeCoderTask: slot => agentTaskQueue.enqueueSafeCoderTask(slot),
+  } });
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
   const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages, safetyKey }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
@@ -138,6 +141,7 @@ export async function createRuntime(env = process.env) {
     agentTaskQueue,
     processSafeAgentTasks,
     runSafeAgentWorker,
+    enqueueSafeCoderTask,
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };
