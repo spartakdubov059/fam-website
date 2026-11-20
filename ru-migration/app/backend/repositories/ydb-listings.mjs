@@ -1166,6 +1166,21 @@ export function createYdbListingsRepository(sql) {
       }));
     },
 
+    async listOwnIdeas(userId, schoolId) {
+      if (!UUID.test(userId || '') || typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid own idea lookup');
+      const statement = sql`SELECT id, text, image_status, ai_status, admin_status, created_at
+        FROM fam_ideas WHERE user_id = ${userId} AND school_id = ${schoolId}
+        ORDER BY created_at DESC LIMIT 50;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const ideas = (await statement)?.[0] ?? [];
+      return Promise.all(ideas.map(async idea => {
+        const images = await sql`SELECT image_index FROM fam_idea_images
+          WHERE idea_id = ${idea.id} AND user_id = ${userId} AND school_id = ${schoolId}
+          ORDER BY image_index ASC LIMIT 3;`;
+        return { ...idea, image_count: (images?.[0] ?? []).length };
+      }));
+    },
+
     async getSchoolIdeaImage(ideaId, imageIndex) {
       if (!UUID.test(ideaId || '') || !Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > 2) throw new TypeError('invalid idea image lookup');
       const statement = sql`SELECT user_id, school_id, image_status FROM fam_ideas WHERE id = ${ideaId} LIMIT 1;`;
