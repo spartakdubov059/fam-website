@@ -26,7 +26,7 @@ function api({ authenticated = identity, resolvedActor = actor, repository = {},
   return createAccountDeletionApi({
     authenticate: async () => authenticated,
     resolveActor: async () => resolvedActor,
-    repository,
+    repository: { getActiveAccountSuspension: async () => null, ...repository },
     pendingImages,
     now: () => clock,
   });
@@ -78,6 +78,30 @@ test('last school administrator cannot delete the account', async () => {
     restoreAccountAfterDeletionFailure: async () => true,
   }, pendingImages: { listUserObjects: async () => [], delete: async () => {} } });
   assert.deepEqual(await handler(request()), { status: 409, body: { ok: false, error: 'last_school_admin' } });
+});
+
+test('suspension blocks school-admin deletion actions but preserves self-deletion', async () => {
+  let destructiveCalls = 0;
+  const repository = {
+    getActiveAccountSuspension: async () => ({ reason: 'test', expires_at: '2099-01-01T00:00:00Z' }),
+    beginAccountDeletion: async () => { destructiveCalls++; return { ok: true, school_id: actor.school_id, claim_token: 'self-claim' }; },
+    beginAdminAccountDeletion: async () => { destructiveCalls++; return { ok: true }; },
+    beginRequestedAccountDeletion: async () => { destructiveCalls++; return { ok: true }; },
+    finishAccountDeletion: async () => { destructiveCalls++; return { ok: true, deleted: true }; },
+    restoreAccountAfterDeletionFailure: async () => true,
+    restoreRequestedAccountDeletion: async () => true,
+  };
+  const suspendedAdmin = { ...actor, role: 'school_admin' };
+  const images = { listUserObjects: async () => [], delete: async () => {} };
+  const adminDelete = await api({ resolvedActor: suspendedAdmin, repository, pendingImages: images })(adminDeleteRequest());
+  const review = await api({ resolvedActor: suspendedAdmin, repository, pendingImages: images })(reviewRequest({ decision: 'reject' }));
+  assert.deepEqual(adminDelete, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(review, adminDelete);
+  assert.equal(destructiveCalls, 0);
+
+  const selfDelete = await api({ repository, pendingImages: images })(request());
+  assert.equal(selfDelete.status, 200, 'an account owner can still delete their own account while suspended');
+  assert.equal(destructiveCalls, 2);
 });
 
 test('inventory failure before storage deletion restores the profile', async () => {

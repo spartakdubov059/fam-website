@@ -298,6 +298,7 @@ test('only the same-school school administrator can read pending account deletio
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
     resolveActor: async () => actor,
     repository: {
+      getActiveAccountSuspension: async () => null,
       listPendingAccountDeletionRequests: async school => { selectedSchool = school; return [{ request_id: requestId, reason: 'synthetic' }]; },
       rejectAccountDeletionRequest: async (...args) => { rejected = args; return args[1] === actor.school_id; },
     } });
@@ -316,6 +317,20 @@ test('only the same-school school administrator can read pending account deletio
   assert.equal((await handler(request)).status, 403);
   const councilPatch = req({ decision: 'reject', review_note: 'Проверено' }, 'PATCH'); councilPatch.url = `/api/v1/deletion-requests/${requestId}`;
   assert.equal((await handler(councilPatch)).status, 403);
+});
+test('a suspended school administrator cannot reject school account deletion requests', async () => {
+  let rejected = 0;
+  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
+    resolveActor: async () => ({ id: 'admin-id', school_id: 'school-a', role: 'school_admin' }),
+    repository: {
+      getActiveAccountSuspension: async () => ({ reason: 'test', expires_at: '2099-01-01T00:00:00Z' }),
+      rejectAccountDeletionRequest: async () => { rejected++; return true; },
+    } });
+  const patch = req({ decision: 'reject', review_note: 'Проверено' }, 'PATCH');
+  patch.url = `/api/v1/deletion-requests/${requestId}`;
+  assert.deepEqual(await handler(patch), { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.equal(rejected, 0);
 });
 test('council members can read only their own school-scoped deletion request history', async () => {
   let args;

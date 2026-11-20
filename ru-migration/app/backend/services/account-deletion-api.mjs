@@ -35,6 +35,16 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
     let actor;
     try { actor = await resolveActor(identity); } catch { actor = null; }
     if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+    if (adminDeletion || (req.method === 'PATCH' && reviewMatch)) {
+      if (typeof repository?.getActiveAccountSuspension !== 'function') {
+        return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+      }
+      try {
+        if (await repository.getActiveAccountSuspension(actor.school_id, actor.id)) {
+          return { status: 403, body: { ok: false, error: 'account_suspended' } };
+        }
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     const parsed = await readJson(req);
     if (parsed.error) return { status: parsed.error === 'request_too_large' ? 413 : 400, body: { ok: false, error: parsed.error } };
     if (adminDeletion) {
