@@ -198,3 +198,11 @@
 - [SDK/Sharp CI #44795219430](https://github.com/spartakdubov059/fam-website/actions/runs/44795219430): success, **383/383 backend/UI tests**, pinned SDK/Sharp и 8 systemd timer-файлов.
 - [Disposable YDB CI #44795219480](https://github.com/spartakdubov059/fam-website/actions/runs/44795219480): success; synthetic integration и cleanup. Ни облачные ресурсы, ни реальные данные не использовались.
 - Визуальное объединение типов карточек в одну сетку исходной Afisha остаётся незавершённым.
+
+
+## Индексы школьных workflow — 20 ноября 2026
+
+- На code commit [fd5b251](https://github.com/spartakdubov059/fam-website/commit/fd5b25138c579fb0297902d9570dad4dd9598b19) в `schema/29_fk_lookup_indexes.yql` добавлены 9 GLOBAL secondary indexes по найденным RU-полям заявок, блокировок и административного аудита. Индекс source `account_suspensions.target_id` уже покрывается ведущим полем RU primary key `(target_id, suspension_id)`.
+- Точный [Disposable YDB CI #44799171636](https://github.com/spartakdubov059/fam-website/actions/runs/44799171636) успешно применил весь schema bundle и прошёл synthetic repository integration; временная база удалена.
+- [SDK/Sharp CI #44799171773](https://github.com/spartakdubov059/fam-website/actions/runs/44799171773) завершился успешно: 383/383 backend/UI tests, pinned SDK, Sharp/WebP и timer checks.
+- Проверено применение DDL, но не `EXPLAIN`-планы реальных RU запросов, selection planner или нагрузка на read/write units в Yandex Cloud. Облачные индексы не создавались.
