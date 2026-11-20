@@ -17,6 +17,7 @@ function fixture() {
   const nodes = new Map([
     ['ruTabbar', { querySelectorAll: () => buttons }],
     ['publicListings', new Node('publicListings')],
+    ['ruAfishaFeed', new Node('ruAfishaFeed')],
     ['ruPulse', new Node('ruPulse')],
     ['ruBoardCategoryAfisha', new Node('ruBoardCategoryAfisha')],
     ['ruOpenMessages', new Node('ruOpenMessages')],
@@ -34,7 +35,7 @@ test('mobile Afisha navigation selects events and opens the combined school feed
   initializeNavigation({ document: f.document });
   f.buttons[1].listeners.click();
   assert.equal(f.nodes.get('ruBoardCategoryAfisha').clicked, 1);
-  assert.deepEqual(f.nodes.get('ruPulse').scrolled, { behavior: 'smooth', block: 'start' });
+  assert.deepEqual(f.nodes.get('ruAfishaFeed').scrolled, { behavior: 'smooth', block: 'start' });
   assert.equal(f.buttons[1].getAttribute('aria-pressed'), 'true');
   assert.equal(f.buttons[0].getAttribute('aria-pressed'), 'false');
 });
