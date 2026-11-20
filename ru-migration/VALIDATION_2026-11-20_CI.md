@@ -1,5 +1,13 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Перепроверка после обновления карты исходника
+
+- Текущая карта ancestry и 9 миграций/6 Edge Function изменений зафиксирована в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md); она уточняет предыдущую узкую сверку в `SOURCE_SYNC_2026-11-20.md`.
+- На чистом изолированном checkout feature-ветки запущен Node `v22.23.5` (диапазон package: `>=22.15 <23`): `npm test --prefix ru-migration/app/backend` — **331/331 passed**.
+- `node ru-migration/compat/verify.mjs` вывел `SDK_COMPAT_PASS`; `node ru-migration/compat/verify-systemd-timers.mjs` проверил 7 timer-файлов; `git diff --check` прошёл.
+- Документальный commit [`7287907`](https://github.com/spartakdubov059/fam-website/commit/7287907e02eea46b26615eb0088f983ebb22c238) добавляет crosswalk и не меняет код. Для него новые GitHub CI workflow не запускались; предшествующие зелёные CI относятся к кодовому commit [`fb1f3d2`](https://github.com/spartakdubov059/fam-website/commit/fb1f3d2abc7c739b5d55d65e88fda376e85fb4fc).
+- Повторные GitHub refs после обновления: `main` `5e749c56`, `migration/yandex-cloud` `2795f05a`, feature `7287907e`. Первые две ветки не изменены. Это не облачный staging и не полный security review.
+
 ## Перенос безопасного coder producer в feature branch
 
 - Коммит [`f611526`](https://github.com/spartakdubov059/fam-website/commit/f6115268a5d914c5f79970a0e42a99e184a2f00b) добавил RU producer для постановки ручной проверки только по агрегированным allowlisted событиям. Модель и инструменты не запускаются; задача не входит в автоматический allowlist worker.
