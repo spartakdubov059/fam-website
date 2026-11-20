@@ -1,13 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initializeSchoolPulse } from '../../web/pulse.js';
+import { initializeHeroCarousel } from '../../web/hero-carousel.js';
 
 class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.value = ''; this.hidden = false; }
+  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.value = ''; this.hidden = false; this.offsetLeft = 0; this.scrollLeft = 0; this.classList = { toggle() {} }; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
+  dispatchEvent(event) { this.listeners[event.type]?.(event); }
+  querySelector() { return null; }
+  scrollTo({ left }) { this.scrollLeft = left; }
 }
 function fixture({ withHero = false } = {}) {
   const root = new FakeNode('section');
@@ -141,6 +145,8 @@ test('poll vote distribution is shown only to voters or after the poll closes', 
 
 test('featured school cards join the hero carousel and preserve poll voting handlers', async () => {
   const f = fixture({ withHero: true }); let voted = false;
+  initializeHeroCarousel({ document: f.document });
+  assert.equal(f.dots.children.length, 2);
   await initializeSchoolPulse({ ...f, fetchImpl: async url => {
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student', school_id: 'school-a', role: 'student' } }) };
     if (url === '/api/v1/pulse/polls/poll-a/votes') { voted = true; return { ok: true, status: 201, json: async () => ({ ok: true }) }; }
@@ -151,6 +157,7 @@ test('featured school cards join the hero carousel and preserve poll voting hand
   } });
 
   assert.equal(f.track.children.length, 4);
+  assert.equal(f.dots.children.length, 4, 'carousel navigation matches the newly featured cards');
   assert.equal(f.track.children[0].className.includes('hero-pulse-important'), true);
   assert.equal(f.track.children[1].className.includes('hero-pulse-poll'), true);
   assert.equal(f.root.children[2].children.length, 0, 'featured cards move out of the separate feed');
