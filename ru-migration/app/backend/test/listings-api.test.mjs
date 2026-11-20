@@ -951,6 +951,26 @@ test('idea text moderation requires school staff and records a decision only thr
   assert.equal((await handler(approve)).status, 403);
 });
 
+test('school idea workflow is same-school staff only and accepts only bounded lifecycle statuses', async () => {
+  const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let actor = { id: 'staff-a', school_id: 'school-a', role: 'council_member' };
+  let update;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
+    repository: { getActiveAccountSuspension: async () => null,
+      listSchoolIdeaWorkflow: async schoolId => [{ id: ideaId, school_id: schoolId, admin_status: 'new' }],
+      updateSchoolIdeaWorkflow: async value => { update = value; return value.schoolId === 'school-a'; } } });
+  const list = req({}, 'GET'); list.url = '/api/v1/school/ideas/workflow';
+  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: ideaId, school_id: 'school-a', admin_status: 'new' }] } });
+  const patch = status => { const request = req({ status }, 'PATCH'); request.url = `/api/v1/school/ideas/workflow/${ideaId}/status`; return request; };
+  assert.deepEqual(await handler(patch('in_progress')), { status: 200, body: { ok: true, admin_status: 'in_progress' } });
+  assert.deepEqual(update, { ideaId, schoolId: 'school-a', reviewerId: 'staff-a', status: 'in_progress' });
+  assert.equal((await handler(patch('new'))).status, 400);
+  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
+  assert.equal((await handler(list)).status, 403);
+  actor = { id: 'staff-b', school_id: 'school-b', role: 'council_member' };
+  assert.deepEqual(await handler(patch('done')), { status: 404, body: { ok: false, error: 'idea_unavailable' } });
+});
+
 test('notification read state is always owned by the authenticated profile and bounded', async () => {
   const actor = { id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' };
   const saved = [];

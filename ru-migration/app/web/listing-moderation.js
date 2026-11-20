@@ -67,7 +67,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse, schoolIdeaWorkflowResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -91,8 +91,9 @@ export async function initializeListingModeration({ document = globalThis.docume
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/overview', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
         fetchImpl('/api/v1/school/ideas', options).catch(() => ({ ok: false, json: async () => null })),
+        fetchImpl('/api/v1/school/ideas/workflow', options).catch(() => ({ ok: false, json: async () => null })),
       ]);
-      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse)]);
+      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult, schoolIdeaWorkflowResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse), json(schoolIdeaWorkflowResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -160,6 +161,9 @@ export async function initializeListingModeration({ document = globalThis.docume
         && ['pending', 'approved', 'rejected'].includes(item.ai_status)
         && Array.isArray(item.image_keys) && item.image_keys.length <= 3
         && ['none', 'pending', 'approved', 'rejected'].includes(item.image_status)) : [];
+      const ideaWorkflowAvailable = schoolIdeaWorkflowResponse.ok && schoolIdeaWorkflowResult?.ok && Array.isArray(schoolIdeaWorkflowResult.ideas);
+      const workflowIdeas = ideaWorkflowAvailable ? schoolIdeaWorkflowResult.ideas.filter(item => item && UUID.test(item.id || '')
+        && typeof item.text === 'string' && item.text.length <= 1000 && ['new', 'in_progress', 'done', 'rejected'].includes(item.admin_status)) : [];
       const renderSchoolIdeasPanel = () => {
         const ideasPanel = node(document, 'section', 'ru-moderation-card');
         ideasPanel.append(node(document, 'h3', '', 'Школьные идеи и фотографии'));
@@ -200,6 +204,24 @@ export async function initializeListingModeration({ document = globalThis.docume
           ideasPanel.append(card);
         }
         queue.append(ideasPanel);
+      };
+      const renderIdeaWorkflowPanel = () => {
+        const workflowPanel = node(document, 'section', 'ru-moderation-card');
+        workflowPanel.append(node(document, 'h3', '', 'Работа с одобренными идеями'));
+        if (!ideaWorkflowAvailable) workflowPanel.append(node(document, 'p', '', 'Не удалось загрузить статусы идей школы.'));
+        else if (!workflowIdeas.length) workflowPanel.append(node(document, 'p', '', 'Одобренных идей пока нет.'));
+        for (const idea of workflowIdeas) {
+          const card = node(document, 'article', 'ru-moderation-card');
+          const labels = { new: 'Новая', in_progress: 'В работе', done: 'Выполнена', rejected: 'Отклонена' };
+          card.append(node(document, 'p', '', idea.text), node(document, 'p', 'ru-note', `Статус: ${labels[idea.admin_status]}`));
+          const actions = node(document, 'div', 'ru-moderation-actions');
+          if (idea.admin_status === 'new') actions.append(actionButton(document, 'Взять в работу', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'in_progress' })));
+          if (idea.admin_status === 'new' || idea.admin_status === 'in_progress') actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'rejected' })));
+          if (idea.admin_status === 'in_progress') actions.append(actionButton(document, 'Отметить выполненной', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'done' })));
+          if (actions.children.length) card.append(actions);
+          workflowPanel.append(card);
+        }
+        queue.append(workflowPanel);
       };
       if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
         const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
@@ -356,6 +378,7 @@ export async function initializeListingModeration({ document = globalThis.docume
           account_deleted_by_admin: 'Удалён аккаунт администратором', listing_deleted: 'Удалено объявление',
           issued: 'Выдано временное ограничение', lifted: 'Снято временное ограничение',
           idea_text_approved: 'Одобрен текст школьной идеи', idea_text_rejected: 'Отклонён текст школьной идеи',
+          idea_workflow_in_progress: 'Идея взята в работу', idea_workflow_done: 'Идея отмечена выполненной', idea_workflow_rejected: 'Идея отклонена',
           message_approved: 'Одобрена доставка сообщения', message_rejected: 'Отклонено сообщение' };
         const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
           && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);
@@ -364,9 +387,10 @@ export async function initializeListingModeration({ document = globalThis.docume
         for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} · ${new Date(item.created_at).toLocaleString('ru-RU')}`));
         queue.append(overview);
       };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0) {
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0 && workflowIdeas.length === 0) {
         renderPendingMessagesPanel();
         renderSchoolIdeasPanel();
+        renderIdeaWorkflowPanel();
         renderSafetyPanel();
         renderTechnicalAlertsPanel();
         renderSchoolOverviewPanel();
@@ -376,10 +400,11 @@ export async function initializeListingModeration({ document = globalThis.docume
             : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
                 : !schoolIdeasAvailable ? 'Очереди проверки пусты, но не удалось загрузить школьные идеи.'
               : !technicalAlertsAvailable ? 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.'
-              : 'Очереди школьной проверки пусты.';
+              : !ideaWorkflowAvailable ? 'Не удалось загрузить школьные идеи.'
+                : 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, статусов школьных идей — ${workflowIdeas.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable && ideaWorkflowAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -478,6 +503,7 @@ export async function initializeListingModeration({ document = globalThis.docume
       }
       renderPendingMessagesPanel();
       renderSchoolIdeasPanel();
+      renderIdeaWorkflowPanel();
       renderSafetyPanel();
       renderTechnicalAlertsPanel();
       renderSchoolOverviewPanel();

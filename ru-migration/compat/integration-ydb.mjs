@@ -507,6 +507,16 @@ try {
   const reviewedIdeaRows = await sql`SELECT ai_status FROM fam_ideas WHERE id = ${idea.id};`;  assert.equal(reviewedIdeaRows[0][0].ai_status, 'approved', 'school review publishes only an explicitly approved pending idea');
   assert.equal((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0][0].action,
     'idea_text_approved', 'school text decisions are auditable without recording the idea text');
+  const ideaWorkflow = await listingsApi(apiRequest('GET', '/api/v1/school/ideas/workflow', 'synthetic-admin'));
+  assert.equal(ideaWorkflow.status, 200);
+  assert.ok(ideaWorkflow.body.ideas.some(item => item.id === idea.id), 'approved school ideas appear in the scoped workflow list');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/workflow/${idea.id}/status`, 'synthetic-admin', { status: 'in_progress' })),
+    { status: 200, body: { ok: true, admin_status: 'in_progress' } });
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/workflow/${idea.id}/status`, 'synthetic-admin', { status: 'done' })),
+    { status: 200, body: { ok: true, admin_status: 'done' } });
+  assert.equal((await sql`SELECT admin_status FROM fam_ideas WHERE id = ${idea.id};`)[0][0].admin_status, 'done');
+  assert.deepEqual(new Set((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0].map(row => row.action)),
+    new Set(['idea_text_approved', 'idea_workflow_in_progress', 'idea_workflow_done']), 'status transitions are audited without storing idea text');
   const linkedListingId = '99999999-9999-4999-8999-999999999999';
   const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
   for (let index = 0; index < 7; index++) {

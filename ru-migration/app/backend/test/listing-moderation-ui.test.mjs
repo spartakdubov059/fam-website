@@ -45,6 +45,7 @@ test('school moderators review same-school pending photos and publish only after
       return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: '<script>unsafe</script>', description: 'Текст', category: 'Учёба', photo_status: 'pending', photo_url: `/api/v1/listings/${id}/photo` }] }) };
     }
     if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
+    if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
     if (url === `/api/v1/listings/${id}/photo`) return { ok: true, json: async () => ({ ok: true }) };
     return { ok: true, json: async () => ({ ok: true, listings: [] }) };
   } });
@@ -59,6 +60,32 @@ test('school moderators review same-school pending photos and publish only after
   assert.equal(decision.init.method, 'PATCH');
   assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
   assert.equal(f.status.textContent, 'Очереди школьной проверки пусты.');
+});
+
+test('school moderation UI moves approved ideas through work and completion statuses', async () => {
+  const f = fixture(); const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; const calls = [];
+  let adminStatus = 'new';
+  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
+    if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: [{ id, text: 'Предложение школы', admin_status: adminStatus }] }) };
+    if (url === `/api/v1/school/ideas/workflow/${id}/status` && init.method === 'PATCH') {
+      adminStatus = JSON.parse(init.body).status; return { ok: true, json: async () => ({ ok: true, admin_status: adminStatus }) };
+    }
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
+    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
+    return { ok: true, json: async () => ({ ok: true, requests: [], targets: [], suspensions: [], reports: [], alerts: [], messages: [], users: [], audit: [], deletion_requests: [] }) };
+  } });
+  const panel = f.queue.children.find(item => item.children[0]?.textContent === 'Работа с одобренными идеями');
+  assert.ok(panel, `workflow panel missing: ${f.status.textContent}; panels=${f.queue.children.map(item => item.children[0]?.textContent).join('|')}`);
+  assert.deepEqual(panel.children[1].children.at(-1).children.map(button => button.textContent), ['Взять в работу', 'Отклонить']);
+  await panel.children[1].children.at(-1).children[0].listeners.click();
+  const update = calls.find(call => call.url.endsWith('/status'));
+  assert.deepEqual(JSON.parse(update.init.body), { status: 'in_progress' });
+  const updatedPanel = f.queue.children.find(item => item.children[0]?.textContent === 'Работа с одобренными идеями');
+  assert.deepEqual(updatedPanel.children[1].children.at(-1).children.map(button => button.textContent), ['Отклонить', 'Отметить выполненной']);
 });
 
 test('school moderators can inspect and decide idea photos without rendering user text as HTML', async () => {

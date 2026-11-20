@@ -69,6 +69,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const staffVerificationMatch = pathname.match(/^\/api\/v1\/staff-verifications\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images$/i);
     const schoolIdeaTextReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    const schoolIdeaWorkflowMatch = pathname.match(/^\/api\/v1\/school\/ideas\/workflow\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/status$/i);
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
@@ -584,6 +585,35 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.listPendingSchoolIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
       try { return { status: 200, body: { ok: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/school/ideas/workflow') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listSchoolIdeaWorkflow !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try { return { status: 200, body: { ok: true, ideas: await repository.listSchoolIdeaWorkflow(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && schoolIdeaWorkflowMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['in_progress', 'done', 'rejected'].includes(input?.status)) return { status: 400, body: { ok: false, error: 'invalid_status' } };
+      if (typeof repository?.updateSchoolIdeaWorkflow !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const changed = await repository.updateSchoolIdeaWorkflow({ ideaId: schoolIdeaWorkflowMatch[1], schoolId: actor.school_id, reviewerId: actor.id, status: input.status });
+        return changed ? { status: 200, body: { ok: true, admin_status: input.status } }
+          : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'PATCH' && schoolIdeaImageReviewMatch) {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }

@@ -342,6 +342,35 @@ test('school idea text review is same-school, excludes self review and audits a 
   assert.ok(!audit.values.includes('Синтетическая идея'));
 });
 
+test('school idea workflow lists only approved same-school ideas and permits only valid status transitions', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => { calls.push({ text: strings.join('?'), values }); return [[{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new' }]]; };
+  const listed = await createYdbListingsRepository(sql).listSchoolIdeaWorkflow('school-a');
+  assert.deepEqual(listed, [{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new' }]);
+  assert.match(calls[0].text, /school_id = \?/);
+  assert.match(calls[0].text, /ai_status = 'approved'/);
+  assert.ok(!calls[0].text.includes('user_id'));
+
+  const txCalls = [];
+  let currentStatus = 'new';
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); txCalls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('FROM fam_ideas')) return [[{ admin_status: currentStatus }]];
+    if (text.includes('UPDATE fam_ideas')) { currentStatus = values[0]; return [[]]; }
+    return [[]];
+  };
+  const transactionalSql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(transactionalSql);
+  const input = { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', status: 'in_progress' };
+  assert.equal(await repo.updateSchoolIdeaWorkflow(input), true);
+  assert.equal(currentStatus, 'in_progress');
+  assert.ok(txCalls.some(call => call.values.includes('idea_workflow_in_progress')));
+  assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'done' }), true);
+  assert.equal(currentStatus, 'done');
+  assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'rejected' }), false, 'terminal ideas cannot be re-opened');
+});
+
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

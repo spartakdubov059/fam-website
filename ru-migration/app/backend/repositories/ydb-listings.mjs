@@ -1166,6 +1166,36 @@ export function createYdbListingsRepository(sql) {
       }));
     },
 
+    async listSchoolIdeaWorkflow(schoolId) {
+      if (typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid idea workflow school');
+      const statement = sql`SELECT id, text, admin_status, created_at
+        FROM fam_ideas WHERE school_id = ${schoolId} AND ai_status = 'approved'
+        ORDER BY created_at DESC LIMIT 200;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0] ?? [];
+    },
+
+    async updateSchoolIdeaWorkflow({ ideaId, schoolId, reviewerId, status }) {
+      if (!UUID.test(ideaId || '') || typeof schoolId !== 'string' || !schoolId || !UUID.test(reviewerId || '')
+          || !['in_progress', 'done', 'rejected'].includes(status)) throw new TypeError('invalid idea workflow update');
+      return sql.begin(async tx => {
+        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewers?.[0]?.[0];
+        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
+        const rows = await tx`SELECT admin_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'approved' LIMIT 1;`;
+        const idea = rows?.[0]?.[0];
+        const allowed = idea?.admin_status === 'new' ? ['in_progress', 'rejected']
+          : idea?.admin_status === 'in_progress' ? ['done', 'rejected'] : [];
+        if (!idea || !allowed.includes(status)) return false;
+        await tx`UPDATE fam_ideas SET admin_status = ${status}
+          WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'approved' AND admin_status = ${idea.admin_status};`;
+        await tx`INSERT INTO fam_school_content_audit
+          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${ideaId}, 'idea', ${`idea_workflow_${status}`}, '{}', CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
     async listOwnIdeas(userId, schoolId) {
       if (!UUID.test(userId || '') || typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid own idea lookup');
       const statement = sql`SELECT id, text, image_status, ai_status, admin_status, created_at
