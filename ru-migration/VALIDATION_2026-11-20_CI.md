@@ -91,3 +91,9 @@
 - При удалении аккаунта очищаются приватные строки очереди аватаров, уведомления и квоты. В школьном аудите ID автора заменяется постоянной меткой; в safety-записях удаляются actor/target, origin и выдержка текста, а агрегированный fingerprint остаётся для школьной статистики.
 - Точная ревизия `e64fbc23490ae665af06ef1b8a0e2b24e1070b50`: backend suite **365/365** в detached checkout; [SDK/Sharp CI #44775225474](https://github.com/spartakdubov059/fam-website/actions/runs/44775225474) и [одноразовая YDB CI #44775225712](https://github.com/spartakdubov059/fam-website/actions/runs/44775225712) — success.
 - Проверка охватывает этот путь удаления; полный аудит миграции, auth staging и паритет всех исходных функций по-прежнему не подтверждены.
+
+## Дополнение: синтетическая YDB-проверка удаления, 20 ноября 2026
+
+- Disposable YDB сценарий расширен: перед удалением создаются pending-аватар, уведомление, квота, audit и safety incident. Интеграция проверяет удаление приватных ключей и пользовательских строк, замену actor в аудите и очистку прямой attribution/evidence в safety-записи.
+- Точная ревизия `233debf762855d79bacbc22109846f98645d1dc0`: [YDB CI #44775812119](https://github.com/spartakdubov059/fam-website/actions/runs/44775812119) — success, disposable DB cleanup выполнен; [SDK/Sharp CI #44775812071](https://github.com/spartakdubov059/fam-website/actions/runs/44775812071) — success. Detached backend suite на той же вершине: **365/365**, без skipped.
+- Это проверяет перечисленные synthetic deletion flows, но не все Supabase RLS/RPC/triggers или полноценный российский cloud staging.
