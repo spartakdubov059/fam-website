@@ -9,6 +9,7 @@ const job = { user_id: userId, issuer: 'https://issuer.example', subject: 'synth
 test('manual recovery re-lists owner media, deletes it and finalizes the leased job', async () => {
   const calls = [];
   const result = await recoverIncompleteAccountDeletions({ repository: {
+    listAccountMediaKeys: async () => [],
     claimIncompleteAccountDeletions: async limit => { calls.push(['claim', limit]); return [job]; },
     finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true }; },
   }, pendingImages: {
@@ -23,6 +24,7 @@ test('manual recovery re-lists owner media, deletes it and finalizes the leased 
 test('manual recovery leaves the durable job for retry when inventory contains another owner key', async () => {
   let deleted = false; let finished = false;
   const result = await recoverIncompleteAccountDeletions({ repository: {
+    listAccountMediaKeys: async () => [],
     claimIncompleteAccountDeletions: async () => [job],
     finishAccountDeletion: async () => { finished = true; return { ok: true }; },
   }, pendingImages: {
