@@ -15,6 +15,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const feed = node(document, 'div', 'ru-pulse-feed');
   root.replaceChildren(heading, status, feed);
+  let featuredCards = [];
 
   const request = async (path, init = {}) => {
     const response = await fetchImpl(path, { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json', ...(init.headers || {}) }, ...init });
@@ -28,22 +29,17 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
   function publishFeaturedPulseCards() {
     const track = document.getElementById('ruHeroTrack');
     if (!track || typeof track.replaceChildren !== 'function') return;
-    const cards = [...feed.children].filter(card => String(card.className || '').split(/\s+/).includes('ru-pulse-card'));
-    const slides = cards.map((card, index) => {
-      const cardClasses = String(card.className || '').split(/\s+/);
-      const type = cardClasses.includes('ru-pulse-event') ? 'event'
-        : cardClasses.includes('ru-pulse-important') ? 'important'
-          : cardClasses.includes('ru-pulse-poll') ? 'poll' : 'news';
+    const slides = featuredCards.map(({ type, item }, index) => {
       const slide = node(document, 'div', `hero-slide hero-pulse-slide hero-pulse-${type} ru-pulse-generated`);
       slide.setAttribute('role', 'group');
       slide.setAttribute('aria-roledescription', 'слайд');
       slide.setAttribute('aria-label', `Школьная лента, слайд ${index + 1}`);
-      slide.append(card);
+      if (type === 'poll') renderPoll(item, slide);
+      else renderAnnouncement(item, slide);
       return slide;
     });
     const permanentSlides = [...track.children].filter(slide => !String(slide.className || '').split(/\s+/).includes('ru-pulse-generated'));
     track.replaceChildren(...slides, ...permanentSlides);
-    feed.replaceChildren(...[...feed.children].filter(child => !cards.includes(child)));
     const EventConstructor = document.defaultView?.Event || globalThis.Event;
     if (typeof track.dispatchEvent === 'function' && typeof EventConstructor === 'function') {
       track.dispatchEvent(new EventConstructor('famru:hero-slides-changed'));
@@ -60,19 +56,20 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
         && Number(item.max_seats || 0) === 0
         && (!item.event_date || (typeof item.event_date === 'string' && item.event_date >= today)))
         .slice(0, 6);
-      for (const event of events) renderAnnouncement({
+      featuredCards = events.map(event => ({ type: 'event', item: {
         title: event.title,
         body: event.description,
         kind: 'open_event',
         event_starts_at: event.event_date && event.event_time
           ? `${event.event_date}T${event.event_time}` : event.event_date || null,
-      });
+      } }));
+      for (const { item } of featuredCards) renderAnnouncement(item);
       return true;
     } catch { return false; }
   }
 
   async function load() {
-    status.textContent = 'Загружаем школьную ленту…'; feed.replaceChildren();
+    status.textContent = 'Загружаем школьную ленту…'; feed.replaceChildren(); featuredCards = [];
     try {
       const me = await request('/api/v1/me');
       if (me.response.status === 401) {
@@ -89,6 +86,10 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
       if (!pulse.response.ok || !Array.isArray(pulse.result?.announcements) || !Array.isArray(pulse.result?.polls)) throw new Error('pulse_unavailable');
       status.textContent = '';
       if (!pulse.result.announcements.length && !pulse.result.polls.length) feed.append(node(document, 'p', 'ru-pulse-empty', 'В ленте пока нет новостей и опросов.'));
+      featuredCards = [
+        ...pulse.result.announcements.map(item => ({ type: item.kind === 'important' ? 'important' : item.kind === 'open_event' ? 'event' : 'news', item })),
+        ...pulse.result.polls.map(item => ({ type: 'poll', item })),
+      ];
       for (const item of pulse.result.announcements) renderAnnouncement(item);
       for (const poll of pulse.result.polls) renderPoll(poll);
       if (['school_admin', 'council_member'].includes(me.result.profile.role)) renderPublishForms();
@@ -99,7 +100,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     }
   }
 
-  function renderAnnouncement(item) {
+  function renderAnnouncement(item, target = feed) {
     if (!item || typeof item.title !== 'string' || typeof item.body !== 'string') return;
     const card = node(document, 'article', `ru-pulse-card ru-pulse-${item.kind === 'important' ? 'important' : item.kind === 'open_event' ? 'event' : 'news'}`);
     const label = item.kind === 'important' ? 'Важно' : item.kind === 'open_event' ? 'Открытое мероприятие' : 'Новости школы';
@@ -109,10 +110,10 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
       const date = new Date(dateValue);
       if (!Number.isNaN(date.getTime())) card.append(node(document, 'time', 'ru-pulse-date', date.toLocaleString('ru-RU')));
     }
-    feed.append(card);
+    target.append(card);
   }
 
-  function renderPoll(poll) {
+  function renderPoll(poll, target = feed) {
     if (!poll || typeof poll.id !== 'string' || typeof poll.question !== 'string' || !Array.isArray(poll.options)) return;
     const card = node(document, 'article', 'ru-pulse-card ru-pulse-poll');
     card.append(node(document, 'p', 'ru-pulse-kind', 'Опрос'), node(document, 'h3', '', poll.question));
@@ -162,7 +163,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     card.append(node(document, 'p', 'ru-pulse-poll-foot', message));
     if (Number.isSafeInteger(poll.total_votes)) card.append(node(document, 'p', 'ru-pulse-total', `Всего голосов: ${totalVotes}`));
     if (Number.isFinite(closes.getTime())) card.append(node(document, 'time', 'ru-pulse-date', `До ${closes.toLocaleString('ru-RU')}`));
-    feed.append(card);
+    target.append(card);
   }
 
   function renderPublishForms() {

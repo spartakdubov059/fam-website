@@ -152,7 +152,7 @@ test('featured school cards join the hero carousel and preserve poll voting hand
     if (url === '/api/v1/pulse/polls/poll-a/votes') { voted = true; return { ok: true, status: 201, json: async () => ({ ok: true }) }; }
     if (url === '/api/v1/pulse') return { ok: true, json: async () => ({ ok: true, announcements: [
       { id: 'notice-a', title: 'Важная новость', body: 'Текст', kind: 'important' },
-    ], polls: [{ id: 'poll-a', question: 'Выбор?', options: ['Да', 'Нет'], closes_at: '2099-01-01T00:00:00Z', total_votes: 0, my_vote: null }] }) };
+    ], polls: [{ id: 'poll-a', question: 'Выбор?', options: ['Да', 'Нет'], closes_at: '2099-01-01T00:00:00Z', total_votes: voted ? 1 : 0, my_vote: voted ? 0 : null }] }) };
     throw new Error(`unexpected URL ${url}`);
   } });
 
@@ -160,8 +160,12 @@ test('featured school cards join the hero carousel and preserve poll voting hand
   assert.equal(f.dots.children.length, 4, 'carousel navigation matches the newly featured cards');
   assert.equal(f.track.children[0].className.includes('hero-pulse-important'), true);
   assert.equal(f.track.children[1].className.includes('hero-pulse-poll'), true);
-  assert.equal(f.root.children[2].children.length, 0, 'featured cards move out of the separate feed');
+  assert.equal(f.root.children[2].children.length, 2, 'featured cards remain available in the Afisha feed');
   const pollCard = f.track.children[1].children[0];
   await pollCard.children[2].children[0].children[0].listeners.click();
   assert.equal(voted, true, 'moving the card preserves its vote handler');
+  assert.equal(f.track.children[1].children[0].children[2].children[0].children[0].disabled, true,
+    'a successful vote reloads the carousel card with the updated state');
+  assert.equal(f.root.children[2].children[1].children[2].children[0].children[0].disabled, true,
+    'the matching Afisha card also reflects the updated vote state');
 });
