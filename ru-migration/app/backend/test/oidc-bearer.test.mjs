@@ -14,22 +14,31 @@ function token(claims, alg = 'RS256') {
 function request(jwt) { return new Request('https://app.example.test/api', { headers: { authorization: `Bearer ${jwt}` } }); }
 test('accepts a valid issuer/audience token and returns identity without role claims', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
-  const claims = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000, auth_time: 2_000_000_000, role: 'school_admin' };
+  const claims = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000, iat: 2_000_000_000, auth_time: 2_000_000_000, role: 'school_admin' };
   assert.deepEqual(await auth(request(token(claims))), { subject: 'synthetic-subject', issuer, authenticated_at: 2_000_000_000 });
   assert.equal((await auth(request(token(claims))).then(x => x)).role, undefined);
-  const withoutAuthTime = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000 };
+  const withoutAuthTime = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000, iat: 2_000_000_000 };
   const unauthenticatedTimeIdentity = await auth(request(token(withoutAuthTime)));
   assert.equal(unauthenticatedTimeIdentity.authenticated_at, null);
 });
 test('rejects expired, wrong audience and non-RS256 tokens', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
-  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 1 }))), null);
-  assert.equal(await auth(request(token({ iss: issuer, aud: 'other', sub: 'u', exp: 2_000_000_1000 }))), null);
-  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000 }, 'none'))), null);
+  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 1, iat: 2_000_000_000 }))), null);
+  assert.equal(await auth(request(token({ iss: issuer, aud: 'other', sub: 'u', exp: 2_000_000_1000, iat: 2_000_000_000 }))), null);
+  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000, iat: 2_000_000_000 }, 'none'))), null);
+});
+test('requires a valid issued-at claim and rejects a token issued in the future', async () => {
+  const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
+  const base = { iss: issuer, aud: audience, sub: 'synthetic-subject', exp: 2_000_000_1000 };
+  assert.equal(await auth(request(token(base))), null);
+  assert.equal(await auth(request(token({ ...base, iat: 2_000_000_006 }))), null);
+  assert.deepEqual(await auth(request(token({ ...base, iat: 2_000_000_000 }))), {
+    subject: 'synthetic-subject', issuer, authenticated_at: null,
+  });
 });
 test('rejects untrusted extra audiences and an azp for another client', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
-  const base = { iss: issuer, sub: 'synthetic-subject', exp: 2_000_000_1000 };
+  const base = { iss: issuer, sub: 'synthetic-subject', exp: 2_000_000_1000, iat: 2_000_000_000 };
   assert.deepEqual(await auth(request(token({ ...base, aud: [audience] }))), {
     subject: 'synthetic-subject', issuer, authenticated_at: null,
   });
@@ -41,6 +50,6 @@ test('rejects untrusted extra audiences and an azp for another client', async ()
 });
 test('does not trust unknown keys or fetch from non-HTTPS remote JWKS', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [] }), clock: () => 2_000_000_000_000 });
-  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000 }))), null);
+  assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000, iat: 2_000_000_000 }))), null);
   assert.throws(() => createOidcBearerAuthenticator({ issuer, audience, jwksUri: 'http://evil.example/jwks' }));
 });

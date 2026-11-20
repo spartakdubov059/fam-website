@@ -30,8 +30,9 @@ export function createOidcBearerAuthenticator({ issuer, audience, jwksUri, fetch
       if (claims.iss !== issuerUrl || audiences.length !== 1 || audiences[0] !== audience
           || (claims.azp !== undefined && claims.azp !== audience)) return null;
       const now = Math.floor(clock() / 1000);
-      if (!Number.isFinite(claims.exp) || claims.exp <= now || (Number.isFinite(claims.nbf) && claims.nbf > now + 5)) return null;
-      if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 256) return null;
+      if (!Number.isFinite(claims.exp) || claims.exp <= now || !Number.isFinite(claims.iat) || claims.iat > now + 5
+          || (Number.isFinite(claims.nbf) && claims.nbf > now + 5)) return null;
+      if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 255) return null;
       if (!cachedKeys || clock() - cachedAt > cacheMs) {
         const response = await fetchImpl(keysUrl, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
         if (!response.ok) return null;
