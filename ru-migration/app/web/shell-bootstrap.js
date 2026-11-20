@@ -77,8 +77,9 @@ window.onunhandledrejection = function() {
             <div id="ruDeletionReviewQueue"></div>
           </section>
         </section>
-        <section class="hero-wrap ru-hero" aria-label="Баннеры FAM">
-          <div id="ruHeroTrack" class="hero" role="region" aria-label="Баннерная карусель" tabindex="0">
+        <section class="hero-wrap ru-hero" role="region" aria-roledescription="карусель" aria-label="Баннеры FAM">
+          <button id="ruHeroRotation" class="ru-button hero-rotation-control" type="button" aria-label="Остановить автопрокрутку" aria-pressed="true">Пауза</button>
+          <div id="ruHeroTrack" class="hero" role="group" aria-roledescription="слайды" tabindex="0">
             <div class="hero-slide hero-img"><img src="/assets/banner-1.webp" width="1200" height="675" alt="Друзья FAM проводят время вместе." fetchpriority="high"></div>
             <div class="hero-slide hero-img"><img src="/assets/banner-2.webp" width="1200" height="675" alt="Школьные идеи, проекты и творчество." loading="lazy"></div>
             <div class="hero-slide hero-img"><img src="/assets/banner-3.webp" width="1200" height="675" alt="Встречи, учёба и события рядом." loading="lazy"></div>

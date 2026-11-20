@@ -72,6 +72,7 @@
     .ai-offline-banner b { display: block; margin-bottom: 2px; font-size: 13px; }
 
     .hero-wrap { margin: 4px 0 6px; }
+    .hero-rotation-control { display: block; margin: 0 0 8px auto; min-height: 38px; padding: 8px 12px; }
     .hero { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
     .hero::-webkit-scrollbar { display: none; }
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
