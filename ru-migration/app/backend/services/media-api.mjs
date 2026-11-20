@@ -113,7 +113,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       }
     }
     const ideaImageUpload = pathname === '/api/v1/ideas/media/pending';
-    if (req.method !== 'POST' || (!ideaImageUpload && pathname !== '/api/v1/media/pending')) {
+    const avatarImageUpload = pathname === '/api/v1/avatars/media/pending';
+    if (req.method !== 'POST' || (!ideaImageUpload && !avatarImageUpload && pathname !== '/api/v1/media/pending')) {
       return { status: 404, body: { ok: false, error: 'not_found' } };
     }
     if (!pendingImages || typeof pendingImages.put !== 'function') {
@@ -128,7 +129,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
 
     const contentType = String(req.headers?.['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
     if (!ALLOWED_IMAGE_TYPES.has(contentType)) return { status: 415, body: { ok: false, error: 'unsupported_image_type' } };
-    const imageByteLimit = ideaImageUpload ? MAX_IDEA_IMAGE_BYTES : MAX_IMAGE_BYTES;
+    const imageByteLimit = ideaImageUpload || avatarImageUpload ? MAX_IDEA_IMAGE_BYTES : MAX_IMAGE_BYTES;
     const statedLength = Number(req.headers?.['content-length'] || 0);
     if (Number.isFinite(statedLength) && statedLength > imageByteLimit) {
       return { status: 413, body: { ok: false, error: 'image_too_large' } };
