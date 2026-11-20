@@ -1,6 +1,6 @@
 # Сверка FAM `main` и RU-ветки
 
-Сверка выполнена 20 ноября 2026 по актуальным ссылкам GitHub: FAM `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`, исходная `migration/yandex-cloud` `2795f05a9f79376a91a2f76bf0d0e29664861ce0`, RU feature `2a009bf416330a4383905b5e5d45deb1527e3edf`. Эти три указателя проверены независимо. `main` и `migration/yandex-cloud` не изменялись.
+Сверка исходных изменений выполнена 20 ноября 2026. Проверенные сейчас указатели GitHub: FAM `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`, исходная `migration/yandex-cloud` `2795f05a9f79376a91a2f76bf0d0e29664861ce0`, RU feature `codex/fam-ru-offline-safety-review` `73f37eef68809d4f7fd8c113ee45b02e4d462d07`. `main` и `migration/yandex-cloud` не изменялись. Таблицы ниже сверяют девять SQL-миграций и шесть изменений Edge Functions, вошедших в исходный crosswalk; это не построчная проверка всех последующих изменений `main`.
 
 Старая российская ветка создана от исходной миграционной ветки, а не от нынешнего `main`. Между теми upstream-коммитами есть 9 новых SQL-миграций и 6 изменений Edge Functions. Ниже проверен их смысловой эквивалент в YDB/API. Это crosswalk функций, а не утверждение о построчном совпадении SQL, RLS, триггеров или интерфейса.
 
