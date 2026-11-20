@@ -163,7 +163,8 @@ export async function initializeListingModeration({ document = globalThis.docume
         && ['none', 'pending', 'approved', 'rejected'].includes(item.image_status)) : [];
       const ideaWorkflowAvailable = schoolIdeaWorkflowResponse.ok && schoolIdeaWorkflowResult?.ok && Array.isArray(schoolIdeaWorkflowResult.ideas);
       const workflowIdeas = ideaWorkflowAvailable ? schoolIdeaWorkflowResult.ideas.filter(item => item && UUID.test(item.id || '')
-        && typeof item.text === 'string' && item.text.length <= 1000 && ['new', 'in_progress', 'done', 'rejected'].includes(item.admin_status)) : [];
+        && typeof item.text === 'string' && item.text.length <= 1000 && typeof item.is_own === 'boolean'
+        && ['new', 'in_progress', 'done', 'rejected'].includes(item.admin_status)) : [];
       const renderSchoolIdeasPanel = () => {
         const ideasPanel = node(document, 'section', 'ru-moderation-card');
         ideasPanel.append(node(document, 'h3', '', 'Школьные идеи и фотографии'));
@@ -210,6 +211,39 @@ export async function initializeListingModeration({ document = globalThis.docume
         workflowPanel.append(node(document, 'h3', '', 'Работа с одобренными идеями'));
         if (!ideaWorkflowAvailable) workflowPanel.append(node(document, 'p', '', 'Не удалось загрузить статусы идей школы.'));
         else if (!workflowIdeas.length) workflowPanel.append(node(document, 'p', '', 'Одобренных идей пока нет.'));
+        if (ideaWorkflowAvailable && me.profile.role === 'school_admin') {
+          const folderNames = { in_progress: 'идеи в работе', done: 'выполненные идеи', rejected: 'отклонённые идеи' };
+          for (const [folder, label] of Object.entries(folderNames)) {
+            const matches = workflowIdeas.filter(item => item.admin_status === folder);
+            if (!matches.length) continue;
+            workflowPanel.append(actionButton(document, `Очистить: ${label} (${matches.length})`, async () => {
+              if (!confirmImpl(`Удалить ${matches.length} ${label} и связанные фотографии?`)) return;
+              const confirmation = 'УДАЛИТЬ ИДЕЮ ШКОЛЫ';
+              if (matches.some(item => !item.is_own)
+                  && promptImpl(`Для окончательного удаления введите точно: ${confirmation}`) !== confirmation) {
+                status.textContent = 'Удаление отменено: фраза подтверждения не совпала.'; return;
+              }
+              status.textContent = `Удаляем: ${label}…`; let deleted = 0;
+              const ordered = [...matches].sort((a, b) => Number(a.is_own) - Number(b.is_own));
+              for (const item of ordered) {
+                try {
+                  const response = await fetchImpl(`/api/v1/ideas/${item.id}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
+                    headers: { 'content-type': 'application/json', accept: 'application/json' },
+                    ...(!item.is_own ? { body: JSON.stringify({ confirmation }) } : {}) });
+                  const result = await json(response);
+                  if (result?.error === 'fresh_authentication_required') {
+                    status.textContent = 'Яндекс ID не подтвердил повторную аутентификацию. Идеи других участников не удалены.'; break;
+                  }
+                  if (!response.ok || !result?.ok) break;
+                  deleted++;
+                } catch { break; }
+              }
+              await load();
+              if (deleted === matches.length) status.textContent = `Удалены ${label}: ${deleted}.`;
+              else if (!status.textContent.includes('не подтвердил')) status.textContent = `Удалено: ${deleted} из ${matches.length}. Очередь обновлена; повторите для оставшихся.`;
+            }));
+          }
+        }
         for (const idea of workflowIdeas) {
           const card = node(document, 'article', 'ru-moderation-card');
           const labels = { new: 'Новая', in_progress: 'В работе', done: 'Выполнена', rejected: 'Отклонена' };
@@ -218,6 +252,7 @@ export async function initializeListingModeration({ document = globalThis.docume
           if (idea.admin_status === 'new') actions.append(actionButton(document, 'Взять в работу', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'in_progress' })));
           if (idea.admin_status === 'new' || idea.admin_status === 'in_progress') actions.append(actionButton(document, 'Отклонить', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'rejected' })));
           if (idea.admin_status === 'in_progress') actions.append(actionButton(document, 'Отметить выполненной', () => patch(`/api/v1/school/ideas/workflow/${idea.id}/status`, { status: 'done' })));
+          if (me.profile.role === 'school_admin' || idea.is_own) actions.append(actionButton(document, 'Удалить идею', () => removeSchoolIdea(idea)));
           if (actions.children.length) card.append(actions);
           workflowPanel.append(card);
         }
@@ -563,6 +598,30 @@ export async function initializeListingModeration({ document = globalThis.docume
       await load();
       if (agentIdeaDecision) status.textContent = `Предложение помощника ${body.decision === 'approve' ? 'принято к работе' : 'отклонено'}.`;
     } catch { status.textContent = 'Не удалось сохранить решение. Очередь не обновлена.'; }
+  }
+
+  async function removeSchoolIdea(idea) {
+    if (!confirmImpl(`Удалить идею школы «${idea.text.slice(0, 80)}»?`)) return;
+    const body = {};
+    if (me.profile.role === 'school_admin' && !idea.is_own) {
+      const confirmation = 'УДАЛИТЬ ИДЕЮ ШКОЛЫ';
+      if (promptImpl(`Для окончательного удаления введите точно: ${confirmation}`) !== confirmation) {
+        status.textContent = 'Удаление отменено: фраза подтверждения не совпала.'; return;
+      }
+      body.confirmation = confirmation;
+    }
+    status.textContent = 'Проверяем возможность безопасного удаления идеи…';
+    try {
+      const response = await fetchImpl(`/api/v1/ideas/${idea.id}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, ...(Object.keys(body).length ? { body: JSON.stringify(body) } : {}) });
+      const result = await json(response);
+      if (result?.error === 'fresh_authentication_required') {
+        status.textContent = 'Яндекс ID не подтвердил повторную аутентификацию. Идея не удалена.'; return;
+      }
+      if (!response.ok || !result?.ok) throw new Error('idea_delete_failed');
+      await load();
+      if (result.image_cleanup === 'queued') status.textContent = 'Идея удалена; связанные фотографии поставлены в очередь очистки.';
+    } catch { status.textContent = 'Не удалось удалить идею. Очередь не обновлена.'; }
   }
 
   await load();

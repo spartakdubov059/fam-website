@@ -776,6 +776,7 @@ try {
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'))).body.reports.some(row => row.fingerprint === safetyFingerprint), false,
     'acknowledged safety clusters leave the unreviewed queue');
   const adminIdeaImageKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-0000-4000-8000-000000000001.webp';
+  accountMediaKeys.add(adminIdeaImageKey);
   await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', adminIdeaImageKey);
   const adminOwnIdea = await repo.createIdea({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     text: 'Идея администратора для самопроверки', image_keys: [adminIdeaImageKey], image_status: 'pending',
@@ -785,6 +786,12 @@ try {
   assert.equal(await repo.reviewSchoolIdeaImages({ ideaId: adminOwnIdea.id, schoolId: 'synthetic-school',
     reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'approve' }), false,
   'school staff cannot approve their own idea photo');
+  const deletedAdminIdea = await listingsApi(apiRequest('DELETE', `/api/v1/ideas/${adminOwnIdea.id}`, 'synthetic-admin', null));
+  assert.deepEqual(deletedAdminIdea, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } },
+    'an idea author can delete their own idea and immediately clean linked private photos');
+  assert.ok(deletedMediaKeys.includes(adminIdeaImageKey));
+  assert.equal((await sql`SELECT id FROM fam_ideas WHERE id = ${adminOwnIdea.id};`)[0].length, 0);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${adminIdeaImageKey};`)[0].length, 0);
   const deletingUserId = '11111111-1111-4111-8111-111111111111';
   const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
   const attachedIdeaImageKey = `pending/${deletingUserId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;

@@ -206,6 +206,7 @@ test('isolated server dispatches private idea-image reads through the media API'
     assert.equal((await fetch(new URL('/api/v1/school/ideas/workflow/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/status', origin), {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'in_progress' }),
     })).status, 200);
+    assert.equal((await fetch(new URL('/api/v1/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', origin), { method: 'DELETE' })).status, 200);
     assert.equal((await fetch(new URL('/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images', origin), {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'approve' }),
     })).status, 200);
@@ -214,6 +215,7 @@ test('isolated server dispatches private idea-image reads through the media API'
     })).status, 200);
     assert.deepEqual(listingPaths, ['GET /api/v1/school/ideas', 'GET /api/v1/school/ideas/workflow',
       'PATCH /api/v1/school/ideas/workflow/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/status',
+      'DELETE /api/v1/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images', 'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation']);
   });
 });

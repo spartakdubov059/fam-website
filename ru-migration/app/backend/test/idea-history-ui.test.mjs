@@ -27,7 +27,7 @@ test('idea history renders only bounded own API fields as text and private image
     }] }) };
   } });
   assert.equal(f.root.hidden, false);
-  const card = f.root.children[2].children[0];
+  const card = f.root.children[3].children[0];
   assert.equal(card.children[0].textContent, '<script>нет</script>');
   assert.equal(card.children[0].children.length, 0);
   assert.equal(card.children[1].textContent, 'В работе');
@@ -42,4 +42,21 @@ test('idea history stays hidden for guests and displays no ideas when the list i
   await initializeIdeaHistory({ ...empty, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ ok: true, ideas: [] }) }) });
   assert.equal(empty.root.hidden, false);
   assert.match(empty.root.children[1].textContent, /ещё не отправляли/);
+});
+
+test('a participant can confirm deletion of their idea and refresh the private history', async () => {
+  const f = fixture(); const calls = []; let exists = true;
+  await initializeIdeaHistory({ ...f, confirmImpl: () => true, fetchImpl: async (url, options = {}) => {
+    calls.push({ url, options });
+    if (options.method === 'DELETE') { exists = false; return { ok: true, json: async () => ({ ok: true, deleted: true, image_cleanup: 'complete' }) }; }
+    return { ok: true, status: 200, json: async () => ({ ok: true, ideas: exists ? [{
+      id: '11111111-1111-4111-8111-111111111111', text: 'Моя тестовая идея', admin_status: 'new', ai_status: 'approved', image_status: 'none', image_count: 0,
+    }] : [] }) };
+  } });
+  const remove = f.root.children[3].children[0].children.at(-1);
+  await remove.listeners.click();
+  assert.deepEqual(calls.map(call => [call.url, call.options.method || 'GET']), [
+    ['/api/v1/me/ideas', 'GET'], ['/api/v1/ideas/11111111-1111-4111-8111-111111111111', 'DELETE'], ['/api/v1/me/ideas', 'GET'],
+  ]);
+  assert.match(f.root.children[1].textContent, /ещё не отправляли/);
 });

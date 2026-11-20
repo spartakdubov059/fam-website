@@ -68,7 +68,7 @@ test('school moderation UI moves approved ideas through work and completion stat
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
-    if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: [{ id, text: 'Предложение школы', admin_status: adminStatus }] }) };
+    if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: [{ id, text: 'Предложение школы', admin_status: adminStatus, is_own: false }] }) };
     if (url === `/api/v1/school/ideas/workflow/${id}/status` && init.method === 'PATCH') {
       adminStatus = JSON.parse(init.body).status; return { ok: true, json: async () => ({ ok: true, admin_status: adminStatus }) };
     }

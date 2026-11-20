@@ -971,6 +971,37 @@ test('school idea workflow is same-school staff only and accepts only bounded li
   assert.deepEqual(await handler(patch('done')), { status: 404, body: { ok: false, error: 'idea_unavailable' } });
 });
 
+test('idea deletion requires owner scope or a freshly confirmed same-school administrator action', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const owner = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-a', role: 'student' };
+  let actor = owner; let identity = { subject: 'owner' }; let deleted = 0; const removed = []; const finished = [];
+  const repository = { getActiveAccountSuspension: async () => null,
+    getSchoolIdeaDeletionContext: async ({ ideaId, schoolId }) => ideaId === id && schoolId === 'school-a' ? { user_id: owner.id, school_id: schoolId } : null,
+    deleteSchoolIdea: async input => { deleted++; return { ok: input.actorId === actor.id, own: input.actorId === owner.id, media_cleanup: [{ object_key: 'pending/bbbb/photo.webp', claim_token: 'claim-a' }] }; },
+    finishPendingImageCleanup: async (...args) => { finished.push(args); return true; },
+  };
+  const handler = createListingsApi({ authenticate: async () => identity, resolveActor: async () => actor, repository,
+    pendingImages: { delete: async key => { removed.push(key); } }, now: () => 1_000_000 });
+  const deletion = (body = null) => { const request = req(body ?? {}, 'DELETE'); request.url = `/api/v1/ideas/${id}`; return request; };
+  assert.deepEqual(await handler(deletion()), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.equal(deleted, 1);
+  assert.deepEqual(removed, ['pending/bbbb/photo.webp']);
+  assert.equal(finished[0][2], true);
+
+  actor = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', school_id: 'school-a', role: 'school_admin' };
+  identity = { subject: 'admin' };
+  assert.deepEqual(await handler(deletion({ confirmation: 'УДАЛИТЬ ИДЕЮ ШКОЛЫ' })), { status: 403, body: { ok: false, error: 'fresh_authentication_required' } });
+  assert.equal(deleted, 1, 'staff deletion is denied before touching the repository when fresh authentication is missing');
+  identity = { subject: 'admin', authenticated_at: 990 };
+  assert.equal((await handler(deletion({ confirmation: 'неверно' }))).status, 400);
+  assert.deepEqual(await handler(deletion({ confirmation: 'УДАЛИТЬ ИДЕЮ ШКОЛЫ' })), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.equal(deleted, 2);
+
+  actor = { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', school_id: 'school-a', role: 'council_member' };
+  identity = { subject: 'council', authenticated_at: 990 };
+  assert.equal((await handler(deletion({ confirmation: 'УДАЛИТЬ ИДЕЮ ШКОЛЫ' }))).status, 403);
+});
+
 test('notification read state is always owned by the authenticated profile and bounded', async () => {
   const actor = { id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' };
   const saved = [];

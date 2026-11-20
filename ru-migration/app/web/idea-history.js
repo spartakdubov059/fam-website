@@ -8,7 +8,8 @@ function node(document, tag, className, text = '') {
 }
 async function readJson(response) { try { return await response.json(); } catch { return null; } }
 
-export async function initializeIdeaHistory({ document = globalThis.document, fetchImpl = globalThis.fetch } = {}) {
+export async function initializeIdeaHistory({ document = globalThis.document, fetchImpl = globalThis.fetch,
+  confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message) } = {}) {
   const root = document?.getElementById?.('ruIdeaHistory');
   if (!root || typeof fetchImpl !== 'function') return;
   root.hidden = true;
@@ -16,7 +17,9 @@ export async function initializeIdeaHistory({ document = globalThis.document, fe
   const status = node(document, 'p', 'ru-note', 'Загружаем историю идей…');
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const list = node(document, 'div', 'ru-idea-history-list');
-  root.replaceChildren(heading, status, list);
+  const clearAll = node(document, 'button', 'ru-button', 'Удалить все мои идеи');
+  clearAll.type = 'button'; clearAll.hidden = true;
+  root.replaceChildren(heading, status, clearAll, list);
 
   const load = async () => {
     status.textContent = 'Загружаем историю идей…'; list.replaceChildren();
@@ -33,6 +36,24 @@ export async function initializeIdeaHistory({ document = globalThis.document, fe
       }
       root.hidden = false;
       status.textContent = result.ideas.length ? '' : 'Вы ещё не отправляли идеи.';
+      clearAll.hidden = result.ideas.length === 0;
+      clearAll.onclick = async () => {
+        const ideas = result.ideas.filter(idea => idea && UUID.test(idea.id || ''));
+        if (!ideas.length || !confirmImpl(`Удалить все ${ideas.length} ваши идеи и связанные с ними фотографии?`)) return;
+        clearAll.disabled = true; let deleted = 0;
+        for (const idea of ideas) {
+          try {
+            const response = await fetchImpl(`/api/v1/ideas/${idea.id}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+            const deletion = await readJson(response);
+            if (!response.ok || !deletion?.ok) break;
+            deleted++;
+          } catch { break; }
+        }
+        await load();
+        if (deleted === ideas.length) status.textContent = `Удалены все ваши идеи: ${deleted}.`;
+        else status.textContent = `Удалено идей: ${deleted} из ${ideas.length}. Обновите список и повторите для оставшихся.`;
+        clearAll.disabled = false;
+      };
       for (const idea of result.ideas) {
         if (!idea || !UUID.test(idea.id || '') || typeof idea.text !== 'string' || idea.text.length > 1000) continue;
         const card = node(document, 'article', 'ru-idea-history-card');
@@ -59,6 +80,20 @@ export async function initializeIdeaHistory({ document = globalThis.document, fe
           const date = new Date(idea.created_at);
           if (Number.isFinite(date.getTime())) card.append(node(document, 'time', 'ru-idea-history-date', date.toLocaleString('ru-RU')));
         }
+        const remove = node(document, 'button', 'ru-button', 'Удалить мою идею');
+        remove.type = 'button';
+        remove.addEventListener('click', async () => {
+          if (!confirmImpl('Удалить эту идею и связанные с ней фотографии?')) return;
+          remove.disabled = true; status.textContent = 'Удаляем идею…';
+          try {
+            const deletion = await fetchImpl(`/api/v1/ideas/${idea.id}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+            const result = await readJson(deletion);
+            if (!deletion.ok || !result?.ok) throw new Error('delete_failed');
+            await load();
+            if (result.image_cleanup === 'queued') status.textContent = 'Идея удалена; связанные фотографии поставлены в очередь очистки.';
+          } catch { status.textContent = 'Не удалось удалить идею. Обновите историю и повторите попытку.'; remove.disabled = false; }
+        });
+        card.append(remove);
         list.append(card);
       }
     } catch {

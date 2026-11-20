@@ -344,12 +344,12 @@ test('school idea text review is same-school, excludes self review and audits a 
 
 test('school idea workflow lists only approved same-school ideas and permits only valid status transitions', async () => {
   const calls = [];
-  const sql = async (strings, ...values) => { calls.push({ text: strings.join('?'), values }); return [[{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new' }]]; };
-  const listed = await createYdbListingsRepository(sql).listSchoolIdeaWorkflow('school-a');
-  assert.deepEqual(listed, [{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new' }]);
+  const sql = async (strings, ...values) => { calls.push({ text: strings.join('?'), values }); return [[{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new', is_own: true }]]; };
+  const listed = await createYdbListingsRepository(sql).listSchoolIdeaWorkflow('school-a', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  assert.deepEqual(listed, [{ id: 'idea-a', text: 'Synthetic idea', admin_status: 'new', is_own: true }]);
   assert.match(calls[0].text, /school_id = \?/);
   assert.match(calls[0].text, /ai_status = 'approved'/);
-  assert.ok(!calls[0].text.includes('user_id'));
+  assert.doesNotMatch(calls[0].text, /SELECT[^;]*user_id,/, 'the workflow exposes only an ownership boolean, not the author id');
 
   const txCalls = [];
   let currentStatus = 'new';
@@ -369,6 +369,54 @@ test('school idea workflow lists only approved same-school ideas and permits onl
   assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'done' }), true);
   assert.equal(currentStatus, 'done');
   assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'rejected' }), false, 'terminal ideas cannot be re-opened');
+});
+
+test('idea deletion is owner-bound or same-school-admin-only and claims linked photos for cleanup', async () => {
+  const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ownerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const adminId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const imageKey = `pending/${ownerId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
+  const calls = [];
+  let role = 'student'; let school = 'school-a'; let actorCalls = 0; let failAsCouncil = false;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) {
+      actorCalls += 1;
+      return [[{ school_id: school, role: failAsCouncil ? 'council_member' : role, active: true }]];
+    }
+    if (text.includes('SELECT id, user_id, school_id FROM fam_ideas')) return school === 'school-a' ? [[{ id: ideaId, user_id: ownerId, school_id: 'school-a' }]] : [[]];
+    if (text.includes('FROM fam_ideas')) return [[]];
+    if (text.includes('FROM fam_idea_images')) return [[{ image_index: 0, object_key: imageKey }]];
+    if (text.includes('FROM fam_pending_media')) return [[{ status: 'linked' }]];
+    return [[]];
+  };
+  const sql = Object.assign((strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, school_id FROM fam_ideas')) return Promise.resolve([[{ id: ideaId, user_id: ownerId, school_id: 'school-a' }]]);
+    if (text.includes('FROM fam_ideas')) return Promise.resolve([[]]);
+    return Promise.resolve([[]]);
+  }, { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.deepEqual(await repo.getSchoolIdeaDeletionContext({ ideaId, schoolId: 'school-a' }), { id: ideaId, user_id: ownerId, school_id: 'school-a' });
+  assert.deepEqual(await repo.deleteSchoolIdea({ ideaId, actorId: ownerId, schoolId: 'school-a' }), {
+    ok: true, own: true, media_cleanup: [{ object_key: imageKey, claim_token: calls.find(call => call.text.includes('UPDATE fam_pending_media')).values[0] }],
+  });
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_ideas')));
+  assert.equal(calls.some(call => call.text.includes('INSERT INTO fam_school_content_audit')), false, 'owner deletion does not create a staff audit row');
+
+  calls.length = 0; role = 'school_admin';
+
+  const adminDelete = await repo.deleteSchoolIdea({ ideaId, actorId: adminId, schoolId: 'school-a' });
+  assert.equal(adminDelete.ok, true);
+  assert.ok(calls.some(call => call.text.includes("'idea_deleted'")), 'staff deletion is recorded in the school content audit');
+  calls.length = 0;
+  role = 'council_member'; failAsCouncil = true;
+  const councilDelete = await repo.deleteSchoolIdea({ ideaId, actorId: adminId, schoolId: 'school-a' });
+  assert.ok(actorCalls >= 3);
+  assert.deepEqual(councilDelete, { ok: false, code: 'forbidden' });
+  school = 'school-b'; role = 'school_admin'; failAsCouncil = false;
+  assert.deepEqual(await repo.deleteSchoolIdea({ ideaId, actorId: adminId, schoolId: 'school-b' }), { ok: false, code: 'idea_unavailable' });
 });
 
 test('account deletion request validates requester and target from same-school profiles before insert', async () => {

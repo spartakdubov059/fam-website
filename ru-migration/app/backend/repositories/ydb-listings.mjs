@@ -1166,9 +1166,9 @@ export function createYdbListingsRepository(sql) {
       }));
     },
 
-    async listSchoolIdeaWorkflow(schoolId) {
-      if (typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid idea workflow school');
-      const statement = sql`SELECT id, text, admin_status, created_at
+    async listSchoolIdeaWorkflow(schoolId, reviewerId) {
+      if (typeof schoolId !== 'string' || !schoolId || !UUID.test(reviewerId || '')) throw new TypeError('invalid idea workflow school');
+      const statement = sql`SELECT id, text, admin_status, created_at, user_id = ${reviewerId} AS is_own
         FROM fam_ideas WHERE school_id = ${schoolId} AND ai_status = 'approved'
         ORDER BY created_at DESC LIMIT 200;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
@@ -1209,6 +1209,55 @@ export function createYdbListingsRepository(sql) {
           ORDER BY image_index ASC LIMIT 3;`;
         return { ...idea, image_count: (images?.[0] ?? []).length };
       }));
+    },
+
+    async getSchoolIdeaDeletionContext({ ideaId, schoolId }) {
+      if (!UUID.test(ideaId || '') || typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid school idea deletion lookup');
+      const statement = sql`SELECT user_id, school_id FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return (await statement)?.[0]?.[0] ?? null;
+    },
+
+    async deleteSchoolIdea({ ideaId, actorId, schoolId }) {
+      if (!UUID.test(ideaId || '') || !UUID.test(actorId || '') || typeof schoolId !== 'string' || !schoolId) {
+        throw new TypeError('invalid school idea deletion');
+      }
+      return sql.begin(async tx => {
+        const actors = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
+        const actor = actors?.[0]?.[0];
+        if (!actor || actor.active !== true || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        const ideas = await tx`SELECT id, user_id, school_id FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
+        const idea = ideas?.[0]?.[0];
+        if (!idea) return { ok: false, code: 'idea_unavailable' };
+        const own = idea.user_id === actorId;
+        if (!own && actor.role !== 'school_admin') return { ok: false, code: 'forbidden' };
+
+        const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images
+          WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId}
+          ORDER BY image_index ASC LIMIT 3;`;
+        const mediaCleanup = [];
+        for (const image of imageRows?.[0] ?? []) {
+          if (typeof image.object_key !== 'string'
+              || image.object_key !== `pending/${idea.user_id}/${image.object_key.split('/').at(-1)}`
+              || !/^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(image.object_key)) {
+            return { ok: false, code: 'idea_media_unavailable' };
+          }
+          const mediaRows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${image.object_key}
+            AND user_id = ${idea.user_id} AND school_id = ${schoolId} LIMIT 1;`;
+          if (mediaRows?.[0]?.[0]?.status !== 'linked') return { ok: false, code: 'idea_media_unavailable' };
+          const claimToken = randomUUID();
+          await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
+            claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
+            WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
+          mediaCleanup.push({ object_key: image.object_key, claim_token: claimToken });
+        }
+        await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
+        await tx`DELETE FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId};`;
+        if (!own) await tx`INSERT INTO fam_school_content_audit
+          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${ideaId}, 'idea', 'idea_deleted', '{}', CurrentUtcTimestamp());`;
+        return { ok: true, own, media_cleanup: mediaCleanup };
+      });
     },
 
     async getSchoolIdeaImage(ideaId, imageIndex) {

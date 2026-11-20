@@ -96,6 +96,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
   }
   if ((((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/listings')
       || (req.method === 'POST' && url.pathname === '/api/v1/ideas')
+      || (req.method === 'DELETE' && /^\/api\/v1\/ideas\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (req.method === 'GET' && url.pathname === '/api/v1/school/ideas')
       || (req.method === 'GET' && url.pathname === '/api/v1/school/ideas/workflow')
       || (req.method === 'PATCH' && /^\/api\/v1\/school\/ideas\/workflow\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/status$/i.test(url.pathname))

@@ -73,6 +73,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
     const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const schoolIdeaDeleteMatch = pathname.match(/^\/api\/v1\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
     const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
     const eventRegistrationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations$/i);
@@ -594,7 +595,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       const suspensionBlock = await schoolRoleSuspensionGate(actor);
       if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.listSchoolIdeaWorkflow !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
-      try { return { status: 200, body: { ok: true, ideas: await repository.listSchoolIdeaWorkflow(actor.school_id) } }; }
+      try { return { status: 200, body: { ok: true, ideas: await repository.listSchoolIdeaWorkflow(actor.school_id, actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'PATCH' && schoolIdeaWorkflowMatch) {
@@ -931,6 +932,44 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         }
         return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolIdeaDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'school_profile_required' } };
+      if (typeof repository?.getSchoolIdeaDeletionContext !== 'function' || typeof repository?.deleteSchoolIdea !== 'function') {
+        return { status: 503, body: { ok: false, error: 'idea_delete_unavailable' } };
+      }
+      let context;
+      try { context = await repository.getSchoolIdeaDeletionContext({ ideaId: schoolIdeaDeleteMatch[1], schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      if (context.user_id !== actor.id) {
+        if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
+        if (!hasFreshConfirmation(identity, now())) return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
+        let input;
+        try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+        catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+        if (input?.confirmation !== 'УДАЛИТЬ ИДЕЮ ШКОЛЫ') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      }
+      let deleted;
+      try { deleted = await repository.deleteSchoolIdea({ ideaId: schoolIdeaDeleteMatch[1], actorId: actor.id, schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'idea_unavailable' } };
+      let imageCleanup = deleted.media_cleanup?.length ? 'queued' : 'not_needed';
+      if (deleted.media_cleanup?.length && typeof pendingImages?.delete === 'function'
+          && typeof repository.finishPendingImageCleanup === 'function') {
+        let complete = true;
+        for (const media of deleted.media_cleanup) {
+          try {
+            await pendingImages.delete(media.object_key);
+            if (!await repository.finishPendingImageCleanup(media.object_key, media.claim_token, true)) complete = false;
+          } catch { complete = false; }
+        }
+        imageCleanup = complete ? 'complete' : 'queued';
+      }
+      return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
     }
     const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);
     if (req.method === 'GET' && pathname === '/api/v1/favorites') {
