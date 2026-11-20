@@ -26,7 +26,9 @@ export function createOidcBearerAuthenticator({ issuer, audience, jwksUri, fetch
       const header = decodeJson(parts[0]);
       const claims = decodeJson(parts[1]);
       if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) return null;
-      if (claims.iss !== issuerUrl || !(claims.aud === audience || (Array.isArray(claims.aud) && claims.aud.includes(audience)))) return null;
+      const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+      if (claims.iss !== issuerUrl || audiences.length !== 1 || audiences[0] !== audience
+          || (claims.azp !== undefined && claims.azp !== audience)) return null;
       const now = Math.floor(clock() / 1000);
       if (!Number.isFinite(claims.exp) || claims.exp <= now || (Number.isFinite(claims.nbf) && claims.nbf > now + 5)) return null;
       if (typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 256) return null;

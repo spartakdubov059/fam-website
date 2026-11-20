@@ -27,6 +27,18 @@ test('rejects expired, wrong audience and non-RS256 tokens', async () => {
   assert.equal(await auth(request(token({ iss: issuer, aud: 'other', sub: 'u', exp: 2_000_000_1000 }))), null);
   assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000 }, 'none'))), null);
 });
+test('rejects untrusted extra audiences and an azp for another client', async () => {
+  const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [jwk] }), clock: () => 2_000_000_000_000 });
+  const base = { iss: issuer, sub: 'synthetic-subject', exp: 2_000_000_1000 };
+  assert.deepEqual(await auth(request(token({ ...base, aud: [audience] }))), {
+    subject: 'synthetic-subject', issuer, authenticated_at: null,
+  });
+  assert.deepEqual(await auth(request(token({ ...base, aud: audience, azp: audience }))), {
+    subject: 'synthetic-subject', issuer, authenticated_at: null,
+  });
+  assert.equal(await auth(request(token({ ...base, aud: [audience, 'untrusted-client'], azp: audience }))), null);
+  assert.equal(await auth(request(token({ ...base, aud: audience, azp: 'another-client' }))), null);
+});
 test('does not trust unknown keys or fetch from non-HTTPS remote JWKS', async () => {
   const auth = createOidcBearerAuthenticator({ issuer, audience, jwksUri: `${issuer}/jwks`, fetchImpl: async () => Response.json({ keys: [] }), clock: () => 2_000_000_000_000 });
   assert.equal(await auth(request(token({ iss: issuer, aud: audience, sub: 'u', exp: 2_000_000_1000 }))), null);
