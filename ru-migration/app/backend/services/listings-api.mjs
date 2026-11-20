@@ -944,7 +944,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let context;
       try { context = await repository.getSchoolIdeaDeletionContext({ ideaId: schoolIdeaDeleteMatch[1], schoolId: actor.school_id }); }
       catch (error) {
-        console.error('RU_IDEA_DELETE_DATABASE_ERROR', 'lookup', error?.name || 'Error', error?.code || 'no_code');
+        console.error('RU_IDEA_DELETE_DATABASE_ERROR', 'lookup', error?.name || 'Error', error?.code || 'no_code', String(error?.message || '').slice(0, 240));
         return { status: 503, body: { ok: false, error: 'database_unavailable' } };
       }
       if (!context) return { status: 404, body: { ok: false, error: 'idea_unavailable' } };
@@ -959,7 +959,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let deleted;
       try { deleted = await repository.deleteSchoolIdea({ ideaId: schoolIdeaDeleteMatch[1], actorId: actor.id, schoolId: actor.school_id }); }
       catch (error) {
-        console.error('RU_IDEA_DELETE_DATABASE_ERROR', 'transaction', error?.name || 'Error', error?.code || 'no_code');
+        console.error('RU_IDEA_DELETE_DATABASE_ERROR', 'transaction', error?.name || 'Error', error?.code || 'no_code', String(error?.message || '').slice(0, 240));
         return { status: 503, body: { ok: false, error: 'database_unavailable' } };
       }
       if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'idea_unavailable' } };
