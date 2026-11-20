@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Driver } from '@ydbjs/core';
-import { query } from '@ydbjs/query';
+import { query, identifier, fragment, join } from '@ydbjs/query';
 import { MetadataCredentialsProvider } from '@ydbjs/auth/metadata';
 import {
   S3Client, HeadBucketCommand, GetObjectCommand, PutObjectCommand, CopyObjectCommand,
@@ -10,7 +10,7 @@ import sharp from 'sharp';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 
 for (const [name, value] of Object.entries({
-  Driver, query, MetadataCredentialsProvider, S3Client, HeadBucketCommand,
+  Driver, query, identifier, fragment, join, MetadataCredentialsProvider, S3Client, HeadBucketCommand,
   GetObjectCommand, PutObjectCommand, CopyObjectCommand, createPresignedPost, sharp,
 })) {
   assert.equal(typeof value, 'function', name + ' must be exported as a function');

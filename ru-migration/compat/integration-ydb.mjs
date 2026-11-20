@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
-import { query, identifier } from '@ydbjs/query';
+import { query, identifier, fragment, join } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
@@ -19,7 +19,7 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
-  const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier })();
+  const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
   assert.deepEqual(schemaHealth, { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false });
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {

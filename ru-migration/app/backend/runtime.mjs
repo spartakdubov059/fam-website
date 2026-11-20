@@ -1,5 +1,5 @@
 import { Driver } from '@ydbjs/core';
-import { query, identifier } from '@ydbjs/query';
+import { query, identifier, fragment, join } from '@ydbjs/query';
 import { MetadataCredentialsProvider } from '@ydbjs/auth/metadata';
 import { createOidcBearerAuthenticator } from './auth/oidc-bearer.mjs';
 import { createDatabaseActorResolver } from './auth/database-actor.mjs';
@@ -92,7 +92,7 @@ export async function createRuntime(env = process.env) {
   await driver.ready();
   const sql = query(driver);
   const probeYdbReadiness = createYdbReadinessProbe(sql);
-  const schemaHealthCheck = createYdbSchemaHealthCheck(sql, { identifier });
+  const schemaHealthCheck = createYdbSchemaHealthCheck(sql, { identifier, fragment, join });
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const agentTaskQueue = createYdbAgentTaskQueue(sql);

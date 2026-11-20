@@ -12,14 +12,15 @@ export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_submission_quotas', 'fam_user_profiles',
 ]);
 
-export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES, identifier } = {}) {
+export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES, identifier, fragment, join } = {}) {
   if (typeof sql !== 'function' || !Array.isArray(tables) || !tables.length
       || typeof identifier !== 'function'
+      || typeof fragment !== 'function' || typeof join !== 'function'
       || tables.some(name => typeof name !== 'string' || !/^fam_[a-z0-9_]+$/.test(name))
       || new Set(tables).size !== tables.length) throw new TypeError('invalid RU schema health configuration');
   return async function checkYdbSchemaHealth() {
-    const statements = tables.map(name => sql.fragment`SELECT * FROM ${identifier(name)} LIMIT 0`);
-    const resultSets = await sql`${sql.join(statements, ';')}`;
+    const statements = tables.map(name => fragment`SELECT * FROM ${identifier(name)} LIMIT 0`);
+    const resultSets = await sql`${join(statements, ';')}`;
     if (!Array.isArray(resultSets) || resultSets.length !== tables.length) throw new Error('invalid RU schema probe result');
     return Object.freeze({ ok: true, tables_checked: tables.length, content_read: false, write_permissions_checked: false });
   };
