@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 20 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, ветка RU `migration/yandex-cloud` `22c05a7e90211e12a5f989b40d1adc5707fcfe71`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Число файлов не означает эквивалентность. Число файлов не означает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 20 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, ветка RU `migration/yandex-cloud` `7fd8f025f089fccbea321c86f9302316af69ac8d`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Проверенные сведения
 
@@ -28,7 +28,7 @@
 
 ## Обновление полноты интерфейса относительно актуального main
 
-- Текущий RU frontend состоит из `ru-migration/app/web/index.html`, `shell-bootstrap.js`, модулей доски/профиля/сообщений/афиши и backend API. В этой ревизии подключён существующий `profile-settings.js` (редактирование имени, фамилии, класса и типа участника), а категория событий получила отдельную кнопку «Афиша», фильтрующую строго по `is_event`; UI тесты и shell isolation test проходят. Это рабочая изолированная оболочка, но она не является полным переносом 311 KB исходного `index.html` SPA.
+- Текущий RU frontend состоит из `ru-migration/app/web/index.html`, `shell-bootstrap.js`, модулей доски/профиля/сообщений/афиши и backend API. В этой ревизии подключён существующий `profile-settings.js` (редактирование имени, фамилии, класса и типа участника), а категория событий получила отдельную кнопку «Афиша», фильтрующую строго по `is_event`. В ограниченных мероприятиях свободные места можно запросить отдельно через активный event occupancy API; запрос не выполняется для всех карточек автоматически. UI tests и shell isolation test проходят. Это рабочая изолированная оболочка, но она не является полным переносом 311 KB исходного `index.html` SPA.
 - Main commit [5496264](https://github.com/spartakdubov059/fam-website/commit/5496264560890d438b93191cbc7340e8ec75e0cd) добавил/изменил mobile tabbar, Afisha cards для announcements/polls, event capacity banners, отображение Afisha при пустом списке объявлений и соответствующие переходы. В RU frontend пока нет идентичного набора разделов и Afisha-визуализации; часть данных доступна через `pulse.js` и board API, но это не UI parity.
 - Следующая работа по полной копии: составить маршрутную/экранную карту исходного SPA, перенести разделы и состояния в RU-модульную архитектуру и для каждой операции использовать только RU API; затем покрыть браузерными сценариями на синтетических данных. Не копировать Supabase browser client, секреты или production-only domain-sync workflow.
 - Полный UI перенос, актуальность всех функций/SQL после `main` `af1f008`, независимый security review и российский облачный staging остаются незавершёнными.
