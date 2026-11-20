@@ -8,6 +8,14 @@ export const FAM_RU_TIMER_UNITS = Object.freeze([
   'fam-ru-site-error-digest.timer',
 ]);
 
+const MAX_RUN_AGE_MS = Object.freeze({
+  'fam-ru-orchestrator-daily-digest.timer': 26 * 60 * 60 * 1000,
+  'fam-ru-pending-media-cleanup.timer': 7 * 60 * 60 * 1000,
+  'fam-ru-runtime-health.timer': 26 * 60 * 60 * 1000,
+  'fam-ru-school-agent-report.timer': 26 * 60 * 60 * 1000,
+  'fam-ru-site-error-digest.timer': 2 * 60 * 60 * 1000,
+});
+
 function parseProperties(stdout) {
   return Object.fromEntries(String(stdout || '').split(/\r?\n/u).filter(Boolean).map((line) => {
     const separator = line.indexOf('=');
@@ -21,7 +29,7 @@ function runSystemctl(args, run = spawnSync) {
   return { ok: true, stdout: result.stdout || '' };
 }
 
-export function analyzeSystemdTimerStates(states, expected = FAM_RU_TIMER_UNITS) {
+export function analyzeSystemdTimerStates(states, expected = FAM_RU_TIMER_UNITS, nowMs = Date.now()) {
   const byUnit = new Map((Array.isArray(states) ? states : []).map((state) => [state.unit, state]));
   const timers = expected.map((unit) => {
     const state = byUnit.get(unit);
@@ -30,16 +38,23 @@ export function analyzeSystemdTimerStates(states, expected = FAM_RU_TIMER_UNITS)
     const enabled = state?.enabled === true;
     const active = state?.activeState === 'active';
     const nextScheduled = typeof state?.nextElapse === 'string' && state.nextElapse !== '' && state.nextElapse !== 'n/a';
-    return { unit, configured, enabled, active, nextScheduled, ok: configured && enabled && active && nextScheduled };
+    const lastRunMs = typeof state?.lastRunAt === 'string' ? Date.parse(state.lastRunAt) : NaN;
+    const lastRunFresh = Number.isFinite(lastRunMs) && lastRunMs <= nowMs && nowMs - lastRunMs <= (MAX_RUN_AGE_MS[unit] ?? 0);
+    const lastRunSucceeded = state?.lastRunResult === 'success' && state?.lastRunCode === 'exited' && state?.lastRunStatus === '0';
+    return { unit, configured, enabled, active, nextScheduled, lastRunSucceeded, lastRunFresh,
+      ok: configured && enabled && active && nextScheduled && lastRunSucceeded && lastRunFresh };
   });
   return { ok: timers.every((timer) => timer.ok), timers };
 }
 
-export function checkSystemdTimerHealth({ run = spawnSync, expected = FAM_RU_TIMER_UNITS } = {}) {
+export function checkSystemdTimerHealth({ run = spawnSync, expected = FAM_RU_TIMER_UNITS, nowMs = Date.now() } = {}) {
   const states = expected.map((unit) => {
     const properties = runSystemctl(['show', unit, '--property=LoadState,ActiveState,NextElapseUSecRealtime,Unit'], run);
     const enabledResult = runSystemctl(['is-enabled', unit], run);
+    const serviceUnit = unit.replace(/\.timer$/u, '.service');
+    const serviceProperties = runSystemctl(['show', serviceUnit, '--property=Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestamp'], run);
     const props = parseProperties(properties.stdout);
+    const service = parseProperties(serviceProperties.stdout);
     return {
       unit,
       loadState: properties.ok ? props.LoadState : 'unavailable',
@@ -47,7 +62,11 @@ export function checkSystemdTimerHealth({ run = spawnSync, expected = FAM_RU_TIM
       nextElapse: properties.ok ? props.NextElapseUSecRealtime : '',
       serviceUnit: properties.ok ? props.Unit : '',
       enabled: enabledResult.ok && enabledResult.stdout.trim() === 'enabled',
+      lastRunResult: serviceProperties.ok ? service.Result : '',
+      lastRunCode: serviceProperties.ok ? service.ExecMainCode : '',
+      lastRunStatus: serviceProperties.ok ? service.ExecMainStatus : '',
+      lastRunAt: serviceProperties.ok ? service.ExecMainStartTimestamp : '',
     };
   });
-  return analyzeSystemdTimerStates(states, expected);
+  return analyzeSystemdTimerStates(states, expected, nowMs);
 }
