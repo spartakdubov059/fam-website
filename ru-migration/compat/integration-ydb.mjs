@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 21091)
-Total output lines: 881
-
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
@@ -223,7 +220,453 @@ try {
   assert.equal(liftedRecord[0][0].lifted_by, '33333333-3333-4333-8333-333333333333');
   const clearedSuspension = await sql`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
   assert.equal(clearedSuspension[0].length, 0, 'lifting removes the open key atomically with the audit record');
-  const finalSuspensionAudit = await sql`SELECT action FROM fam_…11091 tokens truncated… === 'threat_or_intimidation'));
+  const finalSuspensionAudit = await sql`SELECT action FROM fam_account_suspension_audit WHERE target_id = '11111111-1111-4111-8111-111111111111' ORDER BY created_at ASC;`;
+  assert.deepEqual(finalSuspensionAudit[0].map(row => row.action), ['issued', 'lifted']);
+  const staleAdminAuth = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-stale-admin', { action: 'lift' }));
+  assert.equal(staleAdminAuth.status, 403);
+  const roleTargets = await listingsApi(apiRequest('GET', '/api/v1/role-management/targets', 'synthetic-admin'));
+  assert.equal(roleTargets.status, 200);
+  assert.ok(roleTargets.body.targets.some(row => row.id === '77777777-7777-4777-8777-777777777777'));
+  assert.ok(!roleTargets.body.targets.some(row => row.id === '33333333-3333-4333-8333-333333333333'), 'administrator cannot demote self');
+  const revokeCouncilRole = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/77777777-7777-4777-8777-777777777777', 'synthetic-admin', { action: 'revoke' }));
+  assert.deepEqual(revokeCouncilRole, { status: 200, body: { ok: true, target_id: '77777777-7777-4777-8777-777777777777', previous_role: 'council_member', role: 'student' } });
+  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' })).role, 'student');
+  const revokedAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = '77777777-7777-4777-8777-777777777777';`;
+  assert.equal(revokedAudit[0][0].action, 'role_revoked');  assert.equal(revokedAudit[0][0].previous_role, 'council_member');
+  const revokeSecondAdmin = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-admin', { action: 'revoke' }));
+  assert.deepEqual(revokeSecondAdmin, { status: 200, body: { ok: true, target_id: '88888888-8888-4888-8888-888888888888', previous_role: 'school_admin', role: 'student' } });
+  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-admin-target' })).role, 'student');
+  const deniedStaleRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-stale-admin', { action: 'revoke' }));
+  assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
+  const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
+  assert.equal(otherSchoolRevoke.status, 404, 'role revocation cannot cross school boundaries');
+  const pulseAnnouncement = await listingsApi(apiRequest('POST', '/api/v1/pulse/announcements', 'synthetic-admin', {
+    title: 'Проверка школьной доски', body: 'Встреча состоится в пятницу', kind: 'news', school_id: 'other-school', author_id: '22222222-2222-4222-8222-222222222222',
+  }));
+  assert.equal(pulseAnnouncement.status, 201, JSON.stringify(pulseAnnouncement.body));
+  const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
+    question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика', 'Приключения', 'Детектив', 'Научная фантастика', 'Поэзия', 'История', 'Другое'],
+  }));
+  assert.equal(pulsePoll.status, 201);
+  const invalidPulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
+    question: 'Какую книгу обсудим?', options: ['Сказки', ' сказки '],
+  }));
+  assert.equal(invalidPulsePoll.status, 400);
+  const pulseRead = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
+  assert.equal(pulseRead.status, 200);
+  assert.ok(pulseRead.body.announcements.some(row => row.id === pulseAnnouncement.body.id));
+  assert.equal(pulseRead.body.announcements[0].author_id, undefined, 'school pulse never exposes author identity');
+  assert.ok(pulseRead.body.polls.some(row => row.id === pulsePoll.body.id));
+  const pollVoters = ['synthetic-user', 'synthetic-registrant', 'synthetic-role-student', 'synthetic-admin', 'synthetic-council'];
+  for (const [index, token] of pollVoters.entries()) {
+    const vote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, token, { choice_index: index === 4 ? 7 : index * 2 }));
+    assert.equal(vote.status, 201);
+  }  const duplicatePollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-registrant', { choice_index: 0 }));
+  assert.equal(duplicatePollVote.status, 409);
+  const invalidUpperPollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-admin', { choice_index: 8 }));
+  assert.equal(invalidUpperPollVote.status, 400);
+  const otherSchoolPulse = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-other-school'));
+  assert.equal(otherSchoolPulse.status, 200);
+  assert.equal(otherSchoolPulse.body.announcements.length, 0, 'school pulse feed cannot cross school boundaries');
+  const pulseAfterVotes = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
+  const visiblePoll = pulseAfterVotes.body.polls.find(row => row.id === pulsePoll.body.id);
+  assert.equal(visiblePoll.total_votes, 5);
+  assert.deepEqual(visiblePoll.counts, [1, 0, 1, 0, 1, 0, 1, 1], 'eight-choice totals appear only after five synthetic votes');
+  assert.equal(visiblePoll.my_vote, 2);
+  const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
+    reason: 'Repeated unrelated posts in the school group.',
+  }));
+  assert.equal(deletionRequest.status, 202);
+  assert.equal(deletionRequest.body.already_exists, false);
+  const duplicateDeletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
+    reason: 'Repeated unrelated posts in the school group.',
+  }));
+  assert.equal(duplicateDeletionRequest.status, 200);
+  assert.equal(duplicateDeletionRequest.body.request_id, deletionRequest.body.request_id);
+  const deletionQueue = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'));
+  assert.equal(deletionQueue.status, 200);
+  assert.equal(deletionQueue.body.requests.length, 1);
+  assert.equal(Object.hasOwn(deletionQueue.body.requests[0], 'issuer'), false);
+  const ownDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
+  assert.equal(ownDeletionRequests.status, 200);
+  assert.equal(ownDeletionRequests.body.requests.length, 1);
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-lyceum-admin'))).body.requests.length, 0,    'the review queue is restricted to the administrator school');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/deletion-requests/${deletionRequest.body.request_id}`, 'synthetic-admin', {
+    decision: 'reject', review_note: 'Проверено в тестовой школе',
+  })), { status: 200, body: { ok: true, status: 'rejected' } });
+  const updatedOwnDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
+  assert.equal(updatedOwnDeletionRequests.body.requests[0].status, 'rejected');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'))).body.requests.length, 0);
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-registrant'))).status, 403);
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-registrant', {
+    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
+  }))).status, 403);
+  console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
+  const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
+  }));
+  assert.equal(profileSubmission.status, 202);
+  assert.equal(profileSubmission.body.status, 'pending');
+  const privateProfileStatus = await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'));
+  assert.equal(privateProfileStatus.status, 200);
+  assert.equal(privateProfileStatus.body.request.status, 'pending');
+  assert.deepEqual(Object.keys(privateProfileStatus.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
+  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new' }), null,
+    'an access request alone never creates a profile');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-student'))).status, 403,
+    'students cannot read access requests');
+  const profileQueue = await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-lyceum-admin'));
+  assert.equal(profileQueue.status, 200);
+  const profileRequest = profileQueue.body.requests.find(row => row.first_name === 'Тест' && row.last_name === 'Профиль');
+  assert.ok(profileRequest);
+  assert.equal(Object.hasOwn(profileRequest, 'subject'), false, 'review queue omits external identity subjects');  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${profileRequest.request_id}`, 'synthetic-admin', { decision: 'approve' }))).status, 404,
+    'an administrator from another school cannot approve the request');
+  const profileDecision = await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${profileRequest.request_id}`, 'synthetic-lyceum-admin', { decision: 'approve' }));
+  assert.deepEqual(profileDecision, { status: 200, body: { ok: true, status: 'approved' } });
+  const approvedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new' });
+  assert.ok(approvedActor);
+  assert.match(approvedActor.id, /^[0-9a-f-]{36}$/);
+  assert.deepEqual({ school_id: approvedActor.school_id, role: approvedActor.role, first_name: approvedActor.first_name,
+    last_name: approvedActor.last_name, class_name: approvedActor.class_name }, {
+    school_id: 'lyceum_3', role: 'student', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б',
+  });
+  const roleSubmission = await listingsApi(apiRequest('POST', '/api/v1/role-requests', 'synthetic-role-student', { requested_role: 'Участник Ученического совета' }));
+  assert.equal(roleSubmission.status, 202, 'a verified student may request a fixed school role');
+  const roleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));
+  assert.equal(roleStatus.body.role, 'student');
+  assert.equal(roleStatus.body.request.request_id, roleSubmission.body.request_id);
+  const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
+  assert.equal(roleQueue.status, 200);
+  const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
+  assert.ok(roleRequest);
+  assert.equal(roleRequest.requested_role, 'council_member');
+  assert.equal(roleRequest.user_id, '55555555-5555-4555-8555-555555555555');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-lyceum-admin', { action: 'start_review' }))).status, 409,
+    'a different school cannot claim the role request');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { action: 'start_review' }))).status, 200);
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { decision: 'approve' })),
+    { status: 200, body: { ok: true, status: 'approved' } });
+  const elevatedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-student' });
+  assert.equal(elevatedActor.role, 'council_member', 'only the same-school administrator decision grants the role');
+  const elevatedRoleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));  assert.equal(elevatedRoleStatus.body.role, 'council_member', 'the profile UI can refresh its database-backed role after approval');
+  const profileEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-role-student', {
+    first_name: 'Советник', last_name: 'Тестовый', class_name: '9Б', role: 'school_admin', school_id: 'other-school', user_id: 'forged-user',
+  }));
+  assert.equal(profileEdit.status, 200);
+  assert.deepEqual({ role: profileEdit.body.profile.role, school_id: profileEdit.body.profile.school_id,
+    first_name: profileEdit.body.profile.first_name, last_name: profileEdit.body.profile.last_name, class_name: profileEdit.body.profile.class_name }, {
+    role: 'council_member', school_id: 'synthetic-school', first_name: 'Советник', last_name: 'Тестовый', class_name: '9Б',
+  });
+  const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
+  assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
+  const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
+  }));
+  assert.equal(staffProfileSubmission.status, 202);
+  const staffRequest = (await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-lyceum-admin')))
+    .body.requests.find(row => row.first_name === 'Тест' && row.last_name === 'Сотрудник');
+  assert.equal(staffRequest.person_type, 'school_staff');
+  assert.equal(staffRequest.staff_position, 'Учитель');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${staffRequest.request_id}`, 'synthetic-lyceum-admin', { decision: 'approve' }))).status, 200);
+  const pendingStaff = await listingsApi(apiRequest('GET', '/api/v1/staff-verifications', 'synthetic-lyceum-admin'));
+  assert.equal(pendingStaff.status, 200);
+  const staffToVerify = pendingStaff.body.requests.find(row => row.first_name === 'Тест' && row.last_name === 'Сотрудник');
+  assert.ok(staffToVerify);
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/staff-verifications/${staffToVerify.user_id}`, 'synthetic-lyceum-admin', { decision: 'approved' }))).status, 200);
+  const verifiedStaff = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new-staff' });
+  assert.equal(verifiedStaff.person_type, 'school_staff');
+  assert.equal(verifiedStaff.staff_position, 'Учитель');
+  assert.equal(verifiedStaff.staff_verification_status, 'approved');  const legacyStaffEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
+    first_name: 'Тест', last_name: 'Сотрудник после правки',
+  }));
+  assert.equal(legacyStaffEdit.status, 200);
+  assert.equal(legacyStaffEdit.body.profile.person_type, 'school_staff');
+  assert.equal(legacyStaffEdit.body.profile.staff_position, 'Учитель');
+  assert.equal(legacyStaffEdit.body.profile.staff_verification_status, 'approved',
+    'an older profile form that omits category fields preserves verified staff status');
+  const changedStaffPosition = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
+    first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Директор', class_name: '',
+  }));
+  assert.equal(changedStaffPosition.status, 200);
+  assert.equal(changedStaffPosition.body.profile.staff_verification_status, 'pending',
+    'changing a verified staff position requires school administrator review again');
+  const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
+    title: 'Обмен учебниками', description: 'Синтетическое объявление для интеграционной проверки', category: 'Учёба',
+  }));
+  assert.equal(apiSubmission.status, 201);
+  assert.equal(apiSubmission.body.status, 'pending');
+  assert.deepEqual(await repo.listActiveListings(), [], 'API submissions remain invisible before school moderation');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-student', { decision: 'approve' }))).status, 403,
+    'student cannot moderate even when using a valid database-backed identity');
+  const apiApproval = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-admin', { decision: 'approve' }));
+  assert.deepEqual(apiApproval, { status: 200, body: { ok: true, status: 'active' } });
+  assert.equal((await repo.listActiveListings()).length, 1, 'approved API submission becomes visible through public projection');
+  const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
+  const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
+    description: 'Учебник', category: 'Учёба', price_text: 'Бесплатно', is_event: false,
+    event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' });
+  const sets = await sql`SELECT id, user_id, school_id, title, status FROM fam_listings WHERE id = ${listing.id};`;  assert.equal(sets[0].length, 1);
+  assert.equal(sets[0][0].title, title);
+  assert.equal(sets[0][0].user_id, 'synthetic-user');
+  assert.equal(sets[0][0].school_id, 'synthetic-school');
+  assert.equal(sets[0][0].status, 'pending');
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
+  const beforeDirectModeration = await repo.listActiveListings();
+  assert.equal(beforeDirectModeration.length, 1, 'only the separately API-approved item is public');
+  assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
+  assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
+  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
+  const publicListings = await repo.listActiveListings();
+  assert.equal(publicListings.length, 2);
+  const publicDirectListing = publicListings.find(row => row.id === listing.id);
+  assert.ok(publicDirectListing);
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
+    'a same-school member can contact the owner of an active listing');
+  assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
+    'listing owners cannot open a self-conversation');
+  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'other-school'), null,
+    'listing contact lookup cannot cross school boundaries');
+  assert.equal(publicDirectListing.title, title);
+  assert.equal(Object.hasOwn(publicDirectListing, 'user_id'), false);
+  assert.equal(Object.hasOwn(publicDirectListing, 'school_id'), false);
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), true);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
+  assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
+
+  const deletionPhotoKey = 'pending/11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', deletionPhotoKey);
+  const deletable = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
+    title: 'Своё синтетическое объявление', description: 'Проверка удаления владельцем', category: 'Учёба',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletionPhotoKey, photo_status: 'approved', status: 'pending' });
+  assert.equal(await repo.moderateListing(deletable.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.setFavorite('synthetic-user', deletable.id, true), true);
+  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/me/listings', 'synthetic-registrant'))).body.listing_ids, [deletable.id],
+    'private own-listing projection only returns the authenticated student’s active ids');
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-student', null))).status, 404,
+    'a different student cannot remove someone else’s listing');
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-admin', null))).status, 403,
+    'school staff cannot use the ordinary-student self-delete route');
+  const ownDelete = await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-registrant', null));
+  assert.deepEqual(ownDelete, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.deepEqual(deletedMediaKeys, [deletionPhotoKey]);
+  assert.equal((await repo.listActiveListings()).some(row => row.id === deletable.id), false);
+  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletionPhotoKey};`)?.[0]?.length ?? 0, 0,
+    'deleted listing cleanup removes its media registry entry after the object store confirms deletion');
+  const idea = await repo.createIdea({ user_id: 'synthetic-user', school_id: 'synthetic-school',
+    text: 'Синтетическая идея книжного обмена', ai_status: 'pending', ai_summary: 'Синтетическая идея',
+    ai_reason: 'review_unavailable', admin_status: 'new' });
+  const ideaRows = await sql`SELECT user_id, school_id, text, ai_status, admin_status FROM fam_ideas WHERE id = ${idea.id};`;
+  assert.equal(ideaRows[0][0].user_id, 'synthetic-user');
+  assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
+  assert.equal(ideaRows[0][0].ai_status, 'pending');
+  assert.equal(ideaRows[0][0].admin_status, 'new');
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-admin', { decision: 'approve' })),
+    { status: 200, body: { ok: true, ai_status: 'approved' } });
+  const reviewedIdeaRows = await sql`SELECT ai_status FROM fam_ideas WHERE id = ${idea.id};`;  assert.equal(reviewedIdeaRows[0][0].ai_status, 'approved', 'school review publishes only an explicitly approved pending idea');
+  assert.equal((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0][0].action,
+    'idea_text_approved', 'school text decisions are auditable without recording the idea text');
+  const linkedListingId = '99999999-9999-4999-8999-999999999999';
+  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
+  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, listing_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
+  assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(messageRows[0][0].school_id, 'synthetic-school');
+  assert.equal(messageRows[0][0].listing_id, linkedListingId);
+  assert.equal(messageRows[0][0].is_read, false);
+  assert.deepEqual((await repo.listMessages('synthetic-user', 'synthetic-school')).map(row => row.id), [message.id]);
+  assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);
+  assert.equal(await repo.markMessageRead('synthetic-user', 'synthetic-school', message.id), false, 'sender cannot mark the recipient inbox as read');
+  assert.equal(await repo.markMessageRead('11111111-1111-4111-8111-111111111111', 'synthetic-school', message.id), true);
+  const readRows = await sql`SELECT is_read FROM fam_messages WHERE id = ${message.id};`;
+  assert.equal(readRows[0][0].is_read, true);
+  await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }), error => error.code === 'recipient_unavailable');
+
+  const pendingMessageResponse = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-user', {
+    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Синтетическое сообщение ожидает школьной проверки',
+  }));
+  assert.equal(pendingMessageResponse.status, 201);
+  assert.deepEqual({ ok: pendingMessageResponse.body.ok, status: pendingMessageResponse.body.status }, { ok: true, status: 'pending' });
+  const pendingMessageId = pendingMessageResponse.body.id;
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), false,
+    'recipient inbox cannot see messages awaiting review');
+  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), true);
+  assert.equal((await repo.listPendingMessages('lyceum_3')).some(row => row.id === pendingMessageId), false,
+    'pending messages are school-scoped');
+  assert.equal(await repo.decidePendingMessage({ messageId: pendingMessageId, schoolId: 'synthetic-school', reviewerId: '44444444-4444-4444-8444-444444444444', decision: 'approve' }), false,    'an administrator from another school cannot approve the message');
+  const messageReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/messages/moderation', 'synthetic-admin', null));
+  assert.equal(messageReviewQueue.status, 200);
+  assert.equal(messageReviewQueue.body.messages.some(row => row.id === pendingMessageId), true);
+  const messageReview = await listingsApi(apiRequest('PATCH', `/api/v1/messages/moderation/${pendingMessageId}`, 'synthetic-admin', { decision: 'approve' }));
+  assert.equal(messageReview.status, 200);
+  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), false);
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), true,
+    'approved message is atomically delivered to the recipient inbox');
+
+  const rejectedPending = await repo.createPendingMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+    school_id: 'synthetic-school', body: 'Синтетическое сообщение будет отклонено' });
+  assert.equal(await repo.decidePendingMessage({ messageId: rejectedPending.id, schoolId: 'synthetic-school', reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'reject' }), true);
+  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === rejectedPending.id), false,
+    'rejected message is never delivered');
+
+  const limitedEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическая встреча с ограниченным числом мест', description: 'Проверка атомарной записи', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-01', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
+  assert.equal(await repo.moderateListing(limitedEvent.id, 'synthetic-school', 'active'), true);
+  const eventApiRequest = apiRequest('POST', `/api/v1/listings/${limitedEvent.id}/registrations`, 'synthetic-registrant', null);
+  const registrationResponse = await listingsApi(eventApiRequest);
+  assert.equal(registrationResponse.status, 201);
+  assert.equal(registrationResponse.body.registration.status, 'confirmed');
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
+  await assert.rejects(repo.registerForEvent(limitedEvent.id, '22222222-2222-4222-8222-222222222222'), error => error.code === 'no_seats_available');
+  assert.equal(await repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'), true);
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
+  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
+    .filter(row => row.event_id === limitedEvent.id).map(row => row.status), ['cancelled']);
+  const concurrentEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое мероприятие для гонки за местом', description: 'Параллельная проверка вместимости', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
+  assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', 'active'), true);
+  const concurrentAttempts = await Promise.allSettled([
+    repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111'),
+    repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222'),
+  ]);
+  assert.equal(concurrentAttempts.filter(result => result.status === 'fulfilled').length, 1,
+    'serializable capacity check permits at most one successful registration for the final seat');
+  assert.equal(await repo.getEventOccupancy(concurrentEvent.id), 1, 'concurrent requests cannot overbook or lose the occupancy count');
+
+  const reviewEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое мероприятие по заявкам', description: 'Проверка школьного решения', category: 'Афиша',
+    price_text: 'Бесплатно', is_event: true, event_date: '2099-05-02', event_time: '12:00', event_type: 'request', max_seats: 0, status: 'pending' });
+  assert.equal(await repo.moderateListing(reviewEvent.id, 'synthetic-school', 'active'), true);
+  const requestResponse = await listingsApi(apiRequest('POST', `/api/v1/listings/${reviewEvent.id}/registrations`, 'synthetic-registrant', null));
+  assert.equal(requestResponse.status, 201);
+  assert.equal(requestResponse.body.registration.status, 'pending');
+  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 1);
+  const reviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-admin'));
+  assert.equal(reviewQueue.status, 200);
+  assert.equal(reviewQueue.body.applications.some(row => row.event_id === reviewEvent.id && row.user_id === '11111111-1111-4111-8111-111111111111'), true,
+    'same-school moderator can see the synthetic pending registration');
+  assert.equal(reviewQueue.body.applications.some(row => row.user_id === '22222222-2222-4222-8222-222222222222'), false,
+    'event review queue excludes registrations from other schools');
+  const studentReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-student'));
+  assert.equal(studentReviewQueue.status, 403, 'students cannot read the event review queue');
+  assert.equal(await repo.moderateEventRegistration(reviewEvent.id, '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'other-school', 'confirmed'), false,    'event registration review is scoped to the event owner school');
+  const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
+  assert.deepEqual(reviewResponse, { status: 200, body: { ok: true, status: 'rejected' } });
+  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 0, 'rejecting a pending request releases its reserved seat');
+  await sql`UPSERT INTO fam_account_suspensions
+    (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
+    VALUES ('synthetic-school', 'synthetic-user', 'synthetic-suspension', 'student', 24,
+      'Synthetic integration suspension', 'active', 'synthetic-admin', CurrentUtcTimestamp(),
+      Unwrap(CurrentUtcTimestamp() + Interval('PT24H')));`;
+  const suspendedWrite = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-user', {
+    title: 'Не должно сохраниться', description: 'Synthetic suspension guard', category: 'Учёба',
+  }));
+  assert.equal(suspendedWrite.status, 403, 'active account suspension blocks authenticated writes');
+  assert.equal(suspendedWrite.body.error, 'account_suspended');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/listings', 'synthetic-user'))).status, 200,
+    'account suspension leaves read access available');
+  assert.equal((await repo.getActiveAccountSuspension('synthetic-school', 'synthetic-user'))?.reason,
+    'Synthetic integration suspension');
+  const photoKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', photoKey);
+  const photoListing = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
+    title: 'Синтетическое объявление с фото', description: 'Изображение остаётся закрытым до отдельного одобрения', category: 'Творчество',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: photoKey,
+    photo_status: 'pending', status: 'pending' });
+  assert.equal(await repo.claimPendingImageDeletion('33333333-3333-4333-8333-333333333333', photoKey), null,
+    'an uploaded image cannot be discarded after it is atomically linked to a listing');
+  assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', 'active'), false,
+    'listing with pending photo cannot become public');
+  assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
+    'pending photo listing remains absent from the public projection');  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', avatarKey);
+  const avatarSubmit = await listingsApi(apiRequest('POST', '/api/v1/me/avatar', 'synthetic-registrant', { image_key: avatarKey }));
+  assert.equal(avatarSubmit.status, 202, 'avatar uploads stay private and enter manual school review');
+  const avatarQueue = await listingsApi(apiRequest('GET', '/api/v1/avatars/moderation', 'synthetic-admin', null));
+  assert.equal(avatarQueue.status, 200);
+  assert.ok(avatarQueue.body.requests.some(item => item.id === avatarSubmit.body.request_id));
+  assert.equal((await repo.listPendingAvatarReviews('other-school')).some(item => item.id === avatarSubmit.body.request_id), false,
+    'other schools cannot discover pending avatars');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-registrant', { decision: 'approve' }))).status, 403,
+    'students cannot approve an avatar');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-admin', { decision: 'approve' }))).status, 200);
+  assert.equal(await repo.isCurrentAvatar(avatarSubmit.body.request_id), true,
+    'approved avatar URL is associated with the reviewed profile');
+  const orphanKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', orphanKey);
+  await sql`UPDATE fam_pending_media SET created_at = Unwrap(CurrentUtcTimestamp() - Interval('P8D')) WHERE object_key = ${orphanKey};`;
+  const expiredMediaClaims = await repo.claimExpiredPendingImages(10);
+  assert.deepEqual(expiredMediaClaims.map(item => item.object_key), [orphanKey],
+    'stale unlinked uploads are claimed while the image attached to a listing is preserved');
+  assert.equal(await repo.finishPendingImageCleanup(orphanKey, expiredMediaClaims[0].claim_token, true), true);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${orphanKey};`)?.[0]?.length ?? 0, 0,
+    'completed cleanup removes the private media registry row');
+  const otherSchoolPending = await repo.createListing({ user_id: '22222222-2222-4222-8222-222222222222', school_id: 'other-school',
+    title: 'Чужое школьное объявление', description: 'Не должно попасть в очередь', category: 'Учёба',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, status: 'pending' });
+  const moderationQueue = await listingsApi(apiRequest('GET', '/api/v1/listings/moderation', 'synthetic-admin'));
+  assert.equal(moderationQueue.status, 200);
+  assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
+  assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');  assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
+  const schoolDeleteMedia = 'pending/55555555-5555-4555-8555-555555555555/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp';
+  await repo.registerPendingImage('55555555-5555-4555-8555-555555555555', schoolDeleteMedia);
+  const schoolDeleteListing = await repo.createListing({ user_id: '55555555-5555-4555-8555-555555555555', school_id: 'synthetic-school',
+    title: 'Синтетическое объявление для удаления администратором', description: 'Тестируется только на одноразовой базе', category: 'Книги',
+    price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: schoolDeleteMedia, photo_status: 'pending', status: 'pending' });
+  accountMediaKeys.add(schoolDeleteMedia);
+  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${otherSchoolPending.id}`, 'synthetic-admin', {
+    confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ',
+  }))).status, 404, 'administrator cannot delete another school listing');
+  const schoolDeleteResult = await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${schoolDeleteListing.id}`, 'synthetic-admin', {
+    confirmation: 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ',
+  }));
+  assert.deepEqual(schoolDeleteResult, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
+  assert.ok(deletedMediaKeys.includes(schoolDeleteMedia), 'school listing deletion removes its registered private image');
+  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${schoolDeleteListing.id};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${schoolDeleteMedia};`)?.[0]?.length ?? 0, 0);
+  const schoolDeleteAudit = await sql`SELECT school_id, actor_id, entity_id, entity_type, action FROM fam_school_content_audit WHERE entity_id = ${schoolDeleteListing.id};`;
+  assert.deepEqual(schoolDeleteAudit?.[0]?.[0], { school_id: 'synthetic-school', actor_id: '33333333-3333-4333-8333-333333333333',
+    entity_id: schoolDeleteListing.id, entity_type: 'listing', action: 'listing_deleted' });
+  const adminOverview = await listingsApi(apiRequest('GET', '/api/v1/school/admin/overview', 'synthetic-admin'));
+  assert.equal(adminOverview.status, 200);
+  assert.ok(adminOverview.body.users.some(row => row.id === '33333333-3333-4333-8333-333333333333'));
+  assert.ok(!adminOverview.body.users.some(row => row.id === '22222222-2222-4222-8222-222222222222'), 'school overview excludes profiles from other schools');
+  assert.ok(adminOverview.body.listings.some(row => row.id === otherSchoolPending.id) === false, 'school overview excludes listings from another school');
+  assert.ok(adminOverview.body.audit.some(row => row.action === 'listing_deleted'), 'school overview returns the recent school action audit');
+  const safetyFingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  for (let i = 0; i < 3; i++) {
+    await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
+      created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)      VALUES ('synthetic-school', ${safetyFingerprint}, 'message', 'targeted_harassment', ${`aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`},
+        ${i === 0 ? 'medium' : 'high'}, CurrentUtcTimestamp(), NULL, NULL, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '11111111-1111-4111-8111-111111111111', 'fam.example.ru', 'synthetic sanitized excerpt');`;
+  }
+  const safetyReports = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
+  assert.equal(safetyReports.status, 200);
+  const safetyGroup = safetyReports.body.reports.find(row => row.fingerprint === safetyFingerprint);
+  assert.equal(safetyGroup.occurrences, 3);
+  assert.equal(safetyGroup.severity, 'high');
+  assert.equal(safetyGroup.actor.first_name, 'Тест');
+  const emittedSafety = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-safety-actor', {
+    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Поступали угрозы в адрес ученика.',
+  }));
+  assert.equal(emittedSafety.status, 201);
+  assert.equal(emittedSafety.body.status, 'pending');
+  assert.equal((await sql`SELECT id FROM fam_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 0,
+    'unreviewed message stays out of the recipient inbox');
+  assert.equal((await sql`SELECT id FROM fam_pending_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 1,
+    'unreviewed message is kept in the school review queue');
+  const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
+    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message' ORDER BY created_at DESC LIMIT 1;`;
+  assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
+  assert.equal(emittedIncident?.[0]?.[0]?.category, 'threat_or_intimidation');
+  assert.equal(emittedIncident?.[0]?.[0]?.severity, 'high');
+  assert.equal(emittedIncident?.[0]?.[0]?.evidence_excerpt, null);
+  const emittedQueue = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
+  assert.ok(emittedQueue.body.reports.some(row => row.category === 'threat_or_intimidation'));
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-lyceum-admin'))).body.reports.length, 0,
     'safety reports are isolated by school');
   assert.deepEqual(await listingsApi(apiRequest('PATCH', '/api/v1/school/admin/safety-reports', 'synthetic-admin', {    fingerprint: safetyFingerprint, category: 'targeted_harassment', source_kind: 'message',
