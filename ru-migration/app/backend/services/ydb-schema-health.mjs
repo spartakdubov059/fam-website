@@ -1,3 +1,5 @@
+import { identifier } from '@ydbjs/query';
+
 export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_account_deletion_jobs', 'fam_account_deletion_open', 'fam_account_deletion_requests',
   'fam_account_suspension_audit', 'fam_account_suspension_open', 'fam_account_suspensions',
@@ -17,9 +19,10 @@ export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES } 
       || tables.some(name => typeof name !== 'string' || !/^fam_[a-z0-9_]+$/.test(name))
       || new Set(tables).size !== tables.length) throw new TypeError('invalid RU schema health configuration');
   return async function checkYdbSchemaHealth() {
-    const statements = tables.map(name => sql.fragment`SELECT * FROM ${sql.identifier(name)} LIMIT 0`);
+    const statements = tables.map(name => sql.fragment`SELECT * FROM ${identifier(name)} LIMIT 0`);
     const resultSets = await sql`${sql.join(statements, ';')}`;
     if (!Array.isArray(resultSets) || resultSets.length !== tables.length) throw new Error('invalid RU schema probe result');
     return Object.freeze({ ok: true, tables_checked: tables.length, content_read: false, write_permissions_checked: false });
   };
 }
+
