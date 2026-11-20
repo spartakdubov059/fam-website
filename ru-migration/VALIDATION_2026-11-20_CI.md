@@ -2,7 +2,7 @@
 
 ## Актуальное уточнение (20 ноября 2026)
 
-- Удалённая `migration/yandex-cloud` сейчас указывает на документационный commit [`a729b6f`](https://github.com/spartakdubov059/fam-website/commit/a729b6f8ed7b80ef5dcb7f421e84412245d63885); его дерево совпадает с локальной копией. Истории Git локальной и удалённой веток расходятся, поэтому обычный push из этой копии не использовать.
+- На момент этой записи удалённая `migration/yandex-cloud` указывает на документационный commit [`7c4586f`](https://github.com/spartakdubov059/fam-website/commit/7c4586f32fef6b4497048fbf77dfa4ae99065d0a), родитель которого — [`a729b6f`](https://github.com/spartakdubov059/fam-website/commit/a729b6f8ed7b80ef5dcb7f421e84412245d63885). В `7c4586f` обновлён только этот журнал. До этого локальное дерево совпадало с `a729b6f`; локальная и удалённая истории Git расходятся, поэтому обычный push из checkout не использовать.
 - Последний commit с изменённым кодом — [`bbb1644`](https://github.com/spartakdubov059/fam-website/commit/bbb1644d1da8614597570655d10c62b4030a2146). Для него завершились успешно [SDK/Sharp CI, run 44667460743](https://github.com/spartakdubov059/fam-website/actions/runs/44667460743) и [одноразовая YDB CI, run 44667460572](https://github.com/spartakdubov059/fam-website/actions/runs/44667460572). Первый workflow проверяет pinned SDK/Sharp и backend suite; второй — схемы и синтетические сценарии на локальной временной YDB с последующей очисткой.
 - Для `a729b6f` новых проверок нет: в нём менялась только документация; предыдущие зелёные workflow относятся к `bbb1644`, не к `a729b6f`.
 - Повторить Node suite локально в текущем checkout не удалось: shell сообщает `node: command not found`. Успехи выше — удалённые CI результаты, а не новый локальный запуск.
