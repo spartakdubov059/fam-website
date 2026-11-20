@@ -7,7 +7,7 @@ on:
       - "ru-migration/compat/**"
       - "ru-migration/app/backend/**"
       - "ru-migration/app/web/**"
-      - "ru-migration/deploy/systemd/**"
+      - "ru-migration/deploy/**"
       - ".github/workflows/fam-ru-sdk-compat.yml"
   workflow_dispatch:
 
@@ -29,6 +29,8 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - name: Build and verify the direct-upload Yandex Cloud Functions package
+        run: node ru-migration/deploy/package-yandex-function.mjs "$RUNNER_TEMP/fam-ru-yandex-function.zip"
       - name: Install locked compatibility dependencies
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Install and test isolated FAM RU backend
