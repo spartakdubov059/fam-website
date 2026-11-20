@@ -11,7 +11,7 @@
 ## Результаты
 
 - Целевые тесты `test/media-api.test.mjs test/avatar-review.test.mjs test/account-suspensions-api.test.mjs`: **28/28**.
-- Полный backend suite `node --test test/*.test.mjs`: **413/413**.
+- Полный backend suite `node --test test/*.test.mjs` на Node 22.15.0: **413/413**.
 - `ru-migration/compat/verify.mjs`: `SDK_COMPAT_PASS` для pinned Sharp/WebP, YDB query-client методов и AWS exports.
 - `git diff --check`: успешно.
 - Combined GitHub status на точном tip: `statuses: []` — CI checks не опубликованы.
