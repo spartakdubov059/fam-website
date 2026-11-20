@@ -27,7 +27,12 @@ function api({ authenticated = identity, resolvedActor = actor, repository = {},
     authenticate: async () => authenticated,
     resolveActor: async () => resolvedActor,
     repository: { getActiveAccountSuspension: async () => null, listAccountMediaKeys: async () => [], ...repository },
-    pendingImages,
+    pendingImages: {
+      listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
+        ...await pendingImages.listUserObjects(userId), ...ownedKeys,
+      ])],
+      ...pendingImages,
+    },
     now: () => clock,
   });
 }
@@ -69,6 +74,17 @@ test('account deletion deactivates first, removes every listed object, then clea
   assert.deepEqual(calls.map(call => call[0]), ['begin', 'list', 'delete', 'finish']);
   assert.equal(calls[0][1].userId, actor.id);
   assert.equal(calls[3][1].schoolId, actor.school_id);
+});
+
+test('account deletion refuses storage adapters without linked-media inventory support', async () => {
+  let began = false;
+  const response = await api({ repository: {
+    beginAccountDeletion: async () => { began = true; }, finishAccountDeletion: async () => ({ ok: true }),
+    restoreAccountAfterDeletionFailure: async () => true,
+  }, pendingImages: { listAccountObjects: undefined, listUserObjects: async () => [], delete: async () => {} } })(request());
+  assert.equal(response.status, 503);
+  assert.equal(response.body.error, 'private_storage_unavailable');
+  assert.equal(began, false);
 });
 
 test('last school administrator cannot delete the account', async () => {
