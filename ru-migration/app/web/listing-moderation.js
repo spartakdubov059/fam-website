@@ -1,465 +1,39 @@
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STAFF_ROLES = new Set(['school_admin', 'council_member']);
-
-function node(document, tag, className, text = '') {
-  const result = document.createElement(tag);
-  if (className) result.className = className;
-  result.textContent = text;
-  return result;
-}
-
-async function json(response) {
-  try { return await response.json(); } catch { return null; }
-}
-
-export async function initializeListingModeration({ document = globalThis.document, fetchImpl = globalThis.fetch,
-  confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message),
-  promptImpl = message => typeof globalThis.prompt === 'function' ? globalThis.prompt(message) : null } = {}) {
-  if (!document || typeof fetchImpl !== 'function') return;
-  const panel = document.getElementById('ruModeration');
-  const status = document.getElementById('ruModerationStatus');
-  const queue = document.getElementById('ruModerationQueue');
-  if (!panel || !status || !queue) return;
-
-  let me;
-  try {
-    const response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
-    if (!response.ok) return;
-    me = await json(response);
-  } catch { return; }
-  if (!me?.ok || !STAFF_ROLES.has(me.profile?.role)) return;
-  panel.hidden = false;
-
-  async function deleteSchoolAccount(account) {
-    if (me.profile.role !== 'school_admin' || !account || !UUID.test(account.id || '')
-        || !['student', 'council_member'].includes(account.role)
-        || account.id.toLowerCase() === String(me.profile.id || '').toLowerCase()) return;
-    const accountCode = account.id.slice(-6).toUpperCase();
-    const displayName = [account.first_name, account.last_name]
-      .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚ ÑƒÑ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ°';
-    if (!confirmImpl(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ #${accountCode} (${displayName})? Ð‘ÑƒÐ´ÑƒÑ‚ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹ ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ðµ Ð¿ÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸Ð¸, Ð¿ÐµÑ€ÐµÐ¿Ð¸ÑÐºÐ¸ Ð¸ Ñ„Ð°Ð¹Ð»Ñ‹.`)) return;
-    const confirmation = 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐÐšÐšÐÐ£ÐÐ¢ Ð£Ð§ÐÐ¡Ð¢ÐÐ˜ÐšÐ';
-    if (promptImpl(`Ð”Ð»Ñ Ð¾ÐºÐ¾Ð½Ñ‡Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾Ð³Ð¾ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ñ Ð²Ð²ÐµÐ´Ð¸Ñ‚Ðµ Ñ‚Ð¾Ñ‡Ð½Ð¾: ${confirmation}`) !== confirmation) {
-      status.textContent = 'Ð£Ð´Ð°Ð»ÐµÐ½Ð¸Ðµ Ð¾Ñ‚Ð¼ÐµÐ½ÐµÐ½Ð¾: Ñ„Ñ€Ð°Ð·Ð° Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Ð½Ðµ ÑÐ¾Ð²Ð¿Ð°Ð»Ð°.';
-      return;
-    }
-    status.textContent = 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÐµÐ¼ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ Ð¯Ð½Ð´ÐµÐºÑ ID Ð¸ ÑƒÐ´Ð°Ð»ÑÐµÐ¼ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚â€¦';
-    try {
-      const response = await fetchImpl(`/api/v1/school/accounts/${encodeURIComponent(account.id)}`, {
-        method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify({ confirmation }),
-      });
-      const result = await json(response);
-      if (result?.error === 'recent_yandex_login_required') {
-        status.replaceChildren(node(document, 'span', '', 'ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚Ðµ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ‡ÐµÑ€ÐµÐ· Ð¯Ð½Ð´ÐµÐºÑ ID, Ð·Ð°Ñ‚ÐµÐ¼ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ. '));
-        const link = node(document, 'a', '', 'ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ'); link.href = '/auth/yandex/start?reauth=1';
-        status.append(link);
-        return;
-      }
-      if (!response.ok || result?.ok !== true) throw new Error('account_deletion_failed');
-      await load();
-      status.textContent = 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚ Ð¸ ÑÐ²ÑÐ·Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ ÑƒÐ´Ð°Ð»ÐµÐ½Ñ‹.';
-    } catch {
-      status.textContent = 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑƒÐ´Ð°Ð»Ð¸Ñ‚ÑŒ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚. ÐŸÑ€Ð¾Ð²ÐµÑ€ÑŒÑ‚Ðµ Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒ Ð¸ ÑÐ¾ÑÑ‚Ð¾ÑÐ½Ð¸Ðµ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚Ð° Ð¿ÐµÑ€ÐµÐ´ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð¾Ð¼.';
-    }
-  }
-
-  async function load() {
-    status.textContent = 'Ð—Ð°Ð³Ñ€ÑƒÐ¶Ð°ÐµÐ¼ Ð¾Ñ‡ÐµÑ€ÐµÐ´ÑŒâ€¦';
-    try {
-      const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse] = await Promise.all([
-        fetchImpl('/api/v1/listings/moderation', options),
-        fetchImpl('/api/v1/event-registrations/review', options),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/staff-verifications', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-requests/review', options)
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, requests: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions', options)
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, suspensions: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/suspensions/targets', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/role-management/targets', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, targets: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/safety-reports', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/messages/moderation', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/technical-alerts', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, alerts: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/overview', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
-        fetchImpl('/api/v1/school/ideas', options).catch(() => ({ ok: false, json: async () => null })),
-      ]);
-      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse)]);
-      if (!response.ok || !result?.ok || !Array.isArray(result.listings)
-        || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
-        || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
-        || !roleResponse.ok || !roleResult?.ok || !Array.isArray(roleResult.requests)) throw new Error('queue_unavailable');
-      queue.replaceChildren();
-      const applications = eventResult.applications.filter(application => application
-        && UUID.test(application.event_id) && UUID.test(application.user_id)
-        && application.status === 'pending' && typeof application.event_title === 'string');
-      const profileRequests = profileResult.requests.filter(request => request && UUID.test(request.request_id)
-        && typeof request.first_name === 'string' && typeof request.last_name === 'string'
-        && typeof request.class_name === 'string' && ['student', 'school_staff', 'parent'].includes(request.person_type));
-      const staffVerificationsAvailable = me.profile.role !== 'school_admin'
-        || (staffVerificationResponse.ok && staffVerificationResult?.ok && Array.isArray(staffVerificationResult.requests));
-      const staffVerifications = me.profile.role === 'school_admin' && staffVerificationsAvailable
-        ? staffVerificationResult.requests.filter(request => request && UUID.test(request.user_id)
-          && typeof request.first_name === 'string' && typeof request.last_name === 'string'
-          && typeof request.staff_position === 'string' && request.staff_position.length <= 100) : [];
-      const roleRequests = roleResult.requests.filter(request => request && UUID.test(request.request_id)
-        && ['council_member', 'school_admin'].includes(request.requested_role)
-        && ['pending', 'reviewing'].includes(request.status));
-      const roleManagementAvailable = me.profile.role !== 'school_admin' || (roleManagementResponse.ok && roleManagementResult?.ok && Array.isArray(roleManagementResult.targets));
-      const roleManagementTargets = me.profile.role === 'school_admin' && roleManagementAvailable
-        ? roleManagementResult.targets.filter(item => item && UUID.test(item.id) && ['council_member', 'school_admin'].includes(item.role)) : [];
-      const suspensionsAvailable = me.profile.role !== 'school_admin'
-        || (suspensionResponse.ok && suspensionResult?.ok && Array.isArray(suspensionResult.suspensions));
-      const suspensions = me.profile.role === 'school_admin' && suspensionsAvailable
-        ? suspensionResult.suspensions.filter(item => item && UUID.test(item.target_id)
-          && ['student', 'council_member'].includes(item.target_role) && typeof item.reason === 'string'
-          && typeof item.expires_at === 'string') : [];
-      const safetyReportsAvailable = me.profile.role !== 'school_admin'
-        || (safetyResponse.ok && safetyResult?.ok && Array.isArray(safetyResult.reports));
-      const safetyReports = me.profile.role === 'school_admin' && safetyReportsAvailable
-        ? safetyResult.reports.filter(item => item && /^[0-9a-f]{64}$/.test(item.fingerprint || '')
-          && ['message', 'idea', 'listing', 'image'].includes(item.source_kind)
-          && ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
-            'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(item.category)
-          && ['medium', 'high'].includes(item.severity) && Number.isInteger(item.occurrences)) : [];
-      const pendingMessagesAvailable = me.profile.role !== 'school_admin'
-        || (pendingMessagesResponse.ok && pendingMessagesResult?.ok && Array.isArray(pendingMessagesResult.messages));
-      const pendingMessages = me.profile.role === 'school_admin' && pendingMessagesAvailable
-        ? pendingMessagesResult.messages.filter(item => item && UUID.test(item.id || '') && UUID.test(item.sender_id || '')
-          && typeof item.body === 'string' && item.body.length > 0 && item.body.length <= 1000) : [];
-      const technicalAlertsAvailable = me.profile.role !== 'school_admin'
-        || (technicalAlertsResponse.ok && technicalAlertsResult?.ok && Array.isArray(technicalAlertsResult.alerts));
-      const technicalAlerts = me.profile.role === 'school_admin' && technicalAlertsAvailable
-        ? technicalAlertsResult.alerts.filter(item => item
-          && ['js_runtime', 'unhandled_rejection', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
-          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(item.page_area)
-          && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
-          && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
-          && Number.isFinite(Date.parse(item.hour_bucket))) : [];
-      const siteErrorDigest = me.profile.role === 'school_admin' && technicalAlertsAvailable
-        ? technicalAlertsResult.digest && typeof technicalAlertsResult.digest.summary === 'string'
-          && technicalAlertsResult.digest.summary.length <= 1000
-          && typeof technicalAlertsResult.digest.digest_slot === 'string'
-          && Number.isFinite(Date.parse(`${technicalAlertsResult.digest.digest_slot}:00Z`))
-          && Number.isFinite(Date.parse(technicalAlertsResult.digest.generated_at || ''))
-          ? technicalAlertsResult.digest : null : null;
-      const schoolOverviewAvailable = me.profile.role !== 'school_admin'
-        || (schoolOverviewResponse.ok && schoolOverviewResult?.ok
-          && ['users', 'listings', 'audit', 'deletion_requests', 'suspensions'].every(key => Array.isArray(schoolOverviewResult[key])));
-      const schoolIdeasAvailable = schoolIdeasResponse.ok && schoolIdeasResult?.ok && Array.isArray(schoolIdeasResult.ideas);
-      const schoolIdeas = schoolIdeasAvailable ? schoolIdeasResult.ideas.filter(item => item && UUID.test(item.id || '')
-        && typeof item.text === 'string' && item.text.length <= 1000
-        && ['pending', 'approved', 'rejected'].includes(item.ai_status)
-        && Array.isArray(item.image_keys) && item.image_keys.length <= 3
-        && ['none', 'pending', 'approved', 'rejected'].includes(item.image_status)) : [];
-      const renderSchoolIdeasPanel = () => {
-        const ideasPanel = node(document, 'section', 'ru-moderation-card');
-        ideasPanel.append(node(document, 'h3', '', 'Ð¨ÐºÐ¾Ð»ÑŒÐ½Ñ‹Ðµ Ð¸Ð´ÐµÐ¸ Ð¸ Ñ„Ð¾Ñ‚Ð¾Ð³Ñ€Ð°Ñ„Ð¸Ð¸'));
-        if (!schoolIdeasAvailable) ideasPanel.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð¿Ñ€ÐµÐ´Ð»Ð¾Ð¶ÐµÐ½Ð¸Ñ ÑˆÐºÐ¾Ð»Ñ‹.'));
-        else if (!schoolIdeas.length) ideasPanel.append(node(document, 'p', '', 'ÐÐ¾Ð²Ñ‹Ñ… Ð¿Ñ€ÐµÐ´Ð»Ð¾Ð¶ÐµÐ½Ð¸Ð¹ Ð½ÐµÑ‚.'));
-        for (const idea of schoolIdeas) {
-          const card = node(document, 'article', 'ru-moderation-card');
-          card.append(node(document, 'p', '', idea.text));
-          card.append(node(document, 'p', 'ru-note', idea.ai_status === 'pending' ? 'Ð¢ÐµÐºÑÑ‚ Ð¾Ð¶Ð¸Ð´Ð°ÐµÑ‚ Ñ€ÐµÑˆÐµÐ½Ð¸Ñ ÑˆÐºÐ¾Ð»Ñ‹.'
-            : idea.ai_status === 'approved' ? 'Ð¢ÐµÐºÑÑ‚ Ð¾Ð´Ð¾Ð±Ñ€ÐµÐ½ ÑˆÐºÐ¾Ð»Ð¾Ð¹.' : 'Ð¢ÐµÐºÑÑ‚ Ð¾Ñ‚ÐºÐ»Ð¾Ð½Ñ‘Ð½ ÑˆÐºÐ¾Ð»Ð¾Ð¹.'));
-          if (idea.ai_status === 'pending') {
-            const textActions = node(document, 'div', 'ru-moderation-actions');
-            textActions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ñ‚ÐµÐºÑÑ‚', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'approve' })));
-            textActions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ñ‚ÐµÐºÑÑ‚', () => patch(`/api/v1/school/ideas/${idea.id}/moderation`, { decision: 'reject' })));
-            card.append(textActions);
-          }
-          const validKeys = idea.image_keys.every(key => typeof key === 'string'
-            && /^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(key));
-          if (idea.image_status === 'pending' && validKeys && idea.image_keys.length) {
-            idea.image_keys.forEach((_, index) => {
-              const image = document.createElement('img');
-              image.className = 'ru-listing-photo';
-              image.src = `/api/v1/ideas/${idea.id}/images/${index}`;
-              image.alt = `Ð¤Ð¾Ñ‚Ð¾ Ðº ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¸Ð´ÐµÐµ ${index + 1}`;
-              image.loading = 'lazy';
-              image.referrerPolicy = 'no-referrer';
-              card.append(image);
-            });
-            const actions = node(document, 'div', 'ru-moderation-actions');
-            actions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾', () => patch(`/api/v1/school/ideas/${idea.id}/images`, { decision: 'approve' })));
-            actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾', () => patch(`/api/v1/school/ideas/${idea.id}/images`, { decision: 'reject' })));
-            card.append(actions);
-          } else if (idea.image_status === 'approved') {
-            card.append(node(document, 'p', '', 'Ð¤Ð¾Ñ‚Ð¾ Ð¾Ð´Ð¾Ð±Ñ€ÐµÐ½Ñ‹ Ð¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹ ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ ÐºÐ¾Ð¼Ð°Ð½Ð´Ðµ.'));
-          } else if (idea.image_status === 'rejected') {
-            card.append(node(document, 'p', '', 'Ð¤Ð¾Ñ‚Ð¾ Ð¾Ñ‚ÐºÐ»Ð¾Ð½ÐµÐ½Ñ‹.'));
-          }
-          ideasPanel.append(card);
-        }
-        queue.append(ideasPanel);
-      };
-      if (me.profile.role === 'school_admin' && suspensionTargetsResponse.ok && suspensionTargetsResult?.ok && Array.isArray(suspensionTargetsResult.targets)) {
-        const targets = suspensionTargetsResult.targets.filter(item => item && UUID.test(item.id) && ['student', 'council_member'].includes(item.role));
-        if (targets.length) {
-          const panel = node(document, 'section', 'ru-moderation-card');
-          panel.append(node(document, 'h3', '', 'Ð’Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ðµ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ð¹ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚Ð°'));
-          const note = node(document, 'p', '', 'Ð”Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð°Ð¼ ÑÑ‚Ð¾Ð¹ ÑˆÐºÐ¾Ð»Ñ‹ Ð¿Ð¾ÑÐ»Ðµ ÑÐ²Ð½Ð¾Ð³Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Ñ‡ÐµÑ€ÐµÐ· Ð¯Ð½Ð´ÐµÐºÑ ID. Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ ÑÑ€Ð¾Ðº Ð¸ ÑƒÐºÐ°Ð¶Ð¸Ñ‚Ðµ Ñ„Ð°ÐºÑ‚Ð¸Ñ‡ÐµÑÐºÑƒÑŽ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ Ð±ÐµÐ· Ð»Ð¸Ñ‡Ð½Ñ‹Ñ… Ð´Ð°Ð½Ð½Ñ‹Ñ….');
-          const form = document.createElement('form'); form.className = 'ru-suspension-form';
-          const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚');
-          const prompt = node(document, 'option', '', 'Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);
-          for (const target of targets) {
-            const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
-            const option = node(document, 'option', '', `${name || 'Ð£Ñ‡ÐµÐ½Ð¸Ðº'} Â· ${target.role === 'student' ? 'ÑƒÑ‡ÐµÐ½Ð¸Ðº' : 'Ð¡Ð¾Ð²ÐµÑ‚'}`);
-            option.value = target.id; select.append(option);
-          }
-          const duration = document.createElement('select'); duration.required = true; duration.setAttribute('aria-label', 'Ð¡Ñ€Ð¾Ðº Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ñ');
-          for (const [hours, label] of [[24, '24 Ñ‡Ð°ÑÐ°'], [72, '3 Ð´Ð½Ñ'], [168, '7 Ð´Ð½ÐµÐ¹']]) { const option = node(document, 'option', '', label); option.value = String(hours); duration.append(option); }
-          const reason = document.createElement('textarea'); reason.required = true; reason.minLength = 15; reason.maxLength = 400; reason.placeholder = 'ÐŸÑ€Ð¸Ñ‡Ð¸Ð½Ð° (15â€“400 ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð², Ð±ÐµÐ· ÐºÐ¾Ð½Ñ‚Ð°ÐºÑ‚Ð¾Ð²)';
-          const issueSuspension = async () => {
-            if (!UUID.test(select.value || '') || reason.value.trim().length < 15 || reason.value.trim().length > 400) { status.textContent = 'Ð’Ñ‹Ð±ÐµÑ€Ð¸Ñ‚Ðµ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ Ð¸ ÑƒÐºÐ°Ð¶Ð¸Ñ‚Ðµ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ Ð´Ð»Ð¸Ð½Ð¾Ð¹ 15â€“400 ÑÐ¸Ð¼Ð²Ð¾Ð»Ð¾Ð².'; return; }
-            await patch(`/api/v1/suspensions/${select.value}`, { action: 'issue', duration_hours: Number(duration.value), reason: reason.value.trim() });
-          };
-          const submit = actionButton(document, 'Ð£ÑÑ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ðµ', issueSuspension);
-          form.addEventListener('submit', async event => { event.preventDefault(); await issueSuspension(); });
-          form.append(select, duration, reason, submit); panel.append(note, form); queue.append(panel);
-        }
-      }
-      if (me.profile.role === 'school_admin' && roleManagementTargets.length) {
-        const panel = node(document, 'section', 'ru-moderation-card');
-        panel.append(node(document, 'h3', '', 'Ð£Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð¾Ð»Ð½Ð¾Ð¼Ð¾Ñ‡Ð¸ÑÐ¼Ð¸ ÑˆÐºÐ¾Ð»Ñ‹'));
-        panel.append(node(document, 'p', '', 'ÐŸÐ¾ÑÐ»Ðµ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Ð¿Ð¾Ð»Ð½Ð¾Ð¼Ð¾Ñ‡Ð¸Ð¹ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ Ð¾ÑÑ‚Ð°Ð½ÐµÑ‚ÑÑ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ð¼.'));
-        for (const target of roleManagementTargets) {
-          const row = node(document, 'div', 'ru-moderation-actions');
-          const name = [target.first_name, target.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
-          row.append(node(document, 'span', '', `${name || 'ÐŸÐ¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»ÑŒ'} Â· ${target.role === 'school_admin' ? 'Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€ ÑˆÐºÐ¾Ð»Ñ‹' : 'ÑƒÑ‡Ð°ÑÑ‚Ð½Ð¸Ðº Ð¡Ð¾Ð²ÐµÑ‚Ð°'}${target.class_name ? ` Â· ${target.class_name}` : ''}`));
-          row.append(actionButton(document, 'Ð¡Ð½ÑÑ‚ÑŒ Ñ€Ð¾Ð»ÑŒ', async () => {
-            const confirmAction = document.defaultView?.confirm || globalThis.confirm;
-            if (!confirmAction || !confirmAction(`Ð¡Ð½ÑÑ‚ÑŒ Ñ€Ð¾Ð»ÑŒ Ñƒ ${name || 'Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»Ñ'}? ÐÐºÐºÐ°ÑƒÐ½Ñ‚ Ð¾ÑÑ‚Ð°Ð½ÐµÑ‚ÑÑ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ð¼.`)) return;
-            await patch(`/api/v1/role-management/${target.id}`, { action: 'revoke' });
-          }));
-          panel.append(row);
-        }
-        queue.append(panel);
-      }
-      const renderSafetyPanel = () => {
-        if (me.profile.role !== 'school_admin') return;
-        const safetyPanel = node(document, 'section', 'ru-moderation-card');
-        safetyPanel.append(node(document, 'h3', '', 'Ð¡Ð¸Ð³Ð½Ð°Ð»Ñ‹ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸'));
-        safetyPanel.append(node(document, 'p', '', 'Ð¡Ð²Ð¾Ð´ÐºÐ° Ð½ÐµÐ¿Ð¾Ð»Ð½Ð°Ñ: ÑÐ¸ÑÑ‚ÐµÐ¼Ð° Ð·Ð°Ð¿Ð¸ÑÑ‹Ð²Ð°ÐµÑ‚ Ð»Ð¾ÐºÐ°Ð»ÑŒÐ½Ð¾ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð½Ñ‹Ðµ ÑƒÐ³Ñ€Ð¾Ð·Ñ‹ Ð¸ Ð´Ð¸ÑÐºÑ€Ð¸Ð¼Ð¸Ð½Ð°Ñ†Ð¸ÑŽ; Ð´Ñ€ÑƒÐ³Ð¸Ðµ ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹ Ð¿Ð¾ÐºÐ° Ð½Ðµ Ð¿ÐµÑ€ÐµÐ½ÐµÑÐµÐ½Ñ‹.'));
-        if (!safetyReportsAvailable) safetyPanel.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½Ð½Ñ‹Ðµ ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹.'));
-        const categoryNames = { targeted_harassment: 'Ð¢Ñ€Ð°Ð²Ð»Ñ', hate_or_discrimination: 'ÐÐµÐ½Ð°Ð²Ð¸ÑÑ‚ÑŒ Ð¸Ð»Ð¸ Ð´Ð¸ÑÐºÑ€Ð¸Ð¼Ð¸Ð½Ð°Ñ†Ð¸Ñ',
-          threat_or_intimidation: 'Ð£Ð³Ñ€Ð¾Ð·Ð° Ð¸Ð»Ð¸ Ð·Ð°Ð¿ÑƒÐ³Ð¸Ð²Ð°Ð½Ð¸Ðµ', negative_personal_call: 'ÐžÑÐºÐ¾Ñ€Ð±Ð»ÐµÐ½Ð¸Ðµ',
-          spam_or_repeated_abuse: 'Ð¡Ð¿Ð°Ð¼ Ð¸Ð»Ð¸ Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€Ð½Ð¾Ðµ Ð½Ð°Ñ€ÑƒÑˆÐµÐ½Ð¸Ðµ', unsafe_image: 'ÐÐµÐ±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾Ðµ Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ',
-          personal_data_in_image: 'Ð›Ð¸Ñ‡Ð½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð½Ð° Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ð¸', unclear_safety_signal: 'Ð”Ñ€ÑƒÐ³Ð¾Ð¹ ÑÐ¸Ð³Ð½Ð°Ð» Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸' };
-        const sourceNames = { message: 'ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ', idea: 'Ð¸Ð´ÐµÑ', listing: 'Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ', image: 'Ð¸Ð·Ð¾Ð±Ñ€Ð°Ð¶ÐµÐ½Ð¸Ðµ' };
-        for (const report of safetyReports) {
-          const card = node(document, 'article', 'ru-moderation-card');
-          card.append(node(document, 'h4', '', `${report.severity === 'high' ? 'Ð’Ñ‹ÑÐ¾ÐºÐ°Ñ' : 'Ð¡Ñ€ÐµÐ´Ð½ÑÑ'} Ð²Ð°Ð¶Ð½Ð¾ÑÑ‚ÑŒ Â· ${categoryNames[report.category]}`));
-          card.append(node(document, 'p', '', `Ð˜ÑÑ‚Ð¾Ñ‡Ð½Ð¸Ðº: ${sourceNames[report.source_kind]} Â· ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€ÐµÐ½Ð¸Ð¹: ${report.occurrences}`));
-          const personName = person => person ? [person.first_name, person.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ') || `ÐÐºÐºÐ°ÑƒÐ½Ñ‚ ${person.account_code || ''}` : 'ÐÐµÐ¸Ð·Ð²ÐµÑÑ‚Ð½Ð¾';
-          card.append(node(document, 'p', '', `Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº: ${personName(report.actor)} Â· Ð—Ð°Ñ‚Ñ€Ð¾Ð½ÑƒÑ‚: ${personName(report.target)}`));
-          if (typeof report.evidence_excerpt === 'string') card.append(node(document, 'p', '', `Ð¤Ñ€Ð°Ð³Ð¼ÐµÐ½Ñ‚: ${report.evidence_excerpt}`));
-          if (typeof report.source_origin === 'string') card.append(node(document, 'p', '', `Ð Ð°Ð·Ð´ÐµÐ»: ${report.source_origin}`));
-          if (typeof report.last_seen === 'string') card.append(node(document, 'p', '', `ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¹ ÑÐ¸Ð³Ð½Ð°Ð»: ${new Date(report.last_seen).toLocaleString('ru-RU')}`));
-          card.append(actionButton(document, 'ÐžÑ‚Ð¼ÐµÑ‚Ð¸Ñ‚ÑŒ Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ÐµÐ½Ð½Ñ‹Ð¼', () => patch('/api/v1/school/admin/safety-reports', {
-            fingerprint: report.fingerprint, category: report.category, source_kind: report.source_kind,
-          })));
-          safetyPanel.append(card);
-        }
-        queue.append(safetyPanel);
-      };
-      const renderPendingMessagesPanel = () => {
-        if (me.profile.role !== 'school_admin') return;
-        const reviewPanel = node(document, 'section', 'ru-moderation-card');
-        reviewPanel.append(node(document, 'h3', '', 'Ð¡Ð¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ Ð½Ð° ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐµ'));
-        if (!pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ Ð½Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÑƒ.'));
-        if (!pendingMessages.length && pendingMessagesAvailable) reviewPanel.append(node(document, 'p', '', 'Ð¡Ð¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ð¹ Ð½Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐµ Ð½ÐµÑ‚.'));
-        for (const message of pendingMessages) {
-          const card = node(document, 'article', 'ru-moderation-card');
-          card.append(node(document, 'p', '', `ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÐµÐ»ÑŒ Â· ${message.sender_id.slice(-6).toUpperCase()}`));
-          card.append(node(document, 'p', '', message.body));
-          if (typeof message.created_at === 'string') card.append(node(document, 'p', '', `ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ð¾: ${new Date(message.created_at).toLocaleString('ru-RU')}`));
-          const actions = node(document, 'div', 'ru-moderation-actions');
-          actions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ð¸ Ð´Ð¾ÑÑ‚Ð°Ð²Ð¸Ñ‚ÑŒ', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'approve' })));
-          actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ', () => patch(`/api/v1/messages/moderation/${message.id}`, { decision: 'reject' })));
-          card.append(actions); reviewPanel.append(card);
-        }
-        queue.append(reviewPanel);
-      };
-      const renderTechnicalAlertsPanel = () => {
-        if (me.profile.role !== 'school_admin') return;
-        const alertsPanel = node(document, 'section', 'ru-moderation-card');
-        alertsPanel.append(node(document, 'h3', '', 'Ð¢ÐµÑ…Ð½Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ Ð¿Ñ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ñ FAM Ð·Ð° ÑÑƒÑ‚ÐºÐ¸'));
-        alertsPanel.append(node(document, 'p', '', 'ÐžÐ±Ñ‰Ð¸Ðµ ÑÑ‡Ñ‘Ñ‚Ñ‡Ð¸ÐºÐ¸ Ð¾ÑˆÐ¸Ð±Ð¾Ðº ÑÐ°Ð¹Ñ‚Ð°. Ð’ Ð½Ð¸Ñ… Ð½ÐµÑ‚ Ñ‚ÐµÐºÑÑ‚Ð° Ð¾ÑˆÐ¸Ð±Ð¾Ðº Ð¸Ð»Ð¸ ÑÐ²ÐµÐ´ÐµÐ½Ð¸Ð¹ Ð¾Ð± Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚Ð°Ñ….'));
-        if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ñ‚ÐµÑ…Ð½Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ Ð¿Ñ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ñ.'));
-        if (siteErrorDigest) {
-          alertsPanel.append(node(document, 'h4', '', 'ÐŸÐ¾ÑÐ»ÐµÐ´Ð½ÑÑ Ñ„Ð¾Ð½Ð¾Ð²Ð°Ñ ÑÐ²Ð¾Ð´ÐºÐ°'));
-          alertsPanel.append(node(document, 'p', '', siteErrorDigest.summary));
-          alertsPanel.append(node(document, 'p', 'ru-note', `Ð˜Ð½Ñ‚ÐµÑ€Ð²Ð°Ð» UTC: ${siteErrorDigest.digest_slot} Â· ÑÐ¾Ð·Ð´Ð°Ð½Ð¾ ${new Date(siteErrorDigest.generated_at).toLocaleString('ru-RU')}`));
-        }
-        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'ÐŸÐ¾Ñ€Ð¾Ð³Ð¾Ð²Ñ‹Ñ… Ð¿Ð¾Ð²Ñ‚Ð¾Ñ€ÑÑŽÑ‰Ð¸Ñ…ÑÑ ÑÐ±Ð¾ÐµÐ² Ð½Ðµ Ð¾Ð±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½Ð¾.'));
-        const codeNames = { js_runtime: 'ÐžÑˆÐ¸Ð±ÐºÐ° Ð¸Ð½Ñ‚ÐµÑ€Ñ„ÐµÐ¹ÑÐ°', unhandled_rejection: 'Ð¡Ð±Ð¾Ð¹ Ñ„Ð¾Ð½Ð¾Ð²Ð¾Ð¹ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ð¸Ð¸', supabase_sdk_unavailable: 'Ð¡Ð»ÑƒÐ¶Ð±Ð° Ð´Ð°Ð½Ð½Ñ‹Ñ… Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð°',
-          listings_load_failed: 'ÐÐµ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ð»Ð¸ÑÑŒ Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ñ', notifications_load_failed: 'ÐÐµ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ð»Ð¸ÑÑŒ ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ',
-          database_request_failed: 'ÐžÑˆÐ¸Ð±ÐºÐ° Ð±Ð°Ð·Ñ‹ Ð´Ð°Ð½Ð½Ñ‹Ñ…', auth_backend_failed: 'ÐžÑˆÐ¸Ð±ÐºÐ° Ð²Ñ…Ð¾Ð´Ð°' };
-        const areaNames = { auth: 'Ð²Ñ…Ð¾Ð´', listings: 'Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ñ', notifications: 'ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ', database: 'Ð±Ð°Ð·Ð° Ð´Ð°Ð½Ð½Ñ‹Ñ…', other: 'Ð´Ñ€ÑƒÐ³Ð¾Ðµ' };
-        for (const alert of technicalAlerts) {
-          const card = node(document, 'article', 'ru-moderation-card');
-          card.append(node(document, 'h4', '', `${alert.severity === 'critical' ? 'ÐšÑ€Ð¸Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸Ð¹ ÑÐ±Ð¾Ð¹' : 'ÐŸÑ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ðµ'} Â· ${codeNames[alert.event_code]}`));
-          card.append(node(document, 'p', '', `Ð Ð°Ð·Ð´ÐµÐ»: ${areaNames[alert.page_area]} Â· Ð¡Ð¾Ð±Ñ‹Ñ‚Ð¸Ð¹ Ð·Ð° Ñ‡Ð°Ñ: ${alert.event_count}`));
-          card.append(node(document, 'p', '', `Ð§Ð°Ñ UTC: ${new Date(alert.hour_bucket).toLocaleString('ru-RU', { timeZone: 'UTC' })}`));
-          alertsPanel.append(card);
-        }
-        queue.append(alertsPanel);
-      };
-      const renderSchoolOverviewPanel = () => {
-        if (me.profile.role !== 'school_admin') return;
-        const overview = node(document, 'section', 'ru-moderation-card');
-        overview.append(node(document, 'h3', '', 'ÐžÐ±Ð·Ð¾Ñ€ ÑˆÐºÐ¾Ð»Ñ‹'));
-        if (!schoolOverviewAvailable) {
-          overview.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð¾Ð±Ð·Ð¾Ñ€ ÑˆÐºÐ¾Ð»Ñ‹. ÐŸÐ¾Ð²Ñ‚Ð¾Ñ€Ð¸Ñ‚Ðµ Ð¿Ð¾Ð¿Ñ‹Ñ‚ÐºÑƒ Ð¿Ð¾Ð·Ð¶Ðµ.'));
-          queue.append(overview);
-          return;
-        }
-        const users = schoolOverviewResult.users.filter(item => item && UUID.test(item.id || '')
-          && ['student', 'council_member', 'school_admin'].includes(item.role));
-        const listings = schoolOverviewResult.listings.filter(item => item && UUID.test(item.id || '')
-          && ['active', 'pending', 'rejected', 'removed'].includes(item.status));
-        const deletionRequests = schoolOverviewResult.deletion_requests.filter(item => item && UUID.test(item.id || '')
-          && ['student', 'council_member'].includes(item.target_role) && ['pending', 'processing'].includes(item.status));
-        const suspensions = schoolOverviewResult.suspensions.filter(item => item && UUID.test(item.target_id || '')
-          && ['student', 'council_member'].includes(item.target_role));
-        overview.append(node(document, 'p', '', `Ð’ Ð²Ñ‹Ð±Ð¾Ñ€ÐºÐµ: Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÐµÐ¹ â€” ${users.length}, Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð¿ÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸Ð¹ â€” ${listings.filter(item => item.status === 'active').length}, Ð¾Ð¶Ð¸Ð´Ð°ÑŽÑ‚ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ â€” ${listings.filter(item => item.status === 'pending').length}, Ð·Ð°ÑÐ²Ð¾Ðº Ð½Ð° ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸Ðµ â€” ${deletionRequests.length}, Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ð¹ â€” ${suspensions.length}.`));
-        overview.append(node(document, 'p', '', 'Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ð¼Ð¸ 100 Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÑÐ¼Ð¸ Ð¸ Ð¿ÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸ÑÐ¼Ð¸, 50 Ð·Ð°ÑÐ²ÐºÐ°Ð¼Ð¸ Ð¸ 100 Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸ÑÐ¼Ð¸.'));
-        const accounts = node(document, 'section', 'ru-school-account-list');
-        accounts.append(node(document, 'h4', '', 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚Ñ‹ ÑˆÐºÐ¾Ð»Ñ‹'));
-        accounts.append(node(document, 'p', 'ru-note', 'Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ÐºÐ°Ð·Ñ‹Ð²Ð°ÐµÑ‚ Ð´Ð¾ 100 Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÐµÐ¹. Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð¼Ð¾Ð¶Ð½Ð¾ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ ÑƒÑ‡ÐµÐ½Ð¸ÐºÐ° Ð¸Ð»Ð¸ Ð¡Ð¾Ð²ÐµÑ‚Ð°; Ð¿ÐµÑ€ÐµÐ´ ÑƒÐ´Ð°Ð»ÐµÐ½Ð¸ÐµÐ¼ Ð½ÑƒÐ¶Ð½Ð¾ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ðµ Ñ‡ÐµÑ€ÐµÐ· Ð¯Ð½Ð´ÐµÐºÑ ID.'));
-        const roleNames = { student: 'Ð£Ñ‡ÐµÐ½Ð¸Ðº', council_member: 'Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº Ð£Ñ‡ÐµÐ½Ð¸Ñ‡ÐµÑÐºÐ¾Ð³Ð¾ ÑÐ¾Ð²ÐµÑ‚Ð°', school_admin: 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€ ÑˆÐºÐ¾Ð»Ñ‹' };
-        for (const account of users) {
-          const card = node(document, 'article', 'ru-school-account-card');
-          const name = [account.first_name, account.last_name]
-            .filter(value => typeof value === 'string' && value.trim()).map(value => value.trim()).join(' ') || 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚ ÑƒÑ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ°';
-          card.append(node(document, 'b', '', name));
-          card.append(node(document, 'p', '', `ÐšÐ»Ð°ÑÑ: ${typeof account.class_name === 'string' && account.class_name.trim() ? account.class_name.trim() : 'Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½'} Â· ${roleNames[account.role]} Â· Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ #${account.id.slice(-6).toUpperCase()}`));
-          card.append(node(document, 'p', 'ru-note', `ÐŸÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸Ð¹ Ð² Ð²Ñ‹Ð±Ð¾Ñ€ÐºÐµ: ${listings.filter(item => item.user_id === account.id).length}.`));
-          if (['student', 'council_member'].includes(account.role)
-              && account.id.toLowerCase() !== String(me.profile.id || '').toLowerCase()) {
-            card.append(actionButton(document, 'Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚', () => deleteSchoolAccount(account)));
-          }
-          accounts.append(card);
-        }
-        if (!users.length) accounts.append(node(document, 'p', '', 'ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ðµ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»Ð¸ ÑˆÐºÐ¾Ð»Ñ‹ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ñ‹.'));
-        overview.append(accounts);
-        const actionNames = { role_revoked: 'Ð¡Ð½ÑÑ‚Ð° ÑˆÐºÐ¾Ð»ÑŒÐ½Ð°Ñ Ñ€Ð¾Ð»ÑŒ', account_deleted: 'Ð£Ð´Ð°Ð»Ñ‘Ð½ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ Ð¿Ð¾ Ñ€ÐµÑˆÐµÐ½Ð¸ÑŽ ÑˆÐºÐ¾Ð»Ñ‹',
-          account_deleted_by_admin: 'Ð£Ð´Ð°Ð»Ñ‘Ð½ Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð¾Ð¼', listing_deleted: 'Ð£Ð´Ð°Ð»ÐµÐ½Ð¾ Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ',
-          issued: 'Ð’Ñ‹Ð´Ð°Ð½Ð¾ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ðµ', lifted: 'Ð¡Ð½ÑÑ‚Ð¾ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð½Ð¾Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ðµ',
-          idea_text_approved: 'ÐžÐ´Ð¾Ð±Ñ€ÐµÐ½ Ñ‚ÐµÐºÑÑ‚ ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¸Ð´ÐµÐ¸', idea_text_rejected: 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ñ‘Ð½ Ñ‚ÐµÐºÑÑ‚ ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¸Ð´ÐµÐ¸',
-          message_approved: 'ÐžÐ´Ð¾Ð±Ñ€ÐµÐ½Ð° Ð´Ð¾ÑÑ‚Ð°Ð²ÐºÐ° ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ', message_rejected: 'ÐžÑ‚ÐºÐ»Ð¾Ð½ÐµÐ½Ð¾ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ðµ' };
-        const audit = schoolOverviewResult.audit.filter(item => item && typeof actionNames[item.action] === 'string'
-          && typeof item.created_at === 'string' && Number.isFinite(Date.parse(item.created_at))).slice(0, 5);
-        overview.append(node(document, 'h4', '', 'ÐŸÐ¾ÑÐ»ÐµÐ´Ð½Ð¸Ðµ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ ÑˆÐºÐ¾Ð»Ñ‹'));
-        if (!audit.length) overview.append(node(document, 'p', '', 'Ð—Ð°Ð¿Ð¸ÑÐ°Ð½Ð½Ñ‹Ñ… Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ð¹ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ‚.'));
-        for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} Â· ${new Date(item.created_at).toLocaleString('ru-RU')}`));
-        queue.append(overview);
-      };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0) {
-        renderPendingMessagesPanel();
-        renderSchoolIdeasPanel();
-        renderSafetyPanel();
-        renderTechnicalAlertsPanel();
-        renderSchoolOverviewPanel();
-        if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
-        status.textContent = !suspensionsAvailable ? 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹, Ð½Ð¾ Ð½Ðµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð´ÐµÐ¹ÑÑ‚Ð²ÑƒÑŽÑ‰Ð¸Ðµ Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ñ. ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚Ðµ ÑÐ¿Ð¸ÑÐ¾Ðº Ð¿Ð¾Ð·Ð¶Ðµ.'
-          : !pendingMessagesAvailable ? 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹, Ð½Ð¾ Ð½Ðµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ñ Ð½Ð° Ñ€ÑƒÑ‡Ð½ÑƒÑŽ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÑƒ.'
-            : !safetyReportsAvailable ? 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹, Ð½Ð¾ Ð½Ðµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸.'
-                : !schoolIdeasAvailable ? 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹, Ð½Ð¾ Ð½Ðµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ ÑˆÐºÐ¾Ð»ÑŒÐ½Ñ‹Ðµ Ð¸Ð´ÐµÐ¸.'
-              : !technicalAlertsAvailable ? 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹, Ð½Ð¾ Ð½Ðµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ñ‚ÐµÑ…Ð½Ð¸Ñ‡ÐµÑÐºÐ¸Ðµ Ð¿Ñ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ñ.'
-              : 'ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸ ÑˆÐºÐ¾Ð»ÑŒÐ½Ð¾Ð¹ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¿ÑƒÑÑ‚Ñ‹.';
-        return;
-      }
-      status.textContent = `ÐžÑ‡ÐµÑ€ÐµÐ´Ð¸: Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ð¹ â€” ${result.listings.length}, Ð·Ð°ÑÐ²Ð¾Ðº Ð½Ð° Ð¼ÐµÑ€Ð¾Ð¿Ñ€Ð¸ÑÑ‚Ð¸Ñ â€” ${applications.length}, ÑˆÐºÐ¾Ð»ÑŒÐ½Ñ‹Ñ… Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÐµÐ¹ â€” ${profileRequests.length}, Ð·Ð°Ð¿Ñ€Ð¾ÑÐ¾Ð² Ñ€Ð¾Ð»ÐµÐ¹ â€” ${roleRequests.length}, Ð´ÐµÐ¹ÑÑ‚Ð²ÑƒÑŽÑ‰Ð¸Ñ… Ð¾Ð³Ñ€Ð°Ð½Ð¸Ñ‡ÐµÐ½Ð¸Ð¹ â€” ${suspensions.length}, ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸Ð¹ Ð½Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐµ â€” ${pendingMessages.length}, ÑˆÐºÐ¾Ð»ÑŒÐ½Ñ‹Ñ… Ð¸Ð´ÐµÐ¹ â€” ${schoolIdeas.length}, ÑÐ¸Ð³Ð½Ð°Ð»Ð¾Ð² Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸ â€” ${safetyReports.length}, Ñ‚ÐµÑ…Ð½Ð¸Ñ‡ÐµÑÐºÐ¸Ñ… Ð¿Ñ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ð¹ â€” ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable ? '' : ' ÐÐµ Ð²ÑÐµ Ð¾Ñ‡ÐµÑ€ÐµÐ´Ð¸ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ; ÑÐ¿Ð¸ÑÐ¾Ðº Ð½ÐµÐ¿Ð¾Ð»Ð½Ñ‹Ð¹.'}`;
-      for (const listing of result.listings) {
-        if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
-        const card = node(document, 'article', 'ru-moderation-card');
-        card.append(node(document, 'h3', '', listing.title));
-        card.append(node(document, 'p', '', `${listing.category || ''} Â· ${listing.price_text || 'Ð‘ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾'}`));
-        card.append(node(document, 'p', '', listing.description));
-        if (listing.photo_url === `/api/v1/listings/${listing.id}/photo` && ['pending', 'approved'].includes(listing.photo_status)) {
-          const photo = document.createElement('img');
-          photo.className = 'ru-listing-photo';
-          photo.src = listing.photo_url;
-          photo.alt = `Ð¤Ð¾Ñ‚Ð¾ Ð½Ð° Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐµ: ${listing.title}`;
-          photo.loading = 'lazy';
-          photo.referrerPolicy = 'no-referrer';
-          card.append(photo);
-        }
-        const actions = node(document, 'div', 'ru-moderation-actions');
-        if (listing.photo_status === 'pending') {
-          actions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾', () => decide(`/api/v1/listings/${listing.id}/photo`, 'approve')));
-          actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ñ„Ð¾Ñ‚Ð¾', () => decide(`/api/v1/listings/${listing.id}/photo`, 'reject')));
-        }
-        if (['none', 'approved'].includes(listing.photo_status)) {
-          actions.append(actionButton(document, 'ÐžÐ¿ÑƒÐ±Ð»Ð¸ÐºÐ¾Ð²Ð°Ñ‚ÑŒ', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'approve')));
-        }
-        actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ð¾Ð±ÑŠÑÐ²Ð»ÐµÐ½Ð¸Ðµ', () => decide(`/api/v1/listings/${listing.id}/moderation`, 'reject')));
-        card.append(actions);
-        queue.append(card);
-      }
-      for (const application of applications) {
-        const card = node(document, 'article', 'ru-moderation-card');
-        card.append(node(document, 'h3', '', application.event_title));
-        const name = [application.first_name, application.last_name].filter(value => typeof value === 'string' && value.trim()).join(' ');
-        const personType = application.person_type === 'school_staff' ? 'ÑÐ¾Ñ‚Ñ€ÑƒÐ´Ð½Ð¸Ðº ÑˆÐºÐ¾Ð»Ñ‹'
-          : application.person_type === 'parent' ? 'Ñ€Ð¾Ð´Ð¸Ñ‚ÐµÐ»ÑŒ' : 'ÑƒÑ‡ÐµÐ½Ð¸Ðº';
-        const details = [personType, application.class_name, application.staff_position].filter(value => typeof value === 'string' && value.trim()).join(' Â· ');
-        card.append(node(document, 'p', '', `Ð—Ð°ÑÐ²ÐºÐ°: ${name || personType} Â· ${details}`));
-        const actions = node(document, 'div', 'ru-moderation-actions');
-        const path = `/api/v1/listings/${application.event_id}/registrations/${application.user_id}`;
-        actions.append(actionButton(document, 'ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ð·Ð°ÑÐ²ÐºÑƒ', () => decide(path, 'approve')));
-        actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ð·Ð°ÑÐ²ÐºÑƒ', () => decide(path, 'reject')));
-        card.append(actions);
-        queue.append(card);
-      }
-      for (const request of profileRequests) {
-        const card = node(document, 'article', 'ru-moderation-card');
-        card.append(node(document, 'h3', '', `${request.first_name} ${request.last_name}`));
-        const typeName = request.person_type === 'school_staff' ? 'ÑÐ¾Ñ‚Ñ€ÑƒÐ´Ð½Ð¸Ðº ÑˆÐºÐ¾Ð»Ñ‹'
-          : request.person_type === 'parent' ? 'Ñ€Ð¾Ð´Ð¸Ñ‚ÐµÐ»ÑŒ' : 'ÑƒÑ‡ÐµÐ½Ð¸Ðº';
-        card.append(node(document, 'p', '', `Ð—Ð°ÑÐ²ÐºÐ°: ${typeName}${request.class_name ? ` Â· ÐºÐ»Ð°ÑÑ ${request.class_name}` : ''}${request.staff_position ? ` Â· ${request.staff_position}` : ''}`));
-        const actions = node(document, 'div', 'ru-moderation-actions');
-        const path = `/api/v1/profile-requests/${request.request_id}`;
-        actions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»ÑŒ', () => decide(path, 'approve')));
-        actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ Ð·Ð°ÑÐ²ÐºÑƒ', () => decide(path, 'reject')));
-        card.append(actions); queue.append(card);
-      }
-      if (me.profile.role === 'school_admin') {
-        const panel = node(document, 'section', 'ru-moderation-card');
-        panel.append(node(document, 'h3', '', 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐºÐ° ÑÐ¾Ñ‚Ñ€ÑƒÐ´Ð½Ð¸ÐºÐ¾Ð² ÑˆÐºÐ¾Ð»Ñ‹'));
-        if (!staffVerificationsAvailable) panel.append(node(document, 'p', '', 'ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ Ð·Ð°Ð³Ñ€ÑƒÐ·Ð¸Ñ‚ÑŒ Ð·Ð°ÑÐ²ÐºÐ¸ ÑÐ¾Ñ‚Ñ€ÑƒÐ´Ð½Ð¸ÐºÐ¾Ð².'));
-        else if (!staffVerifications.length) panel.append(node(document, 'p', '', 'ÐÐ¾Ð²Ñ‹Ñ… Ð·Ð°ÑÐ²Ð¾Ðº Ð½Ð° Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ Ð´Ð¾Ð»Ð¶Ð½Ð¾ÑÑ‚Ð¸ Ð½ÐµÑ‚.'));
-        for (const request of staffVerifications) {
-          const row = node(document, 'article', 'ru-moderation-card');
-          row.append(node(document, 'p', '', `${request.first_name} ${request.last_name} Â· ${request.staff_position}`));
-          const actions = node(document, 'div', 'ru-moderation-actions');
-          actions.append(actionButton(document, 'ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ Ð´Ð¾Ð»Ð¶Ð½Ð¾ÑÑ‚ÑŒ', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'approved' })));
-          actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ', () => patch(`/api/v1/staff-verifications/${request.user_id}`, { decision: 'rejected' })));
-          row.append(actions); panel.append(row);
-        }
-        queue.append(panel);
-      }
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíÛMuÕ:-jZ.¶›­–)Þ³V6öç7BUT”BÒõå³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'ÒBö“°¦6öç7B5Ddeõ$ôÄU2ÒæWr6WB…²w66†ööÅöFÖ–ârÂv6÷Væ6–ÅöÖVÖ&W"uÒ“° ¦gVæ7F–öâæöFR†Fö7VÖVçBÂFrÂ6Æ74æÖRÂFW‡BÒrr’°¢6öç7B&W7VÇBÒFö7VÖVçBæ7&VFTVÆVÖVçB‡Fr“°¢–b†6Æ74æÖR’&W7VÇBæ6Æ74æÖRÒ6Æ74æÖS°¢&W7VÇBçFW‡D6öçFVçBÒFW‡C°¢&WGW&â&W7VÇC°§Ð ¦7–æ2gVæ7F–öâ§6öâ‡&W7öç6R’°¢G'’²&WGW&âv—B&W7öç6Ræ§6öâ‚“²Ò6F6‚²&WGW&âçVÆÃ²Ð§Ð ¦W‡÷'B7–æ2gVæ7F–öâ–æ—F–Æ—¦TÆ—7F–ætÖöFW&F–öâ‡²Fö7VÖVçBÒvÆö&ÅF†—2æFö7VÖVçBÂfWF6„–×ÂÒvÆö&ÅF†—2æfWF6‚À¢6öæf—&Ô–×ÂÒÖW76vRÓâG—VöbvÆö&ÅF†—2æ6öæf—&ÒÓÓÒvgVæ7F–öârbbvÆö&ÅF†—2æ6öæf—&Ò†ÖW76vR’À¢&ö×D–×ÂÒÖW76vRÓâG—VöbvÆö&ÅF†—2ç&ö×BÓÓÒvgVæ7F–öâròvÆö&ÅF†—2ç&ö×B†ÖW76vR’¢çVÆÂÒÒ·Ò’°¢–b‚Fö7VÖVçBÇÂG—VöbfWF6„–×ÂÓÒvgVæ7F–öâr’&WGW&ã°¢6öç7BæVÂÒFö7VÖVçBævWDVÆVÖVçD'”–B‚w'TÖöFW&F–öâr“°¢6öç7B7FGW2ÒFö7VÖVçBævWDVÆVÖVçD'”–B‚w'TÖöFW&F–öå7FGW2r“°¢6öç7BVWVRÒFö7VÖVçBævWDVÆVÖVçD'”–B‚w'TÖöFW&F–öåVWVRr“°¢–b‚æVÂÇÂ7FGW2ÇÂVWVR’&WGW&ã° ¢ÆWBÖS°¢G'’°¢6öç7B&W7öç6RÒv—BfWF6„–×Â‚rö’÷cöÖRrÂ²ÖWF†öC¢ttUBrÂ7&VFVçF–Ç3¢w6ÖRÖ÷&–v–ârÂ66†S¢væò×7F÷&RrÂ†VFW'3¢²66WC¢vÆ–6F–öâö§6öârÒÒ“°¢–b‚&W7öç6Ræö²’&WGW&ã°¢ÖRÒv—B§6öâ‡&W7öç6R“°¢Ò6F6‚²&WGW&ã²Ð¢–b‚ÖSòæö²ÇÂ5Ddeõ$ôÄU2æ†2†ÖRç&öf–ÆSòç&öÆR’’&WGW&ã°¢æVÂæ†–FFVâÒfÇ6S° ¢7–æ2gVæ7F–öâFVÆWFU66†ööÄ66÷VçB†66÷VçB’°¢–b†ÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–ârÇÂ66÷VçBÇÂUT”BçFW7B†66÷VçBæ–BÇÂrr¢ÇÂ²w7GVFVçBrÂv6÷Væ6–ÅöÖVÖ&W"uÒæ–æ6ÇVFW2†66÷VçBç&öÆR¢ÇÂ66÷VçBæ–BçFôÆ÷vW$66R‚’ÓÓÒ7G&–ær†ÖRç&öf–ÆRæ–BÇÂrr’çFôÆ÷vW$66R‚’’&WGW&ã°¢6öç7B66÷VçD6öFRÒ66÷VçBæ–Bç6Æ–6R‚Ób’çFõWW$66R‚“°¢6öç7BF—7Æ”æÖRÒ¶66÷VçBæf—'7EöæÖRÂ66÷VçBæÆ7EöæÖUÐ¢æf–ÇFW"‡fÇVRÓâG—VöbfÇVRÓÓÒw7G&–ærrbbfÇVRçG&–Ò‚’’æÖ‡fÇVRÓâfÇVRçG&–Ò‚’’æ¦ö–â‚rr’ÇÂ}	­­=Ý"=}-Ý­s°¢–b‚6öæf—&Ô–×Â†
+=M½-Â­­=Ý"2G¶66÷VçD6öFWÒ‚G¶F—7Æ”æÖWÒ“ò	=M="=M½]Ý²-ý}ÝÝ½Rý=½­m‚Âý]]ý­‚‚M½²æ’’&WGW&ã°¢6öç7B6öæf—&ÖF–öâÒ}
+=	M		½	
+-
+Â		­	­	
+=	Ý
+"
+=
+}	
+
+-	Ý		­	s°¢–b‡&ö×D–×Â†	M½òí­íÝ}-]½ÍÝí=â=M½]Ýò--]M-R-í}Ýã¢G¶6öæf—&ÖF–öçÖ’ÓÒ6öæf—&ÖF–öâ’°¢7FGW2çFW‡D6öçFVçBÒ}
+=M½]ÝRí-Í]Ý]Ýã¢M}ýíM--]mM]ÝòÝRí-ý½âs°¢&WGW&ã°¢Ð¢7FGW2çFW‡D6öçFVçBÒ}	ýí-]ý]ÂýíM--]mM]ÝR
+ýÝM]­”B‚=M½ý]Â­­=Ý.(
+bs°¢G'’°¢6öç7B&W7öç6RÒv—BfWF6„–×Â†ö’÷c÷66†ööÂö66÷VçG2òG¶Væ6öFUU$”6ö×öæVçB†66÷VçBæ–B—ÖÂ°¢ÖWF†öC¢tDTÄUDRrÂ7&VFVçF–Ç3¢w6ÖRÖ÷&–v–ârÂ66†S¢væò×7F÷&RrÀ¢†VFW'3¢²v6öçFVçB×G—Rs¢vÆ–6F–öâö§6öârÂ66WC¢vÆ–6F–öâö§6öârÒÀ¢&öG“¢¥4ôâç7G&–æv–g’‡²6öæf—&ÖF–öâÒ’À¢Ò“°¢6öç7B&W7VÇBÒv—B§6öâ‡&W7öç6R“°¢–b‡&W7VÇCòæW'&÷"ÓÓÒw&V6VçE÷–æFW…öÆöv–å÷&WV—&VBr’°¢7FGW2ç&WÆ6T6†–ÆG&Vâ†æöFR†Fö7VÖVçBÂw7ârÂrrÂ}	ýíM--]M-RM]--R}]]r
+ýÝM]­”BÂ}-]Âýí--í-R=M½]ÝRâr’“°¢6öç7BÆ–æ²ÒæöFR†Fö7VÖVçBÂvrÂrrÂ}	ýíM--]M-ÂM]--Rr“²Æ–æ²æ‡&VbÒröWF‚÷–æFW‚÷7F'C÷&VWFƒÓs°¢7FGW2æVæB†Æ–æ²“°¢&WGW&ã°¢Ð¢–b‚&W7öç6Ræö²ÇÂ&W7VÇCòæö²ÓÒG'VR’F‡&÷ræWrW'&÷"‚v66÷VçEöFVÆWF–öåöf–ÆVBr“°¢v—BÆöB‚“°¢7FGW2çFW‡D6öçFVçBÒ}	­­=Ý"‚-ý}ÝÝ½RMÝÝ½R=M½]Ý²âs°¢Ò6F6‚°¢7FGW2çFW‡D6öçFVçBÒ}	ÝR=M½íÂ=M½-Â­­=Ý"â	ýí-]Í-Rí}]]MÂ‚í-íýÝR­­=Ý-ý]]Býí--ííÂâs°¢Ð¢Ð ¢7–æ2gVæ7F–öâÆöB‚’°¢7FGW2çFW‡D6öçFVçBÒ}	}==m]Âí}]]MÎ(
+bs°¢G'’°¢6öç7B÷F–öç2Ò²ÖWF†öC¢ttUBrÂ7&VFVçF–Ç3¢w6ÖRÖ÷&–v–ârÂ66†S¢væò×7F÷&RrÂ†VFW'3¢²66WC¢vÆ–6F–öâö§6öârÒÓ°¢6öç7B·&W7öç6RÂWfVçE&W7öç6RÂ&öf–ÆU&W7öç6RÂ7FfefW&–f–6F–öå&W7öç6RÂ&öÆU&W7öç6RÂ7W7Vç6–öå&W7öç6RÂ7W7Vç6–öåF&vWG5&W7öç6RÂ&öÆTÖævVÖVçE&W7öç6RÂ6fWG•&W7öç6RÂVæF–ætÖW76vW5&W7öç6RÂFV6†æ–6ÄÆW'G5&W7öç6RÂ66†ööÄ÷fW'f–Wu&W7öç6RÂ66†ööÄ–FV5&W7öç6UÒÒv—B&öÖ—6RæÆÂ…°¢fWF6„–×Â‚rö’÷cöÆ—7F–æw2öÖöFW&F–öârÂ÷F–öç2’À¢fWF6„–×Â‚rö’÷cöWfVçB×&Vv—7G&F–öç2÷&Wf–WrrÂ÷F–öç2’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷&öf–ÆR×&WVW7G2÷&Wf–WrrÂ÷F–öç2¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂ&WVW7G3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷7Ffb×fW&–f–6F–öç2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂ&WVW7G3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷&öÆR×&WVW7G2÷&Wf–WrrÂ÷F–öç2¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂ&WVW7G3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷7W7Vç6–öç2rÂ÷F–öç2¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂ7W7Vç6–öç3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷7W7Vç6–öç2÷F&vWG2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂF&vWG3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷&öÆRÖÖævVÖVçB÷F&vWG2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂF&vWG3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷66†ööÂöFÖ–â÷6fWG’×&W÷'G2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂ&W÷'G3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷cöÖW76vW2öÖöFW&F–öârÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂÖW76vW3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷66†ööÂöFÖ–â÷FV6†æ–6ÂÖÆW'G2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂÆW'G3¢µÒÒ’Ò’À¢ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–âròfWF6„–×Â‚rö’÷c÷66†ööÂöFÖ–âö÷fW'f–WrrÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’¢¢&öÖ—6Rç&W6öÇfR‡²ö³¢G'VRÂ§6öã¢7–æ2‚’Óâ‡²ö³¢G'VRÂW6W'3¢µÒÂÆ—7F–æw3¢µÒÂVF—C¢µÒÂFVÆWF–öå÷&WVW7G3¢µÒÂ7W7Vç6–öç3¢µÒÒ’Ò’À¢fWF6„–×Â‚rö’÷c÷66†ööÂö–FV2rÂ÷F–öç2’æ6F6‚‚‚’Óâ‡²ö³¢fÇ6RÂ§6öã¢7–æ2‚’ÓâçVÆÂÒ’’À¢Ò“°¢6öç7B·&W7VÇBÂWfVçE&W7VÇBÂ&öf–ÆU&W7VÇBÂ7FfefW&–f–6F–öå&W7VÇBÂ&öÆU&W7VÇBÂ7W7Vç6–öå&W7VÇBÂ7W7Vç6–öåF&vWG5&W7VÇBÂ&öÆTÖævVÖVçE&W7VÇBÂ6fWG•&W7VÇBÂVæF–ætÖW76vW5&W7VÇBÂFV6†æ–6ÄÆW'G5&W7VÇBÂ66†ööÄ÷fW'f–Wu&W7VÇBÂ66†ööÄ–FV5&W7VÇEÒÒv—B&öÖ—6RæÆÂ…¶§6öâ‡&W7öç6R’Â§6öâ†WfVçE&W7öç6R’Â§6öâ‡&öf–ÆU&W7öç6R’Â§6öâ‡7FfefW&–f–6F–öå&W7öç6R’Â§6öâ‡&öÆU&W7öç6R’Â§6öâ‡7W7Vç6–öå&W7öç6R’Â§6öâ‡7W7Vç6–öåF&vWG5&W7öç6R’Â§6öâ‡&öÆTÖævVÖVçE&W7öç6R’Â§6öâ‡6fWG•&W7öç6R’Â§6öâ‡VæF–ætÖW76vW5&W7öç6R’Â§6öâ‡FV6†æ–6ÄÆW'G5&W7öç6R’Â§6öâ‡66†ööÄ÷fW'f–Wu&W7öç6R’Â§6öâ‡66†ööÄ–FV5&W7öç6R•Ò“°¢–b‚&W7öç6Ræö²ÇÂ&W7VÇCòæö²ÇÂ'&’æ—4'&’‡&W7VÇBæÆ—7F–æw2¢ÇÂWfVçE&W7öç6Ræö²ÇÂWfVçE&W7VÇCòæö²ÇÂ'&’æ—4'&’†WfVçE&W7VÇBæÆ–6F–öç2¢ÇÂ&öf–ÆU&W7öç6Ræö²ÇÂ&öf–ÆU&W7VÇCòæö²ÇÂ'&’æ—4'&’‡&öf–ÆU&W7VÇBç&WVW7G2¢ÇÂ&öÆU&W7öç6Ræö²ÇÂ&öÆU&W7VÇCòæö²ÇÂ'&’æ—4'&’‡&öÆU&W7VÇBç&WVW7G2’’F‡&÷ræWrW'&÷"‚wVWVU÷Væf–Æ&ÆRr“°¢VWVRç&WÆ6T6†–ÆG&Vâ‚“°¢6öç7BÆ–6F–öç2ÒWfVçE&W7VÇBæÆ–6F–öç2æf–ÇFW"†Æ–6F–öâÓâÆ–6F–öà¢bbUT”BçFW7B†Æ–6F–öâæWfVçEö–B’bbUT”BçFW7B†Æ–6F–öâçW6W%ö–B¢bbÆ–6F–öâç7FGW2ÓÓÒwVæF–ærrbbG—VöbÆ–6F–öâæWfVçE÷F—FÆRÓÓÒw7G&–ærr“°¢6öç7B&öf–ÆU&WVW7G2Ò&öf–ÆU&W7VÇBç&WVW7G2æf–ÇFW"‡&WVW7BÓâ&WVW7BbbUT”BçFW7B‡&WVW7Bç&WVW7Eö–B¢bbG—Vöb&WVW7Bæf—'7EöæÖRÓÓÒw7G&–ærrbbG—Vöb&WVW7BæÆ7EöæÖRÓÓÒw7G&–ærp¢bbG—Vöb&WVW7Bæ6Æ75öæÖRÓÓÒw7G&–ærrbb²w7GVFVçBrÂw66†ööÅ÷7FfbrÂw&VçBuÒæ–æ6ÇVFW2‡&WVW7BçW'6öå÷G—R’“°¢6öç7B7FfefW&–f–6F–öç4f–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡7FfefW&–f–6F–öå&W7öç6Ræö²bb7FfefW&–f–6F–öå&W7VÇCòæö²bb'&’æ—4'&’‡7FfefW&–f–6F–öå&W7VÇBç&WVW7G2’“°¢6öç7B7FfefW&–f–6F–öç2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbb7FfefW&–f–6F–öç4f–Æ&ÆP¢ò7FfefW&–f–6F–öå&W7VÇBç&WVW7G2æf–ÇFW"‡&WVW7BÓâ&WVW7BbbUT”BçFW7B‡&WVW7BçW6W%ö–B¢bbG—Vöb&WVW7Bæf—'7EöæÖRÓÓÒw7G&–ærrbbG—Vöb&WVW7BæÆ7EöæÖRÓÓÒw7G&–ærp¢bbG—Vöb&WVW7Bç7Ffe÷÷6—F–öâÓÓÒw7G&–ærrbb&WVW7Bç7Ffe÷÷6—F–öâæÆVæwF‚ÃÒ’¢µÓ°¢6öç7B&öÆU&WVW7G2Ò&öÆU&W7VÇBç&WVW7G2æf–ÇFW"‡&WVW7BÓâ&WVW7BbbUT”BçFW7B‡&WVW7Bç&WVW7Eö–B¢bb²v6÷Væ6–ÅöÖVÖ&W"rÂw66†ööÅöFÖ–âuÒæ–æ6ÇVFW2‡&WVW7Bç&WVW7FVE÷&öÆR¢bb²wVæF–ærrÂw&Wf–Wv–æruÒæ–æ6ÇVFW2‡&WVW7Bç7FGW2’“°¢6öç7B&öÆTÖævVÖVçDf–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–ârÇÂ‡&öÆTÖævVÖVçE&W7öç6Ræö²bb&öÆTÖævVÖVçE&W7VÇCòæö²bb'&’æ—4'&’‡&öÆTÖævVÖVçE&W7VÇBçF&vWG2’“°¢6öç7B&öÆTÖævVÖVçEF&vWG2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbb&öÆTÖævVÖVçDf–Æ&ÆP¢ò&öÆTÖævVÖVçE&W7VÇBçF&vWG2æf–ÇFW"†—FVÒÓâ—FVÒbbUT”BçFW7B†—FVÒæ–B’bb²v6÷Væ6–ÅöÖVÖ&W"rÂw66†ööÅöFÖ–âuÒæ–æ6ÇVFW2†—FVÒç&öÆR’’¢µÓ°¢6öç7B7W7Vç6–öç4f–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡7W7Vç6–öå&W7öç6Ræö²bb7W7Vç6–öå&W7VÇCòæö²bb'&’æ—4'&’‡7W7Vç6–öå&W7VÇBç7W7Vç6–öç2’“°¢6öç7B7W7Vç6–öç2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbb7W7Vç6–öç4f–Æ&ÆP¢ò7W7Vç6–öå&W7VÇBç7W7Vç6–öç2æf–ÇFW"†—FVÒÓâ—FVÒbbUT”BçFW7B†—FVÒçF&vWEö–B¢bb²w7GVFVçBrÂv6÷Væ6–ÅöÖVÖ&W"uÒæ–æ6ÇVFW2†—FVÒçF&vWE÷&öÆR’bbG—Vöb—FVÒç&V6öâÓÓÒw7G&–ærp¢bbG—Vöb—FVÒæW‡—&W5öBÓÓÒw7G&–ærr’¢µÓ°¢6öç7B6fWG•&W÷'G4f–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡6fWG•&W7öç6Ræö²bb6fWG•&W7VÇCòæö²bb'&’æ—4'&’‡6fWG•&W7VÇBç&W÷'G2’“°¢6öç7B6fWG•&W÷'G2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbb6fWG•&W÷'G4f–Æ&ÆP¢ò6fWG•&W7VÇBç&W÷'G2æf–ÇFW"†—FVÒÓâ—FVÒbbõå³Ó–Öe×³cGÒBòçFW7B†—FVÒæf–ævW'&–çBÇÂrr¢bb²vÖW76vRrÂv–FVrÂvÆ—7F–ærrÂv–ÖvRuÒæ–æ6ÇVFW2†—FVÒç6÷W&6Uö¶–æB¢bb²wF&vWFVEö†&76ÖVçBrÂv†FUö÷%öF—67&–Ö–æF–öârÂwF‡&VEö÷%ö–çF–Ö–FF–öârÂvæVvF—fU÷W'6öæÅö6ÆÂrÀ¢w7Õö÷%÷&WVFVEö'W6RrÂwVç6fUö–ÖvRrÂwW'6öæÅöFFö–åö–ÖvRrÂwVæ6ÆV%÷6fWG•÷6–væÂuÒæ–æ6ÇVFW2†—FVÒæ6FVv÷'’¢bb²vÖVF—VÒrÂv†–v‚uÒæ–æ6ÇVFW2†—FVÒç6WfW&—G’’bbçVÖ&W"æ—4–çFVvW"†—FVÒæö67W'&Væ6W2’’¢µÓ°¢6öç7BVæF–ætÖW76vW4f–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡VæF–ætÖW76vW5&W7öç6Ræö²bbVæF–ætÖW76vW5&W7VÇCòæö²bb'&’æ—4'&’‡VæF–ætÖW76vW5&W7VÇBæÖW76vW2’“°¢6öç7BVæF–ætÖW76vW2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbbVæF–ætÖW76vW4f–Æ&ÆP¢òVæF–ætÖW76vW5&W7VÇBæÖW76vW2æf–ÇFW"†—FVÒÓâ—FVÒbbUT”BçFW7B†—FVÒæ–BÇÂrr’bbUT”BçFW7B†—FVÒç6VæFW%ö–BÇÂrr¢bbG—Vöb—FVÒæ&öG’ÓÓÒw7G&–ærrbb—FVÒæ&öG’æÆVæwF‚âbb—FVÒæ&öG’æÆVæwF‚ÃÒ’¢µÓ°¢6öç7BFV6†æ–6ÄÆW'G4f–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡FV6†æ–6ÄÆW'G5&W7öç6Ræö²bbFV6†æ–6ÄÆW'G5&W7VÇCòæö²bb'&’æ—4'&’‡FV6†æ–6ÄÆW'G5&W7VÇBæÆW'G2’“°¢6öç7BFV6†æ–6ÄÆW'G2ÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbbFV6†æ–6ÄÆW'G4f–Æ&ÆP¢òFV6†æ–6ÄÆW'G5&W7VÇBæÆW'G2æf–ÇFW"†—FVÒÓâ—FVÐ¢bb²v§5÷'VçF–ÖRrÂwVæ†æFÆVE÷&V¦V7F–öârÂw7W&6U÷6Fµ÷Væf–Æ&ÆRrÂvÆ—7F–æw5öÆöEöf–ÆVBrÂvæ÷F–f–6F–öç5öÆöEöf–ÆVBrÂvFF&6U÷&WVW7Eöf–ÆVBrÂvWF…ö&6¶VæEöf–ÆVBuÒæ–æ6ÇVFW2†—FVÒæWfVçEö6öFR¢bb²vWF‚rÂvÆ—7F–æw2rÂvæ÷F–f–6F–öç2rÂvFF&6RrÂv÷F†W"uÒæ–æ6ÇVFW2†—FVÒçvUö&V¢bb²v7&—F–6ÂrÂwv&æ–æruÒæ–æ6ÇVFW2†—FVÒç6WfW&—G’’bbçVÖ&W"æ—4–çFVvW"†—FVÒæWfVçEö6÷VçB¢bb—FVÒæWfVçEö6÷VçBâbb—FVÒæWfVçEö6÷VçBÃÒbbG—Vöb—FVÒæ†÷W%ö'V6¶WBÓÓÒw7G&–ærp¢bbçVÖ&W"æ—4f–æ—FR„FFRç'6R†—FVÒæ†÷W%ö'V6¶WB’’’¢µÓ°¢6öç7B6—FTW'&÷$F–vW7BÒÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbbFV6†æ–6ÄÆW'G4f–Æ&ÆP¢òFV6†æ–6ÄÆW'G5&W7VÇBæF–vW7BbbG—VöbFV6†æ–6ÄÆW'G5&W7VÇBæF–vW7Bç7VÖÖ'’ÓÓÒw7G&–ærp¢bbFV6†æ–6ÄÆW'G5&W7VÇBæF–vW7Bç7VÖÖ'’æÆVæwF‚ÃÒ ¢bbG—VöbFV6†æ–6ÄÆW'G5&W7VÇBæF–vW7BæF–vW7E÷6Æ÷BÓÓÒw7G&–ærp¢bbçVÖ&W"æ—4f–æ—FR„FFRç'6R†G·FV6†æ–6ÄÆW'G5&W7VÇBæF–vW7BæF–vW7E÷6Æ÷GÓ£¦’¢bbçVÖ&W"æ—4f–æ—FR„FFRç'6R‡FV6†æ–6ÄÆW'G5&W7VÇBæF–vW7BævVæW&FVEöBÇÂrr’¢òFV6†æ–6ÄÆW'G5&W7VÇBæF–vW7B¢çVÆÂ¢çVÆÃ°¢6öç7B66†ööÄ÷fW'f–Wtf–Æ&ÆRÒÖRç&öf–ÆRç&öÆRÓÒw66†ööÅöFÖ–âp¢ÇÂ‡66†ööÄ÷fW'f–Wu&W7öç6Ræö²bb66†ööÄ÷fW'f–Wu&W7VÇCòæö°¢bb²wW6W'2rÂvÆ—7F–æw2rÂvVF—BrÂvFVÆWF–öå÷&WVW7G2rÂw7W7Vç6–öç2uÒæWfW'’†¶W’Óâ'&’æ—4'&’‡66†ööÄ÷fW'f–Wu&W7VÇE¶¶W•Ò’’“°¢6öç7B66†ööÄ–FV4f–Æ&ÆRÒ66†ööÄ–FV5&W7öç6Ræö²bb66†ööÄ–FV5&W7VÇCòæö²bb'&’æ—4'&’‡66†ööÄ–FV5&W7VÇBæ–FV2“°¢6öç7B66†ööÄ–FV2Ò66†ööÄ–FV4f–Æ&ÆRò66†ööÄ–FV5&W7VÇBæ–FV2æf–ÇFW"†—FVÒÓâ—FVÒbbUT”BçFW7B†—FVÒæ–BÇÂrr¢bbG—Vöb—FVÒçFW‡BÓÓÒw7G&–ærrbb—FVÒçFW‡BæÆVæwF‚ÃÒ ¢bb²wVæF–ærrÂv&÷fVBrÂw&V¦V7FVBuÒæ–æ6ÇVFW2†—FVÒæ•÷7FGW2¢bb'&’æ—4'&’†—FVÒæ–ÖvUö¶W—2’bb—FVÒæ–ÖvUö¶W—2æÆVæwF‚ÃÒ0¢bb²væöæRrÂwVæF–ærrÂv&÷fVBrÂw&V¦V7FVBuÒæ–æ6ÇVFW2†—FVÒæ–ÖvU÷7FGW2’’¢µÓ°¢6öç7B&VæFW%66†ööÄ–FV5æVÂÒ‚’Óâ°¢6öç7B–FV5æVÂÒæöFR†Fö7VÖVçBÂw6V7F–öârÂw'RÖÖöFW&F–öâÖ6&Br“°¢–FV5æVÂæVæB†æöFR†Fö7VÖVçBÂvƒ2rÂrrÂ}
+­í½ÍÝ½RM]‚‚Mí-í=M‚r’“°¢–b‚66†ööÄ–FV4f–Æ&ÆR’–FV5æVÂæVæB†æöFR†Fö7VÖVçBÂwrÂrrÂ}	ÝR=M½íÂ}==}-Âý]M½ím]Ýò­í½²âr’“°¢VÇ6R–b‚66†ööÄ–FV2æÆVæwF‚’–FV5æVÂæVæB†æöFR†Fö7VÖVçBÂwrÂrrÂ}	Ýí-½Rý]M½ím]Ý’Ý]"âr’“°¢f÷"†6öç7B–FVöb66†ööÄ–FV2’°¢6öç7B6&BÒæöFR†Fö7VÖVçBÂv'F–6ÆRrÂw'RÖÖöFW&F–öâÖ6&Br“°¢6&BæVæB†æöFR†Fö7VÖVçBÂwrÂrrÂ–FVçFW‡B’“°¢6&BæVæB†æöFR†Fö7VÖVçBÂwrÂw'RÖæ÷FRrÂ–FVæ•÷7FGW2ÓÓÒwVæF–ærrò}
+-]­"ímM]"]]Ýò­í½²âp¢¢–FVæ•÷7FGW2ÓÓÒv&÷fVBrò}
+-]­"íMí]Ò­í½í’âr¢}
+-]­"í-­½íÝÒ­í½í’âr’“°¢–b†–FVæ•÷7FGW2ÓÓÒwVæF–ærr’°¢6öç7BFW‡D7F–öç2ÒæöFR†Fö7VÖVçBÂvF—brÂw'RÖÖöFW&F–öâÖ7F–öç2r“°¢FW‡D7F–öç2æVæB†7F–öä'WGFöâ†Fö7VÖVçBÂ}	íMí-Â-]­"rÂ‚’ÓâF6‚†ö’÷c÷66†ööÂö–FV2òG¶–FVæ–GÒöÖöFW&F–öæÂ²FV6—6–öã¢v&÷fRrÒ’’“°¢FW‡D7F–öç2æVæB†7F–öä'WGFöâ†Fö7VÖVçBÂ}	í-­½íÝ-Â-]­"rÂ‚’ÓâF6‚†ö’÷c÷66†ööÂö–FV2òG¶–FVæ–GÒöÖöFW&F–öæÂ²FV6—6–öã¢w&V¦V7BrÒ’’“°¢6&BæVæB‡FW‡D7F–öç2“°¢Ð¢6öç7BfÆ–D¶W—2Ò–FVæ–ÖvUö¶W—2æWfW'’†¶W’ÓâG—Vöb¶W’ÓÓÒw7G&–ærp¢bbõçVæF–æuÂõ³Ó–ÖbÕ×³3gÕÂõ³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'ÕÂçvV'Bö’çFW7B†¶W’’“°¢–b†–FVæ–ÖvU÷7FGW2ÓÓÒwVæF–ærrbbfÆ–D¶W—2bb–FVæ–ÖvUö¶W—2æÆVæwF‚’°¢–FVæ–ÖvUö¶W—2æf÷$V6‚‚…òÂ–æFW‚’Óâ°¢6öç7B–ÖvRÒFö7VÖVçBæ7&VFTVÆVÖVçB‚v–Örr“°¢–ÖvRæ6Æ74æÖRÒw'RÖÆ—7F–ær×†÷Fòs°¢–ÖvRç7&2Òö’÷cö–FV2òG¶–FVæ–GÒö–ÖvW2òG¶–æFW‡Ö°¢–ÖvRæÇBÒ
+Mí-â¢­í½ÍÝí’M]RG¶–æFW‚²Ö°¢–ÖvRæÆöF–ærÒvÆ§’s°¢–ÖvRç&VfW'&W%öÆ–7’Òvæò×&VfW'&W"s°¢6&BæVæB†–ÖvR“°¢Ò“°¢6öç7B7F–öç2ÒæöFR†Fö7VÖVçBÂvF—brÂw'RÖÖöFW&F–öâÖ7F–öç2r“°¢7F–öç2æVæB†7F–öä'WGFöâ†Fö7VÖVçBÂ}	íMí-ÂMí-ârÂ‚’ÓâF6‚†ö’÷c÷66†ööÂö–FV2òG¶–FVæ–GÒö–ÖvW6Â²FV6—6–öã¢v&÷fRrÒ’’“°¢7F–öç2æVæB†7F–öä'WGFöâ†Fö7VÖVçBÂ}	í-­½íÝ-ÂMí-ârÂ‚’ÓâF6‚†ö’÷c÷66†ööÂö–FV2òG¶–FVæ–GÒö–ÖvW6Â²FV6—6–öã¢w&V¦V7BrÒ’’“°¢6&BæVæB†7F–öç2“°¢ÒVÇ6R–b†–FVæ–ÖvU÷7FGW2ÓÓÒv&÷fVBr’°¢6&BæVæB†æöFR†Fö7VÖVçBÂwrÂrrÂ}
+Mí-âíMí]Ý²‚Mí-=ýÝ²­í½ÍÝí’­íÍÝMRâr’“°¢ÒVÇ6R–b†–FVæ–ÖvU÷7FGW2ÓÓÒw&V¦V7FVBr’°¢6&BæVæB†æöFR†Fö7VÖVçBÂwrÂrrÂ}
+Mí-âí-­½íÝ]Ý²âr’“°¢Ð¢–FV5æVÂæVæB†6&B“°¢Ð¢VWVRæVæB†–FV5æVÂ“°¢Ó°¢–b†ÖRç&öf–ÆRç&öÆRÓÓÒw66†ööÅöFÖ–ârbb7W7Vç6–öåF&vWG5&W7öç6Ræö²bb7W7Vç6–öåF&vWG5&W7VÇCòæö²bb'&’æ—4'&’‡7W7Vç6–öåF&vWG5&W7VÇBçF&vWG2’’°¢6öç7BF&vWG2Ò7W7Vç6–öåF&vWG5&W7VÇBçF&vWG2æf–ÇFW"†—FVÒÓâ—FVÒbbUT”BçFW7B†—FVÒæ–B’bb²w7GVFVçBrÂv6÷Væ6–ÅöÖVÖ&W"uÒæ–æ6ÇVFW2†—FVÒç&öÆR’“°¢–b‡F&vWG2æÆVæwF‚’°¢6öç7BæVÂÒæöFR†Fö7VÖVçBÂw6V7F–öârÂw'RÖÖöFW&F–öâÖ6&Br“°¢æVÂæVæB†æöFR†Fö7VÖVçBÂvƒ2rÂrrÂ}	-]Í]ÝÝíRí=Ý}]ÝRM]--’­­=Ý-r’“°¢6öç7Bæ÷FRÒæöFR†Fö7VÖVçBÂwrÂrrÂ}	Mí-=ýÝâMÍÝ--íÂÝ-í’­í½²ýí½Rý-Ýí=âýíM--]mM]Ýò}]]r
+ýÝM]­”Bâ	-½]-Rí¢‚=­m-RM­-}]­=âý}Ý2]r½}Ý½RMÝÝ½Râr“°¢6öç7Bf÷&ÒÒFö7VÖVçBæ7&VFTVÆVÖVçB‚vf÷&Òr“²f÷&Òæ6Æ74æÖRÒw'R×7W7Vç6–öâÖf÷&Òs°¢5×[h‘éì¶»§q«^u
       for (const request of roleRequests) {
         const card = node(document, 'article', 'ru-moderation-card');
         const roleName = request.requested_role === 'school_admin' ? 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€ ÑˆÐºÐ¾Ð»Ñ‹' : 'Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº Ð£Ñ‡ÐµÐ½Ð¸Ñ‡ÐµÑÐºÐ¾Ð³Ð¾ ÑÐ¾Ð²ÐµÑ‚Ð°';
         card.append(node(document, 'h3', '', `Ð—Ð°Ð¿Ñ€Ð¾Ñ: ${roleName}`));
+        const applicant = request.applicant_name || '';
+        const classLabel = request.class_name ? ` Â· ÐºÐ»Ð°ÑÑ ${request.class_name}` : '';
+        card.append(node(document, 'p', '', `${applicant ? `${applicant}${classLabel} Â· Ð°ÐºÐºÐ°ÑƒÐ½Ñ‚ ` : 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚ '}#${request.account_code || 'â€”'}`));
         card.append(node(document, 'p', '', request.status === 'reviewing' ? 'Ð’Ð·ÑÑ‚Ð¾ Ð½Ð° Ñ€Ð°ÑÑÐ¼Ð¾Ñ‚Ñ€ÐµÐ½Ð¸Ðµ' : 'ÐžÐ¶Ð¸Ð´Ð°ÐµÑ‚ Ñ€Ð°ÑÑÐ¼Ð¾Ñ‚Ñ€ÐµÐ½Ð¸Ñ'));
         const actions = node(document, 'div', 'ru-moderation-actions');
         const path = `/api/v1/role-requests/${request.request_id}`;
         if (request.status === 'pending') actions.append(actionButton(document, 'ÐÐ°Ñ‡Ð°Ñ‚ÑŒ Ñ€Ð°ÑÑÐ¼Ð¾Ñ‚Ñ€ÐµÐ½Ð¸Ðµ', () => patch(path, { action: 'start_review' })));
-        if (request.status === 'reviewing' && request.review_started_by === me.profile.id) {
+        if (request.status === 'reviewing' && request.review_started_by_me === true) {
           actions.append(actionButton(document, 'ÐžÐ´Ð¾Ð±Ñ€Ð¸Ñ‚ÑŒ Ñ€Ð¾Ð»ÑŒ', () => patch(path, { decision: 'approve' })));
           actions.append(actionButton(document, 'ÐžÑ‚ÐºÐ»Ð¾Ð½Ð¸Ñ‚ÑŒ', () => patch(path, { decision: 'reject' })));
         }

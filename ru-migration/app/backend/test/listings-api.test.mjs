@@ -1,961 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { Readable } from 'node:stream';
-import { createListingsApi } from '../services/listings-api.mjs';
-function req(body = {}, method = 'POST') {
-  const request = Readable.from(method === 'GET' ? [] : [Buffer.from(JSON.stringify(body))]);
-  request.method = method;
-  request.url = '/api/v1/listings';
-  return request;
-}
-test('technical alerts are read-only, administrator-only, and contain only aggregate rows', async () => {
-  let reads = 0;
-  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      listSiteErrorAlerts: async () => { reads++; return [{ event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' }]; },
-      getLatestSiteErrorDigest: async () => null,
-    } });
-  const list = req({}, 'GET'); list.url = '/api/v1/school/admin/technical-alerts';
-  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, alerts: [
-    { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
-  ], digest: null } });
-  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
-  assert.equal((await handler(list)).status, 403);
-  assert.equal(reads, 1);
-});
-
-test('school safety reports are administrator-only and acknowledgement is school-bound', async () => {
-  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  let selectedSchool; let acknowledged;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      listSchoolSafetyReports: async schoolId => { selectedSchool = schoolId; return { reports: [{ fingerprint: 'a'.repeat(64) }], period_days: 30 }; },
-      acknowledgeSchoolSafetyReport: async input => { acknowledged = input; return input.schoolId === actor.school_id; },
-    } });
-  const list = req({}, 'GET'); list.url = '/api/v1/school/admin/safety-reports';
-  assert.equal((await handler(list)).status, 200);
-  assert.equal(selectedSchool, 'school-a');
-  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(list)).status, 403);
-  actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  const ack = req({ fingerprint: 'a'.repeat(64), category: 'unsafe_image', source_kind: 'image' }, 'PATCH');
-  ack.url = '/api/v1/school/admin/safety-reports';
-  assert.deepEqual(await handler(ack), { status: 200, body: { ok: true } });
-  assert.deepEqual(acknowledged, { schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'a'.repeat(64), category: 'unsafe_image', sourceKind: 'image' });
-  const malformed = req({ fingerprint: 'bad', category: 'unsafe_image', source_kind: 'image' }, 'PATCH'); malformed.url = ack.url;
-  assert.equal((await handler(malformed)).status, 400);
-});
-
-test('suspension blocks school safety report access while suspension status remains readable', async () => {
-  const actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  let suspended = true; let accessedReports = 0;
-  const repository = {
-    getActiveAccountSuspension: async () => suspended ? { reason: 'test', expires_at: '2099-01-01T00:00:00Z' } : null,
-    listSchoolSafetyReports: async () => { accessedReports++; return { reports: [], period_days: 30 }; },
-    acknowledgeSchoolSafetyReport: async () => { accessedReports++; return true; },
-  };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
-    resolveActor: async () => actor, repository });
-  const list = req({}, 'GET'); list.url = '/api/v1/school/admin/safety-reports';
-  assert.deepEqual(await handler(list), { status: 403, body: { ok: false, error: 'account_suspended' } });
-  const acknowledge = req({ fingerprint: 'a'.repeat(64), category: 'unsafe_image', source_kind: 'image' }, 'PATCH');
-  acknowledge.url = list.url;
-  assert.deepEqual(await handler(acknowledge), { status: 403, body: { ok: false, error: 'account_suspended' } });
-  assert.equal(accessedReports, 0);
-
-  const status = req({}, 'GET'); status.url = '/api/v1/me/suspension';
-  assert.deepEqual(await handler(status), { status: 200, body: { ok: true, suspended: true,
-    suspension: { reason: 'test', expires_at: '2099-01-01T00:00:00Z' } } });
-
-  suspended = false;
-  assert.equal((await handler(list)).status, 200);
-  assert.equal(accessedReports, 1);
-  repository.getActiveAccountSuspension = async () => { throw new Error('synthetic database failure'); };
-  assert.equal((await handler(list)).status, 503, 'suspension check failures deny safety report access');
-  assert.equal(accessedReports, 1);
-});
-
-test('manual message review queue and decision are limited to the same school administrator', async () => {
-  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  let selectedSchool; let decision;
-  const messageId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null,
-      listPendingMessages: async schoolId => { selectedSchool = schoolId; return [{ id: messageId, sender_id: 'student-a', body: '<script>Ñ‚ÐµÐºÑÑ‚</script>' }]; },
-      decidePendingMessage: async input => { decision = input; return input.schoolId === 'school-a'; },
-    } });
-  const list = req({}, 'GET'); list.url = '/api/v1/messages/moderation';
-  assert.deepEqual((await handler(list)).body.messages, [{ id: messageId, sender_id: 'student-a', body: '<script>Ñ‚ÐµÐºÑÑ‚</script>' }]);
-  assert.equal(selectedSchool, 'school-a');
-  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(list)).status, 403);
-  actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  const patch = req({ decision: 'approve' }, 'PATCH'); patch.url = `/api/v1/messages/moderation/${messageId}`;
-  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true } });
-  assert.deepEqual(decision, { messageId, schoolId: 'school-a', reviewerId: 'admin-a', decision: 'approve' });
-  const invalid = req({ decision: 'publish' }, 'PATCH'); invalid.url = patch.url;
-  assert.equal((await handler(invalid)).status, 400);
-});
-
-test('school administrator overview is private to the active administrator and bounded to their school', async () => {
-  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
-  let selectedSchool;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, getSchoolAdminOverview: async schoolId => { selectedSchool = schoolId; return { users: [{ id: 'synthetic-user' }], listings: [], audit: [], deletion_requests: [], suspensions: [] }; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/school/admin/overview';
-  assert.equal((await handler(request)).status, 200);
-  assert.equal(selectedSchool, 'school-a');
-  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(request)).status, 403);
-  actor = { id: 'admin-b', school_id: 'school-b', role: 'school_admin' };
-  assert.equal((await handler(request)).status, 200);
-  assert.equal(selectedSchool, 'school-b');
-});
-
-test('school agent dashboard and idea decisions are school-admin-only and school scoped', async () => {
-  let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' }; let saved; let reviewed;
-  const ideaId = 'a'.repeat(64);
-  const ideaSchoolId = 'school-a';
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'user' }), resolveActor: async () => actor,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      getSchoolAgentDashboard: async schoolId => { saved = schoolId; return { report: null, ideas: [] }; },
-      reviewSchoolAgentIdea: async input => { reviewed = input; return input.schoolId === actor.school_id; },
-    } });
-  const dashboard = req({}, 'GET'); dashboard.url = '/api/v1/school/admin/agent-dashboard';
-  assert.equal((await handler(dashboard)).status, 200); assert.equal(saved, 'school-a');
-  actor = { id: 'council-a', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(dashboard)).status, 403);
-  actor = { id: 'admin-b', school_id: 'school-b', role: 'school_admin' };
-  const decision = req({ decision: 'approve' }, 'PATCH'); decision.url = `/api/v1/school/admin/agent-ideas/${ideaId}`;
-  assert.equal((await handler(decision)).status, 200);
-  assert.deepEqual(reviewed, { id: ideaId, schoolId: 'school-b', reviewerId: 'admin-b', decision: 'approved' });
-  const invalid = req({ decision: 'publish' }, 'PATCH'); invalid.url = decision.url;
-  assert.equal((await handler(invalid)).status, 400);
-});
-
-test('school profile request status is private to the authenticated identity and omits submitted PII', async () => {
-  let identity;
-  const handler = createListingsApi({ authenticate: async () => identity,
-    repository: { getActiveAccountSuspension: async () => null, getSchoolProfileRequest: async (issuer, subject) => ({
-      request_id: 'request-id', school_id: 'lyceum_3', status: 'pending', created_at: '2099-01-01T00:00:00Z',
-    }) } });
-  const request = req({}, 'GET'); request.url = '/api/v1/profile-requests';
-  assert.equal((await handler(request)).status, 401);
-  identity = { issuer: 'https://issuer.example', subject: 'synthetic-student' };
-  const result = await handler(request);
-  assert.equal(result.status, 200);
-  assert.equal(result.body.request.status, 'pending');
-  assert.deepEqual(Object.keys(result.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
-});
-test('role requests use a fixed allowlist, active student profile, and school-admin review scope', async () => {
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let savedRole; let reviewSchool; let reviewAction;
-  let actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
-    resolveActor: async () => actor,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      createSchoolRoleRequest: async request => { savedRole = request.requested_role; return { ok: true, status: 'pending', request_id: id }; },
-      listPendingSchoolRoleRequests: async school => { reviewSchool = school; return [{ request_id: id, requested_role: 'council_member' }]; },
-      startSchoolRoleRequestReview: async (requestId, school, reviewer) => { reviewAction = [requestId, school, reviewer]; return true; },
-      reviewSchoolRoleRequest: async (requestId, school, reviewer, decision, note) => { reviewAction = [requestId, school, reviewer, decision, note]; return true; },
-    } });
-  const submit = req({ requested_role: 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€', school_id: 'attacker-school', role: 'owner' }); submit.url = '/api/v1/role-requests';
-  assert.equal((await handler(submit)).status, 202);
-  assert.equal(savedRole, 'school_admin');
-  const invalid = req({ requested_role: 'owner' }); invalid.url = '/api/v1/role-requests';
-  assert.equal((await handler(invalid)).status, 400);
-  actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin', active: true };
-  const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
-  assert.equal((await handler(queue)).status, 200); assert.equal(reviewSchool, 'school-a');
-  const start = req({ action: 'start_review' }, 'PATCH'); start.url = `/api/v1/role-requests/${id}`;
-  assert.equal((await handler(start)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id']);
-  const approve = req({ decision: 'approve', review_note: 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾ ÑˆÐºÐ¾Ð»Ð¾Ð¹' }, 'PATCH'); approve.url = `/api/v1/role-requests/${id}`;
-  assert.equal((await handler(approve)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id', 'approve', 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾ ÑˆÐºÐ¾Ð»Ð¾Ð¹']);
-});
-
-test('active suspension blocks school role request changes but allows status reads', async () => {
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let suspended = true; let actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
-  let writes = 0; let lookups = 0;
-  const repository = {
-    getActiveAccountSuspension: async (schoolId, userId) => {
-      lookups++;
-      assert.equal(schoolId, 'school-a');
-      assert.equal(userId, actor.id);
-      return suspended ? { expires_at: '2099-01-01T00:00:00Z' } : null;
-    },
-    createSchoolRoleRequest: async () => { writes++; return { ok: true, status: 'pending', request_id: id }; },
-    getSchoolRoleRequest: async () => ({ request_id: id, status: 'pending' }),
-    startSchoolRoleRequestReview: async () => { writes++; return true; },
-  };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
-    resolveActor: async () => actor, repository });
-  const status = req({}, 'GET'); status.url = '/api/v1/role-requests';
-  assert.equal((await handler(status)).status, 200);
-  assert.equal(lookups, 0, 'read-only request status remains available during suspension');
-
-  const submit = req({ requested_role: 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€' }); submit.url = '/api/v1/role-requests';
-  assert.deepEqual(await handler(submit), { status: 403, body: { ok: false, error: 'account_suspended' } });
-  actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin', active: true };
-  const start = req({ action: 'start_review' }, 'PATCH'); start.url = `/api/v1/role-requests/${id}`;
-  assert.deepEqual(await handler(start), { status: 403, body: { ok: false, error: 'account_suspended' } });
-  assert.equal(writes, 0, 'suspended users cannot create, claim, or review school role requests');
-
-  suspended = false;
-  actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
-  const allowed = req({ requested_role: 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€' }); allowed.url = '/api/v1/role-requests';
-  assert.equal((await handler(allowed)).status, 202);
-  assert.equal(writes, 1);
-  repository.getActiveAccountSuspension = async () => { throw new Error('synthetic database failure'); };
-  const unavailable = req({ requested_role: 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€' }); unavailable.url = '/api/v1/role-requests';
-  assert.equal((await handler(unavailable)).status, 503, 'suspension lookup errors fail closed');
-  assert.equal(writes, 1);
-});
-
-test('role request status includes the current database role for migrated school access UI', async () => {
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
-    resolveActor: async () => ({ id: 'student-id', role: 'council_member', school_id: 'school-a' }),
-    repository: { getActiveAccountSuspension: async () => null, getSchoolRoleRequest: async (issuer, subject) => ({ request_id: 'request-a', status: 'approved', requested_role: 'council_member' }) } });
-  const request = req({}, 'GET'); request.url = '/api/v1/role-requests';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, role: 'council_member',
-    request: { request_id: 'request-a', status: 'approved', requested_role: 'council_member' } } });
-});
-
-test('role request submission and review fail closed for unprovisioned or non-admin profiles', async () => {
-  let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
-    resolveActor: async () => null,
-    repository: { getActiveAccountSuspension: async () => null, createSchoolRoleRequest: async () => { writes++; return { ok: true }; }, listPendingSchoolRoleRequests: async () => { writes++; return []; } } });
-  const submit = req({ requested_role: 'Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº Ð£Ñ‡ÐµÐ½Ð¸Ñ‡ÐµÑÐºÐ¾Ð³Ð¾ ÑÐ¾Ð²ÐµÑ‚Ð°' }); submit.url = '/api/v1/role-requests';
-  assert.equal((await handler(submit)).status, 403);
-  const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
-  assert.equal((await handler(queue)).status, 403);
-  assert.equal(writes, 0);
-});
-
-test('active suspensions are visible only to the authenticated school administrator and remain school-scoped', async () => {
-  let requestedSchool; let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listActiveAccountSuspensions: async schoolId => { requestedSchool = schoolId; return [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/suspensions';
-  const response = await handler(request);
-  assert.equal(response.status, 200); assert.equal(requestedSchool, 'school-a');
-  assert.deepEqual(response.body.suspensions, [{ target_id: 'student-a', expires_at: '2099-01-01T00:00:00Z' }]);
-  actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(request)).status, 403);
-});
-test('a user can read only their own active suspension status', async () => {
-  let lookedUp;
-  const actor = { id: 'synthetic-user', school_id: 'school-a', role: 'student' };
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
-    resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async (schoolId, userId) => {
-      lookedUp = { schoolId, userId };
-      return { reason: 'synthetic reason', duration_hours: 24, expires_at: '2099-01-01T00:00:00Z' };
-    } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/me/suspension';
-  const result = await handler(request);
-  assert.equal(result.status, 200);
-  assert.deepEqual(lookedUp, { schoolId: 'school-a', userId: 'synthetic-user' });
-  assert.equal(result.body.suspended, true);
-  assert.equal(result.body.suspension.reason, 'synthetic reason');
-});
-test('council deletion requests are same-school, bounded, and reject personal contact data', async () => {
-  const targetId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
-    resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null,
-      listAccountDeletionTargets: async (school, requester) => [{ id: targetId, role: 'student' }],
-      createAccountDeletionRequest: async input => { saved = input; return { ok: true, request_id: 'synthetic-request', already_exists: false }; },
-    } });
-  const targets = req({}, 'GET'); targets.url = '/api/v1/deletion-requests/targets';
-  assert.equal((await handler(targets)).status, 200);
-  const submit = req({ target_id: targetId, reason_code: 'spam', reason: 'Repeated unrelated messages in the school group.' });
-  submit.url = '/api/v1/deletion-requests';
-  assert.equal((await handler(submit)).status, 202);
-  assert.deepEqual(saved, { schoolId: 'school-a', requesterId: 'council-id', targetId, reasonCode: 'spam', reason: 'Repeated unrelated messages in the school group.' });
-  const pii = req({ target_id: targetId, reason_code: 'spam', reason: 'Repeated messages; contact me at test@example.org' });
-  pii.url = '/api/v1/deletion-requests';
-  assert.equal((await handler(pii)).status, 400);
-  actor = { id: 'student-id', school_id: 'school-a', role: 'student' };
-  assert.equal((await handler(submit)).status, 403);
-});
-test('only the same-school school administrator can read pending account deletion requests', async () => {
-  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin' };
-  let selectedSchool;
-  let rejected;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
-    resolveActor: async () => actor,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      listPendingAccountDeletionRequests: async school => { selectedSchool = school; return [{ request_id: requestId, reason: 'synthetic' }]; },
-      rejectAccountDeletionRequest: async (...args) => { rejected = args; return args[1] === actor.school_id; },
-    } });
-  const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests/review';
-  assert.equal((await handler(request)).status, 200);
-  assert.equal(selectedSchool, 'school-a');
-  actor = { id: 'other-admin', school_id: 'school-b', role: 'school_admin' };
-  assert.equal((await handler(request)).status, 200);
-  assert.equal(selectedSchool, 'school-b');
-  const patch = req({ decision: 'reject', review_note: 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾' }, 'PATCH'); patch.url = `/api/v1/deletion-requests/${requestId}`;
-  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true, status: 'rejected' } });
-  assert.deepEqual(rejected, [requestId, 'school-b', 'other-admin', 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾']);
-  const unsupported = req({ decision: 'approve' }, 'PATCH'); unsupported.url = `/api/v1/deletion-requests/${requestId}`;
-  assert.equal((await handler(unsupported)).status, 403);
-  actor = { id: 'council-id', school_id: 'school-a', role: 'council_member' };
-  assert.equal((await handler(request)).status, 403);
-  const councilPatch = req({ decision: 'reject', review_note: 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾' }, 'PATCH'); councilPatch.url = `/api/v1/deletion-requests/${requestId}`;
-  assert.equal((await handler(councilPatch)).status, 403);
-});
-test('a suspended school administrator cannot reject school account deletion requests', async () => {
-  let rejected = 0;
-  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin' }),
-    resolveActor: async () => ({ id: 'admin-id', school_id: 'school-a', role: 'school_admin' }),
-    repository: {
-      getActiveAccountSuspension: async () => ({ reason: 'test', expires_at: '2099-01-01T00:00:00Z' }),
-      rejectAccountDeletionRequest: async () => { rejected++; return true; },
-    } });
-  const patch = req({ decision: 'reject', review_note: 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾' }, 'PATCH');
-  patch.url = `/api/v1/deletion-requests/${requestId}`;
-  assert.deepEqual(await handler(patch), { status: 403, body: { ok: false, error: 'account_suspended' } });
-  assert.equal(rejected, 0);
-});
-test('council members can read only their own school-scoped deletion request history', async () => {
-  let args;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'council' }),
-    resolveActor: async () => ({ id: 'council-id', school_id: 'school-a', role: 'council_member' }),
-    repository: { getActiveAccountSuspension: async () => null, listOwnAccountDeletionRequests: async (...values) => { args = values; return [{ request_id: 'synthetic', status: 'pending' }]; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/deletion-requests';
-  const response = await handler(request);
-  assert.equal(response.status, 200);
-  assert.deepEqual(args, ['school-a', 'council-id']);
-  assert.deepEqual(response.body.requests, [{ request_id: 'synthetic', status: 'pending' }]);
-});
-test('direct same-origin school-account deletion is dispatched to the Russian deletion handler', async () => {
-  const targetId = '22222222-2222-4222-8222-222222222222';
-  const admin = { id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'school_admin' };
-  const now = Date.now(); let finalized;
-  const handler = createListingsApi({
-    authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin-subject', authenticated_at: Math.floor(now / 1000) }),
-    resolveActor: async () => admin,
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      beginAdminAccountDeletion: async input => ({ ok: true, id: targetId, issuer: 'https://issuer.example', subject: 'target-subject', school_id: input.schoolId, role: 'student', claim_token: 'claim-a' }),
-      finishAccountDeletion: async input => { finalized = input; return { ok: true, deleted: true }; },
-      restoreAccountAfterDeletionFailure: async () => true,
-    },
-    pendingImages: { listUserObjects: async () => [], delete: async () => {} }, now: () => now,
-  });
-  const request = req({ confirmation: 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐÐšÐšÐÐ£ÐÐ¢ Ð£Ð§ÐÐ¡Ð¢ÐÐ˜ÐšÐ' }, 'DELETE');
-  request.url = `/api/v1/school/accounts/${targetId}`;
-  const response = await handler(request);
-  assert.deepEqual(response, { status: 200, body: { ok: true, deleted: true, removed_images: 0 } });
-  assert.equal(finalized.userId, targetId);
-  assert.equal(finalized.claimToken, 'claim-a');
-});
-test('API requires verified identity and database profile before writing', async () => {
-  let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { getActiveAccountSuspension: async () => null, createListing: async () => { writes++; } } });
-  const response = await handler(req({ title: 'x' }));
-  assert.equal(response.status, 401); assert.equal(writes, 0);
-});
-test('API maps identity to database profile and persists unreviewed content as pending', async () => {
-  let record;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }), resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null, createListing: async (x) => { record = x; return { id: 'synthetic-listing' }; } } });
-  const response = await handler(req({ title: 'Book', description: 'School book', category: 'Ð£Ñ‡Ñ‘Ð±Ð°', user_id: 'forged' }));
-  assert.equal(response.status, 201); assert.equal(record.user_id, 'synthetic-user'); assert.equal(record.status, 'pending');
-});
-test('public listing read needs no student identity and returns only repository-approved projection', async () => {
-  const safeRow = { id: 'synthetic-listing', title: 'Book', status: 'active' };
-  const handler = createListingsApi({ authenticate: async () => { throw new Error('public read must not authenticate'); },
-    resolveActor: async () => { throw new Error('public read must not resolve a profile'); },
-    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => [safeRow] } });
-  const request = req({}, 'GET'); request.url = '/api/v1/listings';
-  const response = await handler(request);
-  assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { ok: true, listings: [safeRow] });
-});
-
-test('contacting a listing derives the recipient on the server and sends only reviewed text', async () => {
-  const sender = '11111111-1111-4111-8111-111111111111';
-  const recipient = '22222222-2222-4222-8222-222222222222';
-  const listingId = '33333333-3333-4333-8333-333333333333';
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
-    resolveActor: async () => ({ id: sender, school_id: 'school-a', role: 'student' }),
-    review: async ({ text }) => ({ action: text === 'hello' ? 'ok' : 'pending', reason_code: 'review_pending' }),
-    repository: { getActiveAccountSuspension: async () => null,
-      getListingContactRecipient: async (id, actorId, schoolId) => id === listingId && actorId === sender && schoolId === 'school-a' ? recipient : null,
-      createMessage: async record => { saved = record; return { id: '44444444-4444-4444-8444-444444444444' }; },
-    } });
-  const request = req({ body: 'hello', receiver_id: '55555555-5555-4555-8555-555555555555' });
-  request.url = `/api/v1/listings/${listingId}/contact`;
-  const response = await handler(request);
-  assert.equal(response.status, 201);
-  assert.equal(saved.sender_id, sender);
-  assert.equal(saved.receiver_id, recipient);
-  assert.equal(saved.school_id, 'school-a');
-  assert.equal(saved.body, 'hello');
-  assert.equal(saved.listing_id, listingId, 'the listing contact route links the conversation to the validated listing');
-});
-
-test('listing contact rejects unavailable or cross-school listing without storing a message', async () => {
-  let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }),
-    resolveActor: async () => ({ id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, getListingContactRecipient: async () => null, createMessage: async () => { writes++; } } });
-  const request = req({ body: 'hello' });
-  request.url = '/api/v1/listings/33333333-3333-4333-8333-333333333333/contact';
-  const response = await handler(request);
-  assert.equal(response.status, 404);
-  assert.equal(writes, 0);
-});
-test('public listing read fails closed when the database is unavailable', async () => {
-  const handler = createListingsApi({ repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { throw new Error('offline'); } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/listings';
-  const response = await handler(request);
-  assert.equal(response.status, 503);
-  assert.equal(response.body.error, 'database_unavailable');
-});
-
-test('pending moderation queue is restricted to the authenticated school staff profile', async () => {
-  let schoolScope;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
-    resolveActor: async () => ({ id: 'staff-id', school_id: 'school-a', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingListings: async schoolId => { schoolScope = schoolId; return [{ id: 'pending-id', photo_status: 'pending' }]; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/listings/moderation';
-  const response = await handler(request);
-  assert.equal(response.status, 200);
-  assert.equal(schoolScope, 'school-a');
-  assert.deepEqual(response.body.listings, [{ id: 'pending-id', photo_status: 'pending' }]);
-
-  let reads = 0;
-  const student = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
-    resolveActor: async () => ({ id: 'student-id', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingListings: async () => { reads++; return []; } } });
-  const denied = req({}, 'GET'); denied.url = '/api/v1/listings/moderation';
-  assert.equal((await student(denied)).status, 403);
-  assert.equal(reads, 0);
-});
-
-test('event review queue is school-scoped, staff-only, and does not query for students', async () => {
-  let requestedSchool;
-  const staff = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
-    resolveActor: async () => ({ id: 'staff-id', school_id: 'school-a', role: 'council_member' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingEventReviews: async schoolId => { requestedSchool = schoolId; return [{ event_id: 'event-a', user_id: 'student-a' }]; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/event-registrations/review';
-  const response = await staff(request);
-  assert.equal(response.status, 200);
-  assert.equal(requestedSchool, 'school-a');
-  assert.deepEqual(response.body.applications, [{ event_id: 'event-a', user_id: 'student-a' }]);
-
-  let reads = 0;
-  const student = createListingsApi({ authenticate: async () => ({ subject: 'verified' }),
-    resolveActor: async () => ({ id: 'student-id', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingEventReviews: async () => { reads++; return []; } } });
-  const denied = req({}, 'GET'); denied.url = '/api/v1/event-registrations/review';
-  assert.equal((await student(denied)).status, 403);
-  assert.equal(reads, 0);
-});
-
-test('unprovisioned Yandex identities can request a participant profile but cannot choose an app role', async () => {
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
-    resolveActor: async () => null,
-    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
-  const request = req({ school_id: 'lyceum_3', first_name: 'ÐÐ½Ñ', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '8Ð°', role: 'school_admin', user_id: 'forged' });
-  request.url = '/api/v1/profile-requests';
-  const response = await handler(request);
-  assert.equal(response.status, 202);
-  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'ÐÐ½Ñ', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '8Ð', person_type: 'student', staff_position: '' });
-  assert.equal(Object.hasOwn(saved, 'role'), false);
-
-  let writes = 0;
-  const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
-    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
-  const invalid = req({ school_id: 'unlisted-school', first_name: 'ÐÐ½Ñ', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '8Ð' }); invalid.url = '/api/v1/profile-requests';
-  assert.equal((await denied(invalid)).status, 400);
-  assert.equal(writes, 0);
-});
-
-test('only same-school administrators can read or decide profile access requests', async () => {
-  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let schoolId; let decision;
-  const admin = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
-    resolveActor: async () => ({ id: 'admin', school_id: 'lyceum_3', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'ÐÐ½Ñ', class_name: '8Ð' }]; },
-      reviewSchoolProfileRequest: async (...args) => { [decision, schoolId] = [args[3], args[1]]; return true; } } });
-  const list = req({}, 'GET'); list.url = '/api/v1/profile-requests/review';
-  assert.equal((await admin(list)).status, 200);
-  assert.equal(schoolId, 'lyceum_3');
-  const patch = req({ decision: 'approve' }, 'PATCH'); patch.url = `/api/v1/profile-requests/${requestId}`;
-  assert.deepEqual(await admin(patch), { status: 200, body: { ok: true, status: 'approved' } });
-  assert.equal(decision, 'approve');
-
-  let reads = 0;
-  const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
-    resolveActor: async () => ({ id: 'student', school_id: 'lyceum_3', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async () => { reads++; return []; }, reviewSchoolProfileRequest: async () => { reads++; return true; } } });
-  const forbiddenList = req({}, 'GET'); forbiddenList.url = '/api/v1/profile-requests/review';
-  const forbiddenDecision = req({ decision: 'approve' }, 'PATCH'); forbiddenDecision.url = `/api/v1/profile-requests/${requestId}`;
-  assert.equal((await student(forbiddenList)).status, 403);
-  assert.equal((await student(forbiddenDecision)).status, 403);
-  assert.equal(reads, 0);
-});
-
-test('only an active school administrator can list and decide staff verification requests', async () => {
-  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let decision;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
-    resolveActor: async () => ({ id: 'admin-a', school_id: 'school-a', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null,
-      listPendingSchoolStaffVerifications: async schoolId => { assert.equal(schoolId, 'school-a'); return [{ user_id: userId, staff_position: 'Ð£Ñ‡Ð¸Ñ‚ÐµÐ»ÑŒ' }]; },
-      reviewSchoolStaffVerification: async input => { decision = input; return true; },
-    } });
-  const list = req({}, 'GET'); list.url = '/api/v1/staff-verifications';
-  assert.equal((await handler(list)).body.requests[0].user_id, userId);
-  const patch = req({ decision: 'approved' }, 'PATCH'); patch.url = `/api/v1/staff-verifications/${userId}`;
-  assert.deepEqual(await handler(patch), { status: 200, body: { ok: true, status: 'approved' } });
-  assert.deepEqual(decision, { userId, schoolId: 'school-a', reviewerId: 'admin-a', decision: 'approved' });
-
-  let reads = 0;
-  const student = createListingsApi({ authenticate: async () => ({ subject: 'student' }),
-    resolveActor: async () => ({ id: 'student-a', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolStaffVerifications: async () => { reads++; return []; }, reviewSchoolStaffVerification: async () => { reads++; return true; } } });
-  assert.equal((await student(list)).status, 403);
-  assert.equal((await student(patch)).status, 403);
-  assert.equal(reads, 0);
-});
-
-test('school catalog is a minimal public projection and needs no auth', async () => {
-  const handler = createListingsApi({ authenticate: async () => { throw new Error('school catalog is public'); },
-    schools: [{ id: 'lyceum_3', name: 'Ð›Ð¸Ñ†ÐµÐ¹ â„– 3', secret: 'hidden' }, { id: 'gymnasium_4', name: 'Ð“Ð¸Ð¼Ð½Ð°Ð·Ð¸Ñ â„– 4', secret: 'hidden' }] });
-  const request = req({}, 'GET'); request.url = '/api/v1/schools';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, schools: [
-    { id: 'lyceum_3', name: 'Ð›Ð¸Ñ†ÐµÐ¹ â„– 3' }, { id: 'gymnasium_4', name: 'Ð“Ð¸Ð¼Ð½Ð°Ð·Ð¸Ñ â„– 4' },
-  ] } });
-});
-
-test('profile endpoint authenticates and returns the database profile, never token roles', async () => {
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'admin' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null,} });
-  const request = req({}, 'GET'); request.url = '/api/v1/me';
-  const response = await handler(request);
-  assert.equal(response.status, 200);
-  assert.deepEqual(response.body.profile, { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' });
-});
-test('profile endpoint rejects missing authentication', async () => {
-  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null, repository: { getActiveAccountSuspension: async () => null,} });
-  const request = req({}, 'GET'); request.url = '/api/v1/me';
-  assert.equal((await handler(request)).status, 401);
-});
-test('profile identity update binds to the authenticated subject and ignores role or school fields', async () => {
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (issuer, subject, fields) => { saved = { issuer, subject, ...fields }; return { id: 'own-id', role: 'student', school_id: 'school-a', ...fields }; } } });
-  const request = req({ first_name: '  ÐÐ½Ñ ', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: ' 8Ð° ', role: 'school_admin', school_id: 'other-school', user_id: 'other-id' }, 'PATCH');
-  request.url = '/api/v1/me';
-  const response = await handler(request);
-  assert.equal(response.status, 200);
-  assert.deepEqual(saved, { issuer: 'https://issuer.example', subject: 'own-subject', first_name: 'ÐÐ½Ñ', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '8Ð', person_type: 'student', staff_position: '' });
-  assert.equal(response.body.profile.role, 'student');
-});
-
-test('legacy profile edit preserves a nonstudent category and staff position', async () => {
-  let saved;
-  const identity = { issuer: 'https://issuer.example', subject: 'own-subject' };
-  const handler = createListingsApi({ authenticate: async () => identity,
-    resolveActor: async () => ({ id: 'own-id', school_id: 'school-a', role: 'student', person_type: 'school_staff', staff_position: 'Ð£Ñ‡Ð¸Ñ‚ÐµÐ»ÑŒ', class_name: null }),
-    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
-  const request = req({ first_name: 'ÐÐ½Ð½Ð°', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°' }, 'PATCH'); request.url = '/api/v1/me';
-  assert.equal((await handler(request)).status, 200);
-  assert.deepEqual(saved, { first_name: 'ÐÐ½Ð½Ð°', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '', person_type: 'school_staff', staff_position: 'Ð£Ñ‡Ð¸Ñ‚ÐµÐ»ÑŒ' });
-});
-
-test('profile identity update rejects invalid values before touching the repository', async () => {
-  let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async () => { writes++; return {}; } } });
-  const request = req({ first_name: '<script>', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', class_name: '0Ð' }, 'PATCH'); request.url = '/api/v1/me';
-  assert.equal((await handler(request)).status, 400);
-  assert.equal(writes, 0);
-});
-
-test('profile identity update enforces the current FAM school class format', async () => {
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'own-subject' }),
-    repository: { getActiveAccountSuspension: async () => null, updateOwnProfileIdentity: async (_issuer, _subject, fields) => { saved = fields; return fields; } } });
-  for (const class_name of ['4Ð', '12Ð', '8Ð”', '8A']) {
-    const request = req({ first_name: 'ÐÐ½Ñ', last_name: 'Ð¢ÐµÑÑ‚', class_name }, 'PATCH'); request.url = '/api/v1/me';
-    assert.equal((await handler(request)).status, 400, class_name);
-  }
-  for (const class_name of ['5Ð', '9Ðš', '10Ð‘', '11Ð“']) {
-    const request = req({ first_name: 'ÐÐ½Ñ', last_name: 'Ð¢ÐµÑÑ‚', class_name }, 'PATCH'); request.url = '/api/v1/me';
-    assert.equal((await handler(request)).status, 200, class_name);
-    assert.equal(saved.class_name, class_name);
-  }
-  const parent = req({ first_name: 'ÐÐ½Ð½Ð°', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', person_type: 'parent', class_name: '' }, 'PATCH'); parent.url = '/api/v1/me';
-  assert.equal((await handler(parent)).status, 200);
-  assert.equal(saved.person_type, 'parent');
-  const staff = req({ first_name: 'ÐÐ½Ð½Ð°', last_name: 'Ð˜Ð²Ð°Ð½Ð¾Ð²Ð°', person_type: 'school_staff', staff_position: 'Ð£Ñ‡Ð¸Ñ‚ÐµÐ»ÑŒ Ð¼Ð°Ñ‚ÐµÐ¼Ð°Ñ‚Ð¸ÐºÐ¸', class_name: '' }, 'PATCH'); staff.url = '/api/v1/me';
-  assert.equal((await handler(staff)).status, 200);
-  assert.equal(saved.staff_position, 'Ð£Ñ‡Ð¸Ñ‚ÐµÐ»ÑŒ Ð¼Ð°Ñ‚ÐµÐ¼Ð°Ñ‚Ð¸ÐºÐ¸');
-});
-
-test('favorites are scoped to the authenticated database actor', async () => {
-  let listedFor;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listFavoriteIds: async (userId) => { listedFor = userId; return ['active-listing']; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/favorites';
-  const response = await handler(request);
-  assert.equal(listedFor, 'synthetic-user');
-  assert.deepEqual(response.body, { ok: true, favorite_ids: ['active-listing'] });
-});
-
-test('favorite writes use only the authenticated actor and return 404 for non-active listings', async () => {
-  let call;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, setFavorite: async (...args) => { call = args; return args[1] === '11111111-1111-4111-8111-111111111111'; } } });
-  const request = req({ user_id: 'forged-user' }, 'PUT'); request.url = '/api/v1/listings/11111111-1111-4111-8111-111111111111/favorite';
-  const response = await handler(request);
-  assert.deepEqual(call, ['synthetic-user', '11111111-1111-4111-8111-111111111111', true]);
-  assert.equal(response.status, 200);
-  const missing = req({}, 'PUT'); missing.url = '/api/v1/listings/22222222-2222-4222-8222-222222222222/favorite';
-  assert.equal((await handler(missing)).status, 404);
-});
-
-test('ordinary students can delete only their own listing and media cleanup stays server-side', async () => {
-  const listingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const userId = '11111111-1111-4111-8111-111111111111';
-  let actor = { id: userId, role: 'student', school_id: 'school-a' };
-  const calls = [];
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: actor.id }),
-    resolveActor: async () => actor,
-    pendingImages: { delete: async key => { calls.push(['delete-image', key]); } },
-    repository: { getActiveAccountSuspension: async () => null,
-      listOwnActiveListingIds: async id => id === userId ? [listingId] : [],
-      deleteOwnListing: async (id, target) => {
-        calls.push(['delete-listing', id, target]);
-        return id === userId && target === listingId ? { id: target, media_cleanup: { object_key: 'pending/user/image.webp', claim_token: 'claim-1' } } : null;
-      },
-      finishPendingImageCleanup: async (...args) => { calls.push(['finish-cleanup', ...args]); return true; },
-    } });
-  const own = req({}, 'GET'); own.url = '/api/v1/me/listings';
-  assert.deepEqual((await handler(own)).body.listing_ids, [listingId]);
-  const remove = req({}, 'DELETE'); remove.url = `/api/v1/listings/${listingId}`;
-  assert.deepEqual(await handler(remove), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
-  assert.deepEqual(calls, [
-    ['delete-listing', userId, listingId],
-    ['delete-image', 'pending/user/image.webp'],
-    ['finish-cleanup', 'pending/user/image.webp', 'claim-1', true],
-  ]);
-  actor = { id: '22222222-2222-4222-8222-222222222222', role: 'student', school_id: 'school-a' };
-  assert.equal((await handler(remove)).status, 404);
-  actor = { id: '33333333-3333-4333-8333-333333333333', role: 'school_admin', school_id: 'school-a' };
-  assert.equal((await handler(remove)).status, 403);
-});
-
-test('school administrators require fresh Yandex auth to delete another member listing', async () => {
-  const listingId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const adminId = '11111111-1111-4111-8111-111111111111';
-  let identity = { issuer: 'issuer', subject: 'admin', authenticated_at: 1_800_000_000 };
-  let context = { user_id: '22222222-2222-4222-8222-222222222222', school_id: 'school-a', category: 'ÐšÐ½Ð¸Ð³Ð¸' };
-  let deleted = 0; const calls = [];
-  const handler = createListingsApi({ authenticate: async () => identity,
-    resolveActor: async () => ({ id: adminId, role: 'school_admin', school_id: 'school-a' }),
-    now: () => 1_800_000_000_000,
-    pendingImages: { delete: async key => calls.push(['image', key]) },
-    repository: {
-      getActiveAccountSuspension: async () => null,
-      getSchoolListingDeletionContext: async input => { calls.push(['context', input]); return context; },
-      deleteSchoolListing: async input => { calls.push(['delete', input]); deleted++; return {
-        ok: true, id: listingId, media_cleanup: { object_key: 'pending/owner/image.webp', claim_token: 'claim' },
-      }; },
-      finishPendingImageCleanup: async (...args) => { calls.push(['finish', ...args]); return true; },
-    } });
-  const remove = req({ confirmation: 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐžÐ‘ÐªÐ¯Ð’Ð›Ð•ÐÐ˜Ð• Ð¨ÐšÐžÐ›Ð«' }, 'DELETE');
-  remove.url = `/api/v1/school/listings/${listingId}`;
-  identity.authenticated_at = null;
-  assert.equal((await handler(remove)).body.error, 'recent_yandex_login_required');
-  assert.equal(deleted, 0);
-  identity.authenticated_at = 1_800_000_000;
-  const freshRemove = req({ confirmation: 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐžÐ‘ÐªÐ¯Ð’Ð›Ð•ÐÐ˜Ð• Ð¨ÐšÐžÐ›Ð«' }, 'DELETE');
-  freshRemove.url = remove.url;
-  assert.deepEqual(await handler(freshRemove), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
-  assert.equal(deleted, 1);
-  assert.deepEqual(calls.slice(-3).map(call => call[0]), ['delete', 'image', 'finish']);
-  context = { user_id: adminId, school_id: 'school-a', category: 'ÐÑ„Ð¸ÑˆÐ°' };
-  identity.authenticated_at = null;
-  const ownRemove = req({ confirmation: 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐžÐ‘ÐªÐ¯Ð’Ð›Ð•ÐÐ˜Ð• Ð¨ÐšÐžÐ›Ð«' }, 'DELETE');
-  ownRemove.url = remove.url;
-  assert.equal((await handler(ownRemove)).status, 200, 'owner can remove their own listing without the extra freshness gate');
-  const wrongConfirmation = req({ confirmation: 'delete' }, 'DELETE'); wrongConfirmation.url = remove.url;
-  assert.equal((await handler(wrongConfirmation)).body.error, 'confirmation_required');
-  context = null;
-  const unavailableRemove = req({ confirmation: 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐžÐ‘ÐªÐ¯Ð’Ð›Ð•ÐÐ˜Ð• Ð¨ÐšÐžÐ›Ð«' }, 'DELETE');
-  unavailableRemove.url = remove.url;
-  assert.equal((await handler(unavailableRemove)).status, 404, 'cross-school or missing listing remains unavailable');
-});
-
-test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
-  let actor = { id: 'staff-id', role: 'school_admin' };
-  let queries = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [] } });
-  assert.equal(queries, 0);
-  actor = null;
-  assert.equal((await handler(request)).status, 403);
-});
-
-test('favorites fail closed when the database adapter is unavailable', async () => {
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }), repository: { getActiveAccountSuspension: async () => null,} });
-  const request = req({}, 'GET'); request.url = '/api/v1/favorites';
-  assert.equal((await handler(request)).status, 503);
-});
-
-test('idea submission is authenticated and bound to the database profile', async () => {
-  let saved;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-user' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, createIdea: async record => { saved = record; return { id: 'synthetic-idea' }; } } });
-  const request = req({ text: 'Ð‘Ñ‹Ð»Ð¾ Ð±Ñ‹ Ð·Ð´Ð¾Ñ€Ð¾Ð²Ð¾ Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÐºÐ½Ð¸Ð¶Ð½Ñ‹Ð¹ Ð¾Ð±Ð¼ÐµÐ½', user_id: 'forged-user' });
-  request.url = '/api/v1/ideas';
-  const response = await handler(request);
-  assert.equal(response.status, 201);
-  assert.equal(saved.user_id, 'synthetic-user');
-  assert.equal(saved.school_id, 'synthetic-school');
-  assert.equal(saved.admin_status, 'new');
-});
-
-test('message API fails closed when moderation is unavailable', async () => {
-  let writes = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, createMessage: async () => { writes++; return { id: 'unexpected' }; } } });
-  const request = req({ receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'ÐŸÑ€Ð¸Ð²ÐµÑ‚' });
-  request.url = '/api/v1/messages';
-  const response = await handler(request);
-  assert.equal(response.status, 503);
-  assert.equal(response.body.status, 'pending');
-  assert.equal(writes, 0);
-});
-
-test('message API uses the verified sender profile after an explicit approval', async () => {
-  let saved;
-  const senderId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', user_id: 'forged-sender' }),
-    resolveActor: async () => ({ id: senderId, school_id: 'school-a', role: 'student' }),
-    review: async () => ({ action: 'ok' }),
-    repository: { getActiveAccountSuspension: async () => null, createMessage: async record => { saved = record; return { id: 'synthetic-message' }; } } });
-  const request = req({ sender_id: 'forged-sender', receiver_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', body: 'ÐŸÑ€Ð¸Ð²ÐµÑ‚' });
-  request.url = '/api/v1/messages';
-  const response = await handler(request);
-  assert.equal(response.status, 201);
-  assert.equal(saved.sender_id, senderId);
-  assert.equal(saved.school_id, 'school-a');
-});
-
-test('message read requires authentication and scopes data to the database profile', async () => {
-  let owner;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, listMessages: async (userId, schoolId) => { owner = [userId, schoolId]; return [{ id: 'owned-message' }]; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/messages';
-  const response = await handler(request);
-  assert.deepEqual(owner, ['synthetic-user', 'synthetic-school']);
-  assert.deepEqual(response.body, { ok: true, messages: [{ id: 'owned-message' }] });
-});
-
-test('message read rejects missing identity before querying the database', async () => {
-  let reads = 0;
-  const handler = createListingsApi({ authenticate: async () => null, resolveActor: async () => null,
-    repository: { getActiveAccountSuspension: async () => null, listMessages: async () => { reads++; return []; } } });
-  const request = req({}, 'GET'); request.url = '/api/v1/messages';
-  assert.equal((await handler(request)).status, 401);
-  assert.equal(reads, 0);
-});
-
-test('only the authenticated recipient can mark a message read', async () => {
-  let args;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, markMessageRead: async (...values) => { args = values; return true; } } });
-  const request = req({}, 'PATCH'); request.url = '/api/v1/messages/11111111-1111-4111-8111-111111111111/read';
-  const response = await handler(request);
-  assert.deepEqual(args, ['synthetic-user', 'synthetic-school', '11111111-1111-4111-8111-111111111111']);
-  assert.equal(response.body.is_read, true);
-});
-
-test('bulk message read accepts bounded UUIDs and scopes every update to the verified profile', async () => {
-  let call;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub' }),
-    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'synthetic-school', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, markMessagesRead: async (...args) => { call = args; return 1; } } });
-  const request = req({ message_ids: ['11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111'] });
-  request.url = '/api/v1/messages/read';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, updated: 1 } });
-  assert.deepEqual(call, ['synthetic-user', 'synthetic-school', ['11111111-1111-4111-8111-111111111111']]);
-  const invalid = req({ message_ids: ['not-a-uuid'] }); invalid.url = request.url;
-  assert.equal((await handler(invalid)).status, 400);
-});
-
-test('listing moderation trusts database role and school scope, not token claims or request fields', async () => {
-  let call;
-  const id = '11111111-1111-4111-8111-111111111111';
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
-    resolveActor: async () => ({ id: 'admin-id', school_id: 'school-a', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null, moderateListing: async (...args) => { call = args; return true; } } });
-  const request = req({ decision: 'approve', school_id: 'school-b', status: 'active' }, 'PATCH');
-  request.url = `/api/v1/listings/${id}/moderation`;
-  const response = await handler(request);
-  assert.deepEqual(call, [id, 'school-a', 'active']);
-  assert.deepEqual(response, { status: 200, body: { ok: true, status: 'active' } });
-});
-
-test('listing moderation rejects student role and invalid decisions before repository access', async () => {
-  let writes = 0;
-  const base = { authenticate: async () => ({ subject: 'oidc-sub', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null, moderateListing: async () => { writes++; return true; } } };
-  const id = '11111111-1111-4111-8111-111111111111';
-  const student = createListingsApi({ ...base, resolveActor: async () => ({ id: 'student', school_id: 'school-a', role: 'student' }) });
-  const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${id}/moderation`;
-  assert.equal((await student(request)).status, 403);
-  const admin = createListingsApi({ ...base, resolveActor: async () => ({ id: 'admin', school_id: 'school-a', role: 'school_admin' }) });
-  const invalid = req({ decision: 'active' }, 'PATCH'); invalid.url = `/api/v1/listings/${id}/moderation`;
-  assert.equal((await admin(invalid)).status, 400);
-  assert.equal(writes, 0);
-});
-
-test('event registration is bound to the authenticated profile and capacity errors stay explicit', async () => {
-  const eventId = '11111111-1111-4111-8111-111111111111';
-  const registrationRequest = () => {
-    const request = Readable.from([]); request.method = 'POST'; request.url = `/api/v1/listings/${eventId}/registrations`; return request;
-  };
-  let registeredAs;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'untrusted-subject' }),
-    resolveActor: async () => ({ id: 'synthetic-registrant', school_id: 'school-a', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, registerForEvent: async (...args) => { registeredAs = args; return { event_id: args[0], user_id: args[1], status: 'confirmed' }; } } });
-  const request = registrationRequest();
-  const response = await handler(request);
-  assert.deepEqual(registeredAs, [eventId, 'synthetic-registrant']);
-  assert.deepEqual(response, { status: 201, body: { ok: true, registration: { event_id: eventId, user_id: 'synthetic-registrant', status: 'confirmed' } } });
-
-  const full = createListingsApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: 'u', role: 'student' }),
-    repository: { getActiveAccountSuspension: async () => null, registerForEvent: async () => { throw Object.assign(new Error('full'), { code: 'no_seats_available' }); } } });
-  const fullResponse = await full(registrationRequest());
-  assert.equal(fullResponse.status, 409);
-  assert.equal(fullResponse.body.error, 'no_seats_available');
-});
-
-test('event applicant names are visible only to same-school council roles', async () => {
-  const id = '11111111-1111-4111-8111-111111111111';
-  let scope;
-  const repository = { getActiveAccountSuspension: async () => null, listEventApplicants: async (...args) => { scope = args; return [{ first_name: 'Ð¢ÐµÑÑ‚', class_name: '8Ð', status: 'pending' }]; } };
-  const student = createListingsApi({ authenticate: async () => ({ subject: 's' }),
-    resolveActor: async () => ({ id: 'student', role: 'student', school_id: 'school-a' }), repository });
-  const studentRequest = req({}, 'GET'); studentRequest.url = `/api/v1/listings/${id}/registrations`;
-  assert.equal((await student(studentRequest)).status, 403);
-  assert.equal(scope, undefined);
-  const council = createListingsApi({ authenticate: async () => ({ subject: 's', school_id: 'forged' }),
-    resolveActor: async () => ({ id: 'council', role: 'council_member', school_id: 'school-a' }), repository });
-  const councilRequest = req({}, 'GET'); councilRequest.url = `/api/v1/listings/${id}/registrations`;
-  const response = await council(councilRequest);
-  assert.deepEqual(scope, [id, 'school-a']);
-  assert.deepEqual(response.body, { ok: true, applicants: [{ first_name: 'Ð¢ÐµÑÑ‚', class_name: '8Ð', status: 'pending' }] });
-});
-
-test('event registration review requires council role and delegates event-owner scoping to the repository', async () => {
-  const eventId = '11111111-1111-4111-8111-111111111111';
-  const userId = '22222222-2222-4222-8222-222222222222';
-  let writes = 0;
-  const makeHandler = role => createListingsApi({ authenticate: async () => ({ subject: 'x' }),
-    resolveActor: async () => ({ id: 'organizer', school_id: 'school-a', role }),
-    repository: { getActiveAccountSuspension: async () => null, moderateEventRegistration: async (...args) => { writes++; assert.deepEqual(args, [eventId, userId, 'organizer', 'school-a', 'confirmed']); return true; } } });
-  const request = req({ decision: 'approve' }, 'PATCH'); request.url = `/api/v1/listings/${eventId}/registrations/${userId}`;
-  assert.equal((await makeHandler('student')(request)).status, 403);
-  assert.equal(writes, 0);
-  assert.deepEqual(await makeHandler('council_member')(request), { status: 200, body: { ok: true, status: 'confirmed' } });
-});
-
-test('event occupancy is a public count with no registration identity details', async () => {
-  const eventId = '11111111-1111-4111-8111-111111111111';
-  const handler = createListingsApi({ authenticate: async () => { throw new Error('public occupancy must not authenticate'); },
-    repository: { getActiveAccountSuspension: async () => null, getEventOccupancy: async id => { assert.equal(id, eventId); return 3; } } });
-  const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
-});
-
-test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
-  let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
-  let listedSchool; let listedReviewer; let reviewed;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
-      reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === 'school-a'; } } });
-  const list = req({}, 'GET'); list.url = '/api/v1/school/ideas';
-  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', image_status: 'pending' }] } });
-  assert.equal(listedSchool, 'school-a');
-  assert.equal(listedReviewer, actor.id);
-  const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images';
-  assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, image_status: 'approved' } });
-  assert.equal(reviewed.ideaId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  assert.equal(reviewed.reviewerId, actor.id);
-  actor = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-b', role: 'council_member' };
-  const crossSchoolApprove = req({ decision: 'approve' }, 'PATCH');
-  crossSchoolApprove.url = approve.url;
-  assert.equal((await handler(crossSchoolApprove)).status, 404, 'the repository rejects cross-school reviews');
-  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
-  assert.equal((await handler(list)).status, 403);
-});
-
-test('idea text moderation requires school staff and records a decision only through the scoped repository', async () => {
-  let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
-  let review;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, reviewSchoolIdeaText: async value => { review = value; return value.schoolId === actor.school_id; } } });
-  const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation';
-  assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, ai_status: 'approved' } });
-  assert.deepEqual(review, { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: actor.id, decision: 'approve' });
-  actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
-  assert.equal((await handler(approve)).status, 403);
-});
-
-test('notification read state is always owned by the authenticated profile and bounded', async () => {
-  const actor = { id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', role: 'student' };
-  const saved = [];
-  let listedOwner;
-  const handler = createListingsApi({ authenticate: async () => ({ subject: 'student' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null,
-      listNotificationReadStates: async owner => { listedOwner = owner; return [{ notification_key: 'release:test' }]; },
-      saveNotificationReadStates: async (owner, keys) => { saved.push({ owner, keys }); return true; },
-    } });
-  const list = req({}, 'GET'); list.url = '/api/v1/notification-reads';
-  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, notification_keys: ['release:test'] } });
-  assert.equal(listedOwner, actor.id);
-  const save = req({ notification_keys: ['school-listing:abc', 'dismissed:release:test', 'school-listing:abc'] });
-  save.url = '/api/v1/notification-reads';
-  assert.deepEqual(await handler(save), { status: 200, body: { ok: true } });
-  assert.deepEqual(saved, [{ owner: actor.id, keys: ['school-listing:abc', 'dismissed:release:test'] }]);
-  const invalid = req({ notification_keys: ['bad\nkey'] }); invalid.url = save.url;
-  assert.equal((await handler(invalid)).status, 400);
-  const oversized = req({ notification_keys: Array.from({ length: 101 }, (_, i) => `key:${i}`) }); oversized.url = save.url;
-  assert.equal((await handler(oversized)).status, 400);
-});
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíÛnúÙ:-jZ.¶›­–)Þ³V–×÷'BFW7Bg&öÒvæöFS§FW7Bs°¦–×÷'B76W'Bg&öÒvæöFS¦76W'B÷7G&–7Bs°¦–×÷'B²&VF&ÆRÒg&öÒvæöFS§7G&VÒs°¦–×÷'B²7&VFTÆ—7F–æw4’Òg&öÒrââ÷6W'f–6W2öÆ—7F–æw2Ö’æÖ§2s°¦gVæ7F–öâ&W†&öG’Ò·ÒÂÖWF†öBÒuõ5Br’°¢6öç7B&WVW7BÒ&VF&ÆRæg&öÒ†ÖWF†öBÓÓÒttUBròµÒ¢´'VffW"æg&öÒ„¥4ôâç7G&–æv–g’†&öG’’•Ò“°¢&WVW7BæÖWF†öBÒÖWF†öC°¢&WVW7BçW&ÂÒrö’÷cöÆ—7F–æw2s°¢&WGW&â&WVW7C°§Ð§FW7B‚wFV6†æ–6ÂÆW'G2&R&VBÖöæÇ’ÂFÖ–æ—7G&F÷"ÖöæÇ’ÂæB6öçF–âöæÇ’vw&VvFR&÷w2rÂ7–æ2‚’Óâ°¢ÆWB&VG2Ò°¢ÆWB7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÀ¢Æ—7E6—FTW'&÷$ÆW'G3¢7–æ2‚’Óâ²&VG2²³²&WGW&â·²WfVçEö6öFS¢vFF&6U÷&WVW7Eöf–ÆVBrÂvUö&V¢vFF&6RrÂWfVçEö6÷VçC¢2Â6WfW&—G“¢v7&—F–6ÂrÕÓ²ÒÀ¢vWDÆFW7E6—FTW'&÷$F–vW7C¢7–æ2‚’ÓâçVÆÂÀ¢ÒÒ“°¢6öç7BÆ—7BÒ&W‡·ÒÂttUBr“²Æ—7BçW&ÂÒrö’÷c÷66†ööÂöFÖ–â÷FV6†æ–6ÂÖÆW'G2s°¢76W'BæFVWWVÂ†v—B†æFÆW"†Æ—7B’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆW'G3¢°¢²WfVçEö6öFS¢vFF&6U÷&WVW7Eöf–ÆVBrÂvUö&V¢vFF&6RrÂWfVçEö6÷VçC¢2Â6WfW&—G“¢v7&—F–6ÂrÒÀ¢ÒÂF–vW7C¢çVÆÂÒÒ“°¢7F÷"Ò²–C¢w7GVFVçBÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w7GVFVçBrÓ°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2ÂC2“°¢76W'BæWVÂ‡&VG2Â“°§Ò“° §FW7B‚w66†ööÂ6fWG’&W÷'G2&RFÖ–æ—7G&F÷"ÖöæÇ’æB6¶æ÷vÆVFvVÖVçB—266†ööÂÖ&÷VæBrÂ7–æ2‚’Óâ°¢ÆWB7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢ÆWB6VÆV7FVE66†ööÃ²ÆWB6¶æ÷vÆVFvVC°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÀ¢Æ—7E66†ööÅ6fWG•&W÷'G3¢7–æ266†ööÄ–BÓâ²6VÆV7FVE66†ööÂÒ66†ööÄ–C²&WGW&â²&W÷'G3¢·²f–ævW'&–çC¢vrç&WVBƒcB’ÕÒÂW&–öEöF—3¢3Ó²ÒÀ¢6¶æ÷vÆVFvU66†ööÅ6fWG•&W÷'C¢7–æ2–çWBÓâ²6¶æ÷vÆVFvVBÒ–çWC²&WGW&â–çWBç66†ööÄ–BÓÓÒ7F÷"ç66†ööÅö–C²ÒÀ¢ÒÒ“°¢6öç7BÆ—7BÒ&W‡·ÒÂttUBr“²Æ—7BçW&ÂÒrö’÷c÷66†ööÂöFÖ–â÷6fWG’×&W÷'G2s°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2Â#“°¢76W'BæWVÂ‡6VÆV7FVE66†ööÂÂw66†ööÂÖr“°¢7F÷"Ò²–C¢v6÷Væ6–ÂÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÓ°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2ÂC2“°¢7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢6öç7B6²Ò&W‡²f–ævW'&–çC¢vrç&WVBƒcB’Â6FVv÷'“¢wVç6fUö–ÖvRrÂ6÷W&6Uö¶–æC¢v–ÖvRrÒÂuD4‚r“°¢6²çW&ÂÒrö’÷c÷66†ööÂöFÖ–â÷6fWG’×&W÷'G2s°¢76W'BæFVWWVÂ†v—B†æFÆW"†6²’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÒÒ“°¢76W'BæFVWWVÂ†6¶æ÷vÆVFvVBÂ²66†ööÄ–C¢w66†ööÂÖrÂ&Wf–WvW$–C¢vFÖ–âÖrÂf–ævW'&–çC¢vrç&WVBƒcB’Â6FVv÷'“¢wVç6fUö–ÖvRrÂ6÷W&6T¶–æC¢v–ÖvRrÒ“°¢6öç7BÖÆf÷&ÖVBÒ&W‡²f–ævW'&–çC¢v&BrÂ6FVv÷'“¢wVç6fUö–ÖvRrÂ6÷W&6Uö¶–æC¢v–ÖvRrÒÂuD4‚r“²ÖÆf÷&ÖVBçW&ÂÒ6²çW&Ã°¢76W'BæWVÂ‚†v—B†æFÆW"†ÖÆf÷&ÖVB’’ç7FGW2ÂC“°§Ò“° §FW7B‚w7W7Vç6–öâ&Æö6·266†ööÂ6fWG’&W÷'B66W72v†–ÆR7W7Vç6–öâ7FGW2&VÖ–ç2&VF&ÆRrÂ7–æ2‚’Óâ°¢6öç7B7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢ÆWB7W7VæFVBÒG'VS²ÆWB66W76VE&W÷'G2Ò°¢6öç7B&W÷6—F÷'’Ò°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’Óâ7W7VæFVBò²&V6öã¢wFW7BrÂW‡—&W5öC¢s#“’ÓÓC££¢rÒ¢çVÆÂÀ¢Æ—7E66†ööÅ6fWG•&W÷'G3¢7–æ2‚’Óâ²66W76VE&W÷'G2²³²&WGW&â²&W÷'G3¢µÒÂW&–öEöF—3¢3Ó²ÒÀ¢6¶æ÷vÆVFvU66†ööÅ6fWG•&W÷'C¢7–æ2‚’Óâ²66W76VE&W÷'G2²³²&WGW&âG'VS²ÒÀ¢Ó°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"Â&W÷6—F÷'’Ò“°¢6öç7BÆ—7BÒ&W‡·ÒÂttUBr“²Æ—7BçW&ÂÒrö’÷c÷66†ööÂöFÖ–â÷6fWG’×&W÷'G2s°¢76W'BæFVWWVÂ†v—B†æFÆW"†Æ—7B’Â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v66÷VçE÷7W7VæFVBrÒÒ“°¢6öç7B6¶æ÷vÆVFvRÒ&W‡²f–ævW'&–çC¢vrç&WVBƒcB’Â6FVv÷'“¢wVç6fUö–ÖvRrÂ6÷W&6Uö¶–æC¢v–ÖvRrÒÂuD4‚r“°¢6¶æ÷vÆVFvRçW&ÂÒÆ—7BçW&Ã°¢76W'BæFVWWVÂ†v—B†æFÆW"†6¶æ÷vÆVFvR’Â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v66÷VçE÷7W7VæFVBrÒÒ“°¢76W'BæWVÂ†66W76VE&W÷'G2Â“° ¢6öç7B7FGW2Ò&W‡·ÒÂttUBr“²7FGW2çW&ÂÒrö’÷cöÖR÷7W7Vç6–öâs°¢76W'BæFVWWVÂ†v—B†æFÆW"‡7FGW2’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ7W7VæFVC¢G'VRÀ¢7W7Vç6–öã¢²&V6öã¢wFW7BrÂW‡—&W5öC¢s#“’ÓÓC££¢rÒÒÒ“° ¢7W7VæFVBÒfÇ6S°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2Â#“°¢76W'BæWVÂ†66W76VE&W÷'G2Â“°¢&W÷6—F÷'’ævWD7F—fT66÷VçE7W7Vç6–öâÒ7–æ2‚’Óâ²F‡&÷ræWrW'&÷"‚w7–çF†WF–2FF&6Rf–ÇW&Rr“²Ó°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2ÂS2Âw7W7Vç6–öâ6†V6²f–ÇW&W2FVç’6fWG’&W÷'B66W72r“°¢76W'BæWVÂ†66W76VE&W÷'G2Â“°§Ò“° §FW7B‚vÖçVÂÖW76vR&Wf–WrVWVRæBFV6—6–öâ&RÆ–Ö—FVBFòF†R6ÖR66†ööÂFÖ–æ—7G&F÷"rÂ7–æ2‚’Óâ°¢ÆWB7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢ÆWB6VÆV7FVE66†ööÃ²ÆWBFV6—6–öã°¢6öç7BÖW76vT–BÒvÖÓFÓ†Ös°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÀ¢Æ—7EVæF–ætÖW76vW3¢7–æ266†ööÄ–BÓâ²6VÆV7FVE66†ööÂÒ66†ööÄ–C²&WGW&â·²–C¢ÖW76vT–BÂ6VæFW%ö–C¢w7GVFVçBÖrÂ&öG“¢sÇ67&—Cí-]­#Â÷67&—CârÕÓ²ÒÀ¢FV6–FUVæF–ætÖW76vS¢7–æ2–çWBÓâ²FV6—6–öâÒ–çWC²&WGW&â–çWBç66†ööÄ–BÓÓÒw66†ööÂÖs²ÒÀ¢ÒÒ“°¢6öç7BÆ—7BÒ&W‡·ÒÂttUBr“²Æ—7BçW&ÂÒrö’÷cöÖW76vW2öÖöFW&F–öâs°¢76W'BæFVWWVÂ‚†v—B†æFÆW"†Æ—7B’’æ&öG’æÖW76vW2Â·²–C¢ÖW76vT–BÂ6VæFW%ö–C¢w7GVFVçBÖrÂ&öG“¢sÇ67&—Cí-]­#Â÷67&—CârÕÒ“°¢76W'BæWVÂ‡6VÆV7FVE66†ööÂÂw66†ööÂÖr“°¢7F÷"Ò²–C¢v6÷Væ6–ÂÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÓ°¢76W'BæWVÂ‚†v—B†æFÆW"†Æ—7B’’ç7FGW2ÂC2“°¢7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢6öç7BF6‚Ò&W‡²FV6—6–öã¢v&÷fRrÒÂuD4‚r“²F6‚çW&ÂÒö’÷cöÖW76vW2öÖöFW&F–öâòG¶ÖW76vT–GÖ°¢76W'BæFVWWVÂ†v—B†æFÆW"‡F6‚’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÒÒ“°¢76W'BæFVWWVÂ†FV6—6–öâÂ²ÖW76vT–BÂ66†ööÄ–C¢w66†ööÂÖrÂ&Wf–WvW$–C¢vFÖ–âÖrÂFV6—6–öã¢v&÷fRrÒ“°¢6öç7B–çfÆ–BÒ&W‡²FV6—6–öã¢wV&Æ—6‚rÒÂuD4‚r“²–çfÆ–BçW&ÂÒF6‚çW&Ã°¢76W'BæWVÂ‚†v—B†æFÆW"†–çfÆ–B’’ç7FGW2ÂC“°§Ò“° §FW7B‚w66†ööÂFÖ–æ—7G&F÷"÷fW'f–Wr—2&—fFRFòF†R7F—fRFÖ–æ—7G&F÷"æB&÷VæFVBFòF†V—"66†ööÂrÂ7–æ2‚’Óâ°¢ÆWB7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢ÆWB6VÆV7FVE66†ööÃ°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÂvWE66†ööÄFÖ–ä÷fW'f–Ws¢7–æ266†ööÄ–BÓâ²6VÆV7FVE66†ööÂÒ66†ööÄ–C²&WGW&â²W6W'3¢·²–C¢w7–çF†WF–2×W6W"rÕÒÂÆ—7F–æw3¢µÒÂVF—C¢µÒÂFVÆWF–öå÷&WVW7G3¢µÒÂ7W7Vç6–öç3¢µÒÓ²ÒÒÒ“°¢6öç7B&WVW7BÒ&W‡·ÒÂttUBr“²&WVW7BçW&ÂÒrö’÷c÷66†ööÂöFÖ–âö÷fW'f–Wrs°¢76W'BæWVÂ‚†v—B†æFÆW"‡&WVW7B’’ç7FGW2Â#“°¢76W'BæWVÂ‡6VÆV7FVE66†ööÂÂw66†ööÂÖr“°¢7F÷"Ò²–C¢v6÷Væ6–ÂÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÓ°¢76W'BæWVÂ‚†v—B†æFÆW"‡&WVW7B’’ç7FGW2ÂC2“°¢7F÷"Ò²–C¢vFÖ–âÖ"rÂ66†ööÅö–C¢w66†ööÂÖ"rÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢76W'BæWVÂ‚†v—B†æFÆW"‡&WVW7B’’ç7FGW2Â#“°¢76W'BæWVÂ‡6VÆV7FVE66†ööÂÂw66†ööÂÖ"r“°§Ò“° §FW7B‚w66†ööÂvVçBF6†&ö&BæB–FVFV6—6–öç2&R66†ööÂÖFÖ–âÖöæÇ’æB66†ööÂ66÷VBrÂ7–æ2‚’Óâ°¢ÆWB7F÷"Ò²–C¢vFÖ–âÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ²ÆWB6fVC²ÆWB&Wf–WvVC°¢6öç7B–FV–BÒvrç&WVBƒcB“°¢6öç7B–FV66†ööÄ–BÒw66†ööÂÖs°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v—77VW"rÂ7V&¦V7C¢wW6W"rÒ’Â&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÀ¢vWE66†ööÄvVçDF6†&ö&C¢7–æ266†ööÄ–BÓâ²6fVBÒ66†ööÄ–C²&WGW&â²&W÷'C¢çVÆÂÂ–FV3¢µÒÓ²ÒÀ¢&Wf–Wu66†ööÄvVçD–FV¢7–æ2–çWBÓâ²&Wf–WvVBÒ–çWC²&WGW&â–çWBç66†ööÄ–BÓÓÒ7F÷"ç66†ööÅö–C²ÒÀ¢ÒÒ“°¢6öç7BF6†&ö&BÒ&W‡·ÒÂttUBr“²F6†&ö&BçW&ÂÒrö’÷c÷66†ööÂöFÖ–âövVçBÖF6†&ö&Bs°¢76W'BæWVÂ‚†v—B†æFÆW"†F6†&ö&B’’ç7FGW2Â#“²76W'BæWVÂ‡6fVBÂw66†ööÂÖr“°¢7F÷"Ò²–C¢v6÷Væ6–ÂÖrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÓ°¢76W'BæWVÂ‚†v—B†æFÆW"†F6†&ö&B’’ç7FGW2ÂC2“°¢7F÷"Ò²–C¢vFÖ–âÖ"rÂ66†ööÅö–C¢w66†ööÂÖ"rÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢6öç7BFV6—6–öâÒ&W‡²FV6—6–öã¢v&÷fRrÒÂuD4‚r“²FV6—6–öâçW&ÂÒö’÷c÷66†ööÂöFÖ–âövVçBÖ–FV2òG¶–FV–GÖ°¢76W'BæWVÂ‚†v—B†æFÆW"†FV6—6–öâ’’ç7FGW2Â#“°¢76W'BæFVWWVÂ‡&Wf–WvVBÂ²–C¢–FV–BÂ66†ööÄ–C¢w66†ööÂÖ"rÂ&Wf–WvW$–C¢vFÖ–âÖ"rÂFV6—6–öã¢v&÷fVBrÒ“°¢6öç7B–çfÆ–BÒ&W‡²FV6—6–öã¢wV&Æ—6‚rÒÂuD4‚r“²–çfÆ–BçW&ÂÒFV6—6–öâçW&Ã°¢76W'BæWVÂ‚†v—B†æFÆW"†–çfÆ–B’’ç7FGW2ÂC“°§Ò“° §FW7B‚w66†ööÂ&öf–ÆR&WVW7B7FGW2—2&—fFRFòF†RWF†VçF–6FVB–FVçF—G’æBöÖ—G27V&Ö—GFVB”’rÂ7–æ2‚’Óâ°¢ÆWB–FVçF—G“°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ–FVçF—G’À¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÂvWE66†ööÅ&öf–ÆU&WVW7C¢7–æ2†—77VW"Â7V&¦V7B’Óâ‡°¢&WVW7Eö–C¢w&WVW7BÖ–BrÂ66†ööÅö–C¢vÇ–6WVÕó2rÂ7FGW3¢wVæF–ærrÂ7&VFVEöC¢s#“’ÓÓC££¢rÀ¢Ò’ÒÒ“°¢6öç7B&WVW7BÒ&W‡·ÒÂttUBr“²&WVW7BçW&ÂÒrö’÷c÷&öf–ÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"‡&WVW7B’’ç7FGW2ÂC“°¢–FVçF—G’Ò²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢w7–çF†WF–2×7GVFVçBrÓ°¢6öç7B&W7VÇBÒv—B†æFÆW"‡&WVW7B“°¢76W'BæWVÂ‡&W7VÇBç7FGW2Â#“°¢76W'BæWVÂ‡&W7VÇBæ&öG’ç&WVW7Bç7FGW2ÂwVæF–ærr“°¢76W'BæFVWWVÂ„ö&¦V7Bæ¶W—2‡&W7VÇBæ&öG’ç&WVW7B’ç6÷'B‚’Â²v7&VFVEöBrÂw&WVW7Eö–BrÂw66†ööÅö–BrÂw7FGW2uÒ“°§Ò“°§FW7B‚w&öÆR&WVW7G2W6Rf—†VBÆÆ÷vÆ—7BÂ7F—fR7GVFVçB&öf–ÆRÂæB66†ööÂÖFÖ–â&Wf–Wr66÷RrÂ7–æ2‚’Óâ°¢6öç7B–BÒvÖÓFÓ†Ös°¢ÆWB6fVE&öÆS²ÆWB&Wf–Wu66†ööÃ²ÆWB&Wf–Wt7F–öã°¢ÆWB7F÷"Ò²–C¢w7GVFVçBÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w7GVFVçBrÂ7F—fS¢G'VRÓ°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢w7GVFVçBrÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÀ¢7&VFU66†ööÅ&öÆU&WVW7C¢7–æ2&WVW7BÓâ²6fVE&öÆRÒ&WVW7Bç&WVW7FVE÷&öÆS²&WGW&â²ö³¢G'VRÂ7FGW3¢wVæF–ærrÂ&WVW7Eö–C¢–BÓ²ÒÀ¢Æ—7EVæF–æu66†ööÅ&öÆU&WVW7G3¢7–æ266†ööÂÓâ²&Wf–Wu66†ööÂÒ66†ööÃ²&WGW&â·²&WVW7Eö–C¢–BÂW6W%ö–C¢sÓÓCÓƒÓ#3CScsƒ“"rÀ¢f—'7EöæÖS¢}
+-]"rÂÆ7EöæÖS¢}
+=}]Ý¢rÂ6Æ75öæÖS¢s	rÂ&WVW7FVE÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ7FGW3¢wVæF–ærrÂ&Wf–Wu÷7F'FVEö'“¢çVÆÂÕÓ²ÒÀ¢7F'E66†ööÅ&öÆU&WVW7E&Wf–Ws¢7–æ2‡&WVW7D–BÂ66†ööÂÂ&Wf–WvW"’Óâ²&Wf–Wt7F–öâÒ·&WVW7D–BÂ66†ööÂÂ&Wf–WvW%Ó²&WGW&âG'VS²ÒÀ¢&Wf–Wu66†ööÅ&öÆU&WVW7C¢7–æ2‡&WVW7D–BÂ66†ööÂÂ&Wf–WvW"ÂFV6—6–öâÂæ÷FR’Óâ²&Wf–Wt7F–öâÒ·&WVW7D–BÂ66†ööÂÂ&Wf–WvW"ÂFV6—6–öâÂæ÷FUÓ²&WGW&âG'VS²ÒÀ¢ÒÒ“°¢6öç7B7V&Ö—BÒ&W‡²&WVW7FVE÷&öÆS¢}	MÍÝ--írÂ66†ööÅö–C¢vGF6¶W"×66†ööÂrÂ&öÆS¢v÷væW"rÒ“²7V&Ö—BçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"‡7V&Ö—B’’ç7FGW2Â#"“°¢76W'BæWVÂ‡6fVE&öÆRÂw66†ööÅöFÖ–âr“°¢6öç7B–çfÆ–BÒ&W‡²&WVW7FVE÷&öÆS¢v÷væW"rÒ“²–çfÆ–BçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"†–çfÆ–B’’ç7FGW2ÂC“°¢7F÷"Ò²–C¢vFÖ–âÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÂ7F—fS¢G'VRÓ°¢6öç7BVWVRÒ&W‡·ÒÂttUBr“²VWVRçW&ÂÒrö’÷c÷&öÆR×&WVW7G2÷&Wf–Wrs°¢6öç7BVWVVBÒv—B†æFÆW"‡VWVR“°¢76W'BæWVÂ‡VWVVBç7FGW2Â#“²76W'BæWVÂ‡&Wf–Wu66†ööÂÂw66†ööÂÖr“°¢76W'BæFVWWVÂ‡VWVVBæ&öG’ç&WVW7G5³ÒÂ²&WVW7Eö–C¢–BÂ66÷VçEö6öFS¢ssƒ“"rÂÆ–6çEöæÖS¢}
+-]"
+=}]Ý¢rÀ¢6Æ75öæÖS¢s	rÂ&WVW7FVE÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ7FGW3¢wVæF–ærrÂ7&VFVEöC¢çVÆÂÂ&Wf–Wu÷7F'FVEöC¢çVÆÂÂ&Wf–Wu÷7F'FVEö'•öÖS¢fÇ6RÒ“°¢76W'BæWVÂ„ö&¦V7Bæ†4÷vâ‡VWVVBæ&öG’ç&WVW7G5³ÒÂwW6W%ö–Br’ÂfÇ6RÂw&Wf–WrVWVRW‡÷6W2öæÇ’6†÷'B66÷VçB6öFRr“°¢6öç7B7F'BÒ&W‡²7F–öã¢w7F'E÷&Wf–WrrÒÂuD4‚r“²7F'BçW&ÂÒö’÷c÷&öÆR×&WVW7G2òG¶–GÖ°¢76W'BæWVÂ‚†v—B†æFÆW"‡7F'B’’ç7FGW2Â#“²76W'BæFVWWVÂ‡&Wf–Wt7F–öâÂ¶–BÂw66†ööÂÖrÂvFÖ–âÖ–BuÒ“°¢6öç7B&÷fRÒ&W‡²FV6—6–öã¢v&÷fRrÂ&Wf–Wuöæ÷FS¢}	ýí-]]Ýâ­í½í’rÒÂuD4‚r“²&÷fRçW&ÂÒö’÷c÷&öÆR×&WVW7G2òG¶–GÖ°¢76W'BæWVÂ‚†v—B†æFÆW"†&÷fR’’ç7FGW2Â#“²76W'BæFVWWVÂ‡&Wf–Wt7F–öâÂ¶–BÂw66†ööÂÖrÂvFÖ–âÖ–BrÂv&÷fRrÂ}	ýí-]]Ýâ­í½í’uÒ“°§Ò“° §FW7B‚v7F—fR7W7Vç6–öâ&Æö6·266†ööÂ&öÆR&WVW7B6†ævW2'WBÆÆ÷w27FGW2&VG2rÂ7–æ2‚’Óâ°¢6öç7B–BÒvÖÓFÓ†Ös°¢ÆWB7W7VæFVBÒG'VS²ÆWB7F÷"Ò²–C¢w7GVFVçBÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w7GVFVçBrÂ7F—fS¢G'VRÓ°¢ÆWBw&—FW2Ò²ÆWBÆöö·W2Ò°¢6öç7B&W÷6—F÷'’Ò°¢vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‡66†ööÄ–BÂW6W$–B’Óâ°¢Æöö·W2²³°¢76W'BæWVÂ‡66†ööÄ–BÂw66†ööÂÖr“°¢76W'BæWVÂ‡W6W$–BÂ7F÷"æ–B“°¢&WGW&â7W7VæFVBò²W‡—&W5öC¢s#“’ÓÓC££¢rÒ¢çVÆÃ°¢ÒÀ¢7&VFU66†ööÅ&öÆU&WVW7C¢7–æ2‚’Óâ²w&—FW2²³²&WGW&â²ö³¢G'VRÂ7FGW3¢wVæF–ærrÂ&WVW7Eö–C¢–BÓ²ÒÀ¢vWE66†ööÅ&öÆU&WVW7C¢7–æ2‚’Óâ‡²&WVW7Eö–C¢–BÂ7FGW3¢wVæF–ærrÒ’À¢7F'E66†ööÅ&öÆU&WVW7E&Wf–Ws¢7–æ2‚’Óâ²w&—FW2²³²&WGW&âG'VS²ÒÀ¢Ó°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢wW6W"rÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"Â&W÷6—F÷'’Ò“°¢6öç7B7FGW2Ò&W‡·ÒÂttUBr“²7FGW2çW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"‡7FGW2’’ç7FGW2Â#“°¢76W'BæWVÂ†Æöö·W2ÂÂw&VBÖöæÇ’&WVW7B7FGW2&VÖ–ç2f–Æ&ÆRGW&–ær7W7Vç6–öâr“° ¢6öç7B7V&Ö—BÒ&W‡²&WVW7FVE÷&öÆS¢}	MÍÝ--írÒ“²7V&Ö—BçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæFVWWVÂ†v—B†æFÆW"‡7V&Ö—B’Â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v66÷VçE÷7W7VæFVBrÒÒ“°¢7F÷"Ò²–C¢vFÖ–âÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÂ7F—fS¢G'VRÓ°¢6öç7B7F'BÒ&W‡²7F–öã¢w7F'E÷&Wf–WrrÒÂuD4‚r“²7F'BçW&ÂÒö’÷c÷&öÆR×&WVW7G2òG¶–GÖ°¢76W'BæFVWWVÂ†v—B†æFÆW"‡7F'B’Â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v66÷VçE÷7W7VæFVBrÒÒ“°¢76W'BæWVÂ‡w&—FW2ÂÂw7W7VæFVBW6W'26ææ÷B7&VFRÂ6Æ–ÒÂ÷"&Wf–Wr66†ööÂ&öÆR&WVW7G2r“° ¢7W7VæFVBÒfÇ6S°¢7F÷"Ò²–C¢w7GVFVçBÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w7GVFVçBrÂ7F—fS¢G'VRÓ°¢6öç7BÆÆ÷vVBÒ&W‡²&WVW7FVE÷&öÆS¢}	MÍÝ--írÒ“²ÆÆ÷vVBçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"†ÆÆ÷vVB’’ç7FGW2Â#"“°¢76W'BæWVÂ‡w&—FW2Â“°¢&W÷6—F÷'’ævWD7F—fT66÷VçE7W7Vç6–öâÒ7–æ2‚’Óâ²F‡&÷ræWrW'&÷"‚w7–çF†WF–2FF&6Rf–ÇW&Rr“²Ó°¢6öç7BVæf–Æ&ÆRÒ&W‡²&WVW7FVE÷&öÆS¢}	MÍÝ--írÒ“²Væf–Æ&ÆRçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"‡Væf–Æ&ÆR’’ç7FGW2ÂS2Âw7W7Vç6–öâÆöö·WW'&÷'2f–Â6Æ÷6VBr“°¢76W'BæWVÂ‡w&—FW2Â“°§Ò“° §FW7B‚w&öÆR&WVW7B7FGW2–æ6ÇVFW2F†R7W'&VçBFF&6R&öÆRf÷"Ö–w&FVB66†ööÂ66W72T’rÂ7–æ2‚’Óâ°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢w7GVFVçBrÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ‡²–C¢w7GVFVçBÖ–BrÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ66†ööÅö–C¢w66†ööÂÖrÒ’À¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÂvWE66†ööÅ&öÆU&WVW7C¢7–æ2†—77VW"Â7V&¦V7B’Óâ‡²&WVW7Eö–C¢w&WVW7BÖrÂ7FGW3¢v&÷fVBrÂ&WVW7FVE÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÒ’ÒÒ“°¢6öç7B&WVW7BÒ&W‡·ÒÂttUBr“²&WVW7BçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæFVWWVÂ†v—B†æFÆW"‡&WVW7B’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÀ¢&WVW7C¢²&WVW7Eö–C¢w&WVW7BÖrÂ7FGW3¢v&÷fVBrÂ&WVW7FVE÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÒÒÒ“°§Ò“° §FW7B‚w&öÆR&WVW7B7V&Ö—76–öâæB&Wf–Wrf–Â6Æ÷6VBf÷"Vç&÷f—6–öæVB÷"æöâÖFÖ–â&öf–ÆW2rÂ7–æ2‚’Óâ°¢ÆWBw&—FW2Ò°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢wW6W"rÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’ÓâçVÆÂÀ¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÂ7&VFU66†ööÅ&öÆU&WVW7C¢7–æ2‚’Óâ²w&—FW2²³²&WGW&â²ö³¢G'VRÓ²ÒÂÆ—7EVæF–æu66†ööÅ&öÆU&WVW7G3¢7–æ2‚’Óâ²w&—FW2²³²&WGW&âµÓ²ÒÒÒ“°¢6öç7B7V&Ö—BÒ&W‡²&WVW7FVE÷&öÆS¢}
+=}-Ý¢
+=}]Ý}]­í=âí-]-rÒ“²7V&Ö—BçW&ÂÒrö’÷c÷&öÆR×&WVW7G2s°¢76W'BæWVÂ‚†v—B†æFÆW"‡7V&Ö—B’’ç7FGW2ÂC2“°¢6öç7BVWVRÒ&W‡·ÒÂttUBr“²VWVRçW&ÂÒrö’÷c÷&öÆR×&WVW7G2÷&Wf–Wrs°¢76W'BæWVÂ‚†v—B†æFÆW"‡VWVR’’ç7FGW2ÂC2“°¢76W'BæWVÂ‡w&—FW2Â“°§Ò“° §FW7B‚v7F—fR7W7Vç6–öç2&Rf—6–&ÆRöæÇ’FòF†RWF†VçF–6FVB66†ööÂFÖ–æ—7G&F÷"æB&VÖ–â66†ööÂ×66÷VBrÂ7–æ2‚’Óâ°¢ÆWB&WVW7FVE66†ööÃ²ÆWB7F÷"Ò²–C¢vFÖ–âÖ–BrÂ66†ööÅö–C¢w66†ööÂÖrÂ&öÆS¢w66†ööÅöFÖ–ârÓ°¢6öç7B†æFÆW"Ò7&VFTÆ—7F–æw4’‡²WF†VçF–6FS¢7–æ2‚’Óâ‡²—77VW#¢v‡GG3¢òö—77VW"æW†×ÆRrÂ7V&¦V7C¢vFÖ–ârÒ’À¢&W6öÇfT7F÷#¢7–æ2‚’Óâ7F÷"À¢&W÷6—F÷'“¢²vWD7F—fT66÷VçE7W7Vç6–öã¢7–æ2‚’ÓâçVÆÂÂÆ—7D7F—fT66÷VçE7W7Vç6–öç3¢7–æ266†ööÄ–BÓâ²&WVW7FVE66†ööÂÒ66†ööÄ–C²&WGW&â·²F&vWEö–C¢w7GVFVçBÖrÂW‡—&W5öC¢s#“’ÓÓC££¢rÕÓ²ÒÒÒ“°¢6öç7B&WVW7BÒ&W‡·ÒÂttUBr“²&WVW7BçW&ÂÒrö’÷c÷7W7Vç6–öç2s°¢6öç7B&W7öç6RÒv—B†æFÆW"‡-tï­­¢G§²ÚîÆ­yÝ¡¹•ÍÌ…Ñ”œ¤ì(€½¹ÍÐÝÉ½¹½¹™¥Éµ…Ñ¥½¸€ôÉ•Ä¡ì½¹™¥Éµ…Ñ¥½¸è€‘•±•Ñ”œô°€1Qœ¤ìÝÉ½¹½¹™¥Éµ…Ñ¥½¸¹ÕÉ°€ôÉ•µ½Ù”¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡ÝÉ½¹½¹™¥Éµ…Ñ¥½¸¤¤¹‰½‘ä¹•ÉÉ½È°€½¹™¥Éµ…Ñ¥½¹}É•ÅÕ¥É•œ¤ì(€½¹Ñ•áÐ€ô¹Õ±°ì(€½¹ÍÐÕ¹…Ù…¥±…‰±•I•µ½Ù”€ôÉ•Ä¡ì½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒB{BGB«B¿BKBoBWBwBcBTƒB£BkB{BoB¬œô°€1Qœ¤ì(€Õ¹…Ù…¥±…‰±•I•µ½Ù”¹ÕÉ°€ôÉ•µ½Ù”¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡Õ¹…Ù…¥±…‰±•I•µ½Ù”¤¤¹ÍÑ…ÑÕÌ°€ÐÀÐ°€É½ÍÌµÍ¡½½°½Èµ¥ÍÍ¥¹œ±¥ÍÑ¥¹œÉ•µ…¥¹ÌÕ¹…Ù…¥±…‰±”œ¤ì)ô¤ì()Ñ•ÍÐ ½Ý¸±¥ÍÑ¥¹œ¥‘•¹Ñ¥™¥•ÉÌ…É”¹½Ð•áÁ½Í•Ñ¼ÍÑ…™˜½ÈÕ¹ÁÉ½™¥±•¥‘•¹Ñ¥Ñ¥•Ìœ°…Íå¹Œ€ ¤€ôøì(€±•Ð…Ñ½È€ôì¥è€ÍÑ…™˜µ¥œ°É½±”è€Í¡½½±}…‘µ¥¸œôì(€±•ÐÅÕ•É¥•Ì€ô€Àì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ì¥ÍÍÕ•Èè€¥ÍÍÕ•Èœ°ÍÕ‰©•Ðè€ÍÑ…™˜œô¤°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø…Ñ½È°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°±¥ÍÑ=Ý¹Ñ¥Ù•1¥ÍÑ¥¹%‘Ìè…Íå¹Œ€ ¤€ôøìÅÕ•É¥•Ì¬¬ìÉ•ÑÕÉ¸lÍ•É•Ðµ±¥ÍÑ¥¹œµ¥tìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ”½±¥ÍÑ¥¹Ìœì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°±¥ÍÑ¥¹}¥‘Ìèmtôô¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡ÅÕ•É¥•Ì°€À¤ì(€…Ñ½È€ô¹Õ±°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì)ô¤ì()Ñ•ÍÐ ™…Ù½É¥Ñ•Ì™…¥°±½Í•Ý¡•¸Ñ¡”‘…Ñ…‰…Í”…‘…ÁÑ•È¥ÌÕ¹…Ù…¥±…‰±”œ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°±ôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½™…Ù½É¥Ñ•Ìœì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÔÀÌ¤ì)ô¤ì()Ñ•ÍÐ ¥‘•„ÍÕ‰µ¥ÍÍ¥½¸¥Ì…ÕÑ¡•¹Ñ¥…Ñ•…¹‰½Õ¹Ñ¼Ñ¡”‘…Ñ…‰…Í”ÁÉ½™¥±”œ°…Íå¹Œ€ ¤€ôøì(€±•ÐÍ…Ù•ì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœ°ÕÍ•É}¥è€™½É•µÕÍ•Èœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•…Ñ•%‘•„è…Íå¹ŒÉ•½É€ôøìÍ…Ù•€ôÉ•½ÉìÉ•ÑÕÉ¸ì¥è€Íå¹Ñ¡•Ñ¥Œµ¥‘•„œôìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ìÑ•áÐè€ŸBGF/BïBøƒBÇF,ƒBßBÓBûFBûBËBøƒBûFBëFF/FF0ƒBëB÷BãBÛB÷F/BäƒBûBÇBóB×Bôœ°ÕÍ•É}¥è€™½É•µÕÍ•Èœô¤ì(€É•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½¥‘•…Ìœì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í…Ù•¹ÕÍ•É}¥°€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í…Ù•¹Í¡½½±}¥°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í…Ù•¹…‘µ¥¹}ÍÑ…ÑÕÌ°€¹•Üœ¤ì)ô¤ì()Ñ•ÍÐ µ•ÍÍ…”A$™…¥±Ì±½Í•Ý¡•¸µ½‘•É…Ñ¥½¸¥ÌÕ¹…Ù…¥±…‰±”œ°…Íå¹Œ€ ¤€ôøì(€±•ÐÝÉ¥Ñ•Ì€ô€Àì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€…………………„µ………„´Ñ……„´á……„µ……………………………„œ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•…Ñ•5•ÍÍ…”è…Íå¹Œ€ ¤€ôøìÝÉ¥Ñ•Ì¬¬ìÉ•ÑÕÉ¸ì¥è€Õ¹•áÁ•Ñ•œôìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ìÉ••¥Ù•É}¥è€‰‰‰‰‰‰‰ˆµ‰‰‰ˆ´Ñ‰‰ˆ´á‰‰ˆµ‰‰‰‰‰‰‰‰‰‰‰ˆœ°‰½‘äè€ŸBFBãBËB×Fœô¤ì(€É•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ÔÀÌ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•ÍÁ½¹Í”¹‰½‘ä¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡ÝÉ¥Ñ•Ì°€À¤ì)ô¤ì()Ñ•ÍÐ µ•ÍÍ…”A$ÕÍ•ÌÑ¡”Ù•É¥™¥•Í•¹‘•ÈÁÉ½™¥±”…™Ñ•È…¸•áÁ±¥¥Ð…ÁÁÉ½Ù…°œ°…Íå¹Œ€ ¤€ôøì(€±•ÐÍ…Ù•ì(€½¹ÍÐÍ•¹‘•É%€ô€…………………„µ………„´Ñ……„´á……„µ……………………………„œì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœ°ÕÍ•É}¥è€™½É•µÍ•¹‘•Èœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥èÍ•¹‘•É%°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Ù¥•Üè…Íå¹Œ€ ¤€ôø€¡ì…Ñ¥½¸è€½¬œô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•…Ñ•5•ÍÍ…”è…Íå¹ŒÉ•½É€ôøìÍ…Ù•€ôÉ•½ÉìÉ•ÑÕÉ¸ì¥è€Íå¹Ñ¡•Ñ¥Œµµ•ÍÍ…”œôìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ìÍ•¹‘•É}¥è€™½É•µÍ•¹‘•Èœ°É••¥Ù•É}¥è€‰‰‰‰‰‰‰ˆµ‰‰‰ˆ´Ñ‰‰ˆ´á‰‰ˆµ‰‰‰‰‰‰‰‰‰‰‰ˆœ°‰½‘äè€ŸBFBãBËB×Fœô¤ì(€É•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í…Ù•¹Í•¹‘•É}¥°Í•¹‘•É%¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í…Ù•¹Í¡½½±}¥°€Í¡½½°µ„œ¤ì)ô¤ì()Ñ•ÍÐ µ•ÍÍ…”É•…É•ÅÕ¥É•Ì…ÕÑ¡•¹Ñ¥…Ñ¥½¸…¹Í½Á•Ì‘…Ñ„Ñ¼Ñ¡”‘…Ñ…‰…Í”ÁÉ½™¥±”œ°…Íå¹Œ€ ¤€ôøì(€±•Ð½Ý¹•Èì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°±¥ÍÑ5•ÍÍ…•Ìè…Íå¹Œ€¡ÕÍ•É%°Í¡½½±%¤€ôøì½Ý¹•È€ômÕÍ•É%°Í¡½½±%‘tìÉ•ÑÕÉ¸mì¥è€½Ý¹•µµ•ÍÍ…”œõtìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡½Ý¹•È°lÍå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°t¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•ÍÁ½¹Í”¹‰½‘ä°ì½¬èÑÉÕ”°µ•ÍÍ…•Ìèmì¥è€½Ý¹•µµ•ÍÍ…”œõtô¤ì)ô¤ì()Ñ•ÍÐ µ•ÍÍ…”É•…É•©•ÑÌµ¥ÍÍ¥¹œ¥‘•¹Ñ¥Ñä‰•™½É”ÅÕ•Éå¥¹œÑ¡”‘…Ñ…‰…Í”œ°…Íå¹Œ€ ¤€ôøì(€±•ÐÉ•…‘Ì€ô€Àì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø¹Õ±°°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø¹Õ±°°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°±¥ÍÑ5•ÍÍ…•Ìè…Íå¹Œ€ ¤€ôøìÉ•…‘Ì¬¬ìÉ•ÑÕÉ¸mtìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÄ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•…‘Ì°€À¤ì)ô¤ì()Ñ•ÍÐ ½¹±äÑ¡”…ÕÑ¡•¹Ñ¥…Ñ•É•¥Á¥•¹Ð…¸µ…É¬„µ•ÍÍ…”É•…œ°…Íå¹Œ€ ¤€ôøì(€±•Ð…ÉÌì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°µ…É­5•ÍÍ…•I•…è…Íå¹Œ€ ¸¸¹Ù…±Õ•Ì¤€ôøì…ÉÌ€ôÙ…±Õ•ÌìÉ•ÑÕÉ¸ÑÉÕ”ìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€AQ œ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ì¼ÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄ½É•…œì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…ÉÌ°lÍå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄt¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•ÍÁ½¹Í”¹‰½‘ä¹¥Í}É•…°ÑÉÕ”¤ì)ô¤ì()Ñ•ÍÐ ‰Õ±¬µ•ÍÍ…”É•……•ÁÑÌ‰½Õ¹‘•UU%Ì…¹Í½Á•Ì•Ù•ÉäÕÁ‘…Ñ”Ñ¼Ñ¡”Ù•É¥™¥•ÁÉ½™¥±”œ°…Íå¹Œ€ ¤€ôøì(€±•Ð…±°ì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°µ…É­5•ÍÍ…•ÍI•…è…Íå¹Œ€ ¸¸¹…ÉÌ¤€ôøì…±°€ô…ÉÌìÉ•ÑÕÉ¸€Äìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ìµ•ÍÍ…•}¥‘ÌèlœÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄtô¤ì(€É•ÅÕ•ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½µ•ÍÍ…•Ì½É•…œì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°ÕÁ‘…Ñ•è€Äôô¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…±°°lÍå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°lœÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄut¤ì(€½¹ÍÐ¥¹Ù…±¥€ôÉ•Ä¡ìµ•ÍÍ…•}¥‘Ìèl¹½Ðµ„µÕÕ¥tô¤ì¥¹Ù…±¥¹ÕÉ°€ôÉ•ÅÕ•ÍÐ¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡¥¹Ù…±¥¤¤¹ÍÑ…ÑÕÌ°€ÐÀÀ¤ì)ô¤ì()Ñ•ÍÐ ±¥ÍÑ¥¹œµ½‘•É…Ñ¥½¸ÑÉÕÍÑÌ‘…Ñ…‰…Í”É½±”…¹Í¡½½°Í½Á”°¹½ÐÑ½­•¸±…¥µÌ½ÈÉ•ÅÕ•ÍÐ™¥•±‘Ìœ°…Íå¹Œ€ ¤€ôøì(€±•Ð…±°ì(€½¹ÍÐ¥€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœ°É½±”è€Í¡½½±}…‘µ¥¸œô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€…‘µ¥¸µ¥œ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€Í¡½½±}…‘µ¥¸œô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°µ½‘•É…Ñ•1¥ÍÑ¥¹œè…Íå¹Œ€ ¸¸¹…ÉÌ¤€ôøì…±°€ô…ÉÌìÉ•ÑÕÉ¸ÑÉÕ”ìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œ°Í¡½½±}¥è€Í¡½½°µˆœ°ÍÑ…ÑÕÌè€…Ñ¥Ù”œô°€AQ œ¤ì(€É•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í¥‘ô½µ½‘•É…Ñ¥½¹€ì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…±°°m¥°€Í¡½½°µ„œ°€…Ñ¥Ù”t¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•ÍÁ½¹Í”°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°ÍÑ…ÑÕÌè€…Ñ¥Ù”œôô¤ì)ô¤ì()Ñ•ÍÐ ±¥ÍÑ¥¹œµ½‘•É…Ñ¥½¸É•©•ÑÌÍÑÕ‘•¹ÐÉ½±”…¹¥¹Ù…±¥‘•¥Í¥½¹Ì‰•™½É”É•Á½Í¥Ñ½Éä…•ÍÌœ°…Íå¹Œ€ ¤€ôøì(€±•ÐÝÉ¥Ñ•Ì€ô€Àì(€½¹ÍÐ‰…Í”€ôì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€½¥‘ŒµÍÕˆœ°É½±”è€Í¡½½±}…‘µ¥¸œô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°µ½‘•É…Ñ•1¥ÍÑ¥¹œè…Íå¹Œ€ ¤€ôøìÝÉ¥Ñ•Ì¬¬ìÉ•ÑÕÉ¸ÑÉÕ”ìôôôì(€½¹ÍÐ¥€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍÐÍÑÕ‘•¹Ð€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì€¸¸¹‰…Í”°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€ÍÑÕ‘•¹Ðœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœô¤ô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô°€AQ œ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í¥‘ô½µ½‘•É…Ñ¥½¹€ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥ÐÍÑÕ‘•¹Ð¡É•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì(€½¹ÍÐ…‘µ¥¸€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì€¸¸¹‰…Í”°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€…‘µ¥¸œ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€Í¡½½±}…‘µ¥¸œô¤ô¤ì(€½¹ÍÐ¥¹Ù…±¥€ôÉ•Ä¡ì‘•¥Í¥½¸è€…Ñ¥Ù”œô°€AQ œ¤ì¥¹Ù…±¥¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í¥‘ô½µ½‘•É…Ñ¥½¹€ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð…‘µ¥¸¡¥¹Ù…±¥¤¤¹ÍÑ…ÑÕÌ°€ÐÀÀ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡ÝÉ¥Ñ•Ì°€À¤ì)ô¤ì()Ñ•ÍÐ •Ù•¹ÐÉ•¥ÍÑÉ…Ñ¥½¸¥Ì‰½Õ¹Ñ¼Ñ¡”…ÕÑ¡•¹Ñ¥…Ñ•ÁÉ½™¥±”…¹…Á…¥Ñä•ÉÉ½ÉÌÍÑ…ä•áÁ±¥¥Ðœ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ•Ù•¹Ñ%€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍÐÉ•¥ÍÑÉ…Ñ¥½¹I•ÅÕ•ÍÐ€ô€ ¤€ôøì(€€€½¹ÍÐÉ•ÅÕ•ÍÐ€ôI•…‘…‰±”¹™É½´¡mt¤ìÉ•ÅÕ•ÍÐ¹µ•Ñ¡½€ô€A=MPœìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í•Ù•¹Ñ%‘ô½É•¥ÍÑÉ…Ñ¥½¹Í€ìÉ•ÑÕÉ¸É•ÅÕ•ÍÐì(€ôì(€±•ÐÉ•¥ÍÑ•É•‘Ìì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€Õ¹ÑÉÕÍÑ•µÍÕ‰©•Ðœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ðœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•¥ÍÑ•É½ÉÙ•¹Ðè…Íå¹Œ€ ¸¸¹…ÉÌ¤€ôøìÉ•¥ÍÑ•É•‘Ì€ô…ÉÌìÉ•ÑÕÉ¸ì•Ù•¹Ñ}¥è…ÉÍlÁt°ÕÍ•É}¥è…ÉÍlÅt°ÍÑ…ÑÕÌè€½¹™¥Éµ•œôìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•¥ÍÑÉ…Ñ¥½¹I•ÅÕ•ÍÐ ¤ì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•¥ÍÑ•É•‘Ì°m•Ù•¹Ñ%°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ðt¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•ÍÁ½¹Í”°ìÍÑ…ÑÕÌè€ÈÀÄ°‰½‘äèì½¬èÑÉÕ”°É•¥ÍÑÉ…Ñ¥½¸èì•Ù•¹Ñ}¥è•Ù•¹Ñ%°ÕÍ•É}¥è€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ðœ°ÍÑ…ÑÕÌè€½¹™¥Éµ•œôôô¤ì((€½¹ÍÐ™Õ±°€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€àœô¤°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€Ôœ°É½±”è€ÍÑÕ‘•¹Ðœô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•¥ÍÑ•É½ÉÙ•¹Ðè…Íå¹Œ€ ¤€ôøìÑ¡É½Ü=‰©•Ð¹…ÍÍ¥¸¡¹•ÜÉÉ½È ™Õ±°œ¤°ì½‘”è€¹½}Í•…ÑÍ}…Ù…¥±…‰±”œô¤ìôôô¤ì(€½¹ÍÐ™Õ±±I•ÍÁ½¹Í”€ô…Ý…¥Ð™Õ±°¡É•¥ÍÑÉ…Ñ¥½¹I•ÅÕ•ÍÐ ¤¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡™Õ±±I•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ÐÀä¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡™Õ±±I•ÍÁ½¹Í”¹‰½‘ä¹•ÉÉ½È°€¹½}Í•…ÑÍ}…Ù…¥±…‰±”œ¤ì)ô¤ì()Ñ•ÍÐ •Ù•¹Ð…ÁÁ±¥…¹Ð¹…µ•Ì…É”Ù¥Í¥‰±”½¹±äÑ¼Í…µ”µÍ¡½½°½Õ¹¥°É½±•Ìœ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ¥€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€±•ÐÍ½Á”ì(€½¹ÍÐÉ•Á½Í¥Ñ½Éä€ôì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°±¥ÍÑÙ•¹ÑÁÁ±¥…¹ÑÌè…Íå¹Œ€ ¸¸¹…ÉÌ¤€ôøìÍ½Á”€ô…ÉÌìÉ•ÑÕÉ¸mì™¥ÉÍÑ}¹…µ”è€ŸB‹B×FFœ°±…ÍÍ}¹…µ”è€œãB@œ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœõtìôôì(€½¹ÍÐÍÑÕ‘•¹Ð€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€Ìœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€ÍÑÕ‘•¹Ðœ°É½±”è€ÍÑÕ‘•¹Ðœ°Í¡½½±}¥è€Í¡½½°µ„œô¤°É•Á½Í¥Ñ½Éäô¤ì(€½¹ÍÐÍÑÕ‘•¹ÑI•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÍÑÕ‘•¹ÑI•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í¥‘ô½É•¥ÍÑÉ…Ñ¥½¹Í€ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥ÐÍÑÕ‘•¹Ð¡ÍÑÕ‘•¹ÑI•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡Í½Á”°Õ¹‘•™¥¹•¤ì(€½¹ÍÐ½Õ¹¥°€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€Ìœ°Í¡½½±}¥è€™½É•œô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€½Õ¹¥°œ°É½±”è€½Õ¹¥±}µ•µ‰•Èœ°Í¡½½±}¥è€Í¡½½°µ„œô¤°É•Á½Í¥Ñ½Éäô¤ì(€½¹ÍÐ½Õ¹¥±I•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ì½Õ¹¥±I•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í¥‘ô½É•¥ÍÑÉ…Ñ¥½¹Í€ì(€½¹ÍÐÉ•ÍÁ½¹Í”€ô…Ý…¥Ð½Õ¹¥°¡½Õ¹¥±I•ÅÕ•ÍÐ¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡Í½Á”°m¥°€Í¡½½°µ„t¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•ÍÁ½¹Í”¹‰½‘ä°ì½¬èÑÉÕ”°…ÁÁ±¥…¹ÑÌèmì™¥ÉÍÑ}¹…µ”è€ŸB‹B×FFœ°±…ÍÍ}¹…µ”è€œãB@œ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœõtô¤ì)ô¤ì()Ñ•ÍÐ •Ù•¹ÐÉ•¥ÍÑÉ…Ñ¥½¸É•Ù¥•ÜÉ•ÅÕ¥É•Ì½Õ¹¥°É½±”…¹‘•±•…Ñ•Ì•Ù•¹Ðµ½Ý¹•ÈÍ½Á¥¹œÑ¼Ñ¡”É•Á½Í¥Ñ½Éäœ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ•Ù•¹Ñ%€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍÐÕÍ•É%€ô€œÈÈÈÈÈÈÈÈ´ÈÈÈÈ´ÐÈÈÈ´àÈÈÈ´ÈÈÈÈÈÈÈÈÈÈÈÈœì(€±•ÐÝÉ¥Ñ•Ì€ô€Àì(€½¹ÍÐµ…­•!…¹‘±•È€ôÉ½±”€ôøÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€àœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥è€½É…¹¥é•Èœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”ô¤°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°µ½‘•É…Ñ•Ù•¹ÑI•¥ÍÑÉ…Ñ¥½¸è…Íå¹Œ€ ¸¸¹…ÉÌ¤€ôøìÝÉ¥Ñ•Ì¬¬ì…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…ÉÌ°m•Ù•¹Ñ%°ÕÍ•É%°€½É…¹¥é•Èœ°€Í¡½½°µ„œ°€½¹™¥Éµ•t¤ìÉ•ÑÕÉ¸ÑÉÕ”ìôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô°€AQ œ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í•Ù•¹Ñ%‘ô½É•¥ÍÑÉ…Ñ¥½¹Ì¼‘íÕÍ•É%‘õ€ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ðµ…­•!…¹‘±•È ÍÑÕ‘•¹Ðœ¤¡É•ÅÕ•ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡ÝÉ¥Ñ•Ì°€À¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ðµ…­•!…¹‘±•È ½Õ¹¥±}µ•µ‰•Èœ¤¡É•ÅÕ•ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°ÍÑ…ÑÕÌè€½¹™¥Éµ•œôô¤ì)ô¤ì()Ñ•ÍÐ •Ù•¹Ð½ÕÁ…¹ä¥Ì„ÁÕ‰±¥Œ½Õ¹ÐÝ¥Ñ ¹¼É•¥ÍÑÉ…Ñ¥½¸¥‘•¹Ñ¥Ñä‘•Ñ…¥±Ìœ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ•Ù•¹Ñ%€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôøìÑ¡É½Ü¹•ÜÉÉ½È ÁÕ‰±¥Œ½ÕÁ…¹äµÕÍÐ¹½Ð…ÕÑ¡•¹Ñ¥…Ñ”œ¤ìô°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°•ÑÙ•¹Ñ=ÕÁ…¹äè…Íå¹Œ¥€ôøì…ÍÍ•ÉÐ¹•ÅÕ…°¡¥°•Ù•¹Ñ%¤ìÉ•ÑÕÉ¸€Ììôôô¤ì(€½¹ÍÐÉ•ÅÕ•ÍÐ€ôÉ•Ä¡íô°€Pœ¤ìÉ•ÅÕ•ÍÐ¹ÕÉ°€ô€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘í•Ù•¹Ñ%‘ô½½ÕÁ…¹å€ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡É•ÅÕ•ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°Ñ…­•¸è€Ìôô¤ì)ô¤ì()Ñ•ÍÐ ¥‘•„¥µ…”É•Ù¥•ÜÅÕ•Õ”…¹‘•¥Í¥½¹Ì…É”±¥µ¥Ñ•Ñ¼Í¡½½°ÍÑ…™˜…¹Ñ¡”…Ñ½ÈÍ¡½½°œ°…Íå¹Œ€ ¤€ôøì(€±•Ð…Ñ½È€ôì¥è€œØØØØØØØØ´ØØØØ´ÐØØØ´àØØØ´ØØØØØØØØØØØØœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€½Õ¹¥±}µ•µ‰•Èœôì(€±•Ð±¥ÍÑ•‘M¡½½°ì±•Ð±¥ÍÑ•‘I•Ù¥•Ý•Èì±•ÐÉ•Ù¥•Ý•ì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€ÍÑ…™˜œô¤°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø…Ñ½È°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°±¥ÍÑA•¹‘¥¹M¡½½±%‘•…Ìè…Íå¹Œ€¡Í¡½½±%°É•Ù¥•Ý•É%¤€ôøì±¥ÍÑ•‘M¡½½°€ôÍ¡½½±%ì±¥ÍÑ•‘I•Ù¥•Ý•È€ôÉ•Ù¥•Ý•É%ìÉ•ÑÕÉ¸mì¥è€¥‘•„µ„œ°¥µ…•}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœõtìô°(€€€€€É•Ù¥•ÝM¡½½±%‘•…%µ…•Ìè…Íå¹ŒÙ…±Õ”€ôøìÉ•Ù¥•Ý•€ôÙ…±Õ”ìÉ•ÑÕÉ¸Ù…±Õ”¹Í¡½½±%€ôôô€Í¡½½°µ„œìôôô¤ì(€½¹ÍÐ±¥ÍÐ€ôÉ•Ä¡íô°€Pœ¤ì±¥ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ìœì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡±¥ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°¥‘•…Ìèmì¥è€¥‘•„µ„œ°¥µ…•}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœõtôô¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡±¥ÍÑ•‘M¡½½°°€Í¡½½°µ„œ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡±¥ÍÑ•‘I•Ù¥•Ý•È°…Ñ½È¹¥¤ì(€½¹ÍÐ…ÁÁÉ½Ù”€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô°€AQ œ¤ì…ÁÁÉ½Ù”¹ÕÉ°€ô€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ì½…………………„µ………„´Ñ……„´á……„µ……………………………„½¥µ…•Ìœì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡…ÁÁÉ½Ù”¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°¥µ…•}ÍÑ…ÑÕÌè€…ÁÁÉ½Ù•œôô¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•Ù¥•Ý•¹¥‘•…%°€…………………„µ………„´Ñ……„´á……„µ……………………………„œ¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡É•Ù¥•Ý•¹É•Ù¥•Ý•É%°…Ñ½È¹¥¤ì(€…Ñ½È€ôì¥è€‰‰‰‰‰‰‰ˆµ‰‰‰ˆ´Ñ‰‰ˆ´á‰‰ˆµ‰‰‰‰‰‰‰‰‰‰‰ˆœ°Í¡½½±}¥è€Í¡½½°µˆœ°É½±”è€½Õ¹¥±}µ•µ‰•Èœôì(€½¹ÍÐÉ½ÍÍM¡½½±ÁÁÉ½Ù”€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô°€AQ œ¤ì(€É½ÍÍM¡½½±ÁÁÉ½Ù”¹ÕÉ°€ô…ÁÁÉ½Ù”¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡É½ÍÍM¡½½±ÁÁÉ½Ù”¤¤¹ÍÑ…ÑÕÌ°€ÐÀÐ°€Ñ¡”É•Á½Í¥Ñ½ÉäÉ•©•ÑÌÉ½ÍÌµÍ¡½½°É•Ù¥•ÝÌœ¤ì(€…Ñ½È€ôì¥è€ÍÑÕ‘•¹Ðµ„œ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœôì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡±¥ÍÐ¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì)ô¤ì()Ñ•ÍÐ ¥‘•„Ñ•áÐµ½‘•É…Ñ¥½¸É•ÅÕ¥É•ÌÍ¡½½°ÍÑ…™˜…¹É•½É‘Ì„‘•¥Í¥½¸½¹±äÑ¡É½Õ Ñ¡”Í½Á•É•Á½Í¥Ñ½Éäœ°…Íå¹Œ€ ¤€ôøì(€±•Ð…Ñ½È€ôì¥è€œØØØØØØØØ´ØØØØ´ÐØØØ´àØØØ´ØØØØØØØØØØØØœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€½Õ¹¥±}µ•µ‰•Èœôì(€±•ÐÉ•Ù¥•Üì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€ÍÑ…™˜œô¤°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø…Ñ½È°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°É•Ù¥•ÝM¡½½±%‘•…Q•áÐè…Íå¹ŒÙ…±Õ”€ôøìÉ•Ù¥•Ü€ôÙ…±Õ”ìÉ•ÑÕÉ¸Ù…±Õ”¹Í¡½½±%€ôôô…Ñ½È¹Í¡½½±}¥ìôôô¤ì(€½¹ÍÐ…ÁÁÉ½Ù”€ôÉ•Ä¡ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô°€AQ œ¤ì…ÁÁÉ½Ù”¹ÕÉ°€ô€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ì½…………………„µ………„´Ñ……„´á……„µ……………………………„½µ½‘•É…Ñ¥½¸œì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡…ÁÁÉ½Ù”¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°…¥}ÍÑ…ÑÕÌè€…ÁÁÉ½Ù•œôô¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡É•Ù¥•Ü°ì¥‘•…%è€…………………„µ………„´Ñ……„´á……„µ……………………………„œ°Í¡½½±%è€Í¡½½°µ„œ°É•Ù¥•Ý•É%è…Ñ½È¹¥°‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô¤ì(€…Ñ½È€ôì¥è€ÍÑÕ‘•¹Ðµ„œ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœôì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡…ÁÁÉ½Ù”¤¤¹ÍÑ…ÑÕÌ°€ÐÀÌ¤ì)ô¤ì()Ñ•ÍÐ ¹½Ñ¥™¥…Ñ¥½¸É•…ÍÑ…Ñ”¥Ì…±Ý…åÌ½Ý¹•‰äÑ¡”…ÕÑ¡•¹Ñ¥…Ñ•ÁÉ½™¥±”…¹‰½Õ¹‘•œ°…Íå¹Œ€ ¤€ôøì(€½¹ÍÐ…Ñ½È€ôì¥è€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ÐÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°Í¡½½±}¥è€Í¡½½°µ„œ°É½±”è€ÍÑÕ‘•¹Ðœôì(€½¹ÍÐÍ…Ù•€ômtì(€±•Ð±¥ÍÑ•‘=Ý¹•Èì(€½¹ÍÐ¡…¹‘±•È€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ìÍÕ‰©•Ðè€ÍÑÕ‘•¹Ðœô¤°É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø…Ñ½È°(€€€É•Á½Í¥Ñ½Éäèì•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸è…Íå¹Œ€ ¤€ôø¹Õ±°°(€€€€€±¥ÍÑ9½Ñ¥™¥…Ñ¥½¹I•…‘MÑ…Ñ•Ìè…Íå¹Œ½Ý¹•È€ôøì±¥ÍÑ•‘=Ý¹•È€ô½Ý¹•ÈìÉ•ÑÕÉ¸mì¹½Ñ¥™¥…Ñ¥½¹}­•äè€É•±•…Í”éÑ•ÍÐœõtìô°(€€€€€Í…Ù•9½Ñ¥™¥…Ñ¥½¹I•…‘MÑ…Ñ•Ìè…Íå¹Œ€¡½Ý¹•È°­•åÌ¤€ôøìÍ…Ù•¹ÁÕÍ ¡ì½Ý¹•È°­•åÌô¤ìÉ•ÑÕÉ¸ÑÉÕ”ìô°(€€€ôô¤ì(€½¹ÍÐ±¥ÍÐ€ôÉ•Ä¡íô°€Pœ¤ì±¥ÍÐ¹ÕÉ°€ô€œ½…Á¤½ØÄ½¹½Ñ¥™¥…Ñ¥½¸µÉ•…‘Ìœì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡±¥ÍÐ¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°¹½Ñ¥™¥…Ñ¥½¹}­•åÌèlÉ•±•…Í”éÑ•ÍÐtôô¤ì(€…ÍÍ•ÉÐ¹•ÅÕ…°¡±¥ÍÑ•‘=Ý¹•È°…Ñ½È¹¥¤ì(€½¹ÍÐÍ…Ù”€ôÉ•Ä¡ì¹½Ñ¥™¥…Ñ¥½¹}­•åÌèlÍ¡½½°µ±¥ÍÑ¥¹œé…‰Œœ°€‘¥Íµ¥ÍÍ•éÉ•±•…Í”éÑ•ÍÐœ°€Í¡½½°µ±¥ÍÑ¥¹œé…‰Œtô¤ì(€Í…Ù”¹ÕÉ°€ô€œ½…Á¤½ØÄ½¹½Ñ¥™¥…Ñ¥½¸µÉ•…‘Ìœì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡…Ý…¥Ð¡…¹‘±•È¡Í…Ù”¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”ôô¤ì(€…ÍÍ•ÉÐ¹‘••ÁÅÕ…°¡Í…Ù•°mì½Ý¹•Èè…Ñ½È¹¥°­•åÌèlÍ¡½½°µ±¥ÍÑ¥¹œé…‰Œœ°€‘¥Íµ¥ÍÍ•éÉ•±•…Í”éÑ•ÍÐtõt¤ì(€½¹ÍÐ¥¹Ù…±¥€ôÉ•Ä¡ì¹½Ñ¥™¥…Ñ¥½¹}­•åÌèl‰…‘q¹­•ätô¤ì¥¹Ù…±¥¹ÕÉ°€ôÍ…Ù”¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡¥¹Ù…±¥¤¤¹ÍÑ…ÑÕÌ°€ÐÀÀ¤ì(€½¹ÍÐ½Ù•ÉÍ¥é•€ôÉ•Ä¡ì¹½Ñ¥™¥…Ñ¥½¹}­•åÌèÉÉ…ä¹™É½´¡ì±•¹Ñ è€ÄÀÄô°€¡|°¤¤€ôø­•äè‘í¥õ€¤ô¤ì½Ù•ÉÍ¥é•¹ÕÉ°€ôÍ…Ù”¹ÕÉ°ì(€…ÍÍ•ÉÐ¹•ÅÕ…° ¡…Ý…¥Ð¡…¹‘±•È¡½Ù•ÉÍ¥é•¤¤¹ÍÑ…ÑÕÌ°€ÐÀÀ¤ì)ô¤ì

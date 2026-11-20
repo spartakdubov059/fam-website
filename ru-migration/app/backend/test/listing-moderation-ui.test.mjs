@@ -1,368 +1,17 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { initializeListingModeration } from '../../web/listing-moderation.js';
-
-class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.listeners = {}; this.textContent = ''; this.hidden = false; this.dataset = {}; this.value = ''; this.disabled = false; }
-  append(...items) { this.children.push(...items); }
-  replaceChildren(...items) { this.children = items; }
-  addEventListener(name, handler) { this.listeners[name] = handler; }
-  setAttribute(name, value) { this[name] = value; }
-}
-
-function fixture() {
-  const panel = new FakeNode('section');
-  panel.hidden = true;
-  const status = new FakeNode('p');
-  const queue = new FakeNode('div');
-  const deletionFormSection = new FakeNode('section'); deletionFormSection.hidden = true;
-  const deletionForm = new FakeNode('form');
-  const deletionTarget = new FakeNode('select');
-  const deletionReasonCode = new FakeNode('select'); deletionReasonCode.value = 'spam';
-  const deletionReason = new FakeNode('textarea');
-  const deletionStatus = new FakeNode('p');
-  const ownDeletionRequests = new FakeNode('div');
-  const deletionReviewSection = new FakeNode('section'); deletionReviewSection.hidden = true;
-  const deletionReviewStatus = new FakeNode('p');
-  const deletionReviewQueue = new FakeNode('div');
-  const elements = { ruModeration: panel, ruModerationStatus: status, ruModerationQueue: queue,
-    ruDeletionRequestSubmit: deletionFormSection, ruDeletionRequestForm: deletionForm, ruDeletionTarget: deletionTarget,
-    ruDeletionReasonCode: deletionReasonCode, ruDeletionReason: deletionReason, ruDeletionRequestStatus: deletionStatus,
-    ruDeletionOwnRequests: ownDeletionRequests, ruDeletionRequestReview: deletionReviewSection,
-    ruDeletionReviewStatus: deletionReviewStatus, ruDeletionReviewQueue: deletionReviewQueue };
-  return { document: { getElementById: id => elements[id], createElement: tag => new FakeNode(tag) }, panel, status, queue };
-}
-
-test('school moderators review same-school pending photos and publish only after photo approval', async () => {
-  const f = fixture();
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const calls = [];
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url === '/api/v1/listings/moderation' && calls.filter(call => call.url === url).length === 1) {
-      return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: '<script>unsafe</script>', description: '–¢–µ–∫—Å—Ç', category: '–£—á—ë–±–∞', photo_status: 'pending', photo_url: `/api/v1/listings/${id}/photo` }] }) };
-    }
-    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
-    if (url === `/api/v1/listings/${id}/photo`) return { ok: true, json: async () => ({ ok: true }) };
-    return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-  } });
-  assert.equal(f.panel.hidden, false);
-  const card = f.queue.children[0];
-  assert.equal(card.children[0].textContent, '<script>unsafe</script>');
-  assert.equal(card.children[3].tagName, 'img');
-  const actions = card.children.at(-1).children;
-  assert.deepEqual(actions.map(button => button.textContent), ['–û–¥–æ–±—Ä–∏—Ç—å —Ñ–æ—Ç–æ', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ñ–æ—Ç–æ', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å –æ–±—ä—è–≤–ª–µ–Ω–∏–µ']);
-  await actions[0].listeners.click();
-  const decision = calls.find(call => call.url === `/api/v1/listings/${id}/photo`);
-  assert.equal(decision.init.method, 'PATCH');
-  assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
-  assert.equal(f.status.textContent, '–û—á–µ—Ä–µ–¥–∏ —à–∫–æ–ª—å–Ω–æ–π –ø—Ä–æ–≤–µ—Ä–∫–∏ –ø—É—Å—Ç—ã.');
-});
-
-test('school moderators can inspect and decide idea photos without rendering user text as HTML', async () => {
-  const f = fixture(); const calls = [];
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const key = 'pending/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';
-  let imageStatus = 'pending';
-  let ideasPayload;
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
-    if (url === '/api/v1/school/ideas') {
-      ideasPayload = { ok: true, ideas: imageStatus === 'pending'
-        ? [{ id, text: '<img src=x onerror=alert(1)>', image_keys: [key], image_status: imageStatus, ai_status: 'pending' }] : [] };
-      return { ok: true, json: async () => ideasPayload };
-    }
-    if (url === `/api/v1/school/ideas/${id}/images` && init.method === 'PATCH') { imageStatus = 'approved'; return { ok: true, json: async () => ({ ok: true, image_status }) }; }
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/suspensions' || url === '/api/v1/suspensions/targets' || url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, suspensions: [], targets: [] }) };
-    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
-    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
-    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, alerts: [] }) };
-    if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) };
-    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
-    return { ok: true, json: async () => ({ ok: true }) };
-  } });
-  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === '–®–∫–æ–ª—å–Ω—ã–µ –∏–¥–µ–∏ –∏ —Ñ–æ—Ç–æ–≥—Ä–∞—Ñ–∏–∏');
-  const card = panel?.children.find(item => item.tagName === 'article');
-  assert.ok(card);
-  assert.equal(card.children[0].textContent, '<img src=x onerror=alert(1)>');
-  assert.equal(card.children[1].textContent, '–¢–µ–∫—Å—Ç –æ–∂–∏–¥–∞–µ—Ç —Ä–µ—à–µ–Ω–∏—è —à–∫–æ–ª—ã.');
-  assert.deepEqual(card.children[2].children.map(button => button.textContent), ['–û–¥–æ–±—Ä–∏—Ç—å —Ç–µ–∫—Å—Ç', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ç–µ–∫—Å—Ç']);
-  assert.equal(card.children[3].tagName, 'img');
-  assert.equal(card.children[3].src, `/api/v1/ideas/${id}/images/0`);
-  assert.equal(card.children[3].alt, '–§–æ—Ç–æ –∫ —à–∫–æ–ª—å–Ω–æ–π –∏–¥–µ–µ 1');
-  const actions = card.children[4].children;
-  assert.deepEqual(actions.map(button => button.textContent), ['–û–¥–æ–±—Ä–∏—Ç—å —Ñ–æ—Ç–æ', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å —Ñ–æ—Ç–æ']);
-  await actions[0].listeners.click();
-  const decision = calls.find(call => call.url === `/api/v1/school/ideas/${id}/images` && call.init.method === 'PATCH');
-  assert.deepEqual(JSON.parse(decision.init.body), { decision: 'approve' });
-  assert.equal(imageStatus, 'approved');
-});
-
-test('pending school idea text can be approved with a separate same-origin moderation decision', async () => {
-  const f = fixture(); const calls = [];
-  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
-    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [
-      { id, text: '–°–∏–Ω—Ç–µ—Ç–∏—á–µ—Å–∫–∞—è –∏–¥–µ—è', image_keys: [], image_status: 'none', ai_status: 'pending' },
-    ] }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    return { ok: true, json: async () => ({ ok: true }) };
-  } });
-  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === '–®–∫–æ–ª—å–Ω—ã–µ –∏–¥–µ–∏ –∏ —Ñ–æ—Ç–æ–≥—Ä–∞—Ñ–∏–∏');
-  const card = panel.children.find(item => item.tagName === 'article');
-  await card.children[2].children[0].listeners.click();
-  const call = calls.find(item => item.url === `/api/v1/school/ideas/${id}/moderation`);
-  assert.equal(call.init.method, 'PATCH');
-  assert.deepEqual(JSON.parse(call.init.body), { decision: 'approve' });
-});
-
-test('student profiles do not receive the school moderation queue', async () => {
-  const f = fixture();
-  const routes = [];
-  await initializeListingModeration({ ...f, fetchImpl: async url => {
-    routes.push(url);
-    return { ok: true, json: async () => ({ ok: true, profile: { role: 'student' } }) };
-  } });
-  assert.deepEqual(routes, ['/api/v1/me']);
-  assert.equal(f.panel.hidden, true);
-});
-
-test('school admins see active suspensions returned by the same-school endpoint as text', async () => {
-  const f = fixture(); const calls = [];
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
-    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [{ target_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', target_role: 'student', reason: '<script>unsafe</script>', expires_at: '2099-01-01T00:00:00Z' }] }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/staff-verifications') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    throw new Error(`unexpected route ${url}`);
-  } });
-  assert.ok(calls.some(call => call.url === '/api/v1/suspensions' && call.init.credentials === 'same-origin'));
-  const card = f.queue.children.find(item => item.children?.[1]?.textContent?.startsWith('ID –∞–∫–∫–∞—É–Ω—Ç–∞:'));
-  assert.equal(card.children[1].textContent, 'ID –∞–∫–∫–∞—É–Ω—Ç–∞: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  assert.equal(card.children[2].textContent, '–ü—Ä–∏—á–∏–Ω–∞: <script>unsafe</script>');
-  assert.equal(card.children[2].tagName, 'p');
-});
-
-test('school admins can review rule-based analyst suggestions with safe text rendering', async () => {
-  const f = fixture(); const calls = []; let pending = true;
-  const ideaId = 'a'.repeat(64);
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
-    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true,
-      report: { summary: '<script>summary</script>', generated_at: '2026-11-14T06:00:00Z' },
-      ideas: pending ? [{ id: ideaId, title: '<script>idea</script>', summary: '–°–∏–Ω—Ç–µ—Ç–∏—á–µ—Å–∫–æ–µ –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏–µ', evidence_summary: '–¢–æ–ª—å–∫–æ –∞–≥—Ä–µ–≥–∏—Ä–æ–≤–∞–Ω–Ω—ã–µ –ø–æ–∫–∞–∑–∞—Ç–µ–ª–∏.' }] : [] }) };
-    if (url === `/api/v1/school/admin/agent-ideas/${ideaId}`) { pending = false; return { ok: true, json: async () => ({ ok: true }) }; }
-    return { ok: true, json: async () => ({ ok: true, listings: [], applications: [], requests: [], suspensions: [], targets: [], reports: [], messages: [] }) };
-  } });
-  const card = f.queue.children.find(item => item.children?.[0]?.textContent === '–ï–∂–µ–¥–Ω–µ–≤–Ω–∞—è —Å–≤–æ–¥–∫–∞ –∏ –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏—è –ø–æ–º–æ—â–Ω–∏–∫–æ–≤');
-  assert.ok(card, 'school analyst dashboard should be rendered in the moderation queue');
-  assert.equal(card.children[0].textContent, '–ï–∂–µ–¥–Ω–µ–≤–Ω–∞—è —Å–≤–æ–¥–∫–∞ –∏ –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏—è –ø–æ–º–æ—â–Ω–∏–∫–æ–≤');
-  assert.equal(card.children[1].textContent, '<script>summary</script>');
-  const idea = card.children.find(item => item.tagName === 'article');
-  assert.equal(idea.children[0].textContent, '<script>idea</script>');
-  const actions = idea.children.at(-1).children;
-  assert.deepEqual(actions.map(item => item.textContent), ['–ü—Ä–∏–Ω—è—Ç—å –∫ —Ä–∞–±–æ—Ç–µ', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å']);
-  await actions[0].listeners.click();
-  const review = calls.find(call => call.url === `/api/v1/school/admin/agent-ideas/${ideaId}`);
-  assert.equal(review.init.method, 'PATCH');
-  assert.deepEqual(JSON.parse(review.init.body), { decision: 'approve' });
-  assert.equal(pending, false);
-  assert.equal(f.status.textContent, '–ü—Ä–µ–¥–ª–æ–∂–µ–Ω–∏–µ –ø–æ–º–æ—â–Ω–∏–∫–∞ –ø—Ä–∏–Ω—è—Ç–æ –∫ —Ä–∞–±–æ—Ç–µ.');
-});
-
-test('school admins see only allowlisted aggregate technical alerts rendered as text', async () => {
-  const f = fixture(); const calls = [];
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
-    if (url === '/api/v1/school/admin/technical-alerts') return { ok: true, json: async () => ({ ok: true, digest: {
-      digest_slot: '2026-11-15T12:00', generated_at: '2026-11-15T12:01:00Z',
-      summary: '<script>unsafe</script>', metrics: { total_events_24h: 3, events_last_hour: 1, events: [] },
-    }, alerts: [
-      { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
-      { event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning', hour_bucket: '2026-11-15T12:00:00Z' },
-      { event_code: '<script>x</script>', page_area: 'other', event_count: 999, severity: 'critical', hour_bucket: '2026-11-15T12:00:00Z' },
-    ] }) };
-    if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true,
-      users: [{ id: '11111111-1111-4111-8111-111111111111', role: 'student' }],
-      listings: [{ id: '22222222-2222-4222-8222-222222222222', status: 'active' }, { id: '33333333-3333-4333-8333-333333333333', status: 'pending' }],
-      deletion_requests: [], suspensions: [], audit: [{ action: 'listing_deleted', created_at: '2026-11-15T12:00:00Z', actor: '<unsafe>' }] }) };
-    if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
-    if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
-    if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url.endsWith('/review')) return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
-    if (url === '/api/v1/suspensions/targets' || url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, targets: [] }) };
-    throw new Error(`unexpected route ${url}`);
-  } });
-  assert.ok(calls.some(call => call.url === '/api/v1/school/admin/technical-alerts' && call.init.credentials === 'same-origin'));
-  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === '–¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏—è FAM –∑–∞ —Å—É—Ç–∫–∏');
-  assert.ok(panel);
-  assert.equal(panel.children[1].textContent, '–û–±—â–∏–µ —Å—á—ë—Ç—á–∏–∫–∏ –æ—à–∏–±–æ–∫ —Å–∞–π—Ç–∞. –í –Ω–∏—Ö –Ω–µ—Ç —Ç–µ–∫—Å—Ç–∞ –æ—à–∏–±–æ–∫ –∏–ª–∏ —Å–≤–µ–¥–µ–Ω–∏–π –æ–± –∞–∫–∫–∞—É–Ω—Ç–∞—Ö.');
-  assert.equal(panel.children[3].textContent, '<script>unsafe</script>', 'digest summary is rendered as inert text');
-  const alert = panel.children.find(item => item.tagName === 'article');
-  assert.equal(alert.children[0].textContent, '–ö—Ä–∏—Ç–∏—á–µ—Å–∫–∏–π —Å–±–æ–π ¬∑ –û—à–∏–±–∫–∞ –±–∞–∑—ã –¥–∞–Ω–Ω—ã—Ö');
-  assert.equal(alert.children[1].textContent, '–†–∞–∑–¥–µ–ª: –±–∞–∑–∞ –¥–∞–Ω–Ω—ã—Ö ¬∑ –°–æ–±—ã—Ç–∏–π –∑–∞ —á–∞—Å: 3');
-  const rejectionAlert = panel.children.filter(item => item.tagName === 'article')[1];
-  assert.equal(rejectionAlert.children[0].textContent, '–ü—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–µ ¬∑ –°–±–æ–π —Ñ–æ–Ω–æ–≤–æ–π –æ–ø–µ—Ä–∞—Ü–∏–∏');
-  assert.equal(panel.children.some(item => item.tagName === 'script'), false, 'untrusted digest text does not create markup');
-  const overview = f.queue.children.find(item => item.children?.[0]?.textContent === '–û–±–∑–æ—Ä —à–∫–æ–ª—ã');
-  assert.ok(overview);
-  assert.equal(overview.children[1].textContent, '–í –≤—ã–±–æ—Ä–∫–µ: –∞–∫—Ç–∏–≤–Ω—ã—Ö –ø—Ä–æ—Ñ–∏–ª–µ–π ‚Äî 1, –∞–∫—Ç–∏–≤–Ω—ã—Ö –ø—É–±–ª–∏–∫–∞—Ü–∏–π ‚Äî 1, –æ–∂–∏–¥–∞—é—Ç –ø—Ä–æ–≤–µ—Ä–∫–∏ ‚Äî 1, –∑–∞—è–≤–æ–∫ –Ω–∞ —É–¥–∞–ª–µ–Ω–∏–µ ‚Äî 0, –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–π ‚Äî 0.');
-  assert.match(overview.children[2].textContent, /–ø–æ—Å–ª–µ–¥–Ω–∏–º–∏ 100 –ø—Ä–æ—Ñ–∏–ª—è–º–∏ –∏ –ø—É–±–ª–∏–∫–∞—Ü–∏—è–º–∏/);
-  assert.equal(overview.children.at(-1).textContent,
-    `–£–¥–∞–ª–µ–Ω–æ –æ–±—ä—è–≤–ª–µ–Ω–∏–µ ¬∑ ${new Date('2026-11-15T12:00:00Z').toLocaleString('ru-RU')}`);
-  assert.equal(overview.textContent.includes('<unsafe>'), false);
-});
-
-test('school account management deletes only an identified student or council account after exact confirmation', async () => {
-  const f = fixture(); const calls = []; const confirmations = []; const prompts = [];
-  const adminId = '11111111-1111-4111-8111-111111111111';
-  const studentId = '22222222-2222-4222-8222-222222222222';
-  const councilId = '33333333-3333-4333-8333-333333333333';
-  const otherAdminId = '44444444-4444-4444-8444-444444444444';
-  const removed = new Set();
-  let needsFreshLogin = true;
-  const accounts = [
-    { id: adminId, role: 'school_admin', first_name: '–ì–ª–∞–≤–Ω—ã–π', last_name: '–ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä' },
-    { id: studentId, role: 'student', first_name: '–ò–≤–∞–Ω', last_name: '–£—á–µ–Ω–∏–∫', class_name: '7–ê' },
-    { id: councilId, role: 'council_member', first_name: '–ú–∞—Ä–∏—è', last_name: '–°–æ–≤–µ—Ç' },
-    { id: otherAdminId, role: 'school_admin', first_name: '–î—Ä—É–≥–æ–π', last_name: '–ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä' },
-  ];
-  const confirmation = '–£–î–ê–õ–ò–¢–¨ –ê–ö–ö–ê–£–ù–¢ –£–ß–ê–°–¢–ù–ò–ö–ê';
-  await initializeListingModeration({ ...f,
-    confirmImpl: message => { confirmations.push(message); return true; },
-    promptImpl: message => { prompts.push(message); return confirmation; },
-    fetchImpl: async (url, init = {}) => {
-      calls.push({ url, init });
-      if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: adminId, role: 'school_admin' } }) };
-      if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-      if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-      if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
-      if (url === '/api/v1/school/admin/overview') return { ok: true, json: async () => ({ ok: true,
-        users: accounts.filter(account => !removed.has(account.id)), listings: [], audit: [], deletion_requests: [], suspensions: [] }) };
-      if (url === '/api/v1/school/admin/agent-dashboard') return { ok: true, json: async () => ({ ok: true, report: null, ideas: [] }) };
-      if (url === `/api/v1/school/accounts/${studentId}` && init.method === 'DELETE') {
-        if (needsFreshLogin) {
-          needsFreshLogin = false;
-          return { ok: false, status: 403, json: async () => ({ ok: false, error: 'recent_yandex_login_required' }) };
-        }
-        removed.add(studentId);
-        return { ok: true, json: async () => ({ ok: true, deleted: true }) };
-      }
-      return { ok: true, json: async () => ({ ok: true, requests: [], targets: [], suspensions: [], reports: [], messages: [], alerts: [] }) };
-    },
-  });
-
-  const overview = f.queue.children.find(item => item.children?.[0]?.textContent === '–û–±–∑–æ—Ä —à–∫–æ–ª—ã');
-  const accountPanel = overview.children.find(item => item.tagName === 'section' && item.children?.[0]?.textContent === '–ê–∫–∫–∞—É–Ω—Ç—ã —à–∫–æ–ª—ã');
-  const cards = accountPanel.children.filter(item => item.tagName === 'article');
-  assert.equal(cards.length, 4);
-  const deleteButtons = cards.flatMap(card => card.children.filter(child => child.tagName === 'button'));
-  assert.equal(deleteButtons.length, 2);
-  assert.deepEqual(deleteButtons.map(button => button.textContent), ['–£–¥–∞–ª–∏—Ç—å –∞–∫–∫–∞—É–Ω—Ç', '–£–¥–∞–ª–∏—Ç—å –∞–∫–∫–∞—É–Ω—Ç']);
-  await deleteButtons[0].listeners.click();
-  assert.equal(f.status.children[1].href, '/auth/yandex/start?reauth=1');
-  await deleteButtons[0].listeners.click();
-
-  const deletion = calls.find(call => call.url === `/api/v1/school/accounts/${studentId}` && call.init.method === 'DELETE');
-  assert.ok(deletion);
-  assert.equal(deletion.init.credentials, 'same-origin');
-  assert.deepEqual(JSON.parse(deletion.init.body), { confirmation });
-  assert.equal(confirmations.length, 2);
-  assert.match(confirmations[0], /#222222 \(–ò–≤–∞–Ω –£—á–µ–Ω–∏–∫\)/);
-  assert.equal(prompts.length, 2);
-  assert.match(prompts[0], /–£–î–ê–õ–ò–¢–¨ –ê–ö–ö–ê–£–ù–¢ –£–ß–ê–°–¢–ù–ò–ö–ê/);
-  assert.equal(f.status.textContent, '–ê–∫–∫–∞—É–Ω—Ç –∏ —Å–≤—è–∑–∞–Ω–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ —É–¥–∞–ª–µ–Ω—ã.');
-});
-
-test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
-  const f = fixture(); const calls = [];
-  const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
-    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [{ target_id: target, target_role: 'student', reason: 'Repeated disruption', expires_at: '2099-01-01T00:00:00Z' }] }) };
-    if (url === '/api/v1/suspensions/targets') return { ok: true, json: async () => ({ ok: true, targets: [{ id: target, role: 'student', first_name: '<script>', last_name: '–ò–º—è' }] }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review' || url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, applications: [], requests: [] }) };
-    if (url === `/api/v1/suspensions/${target}` && init.method === 'PATCH') {
-      const body = JSON.parse(init.body);
-      if (body.action === 'issue') return { ok: false, json: async () => ({ ok: false, error: 'fresh_auth_required' }) };
-      if (body.action === 'lift') return { ok: true, json: async () => ({ ok: true, status: 'lifted' }) };
-    }
-    throw new Error(`unexpected route ${url}`);
-  } });
-  const panel = f.queue.children[0];
-  const form = panel.children[2];
-  const [targetSelect, duration, reason, submit] = form.children;
-  assert.equal(targetSelect.children[1].textContent, '<script> –ò–º—è ¬∑ —É—á–µ–Ω–∏–∫', 'names are rendered as text');
-  targetSelect.value = target; duration.value = '72'; reason.value = 'Repeatedly disrupted the shared school board.';
-  await form.listeners.submit({ preventDefault() {} });
-  const issue = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'issue');
-  assert.equal(issue.url, `/api/v1/suspensions/${target}`);
-  assert.deepEqual(JSON.parse(issue.init.body), { action: 'issue', duration_hours: 72, reason: reason.value });
-  assert.equal(f.status.children.find(child => child.href)?.href, '/auth/yandex/start?reauth=1', JSON.stringify(f.status.children));
-  const activeCard = f.queue.children.find(card => card.children.some(child => child.textContent?.startsWith('–ü—Ä–∏—á–∏–Ω–∞:')));
-  const lift = activeCard.children.at(-1);
-  await lift.listeners.click();
-  const liftCall = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'lift');
-  assert.equal(liftCall.url, `/api/v1/suspensions/${target}`);
-});
-
-test('school admins are told when suspension status could not be loaded instead of seeing a false empty result', async () => {
-  const f = fixture();
-  await initializeListingModeration({ ...f, fetchImpl: async url => {
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
-    if (url === '/api/v1/suspensions') return { ok: false, json: async () => ({ ok: false }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
-    if (url === '/api/v1/profile-requests/review' || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    throw new Error(`unexpected route ${url}`);
-  } });
-  assert.match(f.status.textContent, /–Ω–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –¥–µ–π—Å—Ç–≤—É—é—â–∏–µ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è/);
-});
-
-test('staff can confirm or reject a pending event application using safe text rendering', async () => {
-  const f = fixture();
-  const eventId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const userId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-  const calls = [];
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
-    calls.push({ url, init });
-    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
-    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
-    if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [{ event_id: eventId, event_title: '<b>–°–æ–±—ã—Ç–∏–µ</b>', user_id: userId, status: 'pending', first_name: '–ê–Ω—è', last_name: '–ò–≤–∞–Ω–æ–≤–∞', class_name: '8–ê', person_type: 'student' }] }) };
-    if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/staff-verifications') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    return { ok: true, json: async () => ({ ok: true }) };
-  } });
-  const card = f.queue.children[0];
-  assert.equal(card.children[0].textContent, '<b>–°–æ–±—ã—Ç–∏–µ</b>');
-  assert.equal(card.children[1].textContent, '–ó–∞—è–≤–∫–∞: –ê–Ω—è –ò–≤–∞–Ω–æ–≤–∞ ¬∑ —É—á–µ–Ω–∏–∫ ¬∑ 8–ê');
-  const actions = card.children[2].children;
-  assert.deepEqual(actions.map(button => button.textContent), ['–ü–æ–¥—Ç–≤–µ—Ä–¥–∏—Ç—å –∑–∞—è–≤–∫—É', '–û—Ç–∫–ª–æ–Ω–∏—Ç—å –∑–∞—è–≤–∫—É']);
-  await actions[1].listeners.click();
-  const decision = calls.find(call => call.url === `/api/v1/listings/${eventId}/registrations/${userId}`);
-  assert.equal(decision.init.method, 'PATCH');
-  assert.deepEqual(JSON.parse(decision.init.body), { decision: 'reject' });
+Y™Áäx-ÆÈ‹j◊ù¢Îi∫⁄+äßj[hëÈ‹¢ÈÌ◊û:È:-jZ.∂õ≠ñ)ﬁ≥Vñ◊˜'BFW7Bg&ˆ“vÊˆFSßFW7Bs∞¶ñ◊˜'B76W'Bg&ˆ“vÊˆFS¶76W'B˜7G&ñ7Bs∞¶ñ◊˜'B≤ñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚“g&ˆ“r‚‚Ú‚‚˜vV"ˆ∆ó7FñÊr÷÷ˆFW&Fñˆ‚Êß2s∞†¶6∆72f∂TÊˆFR∞¢6ˆÁ7G'V7F˜"áFrí≤FÜó2ÁFtÊ÷R“Fs≤FÜó2Ê6Üñ∆G&V‚“µ”≤FÜó2Ê∆ó7FVÊW'2“∑”≤FÜó2ÁFWáD6ˆÁFVÁB“rs≤FÜó2ÊÜñFFV‚“f«6S≤FÜó2ÊFF6WB“∑”≤FÜó2Áf«VR“rs≤FÜó2ÊFó6&∆VB“f«6S≤–¢VÊBÇ‚‚ÊóFV◊2í≤FÜó2Ê6Üñ∆G&V‚ÁW6ÇÇ‚‚ÊóFV◊2ì≤–¢&W∆6T6Üñ∆G&V‚Ç‚‚ÊóFV◊2í≤FÜó2Ê6Üñ∆G&V‚“óFV◊3≤–¢FDWfVÁD∆ó7FVÊW"ÜÊ÷R¬ÜÊF∆W"í≤FÜó2Ê∆ó7FVÊW'5∂Ê÷U““ÜÊF∆W#≤–¢6WDGG&ñ'WFRÜÊ÷R¬f«VRí≤FÜó5∂Ê÷U““f«VS≤–ß–†¶gVÊ7Fñˆ‚fóáGW&RÇí∞¢6ˆÁ7BÊV¬“ÊWrf∂TÊˆFRÇw6V7Fñˆ‚rì∞¢ÊV¬ÊÜñFFV‚“G'VS∞¢6ˆÁ7B7FGW2“ÊWrf∂TÊˆFRÇwrì∞¢6ˆÁ7BVWVR“ÊWrf∂TÊˆFRÇvFóbrì∞¢6ˆÁ7BFV∆WFñˆ‰f˜&’6V7Fñˆ‚“ÊWrf∂TÊˆFRÇw6V7Fñˆ‚rì≤FV∆WFñˆ‰f˜&’6V7Fñˆ‚ÊÜñFFV‚“G'VS∞¢6ˆÁ7BFV∆WFñˆ‰f˜&““ÊWrf∂TÊˆFRÇvf˜&“rì∞¢6ˆÁ7BFV∆WFñˆÂF&vWB“ÊWrf∂TÊˆFRÇw6V∆V7Brì∞¢6ˆÁ7BFV∆WFñˆÂ&V6ˆ‰6ˆFR“ÊWrf∂TÊˆFRÇw6V∆V7Brì≤FV∆WFñˆÂ&V6ˆ‰6ˆFRÁf«VR“w7“s∞¢6ˆÁ7BFV∆WFñˆÂ&V6ˆ‚“ÊWrf∂TÊˆFRÇwFWáF&Vrì∞¢6ˆÁ7BFV∆WFñˆÂ7FGW2“ÊWrf∂TÊˆFRÇwrì∞¢6ˆÁ7B˜v‰FV∆WFñˆÂ&WVW7G2“ÊWrf∂TÊˆFRÇvFóbrì∞¢6ˆÁ7BFV∆WFñˆÂ&WfñWu6V7Fñˆ‚“ÊWrf∂TÊˆFRÇw6V7Fñˆ‚rì≤FV∆WFñˆÂ&WfñWu6V7Fñˆ‚ÊÜñFFV‚“G'VS∞¢6ˆÁ7BFV∆WFñˆÂ&WfñWu7FGW2“ÊWrf∂TÊˆFRÇwrì∞¢6ˆÁ7BFV∆WFñˆÂ&WfñWuVWVR“ÊWrf∂TÊˆFRÇvFóbrì∞¢6ˆÁ7BV∆V÷VÁG2“≤'T÷ˆFW&Fñˆ„¢ÊV¬¬'T÷ˆFW&FñˆÂ7FGW3¢7FGW2¬'T÷ˆFW&FñˆÂVWVS¢VWVR¿¢'TFV∆WFñˆÂ&WVW7E7V&÷óC¢FV∆WFñˆ‰f˜&’6V7Fñˆ‚¬'TFV∆WFñˆÂ&WVW7Df˜&”¢FV∆WFñˆ‰f˜&“¬'TFV∆WFñˆÂF&vWC¢FV∆WFñˆÂF&vWB¿¢'TFV∆WFñˆÂ&V6ˆ‰6ˆFS¢FV∆WFñˆÂ&V6ˆ‰6ˆFR¬'TFV∆WFñˆÂ&V6ˆ„¢FV∆WFñˆÂ&V6ˆ‚¬'TFV∆WFñˆÂ&WVW7E7FGW3¢FV∆WFñˆÂ7FGW2¿¢'TFV∆WFñˆ‰˜vÂ&WVW7G3¢˜v‰FV∆WFñˆÂ&WVW7G2¬'TFV∆WFñˆÂ&WVW7E&WfñWs¢FV∆WFñˆÂ&WfñWu6V7Fñˆ‚¿¢'TFV∆WFñˆÂ&WfñWu7FGW3¢FV∆WFñˆÂ&WfñWu7FGW2¬'TFV∆WFñˆÂ&WfñWuVWVS¢FV∆WFñˆÂ&WfñWuVWVR”∞¢&WGW&‚≤Fˆ7V÷VÁC¢≤vWDV∆V÷VÁD'îñC¢ñB”‚V∆V÷VÁG5∂ñE“¬7&VFTV∆V÷VÁC¢Fr”‚ÊWrf∂TÊˆFRáFrí“¬ÊV¬¬7FGW2¬VWVR”∞ß–†ßFW7BÇw66Üˆˆ¬÷ˆFW&F˜'2&WfñWr6÷R◊66Üˆˆ¬VÊFñÊrÜ˜F˜2ÊBV&∆ó6ÇˆÊ«ígFW"Ü˜FÚ&˜f¬r¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì∞¢6ˆÁ7BñB“v÷”F”Ü÷s∞¢6ˆÁ7B6∆«2“µ”∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤&ˆ∆S¢v6˜VÊ6ñ≈ˆ÷V÷&W"r““í”∞¢ñbáW&¬””“rˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ñ6FñˆÁ3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚rbb6∆«2Êfñ«FW"Ü6∆¬”‚6∆¬ÁW&¬””“W&¬íÊ∆VÊwFÇ””“í∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢∑≤ñB¬FóF∆S¢s«67&óCÁVÁ6fS¬˜67&óC‚r¬FW67&óFñˆ„¢}
+-]≠"r¬6FVv˜'ì¢}
+=}r¬Ü˜Fı˜7FGW3¢wVÊFñÊrr¬Ü˜Fı˜W&√¢ˆí˜cˆ∆ó7FñÊw2ÚG∂ñG“˜Ü˜Fˆ’““í”∞¢–¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆñFV2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬ñFV3¢µ““í”∞¢ñbáW&¬””“ˆí˜cˆ∆ó7FñÊw2ÚG∂ñG“˜Ü˜Fˆí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR“í”∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ““í”∞¢““ì∞¢76W'BÊWV¬ÜbÁÊV¬ÊÜñFFV‚¬f«6Rì∞¢6ˆÁ7B6&B“bÁVWVRÊ6Üñ∆G&VÂ≥”∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬s«67&óCÁVÁ6fS¬˜67&óC‚rì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥5“ÁFtÊ÷R¬vñ÷rrì∞¢6ˆÁ7B7FñˆÁ2“6&BÊ6Üñ∆G&V‚ÊBÇ”íÊ6Üñ∆G&V„∞¢76W'BÊFVWWV¬Ü7FñˆÁ2Ê÷Ü'WGFˆ‚”‚'WGFˆ‚ÁFWáD6ˆÁFVÁBí¬≤}	ÌMÌç-¬MÌ-‚r¬}	Ì-≠ΩÌ›ç-¬MÌ-‚r¬}	Ì-≠ΩÌ›ç-¬Ì≠˝-Ω]›çRu“ì∞¢vóB7FñˆÁ5≥“Ê∆ó7FVÊW'2Ê6∆ñ6≤Çì∞¢6ˆÁ7BFV6ó6ñˆ‚“6∆«2ÊfñÊBÜ6∆¬”‚6∆¬ÁW&¬””“ˆí˜cˆ∆ó7FñÊw2ÚG∂ñG“˜Ü˜Fˆì∞¢76W'BÊWV¬ÜFV6ó6ñˆ‚ÊñÊóBÊ÷WFÜˆB¬uD4Çrì∞¢76W'BÊFVWWV¬Ñ•4Ù‚Á'6RÜFV6ó6ñˆ‚ÊñÊóBÊ&ˆGíí¬≤FV6ó6ñˆ„¢v&˜fRr“ì∞¢76W'BÊWV¬ÜbÁ7FGW2ÁFWáD6ˆÁFVÁB¬}	Ì}]]MÇç≠ÌΩÕ›Ìí˝Ì-]≠Ç˝=-≤‚rì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬÷ˆFW&F˜'26‚ñÁ7V7BÊBFV6ñFRñFVÜ˜F˜2vóFÜ˜WB&VÊFW&ñÊrW6W"FWáB2ÖD‘¬r¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì≤6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BñB“v÷”F”Ü÷s∞¢6ˆÁ7B∂Wí“wVÊFñÊrˆ&&&&&&&"÷&&&"”F&&"”Ü&&"÷&&&&&&&&&&&"ˆ66666662÷6662”F662”Ü662÷666666666662ÁvV's∞¢∆WBñ÷vU7FGW2“wVÊFñÊrs∞¢∆WBñFV5ñ∆ˆC∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤&ˆ∆S¢v6˜VÊ6ñ≈ˆ÷V÷&W"r““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆñFV2rí∞¢ñFV5ñ∆ˆB“≤ˆ≥¢G'VR¬ñFV3¢ñ÷vU7FGW2””“wVÊFñÊrp¢Ú∑≤ñB¬FWáC¢s∆ñ÷r7&3◊ÇˆÊW'&˜#÷∆W'BÉì‚r¬ñ÷vUˆ∂Wó3¢∂∂Wï“¬ñ÷vU˜7FGW3¢ñ÷vU7FGW2¬ï˜7FGW3¢wVÊFñÊrr’“¢µ“”∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚ñFV5ñ∆ˆB”∞¢–¢ñbáW&¬””“ˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñG“ˆñ÷vW6bbñÊóBÊ÷WFÜˆB””“uD4Çrí≤ñ÷vU7FGW2“v&˜fVBs≤&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬ñ÷vU˜7FGW2“í”≤–¢ñbáW&¬””“rˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ñ6FñˆÁ3¢µ““í”∞¢ñbáW&¬ÊVÊG5vóFÇÇr˜&WfñWrríí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2r«¬W&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2˜F&vWG2r«¬W&¬””“rˆí˜c˜&ˆ∆R÷÷ÊvV÷VÁB˜F&vWG2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬7W7VÁ6ñˆÁ3¢µ“¬F&vWG3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜6fWGí◊&W˜'G2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&W˜'G3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆ÷W76vW2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬÷W76vW3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜FV6ÜÊñ6¬÷∆W'G2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆W'G3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆ˜fW'fñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬W6W'3¢µ“¬∆ó7FñÊw3¢µ“¬VFóC¢µ“¬FV∆WFñˆÂ˜&WVW7G3¢µ“¬7W7VÁ6ñˆÁ3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆvVÁB÷F6Ü&ˆ&Brí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&W˜'C¢ÁV∆¬¬ñFV3¢µ““í”∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR“í”∞¢““ì∞¢6ˆÁ7BÊV¬“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁB””“}
+ç≠ÌΩÕ›ΩRçM]ÇÇMÌ-Ì=MçÇrì∞¢6ˆÁ7B6&B“ÊV√ÚÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“ÁFtÊ÷R””“v'Fñ6∆Rrì∞¢76W'BÊˆ≤Ü6&Bì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬s∆ñ÷r7&3◊ÇˆÊW'&˜#÷∆W'BÉì‚rì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}
+-]≠"ÌmçM]"]ç]›çÚç≠ÌΩ≤‚rì∞¢76W'BÊFVWWV¬Ü6&BÊ6Üñ∆G&VÂ≥%“Ê6Üñ∆G&V‚Ê÷Ü'WGFˆ‚”‚'WGFˆ‚ÁFWáD6ˆÁFVÁBí¬≤}	ÌMÌç-¬-]≠"r¬}	Ì-≠ΩÌ›ç-¬-]≠"u“ì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥5“ÁFtÊ÷R¬vñ÷rrì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥5“Á7&2¬ˆí˜cˆñFV2ÚG∂ñG“ˆñ÷vW2Ûì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥5“Ê«B¬}
+MÌ-‚¢ç≠ÌΩÕ›ÌíçM]Rrì∞¢6ˆÁ7B7FñˆÁ2“6&BÊ6Üñ∆G&VÂ≥E“Ê6Üñ∆G&V„∞¢76W'BÊFVWWV¬Ü7FñˆÁ2Ê÷Ü'WGFˆ‚”‚'WGFˆ‚ÁFWáD6ˆÁFVÁBí¬≤}	ÌMÌç-¬MÌ-‚r¬}	Ì-≠ΩÌ›ç-¬MÌ-‚u“ì∞¢vóB7FñˆÁ5≥“Ê∆ó7FVÊW'2Ê6∆ñ6≤Çì∞¢6ˆÁ7BFV6ó6ñˆ‚“6∆«2ÊfñÊBÜ6∆¬”‚6∆¬ÁW&¬””“ˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñG“ˆñ÷vW6bb6∆¬ÊñÊóBÊ÷WFÜˆB””“uD4Çrì∞¢76W'BÊFVWWV¬Ñ•4Ù‚Á'6RÜFV6ó6ñˆ‚ÊñÊóBÊ&ˆGíí¬≤FV6ó6ñˆ„¢v&˜fRr“ì∞¢76W'BÊWV¬Üñ÷vU7FGW2¬v&˜fVBrì∞ß“ì∞†ßFW7BÇwVÊFñÊr66Üˆˆ¬ñFVFWáB6‚&R&˜fVBvóFÇ6W&FR6÷R÷˜&ñvñ‚÷ˆFW&Fñˆ‚FV6ó6ñˆ‚r¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì≤6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BñB“v÷”F”Ü÷s∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤&ˆ∆S¢w66Üˆˆ≈ˆF÷ñ‚r““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆñFV2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬ñFV3¢∞¢≤ñB¬FWáC¢}
+ç›-]-ç}]≠ÚçM]Úr¬ñ÷vUˆ∂Wó3¢µ“¬ñ÷vU˜7FGW3¢vÊˆÊRr¬ï˜7FGW3¢wVÊFñÊrr“¿¢““í”∞¢ñbáW&¬””“rˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ñ6FñˆÁ3¢µ““í”∞¢ñbáW&¬ÊVÊG5vóFÇÇr˜&WfñWrríí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í”∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR“í”∞¢““ì∞¢6ˆÁ7BÊV¬“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁB””“}
+ç≠ÌΩÕ›ΩRçM]ÇÇMÌ-Ì=MçÇrì∞¢6ˆÁ7B6&B“ÊV¬Ê6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“ÁFtÊ÷R””“v'Fñ6∆Rrì∞¢vóB6&BÊ6Üñ∆G&VÂ≥%“Ê6Üñ∆G&VÂ≥“Ê∆ó7FVÊW'2Ê6∆ñ6≤Çì∞¢6ˆÁ7B6∆¬“6∆«2ÊfñÊBÜóFV“”‚óFV“ÁW&¬””“ˆí˜c˜66Üˆˆ¬ˆñFV2ÚG∂ñG“ˆ÷ˆFW&FñˆÊì∞¢76W'BÊWV¬Ü6∆¬ÊñÊóBÊ÷WFÜˆB¬uD4Çrì∞¢76W'BÊFVWWV¬Ñ•4Ù‚Á'6RÜ6∆¬ÊñÊóBÊ&ˆGíí¬≤FV6ó6ñˆ„¢v&˜fRr“ì∞ß“ì∞†ßFW7BÇw7GVFVÁB&ˆfñ∆W2FÚÊ˜B&V6VófRFÜR66Üˆˆ¬÷ˆFW&Fñˆ‚VWVRr¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì∞¢6ˆÁ7B&˜WFW2“µ”∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2W&¬”‚∞¢&˜WFW2ÁW6ÇáW&¬ì∞¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤&ˆ∆S¢w7GVFVÁBr““í”∞¢““ì∞¢76W'BÊFVWWV¬á&˜WFW2¬≤rˆí˜cˆ÷Ru“ì∞¢76W'BÊWV¬ÜbÁÊV¬ÊÜñFFV‚¬G'VRì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬F÷ñÁ26VR7FófR7W7VÁ6ñˆÁ2&WGW&ÊVB'íFÜR6÷R◊66Üˆˆ¬VÊGˆñÁB2FWáBr¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì≤6ˆÁ7B6∆«2“µ”∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤&ˆ∆S¢w66Üˆˆ≈ˆF÷ñ‚r““í”∞¢ñbáW&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬7W7VÁ6ñˆÁ3¢∑≤F&vWEˆñC¢v÷”F”Ü÷r¬F&vWE˜&ˆ∆S¢w7GVFVÁBr¬&V6ˆ„¢s«67&óCÁVÁ6fS¬˜67&óC‚r¬Wáó&W5ˆC¢s#ìí””C££¢r’““í”∞¢ñbáW&¬””“rˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ñ6FñˆÁ3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜&ˆfñ∆R◊&WVW7G2˜&WfñWrr«¬W&¬””“rˆí˜c˜&ˆ∆R◊&WVW7G2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜7Ffb◊fW&ñfñ6FñˆÁ2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í”∞¢Fá&˜rÊWrW'&˜"ÜVÊWáV7FVB&˜WFRG∑W&«÷ì∞¢““ì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁW&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2rbb6∆¬ÊñÊóBÊ7&VFVÁFñ«2””“w6÷R÷˜&ñvñ‚ríì∞¢6ˆÁ7B6&B“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁCÚÁ7F'G5vóFÇÇtîB≠≠=›-¢ríì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬tîB≠≠=›-¢÷”F”Ü÷rì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥%“ÁFWáD6ˆÁFVÁB¬}	˝ç}ç›¢«67&óCÁVÁ6fS¬˜67&óC‚rì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥%“ÁFtÊ÷R¬wrì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬F÷ñÁ26‚&WfñWr'V∆R÷&6VBÊ«ó7B7VvvW7FñˆÁ2vóFÇ6fRFWáB&VÊFW&ñÊrr¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì≤6ˆÁ7B6∆«2“µ”≤∆WBVÊFñÊr“G'VS∞¢6ˆÁ7BñFVñB“vrÁ&WVBÉcBì∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤ñC¢vF÷ñ‚÷r¬&ˆ∆S¢w66Üˆˆ≈ˆF÷ñ‚r““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆvVÁB÷F6Ü&ˆ&Brí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¿¢&W˜'C¢≤7V÷÷'ì¢s«67&óCÁ7V÷÷'ì¬˜67&óC‚r¬vVÊW&FVEˆC¢s##b””ECc££¢r“¿¢ñFV3¢VÊFñÊrÚ∑≤ñC¢ñFVñB¬FóF∆S¢s«67&óCÊñFV¬˜67&óC‚r¬7V÷÷'ì¢}
+ç›-]-ç}]≠ÌR˝]MΩÌm]›çRr¬WfñFVÊ6U˜7V÷÷'ì¢}
+-ÌΩÕ≠‚=]=çÌ-››ΩR˝Ì≠}-]ΩÇ‚r’“¢µ““í”∞¢ñbáW&¬””“ˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆvVÁB÷ñFV2ÚG∂ñFVñG÷í≤VÊFñÊr“f«6S≤&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR“í”≤–¢&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ“¬∆ñ6FñˆÁ3¢µ“¬&WVW7G3¢µ“¬7W7VÁ6ñˆÁ3¢µ“¬F&vWG3¢µ“¬&W˜'G3¢µ“¬÷W76vW3¢µ““í”∞¢““ì∞¢6ˆÁ7B6&B“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁB””“}	]m]M›]-›Ú-ÌM≠Ç˝]MΩÌm]›çÚ˝ÌÕÌù›ç≠Ì"rì∞¢76W'BÊˆ≤Ü6&B¬w66Üˆˆ¬Ê«ó7BF6Ü&ˆ&B6Ü˜V∆B&R&VÊFW&VBñ‚FÜR÷ˆFW&Fñˆ‚VWVRrì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}	]m]M›]-›Ú-ÌM≠Ç˝]MΩÌm]›çÚ˝ÌÕÌù›ç≠Ì"rì∞¢76W'BÊWV¬Ü6&BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬s«67&óCÁ7V÷÷'ì¬˜67&óC‚rì∞¢6ˆÁ7BñFV“6&BÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“ÁFtÊ÷R””“v'Fñ6∆Rrì∞¢76W'BÊWV¬ÜñFVÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬s«67&óCÊñFV¬˜67&óC‚rì∞¢6ˆÁ7B7FñˆÁ2“ñFVÊ6Üñ∆G&V‚ÊBÇ”íÊ6Üñ∆G&V„∞¢76W'BÊFVWWV¬Ü7FñˆÁ2Ê÷ÜóFV“”‚óFV“ÁFWáD6ˆÁFVÁBí¬≤}	˝ç›˝-¬¢Ì-Rr¬}	Ì-≠ΩÌ›ç-¬u“ì∞¢vóB7FñˆÁ5≥“Ê∆ó7FVÊW'2Ê6∆ñ6≤Çì∞¢6ˆÁ7B&WfñWr“6∆«2ÊfñÊBÜ6∆¬”‚6∆¬ÁW&¬””“ˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆvVÁB÷ñFV2ÚG∂ñFVñG÷ì∞¢76W'BÊWV¬á&WfñWrÊñÊóBÊ÷WFÜˆB¬uD4Çrì∞¢76W'BÊFVWWV¬Ñ•4Ù‚Á'6Rá&WfñWrÊñÊóBÊ&ˆGíí¬≤FV6ó6ñˆ„¢v&˜fRr“ì∞¢76W'BÊWV¬áVÊFñÊr¬f«6Rì∞¢76W'BÊWV¬ÜbÁ7FGW2ÁFWáD6ˆÁFVÁB¬}	˝]MΩÌm]›çR˝ÌÕÌù›ç≠˝ç›˝-‚¢Ì-R‚rì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬F÷ñÁ26VRˆÊ«í∆∆˜v∆ó7FVBvw&VvFRFV6ÜÊñ6¬∆W'G2&VÊFW&VB2FWáBr¬7ñÊ2Çí”‚∞¢6ˆÁ7Bb“fóáGW&RÇì≤6ˆÁ7B6∆«2“µ”∞¢vóBñÊóFñ∆ó¶T∆ó7FñÊt÷ˆFW&Fñˆ‚á≤‚‚Êb¬fWF6Ññ◊√¢7ñÊ2áW&¬¬ñÊóB“∑“í”‚∞¢6∆«2ÁW6Çá≤W&¬¬ñÊóB“ì∞¢ñbáW&¬””“rˆí˜cˆ÷Rrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&ˆfñ∆S¢≤ñC¢vF÷ñ‚÷r¬&ˆ∆S¢w66Üˆˆ≈ˆF÷ñ‚r““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜FV6ÜÊñ6¬÷∆W'G2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬FñvW7C¢∞¢FñvW7E˜6∆˜C¢s##b””UC#£r¬vVÊW&FVEˆC¢s##b””UC#££¢r¿¢7V÷÷'ì¢s«67&óCÁVÁ6fS¬˜67&óC‚r¬÷WG&ñ73¢≤F˜F≈ˆWfVÁG5Û#FÉ¢2¬WfVÁG5ˆ∆7EˆÜ˜W#¢¬WfVÁG3¢µ““¿¢“¬∆W'G3¢∞¢≤WfVÁEˆ6ˆFS¢vFF&6U˜&WVW7Eˆfñ∆VBr¬vUˆ&V¢vFF&6Rr¬WfVÁEˆ6˜VÁC¢2¬6WfW&óGì¢v7&óFñ6¬r¬Ü˜W%ˆ'V6∂WC¢s##b””UC#££¢r“¿¢≤WfVÁEˆ6ˆFS¢wVÊÜÊF∆VE˜&V¶V7Fñˆ‚r¬vUˆ&V¢v˜FÜW"r¬WfVÁEˆ6˜VÁC¢¬6WfW&óGì¢wv&ÊñÊrr¬Ü˜W%ˆ'V6∂WC¢s##b””UC#££¢r“¿¢≤WfVÁEˆ6ˆFS¢s«67&óCÁÉ¬˜67&óC‚r¬vUˆ&V¢v˜FÜW"r¬WfVÁEˆ6˜VÁC¢ììí¬6WfW&óGì¢v7&óFñ6¬r¬Ü˜W%ˆ'V6∂WC¢s##b””UC#££¢r“¿¢““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆ˜fW'fñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¿¢W6W'3¢∑≤ñC¢s””C”É”r¬&ˆ∆S¢w7GVFVÁBr’“¿¢∆ó7FñÊw3¢∑≤ñC¢s#######"”###"”C##"”É##"”###########"r¬7FGW3¢v7FófRr“¬≤ñC¢s33333332”3332”C332”É332”333333333332r¬7FGW3¢wVÊFñÊrr’“¿¢FV∆WFñˆÂ˜&WVW7G3¢µ“¬7W7VÁ6ñˆÁ3¢µ“¬VFóC¢∑≤7Fñˆ„¢v∆ó7FñÊuˆFV∆WFVBr¬7&VFVEˆC¢s##b””UC#££¢r¬7F˜#¢s«VÁ6fS‚r’““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜6fWGí◊&W˜'G2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&W˜'G3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆ÷W76vW2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬÷W76vW3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚ˆvVÁB÷F6Ü&ˆ&Brí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&W˜'C¢ÁV∆¬¬ñFV3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆ∆ó7FñÊw2ˆ÷ˆFW&Fñˆ‚rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ó7FñÊw3¢µ““í”∞¢ñbáW&¬””“rˆí˜cˆWfVÁB◊&Vvó7G&FñˆÁ2˜&WfñWrrí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬∆ñ6FñˆÁ3¢µ““í”∞¢ñbáW&¬ÊVÊG5vóFÇÇr˜&WfñWrríí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬&WVW7G3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬7W7VÁ6ñˆÁ3¢µ““í”∞¢ñbáW&¬””“rˆí˜c˜7W7VÁ6ñˆÁ2˜F&vWG2r«¬W&¬””“rˆí˜c˜&ˆ∆R÷÷ÊvV÷VÁB˜F&vWG2rí&WGW&‚≤ˆ≥¢G'VR¬ß6ˆ„¢7ñÊ2Çí”‚á≤ˆ≥¢G'VR¬F&vWG3¢µ““í”∞¢Fá&˜rÊWrW'&˜"ÜVÊWáV7FVB&˜WFRG∑W&«÷ì∞¢““ì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁW&¬””“rˆí˜c˜66Üˆˆ¬ˆF÷ñ‚˜FV6ÜÊñ6¬÷∆W'G2rbb6∆¬ÊñÊóBÊ7&VFVÁFñ«2””“w6÷R÷˜&ñvñ‚ríì∞¢6ˆÁ7BÊV¬“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁB””“}
+-]]›ç}]≠çR˝]M=˝]mM]›çÚd“}=-≠Çrì∞¢76W'BÊˆ≤áÊV¬ì∞¢76W'BÊWV¬áÊV¬Ê6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}	ÌùçR}-}ç≠ÇÌççÌ¢ù-‚	"›çR›]"-]≠-ÌççÌ¢çΩÇ-]M]›çíÌ≠≠=›-R‚rì∞¢76W'BÊWV¬áÊV¬Ê6Üñ∆G&VÂ≥5“ÁFWáD6ˆÁFVÁB¬s«67&óCÁVÁ6fS¬˜67&óC‚r¬vFñvW7B7V÷÷'íó2&VÊFW&VB2ñÊW'BFWáBrì∞¢6ˆÁ7B∆W'B“ÊV¬Ê6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“ÁFtÊ÷R””“v'Fñ6∆Rrì∞¢76W'BÊWV¬Ü∆W'BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}	≠ç-ç}]≠çíÌí+r	Ìçç≠}≤M››ΩRrì∞¢76W'BÊWV¬Ü∆W'BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}
+}M]≥¢}M››ΩR+r
+ÌΩ-çí}}¢2rì∞¢6ˆÁ7B&V¶V7Fñˆ‰∆W'B“ÊV¬Ê6Üñ∆G&V‚Êfñ«FW"ÜóFV“”‚óFV“ÁFtÊ÷R””“v'Fñ6∆Rrï≥”∞¢76W'BÊWV¬á&V¶V7Fñˆ‰∆W'BÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}	˝]M=˝]mM]›çR+r
+ÌíMÌ›Ì-ÌíÌ˝]mçÇrì∞¢76W'BÊWV¬áÊV¬Ê6Üñ∆G&V‚Á6ˆ÷RÜóFV“”‚óFV“ÁFtÊ÷R””“w67&óBrí¬f«6R¬wVÁG'W7FVBFñvW7BFWáBFˆW2Ê˜B7&VFR÷&∑Wrì∞¢6ˆÁ7B˜fW'fñWr“bÁVWVRÊ6Üñ∆G&V‚ÊfñÊBÜóFV“”‚óFV“Ê6Üñ∆G&V„ÚÂ≥”ÚÁFWáD6ˆÁFVÁB””“}	Ì}Ìç≠ÌΩ≤rì∞¢76W'BÊˆ≤Ü˜fW'fñWrì∞¢76W'BÊWV¬Ü˜fW'fñWrÊ6Üñ∆G&VÂ≥“ÁFWáD6ˆÁFVÁB¬}	"-ΩÌ≠S¢≠-ç-›ΩR˝ÌMçΩ]í(	B¬≠-ç-›ΩR˝=Ωç≠mçí(	B¬ÌmçMÌ"˝Ì-]≠Ç(	B¬}˝-Ì¢›=MΩ]›çR(	B¬Ì=›ç}]›çí(	B‚rì∞¢76W'BÊ÷F6ÇÜ˜fW'fñWrÊ6Üñ∆G&VÂ≥%“ÁFWáD6ˆÁFVÁB¬˝˝ÌΩ]¯Î´hëÈÏ∂ªßq´^wion: 'reject' });
 });
 
 test('only school admins see profile access requests and approve them as students', async () => {
@@ -399,7 +48,10 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
+    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{
+      request_id: id, requested_role: 'school_admin', status: state, account_code: '123ABC',
+      applicant_name: '<unsafe applicant>', class_name: '8–ê', review_started_by_me: state === 'reviewing',
+    }] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
     if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
     if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
@@ -407,6 +59,9 @@ test('school role request review is claimed before only its reviewer can decide'
     return { ok: true, json: async () => ({ ok: true }) };
   } });
   let card = f.queue.children.find(item => item.children?.[0]?.textContent?.startsWith('–ó–∞–ø—Ä–æ—Å:'));
+  assert.equal(card.children[1].textContent, '<unsafe applicant> ¬∑ –∫–ª–∞—Å—Å 8–ê ¬∑ –∞–∫–∫–∞—É–Ω—Ç #123ABC');
+  assert.equal(card.children[1].tagName, 'p', 'the applicant name is rendered in a text-only paragraph');
+  assert.equal(card.children[1].children.length, 0, 'untrusted profile text is never interpreted as markup');
   let actions = card.children.at(-1).children;
   assert.deepEqual(actions.map(button => button.textContent), ['–ù–∞—á–∞—Ç—å —Ä–∞—Å—Å–º–æ—Ç—Ä–µ–Ω–∏–µ']);
   await actions[0].listeners.click();
