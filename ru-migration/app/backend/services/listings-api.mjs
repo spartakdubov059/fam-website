@@ -301,6 +301,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       }
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       let input;
       try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }

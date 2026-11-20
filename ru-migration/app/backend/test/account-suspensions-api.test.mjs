@@ -14,7 +14,7 @@ function api({ authenticatedAt = Math.floor(Date.now() / 1000), stepUpConfirmedA
   return createListingsApi({
     authenticate: async () => ({ issuer: 'https://issuer.test', subject: 'admin', authenticated_at: authenticatedAt, step_up_confirmed_at: stepUpConfirmedAt }),
     resolveActor: async () => role ? ({ ...admin, role }) : null,
-    repository,
+    repository: { getActiveAccountSuspension: async () => null, ...repository },
   });
 }
 
@@ -32,6 +32,26 @@ test('suspension issue and lift require fresh authentication and delegate only s
   const lifted = await handler(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'lift' }));
   assert.deepEqual(lifted, { status: 200, body: { ok: true, status: 'lifted' } });
   assert.deepEqual(calls[1], ['lift', { schoolId: 'school-a', targetId, actorId: admin.id }]);
+});
+
+test('a suspended administrator cannot issue or lift another account suspension', async () => {
+  let mutations = 0;
+  const handler = api({ repository: {
+    getActiveAccountSuspension: async (schoolId, userId) => {
+      assert.equal(schoolId, admin.school_id);
+      assert.equal(userId, admin.id);
+      return { reason: 'synthetic restriction', expires_at: '2099-01-01T00:00:00Z' };
+    },
+    issueAccountSuspension: async () => { mutations++; return { ok: true }; },
+    liftAccountSuspension: async () => { mutations++; return true; },
+  } });
+  const issue = await handler(request('PATCH', `/api/v1/suspensions/${targetId}`, {
+    action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.',
+  }));
+  const lift = await handler(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'lift' }));
+  assert.deepEqual(issue, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(lift, issue);
+  assert.equal(mutations, 0);
 });
 
 test('stale authentication, other roles, self action, invalid duration and contact details are rejected', async () => {
