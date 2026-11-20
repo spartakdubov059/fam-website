@@ -555,6 +555,23 @@ test('listing submissions enforce a durable per-user hourly quota before inserti
   assert.equal(count, 5);
 });
 
+test('idea submissions enforce the upstream five-per-hour durable quota', async () => {
+  let count = 0;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('SELECT submission_count FROM fam_submission_quotas')) return count ? [[{ submission_count: count }]] : [[]];
+    if (text.includes('UPSERT INTO fam_submission_quotas')) { count = values.find(Number.isInteger); return [[]]; }
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const idea = { user_id: 'synthetic-user', school_id: 'synthetic-school', text: 'Идея',
+    ai_status: 'pending', ai_summary: '', ai_reason: '', admin_status: 'new' };
+  for (let index = 0; index < 5; index++) assert.ok((await repo.createIdea(idea)).id);
+  assert.deepEqual(await repo.createIdea(idea), { ok: false, code: 'rate_limited' });
+  assert.equal(count, 5);
+});
+
 test('photo listing creation atomically links only a fresh pending upload owned by the listing author', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
