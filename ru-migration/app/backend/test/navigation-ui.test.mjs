@@ -54,6 +54,7 @@ test('mobile favorites navigation selects the saved-only board view', () => {
   initializeNavigation({ document: f.document });
   f.buttons[2].listeners.click();
   assert.equal(f.document.favoriteClicked, 1);
+  assert.equal(f.nodes.get('publicListings').getAttribute('data-ru-board-view'), 'favorites');
   assert.deepEqual(f.nodes.get('publicListings').scrolled, { behavior: 'smooth', block: 'start' });
   assert.equal(f.buttons[2].getAttribute('aria-pressed'), 'true');
 });
