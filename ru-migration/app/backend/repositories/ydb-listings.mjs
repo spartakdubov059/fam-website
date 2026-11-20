@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function consumeSubmissionQuota(tx, userId, action, limit) {
-  const hour = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
+async function consumeSubmissionQuota(tx, userId, action, limit, windowMs = 3_600_000) {
+  const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
   const rows = await tx`SELECT submission_count FROM fam_submission_quotas
-    WHERE user_id = ${userId} AND action = ${action} AND window_start = ${hour} LIMIT 1;`;
+    WHERE user_id = ${userId} AND action = ${action} AND window_start = ${windowStart} LIMIT 1;`;
   const current = Number(rows?.[0]?.[0]?.submission_count ?? 0);
   if (!Number.isSafeInteger(current) || current < 0 || current >= limit) {
     return false;
   }
   await tx`UPSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
-    VALUES (${userId}, ${action}, ${hour}, Unwrap(CAST(${current + 1} AS Uint32)));`;
+    VALUES (${userId}, ${action}, ${windowStart}, Unwrap(CAST(${current + 1} AS Uint32)));`;
   return true;
 }
 
@@ -1227,21 +1227,24 @@ export function createYdbListingsRepository(sql) {
       if (!record || !record.sender_id || !record.receiver_id || !record.school_id
           || typeof record.body !== 'string' || !record.body.trim() || record.body.length > 1000
           || record.sender_id === record.receiver_id) throw new TypeError('invalid message');
-      const recipient = sql`SELECT user_id AS user_id FROM fam_user_profiles
-        WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
-      if (typeof recipient?.on === 'function') recipient.on('error', () => {});
-      const recipients = await recipient;
-      if (!(recipients?.[0] ?? []).length) {
-        const error = new Error('recipient unavailable');
-        error.code = 'recipient_unavailable';
-        throw error;
-      }
       const id = randomUUID();
-      const statement = sql`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
-        VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, false, CurrentUtcTimestamp());`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      await statement;
-      return { id };
+      return sql.begin(async tx => {
+        const recipients = await tx`SELECT user_id AS user_id FROM fam_user_profiles
+          WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
+        if (!(recipients?.[0] ?? []).length) {
+          const error = new Error('recipient unavailable');
+          error.code = 'recipient_unavailable';
+          throw error;
+        }
+        if (!await consumeSubmissionQuota(tx, record.sender_id, 'message', 8, 60_000)) {
+          const error = new Error('message rate limit');
+          error.code = 'rate_limited';
+          throw error;
+        }
+        await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
+          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, false, CurrentUtcTimestamp());`;
+        return { id };
+      });
     },
 
     async createPendingMessage(record) {
