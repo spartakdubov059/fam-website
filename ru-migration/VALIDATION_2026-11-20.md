@@ -13,3 +13,12 @@
 
 Это не облачный Yandex Cloud staging и не проверка production credentials. На 2026-11-20 доступность бесплатных Yandex Cloud ресурсов с жёстким пределом 0 ₽ не подтверждена; облачные ресурсы не создавались. Полный перенос исходных функций FAM, независимая полная security-проверка и staging QA остаются незавершёнными. Реальные данные не использовались. Pull request и развёртывание не создавались.
 
+
+## Проверка подтверждения Yandex ID (20 ноября 2026)
+
+- Код закреплён коммитом [047a5e1](https://github.com/spartakdubov059/fam-website/commit/047a5e1d844034705b212a4c0533fb6b8a999d59) в ветке migration/yandex-cloud. Обычная Yandex OAuth-сессия больше не выдаёт время создания приложения за время повторной аутентификации. Только OAuth flow с подписанным state reauth=1 добавляет отдельную отметку явного подтверждения; она проверяется для удаления аккаунта/публикации, отзыва роли и ограничения аккаунта.
+- На официальном Node 22.23.5: npm ci, npm test — 300/300, npm audit — 0 уязвимостей; git diff --check — чисто.
+- [SDK/Sharp CI, run 44641934637](https://github.com/spartakdubov059/fam-website/actions/runs/44641934637) — PASS: установка pinned зависимостей, backend suite, systemd и native Sharp/WebP.
+- [Disposable YDB CI, run 44641934710](https://github.com/spartakdubov059/fam-website/actions/runs/44641934710) — PASS: схема и synthetic integration; временная база удалена.
+- Это не российский облачный staging. Полный security scan остаётся незавершённым: Codex Security не завершил проверку ветки из-за ошибок/тайм-аута. Реальные данные учеников, main, production и платные ресурсы не затрагивались.
+
