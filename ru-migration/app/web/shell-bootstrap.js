@@ -43,6 +43,7 @@ window.onunhandledrejection = function() {
           <label>Название<input name="title" maxlength="80" required></label>
           <label>Описание<textarea name="description" maxlength="1000" required></textarea></label>
           <label>Категория<select name="category" required><option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия">Мероприятия</option></select></label>
+          <p id="ruCategoryHint" class="ru-category-hint" role="status" aria-live="polite">Начните вводить название и описание — FAM подскажет подходящую категорию.</p>
           <label>Цена в рублях<input name="price_text" maxlength="50" placeholder="Бесплатно"></label>
           <label>Фото (необязательно)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
           <p class="ru-note">Не загружайте лица, документы, пропуска и контактные данные. Фото останется закрытым до проверки модератором школы.</p>
@@ -121,6 +122,10 @@ window.onunhandledrejection = function() {
     submitScript.type = 'module';
     submitScript.src = '/listing-submit.js';
     document.body.append(submitScript);
+    const categoryHintsScript = document.createElement('script');
+    categoryHintsScript.type = 'module';
+    categoryHintsScript.src = '/category-hints.js';
+    document.body.append(categoryHintsScript);
     const moderationScript = document.createElement('script');
     moderationScript.type = 'module';
     moderationScript.src = '/listing-moderation.js';
