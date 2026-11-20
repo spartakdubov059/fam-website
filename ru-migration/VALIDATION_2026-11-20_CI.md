@@ -241,3 +241,10 @@
 - Интеграционный тест запускает вместе карусель и школьную ленту, проверяет рост точек навигации с двух до четырёх после загрузки карточек и делает синтетическое голосование по перемещённой карточке.
 - Точные GitHub push runs для коммита завершились успешно: [SDK/Sharp CI #44810006681](https://github.com/spartakdubov059/fam-website/actions/runs/44810006681) и [локальная YDB integration #44810006708](https://github.com/spartakdubov059/fam-website/actions/runs/44810006708). Они используют CI compatibility и disposable YDB; это не облачный Yandex Cloud staging.
 - `main` и production не менялись; synthetic-only сценарии, реальные данные и платные облачные ресурсы не использовались.
+
+## Управляемая автопрокрутка карусели — 20 ноября 2026
+
+- Коммит [a82a11c](https://github.com/spartakdubov059/fam-website/commit/a82a11ce9329a0de72a97aa724a8f53b90437eb3) переносит autoplay исходной главной карусели с доступной кнопкой «Пауза»/«Автопрокрутка». Вращение идёт каждые 4,2 секунды, останавливается при клавиатурном фокусе и наведении, при скрытой вкладке ставится на паузу; при `prefers-reduced-motion` не запускается автоматически. Это следует [WAI-ARIA APG carousel pattern](https://www.w3.org/WAI/ARIA/apg/patterns/carousel/).
+- Полный локальный backend/UI suite: **392/392**; `ru-migration/compat/verify.mjs` прошёл. Тесты используют поддельный timer API и не ждут реальное время.
+- Точные GitHub push runs завершились успешно: [SDK/Sharp CI #44811673106](https://github.com/spartakdubov059/fam-website/actions/runs/44811673106) и [Disposable YDB integration #44811672840](https://github.com/spartakdubov059/fam-website/actions/runs/44811672840). Облачный Yandex Cloud не вызывался.
+- Ветка `main`, production, реальные данные и платные ресурсы не затронуты.
