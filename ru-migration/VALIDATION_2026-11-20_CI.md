@@ -1,5 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Перенос безопасного coder producer в feature branch
+
+- Коммит [`f611526`](https://github.com/spartakdubov059/fam-website/commit/f6115268a5d914c5f79970a0e42a99e184a2f00b) добавил RU producer для постановки ручной проверки только по агрегированным allowlisted событиям. Модель и инструменты не запускаются; задача не входит в автоматический allowlist worker.
+- Коммит [`88a63bc`](https://github.com/spartakdubov059/fam-website/commit/88a63bc5e39853ff95ba6a83610b430485f1bad4) добавил synthetic YDB сценарий порога и идемпотентности. [Disposable YDB CI #44701308296](https://github.com/spartakdubov059/fam-website/actions/runs/44701308296) и [SDK/Sharp CI #44701308311](https://github.com/spartakdubov059/fam-website/actions/runs/44701308311) завершились успешно. Локально: 331/331 backend-тестов, SDK compat verifier и portable timer validation прошли.
+- При подготовке интеграционного сценария первоначальная загрузка большого файла была обрезана и CI корректно упал на синтаксической ошибке. Файл восстановлен из локального Git blob с проверкой SHA; успешный CI выше выполнен уже на полном файле.
+- Изменения только в `codex/fam-ru-offline-safety-review`. `main` и `migration/yandex-cloud` не менялись. YDB была одноразовой локальной базой GitHub CI, не российским облачным staging.
+
 ## Актуальная проверка веток и CI (20 ноября 2026)
 
 - На кодовом commit [`0d3be3a`](https://github.com/spartakdubov059/fam-website/commit/0d3be3a5a5b5ea0466340b1e794cff75babed647) оба workflow повторно завершились успешно: [SDK/Sharp CI #44690234889](https://github.com/spartakdubov059/fam-website/actions/runs/44690234889) — `327/327` backend-тестов, pinned SDK/Sharp и systemd timers; [YDB CI #44690234948](https://github.com/spartakdubov059/fam-website/actions/runs/44690234948) — схемы 01–32 и synthetic integration, включая две конкурентные постановки одной задачи (создаётся одна запись) и два конкурентных worker захвата (один lease). CI использовал только временную локальную тестовую YDB.
