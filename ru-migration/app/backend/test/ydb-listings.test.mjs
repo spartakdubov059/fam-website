@@ -745,7 +745,7 @@ test('message repository verifies same-school active recipient before inserting 
   assert.ok(calls.some(call => call.values.includes('Привет')));
   const quotaRead = calls.find(call => call.text.includes('SELECT submission_count FROM fam_submission_quotas'));
   assert.ok(quotaRead.values.includes('message'));
-  assert.equal(quotaRead.values.at(-1).getTime() % 60_000, 0, 'message quota uses a UTC minute bucket');
+  assert.match(quotaRead.text, /window_start > CurrentUtcTimestamp\(\) - Interval\('PT1M'\)/, 'message quota rolls from the last message');
 
   let inserts = 0;
   const absentSql = strings => {
@@ -760,22 +760,26 @@ test('message repository verifies same-school active recipient before inserting 
   assert.equal(inserts, 0);
 });
 
-test('directly delivered messages enforce an eight-per-minute durable account quota', async () => {
+test('directly delivered messages enforce a rolling eight-per-minute durable account quota', async () => {
   const statements = [];
   let count = 0;
+  let now = Date.now();
   const sql = (strings, ...values) => {
     const text = strings.join('?');
     statements.push({ text, values });
     if (text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
     if (text.includes('SELECT submission_count FROM fam_submission_quotas')) {
-      return Promise.resolve(count ? [[{ submission_count: count }]] : [[]]);
+      return Promise.resolve(now - lastSentAt < 60_000 && count ? [[{ submission_count: count }]] : [[]]);
     }
+    if (text.includes('DELETE FROM fam_submission_quotas')) { count = 0; return Promise.resolve([[]]); }
     if (text.includes('UPSERT INTO fam_submission_quotas')) {
       count = values.find(Number.isInteger);
+      lastSentAt = now;
       return Promise.resolve([[]]);
     }
     return Promise.resolve([[]]);
   };
+  let lastSentAt = 0;
   sql.begin = callback => callback(sql);
   const repo = createYdbListingsRepository(sql);
   for (let index = 0; index < 8; index++) {
@@ -785,6 +789,10 @@ test('directly delivered messages enforce an eight-per-minute durable account qu
   assert.deepEqual(await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
     school_id: 'school-id', body: 'Message 9' }), { ok: false, code: 'rate_limited' });
   assert.equal(statements.filter(statement => statement.text.includes('INSERT INTO fam_messages')).length, 8);
+  now += 60_001;
+  assert.match((await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
+    school_id: 'school-id', body: 'Message after quiet period' })).id, /^[0-9a-f-]{36}$/);
+  assert.equal(count, 1, 'the counter resets after one minute without sending');
 });
 
 test('message reads bind user and school and return only the bounded projection', async () => {
