@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { createSuspensionWriteGuard } from '../auth/suspension-write-guard.mjs';
+import { createMediaApi } from '../services/media-api.mjs';
 
 const actor = { id: 'student-1', school_id: 'school-1', role: 'student' };
 
@@ -59,4 +61,53 @@ test('self account deletion remains available to a suspended user', async () => 
   });
   assert.equal(reached, true);
   assert.equal(result.status, 200);
+});
+
+test('mounted suspension guard blocks media uploads, moderation, and pending-image deletion', async () => {
+  let mediaWrites = 0;
+  const repository = {
+    getActiveAccountSuspension: async (schoolId, userId) => {
+      assert.equal(schoolId, 'school-1');
+      assert.equal(userId, 'student-1');
+      return { reason: 'synthetic restriction', expires_at: '2099-01-01T00:00:00Z' };
+    },
+    reserveImageUpload: async () => { mediaWrites++; return true; },
+    registerPendingImage: async () => { mediaWrites++; },
+    moderateListingPhoto: async () => { mediaWrites++; return true; },
+    claimPendingImageDeletion: async () => { mediaWrites++; return 'lease'; },
+    finishPendingImageCleanup: async () => { mediaWrites++; return true; },
+  };
+  const mediaApi = createMediaApi({
+    authenticate: async () => ({ issuer: 'issuer', subject: 'student' }),
+    resolveActor: async () => actor,
+    repository,
+    pendingImages: {
+      put: async () => { mediaWrites++; return { key: 'pending/student-1/image.webp', contentType: 'image/webp', bytes: 1 }; },
+      delete: async () => { mediaWrites++; },
+    },
+  });
+  const guarded = createSuspensionWriteGuard({
+    authenticate: async () => ({ issuer: 'issuer', subject: 'student' }),
+    resolveActor: async () => actor,
+    repository,
+  })(mediaApi);
+  const request = (method, url) => {
+    const req = Readable.from([]);
+    req.method = method;
+    req.url = url;
+    req.headers = { 'content-type': 'image/png' };
+    return req;
+  };
+  const paths = [
+    ['POST', '/api/v1/media/pending'],
+    ['POST', '/api/v1/avatars/media/pending'],
+    ['PATCH', '/api/v1/listings/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/photos/0/moderation'],
+    ['DELETE', '/api/v1/media/pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
+  ];
+  for (const [method, url] of paths) {
+    const result = await guarded(request(method, url));
+    assert.equal(result.status, 403, url);
+    assert.equal(result.body.error, 'account_suspended', url);
+  }
+  assert.equal(mediaWrites, 0);
 });
