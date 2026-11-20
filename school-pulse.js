@@ -32,7 +32,8 @@
           (openEvent&&eventTime?'<span class="pulse-event-clock"> · '+escapeHtml(eventTime)+'</span>':'')+'</span></div>'+
       '<h3>'+escapeHtml(clamp(item?.title,90))+'</h3>'+
       '<p>'+escapeHtml(clamp(item?.body,450))+'</p>'+
-      (openEvent?'<div class="pulse-open-foot"><span class="pulse-open-label"><span class="pulse-open-dot" aria-hidden="true"></span>Без записи · Нет лимита мест</span>'+
+      (openEvent?'<div class="pulse-open-foot"><span class="pulse-open-label"><span class="pulse-open-dot" aria-hidden="true"></span>'+
+        (Number(item?.max_seats||0)>0?'Регистрация · до '+escapeHtml(item.max_seats)+' мест':'Без записи · Без лимита мест')+'</span>'+
         '</div>':'')+'</article>';
   }
   function pollCard(poll){
