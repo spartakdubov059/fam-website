@@ -5,6 +5,7 @@ const IMAGE_KEY = new RegExp(`^pending/${UUID}/${UUID}\\.webp$`, 'i');
 export function createAccountDeletionRecoveryOperation({ repository, pendingImages } = {}) {
   if (typeof repository?.claimIncompleteAccountDeletions !== 'function'
       || typeof repository?.finishAccountDeletion !== 'function'
+      || typeof repository?.listAccountMediaKeys !== 'function'
       || typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') return null;
   return (limit = 10) => recoverIncompleteAccountDeletions({ repository, pendingImages, limit });
 }
@@ -22,7 +23,11 @@ export async function recoverIncompleteAccountDeletions({ repository, pendingIma
       continue;
     }
     try {
-      const keys = await pendingImages.listUserObjects(job.user_id);
+      const ownedKeys = await repository.listAccountMediaKeys(job.user_id);
+      if (!Array.isArray(ownedKeys)) throw new Error('invalid_storage_inventory');
+      const keys = typeof pendingImages.listAccountObjects === 'function'
+        ? await pendingImages.listAccountObjects(job.user_id, ownedKeys)
+        : await pendingImages.listUserObjects(job.user_id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
           || key.split('/')[1].toLowerCase() !== job.user_id.toLowerCase())) throw new Error('invalid_storage_inventory');
       for (const key of new Set(keys)) await pendingImages.delete(key);
