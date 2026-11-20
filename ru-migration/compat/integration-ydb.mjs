@@ -574,6 +574,29 @@ try {
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
   assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
     .filter(row => row.event_id === limitedEvent.id).map(row => row.status), ['cancelled']);
+  const cancelledOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school'));
+  assert.deepEqual(cancelledOccupancy, { status: 200, body: { ok: true, taken: 0 } },
+    'public occupancy is available while its event is active');
+  const reRegistration = await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
+  assert.equal(reRegistration.status, 'confirmed', 'a cancelled registration can be created again');
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
+  const cancelRegisterRace = await Promise.allSettled([
+    repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
+    repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
+  ]);
+  assert.ok(cancelRegisterRace.some(result => result.status === 'fulfilled'), 'at least one serialized race operation completes');
+  const registrationAfterRace = await sql`SELECT status FROM fam_event_registrations
+    WHERE event_id = ${limitedEvent.id} AND user_id = '11111111-1111-4111-8111-111111111111' LIMIT 1;`;
+  if (registrationAfterRace?.[0]?.[0]?.status === 'cancelled') {
+    await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
+  }
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
+    'cancellation and re-registration remain consistent under a concurrent race');
+  await sql`UPDATE fam_listings SET status = 'rejected' WHERE id = ${limitedEvent.id};`;
+  const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school'));
+  assert.deepEqual(hiddenOccupancy, { status: 404, body: { ok: false, error: 'event_unavailable' } },
+    'occupancy is hidden after the event is no longer active');
+  await sql`UPDATE fam_listings SET status = 'active' WHERE id = ${limitedEvent.id};`;
   const concurrentEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическое мероприятие для гонки за местом', description: 'Параллельная проверка вместимости', category: 'Афиша',
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
