@@ -3029,15 +3029,15 @@ window.onunhandledrejection = function() {
       (curCat==="Все" || l.category===curCat) &&
       ((l.title || '').toLowerCase().includes(search) || (l.description && l.description.toLowerCase().includes(search)))
     );
-    let html = filtered.map((l, i) => listingCard(l, i)).join("");
-    if(curCat==="Мероприятия"&&schoolPulse?.getAfishaMarkup) html+=schoolPulse.getAfishaMarkup(search);
+    const afishaMarkup=curCat==="Мероприятия"&&schoolPulse?.getAfishaMarkup?schoolPulse.getAfishaMarkup(search):"";
+    let html = filtered.map((l, i) => listingCard(l, i)).join("")+afishaMarkup;
     html += `<div class="promo-card" data-action="open-listing"><span class="promo-gift">🎁</span><div class="promo-script">Размести объявление <b>бесплатно!</b></div><button class="promo-cta">Создать ${ARROW}</button></div>`;
     const loadError = listingsLoadFailed
       ? '<div role="alert" style="grid-column:1/-1;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);">'
         + 'Не удалось обновить объявления. Проверьте подключение. Ранее загруженные объявления сохранены. '
         + '<button type="button" class="button button-small" id="retryListingsLoad">Повторить</button></div>'
       : '';
-    grid.innerHTML = loadError + (filtered.length ? html : (listingsLoadFailed ? '' : '<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">Ничего не найдено 🔍</p>'));
+    grid.innerHTML = loadError + ((filtered.length||afishaMarkup) ? html : (listingsLoadFailed ? '' : '<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">Ничего не найдено 🔍</p>'));
     if (listingsLoadFailed) {
       grid.querySelector("#retryListingsLoad")?.addEventListener("click", () => { void loadAll(); }, { once: true });
     }
