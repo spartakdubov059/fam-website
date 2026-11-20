@@ -55,7 +55,7 @@ test('poll vote input is bounded and repository enforces school, expiry, and one
   const voted = await handler(request('POST', `/api/v1/pulse/polls/${pollId}/votes`, { choice_index: 1 }));
   assert.equal(voted.status, 201);
   assert.deepEqual(calls, [{ pollId, schoolId: 'school-a', userId: student.id, choiceIndex: 1 }]);
-  assert.equal((await handler(request('POST', `/api/v1/pulse/polls/${pollId}/votes`, { choice_index: 4 }))).status, 400);
+  assert.equal((await handler(request('POST', `/api/v1/pulse/polls/${pollId}/votes`, { choice_index: 8 }))).status, 400);
   const denied = api({ repository: { voteSchoolPoll: async () => ({ ok: false, code: 'already_voted' }) } });
   assert.equal((await denied(request('POST', `/api/v1/pulse/polls/${pollId}/votes`, { choice_index: 0 }))).status, 409);
 });

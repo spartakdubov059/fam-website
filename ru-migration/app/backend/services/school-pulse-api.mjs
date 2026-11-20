@@ -51,7 +51,7 @@ export function createSchoolPulseApi({ authenticate = async () => null, resolveA
       const parsed = await readJson(req, 1024);
       if (parsed.error) return { status: parsed.error === 'request_too_large' ? 413 : 400, body: { ok: false, error: parsed.error } };
       const choiceIndex = parsed.value.choice_index;
-      if (!Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 3) return failure('invalid_choice');
+      if (!Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 7) return failure('invalid_choice');
       if (typeof repository?.voteSchoolPoll !== 'function') return failure('pulse_unavailable');
       try {
         const result = await repository.voteSchoolPoll({ pollId: vote[1], schoolId: actor.school_id, userId: actor.id, choiceIndex });

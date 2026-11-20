@@ -64,7 +64,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     const closes = new Date(poll.closes_at);
     const closed = !Number.isFinite(closes.getTime()) || closes.getTime() <= Date.now();
     const options = node(document, 'div', 'ru-pulse-options');
-    for (const [index, label] of poll.options.slice(0, 4).entries()) {
+    for (const [index, label] of poll.options.slice(0, 8).entries()) {
       if (typeof label !== 'string') continue;
       const option = node(document, 'div', 'ru-pulse-option');
       const vote = node(document, 'button', 'ru-pulse-vote', label); vote.type = 'button';
@@ -122,7 +122,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     const pollForm = document.createElement('form'); pollForm.className = 'ru-pulse-form';
     const question = node(document, 'input'); question.name = 'question'; question.required = true; question.minLength = 8; question.maxLength = 140; question.placeholder = 'Вопрос для опроса';
     const choices = [];
-    for (let index = 0; index < 4; index++) { const choice = node(document, 'input'); choice.name = `option_${index}`; choice.maxLength = 70; choice.required = index < 2; choice.placeholder = `Вариант ${index + 1}`; choices.push(choice); }
+    for (let index = 0; index < 8; index++) { const choice = node(document, 'input'); choice.name = `option_${index}`; choice.maxLength = 70; choice.required = index < 2; choice.placeholder = `Вариант ${index + 1}`; choices.push(choice); }
     const pollStatus = node(document, 'p', 'ru-pulse-form-status', ''); pollStatus.setAttribute('role', 'status');
     const pollSubmit = node(document, 'button', 'ru-button', 'Создать опрос'); pollSubmit.type = 'submit';
     pollForm.append(question, ...choices, pollSubmit, pollStatus);

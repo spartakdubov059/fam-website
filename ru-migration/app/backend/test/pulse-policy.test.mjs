@@ -16,6 +16,9 @@ test('poll policy requires unique safe choices and bounded closing time', () => 
   const valid = validateSchoolPoll({ question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'] }, now);
   assert.equal(valid.ok, true);
   assert.equal(Date.parse(valid.poll.closes_at), now + 7 * 86400000);
+  const expanded = validateSchoolPoll({ question: 'Какой формат выбрать?', options: ['Первый', 'Второй', 'Третий', 'Четвертый', 'Пятый', 'Шестой', 'Седьмой', 'Восьмой'] }, now);
+  assert.equal(expanded.ok, true, 'the source FAM supports up to eight choices');
+  assert.equal(validateSchoolPoll({ question: 'Какой формат выбрать?', options: Array.from({ length: 9 }, (_, index) => `Вариант ${index + 1}`) }, now).ok, false);
   assert.equal(validateSchoolPoll({ question: 'Что выберем?', options: ['Один вариант', ' один вариант '] }, now).code, 'duplicate_poll_options');
   assert.equal(validateSchoolPoll({ question: 'Где встречаемся?', options: ['У школы', 'У дома 12345678901'] }, now).code, 'invalid_poll_options');
   assert.equal(validateSchoolPoll({ question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'], closes_at: '2027-01-20T00:00:00Z' }, now).code, 'invalid_poll_close');

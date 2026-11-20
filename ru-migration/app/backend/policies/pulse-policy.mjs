@@ -30,7 +30,7 @@ export function validateSchoolPoll(input, now = Date.now()) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, code: 'invalid_poll' };
   const question = typeof input.question === 'string' ? input.question.trim() : '';
   if (question.length < 8 || question.length > 140 || !safeText(question) || !Array.isArray(input.options)
-      || input.options.length < 2 || input.options.length > 4) return { ok: false, code: 'invalid_poll' };
+      || input.options.length < 2 || input.options.length > 8) return { ok: false, code: 'invalid_poll' };
   const options = input.options.map(value => typeof value === 'string' ? value.trim() : '');
   if (options.some(value => value.length < 2 || value.length > 70 || !safeText(value))) return { ok: false, code: 'invalid_poll_options' };
   const normalized = options.map(value => value.normalize('NFKC').toLocaleLowerCase('ru'));

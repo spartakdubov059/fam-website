@@ -1646,7 +1646,7 @@ export function createYdbListingsRepository(sql) {
       for (const poll of pollResult?.[0] ?? []) {
         let options;
         try { options = JSON.parse(poll.options_json); } catch { continue; }
-        if (!Array.isArray(options) || options.length < 2 || options.length > 4) continue;
+        if (!Array.isArray(options) || options.length < 2 || options.length > 8) continue;
         const voteQuery = sql`SELECT choice_index, COUNT(*) AS votes FROM fam_school_poll_votes
           WHERE poll_id = ${poll.id} AND school_id = ${schoolId} GROUP BY choice_index;`;
         const myVoteQuery = sql`SELECT choice_index FROM fam_school_poll_votes
@@ -1668,7 +1668,7 @@ export function createYdbListingsRepository(sql) {
     },
 
     async voteSchoolPoll({ pollId, schoolId, userId, choiceIndex }) {
-      if (!pollId || !schoolId || !userId || !Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 3) {
+      if (!pollId || !schoolId || !userId || !Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 7) {
         throw new TypeError('invalid school poll vote');
       }
       return sql.begin(async tx => {

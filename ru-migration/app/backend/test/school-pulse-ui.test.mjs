@@ -21,7 +21,7 @@ test('school feed renders announcements as text and a student can cast one same-
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-a', school_id: 'school-a', role: 'student' } }) };
     if (url === '/api/v1/pulse') return { ok: true, json: async () => ({ ok: true,
       announcements: [{ id: 'notice-a', title: '<img onerror=alert(1)>', body: 'Школьная новость', kind: 'important', published_at: '2027-01-01T10:00:00Z' }],
-      polls: [{ id: 'poll-a', question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'], closes_at: '2099-01-01T00:00:00Z', total_votes: voted ? 1 : 0, my_vote: voted ? 1 : null, counts: null }],
+      polls: [{ id: 'poll-a', question: 'Какую книгу обсудим?', options: ['Первый', 'Второй', 'Третий', 'Четвертый', 'Пятый', 'Шестой', 'Седьмой', 'Восьмой'], closes_at: '2099-01-01T00:00:00Z', total_votes: voted ? 1 : 0, my_vote: voted ? 7 : null, counts: null }],
     }) };
     if (url === '/api/v1/pulse/polls/poll-a/votes') { voted = true; return { ok: true, status: 201, json: async () => ({ ok: true, voted: true }) }; }
     throw new Error(`unexpected URL ${url}`);
@@ -32,10 +32,11 @@ test('school feed renders announcements as text and a student can cast one same-
   assert.equal(notice.children[1].textContent, '<img onerror=alert(1)>');
   assert.equal(notice.children[1].children.length, 0);
   const poll = feed.children[1];
-  const firstVote = poll.children[2].children[0].children[0];
-  await firstVote.listeners.click();
+  assert.equal(poll.children[2].children.length, 8, 'all eight source-compatible choices render');
+  const lastVote = poll.children[2].children[7].children[0];
+  await lastVote.listeners.click();
   assert.equal(calls.find(call => call.url.endsWith('/votes')).init.credentials, 'same-origin');
-  assert.deepEqual(JSON.parse(calls.find(call => call.url.endsWith('/votes')).init.body), { choice_index: 0 });
+  assert.deepEqual(JSON.parse(calls.find(call => call.url.endsWith('/votes')).init.body), { choice_index: 7 });
   const updatedPoll = f.root.children[2].children[1];
   assert.ok(updatedPoll.children[2].children.every(option => option.children[0].disabled), 'a submitted vote is not offered a second time');
 });
@@ -63,6 +64,7 @@ test('school feed is private for guests and publisher controls appear only for t
   } });
   const panel = admin.root.children[2].children.find(node => node.className === 'ru-pulse-publish');
   const form = panel.children[1];
+  assert.equal(panel.children[2].children.length, 11, 'publisher has a question, eight choices, submit and status');
   form.children[0].value = 'Новость школы'; form.children[1].value = 'В пятницу будет собрание';
   await form.listeners.submit({ preventDefault() {} });
   const sent = requests.find(call => call.url === '/api/v1/pulse/announcements');

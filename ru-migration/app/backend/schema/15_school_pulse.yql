@@ -1,4 +1,5 @@
 -- School scoped notices and polls. All actor IDs are supplied by the server.
+-- Poll option count (2..8) and vote index (0..7 plus poll-specific bounds) are enforced by the backend.
 CREATE TABLE fam_school_announcements (
   announcement_id Utf8 NOT NULL,
   school_id Utf8 NOT NULL,

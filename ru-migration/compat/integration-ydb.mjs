@@ -244,7 +244,7 @@ try {
   }));
   assert.equal(pulseAnnouncement.status, 201, JSON.stringify(pulseAnnouncement.body));
   const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
-    question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика'],
+    question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика', 'Приключения', 'Детектив', 'Научная фантастика', 'Поэзия', 'История', 'Другое'],
   }));
   assert.equal(pulsePoll.status, 201);
   const invalidPulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
@@ -258,18 +258,20 @@ try {
   assert.ok(pulseRead.body.polls.some(row => row.id === pulsePoll.body.id));
   const pollVoters = ['synthetic-user', 'synthetic-registrant', 'synthetic-role-student', 'synthetic-admin', 'synthetic-council'];
   for (const [index, token] of pollVoters.entries()) {
-    const vote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, token, { choice_index: index % 2 }));
+    const vote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, token, { choice_index: index === 4 ? 7 : index * 2 }));
     assert.equal(vote.status, 201);
   }  const duplicatePollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-registrant', { choice_index: 0 }));
   assert.equal(duplicatePollVote.status, 409);
+  const invalidUpperPollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-admin', { choice_index: 8 }));
+  assert.equal(invalidUpperPollVote.status, 400);
   const otherSchoolPulse = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-other-school'));
   assert.equal(otherSchoolPulse.status, 200);
   assert.equal(otherSchoolPulse.body.announcements.length, 0, 'school pulse feed cannot cross school boundaries');
   const pulseAfterVotes = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
   const visiblePoll = pulseAfterVotes.body.polls.find(row => row.id === pulsePoll.body.id);
   assert.equal(visiblePoll.total_votes, 5);
-  assert.deepEqual(visiblePoll.counts, [3, 2], 'choice totals appear only after five synthetic votes');
-  assert.equal(visiblePoll.my_vote, 1);
+  assert.deepEqual(visiblePoll.counts, [1, 0, 1, 0, 1, 0, 1, 1], 'eight-choice totals appear only after five synthetic votes');
+  assert.equal(visiblePoll.my_vote, 2);
   const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
     reason: 'Repeated unrelated posts in the school group.',
