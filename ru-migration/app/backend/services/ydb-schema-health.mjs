@@ -1,5 +1,3 @@
-import { identifier } from '@ydbjs/query';
-
 export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_account_deletion_jobs', 'fam_account_deletion_open', 'fam_account_deletion_requests',
   'fam_account_suspension_audit', 'fam_account_suspension_open', 'fam_account_suspensions',
@@ -14,8 +12,9 @@ export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_submission_quotas', 'fam_user_profiles',
 ]);
 
-export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES } = {}) {
+export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES, identifier } = {}) {
   if (typeof sql !== 'function' || !Array.isArray(tables) || !tables.length
+      || typeof identifier !== 'function'
       || tables.some(name => typeof name !== 'string' || !/^fam_[a-z0-9_]+$/.test(name))
       || new Set(tables).size !== tables.length) throw new TypeError('invalid RU schema health configuration');
   return async function checkYdbSchemaHealth() {

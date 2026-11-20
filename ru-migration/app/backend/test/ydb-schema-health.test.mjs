@@ -11,12 +11,12 @@ function fakeSql({ resultSets = REQUIRED_RU_TABLES.map(() => []) } = {}) {
   sql.fragment = (strings, ...values) => ({ strings: [...strings], values });
   sql.identifier = name => ({ identifier: name });
   sql.join = (items, separator) => ({ items, separator });
-  return { sql, calls };
+  return { sql, calls, identifier: name => ({ identifier: name }) };
 }
 
 test('RU schema health checks all required tables with zero-row probes and returns aggregates only', async () => {
-  const { sql, calls } = fakeSql();
-  const result = await createYdbSchemaHealthCheck(sql)();
+  const { sql, calls, identifier } = fakeSql();
+  const result = await createYdbSchemaHealthCheck(sql, { identifier })();
   assert.equal(REQUIRED_RU_TABLES.length, 36);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].values[0].items.length, 36);
@@ -24,18 +24,18 @@ test('RU schema health checks all required tables with zero-row probes and retur
 });
 
 test('RU schema health rejects malformed, duplicate and empty table lists', () => {
-  const { sql } = fakeSql();
+  const { sql, identifier } = fakeSql();
   for (const tables of [[], ['fam_good', 'fam_good'], ['other_table'], ['fam_unsafe-name']]) {
-    assert.throws(() => createYdbSchemaHealthCheck(sql, { tables }), /invalid RU schema health configuration/);
+    assert.throws(() => createYdbSchemaHealthCheck(sql, { tables, identifier }), /invalid RU schema health configuration/);
   }
 });
 
 test('RU schema health propagates YDB errors and rejects incomplete probe results', async () => {
-  const { sql } = fakeSql({ resultSets: [[]] });
-  await assert.rejects(createYdbSchemaHealthCheck(sql)(), /invalid RU schema probe result/);
+  const { sql, identifier } = fakeSql({ resultSets: [[]] });
+  await assert.rejects(createYdbSchemaHealthCheck(sql, { identifier })(), /invalid RU schema probe result/);
   const brokenSql = async () => { throw new Error('synthetic YDB failure'); };
   brokenSql.fragment = (strings, ...values) => ({ strings, values });
   brokenSql.identifier = name => name;
   brokenSql.join = items => items;
-  await assert.rejects(createYdbSchemaHealthCheck(brokenSql)(), /synthetic YDB failure/);
+  await assert.rejects(createYdbSchemaHealthCheck(brokenSql, { identifier })(), /synthetic YDB failure/);
 });
