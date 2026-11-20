@@ -432,6 +432,33 @@ test('direct account deletion requires an active same-school administrator and s
   assert.match(scopedDeactivate.text, /role IN \('student', 'council_member'\)/);
   assert.equal(await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'same-id', targetId: 'same-id' }).then(() => false, () => true), true);
 });
+test('account deletion clears private per-user state and redacts safety attribution atomically', async () => {
+  const calls = [];
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT issuer, subject, school_id, source, actor_id, request_id')) {
+      return [[{ issuer: 'https://issuer.test', subject: 'synthetic', school_id: 'school-a', source: 'self', actor_id: userId,
+        request_id: '', target_role: 'student', review_note: '', lease_valid: true }]];
+    }
+    if (text.includes('SELECT active, school_id FROM fam_user_profiles')) return [[{ active: false, school_id: 'school-a' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const result = await createYdbListingsRepository(sql).finishAccountDeletion({ issuer: 'https://issuer.test', subject: 'synthetic',
+    userId, schoolId: 'school-a', claimToken: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+  assert.deepEqual(result, { ok: true, deleted: true });
+  for (const table of ['fam_avatar_reviews', 'fam_notification_reads', 'fam_submission_quotas']) {
+    const cleanup = calls.find(call => call.text.includes('DELETE FROM ' + table));
+    assert.ok(cleanup, table + ' is cleared');
+    assert.ok(cleanup.values.includes(userId));
+  }
+  const audit = calls.find(call => call.text.includes('UPDATE fam_school_content_audit'));
+  assert.ok(audit); assert.ok(audit.values.includes(userId)); assert.ok(audit.text.includes('deleted-account'));
+  const safety = calls.find(call => call.text.includes('UPDATE fam_safety_incidents'));
+  assert.ok(safety); assert.ok(safety.values.includes(userId));
+  assert.match(safety.text, /evidence_excerpt = CAST\\(NULL AS Utf8\\?\\)/);
+});
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
