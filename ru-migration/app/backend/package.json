@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node server.mjs",
+    "check:timers": "node check-systemd-timer-health.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
