@@ -113,3 +113,11 @@
 - [SDK/Sharp и backend suite #44781191006](https://github.com/spartakdubov059/fam-website/actions/runs/44781191006) — success, 369/369 backend-тестов, timers, SDK/Sharp.
 - [Disposable YDB #44781191568](https://github.com/spartakdubov059/fam-website/actions/runs/44781191568) — success; YDB schema и синтетическая интеграция прошли, ephemeral база удалена.
 - `main` остался на `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`; российская ветка изолирована.
+
+## Сверка регистрации и видимости занятости мероприятий
+
+На кодовом коммите [9cf449a](https://github.com/spartakdubov059/fam-website/commit/9cf449a5b17dd95e6d60209856f2b53c9ea8a49a) исправлена видимость счётчика мест: публичный маршрут теперь возвращает число только для активного мероприятия, иначе — `404 event_unavailable`. В YDB добавлен запрос со связью occupancy с активным event. Также синтетическая интеграция проверяет повторную запись после отмены и гонку отмены с повторной записью; после гонки проверяется, что активная запись и счётчик согласованы.
+
+- [SDK/Sharp CI #44786678750](https://github.com/spartakdubov059/fam-website/actions/runs/44786678750) — success, backend suite **370/370**, без пропусков.
+- [Disposable local YDB CI #44786678706](https://github.com/spartakdubov059/fam-website/actions/runs/44786678706) — success; synthetic integration выполнена на временной локальной YDB и база удалена.
+- Тесты используют синтетические аккаунты. Это не российский облачный staging; main, production и реальные данные не затрагивались.
