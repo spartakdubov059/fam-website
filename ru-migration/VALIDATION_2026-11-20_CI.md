@@ -1,5 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Последняя повторная проверка — 20 ноября 2026
+
+- Кодовый commit [a7c1ab8](https://github.com/spartakdubov059/fam-website/commit/a7c1ab8ebb4b7af557fa38017b1f4b621aa68680) уточнил синтетическую проверку двух локальных safety-маркеров: запрос выбирает категорию угрозы явно и не зависит от одинаковых временных меток инцидентов.
+- [SDK/Sharp CI #44767160863](https://github.com/spartakdubov059/fam-website/actions/runs/44767160863) прошёл: **359/359** backend-тестов, 8 systemd timer-файлов, SDK/Sharp и WebP проверки.
+- [Disposable YDB CI #44767161011](https://github.com/spartakdubov059/fam-website/actions/runs/44767161011) успешно применил схемы 01–33 и выполнил synthetic integration; новые категории адресной травли и прямых личных оскорблений остаются в ручной очереди, а исходный текст не сохраняется. Контейнер тестовой базы удалён cleanup-шагом.
+- Это CI с временной локальной YDB и синтетическими профилями, не облачный staging. Платные облачные ресурсы и production не использовались; реальные данные учеников не затрагивались.
+
 ## Latest exact-commit CI result
 
 - Branch `migration/yandex-cloud` points to [`4699a06`](https://github.com/spartakdubov059/fam-website/commit/4699a0668da486e0881efabece3ce1f3ef69a8d7). Runtime readiness now reports healthy only when auth, YDB and object storage are configured.
