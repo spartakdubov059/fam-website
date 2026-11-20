@@ -18,7 +18,7 @@
 
 ## Проверки кода и CI
 
-На исправленном локальном дереве прошли `npm test` — 300 из 300 backend-тестов на Node 22.23.5 — и `ru-migration/compat/verify.mjs`, который подтвердил закреплённые SDK, Sharp/WebP и переносимую проверку systemd. YDB CI и SDK/Sharp CI на исходном снимке `047a5e1` также прошли: [YDB](https://github.com/spartakdubov059/fam-website/actions/runs/44641934710) и [SDK/Sharp](https://github.com/spartakdubov059/fam-website/actions/runs/44641934637). Новая TTL миграция ещё не проверена на движке YDB, потому что локально нет Docker. Эти проверки не подтверждают работу российского облачного окружения.
+На исправленном локальном дереве прошли `npm test` — 300 из 300 backend-тестов на Node 22.23.5 — и `ru-migration/compat/verify.mjs`, который подтвердил закреплённые SDK, Sharp/WebP и переносимую проверку systemd. SDK/Sharp CI прошёл на коммите `a260f405`: [run](https://github.com/spartakdubov059/fam-website/actions/runs/44654421824). После исправления YDB workflow на коммите `101faf22` успешно прошли применение схем 01–31, интеграционные сценарии с синтетическими данными и удаление disposable database: [YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44656608418). Эти проверки не подтверждают работу российского облачного окружения.
 
 ## Что остаётся проверить
 
