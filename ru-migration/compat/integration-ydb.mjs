@@ -508,6 +508,15 @@ try {
     'idea_text_approved', 'school text decisions are auditable without recording the idea text');
   const linkedListingId = '99999999-9999-4999-8999-999999999999';
   const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
+  for (let index = 0; index < 7; index++) {
+    await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+      school_id: 'synthetic-school', body: `Синтетическое сообщение ${index}` });
+  }
+  await assert.rejects(repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+    school_id: 'synthetic-school', body: 'Девятое синтетическое сообщение' }), error => error.code === 'rate_limited');
+  const messageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
+    WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
+  assert.equal(messageQuota?.[0]?.[0]?.submission_count, 8, 'direct messages enforce the eight-per-minute bucket');
   const messageRows = await sql`SELECT sender_id, receiver_id, school_id, listing_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
   assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
   assert.equal(messageRows[0][0].school_id, 'synthetic-school');
