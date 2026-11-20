@@ -1222,16 +1222,20 @@ export function createYdbListingsRepository(sql) {
       if (!UUID.test(ideaId || '') || !UUID.test(actorId || '') || typeof schoolId !== 'string' || !schoolId) {
         throw new TypeError('invalid school idea deletion');
       }
-      return sql.begin(async tx => {
+      let stage = 'begin';
+      try { return await sql.begin(async tx => {
+        stage = 'actor_profile';
         const actors = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
         const actor = actors?.[0]?.[0];
         if (!actor || actor.active !== true || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
+        stage = 'idea';
         const ideas = await tx`SELECT id, user_id, school_id FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
         const idea = ideas?.[0]?.[0];
         if (!idea) return { ok: false, code: 'idea_unavailable' };
         const own = idea.user_id === actorId;
         if (!own && actor.role !== 'school_admin') return { ok: false, code: 'forbidden' };
 
+        stage = 'idea_images';
         const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images
           WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId}
           ORDER BY image_index ASC LIMIT 3;`;
@@ -1242,22 +1246,31 @@ export function createYdbListingsRepository(sql) {
               || !/^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(image.object_key)) {
             return { ok: false, code: 'idea_media_unavailable' };
           }
+          stage = 'media_status';
           const mediaRows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${image.object_key}
             AND user_id = ${idea.user_id} AND school_id = ${schoolId} LIMIT 1;`;
           if (mediaRows?.[0]?.[0]?.status !== 'linked') return { ok: false, code: 'idea_media_unavailable' };
+          stage = 'media_claim';
           const claimToken = randomUUID();
           await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
             claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
             WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
           mediaCleanup.push({ object_key: image.object_key, claim_token: claimToken });
         }
+        stage = 'delete_idea_images';
         await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
+        stage = 'delete_idea';
         await tx`DELETE FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId};`;
-        if (!own) await tx`INSERT INTO fam_school_content_audit
+        if (!own) {
+          stage = 'audit';
+          await tx`INSERT INTO fam_school_content_audit
           (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
           VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${ideaId}, 'idea', 'idea_deleted', '{}', CurrentUtcTimestamp());`;
+        }
         return { ok: true, own, media_cleanup: mediaCleanup };
-      });
+      }); } catch (error) {
+        throw new Error(`idea deletion transaction failed at ${stage}`, { cause: error });
+      }
     },
 
     async getSchoolIdeaImage(ideaId, imageIndex) {
