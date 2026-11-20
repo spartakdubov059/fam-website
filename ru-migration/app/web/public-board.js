@@ -420,7 +420,9 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     }
     for (const name of categories) {
       const button = element(document, 'button', 'ru-board-category', name);
-      button.type = 'button'; button.setAttribute('aria-pressed', String(name === category));
+      button.type = 'button';
+      if (name === 'Афиша') button.id = 'ruBoardCategoryAfisha';
+      button.setAttribute('aria-pressed', String(name === category));
       button.addEventListener('click', () => { category = name; updateResults(); });
       filterButtons.set(name, button); filters.append(button);
     }
