@@ -14,6 +14,7 @@ test('technical alerts are read-only, administrator-only, and contain only aggre
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
     resolveActor: async () => actor,
     repository: {
+      getActiveAccountSuspension: async () => null,
       listSiteErrorAlerts: async () => { reads++; return [{ event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' }]; },
       getLatestSiteErrorDigest: async () => null,
     } });
@@ -107,7 +108,7 @@ test('school administrator overview is private to the active administrator and b
   let selectedSchool;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
     resolveActor: async () => actor,
-    repository: { getSchoolAdminOverview: async schoolId => { selectedSchool = schoolId; return { users: [{ id: 'synthetic-user' }], listings: [], audit: [], deletion_requests: [], suspensions: [] }; } } });
+    repository: { getActiveAccountSuspension: async () => null, getSchoolAdminOverview: async schoolId => { selectedSchool = schoolId; return { users: [{ id: 'synthetic-user' }], listings: [], audit: [], deletion_requests: [], suspensions: [] }; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/school/admin/overview';
   assert.equal((await handler(request)).status, 200);
   assert.equal(selectedSchool, 'school-a');
@@ -124,6 +125,7 @@ test('school agent dashboard and idea decisions are school-admin-only and school
   const ideaSchoolId = 'school-a';
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'user' }), resolveActor: async () => actor,
     repository: {
+      getActiveAccountSuspension: async () => null,
       getSchoolAgentDashboard: async schoolId => { saved = schoolId; return { report: null, ideas: [] }; },
       reviewSchoolAgentIdea: async input => { reviewed = input; return input.schoolId === actor.school_id; },
     } });
@@ -680,6 +682,7 @@ test('school administrators require fresh Yandex auth to delete another member l
     now: () => 1_800_000_000_000,
     pendingImages: { delete: async key => calls.push(['image', key]) },
     repository: {
+      getActiveAccountSuspension: async () => null,
       getSchoolListingDeletionContext: async input => { calls.push(['context', input]); return context; },
       deleteSchoolListing: async input => { calls.push(['delete', input]); deleted++; return {
         ok: true, id: listingId, media_cleanup: { object_key: 'pending/owner/image.webp', claim_token: 'claim' },

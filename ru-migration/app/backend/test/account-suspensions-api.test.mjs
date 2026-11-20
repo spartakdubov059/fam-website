@@ -54,6 +54,21 @@ test('a suspended administrator cannot issue or lift another account suspension'
   assert.equal(mutations, 0);
 });
 
+test('a suspended administrator cannot read school administration data or revoke roles', async () => {
+  let reads = 0; let mutations = 0;
+  const handler = api({ repository: {
+    getActiveAccountSuspension: async () => ({ reason: 'synthetic restriction', expires_at: '2099-01-01T00:00:00Z' }),
+    getSchoolAdminOverview: async () => { reads++; return {}; },
+    revokeSchoolRole: async () => { mutations++; return { ok: true }; },
+  } });
+  const overview = await handler(request('GET', '/api/v1/school/admin/overview'));
+  const revoke = await handler(request('PATCH', `/api/v1/role-management/${targetId}`, { action: 'revoke' }));
+  assert.deepEqual(overview, { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.deepEqual(revoke, overview);
+  assert.equal(reads, 0);
+  assert.equal(mutations, 0);
+});
+
 test('stale authentication, other roles, self action, invalid duration and contact details are rejected', async () => {
   let mutations = 0;
   const repository = { issueAccountSuspension: async () => { mutations++; return { ok: true }; } };

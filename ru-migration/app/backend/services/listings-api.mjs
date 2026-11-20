@@ -84,6 +84,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.listSiteErrorAlerts !== 'function' || typeof repository?.getLatestSiteErrorDigest !== 'function') return { status: 503, body: { ok: false, error: 'technical_alerts_unavailable' } };
       try { return { status: 200, body: { ok: true, alerts: await repository.listSiteErrorAlerts(), digest: await repository.getLatestSiteErrorDigest() } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
@@ -123,6 +125,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.getSchoolAdminOverview !== 'function') return { status: 503, body: { ok: false, error: 'overview_unavailable' } };
       try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAdminOverview(actor.school_id)) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
@@ -132,6 +136,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.getSchoolAgentDashboard !== 'function') return { status: 503, body: { ok: false, error: 'agent_dashboard_unavailable' } };
       try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAgentDashboard(actor.school_id)) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
@@ -142,6 +148,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       let input;
       try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
@@ -250,6 +258,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.listSchoolRoleTargets !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
       try { return { status: 200, body: { ok: true, targets: await repository.listSchoolRoleTargets(actor.school_id, actor.id) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
@@ -261,6 +271,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!hasFreshConfirmation(identity, now())) return { status: 403, body: { ok: false, error: 'fresh_auth_required' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.revokeSchoolRole !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
       let input;
       try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
@@ -768,6 +780,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.getSchoolListingDeletionContext !== 'function' || typeof repository?.deleteSchoolListing !== 'function') {
         return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
       }
