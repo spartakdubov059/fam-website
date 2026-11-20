@@ -115,6 +115,12 @@ body {
 .ru-board-category[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
 .ru-board-count { grid-column: 1 / -1; margin: 0; color: #b8bbc7; font-size: 0.9rem; }
 .ru-listing-card[hidden] { display: none; }
+.ru-afisha-feed { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; margin-top: 24px; }
+.ru-afisha-feed > #ruPulse, .ru-afisha-feed > #publicListings, .ru-afisha-feed .ru-pulse-feed { display: contents; }
+.ru-afisha-feed > #ruPulse { margin: 0; }
+.ru-afisha-feed > #publicListings { margin: 0; }
+.ru-afisha-feed > #ruPulse > h2, .ru-afisha-feed > #ruPulse > .ru-pulse-status,
+.ru-afisha-feed > #ruPulse > .ru-pulse-empty, .ru-afisha-feed > #publicListings > .ru-board-controls { grid-column: 1 / -1; }
 .ru-pulse { display: grid; gap: 0.9rem; margin: 1.5rem 0; }
 .ru-pulse > h2, .ru-pulse-publish h3 { margin: 0; }
 .ru-pulse-status, .ru-pulse-empty, .ru-pulse-form-status { margin: 0; color: #b8bbc7; }
