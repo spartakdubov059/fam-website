@@ -718,22 +718,55 @@ test('message repository verifies same-school active recipient before inserting 
     if (query.text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
     return Promise.resolve([[]]);
   };
+  sql.begin = callback => callback(sql);
   const repo = createYdbListingsRepository(sql);
   const result = await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-id', listing_id: 'listing-id', body: 'Привет' });
   assert.ok(calls.some(call => call.text.includes('listing_id') && call.values.includes('listing-id')));
   assert.match(result.id, /^[0-9a-f-]{36}$/);
-  assert.ok(calls[0].values.includes('school-id'));
-  assert.ok(calls[0].values.includes('recipient-id'));
-  assert.ok(calls[1].values.includes('Привет'));
+  assert.ok(calls.some(call => call.values.includes('school-id')));
+  assert.ok(calls.some(call => call.values.includes('recipient-id')));
+  assert.ok(calls.some(call => call.values.includes('Привет')));
+  const quotaRead = calls.find(call => call.text.includes('SELECT submission_count FROM fam_submission_quotas'));
+  assert.ok(quotaRead.values.includes('message'));
+  assert.equal(quotaRead.values.at(-1).getTime() % 60_000, 0, 'message quota uses a UTC minute bucket');
 
   let inserts = 0;
-  const absent = createYdbListingsRepository((strings) => {
+  const absentSql = strings => {
     if (strings.join('').includes('FROM fam_user_profiles')) return Promise.resolve([[]]);
     inserts++;
     return Promise.resolve([[]]);
-  });
+  };
+  absentSql.begin = callback => callback(absentSql);
+  const absent = createYdbListingsRepository(absentSql);
   await assert.rejects(absent.createMessage({ sender_id: 'sender-id', receiver_id: 'outside-school', school_id: 'school-id', body: 'Привет' }), error => error.code === 'recipient_unavailable');
   assert.equal(inserts, 0);
+});
+
+test('directly delivered messages enforce an eight-per-minute durable account quota', async () => {
+  const statements = [];
+  let count = 0;
+  const sql = (strings, ...values) => {
+    const text = strings.join('?');
+    statements.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
+    if (text.includes('SELECT submission_count FROM fam_submission_quotas')) {
+      return Promise.resolve(count ? [[{ submission_count: count }]] : [[]]);
+    }
+    if (text.includes('UPSERT INTO fam_submission_quotas')) {
+      count = values.find(Number.isInteger);
+      return Promise.resolve([[]]);
+    }
+    return Promise.resolve([[]]);
+  };
+  sql.begin = callback => callback(sql);
+  const repo = createYdbListingsRepository(sql);
+  for (let index = 0; index < 8; index++) {
+    assert.match((await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
+      school_id: 'school-id', body: `Message ${index}` })).id, /^[0-9a-f-]{36}$/);
+  }
+  await assert.rejects(repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
+    school_id: 'school-id', body: 'Message 9' }), error => error.code === 'rate_limited');
+  assert.equal(statements.filter(statement => statement.text.includes('INSERT INTO fam_messages')).length, 8);
 });
 
 test('message reads bind user and school and return only the bounded projection', async () => {
