@@ -102,6 +102,10 @@ window.onunhandledrejection = function() {
     avatarScript.type = 'module';
     avatarScript.src = '/avatar-workflow.js';
     document.body.append(avatarScript);
+    const profileSettingsScript = document.createElement('script');
+    profileSettingsScript.type = 'module';
+    profileSettingsScript.src = '/profile-settings.js';
+    document.body.append(profileSettingsScript);
     const accountScript = document.createElement('script');
     accountScript.type = 'module';
     accountScript.src = '/account-workflow.js';
