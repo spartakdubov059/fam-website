@@ -42,6 +42,13 @@ window.onunhandledrejection = function() {
         <form id="ruListingForm" class="ru-listing-form" hidden>
           <label>Название<input name="title" maxlength="80" required></label>
           <label>Описание<textarea name="description" maxlength="1000" required></textarea></label>
+          <button id="ruDescriptionHelperToggle" class="ru-button ru-description-helper-toggle" type="button">✦ Составить описание</button>
+          <section id="ruDescriptionHelper" class="ru-description-helper" hidden aria-label="Локальная помощь с описанием">
+            <p id="ruDescriptionHelperNote" class="ru-note" role="status" aria-live="polite"></p>
+            <label>Черновик<textarea id="ruDescriptionDraft" maxlength="1000" rows="7"></textarea></label>
+            <p id="ruDescriptionSuggestions" class="ru-note"></p>
+            <div class="ru-description-helper-actions"><button id="ruDescriptionApply" class="ru-button" type="button">Применить текст</button><button id="ruDescriptionClose" class="ru-button ru-button-secondary" type="button">Закрыть</button></div>
+          </section>
           <label>Категория<select name="category" required><option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия">Мероприятия</option></select></label>
           <p id="ruCategoryHint" class="ru-category-hint" role="status" aria-live="polite">Начните вводить название и описание — FAM подскажет подходящую категорию.</p>
           <label>Цена в рублях<input name="price_text" maxlength="50" placeholder="Бесплатно"></label>
@@ -126,6 +133,10 @@ window.onunhandledrejection = function() {
     categoryHintsScript.type = 'module';
     categoryHintsScript.src = '/category-hints.js';
     document.body.append(categoryHintsScript);
+    const descriptionHelperScript = document.createElement('script');
+    descriptionHelperScript.type = 'module';
+    descriptionHelperScript.src = '/description-helper.js';
+    document.body.append(descriptionHelperScript);
     const moderationScript = document.createElement('script');
     moderationScript.type = 'module';
     moderationScript.src = '/listing-moderation.js';
