@@ -10,7 +10,7 @@
 ## Срок хранения безопасной очереди
 
 - Новая схема `33_fam_agent_task_retention.yql` включает YDB TTL на `finished_at` для завершённых задач и `created_at` для событий очереди (180 дней). Незавершённые задачи с `finished_at = NULL` сохраняются; повторный захват сбрасывает время завершения.
-- Синтетическую схему проверит disposable YDB workflow; локальная команда `verify.mjs` не интерпретирует YQL TTL.
+- Коммит [`fb1f3d2`](https://github.com/spartakdubov059/fam-website/commit/fb1f3d2abc7c739b5d55d65e88fda376e85fb4fc) прошёл [disposable YDB CI #44702250049](https://github.com/spartakdubov059/fam-website/actions/runs/44702250049) и [SDK/Sharp CI #44702250295](https://github.com/spartakdubov059/fam-website/actions/runs/44702250295). Схема 33 применена на временной локальной YDB; локальная команда `verify.mjs` не интерпретирует YQL TTL.
 
 ## Актуальная проверка веток и CI (20 ноября 2026)
 
