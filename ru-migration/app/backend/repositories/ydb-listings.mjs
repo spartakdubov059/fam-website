@@ -1231,15 +1231,9 @@ export function createYdbListingsRepository(sql) {
       return sql.begin(async tx => {
         const recipients = await tx`SELECT user_id AS user_id FROM fam_user_profiles
           WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
-        if (!(recipients?.[0] ?? []).length) {
-          const error = new Error('recipient unavailable');
-          error.code = 'recipient_unavailable';
-          throw error;
-        }
+        if (!(recipients?.[0] ?? []).length) return { ok: false, code: 'recipient_unavailable' };
         if (!await consumeSubmissionQuota(tx, record.sender_id, 'message', 8, 60_000)) {
-          const error = new Error('message rate limit');
-          error.code = 'rate_limited';
-          throw error;
+          return { ok: false, code: 'rate_limited' };
         }
         await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
           VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, false, CurrentUtcTimestamp());`;
