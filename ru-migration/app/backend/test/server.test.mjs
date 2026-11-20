@@ -137,11 +137,11 @@ test('server routes the internal coder bridge separately from public user APIs',
   });
 });
 
-test('configured server reports ready after runtime initialization and reports optional media separately', async () => {
+test('configured server reports full readiness only when object storage is configured', async () => {
   const state = {
     mode: 'isolated-copy', ready: true,
-    services: { auth: true, database: true, objectStorage: false },
-    message: 'Russian backend is configured; optional media storage is reported separately.',
+    services: { auth: true, database: true, objectStorage: true },
+    message: 'Russian backend, database, and object storage are configured.',
   };
   await withServer({ getReadiness: () => state }, async origin => {
     for (const path of ['/api/health', '/api/v1/status']) {

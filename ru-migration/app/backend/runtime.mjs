@@ -27,15 +27,20 @@ import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
   const authConfigured = Boolean(yandexConfigured || oidcConfigured);
   const databaseAvailable = databaseReady === true;
+  const objectStorageAvailable = mediaConfigured === true;
   return {
     mode: 'isolated-copy',
-    ready: authConfigured && databaseAvailable,
-    services: { auth: authConfigured, database: databaseAvailable, objectStorage: Boolean(mediaConfigured) },
-    message: yandexConfigured
-      ? 'Russian backend is configured; optional media storage is reported separately.'
-      : oidcConfigured
-        ? 'Russian backend is configured with OIDC bearer authentication; optional media storage is reported separately.'
-        : 'Yandex ID web authentication or OIDC bearer authentication is not configured.',
+    ready: authConfigured && databaseAvailable && objectStorageAvailable,
+    services: { auth: authConfigured, database: databaseAvailable, objectStorage: objectStorageAvailable },
+    message: !authConfigured
+      ? 'Yandex ID web authentication or OIDC bearer authentication is not configured.'
+      : !databaseAvailable
+        ? 'Russian backend database is not ready.'
+        : !objectStorageAvailable
+          ? 'Russian object storage is not configured.'
+          : yandexConfigured
+            ? 'Russian backend, database, and object storage are configured.'
+            : 'Russian backend, database, and object storage are configured with OIDC bearer authentication.',
   };
 }
 

@@ -2,18 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkYdbReadiness, createYdbReadinessProbe, getRuntimeReadiness } from '../runtime.mjs';
 
-test('runtime readiness accepts the configured OIDC bearer authentication path', () => {
+test('runtime readiness requires auth, YDB and object storage for the complete Russian copy', () => {
   assert.deepEqual(getRuntimeReadiness({
     yandexConfigured: false,
     oidcConfigured: true,
     databaseReady: true,
-    mediaConfigured: false,
+    mediaConfigured: true,
   }), {
     mode: 'isolated-copy',
     ready: true,
-    services: { auth: true, database: true, objectStorage: false },
-    message: 'Russian backend is configured with OIDC bearer authentication; optional media storage is reported separately.',
+    services: { auth: true, database: true, objectStorage: true },
+    message: 'Russian backend, database, and object storage are configured with OIDC bearer authentication.',
   });
+});
+
+test('runtime readiness fails closed when object storage is missing', () => {
+  const readiness = getRuntimeReadiness({ yandexConfigured: true, oidcConfigured: false,
+    databaseReady: true, mediaConfigured: false });
+  assert.equal(readiness.ready, false);
+  assert.deepEqual(readiness.services, { auth: true, database: true, objectStorage: false });
+  assert.equal(readiness.message, 'Russian object storage is not configured.');
 });
 
 test('runtime readiness remains false when neither supported auth mode is configured', () => {
@@ -25,6 +33,7 @@ test('runtime readiness remains false when neither supported auth mode is config
   });
   assert.equal(readiness.ready, false);
   assert.equal(readiness.services.auth, false);
+  assert.equal(readiness.message, 'Yandex ID web authentication or OIDC bearer authentication is not configured.');
 });
 
 test('runtime readiness is false when YDB is unavailable', () => {
@@ -33,6 +42,7 @@ test('runtime readiness is false when YDB is unavailable', () => {
   assert.equal(readiness.ready, false);
   assert.equal(readiness.services.database, false);
   assert.equal(readiness.services.auth, true);
+  assert.equal(readiness.message, 'Russian backend database is not ready.');
 });
 
 test('YDB readiness executes a minimal query and fails closed on query errors', async () => {
