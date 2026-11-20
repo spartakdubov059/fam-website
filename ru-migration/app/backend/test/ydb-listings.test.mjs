@@ -914,3 +914,19 @@ test('event capacity and organizer rejection are returned after the YDB transact
   await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student'), error => error.code === 'organizer_registration');
   await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student'), error => error.code === 'already_registered');
 });
+test('public event occupancy is visible only for active events', async () => {
+  const calls = [];
+  const sql = strings => {
+    const text = strings.join('?');
+    calls.push(text);
+    return Promise.resolve(text.includes('INNER JOIN fam_listings')
+      ? [[{ taken: 2 }]] : [[]]);
+  };
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.getPublicEventOccupancy('active-event-id'), 2);
+  assert.match(calls[0], /INNER JOIN fam_listings AS l ON l\.id = o\.event_id/);
+  assert.match(calls[0], /l\.is_event = true AND l\.status = 'active'/);
+  const hiddenSql = strings => Promise.resolve([[]]);
+  assert.equal(await createYdbListingsRepository(hiddenSql).getPublicEventOccupancy('inactive-event-id'), null);
+  await assert.rejects(repo.getPublicEventOccupancy(''), TypeError);
+});
