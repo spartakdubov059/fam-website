@@ -50,7 +50,7 @@ test('avatar bytes stay private while pending and are public only while the appr
   const review = { id, user_id: student.id, school_id: 'school-a', image_key: key, status: 'pending' };
   let reads = 0; let current = true;
   const handler = createMediaApi({ authenticate: async () => ({ subject: 'moderator' }), resolveActor: async () => moderator,
-    repository: { getAvatarReview: async () => review, isCurrentAvatar: async () => current },
+    repository: { getActiveAccountSuspension: async () => null, getAvatarReview: async () => review, isCurrentAvatar: async () => current },
     pendingImages: { get: async imageKey => { reads++; assert.equal(imageKey, key); return Buffer.from('image'); } } });
   const path = `/api/v1/avatars/${id}/photo`;
   assert.equal((await handler(request('GET', path))).status, 200);
