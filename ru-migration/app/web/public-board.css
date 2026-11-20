@@ -63,6 +63,7 @@ body {
 .ru-listing-form label[hidden] { display: none; }
 .ru-listing-form input, .ru-listing-form textarea, .ru-listing-form select { width: 100%; box-sizing: border-box; padding: 0.65rem; border: 1px solid #aaa5bb; border-radius: 0.5rem; font: inherit; }
 .ru-listing-form textarea { min-height: 7rem; resize: vertical; }
+.ru-category-hint { margin: -0.45rem 0 0; color: #b8bbc7; font-size: 0.9rem; }
 .ru-event-fields { display: grid; gap: 0.8rem; margin: 0; padding: 1rem; border: 1px solid #d9d6e8; border-radius: 0.75rem; }
 .ru-event-fields[hidden] { display: none; }
 .ru-event-fields label { display: grid; gap: 0.35rem; font-weight: 600; }
