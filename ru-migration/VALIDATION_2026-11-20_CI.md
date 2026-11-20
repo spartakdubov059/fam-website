@@ -1,5 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Последняя проверка чувствительной аутентификации
+
+- Проверенный код: [`0d41c98`](https://github.com/spartakdubov059/fam-website/commit/0d41c9824a8c38416e13879d8ad73f0e64ab1440). Точный [SDK/Sharp workflow #44770366256](https://github.com/spartakdubov059/fam-website/actions/runs/44770366256) завершился успешно: **362/362** backend-теста, pinned SDK/Sharp/WebP и 8 systemd timers.
+- Точный [disposable YDB workflow #44770366230](https://github.com/spartakdubov059/fam-website/actions/runs/44770366230) успешно применил схему 01–33 и выполнил synthetic integration. Контейнер удалён cleanup-шагом.
+- Новые проверки подтверждают, что `force_confirm` и локальное время сессии не дают свежую аутентификацию; только проверенный OIDC `auth_time` может пройти чувствительный gate. Поэтому обычные Яндекс ID cookie-сессии fail-closed на операциях удаления и блокировки. Это ограничение нужно снять только после поддержки проверяемого provider auth-time или независимого сильного фактора.
+- Облачный staging не развёртывался, реальные данные и платные ресурсы не использовались; `main` и production не затрагивались. Эти тесты не являются полным security sign-off.
+
 ## Последняя повторная проверка — 20 ноября 2026
 
 - Кодовый commit [a7c1ab8](https://github.com/spartakdubov059/fam-website/commit/a7c1ab8ebb4b7af557fa38017b1f4b621aa68680) уточнил синтетическую проверку двух локальных safety-маркеров: запрос выбирает категорию угрозы явно и не зависит от одинаковых временных меток инцидентов.
