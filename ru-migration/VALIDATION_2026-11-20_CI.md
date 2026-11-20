@@ -184,3 +184,9 @@
 
 - [SDK/Sharp CI #44793200966](https://github.com/spartakdubov059/fam-website/actions/runs/44793200966) — success, **382/382** backend tests.
 - [Disposable YDB CI #44793200980](https://github.com/spartakdubov059/fam-website/actions/runs/44793200980) — success с synthetic integration и cleanup.
+
+## Проверка guard для медиа — 20 ноября 2026
+
+- Кодовый commit [64e4512](https://github.com/spartakdubov059/fam-website/commit/64e4512c0b89bc5f8c8927d859c3f5f6224888da) добавил синтетическую интеграционную проверку общего suspension guard с Media API: блокируются POST объявления/аватара, PATCH модерации изображения и DELETE pending-фото; репозиторий и объектное хранилище не вызываются.
+- Точный [SDK/Sharp CI #44794320383](https://github.com/spartakdubov059/fam-website/actions/runs/44794320383) успешен: **383/383 backend-теста**, 8 systemd timer-файлов, YDB/AWS SDK compatibility и реальная Sharp/WebP обработка.
+- Disposable YDB CI #44794320445 на том же commit ожидался во время фиксации этой записи; облачный staging не создавался. Облачные настройки YDB и S3, бюджет и IAM права остаются непроверенными.
