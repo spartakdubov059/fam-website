@@ -17,7 +17,7 @@ test('a disabled, inactive, missing or unconfigured timer makes the health repor
     enabled: true, activeState: 'active', nextElapse: 'Sat 2026-11-21 03:30:00 UTC' }));
   states[0].enabled = false;
   states[1].activeState = 'inactive';
-  states[2].serviceUnit = '';
+  states[2].serviceUnit = 'fam-unrelated.service';
   states[3].nextElapse = 'n/a';
   states.pop();
   const report = analyzeSystemdTimerStates(states);

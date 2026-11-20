@@ -25,7 +25,8 @@ export function analyzeSystemdTimerStates(states, expected = FAM_RU_TIMER_UNITS)
   const byUnit = new Map((Array.isArray(states) ? states : []).map((state) => [state.unit, state]));
   const timers = expected.map((unit) => {
     const state = byUnit.get(unit);
-    const configured = state?.loadState === 'loaded' && state?.serviceUnit?.endsWith('.service');
+    const configured = state?.loadState === 'loaded'
+      && state?.serviceUnit === unit.replace(/\.timer$/u, '.service');
     const enabled = state?.enabled === true;
     const active = state?.activeState === 'active';
     const nextScheduled = typeof state?.nextElapse === 'string' && state.nextElapse !== '' && state.nextElapse !== 'n/a';
