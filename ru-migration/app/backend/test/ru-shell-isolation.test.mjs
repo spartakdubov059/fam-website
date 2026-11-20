@@ -39,5 +39,6 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
   assert.match(bootstrap, /id="ruIdeaHistory"/);
   assert.match(bootstrap, /id="ruHeroTrack"/);
   assert.match(bootstrap, /id="ruTabbar"/);
+  assert.match(bootstrap, /id="ruAfishaFeed"[\s\S]*id="ruPulse"[\s\S]*id="publicListings"/);
   assert.match(bootstrap, /data-ru-view="afisha"/);
 });
