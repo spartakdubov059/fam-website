@@ -39,6 +39,7 @@ export async function submitMessage({ actor, input, repository, review, safetyKe
     return { ok: true, status: 'approved', id: message.id };
   } catch (error) {
     if (error?.code === 'recipient_unavailable') return { ok: false, code: 'recipient_unavailable' };
+    if (error?.code === 'rate_limited') return { ok: false, code: 'rate_limited' };
     return { ok: false, code: 'database_unavailable' };
   }
 }
