@@ -341,7 +341,8 @@ try {
     WHERE user_id = '55555555-5555-4555-8555-555555555555';`;
   const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
   assert.equal(roleQueue.status, 200);
-  console.log('YDB_ROLE_REVIEW_DIAGNOSTIC:', JSON.stringify({ submitted_id: String(roleSubmission.body.request_id), queue: roleQueue.body.requests.map(row => ({ is_array: Array.isArray(row), keys: Object.keys(row), row })) }));
+  const rawRoleRows = await sql`SELECT request_id, user_id, school_id, requested_role, status FROM fam_school_role_requests WHERE request_id = ${roleSubmission.body.request_id};`;
+  console.log('YDB_ROLE_REVIEW_DIAGNOSTIC:', JSON.stringify({ submitted_id: String(roleSubmission.body.request_id), raw: rawRoleRows?.[0]?.[0], queue: roleQueue.body.requests }));
   const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
   assert.ok(roleRequest);
   assert.equal(roleRequest.requested_role, 'council_member');
