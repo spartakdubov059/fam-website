@@ -470,3 +470,11 @@ test('isolated server routes anonymous site error counters only to its configure
     assert.equal(response.status, 503);
   });
 });
+
+test('isolated server routes read-only technical alerts to the authenticated API handler', async () => {
+  await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, route: request.url } }) }, async origin => {
+    const response = await fetch(new URL('/api/v1/school/admin/technical-alerts', origin));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, route: '/api/v1/school/admin/technical-alerts' });
+  });
+});
