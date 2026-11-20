@@ -97,3 +97,11 @@
 - Disposable YDB сценарий расширен: перед удалением создаются pending-аватар, уведомление, квота, audit и safety incident. Интеграция проверяет удаление приватных ключей и пользовательских строк, замену actor в аудите и очистку прямой attribution/evidence в safety-записи.
 - Точная ревизия `233debf762855d79bacbc22109846f98645d1dc0`: [YDB CI #44775812119](https://github.com/spartakdubov059/fam-website/actions/runs/44775812119) — success, disposable DB cleanup выполнен; [SDK/Sharp CI #44775812071](https://github.com/spartakdubov059/fam-website/actions/runs/44775812071) — success. Detached backend suite на той же вершине: **365/365**, без skipped.
 - Это проверяет перечисленные synthetic deletion flows, но не все Supabase RLS/RPC/triggers или полноценный российский cloud staging.
+
+## Проверка квот контента по исходной SQL-миграции
+
+Точная веточная ревизия `ce9884aefbfd0c35c629e394b448d0b79b74fc22`:
+
+- [SDK/Sharp и backend suite #44780591200](https://github.com/spartakdubov059/fam-website/actions/runs/44780591200) — success; build Yandex Functions package, весь backend suite **369/369**, timers, нативный Sharp и SDK smoke checks.
+- [Disposable YDB #44780591234](https://github.com/spartakdubov059/fam-website/actions/runs/44780591234) — success; schema и synthetic integration прошли, в том числе 8 разрешённых сообщений/мин, отказ 9-го, 5 идей/час, отказ 6-й, ручная message queue и cross-school recipient отказ. Временная локальная CI база удалена.
+- Upstream источник лимитов: `20261108004943_enforce_server_side_content_moderation.sql` на `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`. Это подтверждает квоты и соответствующие сценарии, не полный перенос всех grants/policies этой миграции или всего Supabase.
