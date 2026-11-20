@@ -46,6 +46,18 @@ test('sensitive-topic review stores only a medium school safety marker without t
   assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
 });
 
+test('harassment and negative personal calls create medium redacted school incidents', () => {
+  for (const [localFlag, category] of [['targeted_harassment', 'targeted_harassment'],
+    ['negative_personal_call', 'negative_personal_call']]) {
+    const signal = buildLocalSafetySignal({ actor, targetId, sourceKind: 'message', sourceOrigin: 'messages', localFlag,
+      text: 'Синтетический текст с контактом test@example.ru', safetyKey: key });
+    assert.equal(signal.category, category);
+    assert.equal(signal.severity, 'medium');
+    assert.equal(Object.hasOwn(signal, 'text'), false);
+    assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+  }
+});
+
 test('safety incident recording requires a long key and valid same-school identities', () => {
   const base = { actor, sourceKind: 'message', sourceOrigin: 'messages', localFlag: 'serious_hate_or_threat', text: 'угроза' };
   assert.throws(() => buildLocalSafetySignal({ ...base, safetyKey: 'too-short' }), TypeError);
