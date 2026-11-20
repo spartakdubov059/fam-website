@@ -27,13 +27,13 @@
       ? new Date(item.event_starts_at).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) : "");
     return '<article class="pulse-card pulse-announcement'+(important?' is-important':'')+(openEvent?' is-open-event':'')+'">' +
       '<div class="pulse-card-overline"><span class="pulse-symbol" aria-hidden="true">'+(openEvent?'↗':important?'✦':'◈')+'</span>'+
-        '<span>'+(openEvent?'МЕРОПРИЯТИЕ · АФИША':important?'‼ ВАЖНОЕ ОБЪЯВЛЕНИЕ':'АНОНС · АФИША')+'</span>'+
+        '<span>'+(openEvent?'СОБЫТИЕ ДЛЯ ВСЕХ · АФИША':important?'‼ ВАЖНОЕ ОБЪЯВЛЕНИЕ':'АНОНС · АФИША')+'</span>'+
         '<span class="pulse-date">'+escapeHtml(openEvent?eventLabel:timeLabel(item?.published_at))+
           (openEvent&&eventTime?'<span class="pulse-event-clock"> · '+escapeHtml(eventTime)+'</span>':'')+'</span></div>'+
       '<h3>'+escapeHtml(clamp(item?.title,90))+'</h3>'+
       '<p>'+escapeHtml(clamp(item?.body,450))+'</p>'+
       (openEvent?'<div class="pulse-open-foot"><span class="pulse-open-label"><span class="pulse-open-dot" aria-hidden="true"></span>'+
-        (Number(item?.max_seats||0)>0?'Регистрация · до '+escapeHtml(item.max_seats)+' мест':'Без записи · Без лимита мест')+'</span>'+
+        (Number(item?.max_seats||0)>0?'Регистрация · до '+escapeHtml(item.max_seats)+' мест':'Без записи · Нет лимита мест')+'</span>'+
         '</div>':'')+'</article>';
   }
   function pollCard(poll){
