@@ -1,15 +1,500 @@
-Y™Áäx-ÆÈ‹j◊ù¢Îi∫⁄+äßj[hëÈ‹¢ÈÌ◊æπŸ:-jZ.∂õ≠ñ)ﬁ≥Vñ◊˜'BFW7Bg&ˆ“vÊˆFSßFW7Bs∞¶ñ◊˜'B76W'Bg&ˆ“vÊˆFS¶76W'B˜7G&ñ7Bs∞¶ñ◊˜'B≤7&VFUñF$∆ó7FñÊw5&W˜6óF˜'í“g&ˆ“r‚‚˜&W˜6óF˜&ñW2˜ñF"÷∆ó7FñÊw2Ê÷ß2s∞¶ñ◊˜'B≤vWE6óFTW'&˜$FñvW7E6∆˜B“g&ˆ“r‚‚˜6W'fñ6W2˜6óFR÷W'&˜"÷FñvW7BÊ÷ß2s∞†ßFW7BÇw6óFRW'&˜"FñvW7B6∆˜BW6W2UD2V'FW"Ü˜W'2ÊB&V¶V7G2ñÁf∆ñBFFW2r¬Çí”‚∞¢76W'BÊWV¬ÜvWE6óFTW'&˜$FñvW7E6∆˜BÜÊWrFFRÇs##b””ÖCc£#ì£Sí„ììï¢ríí¬s##b””ÖCc£Rrì∞¢76W'BÊWV¬ÜvWE6óFTW'&˜$FñvW7E6∆˜BÜÊWrFFRÇs##b””ÖCc£3£„¢ríí¬s##b””ÖCc£3rì∞¢76W'BÁFá&˜w2ÇÇí”‚vWE6óFTW'&˜$FñvW7E6∆˜BÜÊWrFFRÇvñÁf∆ñBríí¬ˆñÁf∆ñB6óFRW'&˜"FñvW7BFñ÷RÚì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬&ˆ∆R&WfñWrVWVR¶ˆñÁ2ˆÊ«íFÜR6÷R◊66Üˆˆ¬&ˆfñ∆R&ˆ¶V7Fñˆ‚r¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&˜r“≤&WVW7EˆñC¢w&WVW7B÷r¬W6W%ˆñC¢s””C”É”#3CScsÉì"r¬&WVW7FVE˜&ˆ∆S¢v6˜VÊ6ñ≈ˆ÷V÷&W"r¿¢7FGW3¢wVÊFñÊrr¬fó'7EˆÊ÷S¢}
--]"r¬∆7EˆÊ÷S¢}
-=}]›ç¢r¬6∆75ˆÊ÷S¢sç	r”∞¢6ˆÁ7B&W˜6óF˜'í“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7G&ñÊw2”‚≤VW'í“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑&˜u’“ì≤“ì∞¢76W'BÊFVWWV¬ÜvóB&W˜6óF˜'íÊ∆ó7EVÊFñÊu66Üˆˆ≈&ˆ∆U&WVW7G2Çw66Üˆˆ¬÷rí¬∑&˜u“ì∞¢76W'BÊ÷F6ÇáVW'í¬Ùî‰‰U"§Ùî‚f’˜W6W%˜&ˆfñ∆W22Ù‚¬ÁW6W%ˆñB“%¬ÁW6W%ˆñB‰B¬Á66Üˆˆ≈ˆñB“%¬Á66Üˆˆ≈ˆñBÚì∞¢76W'BÊ÷F6ÇáVW'í¬˜%¬Á66Üˆˆ≈ˆñB“√ÚÚì∞¢76W'BÊ÷F6ÇáVW'í¬˜%¬Á7FGW2î‚¬ÇwVÊFñÊrr¬w&WfñWvñÊru¬íÚì∞¢76W'BÊ÷F6ÇáVW'í¬Ùƒî‘ïBSÚì∞ß“ì∞†ßFW7BÇw6óFRW'&˜"FñvW7Bvw&VvFñˆ‚&VG2ˆÊ«í&˜VÊFVBvw&VvFR6˜VÁFW'2ÊB&WGW&Á2F˜6FVv˜&ñW2r¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&˜w2“∞¢≤WfVÁEˆ6ˆFS¢vß5˜'VÁFñ÷Rr¬vUˆ&V¢v˜FÜW"r¬WfVÁEˆ6˜VÁC¢B¬∆7EˆÜ˜W#¢G'VR“¿¢≤WfVÁEˆ6ˆFS¢vFF&6U˜&WVW7Eˆfñ∆VBr¬vUˆ&V¢vFF&6Rr¬WfVÁEˆ6˜VÁC¢"¬∆7EˆÜ˜W#¢f«6R“¿¢≤WfVÁEˆ6ˆFS¢vß5˜'VÁFñ÷Rr¬vUˆ&V¢v˜FÜW"r¬WfVÁEˆ6˜VÁC¢2¬∆7EˆÜ˜W#¢f«6R“¿¢”∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÇá7G&ñÊw2í”‚≤VW'í“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖ∑&˜w5“ì≤“ì∞¢76W'BÊFVWWV¬ÜvóB&WÚÊvWE6óFTW'&˜$FñvW7D÷WG&ñ72Çí¬∞¢F˜F≈ˆWfVÁG5Û#FÉ¢í¬WfVÁG5ˆ∆7EˆÜ˜W#¢B¿¢WfVÁG3¢∑≤WfVÁEˆ6ˆFS¢vß5˜'VÁFñ÷Rr¬vUˆ&V¢v˜FÜW"r¬ˆ67W'&VÊ6W3¢r“¿¢≤WfVÁEˆ6ˆFS¢vFF&6U˜&WVW7Eˆfñ∆VBr¬vUˆ&V¢vFF&6Rr¬ˆ67W'&VÊ6W3¢"’“¿¢“ì∞¢76W'BÊ÷F6ÇáVW'í¬ÙñÁFW'f≈¬ÇuC#DÇu¬íÚì∞¢76W'BÊ÷F6ÇáVW'í¬ÙñÁFW'f≈¬ÇuCÇu¬íÚì∞¢76W'BÊ÷F6ÇáVW'í¬Ùƒî‘ïBÚì∞¢76W'BÊFˆW4Ê˜D÷F6ÇáVW'í¬ˆ&ˆGó«FWáG«W&««W6W%ˆñG∆V÷ñ««7F6≤ˆíì∞ß“ì∞†ßFW7BÇu%R&6∂w&˜VÊBVWVRÜV«FÇ&VG2ˆÊ«ívw&VvFR7FGW6W2¬Wáó&VB∆V6W2ÊBVWVRvRr¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BÊ˜r“Çí”‚FFRÁ'6RÇs##b””ÖC#££„¢rì∞¢6ˆÁ7B7¬“7G&ñÊw2”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6ÇáFWáBì∞¢ñbáFWáBÊñÊ6«VFW2Çtu$ıU%í7FGW2ríí&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤7FGW3¢wVWVVBr¬6˜VÁC¢"“¬≤7FGW3¢v6∆ñ÷VBr¬6˜VÁC¢’’“ì∞¢ñbáFWáBÊñÊ6«VFW2Çv∆V6UˆWáó&W5ˆBríí&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤6˜VÁC¢’’“ì∞¢ñbáFWáBÊñÊ6«VFW2Ç'7FGW2î‚Çvfñ∆VBr¬v&∆ˆ6∂VBrí"íí&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤6˜VÁC¢2’’“ì∞¢ñbáFWáBÊñÊ6«VFW2Çt‘î‚Üfñ∆&∆UˆBíríí&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤ˆ∆FW7E˜VWVVEˆC¢ÊWrFFRÇs##b””ÖC£C£„¢rí’’“ì∞¢Fá&˜rÊWrW'&˜"ÇwVÊWáV7FVBVW'írì∞¢”∞¢6ˆÁ7B&W˜'B“vóB7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬íÊvWE'T&6∂w&˜VÊEVWVTÜV«FÇÜÊ˜rì∞¢76W'BÊWV¬á&W˜'BÊ6ÜV6∂VEˆB¬s##b””ÖC#££„¢rì∞¢76W'BÊWV¬á&W˜'BÊ6ˆÁFVÁE˜&VB¬f«6Rì∞¢76W'BÊFVWWV¬á&W˜'BÁVWVW2ÊFñ«ï˜&W˜'G2¬≤7FGW6W3¢≤VWVVC¢"¬6∆ñ÷VC¢¬6ˆ◊∆WFVC¢¬&∆ˆ6∂VC¢¬fñ∆VC¢“¬Wáó&VEˆ∆V6W3¢¿¢fñ∆VEˆ˜%ˆ&∆ˆ6∂VEÛ#FÉ¢2¬ˆ∆FW7E˜VWVVEˆvUˆ÷ñÁWFW3¢#“ì∞¢76W'BÊFVWWV¬á&W˜'BÁVWVW2Á6óFUˆW'&˜%ˆFñvW7G2¬&W˜'BÁVWVW2ÊFñ«ï˜&W˜'G2ì∞¢76W'BÊWV¬Ü6∆«2Ê∆VÊwFÇ¬Çì∞¢76W'BÊˆ≤Ü6∆«2ÊWfW'íáVW'í”‚Ù4ıTÂE¬Ö¬•¬óƒ‘îÂ¬Üfñ∆&∆UˆE¬íÚÁFW7BáVW'íííì∞¢76W'BÊˆ≤Ü6∆«2ÊWfW'íáVW'í”‚˜ñ∆ˆG«7V÷÷'ó«W6W%ˆñG«FWáG∆V÷ñ«∆&ˆGíˆíÁFW7BáVW'íííì∞ß“ì∞†ßFW7BÇv∆FW7B6ˆ◊∆WFVB6óFRW'&˜"FñvW7Bó2&ˆ¶V7FVBg&ˆ“&˜VÊFVBvw&VvFRfñV∆G2ˆÊ«ír¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆˜B“s##b””ÖCc£Rs∞¢6ˆÁ7B7V÷÷'í“}	˝Ì-]≠ÌççÌ¢d”¢=]=çÌ-››ΩRM››ΩR‚s∞¢6ˆÁ7B÷WG&ñ72“≤F˜F≈ˆWfVÁG5Û#FÉ¢í¬WfVÁG5ˆ∆7EˆÜ˜W#¢"¿¢WfVÁG3¢∑≤WfVÁEˆ6ˆFS¢vß5˜'VÁFñ÷Rr¬vUˆ&V¢v˜FÜW"r¬ˆ67W'&VÊ6W3¢í’“”∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÜ7ñÊ2Çí”‚µ∑≤FñvW7E˜6∆˜C¢6∆˜B¿¢vVÊW&FVEˆC¢ÊWrFFRÇs##b””ÖCc£c£„¢rí¬÷WG&ñ75ˆß6ˆ„¢•4Ù‚Á7G&ñÊvñgíÜ÷WG&ñ72í¬7V÷÷'í’’“ì∞¢76W'BÊFVWWV¬ÜvóB&WÚÊvWD∆FW7E6óFTW'&˜$FñvW7BÇí¬≤FñvW7E˜6∆˜C¢6∆˜B¿¢vVÊW&FVEˆC¢ÊWrFFRÇs##b””ÖCc£c£„¢rí¬÷WG&ñ72¬7V÷÷'í“ì∞ß“ì∞ßFW7BÇwFV6ÜÊñ6¬∆W'BVW'í∆ñW2FÜR6˜W&6RFá&W6Üˆ∆G2ÊBFW&ófW26WfW&óGívóFÜ˜WB&rFñvÊ˜7Fñ72r¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÇá7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢VW'í“≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2”∞¢&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤WfVÁEˆ6ˆFS¢vFF&6U˜&WVW7Eˆfñ∆VBr¬vUˆ&V¢vFF&6Rr¬WfVÁEˆ6˜VÁC¢2¿¢Ü˜W%ˆ'V6∂WC¢ÊWrFFRÇs##b””UC#££¢rí’’“ì∞¢“ì∞¢6ˆÁ7B∆W'G2“vóB&WÚÊ∆ó7E6óFTW'&˜$∆W'G2Çì∞¢76W'BÊWV¬Ü∆W'G2Ê∆VÊwFÇ¬ì∞¢76W'BÊWV¬Ü∆W'G5≥“Á6WfW&óGí¬v7&óFñ6¬rì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ÙñÁFW'f≈¬ÇuC#DÇu¬íÚì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ˆWfVÁEˆ6˜VÁB„“2Úì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ˆWfVÁEˆ6˜VÁB„“Úì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬Ùƒî‘ïB#Úì∞¢76W'BÊFˆW4Ê˜D÷F6ÇáVW'íÁFWáB¬ˆ÷W76vW∆FW67&óFñˆÁ«W6W%ˆñG∆V÷ñ¬ˆíì∞ß“ì∞†ßFW7BÇvÊ˜Fñfñ6Fñˆ‚7FFRVW&ñW2ÊBw&óFW2&R66˜VBFÚˆÊRfW&ñfñVBW6W"r¬7ñÊ2Çí”‚∞¢6ˆÁ7B˜W&FñˆÁ2“µ”∞¢6ˆÁ7BGÇ“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚≤˜W&FñˆÁ2ÁW6Çá≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2“ì≤&WGW&‚µµ’”≤”∞¢6ˆÁ7B7¬“ˆ&¶V7BÊ76ñv‚Ü7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢˜W&FñˆÁ2ÁW6Çá≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2“ì∞¢&WGW&‚µ∑≤Ê˜Fñfñ6FñˆÂˆ∂Wì¢w&V∆V6SßFW7Br¬&VEˆC¢ÊWrFFRÇs##b””uC££¢rí’’”∞¢“¬≤&Vvñ„¢7ñÊ2v˜&≤”‚v˜&≤áGÇí“ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬ì∞¢6ˆÁ7B7FFW2“vóB&WÚÊ∆ó7DÊ˜Fñfñ6FñˆÂ&VE7FFW2ÇwfW&ñfñVB◊W6W"rì∞¢76W'BÊWV¬á7FFW5≥“ÊÊ˜Fñfñ6FñˆÂˆ∂Wí¬w&V∆V6SßFW7Brì∞¢76W'BÊˆ≤Ü˜W&FñˆÁ5≥“Áf«VW2ÊñÊ6«VFW2ÇwfW&ñfñVB◊W6W"ríì∞¢76W'BÊ÷F6ÇÜ˜W&FñˆÁ5≥“ÁFWáB¬Ùı$DU"%íÊ˜Fñfñ6FñˆÂˆ∂Wíƒî‘ïBÚì∞¢vóB&WÚÁ6fTÊ˜Fñfñ6FñˆÂ&VE7FFW2ÇwfW&ñfñVB◊W6W"r¬≤w&V∆V6SßFW7Br¬vFó6÷ó76VCß&V∆V6SßFW7Bu“ì∞¢6ˆÁ7Bw&óFW2“˜W&FñˆÁ2Á6∆ñ6RÉì∞¢76W'BÊWV¬áw&óFW2Ê∆VÊwFÇ¬"ì∞¢76W'BÊˆ≤áw&óFW2ÊWfW'íáw&óFR”‚w&óFRÁFWáBÊñÊ6«VFW2ÇuU4U%BîÂDÚf’ˆÊ˜Fñfñ6FñˆÂ˜&VG2ríbbw&óFRÁf«VW2ÊñÊ6«VFW2ÇwfW&ñfñVB◊W6W"rííì∞¢vóB76W'BÁ&V¶V7G2á&WÚÁ6fTÊ˜Fñfñ6FñˆÂ&VE7FFW2ÇwfW&ñfñVB◊W6W"r¬'&íÉíÊfñ∆¬Çv∂Wíríí¬GóTW'&˜"ì∞ß“ì∞†ßFW7BÇv7FófR7W7VÁ6ñˆ‚∆ˆˆ∑Wó2&˜VÊFVBFÚFÜR7F˜"66Üˆˆ¬ÊBñvÊ˜&W2Wáó&VB&V6˜&G2r¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÇá7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢VW'í“≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2”∞¢&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤&V6ˆ„¢w7ñÁFÜWFñ2ˆ∆ñ7ífñˆ∆Fñˆ‚r¬GW&FñˆÂˆÜ˜W'3¢#B¬Wáó&W5ˆC¢s#ìí””C££¢r’’“ì∞¢“ì∞¢6ˆÁ7B7W7VÁ6ñˆ‚“vóB&WÚÊvWD7FófT66˜VÁE7W7VÁ6ñˆ‚Çw66Üˆˆ¬÷r¬w7GVFVÁB÷rì∞¢76W'BÊWV¬á7W7VÁ6ñˆ‚Á&V6ˆ‚¬w7ñÁFÜWFñ2ˆ∆ñ7ífñˆ∆Fñˆ‚rì∞¢76W'BÊˆ≤áVW'íÁf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷ríì∞¢76W'BÊˆ≤áVW'íÁf«VW2ÊñÊ6«VFW2Çw7GVFVÁB÷ríì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬˜7FGW2“v7FófRrÚì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ˆWáó&W5ˆB‚7W'&VÁEWF5Fñ÷W7F◊¬Ö¬íÚì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬Ùƒî‘ïBÚì∞¢76W'BÊFˆW4Ê˜D÷F6ÇáVW'íÁFWáB¬ı4TƒT5B¬¢Úì∞¢vóB76W'BÁ&V¶V7G2á&WÚÊvWD7FófT66˜VÁE7W7VÁ6ñˆ‚Çrr¬w7GVFVÁB÷rí¬GóTW'&˜"ì∞ß“ì∞†ßFW7BÇv7FófR7W7VÁ6ñˆ‚∆ó7Bó266Üˆˆ¬÷&˜VÊB¬Fñ÷R÷fñ«FW&VB¬ÊB&˜VÊFVBr¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÇá7G&ñÊw2¬‚‚Áf«VW2í”‚≤VW'í“≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2”≤&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµ∑≤F&vWEˆñC¢w7GVFVÁB÷r’’“ì≤“ì∞¢6ˆÁ7B&˜w2“vóB&WÚÊ∆ó7D7FófT66˜VÁE7W7VÁ6ñˆÁ2Çw66Üˆˆ¬÷rì∞¢76W'BÊFVWWV¬á&˜w2¬∑≤F&vWEˆñC¢w7GVFVÁB÷r’“ì∞¢76W'BÊˆ≤áVW'íÁf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷ríì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬˜66Üˆˆ≈ˆñB“√ÚÚì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ˆWáó&W5ˆB‚7W'&VÁEWF5Fñ÷W7F◊¬Ö¬íÚì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬Ùƒî‘ïBÚì∞ß“ì∞ßFW7BÇw6fWGí&W˜'Bw&˜W2&R&˜VÊFVB¬6ÊóFó¶VB¬66Üˆˆ¬◊66˜VBÊB6∂Ê˜v∆VFvRFˆ÷ñ6∆«ír¬7ñÊ2Çí”‚∞¢6ˆÁ7BfñÊvW'&ñÁB“vrÁ&WVBÉcBì≤6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BÊ˜r“FFRÁ'6RÇs##b”R”5C££„¢rì∞¢6ˆÁ7BñÊ6ñFVÁG2“≥¬¬%“Ê÷ÇÜˆfg6WB¬íí”‚á≤ó%ˆfñÊvW'&ñÁC¢fñÊvW'&ñÁB¬6˜W&6Uˆ∂ñÊC¢v÷W76vRr¬6FVv˜'ì¢wF&vWFVEˆÜ&76÷VÁBr¿¢6WfW&óGì¢í””“Úv÷VFóV“r¢vÜñvÇr¬7&VFVEˆC¢ÊWrFFRÜÊ˜r“ˆfg6WB¢cÛí¬7F˜%ˆñC¢s””C”É”r¿¢F&vWEˆñC¢s#######"”###"”C##"”É##"”###########"r¬6˜W&6Uˆ˜&ñvñ„¢vf“ÊWÜ◊∆RÁ'Rr¬WfñFVÊ6UˆWÜ6W'C¢w6ÊóFó¶VB6◊∆Rr“íì∞¢∆WB6∂Ê˜v∆VFvVB“f«6S∞¢6ˆÁ7B7¬“ˆ&¶V7BÊ76ñv‚Ü7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çu4TƒT5Bó%ˆfñÊvW'&ñÁB¬6˜W&6Uˆ∂ñÊBríí&WGW&‚µ≤‚‚ÊñÊ6ñFVÁG5’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜W6W%˜&ˆfñ∆W2ríí&WGW&‚µ∑≤ñC¢f«VW2ÊBÇ”í¬&ˆ∆S¢w7GVFVÁBr¬fó'7EˆÊ÷S¢}
--]"r¬∆7EˆÊ÷S¢}
-=}]›ç¢r¬6∆75ˆÊ÷S¢sç	r’’”∞¢&WGW&‚µµ’”∞¢“¬≤&Vvñ„¢7ñÊ26∆∆&6≤”‚6∆∆&6≤Ü7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çu4TƒT5BñÊ6ñFVÁEˆñBríí&WGW&‚6∂Ê˜v∆VFvVBÚµµ’“¢µ∑≤ñÊ6ñFVÁEˆñC¢vñÊ6ñFVÁB”r“¬≤ñÊ6ñFVÁEˆñC¢vñÊ6ñFVÁB”"r’’”∞¢ñbáFWáBÊñÊ6«VFW2ÇuUDDRf’˜6fWGïˆñÊ6ñFVÁG2ríí≤6∂Ê˜v∆VFvVB“G'VS≤&WGW&‚µµ’”≤–¢&WGW&‚µµ’”∞¢“í“ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬ì∞¢6ˆÁ7B&W7V«B“vóB&WÚÊ∆ó7E66Üˆˆ≈6fWGï&W˜'G2Çw66Üˆˆ¬÷rì∞¢76W'BÊWV¬á&W7V«BÁW&ñˆEˆFó2¬3ì∞¢76W'BÊWV¬á&W7V«BÁ&W˜'G2Ê∆VÊwFÇ¬ì∞¢76W'BÊWV¬á&W7V«BÁ&W˜'G5≥“Êˆ67W'&VÊ6W2¬2ì∞¢76W'BÊWV¬á&W7V«BÁ&W˜'G5≥“Á6WfW&óGí¬vÜñvÇrì∞¢76W'BÊWV¬á&W7V«BÁ&W˜'G5≥“Ê7F˜"Êfó'7EˆÊ÷R¬}
--]"rì∞¢76W'BÊWV¬Ñˆ&¶V7BÊÜ4˜v‚á&W7V«BÁ&W˜'G5≥“Ê7F˜"¬w7V&¶V7Brí¬f«6Rì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2Ç$ñÁFW'f¬ÇuìBrí"íbb6∆¬Áf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷rííì∞¢76W'BÊWV¬ÜvóB&WÚÊ6∂Ê˜v∆VFvU66Üˆˆ≈6fWGï&W˜'Bá≤66ÜˆˆƒñC¢w66Üˆˆ¬÷r¬&WfñWvW$ñC¢vF÷ñ‚÷r¬fñÊvW'&ñÁB¬6FVv˜'ì¢wF&vWFVEˆÜ&76÷VÁBr¬6˜W&6T∂ñÊC¢v÷W76vRr“í¬G'VRì∞¢76W'BÊWV¬ÜvóB&WÚÊ6∂Ê˜v∆VFvU66Üˆˆ≈6fWGï&W˜'Bá≤66ÜˆˆƒñC¢w66Üˆˆ¬÷"r¬&WfñWvW$ñC¢vF÷ñ‚÷"r¬fñÊvW'&ñÁB¬6FVv˜'ì¢wF&vWFVEˆÜ&76÷VÁBr¬6˜W&6T∂ñÊC¢v÷W76vRr“í¬f«6Rì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2Çw&WfñWvVEˆ'í“Úríbb6∆¬Áf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷rííì∞¢vóB76W'BÁ&V¶V7G2á&WÚÊ6∂Ê˜v∆VFvU66Üˆˆ≈6fWGï&W˜'Bá≤66ÜˆˆƒñC¢w66Üˆˆ¬÷r¬&WfñWvW$ñC¢vF÷ñ‚÷r¬fñÊvW'&ñÁC¢v&Br¬6FVv˜'ì¢wF&vWFVEˆÜ&76÷VÁBr¬6˜W&6T∂ñÊC¢v÷W76vRr“í¬GóTW'&˜"ì∞ß“ì∞†ßFW7BÇw6fWGí6ñvÊ¬w&óFW"7F˜&W2ˆÊ«í∂WñVB÷WFFFÊBÊWfW"‚WfñFVÊ6RWÜ6W'Br¬7ñÊ2Çí”‚∞¢∆WBVW'ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íÇá7G&ñÊw2¬‚‚Áf«VW2í”‚≤VW'í“≤FWáC¢7G&ñÊw2Ê¶ˆñ‚ÇsÚrí¬f«VW2”≤&WGW&‚&ˆ÷ó6RÁ&W6ˆ«fRÖµµ’“ì≤“ì∞¢76W'BÊWV¬ÜvóB&WÚÁ&V6˜&E6fWGï6ñvÊ¬á≤66ÜˆˆƒñC¢w66Üˆˆ¬÷r¬fñÊvW'&ñÁC¢vrÁ&WVBÉcBí¬6˜W&6T∂ñÊC¢v÷W76vRr¿¢6FVv˜'ì¢wFá&VEˆ˜%ˆñÁFñ÷ñFFñˆ‚r¬6WfW&óGì¢vÜñvÇr¬7F˜$ñC¢s””C”É”r¿¢F&vWDñC¢s#######"”###"”C##"”É##"”###########"r¬6˜W&6T˜&ñvñ„¢v÷W76vW2r“í¬G'VRì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ÙîÂ4U%BîÂDÚf’˜6fWGïˆñÊ6ñFVÁG2Úì∞¢76W'BÊ÷F6ÇáVW'íÁFWáB¬ˆWfñFVÊ6UˆWÜ6W'E¬ï«2µd≈TU2Úì∞¢76W'BÊˆ≤áVW'íÁf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷ríbbVW'íÁf«VW2ÊñÊ6«VFW2ÇvrÁ&WVBÉcBííì∞¢76W'BÊWV¬áVW'íÁf«VW2ÊñÊ6«VFW2Ç}-]≠"==Ì}≤rí¬f«6Rì∞¢76W'BÊWV¬áVW'íÁFWáBÊñÊ6«VFW2Ç}-]≠"==Ì}≤rí¬f«6Rì∞¢76W'BÊˆ≤áVW'íÁFWáBÊñÊ6«VFW2ÇtÂTƒ¬rí¬w&WfñWrfñV∆G2ÊBWÜ6W'B&RÁV∆¬rì∞¢vóB76W'BÁ&V¶V7G2á&WÚÁ&V6˜&E6fWGï6ñvÊ¬á≤66ÜˆˆƒñC¢w66Üˆˆ¬÷r¬fñÊvW'&ñÁC¢v&Br¬6˜W&6T∂ñÊC¢v÷W76vRr¿¢6FVv˜'ì¢wFá&VEˆ˜%ˆñÁFñ÷ñFFñˆ‚r¬6WfW&óGì¢vÜñvÇr¬7F˜$ñC¢s””C”É”r¬6˜W&6T˜&ñvñ„¢v÷W76vW2r“í¬GóTW'&˜"ì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬F÷ñ‚˜fW'fñWr&ñÊG2WfW'í&ˆ¶V7Fñˆ‚FÚóG266Üˆˆ¬ÊB&WGW&Á2ÊÚWáFW&Ê¬ñFVÁFóGífñV∆G2r¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7B7¬“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜W6W%˜&ˆfñ∆W2ríí&WGW&‚µ∑≤ñC¢w7ñÁFÜWFñ2◊W6W"r¬&ˆ∆S¢w7GVFVÁBr¬fó'7EˆÊ÷S¢}
--]"r’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆ∆ó7FñÊw2ríí&WGW&‚µ∑≤ñC¢v∆ó7FñÊr÷ñBr¬W6W%ˆñC¢w7ñÁFÜWFñ2◊W6W"r¬7FGW3¢wVÊFñÊrr¬Ü˜Fı˜7FGW3¢wVÊFñÊrr’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜66Üˆˆ≈ˆF÷ñÂˆVFóBríí&WGW&‚µ∑≤7F˜%ˆñC¢vF÷ñ‚÷r¬F&vWEˆñC¢w7GVFVÁB÷r¬7Fñˆ„¢w&ˆ∆U˜&Wfˆ∂VBr¬7&VFVEˆC¢s##b””C££¢r’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆ66˜VÁE˜7W7VÁ6ñˆÂˆVFóBríí&WGW&‚µµ’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜66Üˆˆ≈ˆ6ˆÁFVÁEˆVFóBríí&WGW&‚µµ’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆ66˜VÁEˆFV∆WFñˆÂ˜&WVW7G2ríí&WGW&‚µµ’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆ66˜VÁE˜7W7VÁ6ñˆÁ2ríí&WGW&‚µµ’”∞¢&WGW&‚µµ’”∞¢”∞¢6ˆÁ7B˜fW'fñWr“vóB7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬íÊvWE66ÜˆˆƒF÷ñ‰˜fW'fñWrÇw66Üˆˆ¬÷rì∞¢76W'BÊWV¬Ü˜fW'fñWrÁW6W'5≥“ÊñB¬w7ñÁFÜWFñ2◊W6W"rì∞¢76W'BÊWV¬Ü˜fW'fñWrÊ∆ó7FñÊw5≥“Ê÷ˆFW&FñˆÂ˜7FGW2¬wVÊFñÊrrì∞¢76W'BÊWV¬Ü˜fW'fñWrÊVFóE≥“Ê7F˜"¬vF÷ñ‚÷rì∞¢76W'BÊWV¬Ñˆ&¶V7BÊÜ4˜v‚Ü˜fW'fñWrÁW6W'5≥“¬w7V&¶V7Brí¬f«6Rì∞¢76W'BÊWV¬Ü6∆«2Ê∆VÊwFÇ¬rì∞¢f˜"Ü6ˆÁ7B6∆¬ˆb6∆«2í76W'BÊˆ≤Ü6∆¬Áf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷ríì∞¢vóB76W'BÁ&V¶V7G2Ü7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬íÊvWE66ÜˆˆƒF÷ñ‰˜fW'fñWrÇrrí¬GóTW'&˜"ì∞ß“ì∞†ßFW7BÇvñFVñ÷vR∂Wó2&RFˆ÷ñ6∆«í∆ñÊ∂VBFÚFÜR7ñÁFÜWFñ2ñFVg&ˆ“ˆÊ«íFÜVó"W∆ˆFW"r¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BGÇ“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜VÊFñÊuˆ÷VFñríí&WGW&‚µ∑≤7FGW3¢wVÊFñÊrr’’”∞¢&WGW&‚µµ’”∞¢”∞¢6ˆÁ7B7¬“ˆ&¶V7BÊ76ñv‚Ü7ñÊ2Çí”‚µµ’“¬≤&Vvñ„¢7ñÊ2v˜&≤”‚v˜&≤áGÇí“ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬ì∞¢6ˆÁ7BW6W$ñB“v÷”F”Ü÷s∞¢6ˆÁ7B∂Wí“VÊFñÊrÚG∑W6W$ñG“Û””C”É”ÁvV'∞¢6ˆÁ7B&W7V«B“vóB&WÚÊ7&VFTñFVá≤W6W%ˆñC¢W6W$ñB¬66Üˆˆ≈ˆñC¢w66Üˆˆ¬÷r¬FWáC¢}
--]-Ì-ÚçM]Úr¿¢ñ÷vUˆ∂Wó3¢∂∂Wï“¬ñ÷vU˜7FGW3¢wVÊFñÊrr¬ï˜7FGW3¢v&˜fVBr¬ï˜7V÷÷'ì¢}
--]"r¬ï˜&V6ˆ„¢rr¬F÷ñÂ˜7FGW3¢vÊWrr“ì∞¢76W'BÊ÷F6Çá&W7V«BÊñB¬ıÂ≥”ñ÷b’◊≥3g“BÚì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2ÇtîÂ4U%BîÂDÚf’ˆñFV2ríbb6∆¬ÁFWáBÊñÊ6«VFW2Çvñ÷vUˆ∂Wó2rííì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2ÇtîÂ4U%BîÂDÚf’ˆñFVˆñ÷vW2ríbb6∆¬Áf«VW2ÊñÊ6«VFW2Ü∂Wíííì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2Ç%4UB7FGW2“v∆ñÊ∂VBr"íbb6∆¬Áf«VW2ÊñÊ6«VFW2Ü∂Wííbb6∆¬Áf«VW2ÊñÊ6«VFW2áW6W$ñBííì∞ß“ì∞†ßFW7BÇvñFVñ÷vR∆ñÊ∂vR&V¶V7G2‚ˆ&¶V7B˜vÊVB'íÊ˜FÜW"66˜VÁB&Vf˜&RñÁ6W'FñÊrFÜRñFVr¬7ñÊ2Çí”‚∞¢∆WBñÁ6W'FVB“f«6S∞¢6ˆÁ7BGÇ“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜VÊFñÊuˆ÷VFñríí&WGW&‚f«VW2ÊñÊ6«VFW2Çv&&&&&&&"÷&&&"”F&&"”Ü&&"÷&&&&&&&&&&&"ríÚµµ’“¢µ∑≤7FGW3¢wVÊFñÊrr’’”∞¢ñbáFWáBÊñÊ6«VFW2ÇtîÂ4U%BîÂDÚf’ˆñFV2rííñÁ6W'FVB“G'VS∞¢&WGW&‚µµ’”∞¢”∞¢6ˆÁ7B7¬“ˆ&¶V7BÊ76ñv‚Ü7ñÊ2Çí”‚µµ’“¬≤&Vvñ„¢7ñÊ2v˜&≤”‚v˜&≤áGÇí“ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬ì∞¢6ˆÁ7B∂Wí“wVÊFñÊrˆ÷”F”Ü÷Û””C”É”ÁvV's∞¢vóB76W'BÁ&V¶V7G2á&WÚÊ7&VFTñFVá≤W6W%ˆñC¢v&&&&&&&"÷&&&"”F&&"”Ü&&"÷&&&&&&&&&&&"r¬66Üˆˆ≈ˆñC¢w66Üˆˆ¬÷r¿¢FWáC¢}
-}=mÚ≠-ç›≠r¬ñ÷vUˆ∂Wó3¢∂∂Wï“¬ñ÷vU˜7FGW3¢wVÊFñÊrr¬ï˜7FGW3¢v&˜fVBr¬F÷ñÂ˜7FGW3¢vÊWrr“í¬ˆñFVñ÷vRVÊfñ∆&∆RÚì∞¢76W'BÊWV¬ÜñÁ6W'FVB¬f«6Rì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬ñFV&WfñWr∆ó7FñÊrWÜ6«VFW2FÜR7W'&VÁB&WfñWvW"˜v‚7V&÷ó76ñˆ‚r¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7B7¬“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFV2ríí&WGW&‚µ∑≤ñC¢vñFV÷r¬66Üˆˆ≈ˆñC¢w66Üˆˆ¬÷r¬FWáC¢}
-ç›-]-ç}]≠ÚçM]Úr¬ñ÷vU˜7FGW3¢wVÊFñÊrr’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFVˆñ÷vW2ríí&WGW&‚µ∑≤ˆ&¶V7Eˆ∂Wì¢wVÊFñÊr˜W6W"÷ñB˜Ü˜FÚÁvV'r’’”∞¢&WGW&‚µµ’”∞¢”∞¢6ˆÁ7B&WfñWvW$ñB“v÷”F”Ü÷s∞¢6ˆÁ7BñFV2“vóB7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬íÊ∆ó7EVÊFñÊu66ÜˆˆƒñFV2Çw66Üˆˆ¬÷r¬&WfñWvW$ñBì∞¢76W'BÊFVWWV¬ÜñFV2¬∑≤ñC¢vñFV÷r¬66Üˆˆ≈ˆñC¢w66Üˆˆ¬÷r¬FWáC¢}
-ç›-]-ç}]≠ÚçM]Úr¿¢ñ÷vU˜7FGW3¢wVÊFñÊrr¬ñ÷vUˆ∂Wó3¢≤wVÊFñÊr˜W6W"÷ñB˜Ü˜FÚÁvV'u“’“ì∞¢6ˆÁ7BVWVR“6∆«2ÊfñÊBÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFV2ríì∞¢76W'BÊ÷F6ÇáVWVRÁFWáB¬˜W6W%ˆñB“√ÚÚì∞¢76W'BÊˆ≤áVWVRÁf«VW2ÊñÊ6«VFW2Çw66Üˆˆ¬÷ríì∞¢76W'BÊˆ≤áVWVRÁf«VW2ÊñÊ6«VFW2á&WfñWvW$ñBíì∞¢76W'BÊˆ≤Ü6∆«2Á6ˆ÷RÜ6∆¬”‚6∆¬ÁFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFVˆñ÷vW2ríbb6∆¬Áf«VW2ÊñÊ6«VFW2ÇvñFV÷rííì∞ß“ì∞†ßFW7BÇw66Üˆˆ¬ñFVFWáB&WfñWró26÷R◊66Üˆˆ¬¬WÜ6«VFW26V∆b&WfñWrÊBVFóG2&˜VÊFVBFV6ó6ñˆ‚r¬7ñÊ2Çí”‚∞¢6ˆÁ7B6∆«2“µ”∞¢6ˆÁ7BGÇ“7ñÊ2á7G&ñÊw2¬‚‚Áf«VW2í”‚∞¢6ˆÁ7BFWáB“7G&ñÊw2Ê¶ˆñ‚ÇsÚrì≤6∆«2ÁW6Çá≤FWáB¬f«VW2“ì∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’˜W6W%˜&ˆfñ∆W2ríí&WGW&‚µ∑≤66Üˆˆ≈ˆñC¢w66Üˆˆ¬÷r¬&ˆ∆S¢v6˜VÊ6ñ≈ˆ÷V÷&W"r¬7FófS¢G'VR’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFV2ríí&WGW&‚µ∑≤W6W%ˆñC¢w7GVFVÁB÷ñBr¬ï˜7FGW3¢wVÊFñÊrr¬ñ÷vU˜7FGW3¢wVÊFñÊrr’’”∞¢ñbáFWáBÊñÊ6«VFW2Çte$Ù“f’ˆñFVˆñ÷vW2ríí&WGW&‚µ∑≤ñ÷vUˆñÊFWÉ¢¬ˆ&¶V7Eˆ∂Wì¢wVÊFñÊr˜7GVFVÁB÷ñB˜Ü˜FÚÁvV'r’’”∞¢&WGW&‚µµ’”∞¢”∞¢6ˆÁ7B7¬“ˆ&¶V7BÊ76ñv‚ÇÇí”‚&ˆ÷ó6RÁ&W6ˆ«fRÖµµ’“í¬≤&Vvñ„¢6∆∆&6≤”‚6∆∆&6≤áGÇí“ì∞¢6ˆÁ7B&WÚ“7&VFUñF$∆ó7FñÊw5&W˜6óF˜'íá7¬ì∞¢76W'BÊWzÁkhëÈÏ∂ªßq´^u1111111-1111-4111-8111-111111111111', school_id: 'school-a',
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createYdbListingsRepository } from '../repositories/ydb-listings.mjs';
+import { getSiteErrorDigestSlot } from '../services/site-error-digest.mjs';
+
+test('site error digest slot uses UTC quarter hours and rejects invalid dates', () => {
+  assert.equal(getSiteErrorDigestSlot(new Date('2026-11-18T06:29:59.999Z')), '2026-11-18T06:15');
+  assert.equal(getSiteErrorDigestSlot(new Date('2026-11-18T06:30:00.000Z')), '2026-11-18T06:30');
+  assert.throws(() => getSiteErrorDigestSlot(new Date('invalid')), /invalid site error digest time/);
+});
+
+test('school role review queue joins only the same-school profile projection', async () => {
+  let query;
+  const row = { request_id: 'request-a', user_id: '11111111-1111-4111-8111-1234567890ab', requested_role: 'council_member',
+    status: 'pending', first_name: '–¢–µ—Å—Ç', last_name: '–£—á–µ–Ω–∏–∫', class_name: '8–ê' };
+  const repository = createYdbListingsRepository(strings => { query = strings.join('?'); return Promise.resolve([[row]]); });
+  assert.deepEqual(await repository.listPendingSchoolRoleRequests('school-a'), [row]);
+  assert.match(query, /INNER JOIN fam_user_profiles AS p ON p\.user_id = r\.user_id AND p\.school_id = r\.school_id/);
+  assert.match(query, /r\.school_id = \?/);
+  assert.match(query, /r\.status IN \('pending', 'reviewing'\)/);
+  assert.match(query, /LIMIT 50/);
+});
+
+test('site error digest aggregation reads only bounded aggregate counters and returns top categories', async () => {
+  let query;
+  const rows = [
+    { event_code: 'js_runtime', page_area: 'other', event_count: 4, last_hour: true },
+    { event_code: 'database_request_failed', page_area: 'database', event_count: 2, last_hour: false },
+    { event_code: 'js_runtime', page_area: 'other', event_count: 3, last_hour: false },
+  ];
+  const repo = createYdbListingsRepository((strings) => { query = strings.join('?'); return Promise.resolve([rows]); });
+  assert.deepEqual(await repo.getSiteErrorDigestMetrics(), {
+    total_events_24h: 9, events_last_hour: 4,
+    events: [{ event_code: 'js_runtime', page_area: 'other', occurrences: 7 },
+      { event_code: 'database_request_failed', page_area: 'database', occurrences: 2 }],
+  });
+  assert.match(query, /Interval\('PT24H'\)/);
+  assert.match(query, /Interval\('PT1H'\)/);
+  assert.match(query, /LIMIT 1000/);
+  assert.doesNotMatch(query, /body|text|url|user_id|email|stack/i);
+});
+
+test('RU background queue health reads only aggregate statuses, expired leases and queue age', async () => {
+  const calls = [];
+  const now = () => Date.parse('2026-11-18T12:00:00.000Z');
+  const sql = strings => {
+    const text = strings.join('?'); calls.push(text);
+    if (text.includes('GROUP BY status')) return Promise.resolve([[{ status: 'queued', count: 2 }, { status: 'claimed', count: 1 }]]);
+    if (text.includes('lease_expires_at')) return Promise.resolve([[{ count: 1 }]]);
+    if (text.includes("status IN ('failed', 'blocked')")) return Promise.resolve([[{ count: 3 }]]);
+    if (text.includes('MIN(available_at)')) return Promise.resolve([[{ oldest_queued_at: new Date('2026-11-18T11:40:00.000Z') }]]);
+    throw new Error('unexpected query');
+  };
+  const report = await createYdbListingsRepository(sql).getRuBackgroundQueueHealth(now);
+  assert.equal(report.checked_at, '2026-11-18T12:00:00.000Z');
+  assert.equal(report.content_read, false);
+  assert.deepEqual(report.queues.daily_reports, { statuses: { queued: 2, claimed: 1, completed: 0, blocked: 0, failed: 0 }, expired_leases: 1,
+    failed_or_blocked_24h: 3, oldest_queued_age_minutes: 20 });
+  assert.deepEqual(report.queues.site_error_digests, report.queues.daily_reports);
+  assert.equal(calls.length, 8);
+  assert.ok(calls.every(query => /COUNT\(\*\)|MIN\(available_at\)/.test(query)));
+  assert.ok(calls.every(query => !/payload|summary|user_id|text|email|body/i.test(query)));
+});
+
+test('latest completed site error digest is projected from bounded aggregate fields only', async () => {
+  const slot = '2026-11-18T06:15';
+  const summary = '–ü—Ä–æ–≤–µ—Ä–∫–∞ –æ—à–∏–±–æ–∫ FAM: –∞–≥—Ä–µ–≥–∏—Ä–æ–≤–∞–Ω–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ.';
+  const metrics = { total_events_24h: 9, events_last_hour: 2,
+    events: [{ event_code: 'js_runtime', page_area: 'other', occurrences: 9 }] };
+  const repo = createYdbListingsRepository(async () => [[{ digest_slot: slot,
+    generated_at: new Date('2026-11-18T06:16:00.000Z'), metrics_json: JSON.stringify(metrics), summary }]]);
+  assert.deepEqual(await repo.getLatestSiteErrorDigest(), { digest_slot: slot,
+    generated_at: new Date('2026-11-18T06:16:00.000Z'), metrics, summary });
+});
+test('technical alert query applies the source thresholds and derives severity without raw diagnostics', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ event_code: 'database_request_failed', page_area: 'database', event_count: 3,
+      hour_bucket: new Date('2026-11-15T12:00:00Z') }]]);
+  });
+  const alerts = await repo.listSiteErrorAlerts();
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].severity, 'critical');
+  assert.match(query.text, /Interval\('PT24H'\)/);
+  assert.match(query.text, /event_count >= 3/);
+  assert.match(query.text, /event_count >= 10/);
+  assert.match(query.text, /LIMIT 20/);
+  assert.doesNotMatch(query.text, /message|description|user_id|email/i);
+});
+
+test('notification state queries and writes are scoped to one verified user', async () => {
+  const operations = [];
+  const tx = async (strings, ...values) => { operations.push({ text: strings.join('?'), values }); return [[]]; };
+  const sql = Object.assign(async (strings, ...values) => {
+    operations.push({ text: strings.join('?'), values });
+    return [[{ notification_key: 'release:test', read_at: new Date('2026-11-17T00:00:00Z') }]];
+  }, { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const states = await repo.listNotificationReadStates('verified-user');
+  assert.equal(states[0].notification_key, 'release:test');
+  assert.ok(operations[0].values.includes('verified-user'));
+  assert.match(operations[0].text, /ORDER BY notification_key LIMIT 10001/);
+  await repo.saveNotificationReadStates('verified-user', ['release:test', 'dismissed:release:test']);
+  const writes = operations.slice(1);
+  assert.equal(writes.length, 2);
+  assert.ok(writes.every(write => write.text.includes('UPSERT INTO fam_notification_reads') && write.values.includes('verified-user')));
+  await assert.rejects(repo.saveNotificationReadStates('verified-user', Array(101).fill('key')), TypeError);
+});
+
+test('active suspension lookup is bounded to the actor school and ignores expired records', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => {
+    query = { text: strings.join('?'), values };
+    return Promise.resolve([[{ reason: 'synthetic policy violation', duration_hours: 24, expires_at: '2099-01-01T00:00:00Z' }]]);
+  });
+  const suspension = await repo.getActiveAccountSuspension('school-a', 'student-a');
+  assert.equal(suspension.reason, 'synthetic policy violation');
+  assert.ok(query.values.includes('school-a'));
+  assert.ok(query.values.includes('student-a'));
+  assert.match(query.text, /status = 'active'/);
+  assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
+  assert.match(query.text, /LIMIT 1/);
+  assert.doesNotMatch(query.text, /SELECT \*/);
+  await assert.rejects(repo.getActiveAccountSuspension('', 'student-a'), TypeError);
+});
+
+test('active suspension list is school-bound, time-filtered, and bounded', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => { query = { text: strings.join('?'), values }; return Promise.resolve([[{ target_id: 'student-a' }]]); });
+  const rows = await repo.listActiveAccountSuspensions('school-a');
+  assert.deepEqual(rows, [{ target_id: 'student-a' }]);
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /school_id = \?/);
+  assert.match(query.text, /expires_at > CurrentUtcTimestamp\(\)/);
+  assert.match(query.text, /LIMIT 100/);
+});
+test('safety report groups are bounded, sanitized, school-scoped and acknowledge atomically', async () => {
+  const fingerprint = 'a'.repeat(64); const calls = [];
+  const now = Date.parse('2026-05-03T00:00:00.000Z');
+  const incidents = [0, 1, 2].map((offset, i) => ({ pair_fingerprint: fingerprint, source_kind: 'message', category: 'targeted_harassment',
+    severity: i === 0 ? 'medium' : 'high', created_at: new Date(now - offset * 60_000), actor_id: '11111111-1111-4111-8111-111111111111',
+    target_id: '22222222-2222-4222-8222-222222222222', source_origin: 'fam.example.ru', evidence_excerpt: 'sanitized sample' }));
+  let acknowledged = false;
+  const sql = Object.assign(async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT pair_fingerprint, source_kind')) return [[...incidents]];
+    if (text.includes('FROM fam_user_profiles')) return [[{ id: values.at(-1), role: 'student', first_name: '–¢–µ—Å—Ç', last_name: '–£—á–µ–Ω–∏–∫', class_name: '8–ê' }]];
+    return [[]];
+  }, { begin: async callback => callback(async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT incident_id')) return acknowledged ? [[]] : [[{ incident_id: 'incident-1' }, { incident_id: 'incident-2' }]];
+    if (text.includes('UPDATE fam_safety_incidents')) { acknowledged = true; return [[]]; }
+    return [[]];
+  }) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.listSchoolSafetyReports('school-a');
+  assert.equal(result.period_days, 30);
+  assert.equal(result.reports.length, 1);
+  assert.equal(result.reports[0].occurrences, 3);
+  assert.equal(result.reports[0].severity, 'high');
+  assert.equal(result.reports[0].actor.first_name, '–¢–µ—Å—Ç');
+  assert.equal(Object.hasOwn(result.reports[0].actor, 'subject'), false);
+  assert.ok(calls.some(call => call.text.includes("Interval('P90D')") && call.values.includes('school-a')));
+  assert.equal(await repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint, category: 'targeted_harassment', sourceKind: 'message' }), true);
+  assert.equal(await repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-b', reviewerId: 'admin-b', fingerprint, category: 'targeted_harassment', sourceKind: 'message' }), false);
+  assert.ok(calls.some(call => call.text.includes('reviewed_by = ?') && call.values.includes('school-a')));
+  await assert.rejects(repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'bad', category: 'targeted_harassment', sourceKind: 'message' }), TypeError);
+});
+
+test('safety signal writer stores only keyed metadata and never an evidence excerpt', async () => {
+  let query;
+  const repo = createYdbListingsRepository((strings, ...values) => { query = { text: strings.join('?'), values }; return Promise.resolve([[]]); });
+  assert.equal(await repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'a'.repeat(64), sourceKind: 'message',
+    category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111',
+    targetId: '22222222-2222-4222-8222-222222222222', sourceOrigin: 'messages' }), true);
+  assert.match(query.text, /INSERT INTO fam_safety_incidents/);
+  assert.match(query.text, /evidence_excerpt\)\s+VALUES/);
+  assert.ok(query.values.includes('school-a') && query.values.includes('a'.repeat(64)));
+  assert.equal(query.values.includes('—Ç–µ–∫—Å—Ç —É–≥—Ä–æ–∑—ã'), false);
+  assert.equal(query.text.includes('—Ç–µ–∫—Å—Ç —É–≥—Ä–æ–∑—ã'), false);
+  assert.ok(query.text.includes('NULL'), 'review fields and excerpt are null');
+  await assert.rejects(repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'bad', sourceKind: 'message',
+    category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111', sourceOrigin: 'messages' }), TypeError);
+});
+
+test('school admin overview binds every projection to its school and returns no external identity fields', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ id: 'synthetic-user', role: 'student', first_name: '–¢–µ—Å—Ç' }]];
+    if (text.includes('FROM fam_listings')) return [[{ id: 'listing-id', user_id: 'synthetic-user', status: 'pending', photo_status: 'pending' }]];
+    if (text.includes('FROM fam_school_admin_audit')) return [[{ actor_id: 'admin-a', target_id: 'student-a', action: 'role_revoked', created_at: '2026-01-01T00:00:00Z' }]];
+    if (text.includes('FROM fam_account_suspension_audit')) return [[]];
+    if (text.includes('FROM fam_school_content_audit')) return [[]];
+    if (text.includes('FROM fam_account_deletion_requests')) return [[]];
+    if (text.includes('FROM fam_account_suspensions')) return [[]];
+    return [[]];
+  };
+  const overview = await createYdbListingsRepository(sql).getSchoolAdminOverview('school-a');
+  assert.equal(overview.users[0].id, 'synthetic-user');
+  assert.equal(overview.listings[0].moderation_status, 'pending');
+  assert.equal(overview.audit[0].actor, 'admin-a');
+  assert.equal(Object.hasOwn(overview.users[0], 'subject'), false);
+  assert.equal(calls.length, 7);
+  for (const call of calls) assert.ok(call.values.includes('school-a'));
+  await assert.rejects(createYdbListingsRepository(sql).getSchoolAdminOverview(''), TypeError);
+});
+
+test('idea image keys are atomically linked to the synthetic idea from only their uploader', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_pending_media')) return [[{ status: 'pending' }]];
+    return [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const key = `pending/${userId}/11111111-1111-4111-8111-111111111111.webp`;
+  const result = await repo.createIdea({ user_id: userId, school_id: 'school-a', text: '–¢–µ—Å—Ç–æ–≤–∞—è –∏–¥–µ—è',
+    image_keys: [key], image_status: 'pending', ai_status: 'approved', ai_summary: '–¢–µ—Å—Ç', ai_reason: '', admin_status: 'new' });
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_ideas') && !call.text.includes('image_keys')));
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_idea_images') && call.values.includes(key)));
+  assert.ok(calls.some(call => call.text.includes("SET status = 'linked'") && call.values.includes(key) && call.values.includes(userId)));
+});
+
+test('idea image linkage rejects an object owned by another account before inserting the idea', async () => {
+  let inserted = false;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('FROM fam_pending_media')) return values.includes('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') ? [[]] : [[{ status: 'pending' }]];
+    if (text.includes('INSERT INTO fam_ideas')) inserted = true;
+    return [[]];
+  };
+  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const key = 'pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/11111111-1111-4111-8111-111111111111.webp';
+  await assert.rejects(repo.createIdea({ user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-a',
+    text: '–ß—É–∂–∞—è –∫–∞—Ä—Ç–∏–Ω–∫–∞', image_keys: [key], image_status: 'pending', ai_status: 'approved', admin_status: 'new' }), /idea image unavailable/);
+  assert.equal(inserted, false);
+});
+
+test('school idea review listing excludes the current reviewer own submission', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', text: '–°–∏–Ω—Ç–µ—Ç–∏—á–µ—Å–∫–∞—è –∏–¥–µ—è', image_status: 'pending' }]];
+    if (text.includes('FROM fam_idea_images')) return [[{ object_key: 'pending/user-id/photo.webp' }]];
+    return [[]];
+  };
+  const reviewerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ideas = await createYdbListingsRepository(sql).listPendingSchoolIdeas('school-a', reviewerId);
+  assert.deepEqual(ideas, [{ id: 'idea-a', school_id: 'school-a', text: '–°–∏–Ω—Ç–µ—Ç–∏—á–µ—Å–∫–∞—è –∏–¥–µ—è',
+    image_status: 'pending', image_keys: ['pending/user-id/photo.webp'] }]);
+  const queue = calls.find(call => call.text.includes('FROM fam_ideas'));
+  assert.match(queue.text, /user_id != \?/);
+  assert.ok(queue.values.includes('school-a'));
+  assert.ok(queue.values.includes(reviewerId));
+  assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images') && call.values.includes('idea-a')));
+});
+
+test('school idea text review is same-school, excludes self review and audits a bounded decision', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('FROM fam_ideas')) return [[{ user_id: 'student-id', ai_status: 'pending', image_status: 'pending' }]];
+    if (text.includes('FROM fam_idea_images')) return [[{ image_index: 0, object_key: 'pending/student-id/photo.webp' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.reviewSchoolIdeaText({ ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', decision: 'reject' }), true);
+  const updates = calls.filter(call => call.text.includes('UPDATE fam_pending_media') || call.text.includes('UPDATE fam_ideas'));
+  assert.equal(updates.length, 2);
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')));
+  const audit = calls.find(call => call.text.includes('INSERT INTO fam_school_content_audit'));
+  assert.ok(audit);
+  assert.ok(audit.values.includes('idea_text_rejected'));
+  assert.ok(!audit.values.includes('–°–∏–Ω—Ç–µ—Ç–∏—á–µ—Å–∫–∞—è –∏–¥–µ—è'));
+});
+
+test('account deletion request validates requester and target from same-school profiles before insert', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) {
+      return [[{ school_id: 'school-a', role: calls.length === 1 ? 'council_member' : 'student', active: true }]];
+    }
+    if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.createAccountDeletionRequest({ schoolId: 'school-a', requesterId: 'council-id', targetId: 'student-id', reasonCode: 'spam', reason: 'Repeated unrelated messages in group.' });
+  assert.equal(result.ok, true);
+  const insert = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_requests'));
+  assert.ok(insert);
+  assert.ok(insert.values.includes('school-a'));
+  assert.ok(insert.values.includes('council-id'));
+  assert.ok(insert.values.includes('student-id'));
+  assert.equal(insert.values.includes('https://issuer'), false);
+  assert.match(insert.text, /'pending'/);
+  const openKey = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_open'));
+  assert.ok(openKey);
+  assert.ok(openKey.values.includes('student-id'));
+  assert.equal(await repo.createAccountDeletionRequest({ schoolId: '', requesterId: 'a', targetId: 'b', reasonCode: 'spam', reason: 'this is a sufficiently long reason' }).then(() => false, () => true), true);
+});
+test('account deletion history is private to its requester and rejection closes the request in one transaction', async () => {
+  let listQuery; const calls = [];
+  const sql = Object.assign((strings, ...values) => { listQuery = { text: strings.join('?'), values }; return Promise.resolve([[{ request_id: 'request-a', status: 'pending' }]]); }, {
+    begin: callback => callback(async (strings, ...values) => {
+      const text = strings.join('?'); calls.push({ text, values });
+      if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+      if (text.includes('SELECT target_id, school_id, status FROM fam_account_deletion_requests')) return [[{ target_id: 'student-a', school_id: 'school-a', status: 'pending' }]];
+      if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[{ request_id: 'request-a', school_id: 'school-a' }]];
+      if (text.includes('SELECT status FROM fam_account_deletion_requests')) return [[{ status: 'rejected' }]];
+      return [[]];
+    }),
+  });
+  const repo = createYdbListingsRepository(sql);
+  const own = await repo.listOwnAccountDeletionRequests('school-a', 'council-a');
+  assert.deepEqual(own, [{ request_id: 'request-a', status: 'pending' }]);
+  assert.ok(listQuery.values.includes('school-a') && listQuery.values.includes('council-a'));
+  assert.match(listQuery.text, /ORDER BY created_at DESC LIMIT 10/);
+  assert.equal(await repo.rejectAccountDeletionRequest('request-a', 'school-a', 'admin-a', '–ü—Ä–æ–≤–µ—Ä–µ–Ω–æ'), true);
+  assert.ok(calls.some(call => call.text.includes("SET status = 'rejected'")));
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_account_deletion_open')));
+  assert.equal(await repo.rejectAccountDeletionRequest('request-a', 'other-school', 'admin-a'), false);
+});
+test('approved account deletion claims only an active same-school request and its eligible target in one transaction', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT target_id, school_id, status FROM fam_account_deletion_requests')) return [[{ target_id: 'target-a', school_id: 'school-a', status: 'pending' }]];
+    if (text.includes('SELECT request_id, school_id FROM fam_account_deletion_open')) return [[{ request_id: 'request-a', school_id: 'school-a' }]];
+    if (text.includes('SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT active FROM fam_user_profiles')) return [[{ active: false }]];
+    if (text.includes('SELECT status FROM fam_account_deletion_requests')) return [[{ status: 'processing' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.beginRequestedAccountDeletion({ requestId: 'request-a', schoolId: 'school-a', reviewerId: 'admin-a' });
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'target-a');
+  assert.match(result.claim_token, /^[0-9a-f-]{36}$/i);
+  assert.ok(calls.some(call => call.text.includes("SET status = 'processing'") && call.values.includes('request-a')));
+  assert.ok(calls.some(call => call.text.includes('SET active = false') && call.values.includes('school-a')));
+  const durableJob = calls.find(call => call.text.includes('INSERT INTO fam_account_deletion_jobs'));
+  assert.ok(durableJob);
+  assert.ok(durableJob.values.includes(result.claim_token));
+});
+test('direct account deletion requires an active same-school administrator and student or council target', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT user_id, issuer, subject, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'target-a', issuer: 'https://issuer.test', subject: 'target-subject', school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('SELECT active FROM fam_user_profiles')) return [[{ active: false }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'admin-a', targetId: 'target-a' });
+  assert.equal(result.ok, true);
+  assert.equal(result.id, 'target-a');
+  assert.equal(result.role, 'council_member');
+  assert.match(result.claim_token, /^[0-9a-f-]{36}$/i);
+  const scopedDeactivate = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET active = false'));
+  assert.ok(scopedDeactivate);
+  assert.ok(scopedDeactivate.values.includes('school-a'));
+  assert.match(scopedDeactivate.text, /role IN \('student', 'council_member'\)/);
+  assert.equal(await repo.beginAdminAccountDeletion({ schoolId: 'school-a', reviewerId: 'same-id', targetId: 'same-id' }).then(() => false, () => true), true);
+});
+test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, active, person_type, staff_position')) return [[{ user_id: 'synthetic-user', active: true, person_type: 'student', staff_position: '', staff_verification_status: 'not_required' }]];
+    if (text.includes('SELECT user_id AS id, school_id')) return [[{ id: 'synthetic-user', school_id: 'school-a', role: 'student', first_name: '–ê–Ω—è', last_name: '–ò–≤–∞–Ω–æ–≤–∞', class_name: '8–ê' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', { first_name: '–ê–Ω—è', last_name: '–ò–≤–∞–Ω–æ–≤–∞', class_name: '8–ê', person_type: 'student', staff_position: '' });
+  assert.equal(result.first_name, '–ê–Ω—è');
+  const update = calls.find(call => call.text.includes('UPDATE fam_user_profiles'));
+  assert.ok(update.values.includes('–ê–Ω—è')); assert.ok(update.values.includes('–ò–≤–∞–Ω–æ–≤–∞')); assert.ok(update.values.includes('8–ê'));
+  assert.ok(update.values.includes('https://issuer.test')); assert.ok(update.values.includes('student-sub'));
+  assert.ok(update.values.includes('student'));
+  assert.match(update.text, /user_id = \? AND active = true/);
+  await assert.rejects(repo.updateOwnProfileIdentity('issuer', 'subject', { first_name: 'x', last_name: 'y' }), TypeError);
+});
+test('school role request submission is bound to the database student profile and prevents duplicates', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'student-id', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT request_id, status FROM fam_school_role_requests')) return [[]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const result = await repo.createSchoolRoleRequest({ issuer: 'https://issuer.test', subject: 'student-sub', requested_role: 'school_admin' });
+  assert.equal(result.ok, true); assert.equal(result.status, 'pending');
+  const upsert = calls.find(call => call.text.includes('UPSERT INTO fam_school_role_requests'));
+  assert.ok(upsert.values.includes('student-id'));
+  assert.ok(upsert.values.includes('school-a'));
+  assert.ok(upsert.values.includes('school_admin'));
+  assert.equal(upsert.text.includes('https://issuer.test'), false);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_school_role_request_audit')));
+  await assert.rejects(repo.createSchoolRoleRequest({ issuer: 'x', subject: 'y', requested_role: 'owner' }), TypeError);
+});
+
+test('school role approval requires same-school review ownership and promotes only the applicant profile', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT school_id, role, active FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('SELECT issuer, subject, user_id, school_id, requested_role, status, review_started_by')) return [[{ issuer: 'https://issuer.test', subject: 'student-sub', user_id: 'student-id', school_id: 'school-a', requested_role: 'council_member', status: 'reviewing', review_started_by: 'admin-id' }]];
+    if (text.includes('SELECT user_id, school_id, role, active FROM fam_user_profiles')) return [[{ user_id: 'student-id', school_id: 'school-a', role: 'student', active: true }]];
+    if (text.includes('SELECT status FROM fam_school_role_requests')) return [[{ status: 'approved' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  assert.equal(await repo.reviewSchoolRoleRequest('request-id', 'school-a', 'admin-id', 'approve', '–ü—Ä–æ–≤–µ—Ä–µ–Ω–æ'), true);
+  const promote = calls.find(call => call.text.includes('UPDATE fam_user_profiles SET role'));
+  assert.ok(promote.values.includes('council_member'));
+  assert.ok(promote.values.includes('student-id'));
+  assert.ok(promote.values.includes('school-a'));
+  assert.match(promote.text, /role = 'student' AND active = true/);
+  assert.ok(calls.some(call => call.text.includes('INSERT INTO fam_school_role_request_audit')));
+  assert.equal(await repo.reviewSchoolRoleRequest('request-id', 'school-b', 'admin-id', 'approve'), false);
+  await assert.rejects(repo.reviewSchoolRoleRequest('id', 'school-a', 'admin-id', 'school_admin'), TypeError);
+});
+test('listing insert binds user content as data and writes only pending status', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => { calls.push({ text: strings.join('?'), values }); return [[]]; };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const payload = "–ö–Ω–∏–≥–∞'); DELETE FROM fam_listings; --";
+  const row = { user_id: 'u1', school_id: 's1', title: payload, description: 'text', category: '–£—á—ë–±–∞', price_text: '100 ‚ÇΩ', is_event: false, event_date: null, event_time: null, event_type: null, max_seats: 0, image_key: null, photo_status: 'none', status: 'pending' };
+  const result = await repo.createListing(row);
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  const query = calls.find(call => call.text.includes('INSERT INTO fam_listings'));
+  assert.equal(query.text.includes(payload), false);
+  assert.ok(query.values.includes(payload));
+  assert.ok(query.values.includes(''));
+  assert.ok(query.values.includes('none'));
+  await assert.rejects(repo.createListing({ ...row, status: 'active' }));
+});
+
+test('listing submissions enforce a durable per-user hourly quota before insertion', async () => {
+  let count = 0;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('SELECT submission_count FROM fam_submission_quotas')) return count ? [[{ submission_count: count }]] : [[]];
+    if (text.includes('UPSERT INTO fam_submission_quotas')) { count = values.find(Number.isInteger); return [[]]; }
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const row = { user_id: 'synthetic-user', school_id: 'synthetic-school', title: '–ö–Ω–∏–≥–∞', description: '–£—á–µ–±–Ω–∏–∫',
+    category: '–£—á—ë–±–∞', price_text: '–ë–µ—Å–ø–ª–∞—Ç–Ω–æ', is_event: false, max_seats: 0, status: 'pending' };
+  for (let i = 0; i < 5; i++) await repo.createListing(row);
+  assert.deepEqual(await repo.createListing(row), { ok: false, code: 'rate_limited' });
+  assert.equal(count, 5);
+});
+
+test('photo listing creation atomically links only a fresh pending upload owned by the listing author', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('SELECT user_id, status FROM fam_pending_media')) return [[{ user_id: '11111111-1111-4111-8111-111111111111', status: 'pending' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  const result = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a',
+    title: '–§–æ—Ç–æ', description: '–û–ø–∏—Å–∞–Ω–∏–µ', category: '–¢–≤–æ—Ä—á–µ—Å—Ç–≤–æ', price_text: '–ë–µ—Å–ø–ª–∞—Ç–Ω–æ', is_event: false,
+    max_seats: 0, image_key: imageKey, photo_status: 'pending', status: 'pending' });
+  assert.match(result.id, /^[0-9a-f-]{36}$/);
+  assert.ok(calls.findIndex(call => call.text.includes('SELECT user_id, status FROM fam_pending_media'))
+    < calls.findIndex(call => call.text.includes('INSERT INTO fam_listings')));
+  assert.ok(calls.find(call => call.text.includes("SET status = 'linked'")));
+
+  const rejected = createYdbListingsRepository(Object.assign(() => Promise.resolve([[]]), {
+    begin: callback => callback(async strings => strings.join('').includes('SELECT user_id, status FROM fam_pending_media')
+      ? [[{ user_id: 'someone-else', status: 'pending' }]] : [[]]),
+  }));
+  await assert.rejects(rejected.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a',
     title: '–§–æ—Ç–æ', description: '–û–ø–∏—Å–∞–Ω–∏–µ', category: '–¢–≤–æ—Ä—á–µ—Å—Ç–≤–æ', price_text: '–ë–µ—Å–ø–ª–∞—Ç–Ω–æ', is_event: false,
     max_seats: 0, image_key: imageKey, status: 'pending' }), error => error.code === 'pending_image_unavailable');
 });
