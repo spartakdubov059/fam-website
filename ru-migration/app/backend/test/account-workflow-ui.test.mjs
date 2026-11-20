@@ -89,6 +89,7 @@ test('RU account page shows a safe notice for the users active suspension', asyn
   const notice = f.elements.ruAccountWorkflow.children[2];
   assert.match(notice.textContent, /действует временное ограничение/);
   assert.match(notice.textContent, /Повторные нарушения школьных правил/);
+  assert.match(notice.textContent, /Удаление аккаунта пока недоступно/);
   assert.equal(notice.role, 'status');
   assert.equal(f.elements.ruAccountWorkflow.children[4].textContent, 'Удалить мой аккаунт');
 });

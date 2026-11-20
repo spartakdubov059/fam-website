@@ -42,7 +42,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
       const expiry = typeof result.suspension.expires_at === 'string' ? Date.parse(result.suspension.expires_at) : NaN;
       const date = Number.isFinite(expiry) ? new Date(expiry).toLocaleString('ru-RU') : 'неизвестное время';
       const reason = typeof result.suspension.reason === 'string' ? result.suspension.reason.slice(0, 240) : '';
-      const notice = node(document, 'p', 'ru-note', `Для аккаунта действует временное ограничение до ${date}.${reason ? ` Причина: ${reason}` : ''} Просмотр статуса и удаление своего аккаунта остаются доступны.`);
+      const notice = node(document, 'p', 'ru-note', `Для аккаунта действует временное ограничение до ${date}.${reason ? ` Причина: ${reason}` : ''} Просмотр статуса доступен. Удаление аккаунта пока недоступно, поскольку Яндекс ID не передаёт приложению проверяемое время повторной аутентификации.`);
       notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
       section.insertBefore ? section.insertBefore(notice, status) : section.append(notice);
     }
