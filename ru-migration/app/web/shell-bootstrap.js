@@ -77,6 +77,12 @@ window.onunhandledrejection = function() {
         </section>
         <section id="ruPulse" class="ru-pulse" aria-label="Новости и опросы школы"></section>
         <section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section>
+        <nav id="ruTabbar" class="ru-tabbar" aria-label="Основная навигация">
+          <button type="button" data-ru-view="board" aria-pressed="true">Доска</button>
+          <button type="button" data-ru-view="afisha" aria-pressed="false">Афиша</button>
+          <button type="button" data-ru-view="messages" aria-pressed="false">Сообщения</button>
+          <button type="button" data-ru-view="profile" aria-pressed="false">Профиль</button>
+        </nav>
       </main>`;
     const boardStyles = document.createElement('link');
     boardStyles.rel = 'stylesheet';
@@ -110,6 +116,10 @@ window.onunhandledrejection = function() {
     accountScript.type = 'module';
     accountScript.src = '/account-workflow.js';
     document.body.append(accountScript);
+    const navigationScript = document.createElement('script');
+    navigationScript.type = 'module';
+    navigationScript.src = '/navigation.js';
+    document.body.append(navigationScript);
     const pulseScript = document.createElement('script');
     pulseScript.type = 'module';
     pulseScript.src = '/pulse.js';
