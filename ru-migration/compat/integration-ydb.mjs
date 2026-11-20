@@ -842,7 +842,19 @@ try {
   const safeQueueHealth = await agentQueue.getSafeTaskQueueHealth();
   assert.equal(safeQueueHealth.statuses.completed, 1);
   assert.equal(safeQueueHealth.content_read, false);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent lease-based safe agent queue, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  const concurrentEnqueues = await Promise.all([
+    agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:15'),
+    agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:15'),
+  ]);
+  assert.equal(concurrentEnqueues.filter(result => result.created).length, 1,
+    'concurrent idempotent enqueues create one task');
+  const concurrentClaims = await Promise.all([agentQueue.claimSafeTasks(1), agentQueue.claimSafeTasks(1)]);
+  assert.equal(concurrentClaims.reduce((total, tasks) => total + tasks.length, 0), 1,
+    'a concurrent worker cannot claim the same task twice');
+  const racedClaim = concurrentClaims.flat()[0];
+  assert.equal(await agentQueue.finishSafeTask({ id: racedClaim.id, claimToken: racedClaim.claim_token,
+    status: 'completed', summary: 'Concurrent synthetic claim completed once.' }), true);
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
