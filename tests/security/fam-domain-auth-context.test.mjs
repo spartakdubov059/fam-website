@@ -65,7 +65,7 @@ test("Supabase email confirmation callback remains on the intended host", async 
   const page = simulate({ search: "?code=confirmation" });
   await page.settle();
   assert.equal(page.fetchCount, 0);
-  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
+  assert.deepEqual(page.navigations, []);
 });
 
 test("new guest still redirects to healthy primary host with URL state preserved", async () => {
@@ -100,9 +100,8 @@ test("a 200 response without an explicit ready flag keeps the independent fallba
 });
 
 test("a ready marker redirects even when local session state exists", async () => {
-  const page = simulate({ deferHealth: true });
-  page.setSession(signedIn);
+  const page = simulate({ session: signedIn, deferHealth: true });
   page.respond();
   await page.settle();
-  assert.deepEqual(page.navigations, []);
+  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
 });
