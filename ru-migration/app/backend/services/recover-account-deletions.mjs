@@ -6,7 +6,7 @@ export function createAccountDeletionRecoveryOperation({ repository, pendingImag
   if (typeof repository?.claimIncompleteAccountDeletions !== 'function'
       || typeof repository?.finishAccountDeletion !== 'function'
       || typeof repository?.listAccountMediaKeys !== 'function'
-      || typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') return null;
+      || typeof pendingImages?.listAccountObjects !== 'function' || typeof pendingImages?.delete !== 'function') return null;
   return (limit = 10) => recoverIncompleteAccountDeletions({ repository, pendingImages, limit });
 }
 
@@ -25,9 +25,7 @@ export async function recoverIncompleteAccountDeletions({ repository, pendingIma
     try {
       const ownedKeys = await repository.listAccountMediaKeys(job.user_id);
       if (!Array.isArray(ownedKeys)) throw new Error('invalid_storage_inventory');
-      const keys = typeof pendingImages.listAccountObjects === 'function'
-        ? await pendingImages.listAccountObjects(job.user_id, ownedKeys)
-        : await pendingImages.listUserObjects(job.user_id);
+      const keys = await pendingImages.listAccountObjects(job.user_id, ownedKeys);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
           || key.split('/')[1].toLowerCase() !== job.user_id.toLowerCase())) throw new Error('invalid_storage_inventory');
       for (const key of new Set(keys)) await pendingImages.delete(key);
