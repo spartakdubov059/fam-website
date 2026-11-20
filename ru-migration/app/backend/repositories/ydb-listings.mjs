@@ -15,6 +15,19 @@ async function consumeSubmissionQuota(tx, userId, action, limit, windowMs = 3_60
   return true;
 }
 
+async function consumeRollingSubmissionQuota(tx, userId, action, limit) {
+  const rows = await tx`SELECT submission_count FROM fam_submission_quotas
+    WHERE user_id = ${userId} AND action = ${action}
+      AND window_start > CurrentUtcTimestamp() - Interval('PT1M')
+    ORDER BY window_start DESC LIMIT 1;`;
+  const current = Number(rows?.[0]?.[0]?.submission_count ?? 0);
+  if (!Number.isSafeInteger(current) || current < 0 || current >= limit) return false;
+  await tx`DELETE FROM fam_submission_quotas WHERE user_id = ${userId} AND action = ${action};`;
+  await tx`UPSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
+    VALUES (${userId}, ${action}, CurrentUtcTimestamp(), Unwrap(CAST(${current + 1} AS Uint32)));`;
+  return true;
+}
+
 const isIsoDate = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -1232,7 +1245,7 @@ export function createYdbListingsRepository(sql) {
         const recipients = await tx`SELECT user_id AS user_id FROM fam_user_profiles
           WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
         if (!(recipients?.[0] ?? []).length) return { ok: false, code: 'recipient_unavailable' };
-        if (!await consumeSubmissionQuota(tx, record.sender_id, 'message', 8, 60_000)) {
+        if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
           return { ok: false, code: 'rate_limited' };
         }
         await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
