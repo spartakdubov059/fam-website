@@ -138,6 +138,27 @@ test('server routes the internal coder bridge separately from public user APIs',
   });
 });
 
+
+test('public HTTP allowlist never exposes private agent queue table routes', async () => {
+  let publicApiCalls = 0;
+  await withServer({
+    listingsApi: async () => { publicApiCalls++; return { status: 200, body: { ok: true } }; },
+  }, async origin => {
+    const privatePaths = [
+      '/api/v1/fam-agent-ideas',
+      '/api/v1/fam-agent-tasks',
+      '/api/v1/fam-agent-task-events',
+    ];
+    for (const path of privatePaths) {
+      for (const method of ['GET', 'POST']) {
+        const response = await fetch(new URL(path, origin), { method });
+        assert.equal(response.status, 404, `${method} ${path}`);
+      }
+    }
+    assert.equal(publicApiCalls, 0, 'private queue requests never reach the generic user API');
+  });
+});
+
 test('configured server reports full readiness only when object storage is configured', async () => {
   const state = {
     mode: 'isolated-copy', ready: true,
