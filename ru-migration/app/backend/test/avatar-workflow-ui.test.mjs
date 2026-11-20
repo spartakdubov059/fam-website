@@ -32,7 +32,7 @@ test('RU avatar form uploads privately and submits the Russian review route', as
   await initializeAvatarWorkflow({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: student }) };
-    if (url === '/api/v1/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key: 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' } }) };
+    if (url === '/api/v1/avatars/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key: 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' } }) };
     if (url === '/api/v1/me/avatar') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
     throw new Error(`unexpected route ${url}`);
   } });
@@ -43,7 +43,7 @@ test('RU avatar form uploads privately and submits the Russian review route', as
   let prevented = false;
   await form.listeners.submit({ preventDefault() { prevented = true; } });
   assert.equal(prevented, true);
-  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/media/pending', '/api/v1/me/avatar']);
+  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/avatars/media/pending', '/api/v1/me/avatar']);
   assert.equal(calls[1].init.body, file);
   assert.deepEqual(JSON.parse(calls[2].init.body), { image_key: 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' });
   assert.match(section.children[1].textContent, /отправлено модераторам/);
