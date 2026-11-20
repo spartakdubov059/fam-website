@@ -85,7 +85,8 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
         || (!selfDeletion && !adminDeletion && typeof repository?.restoreRequestedAccountDeletion !== 'function')) {
       return { status: 503, body: { ok: false, error: 'account_deletion_unavailable' } };
     }
-    if (typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function') {
+    if (typeof pendingImages?.listUserObjects !== 'function' || typeof pendingImages?.delete !== 'function'
+        || typeof repository?.listAccountMediaKeys !== 'function') {
       return { status: 503, body: { ok: false, error: 'private_storage_unavailable' } };
     }
 
@@ -110,7 +111,11 @@ export function createAccountDeletionApi({ authenticate = async () => null, reso
           : { ...begun, request_id: reviewMatch[1], reviewer_id: actor.id };
       if (!target.id || !USER_ID.test(target.id) || !target.issuer || !target.subject) throw new Error('invalid deletion target');
       if (typeof begun.claim_token !== 'string' || !begun.claim_token) throw new Error('invalid deletion claim');
-      const keys = await pendingImages.listUserObjects(target.id);
+      const ownedKeys = await repository.listAccountMediaKeys(target.id);
+      if (!Array.isArray(ownedKeys)) throw new Error('invalid_storage_inventory');
+      const keys = typeof pendingImages.listAccountObjects === 'function'
+        ? await pendingImages.listAccountObjects(target.id, ownedKeys)
+        : await pendingImages.listUserObjects(target.id);
       if (!Array.isArray(keys) || keys.some(key => typeof key !== 'string' || !IMAGE_KEY.test(key)
           || key.split('/')[1].toLowerCase() !== target.id.toLowerCase())) throw new Error('invalid_storage_inventory');
       for (const key of new Set(keys)) {
