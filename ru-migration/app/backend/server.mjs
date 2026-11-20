@@ -168,7 +168,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
         if (size > maxBodyBytes) return sendJson(res, 413, { error: 'request_too_large' });
       }
     }
-    return sendJson(res, 503, { error: 'backend_not_configured', message: 'This isolated copy is not connected to any user database.' });
+    return sendJson(res, 404, { ok: false, error: 'not_found' });
   }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'method_not_allowed' });
