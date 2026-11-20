@@ -167,3 +167,12 @@
 - [SDK/Sharp CI #44791905879](https://github.com/spartakdubov059/fam-website/actions/runs/44791905879) — success, **376/376** backend tests и SDK/Sharp/WebP/timer checks.
 - [Disposable YDB CI #44791906120](https://github.com/spartakdubov059/fam-website/actions/runs/44791906120) — success, disposable local YDB synthetic integration и cleanup.
 - Юнит-проверки проверяют создание точек, переход next/previous и ручной выбор слайда. Полный визуальный QA на реальных мобильных браузерах пока не проводился.
+
+
+## Проверка приватной истории собственных идей
+
+На кодовом коммите [58201a9](https://github.com/spartakdubov059/fam-website/commit/58201a9643d71dadd88ee8242b8d127b208c9a15) добавлен `GET /api/v1/me/ideas`: YDB query ограничен actor user ID, school ID и 50 результатами. API закрыт для гостя и профиля без школы. UI показывает только статусы/текст собственных идей и использует приватный endpoint изображений, который отдельно проверяет владельца или школьного модератора.
+
+- [SDK/Sharp CI #44792802094](https://github.com/spartakdubov059/fam-website/actions/runs/44792802094) — success, **381/381** backend tests; SDK/Sharp/WebP/timers прошли.
+- [Disposable YDB CI #44792801248](https://github.com/spartakdubov059/fam-website/actions/runs/44792801248) — success с synthetic integration и удалением одноразовой базы.
+- Unit tests проверяют school/user scoping, 50-row cap, guest isolation и безопасный DOM rendering; это не browser QA.
