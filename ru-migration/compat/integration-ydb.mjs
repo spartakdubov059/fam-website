@@ -689,10 +689,28 @@ try {
   }));
   assert.equal(emittedSafety.status, 201);
   assert.equal(emittedSafety.body.status, 'pending');
+  for (const body of ['Давайте все будем высмеивать одного ученика в чате.',
+    'Напишите ему все неприятные сообщения, чтобы он ушёл из чата.']) {
+    const reviewed = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-safety-actor', {
+      receiver_id: '55555555-5555-4555-8555-555555555555', body,
+    }));
+    assert.equal(reviewed.status, 201);
+    assert.equal(reviewed.body.status, 'pending', 'new local safety markers remain pending for human review');
+  }
   assert.equal((await sql`SELECT id FROM fam_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 0,
     'unreviewed message stays out of the recipient inbox');
-  assert.equal((await sql`SELECT id FROM fam_pending_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 1,
+  assert.equal((await sql`SELECT id FROM fam_pending_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 3,
     'unreviewed message is kept in the school review queue');
+  const localIncidents = await sql`SELECT category, severity, evidence_excerpt FROM fam_safety_incidents
+    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      AND target_id = '55555555-5555-4555-8555-555555555555' AND source_kind = 'message'
+      AND category IN ('targeted_harassment', 'negative_personal_call');`;
+  const localIncidentByCategory = new Map((localIncidents?.[0] ?? []).map(row => [row.category, row]));
+  assert.deepEqual([...localIncidentByCategory.keys()].sort(), ['negative_personal_call', 'targeted_harassment']);
+  for (const row of localIncidentByCategory.values()) {
+    assert.equal(row.severity, 'medium');
+    assert.equal(row.evidence_excerpt, null, 'local classifier never persists the source text');
+  }
   const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
     WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message' ORDER BY created_at DESC LIMIT 1;`;
   assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
