@@ -77,6 +77,9 @@ test('task claim filters to the safe allowlist and returns only task metadata', 
   assert.match(select.query, /approval_required = false/);
   assert.match(select.query, /'queue_health_check'.*'daily_report_digest'.*'system_health_check'.*'site_error_digest'/);
   assert.equal(select.query.includes('payload_json'), false);
+  const claimUpdate = calls.find(call => call.query.includes("UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed'"));
+  assert.match(claimUpdate.query, /finished_at = CAST\(NULL AS Timestamp\?\)/,
+    'a reclaimed task restarts its terminal-retention clock');
 });
 
 test('task finish rejects invalid inputs and refuses an expired or mismatched lease', async () => {

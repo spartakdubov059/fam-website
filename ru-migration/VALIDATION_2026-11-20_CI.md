@@ -7,6 +7,11 @@
 - При подготовке интеграционного сценария первоначальная загрузка большого файла была обрезана и CI корректно упал на синтаксической ошибке. Файл восстановлен из локального Git blob с проверкой SHA; успешный CI выше выполнен уже на полном файле.
 - Изменения только в `codex/fam-ru-offline-safety-review`. `main` и `migration/yandex-cloud` не менялись. YDB была одноразовой локальной базой GitHub CI, не российским облачным staging.
 
+## Срок хранения безопасной очереди
+
+- Новая схема `33_fam_agent_task_retention.yql` включает YDB TTL на `finished_at` для завершённых задач и `created_at` для событий очереди (180 дней). Незавершённые задачи с `finished_at = NULL` сохраняются; повторный захват сбрасывает время завершения.
+- Синтетическую схему проверит disposable YDB workflow; локальная команда `verify.mjs` не интерпретирует YQL TTL.
+
 ## Актуальная проверка веток и CI (20 ноября 2026)
 
 - На кодовом commit [`0d3be3a`](https://github.com/spartakdubov059/fam-website/commit/0d3be3a5a5b5ea0466340b1e794cff75babed647) оба workflow повторно завершились успешно: [SDK/Sharp CI #44690234889](https://github.com/spartakdubov059/fam-website/actions/runs/44690234889) — `327/327` backend-тестов, pinned SDK/Sharp и systemd timers; [YDB CI #44690234948](https://github.com/spartakdubov059/fam-website/actions/runs/44690234948) — схемы 01–32 и synthetic integration, включая две конкурентные постановки одной задачи (создаётся одна запись) и два конкурентных worker захвата (один lease). CI использовал только временную локальную тестовую YDB.

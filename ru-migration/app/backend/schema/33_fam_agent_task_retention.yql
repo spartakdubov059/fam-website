@@ -1,0 +1,4 @@
+-- Keep operational audit material for six months. Tasks without a terminal
+-- finished_at (including queued manual-review tasks) are retained.
+ALTER TABLE fam_agent_tasks SET (TTL = Interval("P180D") ON finished_at);
+ALTER TABLE fam_agent_task_events SET (TTL = Interval("P180D") ON created_at);

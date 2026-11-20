@@ -104,7 +104,8 @@ export function createYdbAgentTaskQueue(sql) {
           await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
               attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
               claimed_by = ${WORKER_ID}, claim_token = ${token}, claimed_at = CurrentUtcTimestamp(),
-              lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'), updated_at = CurrentUtcTimestamp()
+              lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'), finished_at = CAST(NULL AS Timestamp?),
+              updated_at = CurrentUtcTimestamp()
             WHERE id = ${row.id};`;
           await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
             VALUES (${randomUUID()}, ${row.id}, 'claimed', ${WORKER_ID}, 'Задача передана ограниченному RU worker.', CurrentUtcTimestamp());`;
