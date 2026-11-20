@@ -82,6 +82,7 @@ try {
       listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
         ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
         ...(userId === '77777777-7777-4777-8777-777777777777' && accountMediaKeys.has('pending/77777777-7777-4777-8777-777777777777/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp')
+          && !deletedMediaKeys.includes('pending/77777777-7777-4777-8777-777777777777/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp')
           ? ['pending/77777777-7777-4777-8777-777777777777/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp'] : []),
         ...ownedKeys,
       ])],
