@@ -84,3 +84,11 @@ Total output lines: 87
 
 ## Правило обновления статуса
 Для каждой строки приложить RU-файл/endpoint, точный тест (unit и/или disposable YDB), а также отличие. Допустимые состояния: `эквивалент доказан`, `замена с отличием` или `не перенесено`. Пока такой evidence не указан, статус остаётся `не проверено`.
+
+### Event occupancy parity review (2026-11-20)
+
+- Source migrations reviewed: `20261108002701_replace_event_occupancy_with_atomic_counter.sql`, `20261108011855_limit_public_event_occupancy_visibility.sql`, `20261109134551_restore_safe_event_registration_cancellation.sql`, `20261109134709_correct_event_registration_cancellation_rpc.sql`, and `20261109135927_tighten_event_cancellation_and_private_agent_queue_rls.sql`.
+- RU equivalents: `ru-migration/app/backend/repositories/ydb-listings.mjs` (`registerForEvent`, `cancelEventRegistration`, `getEventOccupancy`), schema `06_event_registrations.yql`, and authenticated routes in `listings-api.mjs`. No client table permissions exist; API derives the actor from verified auth.
+- Equivalent behaviors: event must be active and owned by another account; `request` registrations are pending, `open/limited` registrations confirmed; limited events enforce capacity; organizer moderation and participant cancellation release a seat; cancellation remains visible as `cancelled` and a cancelled user can register again. RU stores that state in the registration row instead of deleting it as the final source RPC does; this matches the earlier source RPC response/state contract but retains an internal row.
+- Verification evidence already attached to code revision `603dab5cd83e67f448d5ba218a1ae6721f9ca140`: disposable YDB integration workflow [44781191568](https://github.com/spartakdubov059/fam-website/actions/runs/44781191568) passed, including competition for the last limited seat (exactly one of two concurrent registrations succeeds; occupancy remains 1), full-seat rejection, cancellation and occupancy returning to 0, request approval/rejection. The test currently does not cover simultaneous cancellation and a replacement registration, nor public GET occupancy visibility for inactive events; mark these as residual checks.
+- No source database or student records were accessed; only disposable YDB and synthetic actors were used.
