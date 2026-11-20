@@ -196,7 +196,7 @@ export function createYdbListingsRepository(sql) {
       const rows = await sql`SELECT object_key FROM fam_idea_images WHERE user_id = ${userId};`;
       const avatars = await sql`SELECT image_key AS object_key FROM fam_avatar_reviews WHERE user_id = ${userId};`;
       const keys = [...(rows?.[0] ?? []), ...(avatars?.[0] ?? [])].map(row => row.object_key);
-      const keyPattern = new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\\\.webpimport { randomUUID } from 'node:crypto';
+      const keyPattern = new RegExp(`^pending/${userId}/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.webpimport { randomUUID } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
