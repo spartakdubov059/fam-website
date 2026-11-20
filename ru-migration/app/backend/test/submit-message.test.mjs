@@ -40,6 +40,26 @@ test('serious local message marker is recorded without content before pending de
   assert.equal(writes[1].body, 'Поступали угрозы в адрес ученика.');
 });
 
+test('targeted harassment and direct insults create medium safety reports and remain pending', async () => {
+  const safetyKey = 'local-synthetic-safety-key-with-more-than-32-bytes';
+  for (const [body, category] of [
+    ['Давайте все будем высмеивать одного ученика в чате.', 'targeted_harassment'],
+    ['Напишите ему все неприятные сообщения, чтобы он ушёл из чата.', 'negative_personal_call'],
+  ]) {
+    const writes = [];
+    const result = await submitMessage({ actor, input: { receiver_id: input.receiver_id, body }, safetyKey,
+      repository: {
+        recordSafetySignal: async signal => { writes.push(signal); return true; },
+        createPendingMessage: async value => { writes.push(value); return { id: 'pending-safety-message' }; },
+      } });
+    assert.deepEqual(result, { ok: true, status: 'pending', id: 'pending-safety-message' });
+    assert.equal(writes[0].category, category);
+    assert.equal(writes[0].severity, 'medium');
+    assert.equal(Object.hasOwn(writes[0], 'text'), false);
+    assert.equal(writes[1].body, body);
+  }
+});
+
 test('serious local marker fails closed when the keyed signal store is unavailable', async () => {
   let queued = false;
   const result = await submitMessage({ actor, input: { receiver_id: input.receiver_id, body: 'Поступали угрозы.' },
