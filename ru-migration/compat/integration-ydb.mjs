@@ -522,7 +522,9 @@ try {
   assert.equal(messageRows[0][0].school_id, 'synthetic-school');
   assert.equal(messageRows[0][0].listing_id, linkedListingId);
   assert.equal(messageRows[0][0].is_read, false);
-  assert.deepEqual((await repo.listMessages('synthetic-user', 'synthetic-school')).map(row => row.id), [message.id]);
+  const ownRateLimitedMessages = await repo.listMessages('synthetic-user', 'synthetic-school');
+  assert.equal(ownRateLimitedMessages.length, 8, 'the sender inbox contains all eight allowed messages');
+  assert.ok(ownRateLimitedMessages.some(row => row.id === message.id));
   assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);
   assert.equal(await repo.markMessageRead('synthetic-user', 'synthetic-school', message.id), false, 'sender cannot mark the recipient inbox as read');
   assert.equal(await repo.markMessageRead('11111111-1111-4111-8111-111111111111', 'synthetic-school', message.id), true);
