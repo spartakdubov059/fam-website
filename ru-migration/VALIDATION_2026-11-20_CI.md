@@ -176,3 +176,11 @@
 - [SDK/Sharp CI #44792802094](https://github.com/spartakdubov059/fam-website/actions/runs/44792802094) — success, **381/381** backend tests; SDK/Sharp/WebP/timers прошли.
 - [Disposable YDB CI #44792801248](https://github.com/spartakdubov059/fam-website/actions/runs/44792801248) — success с synthetic integration и удалением одноразовой базы.
 - Unit tests проверяют school/user scoping, 50-row cap, guest isolation и безопасный DOM rendering; это не browser QA.
+
+
+## Навигация к истории идей профиля
+
+На ревизии [8b4e77e](https://github.com/spartakdubov059/fam-website/commit/8b4e77eae249e62203fe58b6bc5965dfe7cf020a) профильная кнопка мобильной навигации сначала ведёт к приватной истории идей, если она доступна пользователю, и затем к настройкам профиля. Для гостя сохраняется переход к доступному разделу без открытия приватной истории.
+
+- [SDK/Sharp CI #44793200966](https://github.com/spartakdubov059/fam-website/actions/runs/44793200966) — success, **382/382** backend tests.
+- [Disposable YDB CI #44793200980](https://github.com/spartakdubov059/fam-website/actions/runs/44793200980) — success с synthetic integration и cleanup.
