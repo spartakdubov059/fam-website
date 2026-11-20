@@ -2,9 +2,21 @@
 
 ## Проверенные ревизии
 
-- Исходный FAM: [`main` `75328206895898ab99c1ac3098de6deceda09459`](https://github.com/spartakdubov059/fam-website/commit/75328206895898ab99c1ac3098de6deceda09459).
-- Российская копия: [`migration/yandex-cloud` `bbb1644d1da8614597570655d10c62b4030a2146`](https://github.com/spartakdubov059/fam-website/commit/bbb1644d1da8614597570655d10c62b4030a2146).
-- В актуальном `main` 77 SQL migration-файлов и 7 Edge Functions; число файлов проверено через GitHub API. Предыдущий source snapshot `7fd418246653f92b53f66bc29fa224d95d04d5cf` содержал 76 migrations.
+- Исходный FAM: [`main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579).
+- Российская копия: [`migration/yandex-cloud` `f23d42b4fa14dd2add9dc899177739e7589ce838`](https://github.com/spartakdubov059/fam-website/commit/f23d42b4fa14dd2add9dc899177739e7589ce838).
+- В актуальном `main` 78 SQL migration-файлов и 7 Edge Functions; число проверено через GitHub API. Предыдущий source snapshot `7fd418246653f92b53f66bc29fa224d95d04d5cf` содержал 76 migrations.
+
+## Дельта исходника `main` 20 ноября 2026
+
+Новый upstream commit [`5e749c5`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579) расширил опросы с 2–4 до 2–8 вариантов, ограничил индекс голоса диапазоном 0–7 и добавил миграцию Postgres. В RU-копии этот сценарий синхронизирован в `f23d42b`: UI создаёт и показывает до восьми вариантов, API принимает только индексы 0–7, YDB репозиторий проверяет индекс относительно числа ответов конкретного опроса, синтетический YDB интеграционный сценарий создаёт восьмивариантный опрос и голосует за индекс 7. На RU-ревизии локально прошли `311/311` тестов; [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44681508222) и [одноразовая YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44681508156) прошли.
+
+Остальные изменения upstream коммита:
+
+- `school-pulse.js` сохраняет текущую hero-карточку после обновления ленты и оставляет карусель доступной при отказе загрузки. Российская оболочка использует отдельный список school-pulse и не имеет этой карусели; визуального аналога, который можно синхронизировать отдельно, в текущем RU UI нет.
+- `index.html` теперь перенаправляет обычные GitHub Pages визиты на Netlify даже при сохранённой локальной Supabase-сессии, сохраняя на Pages только URL auth callbacks. Это upstream Supabase/Netlify маршрутизация, не часть отдельного RU хоста с Яндекс ID; в RU её не переносил.
+- Обновлены PostgreSQL CI тесты и лимит вариантов. Новое изменение затрагивает source `main`; я его не менял. Оно не меняет RU YDB схему кроме допустимого расширения JSON-массива, которое проверяется серверной политикой и репозиторием.
+
+Российская ветка не содержит всех изменений upstream main: полное поведенческое соответствие интерфейса, SQL/RLS/RPC и Edge Functions всё ещё не доказано. Облачный staging и реальные OAuth/S3/YDB не настроены.
 
 ## Delta исходного main после snapshot `7fd4182`
 
