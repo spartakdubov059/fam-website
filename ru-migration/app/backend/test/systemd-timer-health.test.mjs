@@ -21,8 +21,9 @@ test('a disabled, inactive, missing or unconfigured timer makes the health repor
   states[0].enabled = false;
   states[1].activeState = 'inactive';
   states[2].serviceUnit = 'fam-unrelated.service';
-  states[3].nextElapse = 'n/a';
   states.splice(states.findIndex(state => state.unit === 'fam-ru-safe-agent-worker.timer'), 1);
+  states[3].nextElapse = 'n/a';
+  states[4].enabled = false;
   const report = analyzeSystemdTimerStates(states, undefined, Date.parse('2026-11-20T00:30:00Z'));
   assert.equal(report.ok, false);
   assert.deepEqual(report.timers.filter(timer => !timer.ok).map(timer => timer.unit), [...FAM_RU_TIMER_UNITS]);
