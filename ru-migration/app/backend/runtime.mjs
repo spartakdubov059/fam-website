@@ -21,6 +21,7 @@ import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs
 import { createCoderTaskBridge } from './services/coder-task-bridge.mjs';
 import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from './services/scheduled-safe-agent-runner.mjs';
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
+import { createYdbSchemaHealthCheck } from './services/ydb-schema-health.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
@@ -91,6 +92,7 @@ export async function createRuntime(env = process.env) {
   await driver.ready();
   const sql = query(driver);
   const probeYdbReadiness = createYdbReadinessProbe(sql);
+  const schemaHealthCheck = createYdbSchemaHealthCheck(sql);
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const agentTaskQueue = createYdbAgentTaskQueue(sql);
@@ -99,6 +101,7 @@ export async function createRuntime(env = process.env) {
     readinessCheck: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
       databaseReady: await probeYdbReadiness(), mediaConfigured }),
     timerCheck: checkSystemdTimerHealth,
+    schemaCheck: schemaHealthCheck,
     queueHealthCheck: async () => {
       const [health, safeAgentTasks] = await Promise.all([
         repository.getRuBackgroundQueueHealth(), agentTaskQueue.getSafeTaskQueueHealth(),
@@ -139,6 +142,7 @@ export async function createRuntime(env = process.env) {
       const health = await repository.getRuBackgroundQueueHealth();
       return { ...health, queues: { ...health.queues, safe_agent_tasks: await agentTaskQueue.getSafeTaskQueueHealth() } };
     },
+    getRuSchemaHealth: schemaHealthCheck,
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     recoverAccountDeletions: createAccountDeletionRecoveryOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),

@@ -22,7 +22,10 @@ function inspectQueue(queue, maxAgeMinutes) {
   };
 }
 
-export function buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth }) {
+export function buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth, schemaHealth }) {
+  const schemaOk = schemaHealth?.ok === true && Number.isSafeInteger(schemaHealth.tables_checked)
+    && schemaHealth.tables_checked > 0 && schemaHealth.content_read === false
+    && schemaHealth.write_permissions_checked === false;
   const readinessOk = readiness?.ready === true && readiness?.services?.auth === true
     && readiness?.services?.database === true && readiness?.services?.objectStorage === true;
   const timerStates = timers && Array.isArray(timers.timers) ? timers.timers : [];
@@ -45,10 +48,13 @@ export function buildRuSystemHealthReport({ readiness, timers, backgroundQueueHe
     : { dailyReports: inspectQueue(null, 26 * 60), siteErrorDigests: inspectQueue(null, 120), safeAgentTasks: inspectQueue(null, 120) };
   const queuesOk = queues.dailyReports.ok && queues.siteErrorDigests.ok && queues.safeAgentTasks.ok;
   return {
-    ok: readinessOk && timerReport.ok && queuesOk,
+    ok: readinessOk && timerReport.ok && queuesOk && schemaOk,
     readiness: { ok: readinessOk, auth: readiness?.services?.auth === true,
       database: readiness?.services?.database === true, objectStorage: readiness?.services?.objectStorage === true },
     timers: timerReport,
+    schema: { ok: schemaOk, tablesChecked: schemaHealth?.content_read === false
+      && Number.isSafeInteger(schemaHealth.tables_checked) && schemaHealth.tables_checked >= 0
+      ? schemaHealth.tables_checked : 0 },
     queues: { ok: queuesOk, ...queues },
     contentRead: false,
   };

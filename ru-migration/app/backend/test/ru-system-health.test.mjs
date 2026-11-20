@@ -8,6 +8,7 @@ const timers = { ok: true, timers: [
   { unit: 'fam-ru-runtime-health.timer', ok: true },
   { unit: 'fam-ru-school-agent-report.timer', ok: true },
 ] };
+const schemaHealth = { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false };
 const queueHealth = { content_read: false, queues: {
   daily_reports: { statuses: { queued: 1, claimed: 0, completed: 5, blocked: 0, failed: 0 }, expired_leases: 0,
     failed_or_blocked_24h: 0, oldest_queued_age_minutes: 10 },
@@ -18,10 +19,11 @@ const queueHealth = { content_read: false, queues: {
 } };
 
 test('system health combines readiness, timer status and aggregate queues without exposing task content', () => {
-  const report = buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth: queueHealth });
+  const report = buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth: queueHealth, schemaHealth });
   assert.equal(report.ok, true);
   assert.equal(report.readiness.ok, true);
   assert.equal(report.timers.ok, true);
+  assert.equal(report.schema.tablesChecked, 36);
   assert.equal(report.queues.dailyReports.queued, 1);
   assert.equal(report.queues.safeAgentTasks.ok, true);
   assert.equal(report.contentRead, false);
@@ -38,7 +40,7 @@ test('system health fails for missing services, unhealthy timers, stale queues a
   const report = buildRuSystemHealthReport({
     readiness: { ready: false, services: { auth: true, database: false, objectStorage: true } },
     timers: { ok: false, timers: [{ unit: 'fam-ru-runtime-health.timer', ok: false }] },
-    backgroundQueueHealth: degraded,
+    backgroundQueueHealth: degraded, schemaHealth,
   });
   assert.equal(report.ok, false);
   assert.equal(report.readiness.database, false);
@@ -58,7 +60,7 @@ test('system health rejects empty, inconsistent, or duplicate timer reports even
       { unit: 'fam-ru-runtime-health.timer', ok: true },
     ] },
   ]) {
-    const report = buildRuSystemHealthReport({ readiness, timers: timerReport, backgroundQueueHealth: queueHealth });
+    const report = buildRuSystemHealthReport({ readiness, timers: timerReport, backgroundQueueHealth: queueHealth, schemaHealth });
     assert.equal(report.ok, false);
     assert.equal(report.timers.ok, false);
   }
@@ -71,6 +73,7 @@ test('system health closes its database runtime even when an aggregate read fail
     timerCheck: () => timers,
     runtimeFactory: async () => ({
       getRuBackgroundQueueHealth: async () => { throw new Error('synthetic unavailable'); },
+      getRuSchemaHealth: async () => schemaHealth,
       close: async () => { closed = true; },
     }),
   });
@@ -85,10 +88,20 @@ test('system health turns readiness probe errors into a generic degraded result'
     timerCheck: () => timers,
     runtimeFactory: async () => ({
       getRuBackgroundQueueHealth: async () => queueHealth,
+      getRuSchemaHealth: async () => schemaHealth,
       close: async () => {},
     }),
   });
   assert.equal(report.ok, false);
   assert.equal(report.readiness.ok, false);
   assert.equal(JSON.stringify(report).includes('synthetic unavailable'), false);
+});
+
+test('system health fails closed when RU schema tables are unavailable or unverified', () => {
+  for (const invalid of [null, { ...schemaHealth, ok: false }, { ...schemaHealth, tables_checked: 0 },
+    { ...schemaHealth, content_read: true }, { ...schemaHealth, write_permissions_checked: true }]) {
+    const report = buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth: queueHealth, schemaHealth: invalid });
+    assert.equal(report.ok, false);
+    assert.equal(report.schema.ok, false);
+  }
 });

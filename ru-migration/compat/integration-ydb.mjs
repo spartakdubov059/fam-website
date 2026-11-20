@@ -9,6 +9,7 @@ import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
 import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
+import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -18,6 +19,8 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
+  const schemaHealth = await createYdbSchemaHealthCheck(sql)();
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false });
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {
     try {
