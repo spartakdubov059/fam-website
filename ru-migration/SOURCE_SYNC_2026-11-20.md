@@ -1,5 +1,7 @@
 # Сверка FAM source → RU на 20 ноября 2026
 
+> Дополнение после проверки ancestry: текущая RU-ветка построена от `migration/yandex-cloud` `2795f05`, не от актуального `main` `5e749c5`. Полная проверка прямого диапазона выявила 9 SQL migrations и 6 Edge Function изменений, которых нет в исходной миграционной ветке. Большинство сценариев имеют отдельный YDB/API аналог в RU; различия и ограничения перечислены в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md). Поэтому утверждение ниже «новых неперенесённых изменений … не выявлено» относится только к прежней узкой сверке `7fd4182..5e749c5` и не означает полную паритетность `main` и RU.
+
 ## Текущее состояние RU-кода после добавления очереди (20 ноября 2026)
 
 Изолированная RU-ветка на кодовом commit [`0d3be3a`](https://github.com/spartakdubov059/fam-website/commit/0d3be3a5a5b5ea0466340b1e794cff75babed647) прошла [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44690234889) (`327/327`) и [YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/44690234948). В последнем добавлены synthetic проверки конкурентной идемпотентной постановки и эксклюзивного lease четырёх разрешённых типов agent-задач. Документальное подтверждение: [`2bac542`](https://github.com/spartakdubov059/fam-website/commit/2bac54249b223d887f810c5b72bdc38a76b5f0a8). Main остаётся `5e749c5`; облачного staging и полного аудита переноса нет.
