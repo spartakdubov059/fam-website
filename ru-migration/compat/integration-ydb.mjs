@@ -81,7 +81,8 @@ try {
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
       listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
         ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
-      ])],    },
+      ])],
+    },
   }));
   const apiRequest = (method, url, token, body = {}) => {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
