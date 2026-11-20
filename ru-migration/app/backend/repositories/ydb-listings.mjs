@@ -91,8 +91,10 @@ export function createYdbListingsRepository(sql) {
 
     async listPendingSchoolRoleRequests(schoolId) {
       if (!schoolId) throw new TypeError('invalid role request school');
-      const statement = sql`SELECT r.request_id, r.user_id, r.requested_role, r.status, r.created_at, r.review_started_at,
-          r.review_started_by, p.first_name, p.last_name, p.class_name
+      const statement = sql`SELECT r.request_id AS request_id, r.user_id AS user_id,
+          r.requested_role AS requested_role, r.status AS status, r.created_at AS created_at,
+          r.review_started_at AS review_started_at, r.review_started_by AS review_started_by,
+          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name
         FROM fam_school_role_requests AS r
         INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
         WHERE r.school_id = ${schoolId} AND r.status IN ('pending', 'reviewing')
