@@ -1,7 +1,7 @@
 import { initializeMessages } from './messages.js';
 
 const MAX_PUBLIC_LISTINGS = 100;
-const BOARD_CATEGORIES = ['Все', 'Вещи', 'Услуги', 'Творчество', 'Учёба', 'Мероприятия'];
+const BOARD_CATEGORIES = ['Все', 'Вещи', 'Услуги', 'Творчество', 'Учёба', 'Афиша'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let messagesInitialized = false;
 
@@ -365,7 +365,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       const query = String(search.value || '').trim().toLocaleLowerCase('ru');
       let visible = 0;
       for (const { card, listing } of cards) {
-        const categoryMatches = category === 'Все' || listing.category === category;
+        const categoryMatches = category === 'Все' || (category === 'Афиша' ? listing.is_event === true : listing.category === category);
         const viewMatches = boardView !== 'favorites' || favorites.ids.has(listing.id);
         const searchable = [listing.title, listing.description, listing.category, listing.price_text]
           .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
@@ -390,6 +390,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     const categories = [...BOARD_CATEGORIES];
     for (const { listing } of cards) {
       if (typeof listing.category === 'string' && listing.category.length <= 40
+          && !(listing.is_event === true && listing.category === 'Мероприятия')
           && !categories.includes(listing.category) && categories.length < 12) categories.push(listing.category);
     }
     for (const name of categories) {
