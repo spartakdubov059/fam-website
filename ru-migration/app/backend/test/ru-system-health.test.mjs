@@ -43,6 +43,22 @@ test('system health fails for missing services, unhealthy timers, stale queues a
   assert.equal(report.queues.siteErrorDigests.ok, false);
 });
 
+test('system health rejects empty, inconsistent, or duplicate timer reports even when aggregate ok is true', () => {
+  for (const timerReport of [
+    { ok: true, timers: [] },
+    { ok: true, timers: [null] },
+    { ok: true, timers: [{ unit: 'fam-ru-runtime-health.timer', ok: false }] },
+    { ok: true, timers: [
+      { unit: 'fam-ru-runtime-health.timer', ok: true },
+      { unit: 'fam-ru-runtime-health.timer', ok: true },
+    ] },
+  ]) {
+    const report = buildRuSystemHealthReport({ readiness, timers: timerReport, backgroundQueueHealth: queueHealth });
+    assert.equal(report.ok, false);
+    assert.equal(report.timers.ok, false);
+  }
+});
+
 test('system health closes its database runtime even when an aggregate read fails', async () => {
   let closed = false;
   const report = await checkRuSystemHealth({

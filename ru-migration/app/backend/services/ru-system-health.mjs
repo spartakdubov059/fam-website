@@ -25,10 +25,15 @@ function inspectQueue(queue, maxAgeMinutes) {
 export function buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth }) {
   const readinessOk = readiness?.ready === true && readiness?.services?.auth === true
     && readiness?.services?.database === true && readiness?.services?.objectStorage === true;
+  const timerStates = timers && Array.isArray(timers.timers) ? timers.timers : [];
+  const timerNames = timerStates.map(timer => timer?.unit);
+  const timersValid = timerStates.length > 0
+    && timerStates.every(timer => typeof timer?.unit === 'string' && timer.unit !== '' && timer.ok === true)
+    && new Set(timerNames).size === timerNames.length;
   const timerReport = timers && Array.isArray(timers.timers)
-    ? { ok: timers.ok === true, timers: timers.timers.map(timer => ({
-      unit: timer.unit,
-      ok: timer.ok === true,
+    ? { ok: timers.ok === true && timersValid, timers: timers.timers.map(timer => ({
+      unit: typeof timer?.unit === 'string' && timer.unit !== '' ? timer.unit : null,
+      ok: timer?.ok === true,
     })) }
     : { ok: false, timers: [] };
   const queues = backgroundQueueHealth?.content_read === false && backgroundQueueHealth?.queues
