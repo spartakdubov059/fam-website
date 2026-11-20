@@ -455,11 +455,14 @@ export async function initializeListingModeration({ document = globalThis.docume
         const card = node(document, 'article', 'ru-moderation-card');
         const roleName = request.requested_role === 'school_admin' ? 'Администратор школы' : 'Участник Ученического совета';
         card.append(node(document, 'h3', '', `Запрос: ${roleName}`));
+        const applicant = request.applicant_name || '';
+        const classLabel = request.class_name ? ` · класс ${request.class_name}` : '';
+        card.append(node(document, 'p', '', `${applicant ? `${applicant}${classLabel} · аккаунт ` : 'Аккаунт '}#${request.account_code || '—'}`));
         card.append(node(document, 'p', '', request.status === 'reviewing' ? 'Взято на рассмотрение' : 'Ожидает рассмотрения'));
         const actions = node(document, 'div', 'ru-moderation-actions');
         const path = `/api/v1/role-requests/${request.request_id}`;
         if (request.status === 'pending') actions.append(actionButton(document, 'Начать рассмотрение', () => patch(path, { action: 'start_review' })));
-        if (request.status === 'reviewing' && request.review_started_by === me.profile.id) {
+        if (request.status === 'reviewing' && request.review_started_by_me === true) {
           actions.append(actionButton(document, 'Одобрить роль', () => patch(path, { decision: 'approve' })));
           actions.append(actionButton(document, 'Отклонить', () => patch(path, { decision: 'reject' })));
         }

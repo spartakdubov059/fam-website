@@ -164,7 +164,8 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
     repository: {
       getActiveAccountSuspension: async () => null,
       createSchoolRoleRequest: async request => { savedRole = request.requested_role; return { ok: true, status: 'pending', request_id: id }; },
-      listPendingSchoolRoleRequests: async school => { reviewSchool = school; return [{ request_id: id, requested_role: 'council_member' }]; },
+      listPendingSchoolRoleRequests: async school => { reviewSchool = school; return [{ request_id: id, user_id: '11111111-1111-4111-8111-1234567890ab',
+        first_name: 'Тест', last_name: 'Ученик', class_name: '8А', requested_role: 'council_member', status: 'pending', review_started_by: null }]; },
       startSchoolRoleRequestReview: async (requestId, school, reviewer) => { reviewAction = [requestId, school, reviewer]; return true; },
       reviewSchoolRoleRequest: async (requestId, school, reviewer, decision, note) => { reviewAction = [requestId, school, reviewer, decision, note]; return true; },
     } });
@@ -175,7 +176,11 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
   assert.equal((await handler(invalid)).status, 400);
   actor = { id: 'admin-id', school_id: 'school-a', role: 'school_admin', active: true };
   const queue = req({}, 'GET'); queue.url = '/api/v1/role-requests/review';
-  assert.equal((await handler(queue)).status, 200); assert.equal(reviewSchool, 'school-a');
+  const queued = await handler(queue);
+  assert.equal(queued.status, 200); assert.equal(reviewSchool, 'school-a');
+  assert.deepEqual(queued.body.requests[0], { request_id: id, account_code: '7890AB', applicant_name: 'Тест Ученик',
+    class_name: '8А', requested_role: 'council_member', status: 'pending', created_at: null, review_started_at: null, review_started_by_me: false });
+  assert.equal(Object.hasOwn(queued.body.requests[0], 'user_id'), false, 'review queue exposes only a short account code');
   const start = req({ action: 'start_review' }, 'PATCH'); start.url = `/api/v1/role-requests/${id}`;
   assert.equal((await handler(start)).status, 200); assert.deepEqual(reviewAction, [id, 'school-a', 'admin-id']);
   const approve = req({ decision: 'approve', review_note: 'Проверено школой' }, 'PATCH'); approve.url = `/api/v1/role-requests/${id}`;

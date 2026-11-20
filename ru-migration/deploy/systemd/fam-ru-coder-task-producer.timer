@@ -1,0 +1,10 @@
+[Unit]
+Description=Queue the FAM RU coder review task daily at 03:10 UTC (06:10 MSK)
+
+[Timer]
+OnCalendar=*-*-* 03:10:00 UTC
+Persistent=false
+Unit=fam-ru-coder-task-producer.service
+
+[Install]
+WantedBy=timers.target

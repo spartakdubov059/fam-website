@@ -33,6 +33,20 @@ export async function initializeAccountWorkflow({ document = globalThis.document
   const status = node(document, 'p', 'ru-note', 'Для удаления потребуется повторный вход через Яндекс ID и точное подтверждение.');
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   section.append(status);
+  try {
+    const response = await fetchImpl('/api/v1/me/suspension', {
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
+    });
+    const result = await json(response);
+    if (response.ok && result?.ok && result.suspended && result.suspension) {
+      const expiry = typeof result.suspension.expires_at === 'string' ? Date.parse(result.suspension.expires_at) : NaN;
+      const date = Number.isFinite(expiry) ? new Date(expiry).toLocaleString('ru-RU') : 'неизвестное время';
+      const reason = typeof result.suspension.reason === 'string' ? result.suspension.reason.slice(0, 240) : '';
+      const notice = node(document, 'p', 'ru-note', `Для аккаунта действует временное ограничение до ${date}.${reason ? ` Причина: ${reason}` : ''} Просмотр статуса и удаление своего аккаунта остаются доступны.`);
+      notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
+      section.insertBefore ? section.insertBefore(notice, status) : section.append(notice);
+    }
+  } catch { /* Status lookup is informative; deletion authorization remains server-side. */ }
   const button = node(document, 'button', 'ru-button ru-account-delete-button', 'Удалить мой аккаунт');
   button.type = 'button'; section.append(button);
 

@@ -91,9 +91,14 @@ export function createYdbListingsRepository(sql) {
 
     async listPendingSchoolRoleRequests(schoolId) {
       if (!schoolId) throw new TypeError('invalid role request school');
-      const statement = sql`SELECT request_id, user_id, requested_role, status, created_at, review_started_at, review_started_by
-        FROM fam_school_role_requests WHERE school_id = ${schoolId} AND status IN ('pending', 'reviewing')
-        ORDER BY created_at ASC LIMIT 50;`;
+      const statement = sql`SELECT r.request_id AS request_id, r.user_id AS user_id,
+          r.requested_role AS requested_role, r.status AS status, r.created_at AS created_at,
+          r.review_started_at AS review_started_at, r.review_started_by AS review_started_by,
+          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name
+        FROM fam_school_role_requests AS r
+        INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
+        WHERE r.school_id = ${schoolId} AND r.status IN ('pending', 'reviewing')
+        ORDER BY r.created_at ASC LIMIT 50;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       return (await statement)?.[0] ?? [];
     },
@@ -1633,15 +1638,31 @@ export function createYdbListingsRepository(sql) {
       const announcementQuery = sql`SELECT announcement_id AS id, title, body, kind, published_at, event_starts_at
         FROM fam_school_announcements WHERE school_id = ${schoolId} AND published_at <= CurrentUtcTimestamp()
           AND expires_at > CurrentUtcTimestamp() ORDER BY published_at DESC LIMIT 6;`;
+      const openEventQuery = sql`SELECT id, title, Unicode::Substring(description, 0, 450) AS body,
+          created_at AS published_at, event_date, event_time
+        FROM fam_listings WHERE school_id = ${schoolId} AND status = 'active' AND is_event = true
+          AND max_seats = 0 AND (event_date = '' OR CAST(event_date AS Date) >= CurrentUtcDate())
+        ORDER BY created_at DESC LIMIT 6;`;
       const pollQuery = sql`SELECT poll_id AS id, question, options_json, closes_at
         FROM fam_school_polls WHERE school_id = ${schoolId}
           AND closes_at > CurrentUtcTimestamp() - Interval('P7D') ORDER BY created_at DESC LIMIT 3;`;
-      for (const statement of [announcementQuery, pollQuery]) if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const [announcementResult, pollResult] = await Promise.all([announcementQuery, pollQuery]);
+      for (const statement of [announcementQuery, openEventQuery, pollQuery]) if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const [announcementResult, openEventResult, pollResult] = await Promise.all([announcementQuery, openEventQuery, pollQuery]);
       const announcements = (announcementResult?.[0] ?? []).map(row => ({
-        ...row,
+        id: row.id, title: row.title, body: row.body, kind: row.kind, published_at: row.published_at,
         event_starts_at: row.event_starts_at ?? null,
       }));
+      const openEvents = (openEventResult?.[0] ?? []).map(row => ({
+        id: row.id, title: row.title, body: row.body, kind: 'open_event',
+        published_at: row.published_at, event_starts_at: null,
+        event_date: row.event_date || null, event_time: row.event_time || null,
+      }));
+      const timestamp = value => value instanceof Date ? value.getTime() : Date.parse(value ?? '');
+      const feed = [...openEvents, ...announcements].sort((left, right) => {
+        const kindOrder = Number(right.kind === 'open_event') - Number(left.kind === 'open_event');
+        if (kindOrder) return kindOrder;
+        return (timestamp(right.published_at) || 0) - (timestamp(left.published_at) || 0);
+      }).slice(0, 6);
       const polls = [];
       for (const poll of pollResult?.[0] ?? []) {
         let options;
@@ -1664,7 +1685,7 @@ export function createYdbListingsRepository(sql) {
         polls.push({ ...poll, options, options_json: undefined, total_votes: totalVotes,
           my_vote: myVote === undefined ? null : Number(myVote), counts });
       }
-      return { announcements, polls };
+      return { announcements: feed, polls };
     },
 
     async voteSchoolPoll({ pollId, schoolId, userId, choiceIndex }) {

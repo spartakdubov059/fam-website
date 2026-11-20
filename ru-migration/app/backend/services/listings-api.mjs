@@ -256,7 +256,21 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       const suspensionBlock = await schoolRoleSuspensionGate(actor);
       if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.listPendingSchoolRoleRequests !== 'function') return { status: 503, body: { ok: false, error: 'role_review_unavailable' } };
-      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolRoleRequests(actor.school_id) } }; }
+      try {
+        const requests = await repository.listPendingSchoolRoleRequests(actor.school_id);
+        return { status: 200, body: { ok: true, requests: requests.map(request => ({
+          request_id: request.request_id,
+          account_code: typeof request.user_id === 'string' ? request.user_id.slice(-6).toUpperCase() : '',
+          applicant_name: [request.first_name, request.last_name].filter(value => typeof value === 'string' && value.trim())
+            .map(value => value.trim().slice(0, 60)).join(' '),
+          class_name: typeof request.class_name === 'string' ? request.class_name.slice(0, 8) : '',
+          requested_role: request.requested_role,
+          status: request.status,
+          created_at: request.created_at ?? null,
+          review_started_at: request.review_started_at ?? null,
+          review_started_by_me: request.review_started_by === actor.id,
+        })) } };
+      }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/role-management/targets') {

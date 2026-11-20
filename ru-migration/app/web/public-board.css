@@ -131,6 +131,8 @@ body {
 .ru-pulse-vote { padding: 0.6rem 0.85rem; border: 1px solid #454752; border-radius: 0.7rem; background: #111218; color: #f5f6f8; font: inherit; text-align: left; }
 .ru-pulse-vote[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
 .ru-pulse-vote:disabled { opacity: 0.75; cursor: default; }
+.ru-pulse-vote-label { flex: 1 1 auto; padding: 0.6rem 0.85rem; border: 1px solid #454752; border-radius: 0.7rem; background: #111218; }
+.ru-pulse-vote-label.is-selected { border-color: #b8a1ff; background: #373044; }
 .ru-pulse-vote-count, .ru-pulse-total { color: #b8bbc7; font-size: 0.85rem; }
 .ru-pulse-publish { margin-top: 0.4rem; }
 .ru-pulse-form { display: grid; gap: 0.55rem; }

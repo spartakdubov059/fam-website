@@ -1,5 +1,25 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Перепроверка после обновления карты исходника
+
+- Текущая карта ancestry и 9 миграций/6 Edge Function изменений зафиксирована в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md); она уточняет предыдущую узкую сверку в `SOURCE_SYNC_2026-11-20.md`.
+- На чистом изолированном checkout feature-ветки запущен Node `v22.23.5` (диапазон package: `>=22.15 <23`): `npm test --prefix ru-migration/app/backend` — **331/331 passed**.
+- `node ru-migration/compat/verify.mjs` вывел `SDK_COMPAT_PASS`; `node ru-migration/compat/verify-systemd-timers.mjs` проверил 7 timer-файлов; `git diff --check` прошёл.
+- Документальный commit [`7287907`](https://github.com/spartakdubov059/fam-website/commit/7287907e02eea46b26615eb0088f983ebb22c238) добавляет crosswalk и не меняет код. Для него новые GitHub CI workflow не запускались; предшествующие зелёные CI относятся к кодовому commit [`fb1f3d2`](https://github.com/spartakdubov059/fam-website/commit/fb1f3d2abc7c739b5d55d65e88fda376e85fb4fc).
+- Повторные GitHub refs после обновления: `main` `5e749c56`, `migration/yandex-cloud` `2795f05a`, feature `7287907e`. Первые две ветки не изменены. Это не облачный staging и не полный security review.
+
+## Перенос безопасного coder producer в feature branch
+
+- Коммит [`f611526`](https://github.com/spartakdubov059/fam-website/commit/f6115268a5d914c5f79970a0e42a99e184a2f00b) добавил RU producer для постановки ручной проверки только по агрегированным allowlisted событиям. Модель и инструменты не запускаются; задача не входит в автоматический allowlist worker.
+- Коммит [`88a63bc`](https://github.com/spartakdubov059/fam-website/commit/88a63bc5e39853ff95ba6a83610b430485f1bad4) добавил synthetic YDB сценарий порога и идемпотентности. [Disposable YDB CI #44701308296](https://github.com/spartakdubov059/fam-website/actions/runs/44701308296) и [SDK/Sharp CI #44701308311](https://github.com/spartakdubov059/fam-website/actions/runs/44701308311) завершились успешно. Локально: 331/331 backend-тестов, SDK compat verifier и portable timer validation прошли.
+- При подготовке интеграционного сценария первоначальная загрузка большого файла была обрезана и CI корректно упал на синтаксической ошибке. Файл восстановлен из локального Git blob с проверкой SHA; успешный CI выше выполнен уже на полном файле.
+- Изменения только в `codex/fam-ru-offline-safety-review`. `main` и `migration/yandex-cloud` не менялись. YDB была одноразовой локальной базой GitHub CI, не российским облачным staging.
+
+## Срок хранения безопасной очереди
+
+- Новая схема `33_fam_agent_task_retention.yql` включает YDB TTL на `finished_at` для завершённых задач и `created_at` для событий очереди (180 дней). Незавершённые задачи с `finished_at = NULL` сохраняются; повторный захват сбрасывает время завершения.
+- Коммит [`fb1f3d2`](https://github.com/spartakdubov059/fam-website/commit/fb1f3d2abc7c739b5d55d65e88fda376e85fb4fc) прошёл [disposable YDB CI #44702250049](https://github.com/spartakdubov059/fam-website/actions/runs/44702250049) и [SDK/Sharp CI #44702250295](https://github.com/spartakdubov059/fam-website/actions/runs/44702250295). Схема 33 применена на временной локальной YDB; локальная команда `verify.mjs` не интерпретирует YQL TTL.
+
 ## Актуальная проверка веток и CI (20 ноября 2026)
 
 - На кодовом commit [`0d3be3a`](https://github.com/spartakdubov059/fam-website/commit/0d3be3a5a5b5ea0466340b1e794cff75babed647) оба workflow повторно завершились успешно: [SDK/Sharp CI #44690234889](https://github.com/spartakdubov059/fam-website/actions/runs/44690234889) — `327/327` backend-тестов, pinned SDK/Sharp и systemd timers; [YDB CI #44690234948](https://github.com/spartakdubov059/fam-website/actions/runs/44690234948) — схемы 01–32 и synthetic integration, включая две конкурентные постановки одной задачи (создаётся одна запись) и два конкурентных worker захвата (один lease). CI использовал только временную локальную тестовую YDB.

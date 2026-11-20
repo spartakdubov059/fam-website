@@ -399,7 +399,10 @@ test('school role request review is claimed before only its reviewer can decide'
     if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [] }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
     if (url === '/api/v1/profile-requests/review') return { ok: true, json: async () => ({ ok: true, requests: [] }) };
-    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{ request_id: id, requested_role: 'school_admin', status: state, review_started_by: state === 'reviewing' ? 'admin-a' : null }] }) };
+    if (url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, requests: state === 'approved' ? [] : [{
+      request_id: id, requested_role: 'school_admin', status: state, account_code: '123ABC',
+      applicant_name: '<unsafe applicant>', class_name: '8А', review_started_by_me: state === 'reviewing',
+    }] }) };
     if (url === '/api/v1/school/admin/safety-reports') return { ok: true, json: async () => ({ ok: true, reports: [] }) };
     if (url === '/api/v1/messages/moderation') return { ok: true, json: async () => ({ ok: true, messages: [] }) };
     if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
@@ -407,6 +410,9 @@ test('school role request review is claimed before only its reviewer can decide'
     return { ok: true, json: async () => ({ ok: true }) };
   } });
   let card = f.queue.children.find(item => item.children?.[0]?.textContent?.startsWith('Запрос:'));
+  assert.equal(card.children[1].textContent, '<unsafe applicant> · класс 8А · аккаунт #123ABC');
+  assert.equal(card.children[1].tagName, 'p', 'the applicant name is rendered in a text-only paragraph');
+  assert.equal(card.children[1].children.length, 0, 'untrusted profile text is never interpreted as markup');
   let actions = card.children.at(-1).children;
   assert.deepEqual(actions.map(button => button.textContent), ['Начать рассмотрение']);
   await actions[0].listeners.click();

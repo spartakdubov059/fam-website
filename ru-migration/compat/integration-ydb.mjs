@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
-import { query } from '@ydbjs/query';
+import { query, identifier, fragment, join } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
 import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
+import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -18,6 +19,8 @@ try {
   const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
+  const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false });
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {
     try {
@@ -244,6 +247,19 @@ try {
     title: 'Проверка школьной доски', body: 'Встреча состоится в пятницу', kind: 'news', school_id: 'other-school', author_id: '22222222-2222-4222-8222-222222222222',
   }));
   assert.equal(pulseAnnouncement.status, 201, JSON.stringify(pulseAnnouncement.body));
+  const longOpenEventDescription = 'Открытое школьное событие. '.repeat(30);
+  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
+      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
+    VALUES ('synthetic-open-event', 'synthetic-user', 'synthetic-school', 'Открытый день школы', ${longOpenEventDescription},
+      'Мероприятия', 'Бесплатно', true, '2099-12-31', '12:00', 'open', 0, '', 'none', 'active', CurrentUtcTimestamp());`;
+  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
+      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
+    VALUES ('synthetic-limited-event', 'synthetic-user', 'synthetic-school', 'Событие с местами', 'Закрытая регистрация',
+      'Мероприятия', 'Бесплатно', true, '2099-12-31', '12:00', 'open', 10, '', 'none', 'active', CurrentUtcTimestamp());`;
+  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
+      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
+    VALUES ('synthetic-expired-event', 'synthetic-user', 'synthetic-school', 'Прошедшее событие', 'Дата уже прошла',
+      'Мероприятия', 'Бесплатно', true, '2000-01-01', '12:00', 'open', 0, '', 'none', 'active', CurrentUtcTimestamp());`;
   const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
     question: 'Какую книгу обсудим?', options: ['Сказки', 'Фантастика', 'Приключения', 'Детектив', 'Научная фантастика', 'Поэзия', 'История', 'Другое'],
   }));
@@ -256,6 +272,14 @@ try {
   assert.equal(pulseRead.status, 200);
   assert.ok(pulseRead.body.announcements.some(row => row.id === pulseAnnouncement.body.id));
   assert.equal(pulseRead.body.announcements[0].author_id, undefined, 'school pulse never exposes author identity');
+  const openEvent = pulseRead.body.announcements.find(row => row.id === 'synthetic-open-event');
+  assert.equal(openEvent?.kind, 'open_event', 'active no-capacity event is included in school pulse');
+  assert.equal(openEvent.event_date, '2099-12-31');
+  assert.ok(Array.from(openEvent.body).length <= 450, 'event description is capped by Unicode characters');
+  assert.equal(pulseRead.body.announcements.some(row => row.id === 'synthetic-limited-event'), false,
+    'events with a seat limit do not enter open-event feed');
+  assert.equal(pulseRead.body.announcements.some(row => row.id === 'synthetic-expired-event'), false,
+    'past events do not enter the feed');
   assert.ok(pulseRead.body.polls.some(row => row.id === pulsePoll.body.id));
   const pollVoters = ['synthetic-user', 'synthetic-registrant', 'synthetic-role-student', 'synthetic-admin', 'synthetic-council'];
   for (const [index, token] of pollVoters.entries()) {
@@ -337,12 +361,17 @@ try {
   const roleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));
   assert.equal(roleStatus.body.role, 'student');
   assert.equal(roleStatus.body.request.request_id, roleSubmission.body.request_id);
+  await sql`UPDATE fam_user_profiles SET first_name = 'Тест', last_name = 'Заявитель', class_name = '8А'
+    WHERE user_id = '55555555-5555-4555-8555-555555555555';`;
   const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
   assert.equal(roleQueue.status, 200);
   const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
   assert.ok(roleRequest);
   assert.equal(roleRequest.requested_role, 'council_member');
-  assert.equal(roleRequest.user_id, '55555555-5555-4555-8555-555555555555');
+  assert.deepEqual(roleRequest, { request_id: roleSubmission.body.request_id, account_code: '555555', applicant_name: 'Тест Заявитель',
+    class_name: '8А', requested_role: 'council_member', status: 'pending', created_at: roleRequest.created_at,
+    review_started_at: null, review_started_by_me: false });
+  assert.equal(Object.hasOwn(roleRequest, 'user_id'), false, 'same-school reviewer gets a short account code instead of the full Yandex-linked ID');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-lyceum-admin', { action: 'start_review' }))).status, 409,
     'a different school cannot claim the role request');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { action: 'start_review' }))).status, 200);
@@ -827,6 +856,37 @@ try {
   ]);
   assert.ok(indexProbes.every(rows => (rows?.[0]?.length ?? 0) === 0), 'all four FK lookup indexes are usable on the empty synthetic tables');
   const agentQueue = createYdbAgentTaskQueue(sql);
+  const coderBucket = new Date();
+  coderBucket.setUTCMinutes(0, 0, 0);
+  for (let i = 0; i < 3; i++) {
+    await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'auth', occurredAt: new Date(coderBucket.getTime() + i * 60_000) });
+  }
+  const coderSlotDate = new Date();
+  coderSlotDate.setUTCMinutes(Math.floor(coderSlotDate.getUTCMinutes() / 15) * 15, 0, 0);
+  const coderSlot = coderSlotDate.toISOString().slice(0, 16);
+  const coderTask = await agentQueue.enqueueSafeCoderTask(coderSlot);
+  assert.equal(coderTask.created, true, 'thresholded aggregate telemetry creates a synthetic manual-review task');
+  assert.equal(coderTask.task_key, 'audit_frontend_runtime');
+  assert.equal((await agentQueue.enqueueSafeCoderTask(coderSlot)).created, false, 'coder task enqueue is idempotent per quarter-hour slot');
+  const claimedBeforeCoder = await agentQueue.claimSafeTasks(5);
+  assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
+    'the automated worker allowlist never claims coder tasks');
+  const queuedCoder = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${coderTask.id};`;
+  assert.equal(queuedCoder?.[0]?.[0]?.status, 'queued', 'coder task stays out of the automated safe worker');
+  const coderPayload = JSON.parse(queuedCoder?.[0]?.[0]?.payload_json ?? 'null');
+  assert.deepEqual(Object.keys(coderPayload).sort(), ['event_code', 'occurrences', 'page_area', 'task_key'],
+    'coder task carries only the fixed aggregate schema');
+  assert.equal(coderPayload.task_key, coderTask.task_key);
+  assert.ok(['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(coderPayload.event_code));
+  assert.ok(['auth', 'listings', 'notifications', 'database', 'other'].includes(coderPayload.page_area));
+  assert.ok(Number.isInteger(coderPayload.occurrences) && coderPayload.occurrences >= 3 && coderPayload.occurrences <= 1000);
+  const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(coderClaim.id, coderTask.id);
+  assert.equal(coderClaim.task_key, coderPayload.task_key);
+  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
+  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
   const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
   assert.equal(safeTask.created, true);
   assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,

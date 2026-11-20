@@ -12,17 +12,24 @@ export async function checkRuSystemHealth({ runtimeFactory = createRuntime,
   ]);
   let runtime;
   let backgroundQueueHealth = null;
+  let schemaHealth = null;
   try {
     runtime = await runtimeFactory();
-    if (typeof runtime?.getRuBackgroundQueueHealth === 'function') {
-      backgroundQueueHealth = await runtime.getRuBackgroundQueueHealth();
-    }
+    const [queueResult, schemaResult] = await Promise.all([
+      typeof runtime?.getRuBackgroundQueueHealth === 'function'
+        ? Promise.resolve().then(() => runtime.getRuBackgroundQueueHealth()).catch(() => null) : null,
+      typeof runtime?.getRuSchemaHealth === 'function'
+        ? Promise.resolve().then(() => runtime.getRuSchemaHealth()).catch(() => null) : null,
+    ]);
+    backgroundQueueHealth = queueResult;
+    schemaHealth = schemaResult;
   } catch {
     backgroundQueueHealth = null;
+    schemaHealth = null;
   } finally {
     try { await runtime?.close?.(); } catch { /* A read-only health report must not leak shutdown errors. */ }
   }
-  return buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth });
+  return buildRuSystemHealthReport({ readiness, timers, backgroundQueueHealth, schemaHealth });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

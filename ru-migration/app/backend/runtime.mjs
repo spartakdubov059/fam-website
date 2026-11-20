@@ -1,5 +1,5 @@
 import { Driver } from '@ydbjs/core';
-import { query } from '@ydbjs/query';
+import { query, identifier, fragment, join } from '@ydbjs/query';
 import { MetadataCredentialsProvider } from '@ydbjs/auth/metadata';
 import { createOidcBearerAuthenticator } from './auth/oidc-bearer.mjs';
 import { createDatabaseActorResolver } from './auth/database-actor.mjs';
@@ -16,9 +16,12 @@ import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
+import { createSystemHealthTaskHandler } from './services/system-health-task.mjs';
 import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs';
-import { createScheduledSafeAgentRunner } from './services/scheduled-safe-agent-runner.mjs';
+import { createCoderTaskBridge } from './services/coder-task-bridge.mjs';
+import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from './services/scheduled-safe-agent-runner.mjs';
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
+import { createYdbSchemaHealthCheck } from './services/ydb-schema-health.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
@@ -89,9 +92,24 @@ export async function createRuntime(env = process.env) {
   await driver.ready();
   const sql = query(driver);
   const probeYdbReadiness = createYdbReadinessProbe(sql);
+  const schemaHealthCheck = createYdbSchemaHealthCheck(sql, { identifier, fragment, join });
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const agentTaskQueue = createYdbAgentTaskQueue(sql);
+  const coderTaskBridge = createCoderTaskBridge({ queue: agentTaskQueue, token: env.FAM_RU_CODER_WORKER_TOKEN });
+  const systemHealthTask = createSystemHealthTaskHandler({
+    readinessCheck: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
+      databaseReady: await probeYdbReadiness(), mediaConfigured }),
+    timerCheck: checkSystemdTimerHealth,
+    schemaCheck: schemaHealthCheck,
+    queueHealthCheck: async () => {
+      const [health, safeAgentTasks] = await Promise.all([
+        repository.getRuBackgroundQueueHealth(), agentTaskQueue.getSafeTaskQueueHealth(),
+      ]);
+      return { ...health, queues: { ...health.queues, safe_agent_tasks: safeAgentTasks },
+        content_read: health.content_read === false && safeAgentTasks.content_read === false };
+    },
+  });
   const processSafeAgentTasks = createSafeAgentTaskWorker({ queue: agentTaskQueue, handlers: {
     queue_health_check: async () => {
       const health = await agentTaskQueue.getSafeTaskQueueHealth();
@@ -102,21 +120,16 @@ export async function createRuntime(env = process.env) {
       const result = await createOrchestratorDailyDigest({ repository })();
       return `Операционная сводка FAM за ${result.date}: ${result.processed ? 'обработана' : 'уже актуальна или ожидает повторного запуска'}. Использованы только агрегированные показатели.`;
     },
-    system_health_check: async () => {
-      const [readiness, timers] = await Promise.all([
-        getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured, databaseReady: await probeYdbReadiness(), mediaConfigured }),
-        Promise.resolve().then(() => checkSystemdTimerHealth()),
-      ]);
-      const timerRows = Array.isArray(timers?.timers) ? timers.timers : [];
-      const healthyTimers = timerRows.filter(timer => timer?.ok === true).length;
-      return `Техническая проверка FAM завершена. Готовность backend: ${readiness.ready ? 'да' : 'нет'}; исправны расписания: ${healthyTimers}/${timerRows.length}. Проверены только инфраструктурные признаки.`;
-    },
+    system_health_check: systemHealthTask,
     site_error_digest: async () => {
       const result = await createSiteErrorDigest({ repository })();
       return `Сводка ошибок FAM за UTC слот ${result.slot}: обработано ${result.processed_count} задач. Хранятся только агрегированные категории, без текста запросов и личных данных.`;
     },
   } });
   const runSafeAgentWorker = createScheduledSafeAgentRunner({ queue: agentTaskQueue, worker: processSafeAgentTasks });
+  const enqueueSafeCoderTask = createScheduledCoderTaskProducer({ repository: {
+    enqueueSafeCoderTask: slot => agentTaskQueue.enqueueSafeCoderTask(slot),
+  } });
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
   const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages, safetyKey }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
@@ -129,6 +142,7 @@ export async function createRuntime(env = process.env) {
       const health = await repository.getRuBackgroundQueueHealth();
       return { ...health, queues: { ...health.queues, safe_agent_tasks: await agentTaskQueue.getSafeTaskQueueHealth() } };
     },
+    getRuSchemaHealth: schemaHealthCheck,
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     recoverAccountDeletions: createAccountDeletionRecoveryOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
@@ -136,8 +150,10 @@ export async function createRuntime(env = process.env) {
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
     processSiteErrorDigest: createSiteErrorDigest({ repository }),
     agentTaskQueue,
+    coderTaskBridge,
     processSafeAgentTasks,
     runSafeAgentWorker,
+    enqueueSafeCoderTask,
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

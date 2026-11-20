@@ -9,6 +9,59 @@ test('site error digest slot uses UTC quarter hours and rejects invalid dates', 
   assert.throws(() => getSiteErrorDigestSlot(new Date('invalid')), /invalid site error digest time/);
 });
 
+test('school role review queue joins only the same-school profile projection', async () => {
+  let query;
+  const row = { request_id: 'request-a', user_id: '11111111-1111-4111-8111-1234567890ab', requested_role: 'council_member',
+    status: 'pending', first_name: 'Тест', last_name: 'Ученик', class_name: '8А' };
+  const repository = createYdbListingsRepository(strings => { query = strings.join('?'); return Promise.resolve([[row]]); });
+  assert.deepEqual(await repository.listPendingSchoolRoleRequests('school-a'), [row]);
+  assert.match(query, /r\.request_id AS request_id, r\.user_id AS user_id/);
+  assert.match(query, /p\.first_name AS first_name, p\.last_name AS last_name, p\.class_name AS class_name/);
+  assert.match(query, /INNER JOIN fam_user_profiles AS p ON p\.user_id = r\.user_id AND p\.school_id = r\.school_id/);
+  assert.match(query, /r\.school_id = \?/);
+  assert.match(query, /r\.status IN \('pending', 'reviewing'\)/);
+  assert.match(query, /LIMIT 50/);
+});
+
+test('school pulse merges same-school open-entry events ahead of notices without exposing listing ownership', async () => {
+  const calls = [];
+  const announcement = { id: 'notice-a', title: 'Школьная новость', body: 'Собрание в пятницу', kind: 'news',
+    published_at: new Date('2026-03-01T10:00:00Z'), event_starts_at: null, author_id: 'private-author' };
+  const events = [
+    { id: 'event-old', title: 'Старое открытое событие', body: 'Описание события', published_at: new Date('2026-01-01T10:00:00Z'),
+      event_date: '2099-12-30', event_time: '10:00', user_id: 'private-user', image_key: 'private-key' },
+    { id: 'event-new', title: 'Новое открытое событие', body: 'Новое описание', published_at: new Date('2026-02-01T10:00:00Z'),
+      event_date: '2099-12-31', event_time: '11:00', user_id: 'private-user', image_key: 'private-key' },
+  ];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_school_announcements')) return [[announcement]];
+    if (text.includes('FROM fam_listings')) return [[...events]];
+    if (text.includes('FROM fam_school_polls')) return [[]];
+    throw new Error('unexpected school pulse query');
+  };
+
+  const pulse = await createYdbListingsRepository(sql).listSchoolPulse('school-a', 'student-a');
+  assert.deepEqual(pulse.announcements.map(row => row.id), ['event-new', 'event-old', 'notice-a'],
+    'open-entry events are prioritized and ordered by publication time');
+  assert.equal(pulse.announcements[0].kind, 'open_event');
+  assert.equal(pulse.announcements[0].event_date, '2099-12-31');
+  assert.equal(pulse.announcements[0].event_time, '11:00');
+  assert.equal(pulse.announcements[0].event_starts_at, null);
+  assert.equal(Object.hasOwn(pulse.announcements[0], 'user_id'), false);
+  assert.equal(Object.hasOwn(pulse.announcements[0], 'image_key'), false);
+  assert.equal(Object.hasOwn(pulse.announcements[2], 'author_id'), false);
+
+  const query = calls.find(call => call.text.includes('FROM fam_listings'));
+  assert.ok(query.values.includes('school-a'));
+  assert.match(query.text, /status = 'active' AND is_event = true/);
+  assert.match(query.text, /max_seats = 0/);
+  assert.match(query.text, /CAST\(event_date AS Date\) >= CurrentUtcDate\(\)/);
+  assert.match(query.text, /Unicode::Substring\(description, 0, 450\)/);
+  assert.match(query.text, /LIMIT 6/);
+  assert.doesNotMatch(query.text, /user_id|image_key|author_id/);
+});
+
 test('site error digest aggregation reads only bounded aggregate counters and returns top categories', async () => {
   let query;
   const rows = [

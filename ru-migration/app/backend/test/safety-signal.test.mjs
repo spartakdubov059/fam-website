@@ -37,6 +37,15 @@ test('non-safety local moderation flags do not create incident reports', () => {
     localFlag: 'controlled_substances', text: 'тест', safetyKey: key }), null);
 });
 
+test('sensitive-topic review stores only a medium school safety marker without text', () => {
+  const signal = buildLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
+    localFlag: 'self_harm_safety_review', text: 'Разговор о суициде.', safetyKey: key });
+  assert.equal(signal.category, 'unclear_safety_signal');
+  assert.equal(signal.severity, 'medium');
+  assert.equal(Object.hasOwn(signal, 'text'), false);
+  assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+});
+
 test('safety incident recording requires a long key and valid same-school identities', () => {
   const base = { actor, sourceKind: 'message', sourceOrigin: 'messages', localFlag: 'serious_hate_or_threat', text: 'угроза' };
   assert.throws(() => buildLocalSafetySignal({ ...base, safetyKey: 'too-short' }), TypeError);

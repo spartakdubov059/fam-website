@@ -2,9 +2,19 @@ import { containsContactData, findLocalPolicyFlag } from './content-safety.js';
 
 const KINDS = new Set(['news', 'important', 'open_event']);
 const DAY = 24 * 60 * 60 * 1000;
+const SAFETY_GUIDANCE_PATTERNS = [
+  /^о\s+(?:травле|буллинге|насилии|сексуальном насилии|самоповреждении|суициде)[.!?]?$/iu,
+  /^(?:как сообщить о (?:травле|буллинге|насилии|сексуальном насилии)|куда обратиться(?: за помощью)? при (?:травле|буллинге|насилии|сексуальном насилии|самоповреждении|суицидальных мыслях)|как попросить помощи при (?:травле|буллинге|насилии|сексуальном насилии|самоповреждении|суицидальных мыслях))(?: в школе)?[.!?]?$/iu,
+  /^профилактика (?:травли|буллинга|насилия|сексуального насилия|самоповреждения|суицида|самоубийства)[.!?]?$/iu,
+];
 
-function safeText(value) {
-  return typeof value === 'string' && !containsContactData(value) && !findLocalPolicyFlag(value);
+function safeText(value, allowSafetyGuidance = false) {
+  if (typeof value !== 'string' || containsContactData(value)) return false;
+  const flag = findLocalPolicyFlag(value);
+  // Only short, fixed prevention headings/questions bypass the manual-review
+  // hold. A trusted publisher cannot append unsafe instructions to guidance.
+  return !flag || (allowSafetyGuidance && flag.code.endsWith('_safety_review')
+    && SAFETY_GUIDANCE_PATTERNS.some(pattern => pattern.test(value.normalize('NFKC').trim())));
 }
 
 export function validateSchoolAnnouncement(input, now = Date.now()) {
@@ -13,7 +23,7 @@ export function validateSchoolAnnouncement(input, now = Date.now()) {
   const body = typeof input.body === 'string' ? input.body.trim() : '';
   const kind = input.kind ?? 'news';
   if (title.length < 4 || title.length > 90 || body.length < 4 || body.length > 450
-      || !KINDS.has(kind) || !safeText(title) || !safeText(body)) return { ok: false, code: 'invalid_announcement' };
+      || !KINDS.has(kind) || !safeText(title, true) || !safeText(body, true)) return { ok: false, code: 'invalid_announcement' };
   let eventStartsAt = null;
   if (kind === 'open_event') {
     eventStartsAt = typeof input.event_starts_at === 'string' ? Date.parse(input.event_starts_at) : NaN;

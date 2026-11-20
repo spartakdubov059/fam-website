@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 export const FAM_RU_TIMER_UNITS = Object.freeze([
   'fam-ru-orchestrator-daily-digest.timer',
+  'fam-ru-coder-task-producer.timer',
   'fam-ru-pending-media-cleanup.timer',
   'fam-ru-runtime-health.timer',
   'fam-ru-safe-agent-worker.timer',
@@ -11,6 +12,7 @@ export const FAM_RU_TIMER_UNITS = Object.freeze([
 
 const MAX_RUN_AGE_MS = Object.freeze({
   'fam-ru-orchestrator-daily-digest.timer': 26 * 60 * 60 * 1000,
+  'fam-ru-coder-task-producer.timer': 26 * 60 * 60 * 1000,
   'fam-ru-pending-media-cleanup.timer': 7 * 60 * 60 * 1000,
   'fam-ru-runtime-health.timer': 26 * 60 * 60 * 1000,
   'fam-ru-safe-agent-worker.timer': 12 * 60 * 1000,

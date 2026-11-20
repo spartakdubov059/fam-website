@@ -71,3 +71,67 @@ test('school feed is private for guests and publisher controls appear only for t
   assert.deepEqual(Object.keys(JSON.parse(sent.init.body)).sort(), ['body', 'event_starts_at', 'kind', 'title']);
   assert.equal(JSON.parse(sent.init.body).school_id, undefined, 'the browser cannot choose announcement school or author');
 });
+
+test('guests see only future open events without registration limits from the public board', async () => {
+  const f = fixture(); const calls = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  await initializeSchoolPulse({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: false, status: 401, json: async () => ({}) };
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: 'open', title: 'Открытая встреча', description: 'Можно прийти всем', is_event: true, max_seats: 0, event_date: today },
+      { id: 'no-date', title: 'Без даты', description: 'Открытое событие', is_event: true, max_seats: 0, event_date: null },
+      { id: 'limited', title: 'Запись', description: 'Есть места', is_event: true, max_seats: 20, event_date: today },
+      { id: 'past', title: 'Прошедшее', description: 'Вчера', is_event: true, max_seats: 0, event_date: yesterday },
+      { id: 'listing', title: 'Объявление', description: 'Не мероприятие', is_event: false, max_seats: 0 },
+    ] }) };
+    throw new Error(`unexpected URL ${url}`);
+  } });
+
+  assert.equal(calls[1].url, '/api/v1/listings');
+  assert.equal(calls[1].init.credentials, 'omit');
+  const feed = f.root.children[2];
+  assert.deepEqual(feed.children.map(card => card.children[1]?.textContent), ['Открытая встреча', 'Без даты']);
+  assert.ok(feed.children.every(card => card.className.includes('ru-pulse-event')));
+  assert.equal(feed.children[0].children[2].textContent, 'Можно прийти всем');
+  assert.equal(feed.children.some(card => JSON.stringify(card).includes('limited')), false);
+});
+
+test('guest feed does not claim open events loaded when the public listing API fails', async () => {
+  const f = fixture();
+  await initializeSchoolPulse({ ...f, fetchImpl: async url => url === '/api/v1/me'
+    ? { ok: false, status: 401, json: async () => ({}) }
+    : { ok: false, status: 503, json: async () => ({ ok: false }) } });
+  assert.match(f.root.children[1].textContent, /Не удалось загрузить открытые мероприятия/);
+  assert.equal(f.root.children[2].children[0].href, '/auth/yandex/start');
+});
+
+test('poll vote distribution is shown only to voters or after the poll closes', async () => {
+  async function renderPoll(poll) {
+    const f = fixture();
+    await initializeSchoolPulse({ ...f, fetchImpl: async url => url === '/api/v1/me'
+      ? { ok: true, json: async () => ({ ok: true, profile: { id: 'student', school_id: 'school-a', role: 'student' } }) }
+      : { ok: true, json: async () => ({ ok: true, announcements: [], polls: [poll] }) } });
+    return f.root.children[2].children[0];
+  }
+
+  const base = { id: 'poll-a', question: 'Какой вариант?', options: ['Первый', 'Второй'], total_votes: 5,
+    counts: [4, 1], closes_at: '2099-01-01T00:00:00Z', my_vote: null };
+  const openPoll = await renderPoll(base);
+  assert.equal(openPoll.children[2].children[0].children.some(child => child.className === 'ru-pulse-vote-count'), false,
+    'an open poll does not reveal the distribution before this participant votes');
+  assert.equal(openPoll.children[2].children[0].children[0].tagName, 'button');
+
+  const inconsistentPoll = await renderPoll({ ...base, my_vote: 0, counts: [4, 0] });
+  assert.equal(inconsistentPoll.children[2].children[0].children.some(child => child.className === 'ru-pulse-vote-count'), false,
+    'an inconsistent aggregate is not rendered as poll results');
+
+  const voterPoll = await renderPoll({ ...base, my_vote: 0 });
+  assert.equal(voterPoll.children[2].children[0].children[0].textContent, 'Ваш выбор: Первый');
+  assert.equal(voterPoll.children[2].children[0].children[1].textContent, '80%');
+
+  const closedPoll = await renderPoll({ ...base, closes_at: '2020-01-01T00:00:00Z' });
+  assert.equal(closedPoll.children[2].children[1].children[1].textContent, '20%');
+  assert.equal(closedPoll.children[2].children[0].children[0].tagName, 'span');
+});

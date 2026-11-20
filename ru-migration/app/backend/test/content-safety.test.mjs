@@ -32,6 +32,19 @@ test("local idea checks flag sensitive topics without matching ordinary substrin
   assert.equal(findLocalPolicyFlag("Поступали угрозы в адрес ученика.")?.code, "serious_hate_or_threat");
 });
 
+test("sensitive safety topics go to human review instead of automatic approval or rejection", async () => {
+  const { reviewIdeaText } = await import("../policies/review-text.mjs");
+  for (const [text, code] of [
+    ["Разговор о суициде и поиске помощи.", "self_harm_safety_review"],
+    ["Поступили сообщения о сексуальном насилии.", "sexual_safety_review"],
+    ["Как сообщить о травле в школе?", "violence_safety_review"],
+  ]) {
+    assert.equal(findLocalPolicyFlag(text)?.code, code);
+    assert.deepEqual(reviewIdeaText(text), { action: "pending", reason_code: code, local_flag: code });
+  }
+  assert.equal(reviewIdeaText("Посадим траву возле школы.").action, "ok");
+});
+
 
 test("synthetic moderation fixtures match the local privacy gate", () => {
   const fixtures = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));

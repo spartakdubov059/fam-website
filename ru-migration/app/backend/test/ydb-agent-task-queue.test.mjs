@@ -30,6 +30,69 @@ test('safe task enqueue is idempotent and accepts only fixed task types and UTC 
   await assert.rejects(queue.enqueueSafeTask('queue_health_check', '2026-11-20T03:07'), /safe agent task/);
 });
 
+test('coder producer creates only one bounded task from allowlisted aggregate events', async () => {
+  let inserted = false;
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('SELECT status FROM fam_agent_tasks')) return inserted ? [[{ status: 'blocked' }]] : [[]];
+    if (query.includes("task_type = 'coder_patch_request'")) return inserted ? [[{ id: '33333333-3333-4333-8333-333333333333' }]] : [[]];
+    if (query.includes('SUM(event_count)')) return [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 4 }]];
+    if (query.includes('INSERT INTO fam_agent_tasks') && query.includes('VALUES')) inserted = true;
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  const first = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+  const second = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(first.task_key, 'audit_frontend_runtime');
+  const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks') && call.query.includes('VALUES'));
+  assert.ok(insert);
+  assert.match(insert.query, /payload_json/);
+  assert.ok(insert.values.includes(JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 4 })));
+  await assert.rejects(queue.enqueueSafeCoderTask('2026-11-20T03:11'), /coder slot/);
+});
+
+test('coder producer caps 24-hour event aggregates to the bridge payload limit', async () => {
+  const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+    ? [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 24_000 }]] : [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  const result = await queue.enqueueSafeCoderTask('2026-11-20T03:30');
+  const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks'));
+  const payload = JSON.parse(insert.values.find(value => typeof value === 'string' && value.includes('"task_key"')));
+  assert.equal(result.created, true);
+  assert.equal(payload.occurrences, 1000, 'payload remains within the coder bridge validation bound');
+});
+
+test('coder bridge claims only allowlisted aggregate payload and finishes the matching live lease', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const claimToken = '22222222-2222-4222-8222-222222222222';
+  const calls = [];
+  let finished = false; let savedToken;
+  const { sql } = fakeSql((query, values) => {
+    calls.push(query);
+    if (query.includes('SELECT id, payload_json')) return [[{ id,
+      payload_json: JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 7 }),
+      status: 'queued', available: true, lease_expired: false }]];
+    if (query.includes('SET status = Unwrap(CAST(') && query.includes('claim_token = ?')) savedToken = values[1];
+    if (query.includes('SELECT status, claimed_by, claim_token')) return [[{ status: 'claimed',
+      claimed_by: 'fam-agent-qwen-coder-v1', claim_token: savedToken, lease_valid: true }]];
+    if (query.includes('finished_at = CASE')) finished = true;
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  const task = await queue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.deepEqual({ id: task.id, task_key: task.task_key, event_code: task.event_code,
+    page_area: task.page_area, occurrences: task.occurrences },
+  { id, task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 7 });
+  assert.match(calls[0], /task_type = 'coder_patch_request'/);
+  assert.match(task.claim_token, /^[0-9a-f-]{36}$/i);
+  assert.equal(await queue.finishSafeCoderTask({ id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: task.claim_token, resultCode: 'model_completed' }), true);
+  assert.equal(finished, true);
+  await assert.rejects(queue.claimSafeCoderTask({ workerId: 'wrong-worker', leaseSeconds: 7200 }), /coder worker claim/);
+  await assert.rejects(queue.finishSafeCoderTask({ id, workerId: 'wrong-worker', claimToken, resultCode: 'model_completed' }), /coder task result/);
+});
+
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {
   const { sql, calls } = fakeSql(() => [[]]);
   const queue = createYdbAgentTaskQueue(sql);
@@ -56,6 +119,9 @@ test('task claim filters to the safe allowlist and returns only task metadata', 
   assert.match(select.query, /approval_required = false/);
   assert.match(select.query, /'queue_health_check'.*'daily_report_digest'.*'system_health_check'.*'site_error_digest'/);
   assert.equal(select.query.includes('payload_json'), false);
+  const claimUpdate = calls.find(call => call.query.includes("UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed'"));
+  assert.match(claimUpdate.query, /finished_at = CAST\(NULL AS Timestamp\?\)/,
+    'a reclaimed task restarts its terminal-retention clock');
 });
 
 test('task finish rejects invalid inputs and refuses an expired or mismatched lease', async () => {

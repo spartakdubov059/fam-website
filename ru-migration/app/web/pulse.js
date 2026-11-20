@@ -25,11 +25,39 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     link.href = '/auth/yandex/start'; feed.replaceChildren(link);
   };
 
+  async function loadGuestEvents() {
+    try {
+      const response = await request('/api/v1/listings', { credentials: 'omit' });
+      const listings = response.result?.listings;
+      if (!response.response.ok || !Array.isArray(listings) || listings.length > 100) return false;
+      const today = new Date().toISOString().slice(0, 10);
+      const events = listings.filter(item => item && item.is_event === true
+        && Number(item.max_seats || 0) === 0
+        && (!item.event_date || (typeof item.event_date === 'string' && item.event_date >= today)))
+        .slice(0, 6);
+      for (const event of events) renderAnnouncement({
+        title: event.title,
+        body: event.description,
+        kind: 'open_event',
+        event_starts_at: event.event_date && event.event_time
+          ? `${event.event_date}T${event.event_time}` : event.event_date || null,
+      });
+      return true;
+    } catch { return false; }
+  }
+
   async function load() {
     status.textContent = 'Загружаем школьную ленту…'; feed.replaceChildren();
     try {
       const me = await request('/api/v1/me');
-      if (me.response.status === 401) { status.textContent = 'Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.'; login(); return; }
+      if (me.response.status === 401) {
+        const loaded = await loadGuestEvents();
+        status.textContent = loaded
+          ? 'Открытые мероприятия без записи доступны всем. Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.'
+          : 'Не удалось загрузить открытые мероприятия. Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.';
+        if (!loaded || feed.children.length === 0) login();
+        return;
+      }
       if (!me.response.ok || !me.result?.profile?.school_id) { status.textContent = 'Для школьной ленты сначала получите подтверждённый профиль школы.'; return; }
       const pulse = await request('/api/v1/pulse');
       if (!pulse.response.ok || !Array.isArray(pulse.result?.announcements) || !Array.isArray(pulse.result?.polls)) throw new Error('pulse_unavailable');
@@ -63,34 +91,49 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     card.append(node(document, 'p', 'ru-pulse-kind', 'Опрос'), node(document, 'h3', '', poll.question));
     const closes = new Date(poll.closes_at);
     const closed = !Number.isFinite(closes.getTime()) || closes.getTime() <= Date.now();
+    const totalVotes = Number.isSafeInteger(poll.total_votes) ? Math.max(0, poll.total_votes) : 0;
+    const voted = Number.isInteger(poll.my_vote) && poll.my_vote >= 0 && poll.my_vote < poll.options.length;
+    const countsValid = Array.isArray(poll.counts) && poll.counts.length === poll.options.length
+      && poll.counts.every(count => Number.isSafeInteger(count) && count >= 0)
+      && poll.counts.reduce((sum, count) => sum + count, 0) === totalVotes;
+    const showResults = countsValid && (voted || closed) && totalVotes >= 5;
     const options = node(document, 'div', 'ru-pulse-options');
     for (const [index, label] of poll.options.slice(0, 8).entries()) {
       if (typeof label !== 'string') continue;
       const option = node(document, 'div', 'ru-pulse-option');
-      const vote = node(document, 'button', 'ru-pulse-vote', label); vote.type = 'button';
-      vote.disabled = closed || Number.isInteger(poll.my_vote);
-      vote.setAttribute('aria-pressed', String(poll.my_vote === index));
-      if (poll.my_vote === index) vote.textContent = `Ваш выбор: ${label}`;
-      vote.addEventListener('click', async () => {
-        vote.disabled = true;
-        try {
-          const sent = await request(`/api/v1/pulse/polls/${poll.id}/votes`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choice_index: index }) });
-          if (!sent.response.ok) {
-            status.textContent = sent.result?.error === 'already_voted' ? 'Голос уже учтён.'
-              : sent.result?.error === 'poll_closed' ? 'Опрос уже закрыт.' : 'Не удалось сохранить голос.';
-            vote.disabled = false; return;
-          }
-          await load();
-        } catch { status.textContent = 'Нет связи с сервером. Голос не подтверждён.'; vote.disabled = false; }
-      });
-      option.append(vote);
-      if (Array.isArray(poll.counts) && Number.isInteger(poll.counts[index])) {
-        option.append(node(document, 'span', 'ru-pulse-vote-count', `${poll.counts[index]} голосов`));
+      const selected = voted && poll.my_vote === index;
+      if (showResults) {
+        const percent = totalVotes ? Math.round(100 * poll.counts[index] / totalVotes) : 0;
+        option.append(node(document, 'span', selected ? 'ru-pulse-vote-label is-selected' : 'ru-pulse-vote-label',
+          selected ? `Ваш выбор: ${label}` : label));
+        option.append(node(document, 'span', 'ru-pulse-vote-count', `${percent}%`));
+      } else {
+        const vote = node(document, 'button', 'ru-pulse-vote', label); vote.type = 'button';
+        vote.disabled = closed || voted;
+        vote.setAttribute('aria-pressed', String(selected));
+        if (selected) vote.textContent = `Ваш выбор: ${label}`;
+        vote.addEventListener('click', async () => {
+          vote.disabled = true;
+          try {
+            const sent = await request(`/api/v1/pulse/polls/${poll.id}/votes`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ choice_index: index }) });
+            if (!sent.response.ok) {
+              status.textContent = sent.result?.error === 'already_voted' ? 'Голос уже учтён.'
+                : sent.result?.error === 'poll_closed' ? 'Опрос уже закрыт.' : 'Не удалось сохранить голос.';
+              vote.disabled = false; return;
+            }
+            await load();
+          } catch { status.textContent = 'Нет связи с сервером. Голос не подтверждён.'; vote.disabled = false; }
+        });
+        option.append(vote);
       }
       options.append(option);
     }
     card.append(options);
-    if (Number.isInteger(poll.total_votes)) card.append(node(document, 'p', 'ru-pulse-total', `Всего голосов: ${poll.total_votes}`));
+    const message = closed ? 'Опрос завершён'
+      : voted ? (showResults ? 'Спасибо за голос!' : 'Спасибо! Итоги появятся после 5 голосов')
+        : 'Один голос от одного участника';
+    card.append(node(document, 'p', 'ru-pulse-poll-foot', message));
+    if (Number.isSafeInteger(poll.total_votes)) card.append(node(document, 'p', 'ru-pulse-total', `Всего голосов: ${totalVotes}`));
     if (Number.isFinite(closes.getTime())) card.append(node(document, 'time', 'ru-pulse-date', `До ${closes.toLocaleString('ru-RU')}`));
     feed.append(card);
   }
