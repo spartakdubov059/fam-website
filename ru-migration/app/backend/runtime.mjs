@@ -16,6 +16,7 @@ import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
+import { createSystemHealthTaskHandler } from './services/system-health-task.mjs';
 import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs';
 import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from './services/scheduled-safe-agent-runner.mjs';
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
@@ -92,6 +93,18 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const agentTaskQueue = createYdbAgentTaskQueue(sql);
+  const systemHealthTask = createSystemHealthTaskHandler({
+    readinessCheck: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
+      databaseReady: await probeYdbReadiness(), mediaConfigured }),
+    timerCheck: checkSystemdTimerHealth,
+    queueHealthCheck: async () => {
+      const [health, safeAgentTasks] = await Promise.all([
+        repository.getRuBackgroundQueueHealth(), agentTaskQueue.getSafeTaskQueueHealth(),
+      ]);
+      return { ...health, queues: { ...health.queues, safe_agent_tasks: safeAgentTasks },
+        content_read: health.content_read === false && safeAgentTasks.content_read === false };
+    },
+  });
   const processSafeAgentTasks = createSafeAgentTaskWorker({ queue: agentTaskQueue, handlers: {
     queue_health_check: async () => {
       const health = await agentTaskQueue.getSafeTaskQueueHealth();
@@ -102,15 +115,7 @@ export async function createRuntime(env = process.env) {
       const result = await createOrchestratorDailyDigest({ repository })();
       return `Операционная сводка FAM за ${result.date}: ${result.processed ? 'обработана' : 'уже актуальна или ожидает повторного запуска'}. Использованы только агрегированные показатели.`;
     },
-    system_health_check: async () => {
-      const [readiness, timers] = await Promise.all([
-        getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured, databaseReady: await probeYdbReadiness(), mediaConfigured }),
-        Promise.resolve().then(() => checkSystemdTimerHealth()),
-      ]);
-      const timerRows = Array.isArray(timers?.timers) ? timers.timers : [];
-      const healthyTimers = timerRows.filter(timer => timer?.ok === true).length;
-      return `Техническая проверка FAM завершена. Готовность backend: ${readiness.ready ? 'да' : 'нет'}; исправны расписания: ${healthyTimers}/${timerRows.length}. Проверены только инфраструктурные признаки.`;
-    },
+    system_health_check: systemHealthTask,
     site_error_digest: async () => {
       const result = await createSiteErrorDigest({ repository })();
       return `Сводка ошибок FAM за UTC слот ${result.slot}: обработано ${result.processed_count} задач. Хранятся только агрегированные категории, без текста запросов и личных данных.`;
