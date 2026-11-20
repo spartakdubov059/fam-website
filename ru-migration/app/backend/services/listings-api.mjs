@@ -833,9 +833,14 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
-      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [] } };
+      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [], listings: [] } };
       if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
-      try { return { status: 200, body: { ok: true, listing_ids: await repository.listOwnActiveListingIds(actor.id) } }; }
+      try {
+        const listing_ids = await repository.listOwnActiveListingIds(actor.id);
+        const listings = typeof repository.listOwnListingSummaries === 'function'
+          ? await repository.listOwnListingSummaries(actor.id) : [];
+        return { status: 200, body: { ok: true, listing_ids, listings } };
+      }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'DELETE' && schoolListingDeleteMatch) {

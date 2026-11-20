@@ -21,7 +21,8 @@ export function initializeNavigation({ document = globalThis.document } = {}) {
       }
       if (view === 'profile') {
         const history = document.getElementById('ruIdeaHistory');
-        target = history && !history.hidden ? history : document.getElementById('ruProfileSettings')
+        const ownListings = document.getElementById('ruOwnListings');
+        target = history && !history.hidden ? history : ownListings && !ownListings.hidden ? ownListings : document.getElementById('ruProfileSettings')
           || document.getElementById('ruAvatarWorkflow')
           || document.getElementById('ruAccountWorkflow')
           || document.getElementById('ruListingForm')

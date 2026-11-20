@@ -656,6 +656,7 @@ test('ordinary students can delete only their own listing and media cleanup stay
     pendingImages: { delete: async key => { calls.push(['delete-image', key]); } },
     repository: { getActiveAccountSuspension: async () => null,
       listOwnActiveListingIds: async id => id === userId ? [listingId] : [],
+      listOwnListingSummaries: async id => id === userId ? [{ id: listingId, status: 'pending', title: 'Синтетика' }] : [],
       deleteOwnListing: async (id, target) => {
         calls.push(['delete-listing', id, target]);
         return id === userId && target === listingId ? { id: target, media_cleanup: { object_key: 'pending/user/image.webp', claim_token: 'claim-1' } } : null;
@@ -664,6 +665,7 @@ test('ordinary students can delete only their own listing and media cleanup stay
     } });
   const own = req({}, 'GET'); own.url = '/api/v1/me/listings';
   assert.deepEqual((await handler(own)).body.listing_ids, [listingId]);
+  assert.deepEqual((await handler(own)).body.listings, [{ id: listingId, status: 'pending', title: 'Синтетика' }]);
   const remove = req({}, 'DELETE'); remove.url = `/api/v1/listings/${listingId}`;
   assert.deepEqual(await handler(remove), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
   assert.deepEqual(calls, [
@@ -725,7 +727,7 @@ test('own listing identifiers are not exposed to staff or unprofiled identities'
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
     repository: { getActiveAccountSuspension: async () => null, listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [] } });
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [], listings: [] } });
   assert.equal(queries, 0);
   actor = null;
   assert.equal((await handler(request)).status, 403);

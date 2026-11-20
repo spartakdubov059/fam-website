@@ -9,6 +9,25 @@ test('site error digest slot uses UTC quarter hours and rejects invalid dates', 
   assert.throws(() => getSiteErrorDigestSlot(new Date('invalid')), /invalid site error digest time/);
 });
 
+test('own listing summaries are scoped to owner and omit database ownership and storage keys', async () => {
+  let query; let values;
+  const repository = createYdbListingsRepository((strings, ...bound) => {
+    query = strings.join('?'); values = bound;
+    return Promise.resolve([[{ id: 'listing-a', title: 'Синтетика', description: 'Описание', category: 'Учёба',
+      price_text: 'Бесплатно', status: 'pending', photo_status: 'pending', created_at: '2026-01-01',
+      image_key: 'private/key', user_id: 'private-owner', school_id: 'private-school' }]]);
+  });
+  const result = await repository.listOwnListingSummaries('owner-a');
+  assert.deepEqual(values, ['owner-a']);
+  assert.match(query, /WHERE user_id = \?/);
+  assert.match(query, /ORDER BY created_at DESC LIMIT 100/);
+  assert.equal(result[0].status, 'pending');
+  assert.equal(result[0].photo_status, 'pending');
+  assert.equal(Object.hasOwn(result[0], 'image_key'), false);
+  assert.equal(Object.hasOwn(result[0], 'user_id'), false);
+  assert.equal(Object.hasOwn(result[0], 'school_id'), false);
+});
+
 test('school role review queue joins only the same-school profile projection', async () => {
   let query;
   const row = { request_id: 'request-a', user_id: '11111111-1111-4111-8111-1234567890ab', requested_role: 'council_member',

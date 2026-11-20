@@ -38,6 +38,7 @@ window.onunhandledrejection = function() {
         <section id="ruAccountWorkflow" class="ru-account-workflow" hidden aria-label="Управление аккаунтом"></section>
         <section id="ruAvatarWorkflow" class="ru-avatar-workflow" hidden aria-label="Фото профиля"></section>
         <section id="ruIdeaHistory" class="ru-idea-history" hidden aria-label="Мои идеи"></section>
+        <section id="ruOwnListings" class="ru-account-workflow" hidden aria-label="Мои объявления"></section>
         <form id="ruListingForm" class="ru-listing-form" hidden>
           <label>Название<input name="title" maxlength="80" required></label>
           <label>Описание<textarea name="description" maxlength="1000" required></textarea></label>
@@ -136,6 +137,10 @@ window.onunhandledrejection = function() {
     ideaHistoryScript.type = 'module';
     ideaHistoryScript.src = '/idea-history.js';
     document.body.append(ideaHistoryScript);
+    const ownListingsScript = document.createElement('script');
+    ownListingsScript.type = 'module';
+    ownListingsScript.src = '/own-listings.js';
+    document.body.append(ownListingsScript);
     const heroScript = document.createElement('script');
     heroScript.type = 'module';
     heroScript.src = '/hero-carousel.js';

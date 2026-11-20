@@ -1417,6 +1417,22 @@ export function createYdbListingsRepository(sql) {
       return ((await statement)?.[0] ?? []).map(row => row.id);
     },
 
+    async listOwnListingSummaries(userId) {
+      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid listing owner');
+      const statement = sql`SELECT id, title, description, category, price_text, is_event,
+        event_date, event_time, event_type, max_seats, status, photo_status, created_at
+        FROM fam_listings WHERE user_id = ${userId}
+        ORDER BY created_at DESC LIMIT 100;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      return ((await statement)?.[0] ?? []).map(row => ({
+        id: row.id, title: row.title, description: row.description, category: row.category,
+        price_text: row.price_text, is_event: Boolean(row.is_event), event_date: row.event_date || null,
+        event_time: row.event_time || null, event_type: row.event_type || null,
+        max_seats: Number(row.max_seats || 0), status: row.status,
+        photo_status: row.photo_status || 'none', created_at: row.created_at,
+      }));
+    },
+
     async deleteOwnListing(userId, listingId) {
       if (typeof userId !== 'string' || !userId || typeof listingId !== 'string' || !UUID.test(listingId)) {
         throw new TypeError('invalid own listing deletion');
