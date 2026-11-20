@@ -364,7 +364,7 @@ test('direct same-origin school-account deletion is dispatched to the Russian de
       finishAccountDeletion: async input => { finalized = input; return { ok: true, deleted: true }; },
       restoreAccountAfterDeletionFailure: async () => true,
     },
-    pendingImages: { listUserObjects: async () => [], delete: async () => {} }, now: () => now,
+    pendingImages: { listUserObjects: async () => [], listAccountObjects: async (_id, keys = []) => keys, delete: async () => {} }, now: () => now,
   });
   const request = req({ confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }, 'DELETE');
   request.url = `/api/v1/school/accounts/${targetId}`;
