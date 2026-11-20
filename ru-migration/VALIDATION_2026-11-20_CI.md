@@ -1,5 +1,12 @@
 # Проверка FAM RU — 20 ноября 2026
 
+## Latest exact-commit CI result
+
+- Branch `migration/yandex-cloud` points to [`0270d3f`](https://github.com/spartakdubov059/fam-website/commit/0270d3fa2531b053cc91f639be02d38e0298aadc); its tree matches the locally tested source snapshot plus the YDB integration assertion fix.
+- [SDK/Sharp workflow #44758920677](https://github.com/spartakdubov059/fam-website/actions/runs/44758920677) passed on Node 22: **349/349** backend tests, pinned SDK/Sharp and WebP checks, and 8 systemd timer files validated.
+- [Disposable YDB workflow #44758920690](https://github.com/spartakdubov059/fam-website/actions/runs/44758920690) passed schema 01–33 and synthetic integration, including account deletion/role controls, school isolation, media cleanup and review, queues, quotas, indexes, listings, favorites, ideas, messages and events. The local test container was removed by the workflow cleanup step.
+- These are local code/CI checks, not a deployed Yandex Cloud staging environment. No cloud resource, production account, or real student data was used. `main` remains `5e749c56b9270efbfdf1f48cefe6e8d95a01c579`.
+
 ## Перепроверка после обновления карты исходника
 
 - Текущая карта ancestry и 9 миграций/6 Edge Function изменений зафиксирована в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md); она уточняет предыдущую узкую сверку в `SOURCE_SYNC_2026-11-20.md`.
