@@ -191,6 +191,11 @@ export function createYdbListingsRepository(sql) {
       return (await statement)?.[0]?.[0] ?? null;
     },
 
+, 'i');
+      if (keys.some(key => typeof key !== 'string' || !keyPattern.test(key))) throw new Error('invalid account media key');
+      return [...new Set(keys)];
+    },
+
     async listAccountMediaKeys(userId) {
       if (!userId || !UUID.test(userId)) throw new TypeError('invalid account media owner');
       const rows = await sql`SELECT object_key FROM fam_idea_images WHERE user_id = ${userId};`;
@@ -394,6 +399,10 @@ export function createYdbListingsRepository(sql) {
       return [...new Set(keys)];
     },
 
+, 'i');
+      if (keys.some(key => typeof key !== 'string' || !keyPattern.test(key))) throw new Error('invalid account media key');
+      return [...new Set(keys)];
+    },
     async listActiveAccountSuspensions(schoolId) {
       if (!schoolId) throw new TypeError('invalid suspension school');
       const statement = sql`SELECT target_id, target_role, duration_hours, reason, created_at, expires_at
