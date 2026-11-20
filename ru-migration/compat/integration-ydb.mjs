@@ -796,7 +796,7 @@ try {
   const accountDeletion = await listingsApi(apiRequest('DELETE', '/api/v1/me/account', 'synthetic-recent-registrant', {
     confirmation: 'УДАЛИТЬ МОЙ АККАУНТ',
   }));
-  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 3 } });
+  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 4 } });
   assert.ok(deletedMediaKeys.includes(deletingImageKey), 'account deletion removes all private objects under its owner prefix');
   assert.ok(deletedMediaKeys.includes(attachedIdeaImageKey), 'account deletion removes linked idea photos');
   assert.ok(deletedMediaKeys.includes(rejectedIdeaImageKey), 'account deletion removes rejected idea photos awaiting orphan cleanup');
