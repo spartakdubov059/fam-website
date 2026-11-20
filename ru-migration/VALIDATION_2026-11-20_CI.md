@@ -131,3 +131,12 @@
 - [Disposable YDB CI #44788806129](https://github.com/spartakdubov059/fam-website/actions/runs/44788806129) — success: схема и интеграционные сценарии на временной локальной YDB с синтетическими данными; контейнер удалён.
 - В тесте аватаров отдельно проверяется, что размер свыше 2 MiB не создаёт заявку на модерацию.
 - Cloud staging не создавался: подключение и бесплатная квота не подтверждены. Main, production и реальные школьные данные не затрагивались.
+
+
+## Продолжение UI-паритета: профиль и Афиша
+
+На коммите [22c05a7](https://github.com/spartakdubov059/fam-website/commit/22c05a7e90211e12a5f989b40d1adc5707fcfe71) подключён модуль настроек профиля в shell и добавлен отдельный фильтр «Афиша», включающий только записи с `is_event=true`.
+
+- [SDK/Sharp CI #44789909380](https://github.com/spartakdubov059/fam-website/actions/runs/44789909380) — success, **371/371** backend tests, systemd timer validation и pinned SDK/Sharp/WebP checks.
+- [Disposable YDB CI #44789909334](https://github.com/spartakdubov059/fam-website/actions/runs/44789909334) — success; схема и synthetic integration на disposable local YDB, с cleanup.
+- Эти проверки не подтверждают полный паритет SPA и не являются cloud staging QA.
