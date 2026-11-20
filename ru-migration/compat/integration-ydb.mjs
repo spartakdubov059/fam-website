@@ -848,8 +848,21 @@ try {
   assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
     'the automated worker allowlist never claims coder tasks');
   const queuedCoder = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${coderTask.id};`;
-  assert.deepEqual(queuedCoder?.[0]?.[0], { status: 'queued', payload_json: '{}' },
-    'coder task remains queued for manual review and carries no event payload');
+  assert.equal(queuedCoder?.[0]?.[0]?.status, 'queued', 'coder task stays out of the automated safe worker');
+  const coderPayload = JSON.parse(queuedCoder?.[0]?.[0]?.payload_json ?? 'null');
+  assert.deepEqual(Object.keys(coderPayload).sort(), ['event_code', 'occurrences', 'page_area', 'task_key'],
+    'coder task carries only the fixed aggregate schema');
+  assert.equal(coderPayload.task_key, coderTask.task_key);
+  assert.ok(['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(coderPayload.event_code));
+  assert.ok(['auth', 'listings', 'notifications', 'database', 'other'].includes(coderPayload.page_area));
+  assert.ok(Number.isInteger(coderPayload.occurrences) && coderPayload.occurrences >= 3 && coderPayload.occurrences <= 1000);
+  const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(coderClaim.id, coderTask.id);
+  assert.equal(coderClaim.task_key, coderPayload.task_key);
+  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
+  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
   const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
   assert.equal(safeTask.created, true);
   assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,
