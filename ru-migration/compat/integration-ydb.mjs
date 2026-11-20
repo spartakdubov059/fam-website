@@ -80,7 +80,9 @@ try {
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
       listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
-        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
+        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
+        ...(userId === '77777777-7777-4777-8777-777777777777' ? ['pending/77777777-7777-4777-8777-777777777777/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp'] : []),
+        ...ownedKeys,
       ])],
     },
   }));
