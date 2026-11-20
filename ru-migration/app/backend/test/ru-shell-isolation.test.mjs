@@ -21,6 +21,7 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
     '/avatar-workflow.js',
     '/profile-settings.js',
     '/navigation.js',
+    '/hero-carousel.js',
     '/account-workflow.js',
     '/pulse.js',
   ]) {
@@ -34,6 +35,7 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
   assert.doesNotMatch(html, /<style\b/i);
   assert.doesNotMatch(html, /\sstyle\s*=/i);
   assert.match(bootstrap, /document\.body\.innerHTML\s*=/);
+  assert.match(bootstrap, /id="ruHeroTrack"/);
   assert.match(bootstrap, /id="ruTabbar"/);
   assert.match(bootstrap, /data-ru-view="afisha"/);
 });
