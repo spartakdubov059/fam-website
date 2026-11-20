@@ -65,6 +65,10 @@ body {
 .ru-listing-form textarea { min-height: 7rem; resize: vertical; }
 .ru-category-hint { margin: -0.45rem 0 0; color: #b8bbc7; font-size: 0.9rem; }
 .ru-category-suggest { margin: 0 0.25rem 0.25rem 0; padding: 0.2rem 0.45rem; border: 1px solid #8175a2; border-radius: 0.4rem; background: #272331; color: #eee9ff; font: inherit; cursor: pointer; }
+.ru-description-helper-toggle { justify-self: start; }
+.ru-description-helper { display: grid; gap: 0.7rem; padding: 0.85rem; border: 1px solid #514965; border-radius: 0.7rem; background: #1a1921; }
+.ru-description-helper[hidden] { display: none; }
+.ru-description-helper-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .ru-event-fields { display: grid; gap: 0.8rem; margin: 0; padding: 1rem; border: 1px solid #d9d6e8; border-radius: 0.75rem; }
 .ru-event-fields[hidden] { display: none; }
 .ru-event-fields label { display: grid; gap: 0.35rem; font-weight: 600; }
