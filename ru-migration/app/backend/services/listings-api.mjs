@@ -93,6 +93,8 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
       if (req.method === 'GET') {
         if (typeof repository?.listSchoolSafetyReports !== 'function') return { status: 503, body: { ok: false, error: 'safety_reports_unavailable' } };
         try { return { status: 200, body: { ok: true, ...(await repository.listSchoolSafetyReports(actor.school_id)) } }; }

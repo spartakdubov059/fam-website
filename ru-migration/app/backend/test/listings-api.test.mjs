@@ -32,6 +32,7 @@ test('school safety reports are administrator-only and acknowledgement is school
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
     resolveActor: async () => actor,
     repository: {
+      getActiveAccountSuspension: async () => null,
       listSchoolSafetyReports: async schoolId => { selectedSchool = schoolId; return { reports: [{ fingerprint: 'a'.repeat(64) }], period_days: 30 }; },
       acknowledgeSchoolSafetyReport: async input => { acknowledged = input; return input.schoolId === actor.school_id; },
     } });
@@ -47,6 +48,35 @@ test('school safety reports are administrator-only and acknowledgement is school
   assert.deepEqual(acknowledged, { schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'a'.repeat(64), category: 'unsafe_image', sourceKind: 'image' });
   const malformed = req({ fingerprint: 'bad', category: 'unsafe_image', source_kind: 'image' }, 'PATCH'); malformed.url = ack.url;
   assert.equal((await handler(malformed)).status, 400);
+});
+
+test('suspension blocks school safety report access while suspension status remains readable', async () => {
+  const actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
+  let suspended = true; let accessedReports = 0;
+  const repository = {
+    getActiveAccountSuspension: async () => suspended ? { reason: 'test', expires_at: '2099-01-01T00:00:00Z' } : null,
+    listSchoolSafetyReports: async () => { accessedReports++; return { reports: [], period_days: 30 }; },
+    acknowledgeSchoolSafetyReport: async () => { accessedReports++; return true; },
+  };
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
+    resolveActor: async () => actor, repository });
+  const list = req({}, 'GET'); list.url = '/api/v1/school/admin/safety-reports';
+  assert.deepEqual(await handler(list), { status: 403, body: { ok: false, error: 'account_suspended' } });
+  const acknowledge = req({ fingerprint: 'a'.repeat(64), category: 'unsafe_image', source_kind: 'image' }, 'PATCH');
+  acknowledge.url = list.url;
+  assert.deepEqual(await handler(acknowledge), { status: 403, body: { ok: false, error: 'account_suspended' } });
+  assert.equal(accessedReports, 0);
+
+  const status = req({}, 'GET'); status.url = '/api/v1/me/suspension';
+  assert.deepEqual(await handler(status), { status: 200, body: { ok: true, suspended: true,
+    suspension: { reason: 'test', expires_at: '2099-01-01T00:00:00Z' } } });
+
+  suspended = false;
+  assert.equal((await handler(list)).status, 200);
+  assert.equal(accessedReports, 1);
+  repository.getActiveAccountSuspension = async () => { throw new Error('synthetic database failure'); };
+  assert.equal((await handler(list)).status, 503, 'suspension check failures deny safety report access');
+  assert.equal(accessedReports, 1);
 });
 
 test('manual message review queue and decision are limited to the same school administrator', async () => {
