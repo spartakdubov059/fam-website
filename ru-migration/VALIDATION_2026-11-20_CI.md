@@ -158,3 +158,12 @@
 - [SDK/Sharp CI #44791312376](https://github.com/spartakdubov059/fam-website/actions/runs/44791312376) — success, **374/374** backend tests; SDK/Sharp/WebP и systemd timers проверены.
 - [Disposable YDB CI #44791312484](https://github.com/spartakdubov059/fam-website/actions/runs/44791312484) — success; disposable local YDB integration и cleanup завершились успешно.
 - Изменение покрыто unit-проверками навигации и source-level shell isolation test; это не полный browser/device QA.
+
+
+## Проверка главной карусели RU
+
+На коммите [10ac3c0](https://github.com/spartakdubov059/fam-website/commit/10ac3c0248ff089cf6dc7b2af2a6036f6955315f) добавлена главная карусель из шести локальных banner-файлов с текстовыми alt, ручными кнопками и точками управления со screen-reader labels. Автопрокрутка отключена.
+
+- [SDK/Sharp CI #44791905879](https://github.com/spartakdubov059/fam-website/actions/runs/44791905879) — success, **376/376** backend tests и SDK/Sharp/WebP/timer checks.
+- [Disposable YDB CI #44791906120](https://github.com/spartakdubov059/fam-website/actions/runs/44791906120) — success, disposable local YDB synthetic integration и cleanup.
+- Юнит-проверки проверяют создание точек, переход next/previous и ручной выбор слайда. Полный визуальный QA на реальных мобильных браузерах пока не проводился.
