@@ -62,7 +62,7 @@ export async function initializeAvatarWorkflow({ document = globalThis.document,
     let imageKey = null;
     try {
       status.textContent = 'Загружаем фото в российское хранилище…';
-      const uploadResponse = await fetchImpl('/api/v1/media/pending', {
+      const uploadResponse = await fetchImpl('/api/v1/avatars/media/pending', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': file.type, accept: 'application/json' }, body: file,
       });
@@ -82,7 +82,7 @@ export async function initializeAvatarWorkflow({ document = globalThis.document,
       if (imageKey) {
         const objectId = imageKey.split('/').at(-1)?.replace(/\.webp$/i, '');
         if (UUID.test(objectId || '')) {
-          try { await fetchImpl(`/api/v1/media/pending/${objectId}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' }); } catch { /* cleanup can retry later */ }
+          try { await fetchImpl(`/api/v1/avatars/media/pending/${objectId}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' }); } catch { /* cleanup can retry later */ }
         }
       }
       status.textContent = 'Не удалось отправить фото. Проверьте подключение и попробуйте позже.';
