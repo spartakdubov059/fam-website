@@ -18,6 +18,7 @@ test('Russian shell loads its user flows only from same-origin modules', () => {
     '/messages.js',
     '/listing-submit.js',
     '/category-hints.js',
+    '/description-helper.js',
     '/listing-moderation.js',
     '/avatar-workflow.js',
     '/profile-settings.js',
