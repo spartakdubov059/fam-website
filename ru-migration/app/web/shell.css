@@ -77,6 +77,12 @@
     .hero-slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: 28px; min-height: 220px; position: relative; overflow: hidden; background: linear-gradient(140deg, #221739 0%, #14121f 55%, #101018 100%); border: 1px solid rgba(255,255,255,0.08); padding: 26px 24px; display: flex; flex-direction: column; justify-content: center; }
     .hero-slide.hero-img { padding: 0; background: transparent; border: none; height: 240px; display: flex; align-items: center; justify-content: center; }
     .hero-slide.hero-img img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: 28px; }
+    .hero-slide.hero-pulse-slide { min-height: clamp(260px, 48vw, 420px); max-height: 75vh; overflow-y: auto; padding: clamp(20px, 5vw, 48px); }
+    .hero-slide.hero-pulse-important { background: linear-gradient(140deg, #493514, #221a12 60%, #101018); border-color: rgba(255,204,102,0.34); }
+    .hero-slide.hero-pulse-event { background: linear-gradient(140deg, #36255f, #201930 60%, #101018); border-color: rgba(181,148,255,0.34); }
+    .hero-slide.hero-pulse-poll { background: linear-gradient(140deg, #1d3850, #17212c 60%, #101018); border-color: rgba(117,194,255,0.3); }
+    .hero-slide.hero-pulse-news { background: linear-gradient(140deg, #27323f, #1b2029 60%, #101018); }
+    .hero-slide.hero-pulse-slide .ru-pulse-card { width: 100%; border: 0; border-radius: 0; padding: 0; background: transparent; }
     .hero-crown { position: absolute; top: 20px; right: 30%; font-size: 42px; transform: rotate(12deg); animation: crownFloat 3.4s ease-in-out infinite; }
     @keyframes crownFloat { 0%,100% { transform: rotate(12deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-7px); } }
     .hero-script { font-family: 'Caveat', cursive, sans-serif; font-size: 52px; line-height: 1; font-weight: 700; color: #fff; transform: rotate(-2deg); }

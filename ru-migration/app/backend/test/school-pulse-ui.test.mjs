@@ -9,9 +9,12 @@ class FakeNode {
   setAttribute(name, value) { this.attributes[name] = value; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
 }
-function fixture() {
+function fixture({ withHero = false } = {}) {
   const root = new FakeNode('section');
-  return { root, document: { getElementById: id => id === 'ruPulse' ? root : null, createElement: tag => new FakeNode(tag) } };
+  const track = new FakeNode('div'); const dots = new FakeNode('div');
+  if (withHero) track.children = [new FakeNode('div'), new FakeNode('div')];
+  const document = { getElementById: id => id === 'ruPulse' ? root : id === 'ruHeroTrack' && withHero ? track : id === 'ruHeroDots' && withHero ? dots : null, createElement: tag => new FakeNode(tag) };
+  return { root, track, dots, document };
 }
 
 test('school feed renders announcements as text and a student can cast one same-school poll vote', async () => {
@@ -134,4 +137,24 @@ test('poll vote distribution is shown only to voters or after the poll closes', 
   const closedPoll = await renderPoll({ ...base, closes_at: '2020-01-01T00:00:00Z' });
   assert.equal(closedPoll.children[2].children[1].children[1].textContent, '20%');
   assert.equal(closedPoll.children[2].children[0].children[0].tagName, 'span');
+});
+
+test('featured school cards join the hero carousel and preserve poll voting handlers', async () => {
+  const f = fixture({ withHero: true }); let voted = false;
+  await initializeSchoolPulse({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student', school_id: 'school-a', role: 'student' } }) };
+    if (url === '/api/v1/pulse/polls/poll-a/votes') { voted = true; return { ok: true, status: 201, json: async () => ({ ok: true }) }; }
+    if (url === '/api/v1/pulse') return { ok: true, json: async () => ({ ok: true, announcements: [
+      { id: 'notice-a', title: 'Важная новость', body: 'Текст', kind: 'important' },
+    ], polls: [{ id: 'poll-a', question: 'Выбор?', options: ['Да', 'Нет'], closes_at: '2099-01-01T00:00:00Z', total_votes: 0, my_vote: null }] }) };
+    throw new Error(`unexpected URL ${url}`);
+  } });
+
+  assert.equal(f.track.children.length, 4);
+  assert.equal(f.track.children[0].className.includes('hero-pulse-important'), true);
+  assert.equal(f.track.children[1].className.includes('hero-pulse-poll'), true);
+  assert.equal(f.root.children[2].children.length, 0, 'featured cards move out of the separate feed');
+  const pollCard = f.track.children[1].children[0];
+  await pollCard.children[2].children[0].children[0].listeners.click();
+  assert.equal(voted, true, 'moving the card preserves its vote handler');
 });

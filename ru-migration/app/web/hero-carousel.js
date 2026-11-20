@@ -14,13 +14,17 @@ export function initializeHeroCarousel({ document = globalThis.document } = {}) 
   let slides = [...track.children];
   if (!slides.length) return;
   let active = 0;
-  const dotButtons = slides.map((slide, index) => {
-    const image = slide.querySelector?.('img');
-    const button = node(document, image?.alt || 'Баннер FAM', index);
-    button.addEventListener('click', () => goTo(index));
-    dots.append(button);
-    return button;
-  });
+  let dotButtons = [];
+  const rebuildDots = () => {
+    dotButtons = slides.map((slide, index) => {
+      const image = slide.querySelector?.('img');
+      const heading = slide.querySelector?.('h3');
+      const button = node(document, image?.alt || heading?.textContent || 'Баннер FAM', index);
+      button.addEventListener('click', () => goTo(index));
+      return button;
+    });
+    dots.replaceChildren(...dotButtons);
+  };
   const update = () => {
     if (!slides.length) return;
     const measured = slides.map(slide => Math.abs((Number(slide.offsetLeft) || 0) - (Number(track.scrollLeft) || 0)));
@@ -38,6 +42,15 @@ export function initializeHeroCarousel({ document = globalThis.document } = {}) 
     else track.scrollLeft = left;
     update();
   };
+  rebuildDots();
+  track.addEventListener?.('famru:hero-slides-changed', () => {
+    const previous = slides[active];
+    slides = [...track.children];
+    rebuildDots();
+    const preserved = previous ? slides.indexOf(previous) : -1;
+    if (slides.length) goTo(preserved >= 0 ? preserved : Math.min(active, slides.length - 1));
+    else dots.replaceChildren?.();
+  });
   document.getElementById('ruHeroPrevious')?.addEventListener('click', () => goTo(active - 1));
   document.getElementById('ruHeroNext')?.addEventListener('click', () => goTo(active + 1));
   track.addEventListener?.('scroll', update, { passive: true });
@@ -46,8 +59,8 @@ export function initializeHeroCarousel({ document = globalThis.document } = {}) 
     image?.addEventListener?.('error', () => {
       slide.remove?.();
       slides = [...track.children];
-      if (!slides.length) dots.replaceChildren?.();
-      update();
+      rebuildDots();
+      if (slides.length) update(); else dots.replaceChildren?.();
     }, { once: true });
   }
   update();

@@ -25,6 +25,31 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     link.href = '/auth/yandex/start'; feed.replaceChildren(link);
   };
 
+  function publishFeaturedPulseCards() {
+    const track = document.getElementById('ruHeroTrack');
+    if (!track || typeof track.replaceChildren !== 'function') return;
+    const cards = [...feed.children].filter(card => String(card.className || '').split(/\s+/).includes('ru-pulse-card'));
+    const slides = cards.map((card, index) => {
+      const cardClasses = String(card.className || '').split(/\s+/);
+      const type = cardClasses.includes('ru-pulse-event') ? 'event'
+        : cardClasses.includes('ru-pulse-important') ? 'important'
+          : cardClasses.includes('ru-pulse-poll') ? 'poll' : 'news';
+      const slide = node(document, 'div', `hero-slide hero-pulse-slide hero-pulse-${type} ru-pulse-generated`);
+      slide.setAttribute('role', 'group');
+      slide.setAttribute('aria-roledescription', 'слайд');
+      slide.setAttribute('aria-label', `Школьная лента, слайд ${index + 1}`);
+      slide.append(card);
+      return slide;
+    });
+    const permanentSlides = [...track.children].filter(slide => !String(slide.className || '').split(/\s+/).includes('ru-pulse-generated'));
+    track.replaceChildren(...slides, ...permanentSlides);
+    feed.replaceChildren(...[...feed.children].filter(child => !cards.includes(child)));
+    const EventConstructor = document.defaultView?.Event || globalThis.Event;
+    if (typeof track.dispatchEvent === 'function' && typeof EventConstructor === 'function') {
+      track.dispatchEvent(new EventConstructor('famru:hero-slides-changed'));
+    }
+  }
+
   async function loadGuestEvents() {
     try {
       const response = await request('/api/v1/listings', { credentials: 'omit' });
@@ -56,6 +81,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
           ? 'Открытые мероприятия без записи доступны всем. Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.'
           : 'Не удалось загрузить открытые мероприятия. Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.';
         if (!loaded || feed.children.length === 0) login();
+        publishFeaturedPulseCards();
         return;
       }
       if (!me.response.ok || !me.result?.profile?.school_id) { status.textContent = 'Для школьной ленты сначала получите подтверждённый профиль школы.'; return; }
@@ -66,6 +92,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
       for (const item of pulse.result.announcements) renderAnnouncement(item);
       for (const poll of pulse.result.polls) renderPoll(poll);
       if (['school_admin', 'council_member'].includes(me.result.profile.role)) renderPublishForms();
+      publishFeaturedPulseCards();
     } catch {
       status.textContent = 'Не удалось загрузить школьную ленту. Проверьте подключение и попробуйте ещё раз.';
       const retry = node(document, 'button', 'ru-button', 'Повторить'); retry.type = 'button'; retry.addEventListener('click', () => { void load(); }); feed.append(retry);

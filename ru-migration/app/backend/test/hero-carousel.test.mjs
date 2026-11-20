@@ -10,6 +10,7 @@ class FakeNode {
   append(...items) { this.children.push(...items); }
   replaceChildren(...items) { this.children = items; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
+  dispatchEvent(event) { this.listeners[event.type]?.(event); }
   setAttribute(name, value) { this.attributes[name] = value; }
   getAttribute(name) { return this.attributes[name] ?? null; }
   querySelector(selector) { return selector === 'img' ? this.image : null; }
@@ -47,4 +48,18 @@ test('banner carousel dots select a slide without autoplay', () => {
   f.dots.children[2].listeners.click();
   assert.equal(f.track.scrollLeft, 640);
   assert.equal(f.dots.children[2].getAttribute('aria-pressed'), 'true');
+});
+
+test('carousel rebuilds accessible dots when school feed slides are added dynamically', () => {
+  const f = fixture();
+  initializeHeroCarousel({ document: f.document });
+  const pulse = new FakeNode({ offsetLeft: 0 });
+  f.track.children.unshift(pulse);
+  f.track.children.slice(1).forEach((slide, index) => { slide.offsetLeft = (index + 1) * 320; });
+  f.track.dispatchEvent(new Event('famru:hero-slides-changed'));
+  assert.equal(f.dots.children.length, 4);
+  assert.equal(f.track.scrollLeft, 320, 'the currently selected original banner remains selected after insertion');
+  f.dots.children[0].listeners.click();
+  assert.equal(f.track.scrollLeft, 0);
+  assert.equal(f.dots.children[0].getAttribute('aria-pressed'), 'true');
 });
