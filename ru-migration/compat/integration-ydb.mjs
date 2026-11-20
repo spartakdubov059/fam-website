@@ -77,6 +77,7 @@ try {
     repository: repo,
     safetyKey: 'local-ci-only-synthetic-safety-key-over-32-bytes',
     pendingImages: {
+      get: async () => Buffer.from('synthetic-webp'),
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
       listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
