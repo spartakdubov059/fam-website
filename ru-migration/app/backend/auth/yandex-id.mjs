@@ -75,6 +75,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
       const verifier = randomBytes(32).toString('base64url');
       const challenge = createHash('sha256').update(verifier).digest('base64url');
       const nowValue = nowSeconds();
+      // force_confirm requests OAuth consent; it does not prove fresh user authentication.
       const consentRefresh = url.searchParams.get('reauth') === '1';
       const stateToken = encodeSigned({ kind: 'oauth_state', state, verifier, exp: nowValue + STATE_SECONDS }, secret);
       const authorize = new URL(AUTHORIZATION_ENDPOINT);
