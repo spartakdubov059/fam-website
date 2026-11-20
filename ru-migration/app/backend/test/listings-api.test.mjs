@@ -351,6 +351,7 @@ test('direct same-origin school-account deletion is dispatched to the Russian de
     authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'admin-subject', authenticated_at: Math.floor(now / 1000) }),
     resolveActor: async () => admin,
     repository: {
+      getActiveAccountSuspension: async () => null,
       beginAdminAccountDeletion: async input => ({ ok: true, id: targetId, issuer: 'https://issuer.example', subject: 'target-subject', school_id: input.schoolId, role: 'student', claim_token: 'claim-a' }),
       finishAccountDeletion: async input => { finalized = input; return { ok: true, deleted: true }; },
       restoreAccountAfterDeletionFailure: async () => true,
