@@ -170,6 +170,12 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
       const key = input?.image_key;
       if (typeof key !== 'string' || !new RegExp(`^pending/${actor.id}/[0-9a-f-]{36}\\.webp$`, 'i').test(key)) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (!pendingImages || typeof pendingImages.get !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      let pendingImage;
+      try { pendingImage = await pendingImages.get(key); } catch { return { status: 503, body: { ok: false, error: 'media_unavailable' } }; }
+      if (!Buffer.isBuffer(pendingImage) && !(pendingImage instanceof Uint8Array)) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (pendingImage.byteLength === 0) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (pendingImage.byteLength > 2 * 1024 * 1024) return { status: 413, body: { ok: false, error: 'image_too_large' } };
       if (typeof repository?.createAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
       try {
         const reviewRequest = await repository.createAvatarReview({ userId: actor.id, schoolId: actor.school_id, imageKey: key });
