@@ -8,22 +8,12 @@
       if (window.location.hostname !== "spartakdubov059.github.io") return;
       var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
       if (!match) return;
-      // Browser auth storage is isolated by hostname. Never bounce a signed-in
-      // fallback user to a host where the session may be missing or different.
-      // Likewise, complete email/OAuth callbacks on their requested origin.
+      // OAuth and email-link callbacks must finish on the origin that
+      // received them. For normal visits, use the primary domain whenever
+      // its readiness endpoint confirms the deployment is serving correctly.
       function keepFallbackAuthContext() {
         var params = window.location.search + "&" + window.location.hash;
-        if (/(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error_code)=/i.test(params)) return true;
-        try {
-          var raw = window.localStorage && window.localStorage.getItem("sb-tfacqpljrvfpcrhdovbu-auth-token");
-          if (raw) {
-            var session = JSON.parse(raw);
-            if (session && (session.access_token || session.refresh_token)) return true;
-          }
-        } catch (_) {
-          // Storage may be disabled; the normal health-checked fallback still works.
-        }
-        return false;
+        return /(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error|error_code)=/i.test(params);
       }
       if (keepFallbackAuthContext()) return;
       var path = match[1] || "/";
@@ -1706,7 +1696,7 @@
       <div id="pulseCreateFields" class="hidden" style="background:var(--bg);padding:12px;border-radius:12px;margin-bottom:12px">
         <div id="pulseCreateKindWrap" class="form-group"><label for="pulseCreateKind">Тип анонса</label><select id="pulseCreateKind" class="form-control"><option value="news">Анонс</option><option value="important">Важное</option><option value="open_event">Мероприятие</option></select></div>
         <div id="pulseCreateEventWrap" class="form-group hidden"><label for="pulseCreateEventAt">Дата и время</label><input id="pulseCreateEventAt" type="datetime-local" class="form-control"></div>
-        <div id="pulseCreatePollWrap" class="hidden"><label for="pulseCreateOptions">Варианты ответа (по одному в строке, 2–4)</label><textarea id="pulseCreateOptions" class="form-control" rows="4" maxlength="300" placeholder="Вариант 1&#10;Вариант 2"></textarea></div>
+        <div id="pulseCreatePollWrap" class="hidden"><label for="pulseCreateOptions">Варианты ответа (по одному в строке, 2–8)</label><textarea id="pulseCreateOptions" class="form-control" rows="8" maxlength="600" placeholder="Вариант 1&#10;Вариант 2"></textarea></div>
       </div>
       <div id="eventFields" class="hidden" style="background:var(--bg); padding:10px; border-radius:12px; margin-bottom:12px;">
         <div class="form-group"><label for="evDate">Дата</label><input type="date" id="evDate" class="form-control"></div>

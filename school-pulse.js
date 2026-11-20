@@ -36,7 +36,7 @@
         '</div>':'')+'</article>';
   }
   function pollCard(poll){
-    const options=Array.isArray(poll?.options)?poll.options.slice(0,4):[];
+    const options=Array.isArray(poll?.options)?poll.options.slice(0,8):[];
     const counts=Array.isArray(poll?.counts)&&poll.counts.length===options.length?poll.counts:null;
     const total=Number.isFinite(Number(poll?.total_votes))?Math.max(0,Number(poll.total_votes)):0;
     const voted=Number.isInteger(poll?.my_vote)&&poll.my_vote>=0;
@@ -75,6 +75,11 @@
     // All content types share one full-bleed hero stage; no inset card frames.
     const insertFeatured=cards=>{
       if(!announcementTrack)return;
+      const oldSlides=Array.from(announcementTrack.children);
+      const slideWidth=announcementTrack.clientWidth||1;
+      const oldIndex=Math.max(0,Math.min(oldSlides.length-1,Math.round(announcementTrack.scrollLeft/slideWidth)));
+      const oldSlide=oldSlides[oldIndex];
+      const keepSlide=oldSlide&&!oldSlide.classList.contains("pulse-generated");
       announcementTrack.querySelectorAll(".pulse-generated").forEach(card=>card.remove());
       const allowedKinds=new Set(["event","important","announcement","poll"]);
       if(cards.length){
@@ -91,6 +96,12 @@
           return '<div class="hero-slide hero-pulse-slide pulse-generated hero-pulse-'+type+'">'+html+'</div>';
         }).join("");
         announcementTrack.insertAdjacentHTML("afterbegin",slides);
+      }
+      if(keepSlide&&oldSlide.isConnected){
+        const left=oldSlide.getBoundingClientRect().left-announcementTrack.getBoundingClientRect().left+announcementTrack.scrollLeft;
+        announcementTrack.scrollTo({left,behavior:"auto"});
+      }else{
+        announcementTrack.scrollTo({left:0,behavior:"auto"});
       }
       document.getElementById("heroDots")?.replaceChildren(...Array.from(announcementTrack.children).map((_,i)=>{
         const b=document.createElement("button");
@@ -122,7 +133,7 @@
       if(error||!validFeed(data)){
         status.textContent="Не удалось обновить опросы.";
         grid.innerHTML='<div class="pulse-empty">Опросы пока недоступны. Обновите позже.</div>';
-        carousel?.classList.add("hidden");
+        // Keep the photo carousel and last successful featured content usable.
         return;
       }
       const allNews=data.announcements.filter(item=>item&&typeof item.title==="string");
@@ -209,9 +220,9 @@
       event.preventDefault();
       const question=clamp(poller.elements.namedItem("question")?.value.trim(),140);
       const options=String(poller.elements.namedItem("options")?.value||"").split("\n").map(s=>s.trim()).filter(Boolean);
-      if(question.length<8||options.length<2||options.length>4||options.some(o=>o.length>70)||
+      if(question.length<8||options.length<2||options.length>8||options.some(o=>o.length>70)||
          new Set(options.map(s=>s.toLowerCase())).size!==options.length)
-        return alertUser("Укажите вопрос и 2–4 разных варианта ответа, каждый до 70 символов.");
+        return alertUser("Укажите вопрос и 2–8 разных вариантов ответа, каждый до 70 символов.");
       void createRpc(poller,"fam_publish_school_poll",{p_question:question,p_options:options});
     });
     document.getElementById("pulseRefreshBtn")?.addEventListener("click",()=>{void refresh()});

@@ -54,11 +54,11 @@ function simulate({ session = null, search = "", hash = "", deferHealth = false,
 
 const signedIn = JSON.stringify({ access_token: "local-access-token", refresh_token: "local-refresh-token" });
 
-test("existing GitHub Pages login is not redirected to a different origin", async () => {
+test("an existing GitHub Pages login uses the canonical host when it is healthy", async () => {
   const page = simulate({ session: signedIn });
   await page.settle();
-  assert.equal(page.fetchCount, 0);
-  assert.deepEqual(page.navigations, []);
+  assert.equal(page.fetchCount, 1);
+  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
 });
 
 test("Supabase email confirmation callback remains on the intended host", async () => {
@@ -75,13 +75,13 @@ test("new guest still redirects to healthy primary host with URL state preserved
   assert.deepEqual(page.navigations, ["https://famru.netlify.app/?utm_source=school#board"]);
 });
 
-test("login appearing during a slow health request prevents late redirect", async () => {
+test("late login state does not split users across healthy domains", async () => {
   const page = simulate({ deferHealth: true });
   assert.equal(page.fetchCount, 1);
   page.setSession(signedIn);
   page.respond();
   await page.settle();
-  assert.deepEqual(page.navigations, []);
+  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
 });
 
 
@@ -99,10 +99,9 @@ test("a 200 response without an explicit ready flag keeps the independent fallba
   assert.deepEqual(page.navigations, []);
 });
 
-test("valid marker does not redirect after a login appears during slow response", async () => {
-  const page = simulate({ deferHealth: true });
-  page.setSession(signedIn);
+test("a ready marker redirects even when local session state exists", async () => {
+  const page = simulate({ session: signedIn, deferHealth: true });
   page.respond();
   await page.settle();
-  assert.deepEqual(page.navigations, []);
+  assert.deepEqual(page.navigations, ["https://famru.netlify.app/"]);
 });
