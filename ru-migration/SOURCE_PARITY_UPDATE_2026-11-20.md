@@ -1,6 +1,6 @@
 # Дополнение: миграции `main` после основного crosswalk
 
-Снимок сравнения: `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579` (78 миграций), RU `migration/yandex-cloud` `a2f9cd7e832a0c212e71b26f8953fb9801bb492d` (33 YDB schema files). Здесь записано наличие поведения и отличия, а не заявление о полном паритете PostgreSQL RLS/grants.
+Снимок сравнения: `main` `af1f0086066d18b3d814dd535f06eda733ae58de` (78 миграций), RU `migration/yandex-cloud` code commit `ba44454d82cbf179f240940846bbc9e45ea0e7f2` (33 YDB schema files; текущий branch tip включает последующую документацию). Здесь записано наличие поведения и отличия, а не заявление о полном паритете PostgreSQL RLS/grants.
 
 | Source migration | RU соответствие и имеющиеся свидетельства | Отличие / остаточная проверка |
 |---|---|---|
@@ -17,8 +17,13 @@
 | `20261118212000_restore_own_profile_identity_field_grants.sql` | Browser не имеет YDB credentials; профиль читается/изменяется только через `/api/v1/me`, с allowlisted полями и actor из OIDC. | PostgreSQL column grants заменены backend API; роли и grants облачного YDB не проверены. |
 | `20261120045732_expand_school_poll_options.sql` | `pulse-policy.mjs` принимает 2–8 вариантов, тест отдельно проверяет 8 и отклоняет 9; YDB repository/API также отвергают индекс голосования вне реального числа вариантов. | Соответствие проверено в коде и синтетическом CI; не проверено на облачном YDB workload. |
 
-## Проверки актуального кода
+## Проверки предыдущего code snapshot
 
 - Локальный набор media/avatar/listing files (`media-api`, avatar review/UI, listing submit/moderation UI, YDB listings) — **95/95 passed**. Связанный набор pulse/profile/event files — **122/122 passed**; он проверяет poll 8/9 вариантов, school-scoped event applicants и профильные ограничения.
 - На точном кодовом commit `a2f9cd7e`: [SDK/backend CI #44802208226](https://github.com/spartakdubov059/fam-website/actions/runs/44802208226) и [disposable YDB CI #44802208151](https://github.com/spartakdubov059/fam-website/actions/runs/44802208151) прошли. YDB ephemeral с synthetic data; cleanup успешен.
 - Главные ограничения остаются: полный аудит 78 миграций и объектных политик не закончен; облачная YDB IAM/S3, реальный OAuth и браузерное QA в российском staging не проверялись. Пользовательский бюджет — 0 ₽, а бесплатный staging с жёстким лимитом расходов не установлен, поэтому облачные ресурсы не создавались.
+
+## Последняя проверка RU-кода (20 ноября 2026)
+
+- На code commit [ba44454](https://github.com/spartakdubov059/fam-website/commit/ba44454d82cbf179f240940846bbc9e45ea0e7f2) полный локальный backend набор прошёл **387/387**. [SDK/Sharp CI #44804843789](https://github.com/spartakdubov059/fam-website/actions/runs/44804843789) и [disposable YDB CI #44804843580](https://github.com/spartakdubov059/fam-website/actions/runs/44804843580) завершились успешно на синтетической схеме; временная база очищена.
+- Последнее изменение RU — документы на branch tip `f289fbf308af338a614cd1ada3905f8ec922a0e3`; локальная Yandex Cloud идентификация, YDB IAM/S3 и браузерное staging QA не проверялись. Реальные данные и production не подключались.

@@ -1,6 +1,6 @@
 # Инвентарь Supabase Edge Functions → FAM RU (20 ноября 2026)
 
-Сверка выполнена по актуальному `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `c3b90e2658802220984f4d3915828f6082f433fe` (последующие коммиты меняли только документы). В source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
+Сверка выполнена по актуальному `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `ba44454d82cbf179f240940846bbc9e45ea0e7f2`; текущий tip `migration/yandex-cloud` — `f289fbf308af338a614cd1ada3905f8ec922a0e3` (документация). В source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
 
 | Edge Function entrypoint (source SHA) | Source actions / обязанности | RU counterpart | Что не совпадает / статус |
 |---|---|---|---|
@@ -14,7 +14,7 @@
 
 ## Общая проверка
 
-- Exact code commit [c3b90e2](https://github.com/spartakdubov059/fam-website/commit/c3b90e2658802220984f4d3915828f6082f433fe): [SDK/Sharp CI #44800059646](https://github.com/spartakdubov059/fam-website/actions/runs/44800059646) passed 384/384 backend/UI tests; [disposable YDB CI #44800060406](https://github.com/spartakdubov059/fam-website/actions/runs/44800060406) passed synthetic integration and removed its database.
+- Exact listing-history code commit [ba44454](https://github.com/spartakdubov059/fam-website/commit/ba44454d82cbf179f240940846bbc9e45ea0e7f2): local backend suite passed **387/387**. [SDK/Sharp CI #44804843789](https://github.com/spartakdubov059/fam-website/actions/runs/44804843789) and [disposable YDB CI #44804843580](https://github.com/spartakdubov059/fam-website/actions/runs/44804843580) completed successfully; the latter applied the isolated schema, exercised synthetic repository flows and removed its disposable database.
 - No Supabase production credentials, student data, paid model APIs, cloud staging or live schedules were used.
 - This inventory finds no missing entrypoint, but it does not close behavior parity. Remaining major differences include model-backed moderation/vision, Qwen execution, identity-provider reauthentication, UI parity, cloud IAM and enabled scheduled jobs.
 - Cloud staging cannot currently be certified at 0 ₽: no confirmed Yandex Cloud account/credentials or hard spending stop are connected. Do not install or enable timers until a safe staging account and cost controls are verified.
