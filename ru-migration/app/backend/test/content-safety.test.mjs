@@ -32,6 +32,18 @@ test("local idea checks flag sensitive topics without matching ordinary substrin
   assert.equal(findLocalPolicyFlag("Поступали угрозы в адрес ученика.")?.code, "serious_hate_or_threat");
 });
 
+test("clear targeted harassment and personal insults enter human review", async () => {
+  const { reviewIdeaText } = await import("../policies/review-text.mjs");
+  for (const [text, code] of [
+    ["Давайте все будем высмеивать одного ученика в чате.", "targeted_harassment"],
+    ["Напишите ему все неприятные сообщения, чтобы он ушёл из чата.", "negative_personal_call"],
+  ]) {
+    assert.equal(findLocalPolicyFlag(text)?.code, code);
+    assert.deepEqual(reviewIdeaText(text), { action: "pending", reason_code: code, local_flag: code });
+  }
+  assert.equal(findLocalPolicyFlag("Предлагаю провести кампанию против травли.")?.code, "violence_safety_review");
+});
+
 test("sensitive safety topics go to human review instead of automatic approval or rejection", async () => {
   const { reviewIdeaText } = await import("../policies/review-text.mjs");
   for (const [text, code] of [
