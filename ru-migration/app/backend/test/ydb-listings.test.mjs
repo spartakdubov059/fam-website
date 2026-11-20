@@ -930,3 +930,34 @@ test('public event occupancy is visible only for active events', async () => {
   assert.equal(await createYdbListingsRepository(hiddenSql).getPublicEventOccupancy('inactive-event-id'), null);
   await assert.rejects(repo.getPublicEventOccupancy(''), TypeError);
 });
+
+
+test('own idea history is bounded and scopes both ideas and image counts to the actor school', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?');
+    calls.push({ text, values });
+    if (text.includes('FROM fam_ideas')) return [[{
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', text: 'Синтетическая идея',
+      image_status: 'pending', ai_status: 'approved', admin_status: 'new', created_at: new Date('2026-11-20T12:00:00Z'),
+    }]];
+    if (text.includes('FROM fam_idea_images')) return [[{ image_index: 0 }, { image_index: 1 }]];
+    return [[]];
+  };
+  const ideas = await createYdbListingsRepository(sql).listOwnIdeas(
+    '11111111-1111-4111-8111-111111111111', 'school-a');
+  assert.deepEqual(ideas, [{
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', text: 'Синтетическая идея',
+    image_status: 'pending', ai_status: 'approved', admin_status: 'new',
+    created_at: new Date('2026-11-20T12:00:00Z'), image_count: 2,
+  }]);
+  const ownQuery = calls.find(call => call.text.includes('FROM fam_ideas'));
+  assert.match(ownQuery.text, /user_id = \?/);
+  assert.match(ownQuery.text, /school_id = \?/);
+  assert.match(ownQuery.text, /LIMIT 50/);
+  assert.ok(ownQuery.values.includes('11111111-1111-4111-8111-111111111111'));
+  const imageQuery = calls.find(call => call.text.includes('FROM fam_idea_images'));
+  assert.match(imageQuery.text, /user_id = \?/);
+  assert.match(imageQuery.text, /school_id = \?/);
+  assert.ok(imageQuery.values.includes('school-a'));
+});
