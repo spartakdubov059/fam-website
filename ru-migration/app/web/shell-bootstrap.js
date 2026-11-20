@@ -93,8 +93,10 @@ window.onunhandledrejection = function() {
             <button id="ruHeroNext" type="button" aria-label="Следующий баннер">›</button>
           </div>
         </section>
-        <section id="ruPulse" class="ru-pulse" aria-label="Новости и опросы школы"></section>
-        <section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section>
+        <section id="ruAfishaFeed" class="ru-afisha-feed" aria-label="Афиша и школьная лента">
+          <section id="ruPulse" class="ru-pulse" aria-label="Новости и опросы школы"></section>
+          <section id="publicListings" class="ru-listings" aria-live="polite" aria-label="Опубликованные объявления"></section>
+        </section>
         <nav id="ruTabbar" class="ru-tabbar" aria-label="Основная навигация">
           <button type="button" data-ru-view="board" aria-pressed="true">Доска</button>
           <button type="button" data-ru-view="afisha" aria-pressed="false">Афиша</button>
