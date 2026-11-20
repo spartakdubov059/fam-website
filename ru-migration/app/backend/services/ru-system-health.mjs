@@ -40,9 +40,10 @@ export function buildRuSystemHealthReport({ readiness, timers, backgroundQueueHe
     ? {
       dailyReports: inspectQueue(backgroundQueueHealth.queues.daily_reports, 26 * 60),
       siteErrorDigests: inspectQueue(backgroundQueueHealth.queues.site_error_digests, 120),
+      safeAgentTasks: inspectQueue(backgroundQueueHealth.queues.safe_agent_tasks, 120),
     }
-    : { dailyReports: inspectQueue(null, 26 * 60), siteErrorDigests: inspectQueue(null, 120) };
-  const queuesOk = queues.dailyReports.ok && queues.siteErrorDigests.ok;
+    : { dailyReports: inspectQueue(null, 26 * 60), siteErrorDigests: inspectQueue(null, 120), safeAgentTasks: inspectQueue(null, 120) };
+  const queuesOk = queues.dailyReports.ok && queues.siteErrorDigests.ok && queues.safeAgentTasks.ok;
   return {
     ok: readinessOk && timerReport.ok && queuesOk,
     readiness: { ok: readinessOk, auth: readiness?.services?.auth === true,

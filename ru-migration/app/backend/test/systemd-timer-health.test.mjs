@@ -6,7 +6,7 @@ test('timer health reports only the configured allowlist and never exposes times
   const nowMs = Date.parse('2026-11-20T00:30:00Z');
   const states = FAM_RU_TIMER_UNITS.map(unit => ({ unit, loadState: 'loaded', serviceUnit: unit.replace(/\.timer$/u, '.service'),
     enabled: true, activeState: 'active', nextElapse: 'Sat 2026-11-21 03:30:00 UTC', lastRunResult: 'success',
-    lastRunCode: 'exited', lastRunStatus: '0', lastRunAt: '2026-11-20T00:00:00Z' }));
+    lastRunCode: 'exited', lastRunStatus: '0', lastRunAt: unit === 'fam-ru-safe-agent-worker.timer' ? '2026-11-20T00:25:00Z' : '2026-11-20T00:00:00Z' }));
   const report = analyzeSystemdTimerStates(states.concat([{ unit: 'untrusted.timer', loadState: 'loaded', enabled: true, activeState: 'active' }]), undefined, nowMs);
   assert.equal(report.ok, true);
   assert.deepEqual(report.timers.map(timer => timer.unit), [...FAM_RU_TIMER_UNITS]);
@@ -32,7 +32,7 @@ test('timer health rejects failed runs and stale service executions without retu
   const nowMs = Date.parse('2026-11-20T00:30:00Z');
   const states = FAM_RU_TIMER_UNITS.map(unit => ({ unit, loadState: 'loaded', serviceUnit: unit.replace(/\.timer$/u, '.service'),
     enabled: true, activeState: 'active', nextElapse: 'Sat 2026-11-21 03:30:00 UTC', lastRunResult: 'success',
-    lastRunCode: 'exited', lastRunStatus: '0', lastRunAt: '2026-11-20T00:00:00Z' }));
+    lastRunCode: 'exited', lastRunStatus: '0', lastRunAt: unit === 'fam-ru-safe-agent-worker.timer' ? '2026-11-20T00:25:00Z' : '2026-11-20T00:00:00Z' }));
   states[0].lastRunStatus = '1';
   states[1].lastRunAt = '2026-10-01T00:00:00Z';
   const report = analyzeSystemdTimerStates(states, undefined, nowMs);

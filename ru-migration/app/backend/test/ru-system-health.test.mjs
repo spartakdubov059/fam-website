@@ -13,6 +13,8 @@ const queueHealth = { content_read: false, queues: {
     failed_or_blocked_24h: 0, oldest_queued_age_minutes: 10 },
   site_error_digests: { statuses: { queued: 0, claimed: 0, completed: 8, blocked: 0, failed: 0 }, expired_leases: 0,
     failed_or_blocked_24h: 0, oldest_queued_age_minutes: 0 },
+  safe_agent_tasks: { statuses: { queued: 0, claimed: 0, completed: 0, blocked: 0, failed: 0 }, expired_leases: 0,
+    failed_or_blocked_24h: 0, oldest_queued_age_minutes: 0 },
 } };
 
 test('system health combines readiness, timer status and aggregate queues without exposing task content', () => {
@@ -21,6 +23,7 @@ test('system health combines readiness, timer status and aggregate queues withou
   assert.equal(report.readiness.ok, true);
   assert.equal(report.timers.ok, true);
   assert.equal(report.queues.dailyReports.queued, 1);
+  assert.equal(report.queues.safeAgentTasks.ok, true);
   assert.equal(report.contentRead, false);
   assert.equal(JSON.stringify(report).includes('payload'), false);
   assert.equal(JSON.stringify(report).includes('student'), false);
@@ -31,6 +34,7 @@ test('system health fails for missing services, unhealthy timers, stale queues a
   degraded.queues.daily_reports.expired_leases = 1;
   degraded.queues.site_error_digests.failed_or_blocked_24h = 1;
   degraded.queues.site_error_digests.oldest_queued_age_minutes = 121;
+  degraded.queues.safe_agent_tasks.failed_or_blocked_24h = 1;
   const report = buildRuSystemHealthReport({
     readiness: { ready: false, services: { auth: true, database: false, objectStorage: true } },
     timers: { ok: false, timers: [{ unit: 'fam-ru-runtime-health.timer', ok: false }] },
@@ -41,6 +45,7 @@ test('system health fails for missing services, unhealthy timers, stale queues a
   assert.equal(report.timers.ok, false);
   assert.equal(report.queues.dailyReports.ok, false);
   assert.equal(report.queues.siteErrorDigests.ok, false);
+  assert.equal(report.queues.safeAgentTasks.ok, false);
 });
 
 test('system health rejects empty, inconsistent, or duplicate timer reports even when aggregate ok is true', () => {

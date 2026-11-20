@@ -6,6 +6,7 @@ import { createDatabaseActorResolver } from './auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from './auth/suspension-write-guard.mjs';
 import { createYandexIdAuth } from './auth/yandex-id.mjs';
 import { createYdbListingsRepository } from './repositories/ydb-listings.mjs';
+import { createYdbAgentTaskQueue } from './repositories/ydb-agent-task-queue.mjs';
 import { createListingsApi } from './services/listings-api.mjs';
 import { createMediaApi } from './services/media-api.mjs';
 import { createS3PendingImageStore } from './media/s3-pending-store.mjs';
@@ -15,6 +16,9 @@ import { createSchoolAgentReports } from './services/school-agent-reports.mjs';
 import { createAgentDailyReport } from './services/agent-daily-report.mjs';
 import { createOrchestratorDailyDigest } from './services/orchestrator-daily-digest.mjs';
 import { createSiteErrorDigest } from './services/site-error-digest.mjs';
+import { createSafeAgentTaskWorker } from './services/safe-agent-task-worker.mjs';
+import { createScheduledSafeAgentRunner } from './services/scheduled-safe-agent-runner.mjs';
+import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
@@ -87,6 +91,32 @@ export async function createRuntime(env = process.env) {
   const probeYdbReadiness = createYdbReadinessProbe(sql);
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
+  const agentTaskQueue = createYdbAgentTaskQueue(sql);
+  const processSafeAgentTasks = createSafeAgentTaskWorker({ queue: agentTaskQueue, handlers: {
+    queue_health_check: async () => {
+      const health = await agentTaskQueue.getSafeTaskQueueHealth();
+      if (health?.content_read !== false || !health.statuses) throw new Error('queue_health_unavailable');
+      return `Проверка очереди завершена. Задач ожидают: ${health.statuses.queued}; просроченных lease: ${health.expired_leases}; неуспешных задач за сутки: ${health.failed_or_blocked_24h}. Пользовательское содержимое не читалось.`;
+    },
+    daily_report_digest: async () => {
+      const result = await createOrchestratorDailyDigest({ repository })();
+      return `Операционная сводка FAM за ${result.date}: ${result.processed ? 'обработана' : 'уже актуальна или ожидает повторного запуска'}. Использованы только агрегированные показатели.`;
+    },
+    system_health_check: async () => {
+      const [readiness, timers] = await Promise.all([
+        getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured, databaseReady: await probeYdbReadiness(), mediaConfigured }),
+        Promise.resolve().then(() => checkSystemdTimerHealth()),
+      ]);
+      const timerRows = Array.isArray(timers?.timers) ? timers.timers : [];
+      const healthyTimers = timerRows.filter(timer => timer?.ok === true).length;
+      return `Техническая проверка FAM завершена. Готовность backend: ${readiness.ready ? 'да' : 'нет'}; исправны расписания: ${healthyTimers}/${timerRows.length}. Проверены только инфраструктурные признаки.`;
+    },
+    site_error_digest: async () => {
+      const result = await createSiteErrorDigest({ repository })();
+      return `Сводка ошибок FAM за UTC слот ${result.slot}: обработано ${result.processed_count} задач. Хранятся только агрегированные категории, без текста запросов и личных данных.`;
+    },
+  } });
+  const runSafeAgentWorker = createScheduledSafeAgentRunner({ queue: agentTaskQueue, worker: processSafeAgentTasks });
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
   const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages, safetyKey }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
@@ -95,13 +125,19 @@ export async function createRuntime(env = process.env) {
     mediaApi,
     getReadiness: async () => getRuntimeReadiness({ yandexConfigured: Boolean(yandexAuth), oidcConfigured,
       databaseReady: await probeYdbReadiness(), mediaConfigured }),
+    getRuBackgroundQueueHealth: async () => {
+      const health = await repository.getRuBackgroundQueueHealth();
+      return { ...health, queues: { ...health.queues, safe_agent_tasks: await agentTaskQueue.getSafeTaskQueueHealth() } };
+    },
     cleanupPendingMedia: createPendingMediaCleanupOperation({ repository, pendingImages }),
     recoverAccountDeletions: createAccountDeletionRecoveryOperation({ repository, pendingImages }),
     refreshSchoolAgentReports: createSchoolAgentReports({ repository, schools: SCHOOL_CATALOG }),
     refreshAgentDailyReport: createAgentDailyReport({ repository }),
     processOrchestratorDailyDigest: createOrchestratorDailyDigest({ repository }),
     processSiteErrorDigest: createSiteErrorDigest({ repository }),
-    getRuBackgroundQueueHealth: () => repository.getRuBackgroundQueueHealth(),
+    agentTaskQueue,
+    processSafeAgentTasks,
+    runSafeAgentWorker,
     authApi: yandexAuth?.handle || null,
     close: async () => { pendingImages?.close?.(); await driver.close(); },
   };

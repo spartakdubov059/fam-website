@@ -1,0 +1,43 @@
+-- Private operational agent queue. Payloads are machine-authored and must not
+-- contain student text, direct identifiers, credentials, or model prompts.
+CREATE TABLE fam_agent_tasks (
+  id Utf8 NOT NULL,
+  agent_key Utf8 NOT NULL,
+  task_type Utf8 NOT NULL,
+  title Utf8 NOT NULL,
+  description Utf8 NOT NULL,
+  priority Utf8 NOT NULL,
+  status Utf8 NOT NULL,
+  source Utf8 NOT NULL,
+  approval_required Bool NOT NULL,
+  payload_json Utf8 NOT NULL,
+  result_summary Utf8?,
+  attempt_count Uint32 NOT NULL,
+  max_attempts Uint32 NOT NULL,
+  available_at Timestamp NOT NULL,
+  claim_token Utf8?,
+  claimed_by Utf8?,
+  claimed_at Timestamp?,
+  lease_expires_at Timestamp?,
+  started_at Timestamp?,
+  finished_at Timestamp?,
+  created_at Timestamp NOT NULL,
+  updated_at Timestamp NOT NULL,
+  PRIMARY KEY (id)
+);
+
+ALTER TABLE fam_agent_tasks
+  ADD INDEX fam_agent_tasks_status_idx GLOBAL ON (status, available_at);
+
+CREATE TABLE fam_agent_task_events (
+  id Utf8 NOT NULL,
+  task_id Utf8 NOT NULL,
+  event_type Utf8 NOT NULL,
+  actor Utf8 NOT NULL,
+  summary Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (id)
+);
+
+ALTER TABLE fam_agent_task_events
+  ADD INDEX fam_agent_task_events_task_idx GLOBAL ON (task_id, created_at);

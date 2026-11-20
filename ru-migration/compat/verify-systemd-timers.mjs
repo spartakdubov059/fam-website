@@ -9,6 +9,7 @@ const validateCalendars = !process.argv.includes('--structure-only');
 const expectedCalendars = new Map([
   ['fam-ru-orchestrator-daily-digest.timer', ['*-*-* 04:00:00 UTC']],
   ['fam-ru-runtime-health.timer', ['*-*-* 03:40:00 UTC']],
+  ['fam-ru-safe-agent-worker.timer', ['*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00 UTC']],
   ['fam-ru-school-agent-report.timer', ['*-*-* 03:30:00 UTC']],
   ['fam-ru-site-error-digest.timer', ['*-*-* *:30:00 UTC']],
 ]);

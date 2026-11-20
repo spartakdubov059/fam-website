@@ -4,6 +4,7 @@ import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
+import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
@@ -825,7 +826,23 @@ try {
     sql`SELECT choice_index FROM fam_school_poll_votes VIEW fam_school_poll_votes_voter_id_idx WHERE voter_id = ${quotaUserId};`,
   ]);
   assert.ok(indexProbes.every(rows => (rows?.[0]?.length ?? 0) === 0), 'all four FK lookup indexes are usable on the empty synthetic tables');
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  const agentQueue = createYdbAgentTaskQueue(sql);
+  const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
+  assert.equal(safeTask.created, true);
+  assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,
+    'safe scheduled task enqueue is idempotent');
+  const claimedSafeTasks = await agentQueue.claimSafeTasks(1);
+  assert.equal(claimedSafeTasks.length, 1);
+  assert.equal(claimedSafeTasks[0].task_type, 'queue_health_check');
+  assert.equal(Object.hasOwn(claimedSafeTasks[0], 'payload'), false, 'worker claim does not expose arbitrary task payload');
+  assert.equal(await agentQueue.finishSafeTask({ id: claimedSafeTasks[0].id, claimToken: claimedSafeTasks[0].claim_token,
+    status: 'completed', summary: 'Synthetic aggregate queue check completed.' }), true);
+  assert.equal(await agentQueue.finishSafeTask({ id: claimedSafeTasks[0].id, claimToken: claimedSafeTasks[0].claim_token,
+    status: 'completed', summary: 'Stale claim must not complete.' }), false, 'finished claims cannot be replayed');
+  const safeQueueHealth = await agentQueue.getSafeTaskQueueHealth();
+  assert.equal(safeQueueHealth.statuses.completed, 1);
+  assert.equal(safeQueueHealth.content_read, false);
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent lease-based safe agent queue, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

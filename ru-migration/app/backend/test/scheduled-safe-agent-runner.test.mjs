@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createScheduledSafeAgentRunner, getDueSafeAgentTasks } from '../services/scheduled-safe-agent-runner.mjs';
+
+test('safe agent schedule follows UTC source slots and ignores other times', () => {
+  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T03:40:00Z'), ['system_health_check']);
+  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T04:00:00Z'), ['daily_report_digest']);
+  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T04:30:00Z'), ['site_error_digest']);
+  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T04:35:00Z'), []);
+  assert.throws(() => getDueSafeAgentTasks('not-a-date'), /schedule time/);
+});
+
+test('scheduled worker idempotently enqueues due work before claiming and records only counts', async () => {
+  const calls = [];
+  const runner = createScheduledSafeAgentRunner({
+    queue: { enqueueSafeTask: async (...args) => { calls.push(args); return { created: calls.length === 1 }; } },
+    worker: async limit => { calls.push(['worker', limit]); return { claimed: 1, completed: 1, blocked: 0, failed: 0, content_read: false }; },
+    now: () => new Date('2026-11-20T03:40:00Z'),
+  });
+  assert.deepEqual(await runner(), { claimed: 1, completed: 1, blocked: 0, failed: 0, content_read: false, scheduled: 1, created: 1 });
+  assert.deepEqual(calls, [['system_health_check', '2026-11-20T03:40'], ['worker', 3]]);
+});
