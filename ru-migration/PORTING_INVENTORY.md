@@ -2,9 +2,9 @@
 
 ## Актуальная сверка исходника (20 ноября 2026)
 
-- Исходный `main` проверен на commit [`75328206895898ab99c1ac3098de6deceda09459`](https://github.com/spartakdubov059/fam-website/commit/75328206895898ab99c1ac3098de6deceda09459): в нём 77 файлов `supabase/migrations` и 7 Edge Function. Функциональная эквивалентность всех SQL migrations/RLS/RPC/триггеров российскому API не подтверждена; перечень исходных функций и не перенесённых частей — выше и в `CRON_PORTING.md`.
-- Новая migration `20261118212000_restore_own_profile_identity_field_grants.sql` добавляет владельцу профиля ограниченные Supabase column grants. Это модель полномочий Postgres/Supabase, она не переносится как YDB DDL; в RU-ветке редактирование профиля выполняет отдельный backend с разрешёнными полями и собственными проверками доступа.
-- Подробная фиксация snapshot/delta: [`SOURCE_SYNC_2026-11-20.md`](SOURCE_SYNC_2026-11-20.md). Полный security audit и облачный staging остаются незавершёнными.
+- Исходный `main` проверен на commit [`7fd418246653f92b53f66bc29fa224d95d04d5cf`](https://github.com/spartakdubov059/fam-website/commit/7fd418246653f92b53f66bc29fa224d95d04d5cf): в нём 76 файлов `supabase/migrations` и 7 Edge Functions. Функциональная эквивалентность всех SQL migrations/RLS/RPC/триггеров российскому API не подтверждена; перечень исходных функций и не перенесённых частей — ниже и в `CRON_PORTING.md`.
+- После snapshot `7532820` migration `20261118212000_restore_own_profile_identity_field_grants.sql` удалена. Изменения `main` на диапазоне `7532820..7fd4182` также уточнили fallback на GitHub Pages/Netlify и страницы доступности; они относятся к существующему Supabase/Netlify сайту и не добавляют YDB backend-функций. Российский профиль использует отдельные server-side проверки и не зависит от Postgres grants.
+- Подробная фиксация snapshot/delta и локальной проверки: [`SOURCE_SYNC_2026-11-20.md`](SOURCE_SYNC_2026-11-20.md). Полный security audit и облачный staging остаются незавершёнными.
 
 
 Обследование исходников ветки `migration/yandex-cloud`, 13 ноября 2026. Это перечень компонентов для самостоятельного переноса по коду текущего FAM; архив предыдущей сборки не требуется для этого этапа.
@@ -13,7 +13,7 @@
 
 - Статический фронтенд в корневом `index.html`; сейчас он обращается к Supabase напрямую.
 - 7 Edge Functions: `council-management`, `fam-agent-coder-bridge`, `fam-agent-worker`, `fam-listing-image-worker`, `moderate`, `school-admin-access`, `submit-content`.
-- На актуальном исходном `main` на 20 ноября 2026 есть 77 SQL migration-файлов (commit `75328206895898ab99c1ac3098de6deceda09459`). Их нужно сопоставлять с российской схемой и API, а не переносить механически: YDB не исполняет Supabase RLS/RPC/триггеры. Полный построчный перенос и аудит пока не выполнены.
+- На актуальном исходном `main` на 20 ноября 2026 есть 76 SQL migration-файлов (commit `7fd418246653f92b53f66bc29fa224d95d04d5cf`). Их нужно сопоставлять с российской схемой и API, а не переносить механически: YDB не исполняет Supabase RLS/RPC/триггеры. Полный построчный перенос и аудит пока не выполнены.
 - В исходных миграциях перечислено 7 текущих активных расписаний `pg_cron` плюс отменённое старое `fam-agent-daily-report`; точные вызовы и статус переноса сверены в [CRON_PORTING.md](CRON_PORTING.md). Российские аналоги не устанавливаются автоматически.
 - Зависимости, которые нельзя потерять: Auth и роли, приватные/публичные медиа, модерация, очереди, учёт событий, удаление аккаунта, школьные ограничения доступа и фоновые отчёты.
 
