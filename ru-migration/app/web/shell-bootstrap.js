@@ -37,6 +37,7 @@ window.onunhandledrejection = function() {
         <p id="ruSubmitStatus" class="ru-note" role="status" aria-live="polite">Войдите через Яндекс ID, чтобы подать объявление.</p>
         <section id="ruAccountWorkflow" class="ru-account-workflow" hidden aria-label="Управление аккаунтом"></section>
         <section id="ruAvatarWorkflow" class="ru-avatar-workflow" hidden aria-label="Фото профиля"></section>
+        <section id="ruIdeaHistory" class="ru-idea-history" hidden aria-label="Мои идеи"></section>
         <form id="ruListingForm" class="ru-listing-form" hidden>
           <label>Название<input name="title" maxlength="80" required></label>
           <label>Описание<textarea name="description" maxlength="1000" required></textarea></label>
@@ -131,6 +132,10 @@ window.onunhandledrejection = function() {
     accountScript.type = 'module';
     accountScript.src = '/account-workflow.js';
     document.body.append(accountScript);
+    const ideaHistoryScript = document.createElement('script');
+    ideaHistoryScript.type = 'module';
+    ideaHistoryScript.src = '/idea-history.js';
+    document.body.append(ideaHistoryScript);
     const heroScript = document.createElement('script');
     heroScript.type = 'module';
     heroScript.src = '/hero-carousel.js';
