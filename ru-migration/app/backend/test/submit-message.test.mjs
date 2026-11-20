@@ -76,6 +76,12 @@ test('only an explicit moderation approval can insert a message', async () => {
   assert.deepEqual(result, { ok: true, status: 'approved', id: 'synthetic-message' });
 });
 
+test('message quota exhaustion returns a rate limit instead of a database failure', async () => {
+  const result = await submitMessage({ actor, input, review: async () => ({ action: 'ok' }),
+    repository: { createMessage: async () => { throw Object.assign(new Error('limited'), { code: 'rate_limited' }); } } });
+  assert.deepEqual(result, { ok: false, code: 'rate_limited' });
+});
+
 test('message rejects self-send, malformed recipients and contact details before review', async () => {
   let reviews = 0;
   const options = { actor, review: async () => { reviews++; return { action: 'ok' }; }, repository: { createMessage: async () => ({ id: 'unexpected' }) } };
