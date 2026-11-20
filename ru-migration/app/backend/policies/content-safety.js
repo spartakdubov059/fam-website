@@ -8,6 +8,14 @@ const HOUSE_ADDRESS_RE = /(?:^|[^\p{L}\p{N}])(?:дом|д\.?|квартира|к
 const PHONE_RE = /(?<!\d)\+?\d(?:[ \t().-]*\d){9,14}(?!\d)/gu;
 const POSTCODE_RE = /(?:почтов(?:ый|ого)\s+индекс|индекс)\s*[:№-]?\s*\d{6}\b/iu;
 
+// Offline screening is only a reason to hold material for a trusted human;
+// these rules never approve or reject safety-sensitive content by themselves.
+const SENSITIVE_SAFETY_REVIEW_RULES = [
+  { code: "self_harm_safety_review", pattern: /(?:самоубийств[\p{L}]*|суицид[\p{L}]*|самоповрежден[\p{L}]*|покончить\s+с\s+собой|(?:хочу|планирую|думаю)\s+(?:убить|лишить\s+жизни)\s+себя|режу\s+себя|порезал(?:а|и)?\s+себя)/iu },
+  { code: "sexual_safety_review", pattern: /(?:сексуальн[\p{L}]*\s+(?:насили[\p{L}]*|домогательств[\p{L}]*|принуждени[\p{L}]*|эксплуатац[\p{L}]*)|изнасилован[\p{L}]*|непристойн[\p{L}]*\s+(?:предложени[\p{L}]*|прикосновени[\p{L}]*))/iu },
+  { code: "violence_safety_review", pattern: /(?:насили[\p{L}]*|нападени[\p{L}]*|побо[\p{L}]*|избил[\p{L}]*|травл[\p{L}]*|буллинг)/iu },
+];
+
 const LOCAL_REVIEW_RULES = [
   { code: "controlled_substances", pattern: /(?:^|[^\p{L}\p{N}])(?:наркот[\p{L}]*|мефедрон[\p{L}]*|спайс[\p{L}]*|закладк[\p{L}]*|героин[\p{L}]*|амфетамин[\p{L}]*|экстази[\p{L}]*|мдма|кокаин[\p{L}]*|снюс[\p{L}]*|насвай[\p{L}]*)(?=$|[^\p{L}\p{N}])/iu },
   { code: "nicotine_or_alcohol", pattern: /(?:^|[^\p{L}\p{N}])(?:сигарет[\p{L}]*|вейп[\p{L}]*|никотин[\p{L}]*|табак[\p{L}]*|кальян[\p{L}]*|алкогол[\p{L}]*|водк[\p{L}]*|пив[\p{L}]*|энергетик[\p{L}]*)(?=$|[^\p{L}\p{N}])/iu },
@@ -44,6 +52,9 @@ export function containsContactData(value) {
 
 export function findLocalPolicyFlag(value) {
   const normalized = String(value ?? "").normalize("NFKC");
+  for (const rule of SENSITIVE_SAFETY_REVIEW_RULES) {
+    if (rule.pattern.test(normalized)) return { code: rule.code };
+  }
   for (const rule of LOCAL_REVIEW_RULES) {
     if (rule.pattern.test(normalized)) return { code: rule.code };
   }
