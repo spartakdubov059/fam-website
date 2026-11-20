@@ -1,0 +1,3 @@
+-- Enforce the existing 90-day safety-signal retention independently of
+-- school administrators opening the review queue. YDB TTL deletion is async.
+ALTER TABLE fam_safety_incidents SET (TTL = Interval("P90D") ON created_at);
