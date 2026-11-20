@@ -805,16 +805,43 @@ try {
   const requestedImageKey = `pending/${requestedTargetId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
   accountMediaKeys.add(requestedImageKey);
   await repo.registerPendingImage(requestedTargetId, requestedImageKey);
+  const requestedAvatarKey = `pending/${requestedTargetId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
+  accountMediaKeys.add(requestedAvatarKey);
+  await repo.registerPendingImage(requestedTargetId, requestedAvatarKey);
+  await sql`INSERT INTO fam_avatar_reviews (id, user_id, school_id, image_key, status, created_at, reviewed_by, reviewed_at)
+    VALUES ('eeeeeeee-0000-4000-8000-000000000001', ${requestedTargetId}, 'synthetic-school', ${requestedAvatarKey}, 'pending', CurrentUtcTimestamp(), '', NULL);`;
+  await sql`INSERT INTO fam_notification_reads (user_id, notification_key, read_at)
+    VALUES (${requestedTargetId}, 'synthetic-notification', CurrentUtcTimestamp());`;
+  await sql`INSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
+    VALUES (${requestedTargetId}, 'listing', CurrentUtcTimestamp(), Unwrap(CAST(1 AS Uint32)));`;
+  const deletionAuditId = 'eeeeeeee-0000-4000-8000-000000000002';
+  await sql`INSERT INTO fam_school_content_audit (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
+    VALUES (${deletionAuditId}, 'synthetic-school', ${requestedTargetId}, 'synthetic-entity', 'listing', 'synthetic_review', '{}', CurrentUtcTimestamp());`;
+  const deletionSafetyFingerprint = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const deletionSafetyId = 'eeeeeeee-0000-4000-8000-000000000003';
+  await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
+    created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
+    VALUES ('synthetic-school', ${deletionSafetyFingerprint}, 'message', 'targeted_harassment', ${deletionSafetyId}, 'medium',
+      CurrentUtcTimestamp(), NULL, NULL, ${requestedTargetId}, '33333333-3333-4333-8333-333333333333', 'fam.example.ru', 'sanitized synthetic evidence');`;
   const requestedDeletion = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
     target_id: requestedTargetId, reason_code: 'spam', reason: 'Repeated unrelated messages in the synthetic school test.',
   }));
   assert.equal(requestedDeletion.status, 202);
   const approvedDeletion = await listingsApi(apiRequest('PATCH', `/api/v1/deletion-requests/${requestedDeletion.body.request_id}`, 'synthetic-admin', {    decision: 'approve', confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА', review_note: 'Подтверждено синтетическим тестом',
   }));
-  assert.deepEqual(approvedDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
+  assert.deepEqual(approvedDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 2 } });
   assert.ok(deletedMediaKeys.includes(requestedImageKey), 'approved deletion removes private media for the requested synthetic account');
+  assert.ok(deletedMediaKeys.includes(requestedAvatarKey), 'approved deletion also removes a linked avatar object');
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-delete-target' }), null,
     'approved deletion removes the requested profile identity mapping');
+  assert.equal((await sql`SELECT id FROM fam_avatar_reviews WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT notification_key FROM fam_notification_reads WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
+  assert.equal((await sql`SELECT action FROM fam_submission_quotas WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
+  const anonymizedAudit = await sql`SELECT actor_id FROM fam_school_content_audit WHERE event_id = ${deletionAuditId};`;
+  assert.equal(anonymizedAudit?.[0]?.[0]?.actor_id, 'deleted-account');
+  const anonymizedSafety = await sql`SELECT actor_id, target_id, source_origin, evidence_excerpt FROM fam_safety_incidents
+    WHERE school_id = 'synthetic-school' AND pair_fingerprint = ${deletionSafetyFingerprint} AND incident_id = ${deletionSafetyId};`;
+  assert.deepEqual(anonymizedSafety?.[0]?.[0], { actor_id: null, target_id: null, source_origin: null, evidence_excerpt: null });
   const approvedRequest = await sql`SELECT status, reviewed_by, review_note FROM fam_account_deletion_requests WHERE request_id = ${requestedDeletion.body.request_id};`;
   assert.deepEqual(approvedRequest[0][0], { status: 'approved', reviewed_by: '33333333-3333-4333-8333-333333333333', review_note: 'Подтверждено синтетическим тестом' });
   assert.equal((await sql`SELECT request_id FROM fam_account_deletion_open WHERE target_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0,
