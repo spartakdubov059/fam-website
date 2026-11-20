@@ -97,6 +97,24 @@ test('authenticated board opens the saved favorites view and removes an item fro
   assert.equal(calls.some(call => call.options.method === 'DELETE'), true);
 });
 
+test('favorite navigation selected during loading is applied when the board arrives', async () => {
+  const root = new FakeNode('section');
+  root.setAttribute('data-ru-board-view', 'favorites');
+  const savedId = '11111111-1111-4111-8111-111111111111';
+  const otherId = '22222222-2222-4222-8222-222222222222';
+  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: savedId, title: 'Сохранённое', description: 'Да', category: 'Учёба' },
+      { id: otherId, title: 'Обычное', description: 'Нет', category: 'Вещи' },
+    ] }) };
+    if (url === '/api/v1/favorites') return { ok: true, json: async () => ({ ok: true, favorite_ids: [savedId] }) };
+    return { ok: false, status: 401, json: async () => ({}) };
+  } });
+  const cards = root.children.filter(node => node.className === 'ru-listing-card');
+  assert.equal(cards[0].hidden, false);
+  assert.equal(cards[1].hidden, true);
+});
+
 test('guest board renders a useful empty state when there are no approved listings', async () => {
   const root = new FakeNode('section');
   await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, listings: [] }) }) });
