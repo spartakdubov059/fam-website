@@ -206,3 +206,10 @@
 - Точный [Disposable YDB CI #44799171636](https://github.com/spartakdubov059/fam-website/actions/runs/44799171636) успешно применил весь schema bundle и прошёл synthetic repository integration; временная база удалена.
 - [SDK/Sharp CI #44799171773](https://github.com/spartakdubov059/fam-website/actions/runs/44799171773) завершился успешно: 383/383 backend/UI tests, pinned SDK, Sharp/WebP и timer checks.
 - Проверено применение DDL, но не `EXPLAIN`-планы реальных RU запросов, selection planner или нагрузка на read/write units в Yandex Cloud. Облачные индексы не создавались.
+
+## Публичные маршруты приватной очереди — 20 ноября 2026
+
+- На коммите [c3b90e2](https://github.com/spartakdubov059/fam-website/commit/c3b90e2658802220984f4d3915828f6082f433fe) добавлен тест, который отправляет GET/POST к предполагаемым HTTP-путям трёх private YDB queue tables. Сервер возвращает `404 not_found` и не передаёт запрос generic user API. Fallback неизвестных `/api/*` путей теперь отвечает 404; известные API без настроенного backend по-прежнему fail closed как 503.
+- Точный [SDK/Sharp CI #44800059646](https://github.com/spartakdubov059/fam-website/actions/runs/44800059646) прошёл **384/384** теста, проверил 8 timer-файлов, pinned YDB/AWS SDK и Sharp/WebP.
+- Точный [Disposable YDB CI #44800060406](https://github.com/spartakdubov059/fam-website/actions/runs/44800060406) завершился успешно с synthetic integration и cleanup.
+- Проверен публичный HTTP boundary; облачные YDB IAM/service-account права и эквивалент `FORCE ROW LEVEL SECURITY` не проверены, т.к. облачный staging не настроен.
