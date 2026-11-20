@@ -457,7 +457,7 @@ test('account deletion clears private per-user state and redacts safety attribut
   assert.ok(audit); assert.ok(audit.values.includes(userId)); assert.ok(audit.text.includes('deleted-account'));
   const safety = calls.find(call => call.text.includes('UPDATE fam_safety_incidents'));
   assert.ok(safety); assert.ok(safety.values.includes(userId));
-  assert.match(safety.text, /evidence_excerpt = CAST\\(NULL AS Utf8\\?\\)/);
+  assert.ok(safety.text.includes('evidence_excerpt = CAST(NULL AS Utf8?)'));
 });
 test('profile identity update changes only first name, last name, and class for its issuer/subject key', async () => {
   const calls = [];
