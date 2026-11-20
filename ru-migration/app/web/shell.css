@@ -839,3 +839,40 @@
     }
     @media (min-width: 900px) { .l-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
     @media (max-width: 359px) { .l-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.ru-tabbar {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  width: min(520px, calc(100% - 20px));
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  background: rgba(16,16,24,.92);
+  box-shadow: 0 12px 36px rgba(0,0,0,.48);
+  backdrop-filter: blur(20px);
+}
+.ru-tabbar button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+.ru-tabbar button[aria-pressed="true"] {
+  background: var(--gradient-violet);
+  color: #fff;
+}
+.ru-tabbar button:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+body { padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
