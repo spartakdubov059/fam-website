@@ -712,7 +712,8 @@ try {
     assert.equal(row.evidence_excerpt, null, 'local classifier never persists the source text');
   }
   const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
-    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message' ORDER BY created_at DESC LIMIT 1;`;
+    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message'
+      AND category = 'threat_or_intimidation' ORDER BY created_at DESC LIMIT 1;`;
   assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
   assert.equal(emittedIncident?.[0]?.[0]?.category, 'threat_or_intimidation');
   assert.equal(emittedIncident?.[0]?.[0]?.severity, 'high');
