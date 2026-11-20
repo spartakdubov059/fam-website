@@ -227,3 +227,9 @@
 - Точный [SDK/Sharp CI #44800059646](https://github.com/spartakdubov059/fam-website/actions/runs/44800059646) прошёл **384/384** теста, проверил 8 timer-файлов, pinned YDB/AWS SDK и Sharp/WebP.
 - Точный [Disposable YDB CI #44800060406](https://github.com/spartakdubov059/fam-website/actions/runs/44800060406) завершился успешно с synthetic integration и cleanup.
 - Проверен публичный HTTP boundary; облачные YDB IAM/service-account права и эквивалент `FORCE ROW LEVEL SECURITY` не проверены, т.к. облачный staging не настроен.
+
+## OIDC audience и issued-at hardening — 20 ноября 2026
+
+- Кодовый commit [95000b8](https://github.com/spartakdubov059/fam-website/commit/95000b8e6271d984ef2056c6873358f21d608ff6) ужесточил проверку JWT `aud`, `azp` и обязательного `iat`; локально прошло **389/389** backend-тестов.
+- [SDK/Sharp CI #44807710650](https://github.com/spartakdubov059/fam-website/actions/runs/44807710650) завершился success: установлен locked compatibility набор, выполнен FAM RU backend suite, проверены timer references, нативная Sharp/WebP обработка и сборка serverless package.
+- [Disposable YDB CI #44807711094](https://github.com/spartakdubov059/fam-website/actions/runs/44807711094) завершился success: схема применена, синтетическая repository integration выполнена, временная база удалена. Внешний Yandex Cloud, реальные профили и production не использовались.
