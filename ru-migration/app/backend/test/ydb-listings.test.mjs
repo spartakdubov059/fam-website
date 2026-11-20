@@ -738,7 +738,8 @@ test('message repository verifies same-school active recipient before inserting 
   };
   absentSql.begin = callback => callback(absentSql);
   const absent = createYdbListingsRepository(absentSql);
-  await assert.rejects(absent.createMessage({ sender_id: 'sender-id', receiver_id: 'outside-school', school_id: 'school-id', body: 'Привет' }), error => error.code === 'recipient_unavailable');
+  assert.deepEqual(await absent.createMessage({ sender_id: 'sender-id', receiver_id: 'outside-school', school_id: 'school-id', body: 'Привет' }),
+    { ok: false, code: 'recipient_unavailable' });
   assert.equal(inserts, 0);
 });
 
@@ -764,8 +765,8 @@ test('directly delivered messages enforce an eight-per-minute durable account qu
     assert.match((await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
       school_id: 'school-id', body: `Message ${index}` })).id, /^[0-9a-f-]{36}$/);
   }
-  await assert.rejects(repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
-    school_id: 'school-id', body: 'Message 9' }), error => error.code === 'rate_limited');
+  assert.deepEqual(await repo.createMessage({ sender_id: 'sender-id', receiver_id: 'recipient-id',
+    school_id: 'school-id', body: 'Message 9' }), { ok: false, code: 'rate_limited' });
   assert.equal(statements.filter(statement => statement.text.includes('INSERT INTO fam_messages')).length, 8);
 });
 
