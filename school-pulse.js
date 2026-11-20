@@ -152,8 +152,8 @@
       const otherNews=allNews.filter(item=>item.kind!=="open_event"&&item.kind!=="important").slice(0,6);
       const polls=data.polls.filter(item=>item&&typeof item.question==="string"&&Array.isArray(item.options)&&item.options.length>=2).slice(0,6);
       const legacyEvents=(getListings()||[]).filter(item=>item&&item.status==="active"&&item.is_event===true&&(!item.event_date||item.event_date>=new Date().toISOString().slice(0,10))).slice(0,6);
-      const featured=importantNews.map(announcementCard)
-        .concat(eventNews.map(announcementCard),legacyEvents.map(item=>announcementCard({...item,body:item.description,kind:"open_event"})),polls.map(pollCard),otherNews.map(announcementCard));
+      const priorityNews=importantNews.concat(eventNews,legacyEvents.map(item=>({...item,body:item.description,kind:"open_event"})));
+      const featured=priorityNews.map(announcementCard).concat(polls.map(pollCard),otherNews.map(announcementCard));
       cachedAfishaItems=importantNews.map(item=>({type:"announcement",item}))
         .concat(eventNews.map(item=>({type:"announcement",item})),polls.map(item=>({type:"poll",item})),otherNews.map(item=>({type:"announcement",item})));
       insertFeatured(featured);
