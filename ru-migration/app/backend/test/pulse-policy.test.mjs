@@ -10,6 +10,8 @@ test('announcement policy bounds fields and open-event dates without external mo
   assert.equal(validateSchoolAnnouncement({ title: 'Встреча', body: 'Приходите по адресу улица Ленина 12' }, now).ok, false);
   assert.equal(validateSchoolAnnouncement({ title: 'Встреча', body: 'Приходите на праздник', kind: 'open_event' }, now).ok, false);
   assert.equal(validateSchoolAnnouncement({ title: 'Важное', body: 'Ссылка https://example.com' }, now).ok, false);
+  assert.equal(validateSchoolAnnouncement({ title: 'О травле', body: 'Как сообщить о травле в школе?' }, now).ok, true,
+    'school administrators can publish prevention guidance');
 });
 
 test('poll policy requires unique safe choices and bounded closing time', () => {

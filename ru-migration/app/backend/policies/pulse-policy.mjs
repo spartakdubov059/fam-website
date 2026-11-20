@@ -4,7 +4,11 @@ const KINDS = new Set(['news', 'important', 'open_event']);
 const DAY = 24 * 60 * 60 * 1000;
 
 function safeText(value) {
-  return typeof value === 'string' && !containsContactData(value) && !findLocalPolicyFlag(value);
+  if (typeof value !== 'string' || containsContactData(value)) return false;
+  const flag = findLocalPolicyFlag(value);
+  // Safety-sensitive material is held for a human in user submissions. A
+  // school administrator must still be able to publish prevention guidance.
+  return !flag || flag.code.endsWith('_safety_review');
 }
 
 export function validateSchoolAnnouncement(input, now = Date.now()) {
