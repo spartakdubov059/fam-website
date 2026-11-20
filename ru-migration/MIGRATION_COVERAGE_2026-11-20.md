@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 20 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, ветка RU `migration/yandex-cloud` `8b4e77eae249e62203fe58b6bc5965dfe7cf020a`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 20 ноября 2026 г. по GitHub refs: FAM `main` `af1f0086066d18b3d814dd535f06eda733ae58de`, проверенный код RU `migration/yandex-cloud` `c3b90e2658802220984f4d3915828f6082f433fe`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Проверенные сведения
 
