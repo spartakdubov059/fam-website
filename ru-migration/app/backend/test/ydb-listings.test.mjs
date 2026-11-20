@@ -395,6 +395,21 @@ test('approved account deletion claims only an active same-school request and it
   assert.ok(durableJob);
   assert.ok(durableJob.values.includes(result.claim_token));
 });
+test('account media inventory selects only linked idea and avatar keys for the requested user', async () => {
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const key = `pending/${userId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
+  const queries = [];
+  const repo = createYdbListingsRepository(strings => {
+    queries.push(strings.join('?'));
+    return Promise.resolve([[{ object_key: key }]]);
+  });
+  assert.deepEqual(await repo.listAccountMediaKeys(userId), [key]);
+  assert.match(queries[0], /fam_idea_images WHERE user_id = \\?/);
+  assert.match(queries[1], /fam_avatar_reviews WHERE user_id = \\?/);
+  const invalid = createYdbListingsRepository(() => Promise.resolve([[{ object_key: 'pending/11111111-1111-4111-8111-111111111111/not-a-uuid.webp' }]]));
+  await assert.rejects(invalid.listAccountMediaKeys(userId), /invalid account media key/);
+});
+
 test('direct account deletion requires an active same-school administrator and student or council target', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
