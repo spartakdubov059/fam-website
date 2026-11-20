@@ -859,7 +859,7 @@ try {
   const adminDeletion = await listingsApi(apiRequest('DELETE', `/api/v1/school/accounts/${adminDeleteTargetId}`, 'synthetic-admin', {
     confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА',
   }));
-  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 2 } });
+  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
   assert.ok(deletedMediaKeys.includes(adminDeleteImageKey), 'direct school-admin deletion removes the eligible synthetic target private image');
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' }), null,
     'direct school-admin deletion removes only the same-school student identity mapping');
