@@ -14,6 +14,7 @@ test('manual recovery re-lists owner media, deletes it and finalizes the leased 
     finishAccountDeletion: async input => { calls.push(['finish', input]); return { ok: true }; },
   }, pendingImages: {
     listUserObjects: async id => { calls.push(['list', id]); return [key]; },
+    listAccountObjects: async id => { calls.push(['list', id]); return [key]; },
     delete: async imageKey => calls.push(['delete', imageKey]),
   } });
   assert.deepEqual(result, { claimed: 1, completed: 1, failed: 0 });
@@ -29,6 +30,7 @@ test('manual recovery leaves the durable job for retry when inventory contains a
     finishAccountDeletion: async () => { finished = true; return { ok: true }; },
   }, pendingImages: {
     listUserObjects: async () => ['pending/22222222-2222-4222-8222-222222222222/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp'],
+    listAccountObjects: async () => ['pending/22222222-2222-4222-8222-222222222222/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp'],
     delete: async () => { deleted = true; },
   } });
   assert.deepEqual(result, { claimed: 1, completed: 0, failed: 1 });
