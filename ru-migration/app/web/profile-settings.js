@@ -67,18 +67,31 @@ export async function initializeProfileSettings({ document = globalThis.document
   person.input.value = ['student', 'school_staff', 'parent'].includes(profile.person_type) ? profile.person_type : 'student';
   const schoolClass = field('class_name', 'Класс, например 8А'); schoolClass.input.maxLength = 8; schoolClass.input.autocomplete = 'off'; schoolClass.input.value = profile.class_name || '';
   const staffPosition = field('staff_position', 'Должность в школе'); staffPosition.input.maxLength = 100; staffPosition.input.value = profile.staff_position || '';
+  const verification = node(document, 'p', 'ru-note', '');
+  verification.setAttribute('role', 'status'); verification.setAttribute('aria-live', 'polite');
+  const updateVerification = () => {
+    const isStaff = person.input.value === 'school_staff';
+    verification.hidden = !isStaff;
+    if (!isStaff) return;
+    verification.textContent = profile.staff_verification_status === 'approved'
+      ? 'Должность подтверждена администратором школы.'
+      : profile.staff_verification_status === 'rejected'
+        ? 'Администратор не подтвердил должность. Исправьте её и сохраните профиль, чтобы отправить исправленную должность на проверку.'
+        : 'Должность ожидает проверки администратором школы. До подтверждения статус сотрудника не подтверждён.';
+  };
   const updateVisibility = () => {
     schoolClass.label.hidden = person.input.value !== 'student';
     schoolClass.input.required = person.input.value === 'student';
     staffPosition.label.hidden = person.input.value !== 'school_staff';
     staffPosition.input.required = person.input.value === 'school_staff';
+    updateVerification();
   };
   person.input.addEventListener('change', updateVisibility);
   updateVisibility();
   const status = node(document, 'p', 'ru-note', '');
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const save = node(document, 'button', 'ru-button', 'Сохранить профиль'); save.type = 'submit';
-  form.append(first.label, last.label, person.label, schoolClass.label, staffPosition.label, status, save);
+  form.append(first.label, last.label, person.label, schoolClass.label, staffPosition.label, verification, status, save);
   section.append(form);
   if (typeof listingForm.before === 'function') listingForm.before(section); else shell.append(section);
 
@@ -103,7 +116,13 @@ export async function initializeProfileSettings({ document = globalThis.document
       if (result.status === 401) status.textContent = 'Сеанс завершён. Войдите через Яндекс ID и повторите попытку.';
       else if (result.status === 400 && updated?.error === 'invalid_profile_identity') status.textContent = 'Проверьте имя, фамилию, класс и должность.';
       else if (!result.ok || !updated?.ok) status.textContent = 'Не удалось сохранить профиль. Попробуйте позже.';
-      else status.textContent = 'Профиль сохранён.';
+      else {
+        if (updated.profile?.person_type) profile.person_type = updated.profile.person_type;
+        if (updated.profile?.staff_position !== undefined) profile.staff_position = updated.profile.staff_position;
+        if (updated.profile?.staff_verification_status) profile.staff_verification_status = updated.profile.staff_verification_status;
+        updateVerification();
+        status.textContent = 'Профиль сохранён.';
+      }
     } catch { status.textContent = 'Нет связи с сервером. Изменения не подтверждены.'; }
     finally { save.disabled = false; }
   });
