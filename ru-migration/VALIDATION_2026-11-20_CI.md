@@ -233,3 +233,10 @@
 - Кодовый commit [95000b8](https://github.com/spartakdubov059/fam-website/commit/95000b8e6271d984ef2056c6873358f21d608ff6) ужесточил проверку JWT `aud`, `azp` и обязательного `iat`; локально прошло **389/389** backend-тестов.
 - [SDK/Sharp CI #44807710650](https://github.com/spartakdubov059/fam-website/actions/runs/44807710650) завершился success: установлен locked compatibility набор, выполнен FAM RU backend suite, проверены timer references, нативная Sharp/WebP обработка и сборка serverless package.
 - [Disposable YDB CI #44807711094](https://github.com/spartakdubov059/fam-website/actions/runs/44807711094) завершился success: схема применена, синтетическая repository integration выполнена, временная база удалена. Внешний Yandex Cloud, реальные профили и production не использовались.
+
+## Главная карусель и школьная лента — 20 ноября 2026
+
+- Коммит [434ba3f](https://github.com/spartakdubov059/fam-website/commit/434ba3f4b68e4b3c991ca91dbdf3f0dc70e1771a) помещает карточки объявлений и опросов из RU школьной ленты в главную карусель; точки навигации обновляются при изменении набора слайдов, а обработчики голосования сохраняются.
+- Локальный `node --test ru-migration/app/backend/test/*.test.mjs`: **391/391**. Целевые проверки карусели/школьной ленты: **9/9**. `git diff --check` прошёл.
+- Точные GitHub push runs для коммита завершились успешно: [SDK/Sharp CI #44809481180](https://github.com/spartakdubov059/fam-website/actions/runs/44809481180) и [локальная YDB integration #44809481169](https://github.com/spartakdubov059/fam-website/actions/runs/44809481169). Они используют CI compatibility и disposable YDB; это не облачный Yandex Cloud staging.
+- `main` и production не менялись; synthetic-only сценарии, реальные данные и платные облачные ресурсы не использовались.
