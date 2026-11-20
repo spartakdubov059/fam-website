@@ -4,6 +4,17 @@ const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function createMediaApi({ authenticate, resolveActor, pendingImages, repository }) {
+  const suspendedModeratorGate = async actor => {
+    if (!UUID.test(actor?.id || '') || typeof repository?.getActiveAccountSuspension !== 'function') {
+      return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+    }
+    try {
+      const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
+      return suspension ? { status: 403, body: { ok: false, error: 'account_suspended' } } : null;
+    } catch {
+      return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+    }
+  };
   return async function handle(req) {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
     const ideaPhotoMatch = pathname.match(/^\/api\/v1\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images\/([0-2])$/i);
@@ -61,6 +72,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         if (!actor || !['school_admin', 'council_member'].includes(actor.role) || actor.school_id !== listing.school_id) {
           return { status: 403, body: { ok: false, error: 'forbidden' } };
         }
+        const suspensionBlock = await suspendedModeratorGate(actor);
+        if (suspensionBlock) return suspensionBlock;
       } else if (listing.status !== 'active') {
         let identity; try { identity = await authenticate(req); } catch { identity = null; }
         if (!identity) return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
@@ -86,6 +99,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       try {
         const photo = await repository.getListingPhoto(photoMatch[1]);
         if (!photo?.image_key || photo.school_id !== actor.school_id || photo.photo_status !== 'pending' || photo.status !== 'pending') return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
+        const suspensionBlock = await suspendedModeratorGate(actor);
+        if (suspensionBlock) return suspensionBlock;
         const changed = await repository.moderateListingPhoto(photoMatch[1], actor.school_id, decision);
         return changed ? { status: 200, body: { ok: true, photo_status: decision } } : { status: 409, body: { ok: false, error: 'photo_review_conflict' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
