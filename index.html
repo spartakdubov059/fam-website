@@ -404,15 +404,19 @@
     .empty-icon { width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 20px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(91,140,255,0.1)); display: grid; place-items: center; font-size: 26px; }
     .ai-thinking { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(244,114,182,0.1)); border-radius: 12px; border: 1px solid rgba(139,92,246,0.35); font-size: 12px; font-weight: 700; margin-bottom: 10px; }
 
-    .tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom, 0px)); width: min(480px, calc(100% - 24px)); display: flex; justify-content: space-around; align-items: center; padding: 4px 12px; border-radius: 999px; background: rgba(16,16,24,0.72); backdrop-filter: blur(36px) saturate(220%); border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 40px rgba(0,0,0,.6); z-index: 50; }
-    .tabbar-indicator { position: absolute; top: 0; left: 0; width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, rgba(250,250,255,.97), rgba(205,210,225,.92)); box-shadow: 0 8px 22px rgba(0,0,0,.5); transition: transform 0.45s var(--spring), scale 0.4s var(--spring), opacity 0.3s ease; scale: 1; opacity: 1; z-index: 0; pointer-events: none; transform: translate(0, 0); }
-    .tabbar-indicator.idle { scale: 0; opacity: 0; }
-    .tab-btn { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: var(--muted); padding: 4px 8px; flex: 1; }
-    .tab-ico { position: relative; width: 42px; height: 42px; display: grid; place-items: center; }
-    .tab-ico svg { width: 20px; height: 20px; }
-    .tab-label { font-size: 10px; font-weight: 700; }
-    .tab-btn.active .tab-ico { color: #0B0B10; }
-    .tab-btn.active .tab-label { color: #fff; }
+    .tabbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: min(480px, calc(100% - 28px)); min-height: 78px; display: flex; justify-content: space-around; align-items: center; padding: 8px 12px; border-radius: 30px; background: linear-gradient(145deg, rgba(38,39,50,.74), rgba(17,18,26,.78)); -webkit-backdrop-filter: blur(42px) saturate(190%); backdrop-filter: blur(42px) saturate(190%); border: 1px solid rgba(255,255,255,.18); box-shadow: 0 18px 48px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(255,255,255,.04); z-index: 50; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+    .tabbar::before { content:""; position:absolute; inset:1px; border-radius:inherit; pointer-events:none; background:linear-gradient(115deg,rgba(255,255,255,.11),transparent 32%,transparent 70%,rgba(255,255,255,.035)); }
+    .tabbar-indicator { position:absolute; top:0; left:0; width:54px; height:54px; border-radius:21px; background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(218,224,239,.91)); box-shadow:0 8px 24px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.95); transition:transform .46s cubic-bezier(.22,1,.36,1),width .28s cubic-bezier(.22,1,.36,1),height .28s cubic-bezier(.22,1,.36,1),border-radius .28s ease,opacity .2s ease; opacity:1; z-index:0; pointer-events:none; transform:translate(0,0); will-change:transform,width,height; }
+    .tabbar-indicator.idle { opacity:0; }
+    .tabbar-indicator.dragging { transition:none; }
+    .tabbar-indicator.moving { width:62px; border-radius:23px; }
+    .tab-btn { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:1px; background:none; border:0; color:var(--muted); padding:4px 7px; flex:1; min-width:0; touch-action:none; }
+    .tab-ico { position:relative; width:52px; height:50px; display:grid; place-items:center; transition:transform .25s cubic-bezier(.22,1,.36,1),color .2s ease; }
+    .tab-ico svg { width:21px; height:21px; }
+    .tab-label { font-size:10px; font-weight:700; letter-spacing:.01em; transition:color .2s ease,opacity .2s ease; }
+    .tab-btn.active .tab-ico { color:#11131a; transform:scale(1.04); }
+    .tab-btn.active .tab-label { color:#fff; }
+    .tab-btn.drag-target .tab-ico { transform:scale(1.09); }
     .tab-plus { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; border-radius: 50%; background: var(--gradient-violet); color: #fff; border: 4px solid var(--bg); display: grid; place-items: center; z-index: 3; box-shadow: 0 10px 28px rgba(139,92,246,0.6); }
     .tab-plus svg { width: 22px; height: 22px; }
     .tabbar-badge { position: absolute; top: 2px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: #4A8CFF; color: #fff; font-size: 9px; font-weight: 800; display: grid; place-items: center; border: 2px solid rgba(16,16,24,0.95); }
@@ -427,8 +431,11 @@
     @keyframes pageInLeft   { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
     @keyframes pageInRight  { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
 
-    .footer { background: var(--surface); border-top: 1px solid var(--border); padding: 22px 16px; text-align: center; margin-top: auto; }
-    .footer-brand { font-weight: 900; letter-spacing: 3px; font-size: 14px; background: linear-gradient(90deg, #6BCB9B, #4facfe, #F0C14B, #4facfe, #6BCB9B); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer { display:flex; justify-content:center; align-items:center; padding:12px 16px calc(98px + env(safe-area-inset-bottom,0px)); margin-top:auto; background:transparent; border:0; text-align:center; }
+    .footer-lockup { display:inline-flex; align-items:center; gap:9px; opacity:.76; }
+    .footer-mark { width:26px; height:26px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.17); border-radius:8px; color:#e8ebf5; font-size:11px; font-weight:900; letter-spacing:-.08em; background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.025)); box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
+    .footer-brand { display:flex; flex-direction:column; align-items:flex-start; color:#dce0eb; font-size:11px; font-weight:800; letter-spacing:.15em; line-height:1.15; }
+    .footer-brand small { margin-top:3px; color:var(--muted); font-size:8px; font-weight:650; letter-spacing:.19em; }
 
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -1284,6 +1291,18 @@
   }
 }
 
+
+    @media (max-width:600px) {
+      .tabbar { width:calc(100% - 24px); min-height:74px; bottom:calc(9px + env(safe-area-inset-bottom,0px)); padding:6px 8px; border-radius:27px; }
+      .tabbar-indicator { width:50px; height:50px; border-radius:19px; }
+      .tabbar-indicator.moving { width:58px; border-radius:21px; }
+      .tab-btn { padding:3px 2px; }
+      .tab-ico { width:48px; height:46px; }
+      .footer { padding-bottom:calc(91px + env(safe-area-inset-bottom,0px)); }
+    }
+    @media (prefers-reduced-motion:reduce) {
+      .tabbar-indicator,.tab-ico,.tab-label { transition:none!important; }
+    }
 </style>
 </head>
 <body>
@@ -1618,7 +1637,7 @@
   <button class="tab-plus" id="fabBtn" aria-label="Создать объявление"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 </nav>
 
-<footer class="footer"><span class="footer-brand">SPR Studio</span></footer>
+<footer class="footer"><div class="footer-lockup" aria-label="SPR Studio — FAM Digital"><span class="footer-mark" aria-hidden="true">SPR</span><span class="footer-brand">SPR STUDIO<small>FAM DIGITAL</small></span></div></footer>
 
 <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="modal-content">
@@ -1690,11 +1709,11 @@
       <div class="form-group">
         <label for="lCat">Категория</label>
         <select id="lCat" class="form-control" required>
-          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Мероприятие</option><option value="__announcement" data-staff-only="true">Анонс</option><option value="__poll" data-staff-only="true">Опрос</option>
+          <option value="Вещи">Вещи</option><option value="Услуги">Услуги</option><option value="Творчество">Творчество</option><option value="Учёба">Учёба</option><option value="Мероприятия" id="evOption" style="display:none;">Афиша · мероприятие</option><option value="__announcement" data-staff-only="true">Афиша · анонс</option><option value="__poll" data-staff-only="true">Афиша · опрос</option>
         </select>
       </div>
       <div id="pulseCreateFields" class="hidden" style="background:var(--bg);padding:12px;border-radius:12px;margin-bottom:12px">
-        <div id="pulseCreateKindWrap" class="form-group"><label for="pulseCreateKind">Тип анонса</label><select id="pulseCreateKind" class="form-control"><option value="news">Анонс</option><option value="important">Важное</option><option value="open_event">Мероприятие</option></select></div>
+        <div id="pulseCreateKindWrap" class="form-group"><label for="pulseCreateKind">Тип анонса</label><select id="pulseCreateKind" class="form-control"><option value="news">Обычный анонс</option><option value="important">Важное объявление</option></select></div>
         <div id="pulseCreateEventWrap" class="form-group hidden"><label for="pulseCreateEventAt">Дата и время</label><input id="pulseCreateEventAt" type="datetime-local" class="form-control"></div>
         <div id="pulseCreatePollWrap" class="hidden"><label for="pulseCreateOptions">Варианты ответа (по одному в строке, 2–8)</label><textarea id="pulseCreateOptions" class="form-control" rows="8" maxlength="600" placeholder="Вариант 1&#10;Вариант 2"></textarea></div>
       </div>
@@ -2810,7 +2829,7 @@ window.onunhandledrejection = function() {
       }
       if (!heroRendered) { renderHero(); heroRendered = true; }
       renderListings(); renderFavorites(); updateBellBadge(); updateChatBadge(); refreshNotificationFeed();
-      if (schoolPulse) void schoolPulse.refresh();
+      if (schoolPulse) void schoolPulse.refresh().then(() => { if(curCat==="Мероприятия") renderListings(); });
       if(!$("profileSection").classList.contains("hidden")) renderProfile();
     } catch (e) {
       console.error("Ошибка загрузки данных FAM");
@@ -3011,6 +3030,7 @@ window.onunhandledrejection = function() {
       ((l.title || '').toLowerCase().includes(search) || (l.description && l.description.toLowerCase().includes(search)))
     );
     let html = filtered.map((l, i) => listingCard(l, i)).join("");
+    if(curCat==="Мероприятия"&&schoolPulse?.getAfishaMarkup) html+=schoolPulse.getAfishaMarkup(search);
     html += `<div class="promo-card" data-action="open-listing"><span class="promo-gift">🎁</span><div class="promo-script">Размести объявление <b>бесплатно!</b></div><button class="promo-cta">Создать ${ARROW}</button></div>`;
     const loadError = listingsLoadFailed
       ? '<div role="alert" style="grid-column:1/-1;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);">'
@@ -5001,8 +5021,48 @@ window.onunhandledrejection = function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  document.querySelectorAll('.tab-btn[data-tab]').forEach(b => {
-    b.onclick = (e) => { e.preventDefault(); showTab(b.dataset.tab); };
+  let tabDragState = null;
+  let suppressTabClickUntil = 0;
+  const tabbarEl = $("tabbar");
+  const tabButtons = Array.from(document.querySelectorAll(".tab-btn[data-tab]"));
+  function tabAtPoint(x,y){
+    const hit=document.elementFromPoint(x,y)?.closest(".tab-btn[data-tab]");
+    if(hit&&tabbarEl.contains(hit))return hit;
+    return tabButtons.find(button=>{const r=button.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;})||null;
+  }
+  function moveTabIndicatorToPoint(x,y){
+    const indicator=$("tabIndicator"),bar=tabbarEl.getBoundingClientRect();
+    indicator.classList.add("dragging");indicator.classList.remove("idle");
+    indicator.style.transform=`translate(${Math.max(0,Math.min(bar.width-indicator.offsetWidth,x-bar.left-indicator.offsetWidth/2))}px,${Math.max(0,Math.min(bar.height-indicator.offsetHeight,y-bar.top-indicator.offsetHeight/2))}px)`;
+  }
+  tabButtons.forEach(button=>{
+    button.onclick=e=>{e.preventDefault();if(Date.now()<suppressTabClickUntil)return;showTab(button.dataset.tab);};
+    button.addEventListener("pointerdown",event=>{
+      if(event.button!==undefined&&event.button!==0)return;
+      tabDragState={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,moved:false,target:button};
+      button.setPointerCapture?.(event.pointerId);
+    });
+    button.addEventListener("pointermove",event=>{
+      if(!tabDragState||tabDragState.pointerId!==event.pointerId)return;
+      if(!tabDragState.moved&&Math.hypot(event.clientX-tabDragState.startX,event.clientY-tabDragState.startY)<5)return;
+      tabDragState.moved=true;moveTabIndicatorToPoint(event.clientX,event.clientY);
+      const hit=tabAtPoint(event.clientX,event.clientY);
+      tabButtons.forEach(item=>item.classList.toggle("drag-target",item===hit));
+      if(hit){tabDragState.target=hit;document.querySelectorAll(".tab-btn").forEach(item=>item.classList.toggle("active",item===hit));}
+    });
+    const finishDrag=event=>{
+      if(!tabDragState||tabDragState.pointerId!==event.pointerId)return;
+      const state=tabDragState;tabDragState=null;
+      tabButtons.forEach(item=>item.classList.remove("drag-target"));
+      if(state.moved){
+        suppressTabClickUntil=Date.now()+350;
+        const hit=tabAtPoint(event.clientX,event.clientY)||state.target;
+        if(hit)showTab(hit.dataset.tab,true);else positionIndicator(false);
+      }
+      $("tabIndicator").classList.remove("dragging");
+    };
+    button.addEventListener("pointerup",finishDrag);
+    button.addEventListener("pointercancel",finishDrag);
   });
 
   function jumpToProfileSection(targetId) {
@@ -5182,7 +5242,7 @@ window.onunhandledrejection = function() {
           if(error||!data)throw new Error("Не удалось опубликовать анонс.");
         }else{
           const opts=$("pulseCreateOptions").value.split("\n").map(x=>x.trim()).filter(Boolean);
-          if(title.length<8||opts.length<2||opts.length>4||opts.some(x=>x.length>70)||new Set(opts.map(x=>x.toLowerCase())).size!==opts.length)throw new Error("Укажите вопрос и 2–4 разных варианта ответа (до 70 символов).");
+          if(title.length<8||opts.length<2||opts.length>8||opts.some(x=>x.length>70)||new Set(opts.map(x=>x.toLowerCase())).size!==opts.length)throw new Error("Укажите вопрос и 2–8 разных вариантов ответа (до 70 символов).");
           const {data,error}=await sb.rpc("fam_publish_school_poll",{p_question:title,p_options:opts});
           if(error||!data)throw new Error("Не удалось опубликовать опрос.");
         }
