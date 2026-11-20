@@ -44,3 +44,13 @@ test('mobile messages and profile navigation open or locate their same-page sect
   f.buttons[3].listeners.click();
   assert.deepEqual(f.nodes.get('ruProfileSettings').scrolled, { behavior: 'smooth', block: 'start' });
 });
+
+
+test('profile tab opens the signed-in idea history before settings', () => {
+  const f = fixture();
+  const history = new Node('ruIdeaHistory'); history.hidden = false;
+  f.nodes.set('ruIdeaHistory', history);
+  initializeNavigation({ document: f.document });
+  f.buttons[3].listeners.click();
+  assert.deepEqual(history.scrolled, { behavior: 'smooth', block: 'start' });
+});
