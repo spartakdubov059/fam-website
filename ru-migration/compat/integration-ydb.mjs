@@ -79,6 +79,9 @@ try {
     pendingImages: {
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
       listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
+      listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
+        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
+      ])],
     },
   }));
   const apiRequest = (method, url, token, body = {}) => {
@@ -873,6 +876,9 @@ try {
   await sql`UPDATE fam_account_deletion_jobs SET claim_until = Unwrap(CurrentUtcTimestamp() - Interval('PT1M')) WHERE user_id = ${recoveryUserId};`;
   const recoverAccountDeletions = createAccountDeletionRecoveryOperation({ repository: repo, pendingImages: {
     listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
+      listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
+        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
+      ])],
     delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
   } });
   assert.deepEqual(await recoverAccountDeletions(10), { claimed: 1, completed: 1, failed: 0 },
