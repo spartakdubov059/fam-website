@@ -1,6 +1,19 @@
--- Keep the same-school account cleanup lookups bounded as these tables grow.
+-- Keep school workflow and account-cleanup lookups bounded as these tables grow.
 -- Synchronous indexes are maintained atomically with writes by YDB.
 ALTER TABLE fam_avatar_reviews ADD INDEX fam_avatar_reviews_user_id_idx GLOBAL ON (user_id);
 ALTER TABLE fam_school_announcements ADD INDEX fam_school_announcements_author_id_idx GLOBAL ON (author_id);
 ALTER TABLE fam_school_polls ADD INDEX fam_school_polls_author_id_idx GLOBAL ON (author_id);
 ALTER TABLE fam_school_poll_votes ADD INDEX fam_school_poll_votes_voter_id_idx GLOBAL ON (voter_id);
+
+-- Counterparts of the source foreign-key lookup indexes. The RU column names
+-- differ where the migration's reviewer_id is stored as reviewed_by.
+ALTER TABLE fam_account_deletion_requests ADD INDEX fam_account_deletion_requester_id_idx GLOBAL ON (requester_id);
+ALTER TABLE fam_account_deletion_requests ADD INDEX fam_account_deletion_reviewed_by_idx GLOBAL ON (reviewed_by);
+ALTER TABLE fam_account_deletion_requests ADD INDEX fam_account_deletion_target_id_idx GLOBAL ON (target_id);
+ALTER TABLE fam_account_suspensions ADD INDEX fam_account_suspensions_issued_by_idx GLOBAL ON (issued_by);
+ALTER TABLE fam_account_suspensions ADD INDEX fam_account_suspensions_lifted_by_idx GLOBAL ON (lifted_by);
+-- target_id is already the leading column of fam_account_suspensions' primary key.
+ALTER TABLE fam_school_admin_audit ADD INDEX fam_school_admin_audit_actor_id_idx GLOBAL ON (actor_id);
+ALTER TABLE fam_school_admin_audit ADD INDEX fam_school_admin_audit_target_id_idx GLOBAL ON (target_id);
+ALTER TABLE fam_school_role_requests ADD INDEX fam_school_role_requests_review_started_by_idx GLOBAL ON (review_started_by);
+ALTER TABLE fam_school_role_requests ADD INDEX fam_school_role_requests_reviewed_by_idx GLOBAL ON (reviewed_by);
