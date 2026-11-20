@@ -11,7 +11,7 @@ class Node {
   click() { this.clicked++; this.listeners.click?.(); }
 }
 function fixture() {
-  const buttons = ['board', 'afisha', 'messages', 'profile'].map(view => {
+  const buttons = ['board', 'afisha', 'favorites', 'messages', 'profile'].map(view => {
     const button = new Node(); button.setAttribute('data-ru-view', view); return button;
   });
   const nodes = new Map([
@@ -23,7 +23,10 @@ function fixture() {
     ['ruMessages', new Node('ruMessages')],
     ['ruProfileSettings', new Node('ruProfileSettings')],
   ]);
-  return { buttons, nodes, document: { getElementById: id => nodes.get(id) || null } };
+  let favoriteClicked = 0;
+  return { buttons, nodes, document: { getElementById: id => nodes.get(id) || null,
+    querySelector: selector => selector.includes('data-view="favorites"') ? { click: () => { favoriteClicked++; } } : null,
+    get favoriteClicked() { return favoriteClicked; } } };
 }
 
 test('mobile Afisha navigation selects events and opens the combined school feed', () => {
@@ -39,11 +42,20 @@ test('mobile Afisha navigation selects events and opens the combined school feed
 test('mobile messages and profile navigation open or locate their same-page sections', () => {
   const f = fixture();
   initializeNavigation({ document: f.document });
-  f.buttons[2].listeners.click();
+  f.buttons[3].listeners.click();
   assert.equal(f.nodes.get('ruOpenMessages').clicked, 1);
   assert.deepEqual(f.nodes.get('ruMessages').scrolled, { behavior: 'smooth', block: 'start' });
-  f.buttons[3].listeners.click();
+  f.buttons[4].listeners.click();
   assert.deepEqual(f.nodes.get('ruProfileSettings').scrolled, { behavior: 'smooth', block: 'start' });
+});
+
+test('mobile favorites navigation selects the saved-only board view', () => {
+  const f = fixture();
+  initializeNavigation({ document: f.document });
+  f.buttons[2].listeners.click();
+  assert.equal(f.document.favoriteClicked, 1);
+  assert.deepEqual(f.nodes.get('publicListings').scrolled, { behavior: 'smooth', block: 'start' });
+  assert.equal(f.buttons[2].getAttribute('aria-pressed'), 'true');
 });
 
 
@@ -52,6 +64,6 @@ test('profile tab opens the signed-in idea history before settings', () => {
   const history = new Node('ruIdeaHistory'); history.hidden = false;
   f.nodes.set('ruIdeaHistory', history);
   initializeNavigation({ document: f.document });
-  f.buttons[3].listeners.click();
+  f.buttons[4].listeners.click();
   assert.deepEqual(history.scrolled, { behavior: 'smooth', block: 'start' });
 });
