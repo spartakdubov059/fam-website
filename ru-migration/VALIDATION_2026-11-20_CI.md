@@ -121,3 +121,13 @@
 - [SDK/Sharp CI #44786678750](https://github.com/spartakdubov059/fam-website/actions/runs/44786678750) — success, backend suite **370/370**, без пропусков.
 - [Disposable local YDB CI #44786678706](https://github.com/spartakdubov059/fam-website/actions/runs/44786678706) — success; synthetic integration выполнена на временной локальной YDB и база удалена.
 - Тесты используют синтетические аккаунты. Это не российский облачный staging; main, production и реальные данные не затрагивались.
+
+
+## Проверка лимита аватаров и приватного медиахранилища
+
+На кодовой ревизии [62305a5](https://github.com/spartakdubov059/fam-website/commit/62305a501f3f82c99c1d0317fe6b39277fc6b314) добавлен avatar-specific upload endpoint с лимитом 2 MiB. Перед созданием заявки сервер повторно проверяет размер сохранённого объекта; объект больше 2 MiB отклоняется с 413 и не попадает в очередь.
+
+- [SDK/Sharp CI #44788806256](https://github.com/spartakdubov059/fam-website/actions/runs/44788806256) — success: **370/370** backend tests, сборка пакета Yandex Cloud Functions, pinned YDB/AWS SDK и Sharp/WebP smoke test.
+- [Disposable YDB CI #44788806129](https://github.com/spartakdubov059/fam-website/actions/runs/44788806129) — success: схема и интеграционные сценарии на временной локальной YDB с синтетическими данными; контейнер удалён.
+- В тесте аватаров отдельно проверяется, что размер свыше 2 MiB не создаёт заявку на модерацию.
+- Cloud staging не создавался: подключение и бесплатная квота не подтверждены. Main, production и реальные школьные данные не затрагивались.
