@@ -8,22 +8,12 @@
       if (window.location.hostname !== "spartakdubov059.github.io") return;
       var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
       if (!match) return;
-      // Browser auth storage is isolated by hostname. Never bounce a signed-in
-      // fallback user to a host where the session may be missing or different.
-      // Likewise, complete email/OAuth callbacks on their requested origin.
+      // OAuth and email-link callbacks must finish on the origin that
+      // received them. For normal visits, use the primary domain whenever
+      // its readiness endpoint confirms the deployment is serving correctly.
       function keepFallbackAuthContext() {
         var params = window.location.search + "&" + window.location.hash;
-        if (/(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error_code)=/i.test(params)) return true;
-        try {
-          var raw = window.localStorage && window.localStorage.getItem("sb-tfacqpljrvfpcrhdovbu-auth-token");
-          if (raw) {
-            var session = JSON.parse(raw);
-            if (session && (session.access_token || session.refresh_token)) return true;
-          }
-        } catch (_) {
-          // Storage may be disabled; the normal health-checked fallback still works.
-        }
-        return false;
+        return /(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error|error_code)=/i.test(params);
       }
       if (keepFallbackAuthContext()) return;
       var path = match[1] || "/";
