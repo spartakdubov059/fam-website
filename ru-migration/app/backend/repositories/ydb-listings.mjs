@@ -1547,6 +1547,17 @@ export function createYdbListingsRepository(sql) {
       return Number(rows?.[0]?.[0]?.taken ?? 0);
     },
 
+
+    async getPublicEventOccupancy(eventId) {
+      if (!eventId) throw new TypeError('invalid event id');
+      const statement = sql`SELECT o.taken FROM fam_event_occupancy AS o
+        INNER JOIN fam_listings AS l ON l.id = o.event_id
+        WHERE o.event_id = ${eventId} AND l.is_event = true AND l.status = 'active' LIMIT 1;`;
+      if (typeof statement?.on === 'function') statement.on('error', () => {});
+      const rows = await statement;
+      const row = rows?.[0]?.[0];
+      return row ? Number(row.taken ?? 0) : null;
+    },
     async listEventRegistrations(userId) {
       if (!userId) throw new TypeError('invalid event registrant');
       const statement = sql`SELECT r.event_id AS event_id, r.user_id AS user_id, r.status AS status,
