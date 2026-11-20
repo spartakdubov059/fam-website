@@ -2,9 +2,9 @@
 
 ## Актуальная сверка исходника (20 ноября 2026)
 
-- Текущий исходный `main` проверен на commit [`5e749c56b9270efbfdf1f48cefe6e8d95a01c579`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579): 78 файлов `supabase/migrations` и 7 Edge Functions. Базовый снимок `7fd4182` содержал 76 migrations; текущая дельта расширила школьные опросы с четырёх до восьми ответов, изменила поведение carousel при обновлении ленты и упрощает перевод GitHub Pages на Netlify при доступности домена.
-- Новая migration `20261118212000_restore_own_profile_identity_field_grants.sql` возвращает authenticated доступ только к колонкам `person_type`, `staff_position`, `staff_verification_status` с сохранением RLS; запись разрешена только в `person_type` и `staff_position`. В RU эквивалентом служит allowlist серверного маршрута `/api/v1/me`: YDB транзакция проверяет личность и активный профиль, сама выставляет `staff_verification_status=pending` при изменении сведений сотрудника. Это не прямой перенос Postgres grants, а проверка прав в backend.
-- Последняя проверенная RU-ревизия кода [`f23d42b`](https://github.com/spartakdubov059/fam-website/commit/f23d42b4fa14dd2add9dc899177739e7589ce838); актуальная сводка и CI — в [`README.md`](README.md), [`VALIDATION_2026-11-20_CI.md`](VALIDATION_2026-11-20_CI.md) и [`SECURITY_REVIEW_2026-11-20.md`](SECURITY_REVIEW_2026-11-20.md). Полный аудит 78 migrations/RLS/RPC/triggers, функций и облачный staging не завершены.
+- Повторный fetch GitHub `main` указывает на commit [`7fd418246653f92b53f66bc29fa224d95d04d5cf`](https://github.com/spartakdubov059/fam-website/commit/7fd418246653f92b53f66bc29fa224d95d04d5cf): 76 файлов `supabase/migrations` и 7 Edge Functions. Commit [`5e749c56b9270efbfdf1f48cefe6e8d95a01c579`](https://github.com/spartakdubov059/fam-website/commit/5e749c56b9270efbfdf1f48cefe6e8d95a01c579) по-прежнему доступен, но не является предком текущего `main`. Его изменения (в том числе опросы до 8 ответов) нельзя обозначать как текущие требования `main` без дополнительного подтверждения.
+- В RU реализован вариант опроса на 2–8 ответов. Это шире поведения текущего `main` snapshot, а не доказательство полного соответствия текущему исходнику. Изменение оставлено в изолированной ветке; его следует учитывать как RU-вариант при последующем продуктовом сопоставлении.
+- Последняя проверенная RU-ревизия [`e6044a0`](https://github.com/spartakdubov059/fam-website/commit/e6044a0489245ea755d7031b422d1f0c3f500b02): 315/315 backend-тестов, SDK/Sharp CI и одноразовая YDB CI успешны. Полный аудит 76 migrations/RLS/RPC/triggers, функций и облачный staging не завершены.
 
 
 Обследование исходников ветки `migration/yandex-cloud`, 13 ноября 2026. Это перечень компонентов для самостоятельного переноса по коду текущего FAM; архив предыдущей сборки не требуется для этого этапа.
@@ -13,7 +13,7 @@
 
 - Статический фронтенд в корневом `index.html`; сейчас он обращается к Supabase напрямую.
 - 7 Edge Functions: `council-management`, `fam-agent-coder-bridge`, `fam-agent-worker`, `fam-listing-image-worker`, `moderate`, `school-admin-access`, `submit-content`.
-- На исходном snapshot `7fd418246653f92b53f66bc29fa224d95d04d5cf` было 76 SQL migration-файлов; текущий `main` `5e749c56b9270efbfdf1f48cefe6e8d95a01c579` содержит 78. Их нужно сопоставлять с российской схемой и API, а не переносить механически: YDB не исполняет Supabase RLS/RPC/триггеры. Полный построчный перенос и аудит пока не выполнены.
+- Текущий проверенный `main` `7fd418246653f92b53f66bc29fa224d95d04d5cf` содержит 76 SQL migration-файлов. Их нужно сопоставлять с российской схемой и API, а не переносить механически: YDB не исполняет Supabase RLS/RPC/триггеры. Полный построчный перенос и аудит пока не выполнены.
 - В исходных миграциях перечислено 7 текущих активных расписаний `pg_cron` плюс отменённое старое `fam-agent-daily-report`; точные вызовы и статус переноса сверены в [CRON_PORTING.md](CRON_PORTING.md). Российские аналоги не устанавливаются автоматически.
 - Зависимости, которые нельзя потерять: Auth и роли, приватные/публичные медиа, модерация, очереди, учёт событий, удаление аккаунта, школьные ограничения доступа и фоновые отчёты.
 
