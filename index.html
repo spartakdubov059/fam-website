@@ -3023,6 +3023,15 @@ window.onunhandledrejection = function() {
 
   function renderListings() {
     const grid = $("listingsGrid");
+    if (!user) {
+      // The school board is private. Do not show a misleading empty-search
+      // message or fetch private listings before authentication.
+      grid.innerHTML = '<div style="grid-column:1/-1;max-width:520px;margin:16px auto;padding:24px;text-align:center;border:1px solid var(--border);border-radius:18px;background:var(--surface);">' +
+        '<h3 style="font-size:16px;margin:0 0 9px;">Объявления только для участников школы</h3>' +
+        '<p style="font-size:12px;color:var(--muted);margin-bottom:15px;">Войдите, чтобы смотреть объявления своей школы и общаться с другими участниками.</p>' +
+        '<button type="button" class="button button-primary" data-action="open-auth">Войти в FAM</button></div>';
+      return;
+    }
     const search = $("searchInput").value.toLowerCase();
     const filtered = listings.filter(l =>
       l.status === "active" &&
