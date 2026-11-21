@@ -15,7 +15,7 @@ set role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select public.fam_publish_school_announcement('Короткие новости','Кружки открыты для новых проектов','news');
 select public.fam_publish_school_announcement('Большая встреча для всех','Приходите на открытый школьный день. Места не ограничены.','open_event',now()+interval '2 days');
-select public.fam_publish_school_poll('Какой формат встречи выбрать?', '["Кинопоказ","Мастер-класс","Настольные игры"]'::jsonb);
+select public.fam_publish_school_poll('Какой формат встречи выбрать?', '["Кинопоказ","Мастер-класс","Настольные игры","Квиз","Прогулка","Творческая встреча","Спорт","Другое"]'::jsonb);
 
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 do $check$
@@ -25,8 +25,8 @@ declare
 begin
 select (public.fam_pulse_feed()->'polls'->0->>'id')::uuid into id;
 if id is null then raise exception 'Admin poll missing';end if;
-if public.fam_vote_school_poll(id,0) is not true then raise exception 'Vote missing';end if;
-if public.fam_vote_school_poll(id,1) is not false then raise exception 'Double-vote possible';end if;
+if public.fam_vote_school_poll(id,7) is not true then raise exception 'Vote missing';end if;
+if public.fam_vote_school_poll(id,0) is not false then raise exception 'Double-vote possible';end if;
 select public.fam_pulse_feed() into result;
 if jsonb_array_length(result->'announcements')<>3 or jsonb_array_length(result->'polls')<>1 then
   raise exception 'School feed missing cards';end if;

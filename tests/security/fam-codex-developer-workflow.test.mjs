@@ -78,6 +78,14 @@ test("agent uses local open weights and never needs a paid API key", () => {
   assert.doesNotMatch(runner, /api\.openai\.com|OPENAI_API_KEY/);
 });
 
+test("llama.cpp server builds without unnecessary web UI assets", () => {
+  // The pinned upstream llama.cpp defaults LLAMA_USE_PREBUILT_UI=ON; missing
+  // Workbox files in its downloaded UI archive previously broke the build.
+  assert.match(workflow, /-DLLAMA_BUILD_UI=OFF/);
+  assert.match(workflow, /-DLLAMA_USE_PREBUILT_UI=OFF/);
+  assert.match(workflow, /cmake --build "\$RUNNER_TEMP\/llama\.cpp\/build" --config Release --target llama-server/);
+});
+
 test("model receives read-only repository access and can only propose allowlisted paths", () => {
   assert.match(workflow, /generate:[\s\S]*?permissions:\n\s+contents: read/);
   assert.match(workflow, /index\.html\|css\/\*\|js\/\*\|assets\/\*\|docs\/\*\|tests\/\*/);

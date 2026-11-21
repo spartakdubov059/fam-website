@@ -74,3 +74,18 @@
   .pulse-card,.pulse-option,.pulse-refresh,.pulse-card::before{transition:none!important}
   .pulse-card:hover{transform:none}
 }
+
+/* Distinct Afisha formats in the shared carousel. */
+.hero-pulse-announcement .pulse-card{border-color:rgba(139,92,246,.36);background:linear-gradient(140deg,rgba(69,51,112,.82),#171923 72%)}
+.hero-pulse-announcement .pulse-card-overline,.hero-pulse-announcement .pulse-symbol{color:#c9b3ff}
+.hero-pulse-announcement .pulse-symbol{background:rgba(139,92,246,.17)}
+.hero-pulse-important .pulse-card{border-color:rgba(255,113,99,.58);background:linear-gradient(135deg,rgba(91,38,43,.94),#211a22 72%);box-shadow:inset 4px 0 0 #ff7163,0 12px 30px rgba(0,0,0,.16)}
+.hero-pulse-important .pulse-card-overline,.hero-pulse-important .pulse-symbol{color:#ff9b7c}
+.hero-pulse-important .pulse-symbol{background:rgba(255,113,99,.15)}
+.hero-pulse-event .pulse-card{border-color:rgba(200,245,66,.42);background:linear-gradient(135deg,rgba(48,61,35,.85),#171923 76%)}
+.hero-pulse-event .pulse-card-overline,.hero-pulse-event .pulse-symbol{color:var(--lime)}
+.hero-pulse-event .pulse-symbol{background:rgba(200,245,66,.14)}
+.hero-pulse-poll .pulse-card{border-color:rgba(91,190,255,.42);background:linear-gradient(135deg,rgba(34,64,93,.83),#171923 76%)}
+.hero-pulse-poll .pulse-card-overline,.hero-pulse-poll .pulse-symbol{color:#8dd5ff}
+.hero-pulse-poll .pulse-symbol{background:rgba(91,190,255,.15)}
+#listingsGrid .pulse-card{grid-column:1/-1}
