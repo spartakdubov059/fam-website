@@ -25,7 +25,7 @@ function createFakeDocument() {
   };
 }
 
-test('guest board requests only the public endpoint and writes listing data as text', async () => {
+test('school board request includes the same-origin session and writes listing data as text', async () => {
   const root = new FakeNode('section');
   let options;
   await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, init) => {
@@ -33,7 +33,7 @@ test('guest board requests only the public endpoint and writes listing data as t
     return { ok: true, json: async () => ({ ok: true, listings: [{ id: 'listing-1', title: '<script>alert(1)</script>', description: 'Синтетическое описание', category: 'Учёба', price_text: 'Бесплатно', is_event: false }] }) };
   } });
   assert.equal(options.url, '/api/v1/listings');
-  assert.equal(options.init.credentials, 'omit');
+  assert.equal(options.init.credentials, 'same-origin');
   assert.equal(options.init.cache, 'no-store');
   const title = boardCard(root).children[1];
   assert.equal(title.textContent, '<script>alert(1)</script>');
@@ -153,9 +153,20 @@ test('favorite navigation selected during loading is applied when the board arri
   assert.equal(cards[1].hidden, true);
 });
 
-test('guest board renders a useful empty state when there are no approved listings', async () => {
+test('guest board offers the same login prompt as the source FAM', async () => {
   const root = new FakeNode('section');
-  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, listings: [] }) }) });
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async url => url === '/api/v1/listings'
+    ? ({ ok: true, json: async () => ({ ok: true, listings: [] }) })
+    : ({ ok: false, status: 401, json: async () => ({}) }) });
+  assert.match(root.children[0].textContent, /Войдите, чтобы смотреть объявления своей школы/);
+  assert.equal(root.children[1].href, '/auth/yandex/start');
+});
+
+test('signed-in school board shows its normal empty state', async () => {
+  const root = new FakeNode('section');
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async url => url === '/api/v1/listings'
+    ? ({ ok: true, json: async () => ({ ok: true, listings: [] }) })
+    : ({ ok: true, json: async () => ({ ok: true, favorite_ids: [] }) }) });
   assert.match(root.children[0].textContent, /Пока нет опубликованных объявлений/);
 });
 

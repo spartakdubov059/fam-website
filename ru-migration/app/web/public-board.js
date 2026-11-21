@@ -339,14 +339,22 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
   }
   root.replaceChildren(element(document, 'p', 'ru-board-status', 'Загружаем объявления…'));
   try {
-    const response = await fetchImpl('/api/v1/listings', { method: 'GET', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' } });
+    const response = await fetchImpl('/api/v1/listings', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error('listing_read_unavailable');
     const result = await response.json();
     if (!result?.ok || !Array.isArray(result.listings) || result.listings.length > MAX_PUBLIC_LISTINGS) throw new Error('invalid_listing_response');
     const events = result.listings.some(listing => listing?.is_event === true);
     const session = events ? await loadMyEventRegistrations(fetchImpl) : { state: 'guest', registrations: new Map() };
     if (result.listings.length === 0) {
-      root.replaceChildren(element(document, 'p', 'ru-board-status', 'Пока нет опубликованных объявлений. Новые объявления появятся после проверки администрацией школы.'));
+      const favorites = await loadMyFavorites(fetchImpl);
+      const status = element(document, 'p', 'ru-board-status', favorites.state === 'guest'
+        ? 'Войдите, чтобы смотреть объявления своей школы.'
+        : 'Пока нет опубликованных объявлений. Новые объявления появятся после проверки администрацией школы.');
+      if (favorites.state === 'guest') {
+        const login = element(document, 'a', 'ru-board-login', 'Войти через Яндекс ID');
+        login.href = '/auth/yandex/start';
+        root.replaceChildren(status, login);
+      } else root.replaceChildren(status);
       return;
     }
     const favorites = await loadMyFavorites(fetchImpl);

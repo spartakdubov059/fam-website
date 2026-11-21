@@ -1026,11 +1026,20 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       return { status: 200, body: { ok: true, profile: actor } };
     }
     if (req.method === 'GET' && pathname === '/api/v1/listings') {
+      // Match the source FAM board policy: active listings are visible only
+      // to signed-in profiles from the same school. Guests receive an empty
+      // feed so the UI can show its login prompt without leaking school data.
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 200, body: { ok: true, listings: [] } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 200, body: { ok: true, listings: [] } };
       if (typeof repository.listActiveListings !== 'function') {
         return { status: 503, body: { ok: false, error: 'listing_read_unavailable' } };
       }
       try {
-        const listings = await repository.listActiveListings();
+        const listings = await repository.listActiveListings(actor.school_id);
         return { status: 200, body: { ok: true, listings } };
       } catch {
         return { status: 503, body: { ok: false, error: 'database_unavailable' } };

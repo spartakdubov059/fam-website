@@ -28,6 +28,17 @@ test('own listing summaries are scoped to owner and omit database ownership and 
   assert.equal(Object.hasOwn(result[0], 'school_id'), false);
 });
 
+test('active listing feed requires a school scope in the YDB query', async () => {
+  let query; let values;
+  const repository = createYdbListingsRepository((strings, ...bound) => {
+    query = strings.join('?'); values = bound; return Promise.resolve([[]]);
+  });
+  assert.deepEqual(await repository.listActiveListings('school-a'), []);
+  assert.deepEqual(values, ['school-a']);
+  assert.match(query, /WHERE school_id = \? AND status = 'active'/);
+  await assert.rejects(repository.listActiveListings(''), TypeError);
+});
+
 test('school role review queue joins only the same-school profile projection', async () => {
   let query;
   const row = { request_id: 'request-a', user_id: '11111111-1111-4111-8111-1234567890ab', requested_role: 'council_member',

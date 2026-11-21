@@ -199,14 +199,22 @@ test('a suspended school-role owner retains access to their own idea attachment'
   assert.equal(suspensionChecks, 0);
 });
 
-test('only approved photos on active listings are public and rejected photos remain unavailable', async () => {
+test('approved active listing photos are visible only to members of their school', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const listing = { school_id: 'school-a', status: 'active', image_key: 'pending/key.webp', photo_status: 'approved' };
-  const api = createMediaApi({ authenticate: async () => null, resolveActor: async () => null,
+  const api = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ school_id: 'school-a', role: 'student' }),
     repository: { getListingPhoto: async () => listing }, pendingImages: { get: async () => Buffer.from('webp') } });
   const publicPhoto = await api(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }));
   assert.equal(publicPhoto.status, 200);
   assert.equal(publicPhoto.headers['content-type'], 'image/webp');
+  const guestApi = createMediaApi({ authenticate: async () => null, resolveActor: async () => null,
+    repository: { getListingPhoto: async () => listing }, pendingImages: { get: async () => Buffer.from('webp') } });
+  assert.equal((await guestApi(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }))).status, 404);
+  const otherSchoolApi = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }),
+    resolveActor: async () => ({ school_id: 'school-b', role: 'student' }),
+    repository: { getListingPhoto: async () => listing }, pendingImages: { get: async () => Buffer.from('webp') } });
+  assert.equal((await otherSchoolApi(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }))).status, 404);
   listing.photo_status = 'rejected';
   assert.equal((await api(request({ method: 'GET', path: `/api/v1/listings/${id}/photo` }))).status, 404);
 });

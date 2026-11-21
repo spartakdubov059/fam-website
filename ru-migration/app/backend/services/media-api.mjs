@@ -82,11 +82,12 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         }
         const suspensionBlock = await suspendedModeratorGate(actor);
         if (suspensionBlock) return suspensionBlock;
-      } else if (listing.status !== 'active') {
+      } else {
         let identity; try { identity = await authenticate(req); } catch { identity = null; }
         if (!identity) return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
         let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-        if (!actor || !['school_admin', 'council_member'].includes(actor.role) || actor.school_id !== listing.school_id) {
+        if (!actor || actor.school_id !== listing.school_id || (listing.status !== 'active'
+            && !['school_admin', 'council_member'].includes(actor.role))) {
           return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
         }
       }

@@ -383,15 +383,41 @@ test('API maps identity to database profile and persists unreviewed content as p
   const response = await handler(req({ title: 'Book', description: 'School book', category: 'Учёба', user_id: 'forged' }));
   assert.equal(response.status, 201); assert.equal(record.user_id, 'synthetic-user'); assert.equal(record.status, 'pending');
 });
-test('public listing read needs no student identity and returns only repository-approved projection', async () => {
+test('guest listing read returns an empty board without touching listing data', async () => {
   const safeRow = { id: 'synthetic-listing', title: 'Book', status: 'active' };
-  const handler = createListingsApi({ authenticate: async () => { throw new Error('public read must not authenticate'); },
-    resolveActor: async () => { throw new Error('public read must not resolve a profile'); },
-    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => [safeRow] } });
+  let reads = 0;
+  const handler = createListingsApi({ authenticate: async () => null,
+    resolveActor: async () => { throw new Error('guest must not resolve a profile'); },
+    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { reads++; return [safeRow]; } } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings';
   const response = await handler(request);
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { ok: true, listings: [safeRow] });
+  assert.deepEqual(response.body, { ok: true, listings: [] });
+  assert.equal(reads, 0);
+});
+
+test('active listing reads are restricted to the authenticated profile school', async () => {
+  let requestedSchool;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'member' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'school-a', role: 'student' }),
+    repository: { getActiveAccountSuspension: async () => null,
+      listActiveListings: async schoolId => { requestedSchool = schoolId; return [{ id: 'school-a-listing' }]; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/listings';
+  const response = await handler(request);
+  assert.equal(response.status, 200);
+  assert.equal(requestedSchool, 'school-a');
+  assert.deepEqual(response.body, { ok: true, listings: [{ id: 'school-a-listing' }] });
+});
+
+test('active listing reads return no cross-school rows when actor profile is unavailable', async () => {
+  let reads = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'member' }),
+    resolveActor: async () => null,
+    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { reads++; return []; } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/listings';
+  const response = await handler(request);
+  assert.deepEqual(response, { status: 200, body: { ok: true, listings: [] } });
+  assert.equal(reads, 0);
 });
 
 test('contacting a listing derives the recipient on the server and sends only reviewed text', async () => {
@@ -429,7 +455,9 @@ test('listing contact rejects unavailable or cross-school listing without storin
   assert.equal(writes, 0);
 });
 test('public listing read fails closed when the database is unavailable', async () => {
-  const handler = createListingsApi({ repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { throw new Error('offline'); } } });
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'member' }),
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: 'school-a', role: 'student' }),
+    repository: { getActiveAccountSuspension: async () => null, listActiveListings: async () => { throw new Error('offline'); } } });
   const request = req({}, 'GET'); request.url = '/api/v1/listings';
   const response = await handler(request);
   assert.equal(response.status, 503);
