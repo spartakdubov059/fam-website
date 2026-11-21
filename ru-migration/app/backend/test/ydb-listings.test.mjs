@@ -1076,22 +1076,26 @@ test('message reads bind user and school and return only the bounded projection'
   assert.equal(rows[0].body, 'private');
 });
 
-test('mark-read checks recipient and school before updating the message', async () => {
+test('mark-read scopes both the update and confirmation to recipient and school', async () => {
   const calls = [];
   const sql = (strings, ...values) => {
     const query = { text: strings.join('?'), values }; calls.push(query);
-    return Promise.resolve(calls.length === 1 ? [[{ id: 'message-id' }]] : [[]]);
+    return Promise.resolve(calls.length === 2 ? [[{ id: 'message-id' }]] : [[]]);
   };
   const repo = createYdbListingsRepository(sql);
   assert.equal(await repo.markMessageRead('recipient-id', 'school-id', 'message-id'), true);
+  assert.match(calls[0].text, /SET is_read = true/);
+  assert.match(calls[0].text, /receiver_id = \?/);
+  assert.match(calls[0].text, /school_id = \?/);
   assert.ok(calls[0].values.includes('recipient-id'));
   assert.ok(calls[0].values.includes('school-id'));
-  assert.match(calls[1].text, /SET is_read = true/);
+  assert.match(calls[1].text, /receiver_id = \?/);
+  assert.match(calls[1].text, /school_id = \?/);
 
   let writes = 0;
   const absent = createYdbListingsRepository(() => { writes++; return Promise.resolve([[]]); });
   assert.equal(await absent.markMessageRead('other-user', 'school-id', 'message-id'), false);
-  assert.equal(writes, 1);
+  assert.equal(writes, 2);
 });
 
 test('listing moderation checks school and pending state in one transaction before changing status', async () => {

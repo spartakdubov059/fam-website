@@ -1441,14 +1441,14 @@ export function createYdbListingsRepository(sql) {
 
     async markMessageRead(userId, schoolId, messageId) {
       if (!userId || !schoolId || !messageId) throw new TypeError('invalid message owner');
-      const owned = sql`SELECT id FROM fam_messages WHERE id = ${messageId}
-        AND receiver_id = ${userId} AND school_id = ${schoolId} LIMIT 1;`;
-      if (typeof owned?.on === 'function') owned.on('error', () => {});
-      if (!(await owned)?.[0]?.length) return false;
-      const update = sql`UPDATE fam_messages SET is_read = true WHERE id = ${messageId};`;
+      const update = sql`UPDATE fam_messages SET is_read = true WHERE id = ${messageId}
+        AND receiver_id = ${userId} AND school_id = ${schoolId};`;
       if (typeof update?.on === 'function') update.on('error', () => {});
       await update;
-      return true;
+      const confirmed = sql`SELECT id FROM fam_messages WHERE id = ${messageId}
+        AND receiver_id = ${userId} AND school_id = ${schoolId} LIMIT 1;`;
+      if (typeof confirmed?.on === 'function') confirmed.on('error', () => {});
+      return Boolean((await confirmed)?.[0]?.length);
     },
 
     async markMessagesRead(userId, schoolId, messageIds) {
