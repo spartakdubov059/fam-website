@@ -111,6 +111,7 @@ Migration `20261108001537_harden_fam_core_access_policies.sql` was compared with
 - Source messages: RU reads bind current user as sender/recipient and school; writes use verified actor, same-school recipient checks, durable quota and moderation paths.
 - Source ideas: RU binds uploader and school and limits review to same-school staff; own deletion and staff review are explicit API operations.
 - Source registrations: see event occupancy/cancellation review below.
+- Registration access difference: source policies let an event owner read registrations for their own listing and update them, with the source `UPDATE` predicate checking listing ownership/event status but not school equality. RU exposes applicant reads and approve/reject only to active same-school `school_admin`/`council_member` actors; the event creator has no organizer-specific registration review endpoint unless they also hold one of those roles. RU therefore narrows the source's organizer workflow while adding school scope. Preserve this as a parity gap pending a reviewed product decision; do not broaden access without an explicit owner-and-school rule and tests.
 - Это route-level mapping, не доказательство эквивалентности каждой Postgres grant/RLS policy/trigger и каждого response field. Runtime service-account isolation и полный endpoint/field matrix остаются непроверенными; миграция остаётся частичной заменой.
 
 ### School role request workflow
