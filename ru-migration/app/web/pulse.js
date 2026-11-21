@@ -7,6 +7,13 @@ function node(document, tag, className = '', text = '') {
 
 async function json(response) { try { return await response.json(); } catch { return null; } }
 
+function notifyAfishaUpdated(document) {
+  const EventConstructor = document?.defaultView?.Event || globalThis.Event;
+  if (typeof document?.dispatchEvent === 'function' && typeof EventConstructor === 'function') {
+    document.dispatchEvent(new EventConstructor('famru:pulse-updated'));
+  }
+}
+
 export async function initializeSchoolPulse({ document = globalThis.document, fetchImpl = globalThis.fetch, location = globalThis.location } = {}) {
   const root = document?.getElementById?.('ruPulse');
   if (!root || typeof fetchImpl !== 'function') return;
@@ -79,6 +86,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
           : 'Не удалось загрузить открытые мероприятия. Войдите через Яндекс ID, чтобы открыть новости и опросы своей школы.';
         if (!loaded || feed.children.length === 0) login();
         publishFeaturedPulseCards();
+        notifyAfishaUpdated(document);
         return;
       }
       if (!me.response.ok || !me.result?.profile?.school_id) { status.textContent = 'Для школьной ленты сначала получите подтверждённый профиль школы.'; return; }
@@ -90,19 +98,26 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
         ...pulse.result.announcements.map(item => ({ type: item.kind === 'important' ? 'important' : item.kind === 'open_event' ? 'event' : 'news', item })),
         ...pulse.result.polls.map(item => ({ type: 'poll', item })),
       ];
-      for (const item of pulse.result.announcements) renderAnnouncement(item);
-      for (const poll of pulse.result.polls) renderPoll(poll);
+      const priority = { important: 0, event: 1, poll: 2, news: 3 };
+      featuredCards.sort((left, right) => priority[left.type] - priority[right.type]);
+      for (const { type, item } of featuredCards) {
+        if (type === 'poll') renderPoll(item);
+        else renderAnnouncement(item);
+      }
       if (['school_admin', 'council_member'].includes(me.result.profile.role)) renderPublishForms();
       publishFeaturedPulseCards();
+      notifyAfishaUpdated(document);
     } catch {
       status.textContent = 'Не удалось загрузить школьную ленту. Проверьте подключение и попробуйте ещё раз.';
       const retry = node(document, 'button', 'ru-button', 'Повторить'); retry.type = 'button'; retry.addEventListener('click', () => { void load(); }); feed.append(retry);
+      notifyAfishaUpdated(document);
     }
   }
 
   function renderAnnouncement(item, target = feed) {
     if (!item || typeof item.title !== 'string' || typeof item.body !== 'string') return;
     const card = node(document, 'article', `ru-pulse-card ru-pulse-${item.kind === 'important' ? 'important' : item.kind === 'open_event' ? 'event' : 'news'}`);
+    card.setAttribute('data-search', `${item.title} ${item.body}`.toLocaleLowerCase('ru-RU'));
     const label = item.kind === 'important' ? 'Важно' : item.kind === 'open_event' ? 'Открытое мероприятие' : 'Новости школы';
     card.append(node(document, 'p', 'ru-pulse-kind', label), node(document, 'h3', '', item.title), node(document, 'p', 'ru-pulse-body', item.body));
     const dateValue = item.event_starts_at || item.published_at;
@@ -116,6 +131,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
   function renderPoll(poll, target = feed) {
     if (!poll || typeof poll.id !== 'string' || typeof poll.question !== 'string' || !Array.isArray(poll.options)) return;
     const card = node(document, 'article', 'ru-pulse-card ru-pulse-poll');
+    card.setAttribute('data-search', poll.question.toLocaleLowerCase('ru-RU'));
     card.append(node(document, 'p', 'ru-pulse-kind', 'Опрос'), node(document, 'h3', '', poll.question));
     const closes = new Date(poll.closes_at);
     const closed = !Number.isFinite(closes.getTime()) || closes.getTime() <= Date.now();

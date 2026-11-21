@@ -91,6 +91,25 @@ export function createYdbAgentTaskQueue(sql) {
     async claimSafeCoderTask({ workerId, leaseSeconds = 7200 } = {}) {
       if (workerId !== 'fam-agent-qwen-coder-v1' || leaseSeconds !== 7200) throw new TypeError('invalid coder worker claim');
       return sql.begin(async tx => {
+        const exhausted = await tx`SELECT id, claim_token FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND claimed_by = ${workerId}
+            AND status IN ('claimed', 'in_progress') AND lease_expires_at <= CurrentUtcTimestamp()
+            AND attempt_count >= max_attempts LIMIT 1;`;
+        for (const task of exhausted?.[0] ?? []) {
+          const summary = 'Локальный анализатор исчерпал число попыток после истечения аренды.';
+          await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('failed' AS Utf8)),
+              result_summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
+              claim_token = CAST(NULL AS Utf8?), claimed_at = CAST(NULL AS Timestamp?),
+              lease_expires_at = CAST(NULL AS Timestamp?), finished_at = CurrentUtcTimestamp(),
+              updated_at = CurrentUtcTimestamp()
+            WHERE id = ${task.id} AND claim_token = ${task.claim_token}
+              AND claimed_by = ${workerId} AND status IN ('claimed', 'in_progress')
+              AND lease_expires_at <= CurrentUtcTimestamp() AND attempt_count >= max_attempts;`;
+          await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+            VALUES (${randomUUID()}, ${task.id}, 'failed', ${workerId},
+              'Задача закрыта после истечения аренды последней разрешённой попытки.', CurrentUtcTimestamp());`;
+        }
         const rows = await tx`SELECT id, payload_json, status, attempt_count, max_attempts,
             CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
             CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired

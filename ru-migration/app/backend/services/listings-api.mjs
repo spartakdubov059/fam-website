@@ -81,17 +81,6 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
     const profileRequestMatch = pathname.match(/^\/api\/v1\/profile-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
     const roleRequestMatch = pathname.match(/^\/api\/v1\/role-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
-    if (req.method === 'GET' && pathname === '/api/v1/school/admin/technical-alerts') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listSiteErrorAlerts !== 'function' || typeof repository?.getLatestSiteErrorDigest !== 'function') return { status: 503, body: { ok: false, error: 'technical_alerts_unavailable' } };
-      try { return { status: 200, body: { ok: true, alerts: await repository.listSiteErrorAlerts(), digest: await repository.getLatestSiteErrorDigest() } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
     if ((req.method === 'GET' || req.method === 'PATCH') && pathname === '/api/v1/school/admin/safety-reports') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
@@ -584,7 +573,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       const suspensionBlock = await schoolRoleSuspensionGate(actor);
       if (suspensionBlock) return suspensionBlock;
       if (typeof repository?.listPendingSchoolIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
-      try { return { status: 200, body: { ok: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id) } }; }
+      try { return { status: 200, body: { ok: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id, actor.role) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/school/ideas/workflow') {
@@ -638,7 +627,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (!actor || actor.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
       const suspensionBlock = await schoolRoleSuspensionGate(actor);
       if (suspensionBlock) return suspensionBlock;
       let input;
@@ -947,7 +936,6 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (!context) return { status: 404, body: { ok: false, error: 'idea_unavailable' } };
       if (context.user_id !== actor.id) {
         if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
-        if (!hasFreshConfirmation(identity, now())) return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
         let input;
         try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
         catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }

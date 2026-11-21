@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
 import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
-import { reviewListingImage } from "./image-reviewer.ts";
 import { splitFlaggedCategoriesByInputType } from "./moderation-input-types.js";
 import { recordSafetySignal, type SafetyContext, type SafetyCategory } from "./user-safety-agent.ts";
 
@@ -37,7 +36,7 @@ const MODERATION_CACHE_MAX_ENTRIES = 400;
 
 async function createModerationCacheKey(text: string, imageUrl: string, mode = "content"): Promise<string> {
   const source = JSON.stringify({
-    version: "fam-openai-moderation-v2",
+    version: "fam-openai-moderation-v3",
     mode,
     text,
     image_url: imageUrl,
@@ -258,9 +257,9 @@ serve(async (req: Request) => {
       safetyContext.source_origin = req.headers.get("origin");
       safetyContext.evidence_excerpt = imageUrl ? null : value;
     }
-    const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : "listing";
-    const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : "listing-images-pending";
-    const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : "listing_";
+    const imagePurpose = payload?.image_purpose === "avatar" ? "avatar" : payload?.image_purpose === "idea" ? "idea" : "listing";
+    const pendingImageBucket = imagePurpose === "avatar" ? "avatars-pending" : imagePurpose === "idea" ? "idea-images" : "listing-images-pending";
+    const pendingImagePrefix = imagePurpose === "avatar" ? "avatar_" : imagePurpose === "idea" ? "idea_" : "listing_";
     const allowedImagePrefix = SUPABASE_URL + "/storage/v1/object/sign/" + pendingImageBucket + "/";
     const expectedImagePrefix = safetyContext?.sender_id
       ? allowedImagePrefix + safetyContext.sender_id + "/" + pendingImagePrefix + safetyContext.sender_id + "_"
@@ -334,12 +333,15 @@ serve(async (req: Request) => {
         await writeSafetySignal(safetyContext, "unclear_safety_signal", "high");
       }
 
-      return cacheAndRespond(cacheKey, {
-        action: ideaReview.action,
-        reason_code: ideaReview.reason_code,
-        reason: ideaReview.reason,
-        provider: "openai_idea_moderator",
-      }, headers);
+      if (ideaReview.action !== "ok" || !imageUrl) {
+        return cacheAndRespond(cacheKey, {
+          action: ideaReview.action,
+          reason_code: ideaReview.reason_code,
+          reason: ideaReview.reason,
+          provider: "openai_idea_moderator",
+        }, headers);
+      }
+      // A clean idea with a photo continues through the shared visual image checks below.
     }
 
     // For locally flagged text, ask the OpenAI contextual agent first. This avoids
@@ -554,36 +556,13 @@ serve(async (req: Request) => {
         }
       }
 
-      if (imageUrl) {
-        const imageReview = await reviewListingImage(value, imageUrl, OPENAI_KEY, imagePurpose);
-        console.info("fam_image_review_completed", JSON.stringify({
-          action: imageReview.action,
-          reason_code: imageReview.reason_code,
-          model: imageReview.model ?? null,
-        }));
-        if (imageReview.action !== "ok") {
-          if (["personal_information", "private_document"].includes(imageReview.reason_code)) {
-            await writeSafetySignal(safetyContext, "personal_data_in_image", "medium");
-          } else if (imageReview.action === "reject") {
-            await writeSafetySignal(safetyContext, "unsafe_image", "high");
-          } else if (["image_requires_review", "image_requires_human_review"].includes(imageReview.reason_code)) {
-            await writeSafetySignal(safetyContext, "unclear_safety_signal", "medium");
-          }
-          // Provider rate limits, quota, or outages are service failures, not user safety violations.
-          return cacheAndRespond(cacheKey, {
-            action: imageReview.action,
-            reason_code: imageReview.reason_code,
-            reason: imageReview.reason,
-            provider: "openai_image_agent",
-          }, headers);
-        }
-        return cacheAndRespond(cacheKey, {
-          action: "ok",
-          provider: "openai+image_agent",
-          image_review: "approved",
-        }, headers);
-      }
-      return cacheAndRespond(cacheKey, { action: "ok", provider: "openai" }, headers);
+      // The multimodal moderation request above already checked this image.
+      // Avoid a second call to a paid generative model for the same photo.
+      return cacheAndRespond(cacheKey, {
+        action: "ok",
+        provider: "openai_moderation",
+        ...(imageUrl ? { image_review: "moderation_clear" } : {}),
+      }, headers);
     }
 
     return jsonResponse({

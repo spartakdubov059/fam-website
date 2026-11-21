@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { initializeNavigation } from '../../web/navigation.js';
+
+const shellCss = await readFile(new URL('../../web/shell.css', import.meta.url), 'utf8');
 
 class Node {
   constructor(id = '') { this.id = id; this.attributes = {}; this.listeners = {}; this.scrolled = null; this.clicked = 0; }
@@ -29,6 +32,10 @@ function fixture() {
     querySelector: selector => selector.includes('data-view="favorites"') ? { click: () => { favoriteClicked++; } } : null,
     get favoriteClicked() { return favoriteClicked; } } };
 }
+
+test('mobile navigation layout allocates one grid column for each of its five tabs', () => {
+  assert.match(shellCss, /\.ru-tabbar\s*\{[^}]*grid-template-columns:\s*repeat\(5,\s*minmax\(0,\s*1fr\)\)/s);
+});
 
 test('mobile Afisha navigation selects events and opens the combined school feed', () => {
   const f = fixture();

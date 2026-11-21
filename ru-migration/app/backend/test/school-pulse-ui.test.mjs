@@ -48,6 +48,27 @@ test('school feed renders announcements as text and a student can cast one same-
   assert.ok(updatedPoll.children[2].children.every(option => option.children[0].disabled), 'a submitted vote is not offered a second time');
 });
 
+test('school feed renders mixed cards in FAM priority order', async () => {
+  const f = fixture();
+  await initializeSchoolPulse({ ...f, fetchImpl: async url => url === '/api/v1/me'
+    ? { ok: true, json: async () => ({ ok: true, profile: { id: 'student', school_id: 'school-a', role: 'student' } }) }
+    : { ok: true, json: async () => ({ ok: true,
+      announcements: [
+        { id: 'news', title: 'Обычная новость', body: 'Текст', kind: 'news' },
+        { id: 'event', title: 'Открытое событие', body: 'Текст', kind: 'open_event' },
+        { id: 'important', title: 'Важное', body: 'Текст', kind: 'important' },
+      ],
+      polls: [{ id: 'poll', question: 'Вопрос?', options: ['Да', 'Нет'], closes_at: '2099-01-01T00:00:00Z' }],
+    }) } });
+  const cards = f.root.children[2].children;
+  assert.deepEqual(cards.map(card => card.className), [
+    'ru-pulse-card ru-pulse-important',
+    'ru-pulse-card ru-pulse-event',
+    'ru-pulse-card ru-pulse-poll',
+    'ru-pulse-card ru-pulse-news',
+  ]);
+});
+
 test('school feed is private for guests and publisher controls appear only for trusted school roles', async () => {
   const guest = fixture();
   await initializeSchoolPulse({ ...guest, fetchImpl: async () => ({ ok: false, status: 401, json: async () => ({}) }) });

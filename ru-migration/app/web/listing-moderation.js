@@ -67,7 +67,7 @@ export async function initializeListingModeration({ document = globalThis.docume
     status.textContent = 'Загружаем очередь…';
     try {
       const options = { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } };
-      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, technicalAlertsResponse, schoolOverviewResponse, schoolIdeasResponse, schoolIdeaWorkflowResponse] = await Promise.all([
+      const [response, eventResponse, profileResponse, staffVerificationResponse, roleResponse, suspensionResponse, suspensionTargetsResponse, roleManagementResponse, safetyResponse, pendingMessagesResponse, schoolOverviewResponse, schoolIdeasResponse, schoolIdeaWorkflowResponse] = await Promise.all([
         fetchImpl('/api/v1/listings/moderation', options),
         fetchImpl('/api/v1/event-registrations/review', options),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/profile-requests/review', options)
@@ -86,14 +86,12 @@ export async function initializeListingModeration({ document = globalThis.docume
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, reports: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/messages/moderation', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, messages: [] }) }),
-        me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/technical-alerts', options).catch(() => ({ ok: false, json: async () => null }))
-          : Promise.resolve({ ok: true, json: async () => ({ ok: true, alerts: [] }) }),
         me.profile.role === 'school_admin' ? fetchImpl('/api/v1/school/admin/overview', options).catch(() => ({ ok: false, json: async () => null }))
           : Promise.resolve({ ok: true, json: async () => ({ ok: true, users: [], listings: [], audit: [], deletion_requests: [], suspensions: [] }) }),
         fetchImpl('/api/v1/school/ideas', options).catch(() => ({ ok: false, json: async () => null })),
         fetchImpl('/api/v1/school/ideas/workflow', options).catch(() => ({ ok: false, json: async () => null })),
       ]);
-      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, technicalAlertsResult, schoolOverviewResult, schoolIdeasResult, schoolIdeaWorkflowResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(technicalAlertsResponse), json(schoolOverviewResponse), json(schoolIdeasResponse), json(schoolIdeaWorkflowResponse)]);
+      const [result, eventResult, profileResult, staffVerificationResult, roleResult, suspensionResult, suspensionTargetsResult, roleManagementResult, safetyResult, pendingMessagesResult, schoolOverviewResult, schoolIdeasResult, schoolIdeaWorkflowResult] = await Promise.all([json(response), json(eventResponse), json(profileResponse), json(staffVerificationResponse), json(roleResponse), json(suspensionResponse), json(suspensionTargetsResponse), json(roleManagementResponse), json(safetyResponse), json(pendingMessagesResponse), json(schoolOverviewResponse), json(schoolIdeasResponse), json(schoolIdeaWorkflowResponse)]);
       if (!response.ok || !result?.ok || !Array.isArray(result.listings)
         || !eventResponse.ok || !eventResult?.ok || !Array.isArray(eventResult.applications)
         || !profileResponse.ok || !profileResult?.ok || !Array.isArray(profileResult.requests)
@@ -136,22 +134,6 @@ export async function initializeListingModeration({ document = globalThis.docume
       const pendingMessages = me.profile.role === 'school_admin' && pendingMessagesAvailable
         ? pendingMessagesResult.messages.filter(item => item && UUID.test(item.id || '') && UUID.test(item.sender_id || '')
           && typeof item.body === 'string' && item.body.length > 0 && item.body.length <= 1000) : [];
-      const technicalAlertsAvailable = me.profile.role !== 'school_admin'
-        || (technicalAlertsResponse.ok && technicalAlertsResult?.ok && Array.isArray(technicalAlertsResult.alerts));
-      const technicalAlerts = me.profile.role === 'school_admin' && technicalAlertsAvailable
-        ? technicalAlertsResult.alerts.filter(item => item
-          && ['js_runtime', 'unhandled_rejection', 'supabase_sdk_unavailable', 'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed'].includes(item.event_code)
-          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(item.page_area)
-          && ['critical', 'warning'].includes(item.severity) && Number.isInteger(item.event_count)
-          && item.event_count > 0 && item.event_count <= 1000 && typeof item.hour_bucket === 'string'
-          && Number.isFinite(Date.parse(item.hour_bucket))) : [];
-      const siteErrorDigest = me.profile.role === 'school_admin' && technicalAlertsAvailable
-        ? technicalAlertsResult.digest && typeof technicalAlertsResult.digest.summary === 'string'
-          && technicalAlertsResult.digest.summary.length <= 1000
-          && typeof technicalAlertsResult.digest.digest_slot === 'string'
-          && Number.isFinite(Date.parse(`${technicalAlertsResult.digest.digest_slot}:00Z`))
-          && Number.isFinite(Date.parse(technicalAlertsResult.digest.generated_at || ''))
-          ? technicalAlertsResult.digest : null : null;
       const schoolOverviewAvailable = me.profile.role !== 'school_admin'
         || (schoolOverviewResponse.ok && schoolOverviewResult?.ok
           && ['users', 'listings', 'audit', 'deletion_requests', 'suspensions'].every(key => Array.isArray(schoolOverviewResult[key])));
@@ -231,9 +213,6 @@ export async function initializeListingModeration({ document = globalThis.docume
                     headers: { 'content-type': 'application/json', accept: 'application/json' },
                     ...(!item.is_own ? { body: JSON.stringify({ confirmation }) } : {}) });
                   const result = await json(response);
-                  if (result?.error === 'fresh_authentication_required') {
-                    status.textContent = 'Яндекс ID не подтвердил повторную аутентификацию. Идеи других участников не удалены.'; break;
-                  }
                   if (!response.ok || !result?.ok) break;
                   deleted++;
                 } catch { break; }
@@ -346,31 +325,6 @@ export async function initializeListingModeration({ document = globalThis.docume
         }
         queue.append(reviewPanel);
       };
-      const renderTechnicalAlertsPanel = () => {
-        if (me.profile.role !== 'school_admin') return;
-        const alertsPanel = node(document, 'section', 'ru-moderation-card');
-        alertsPanel.append(node(document, 'h3', '', 'Технические предупреждения FAM за сутки'));
-        alertsPanel.append(node(document, 'p', '', 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.'));
-        if (!technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Не удалось загрузить технические предупреждения.'));
-        if (siteErrorDigest) {
-          alertsPanel.append(node(document, 'h4', '', 'Последняя фоновая сводка'));
-          alertsPanel.append(node(document, 'p', '', siteErrorDigest.summary));
-          alertsPanel.append(node(document, 'p', 'ru-note', `Интервал UTC: ${siteErrorDigest.digest_slot} · создано ${new Date(siteErrorDigest.generated_at).toLocaleString('ru-RU')}`));
-        }
-        if (!technicalAlerts.length && technicalAlertsAvailable) alertsPanel.append(node(document, 'p', '', 'Пороговых повторяющихся сбоев не обнаружено.'));
-        const codeNames = { js_runtime: 'Ошибка интерфейса', unhandled_rejection: 'Сбой фоновой операции', supabase_sdk_unavailable: 'Служба данных недоступна',
-          listings_load_failed: 'Не загрузились объявления', notifications_load_failed: 'Не загрузились уведомления',
-          database_request_failed: 'Ошибка базы данных', auth_backend_failed: 'Ошибка входа' };
-        const areaNames = { auth: 'вход', listings: 'объявления', notifications: 'уведомления', database: 'база данных', other: 'другое' };
-        for (const alert of technicalAlerts) {
-          const card = node(document, 'article', 'ru-moderation-card');
-          card.append(node(document, 'h4', '', `${alert.severity === 'critical' ? 'Критический сбой' : 'Предупреждение'} · ${codeNames[alert.event_code]}`));
-          card.append(node(document, 'p', '', `Раздел: ${areaNames[alert.page_area]} · Событий за час: ${alert.event_count}`));
-          card.append(node(document, 'p', '', `Час UTC: ${new Date(alert.hour_bucket).toLocaleString('ru-RU', { timeZone: 'UTC' })}`));
-          alertsPanel.append(card);
-        }
-        queue.append(alertsPanel);
-      };
       const renderSchoolOverviewPanel = () => {
         if (me.profile.role !== 'school_admin') return;
         const overview = node(document, 'section', 'ru-moderation-card');
@@ -422,24 +376,22 @@ export async function initializeListingModeration({ document = globalThis.docume
         for (const item of audit) overview.append(node(document, 'p', '', `${actionNames[item.action]} · ${new Date(item.created_at).toLocaleString('ru-RU')}`));
         queue.append(overview);
       };
-      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && technicalAlerts.length === 0 && !siteErrorDigest && schoolIdeas.length === 0 && workflowIdeas.length === 0) {
+      if (result.listings.length === 0 && applications.length === 0 && profileRequests.length === 0 && roleRequests.length === 0 && suspensions.length === 0 && roleManagementTargets.length === 0 && safetyReports.length === 0 && pendingMessages.length === 0 && schoolIdeas.length === 0 && workflowIdeas.length === 0) {
         renderPendingMessagesPanel();
         renderSchoolIdeasPanel();
         renderIdeaWorkflowPanel();
         renderSafetyPanel();
-        renderTechnicalAlertsPanel();
         renderSchoolOverviewPanel();
         if (me.profile.role === 'school_admin') await renderSchoolAgentDashboard(options);
         status.textContent = !suspensionsAvailable ? 'Очереди проверки пусты, но не удалось загрузить действующие ограничения. Обновите список позже.'
           : !pendingMessagesAvailable ? 'Очереди проверки пусты, но не удалось загрузить сообщения на ручную проверку.'
             : !safetyReportsAvailable ? 'Очереди школьной проверки пусты, но не удалось загрузить сигналы безопасности.'
                 : !schoolIdeasAvailable ? 'Очереди проверки пусты, но не удалось загрузить школьные идеи.'
-              : !technicalAlertsAvailable ? 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.'
               : !ideaWorkflowAvailable ? 'Не удалось загрузить школьные идеи.'
                 : 'Очереди школьной проверки пусты.';
         return;
       }
-      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, статусов школьных идей — ${workflowIdeas.length}, сигналов безопасности — ${safetyReports.length}, технических предупреждений — ${technicalAlerts.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && technicalAlertsAvailable && schoolIdeasAvailable && ideaWorkflowAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
+      status.textContent = `Очереди: объявлений — ${result.listings.length}, заявок на мероприятия — ${applications.length}, школьных профилей — ${profileRequests.length}, запросов ролей — ${roleRequests.length}, действующих ограничений — ${suspensions.length}, сообщений на проверке — ${pendingMessages.length}, школьных идей — ${schoolIdeas.length}, статусов школьных идей — ${workflowIdeas.length}, сигналов безопасности — ${safetyReports.length}.${suspensionsAvailable && pendingMessagesAvailable && safetyReportsAvailable && schoolIdeasAvailable && ideaWorkflowAvailable ? '' : ' Не все очереди удалось загрузить; список неполный.'}`;
       for (const listing of result.listings) {
         if (!listing || !UUID.test(listing.id) || typeof listing.title !== 'string' || typeof listing.description !== 'string') continue;
         const card = node(document, 'article', 'ru-moderation-card');
@@ -540,7 +492,6 @@ export async function initializeListingModeration({ document = globalThis.docume
       renderSchoolIdeasPanel();
       renderIdeaWorkflowPanel();
       renderSafetyPanel();
-      renderTechnicalAlertsPanel();
       renderSchoolOverviewPanel();
     } catch { status.textContent = 'Не удалось загрузить очередь. Проверьте подключение и попробуйте позже.'; }
   }
@@ -615,9 +566,6 @@ export async function initializeListingModeration({ document = globalThis.docume
       const response = await fetchImpl(`/api/v1/ideas/${idea.id}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' }, ...(Object.keys(body).length ? { body: JSON.stringify(body) } : {}) });
       const result = await json(response);
-      if (result?.error === 'fresh_authentication_required') {
-        status.textContent = 'Яндекс ID не подтвердил повторную аутентификацию. Идея не удалена.'; return;
-      }
       if (!response.ok || !result?.ok) throw new Error('idea_delete_failed');
       await load();
       if (result.image_cleanup === 'queued') status.textContent = 'Идея удалена; связанные фотографии поставлены в очередь очистки.';

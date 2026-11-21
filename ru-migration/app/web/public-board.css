@@ -121,6 +121,10 @@ body {
 .ru-board-category[aria-pressed="true"] { border-color: #b8a1ff; background: #373044; }
 .ru-board-count { grid-column: 1 / -1; margin: 0; color: #b8bbc7; font-size: 0.9rem; }
 .ru-listing-card[hidden] { display: none; }
+.ru-pulse-card[hidden] { display: none; }
+#ruPulse:not([data-afisha-active="true"]) > h2,
+#ruPulse:not([data-afisha-active="true"]) > .ru-pulse-status,
+#ruPulse:not([data-afisha-active="true"]) .ru-pulse-feed > * { display: none; }
 .ru-afisha-feed { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; margin-top: 24px; }
 .ru-afisha-feed > #ruPulse, .ru-afisha-feed > #publicListings, .ru-afisha-feed .ru-pulse-feed { display: contents; }
 .ru-afisha-feed > #ruPulse { margin: 0; }

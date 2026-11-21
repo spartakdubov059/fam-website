@@ -7,8 +7,11 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const timerDirectory = resolve(scriptDirectory, '../deploy/systemd');
 const validateCalendars = !process.argv.includes('--structure-only');
 const expectedCalendars = new Map([
+  // RU-only local jobs; neither is an active upstream pg_cron schedule.
+  ['fam-ru-agent-daily-report.timer', ['*-*-* 06:00:00 UTC']],
   ['fam-ru-orchestrator-daily-digest.timer', ['*-*-* 04:00:00 UTC']],
   ['fam-ru-coder-task-producer.timer', ['*-*-* 03:10:00 UTC']],
+  ['fam-ru-pending-media-cleanup.timer', ['*-*-* 00,06,12,18:17:00 UTC']],
   ['fam-ru-runtime-health.timer', ['*-*-* 03:40:00 UTC']],
   ['fam-ru-safe-agent-worker.timer', ['*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00 UTC']],
   ['fam-ru-school-agent-report.timer', ['*-*-* 03:30:00 UTC']],
@@ -20,6 +23,11 @@ const timerNames = (await readdir(timerDirectory))
 
 if (timerNames.length === 0) {
   throw new Error('No FAM RU systemd timers were found.');
+}
+const expectedTimerNames = [...expectedCalendars.keys()].sort();
+if (timerNames.length !== expectedTimerNames.length
+    || timerNames.some((name, index) => name !== expectedTimerNames[index])) {
+  throw new Error(`Timer inventory does not match the reviewed set: ${timerNames.join(', ')}`);
 }
 
 let usedSystemdCalendarParser = false;
@@ -75,6 +83,11 @@ if (!/^Persistent=false$/m.test(errorDigest)) {
 const coderProducer = await readFile(join(timerDirectory, 'fam-ru-coder-task-producer.timer'), 'utf8');
 if (!/^Persistent=false$/m.test(coderProducer)) {
   throw new Error('Coder task producer must not catch up a missed scheduled run after downtime.');
+}
+
+const safeAgentWorker = await readFile(join(timerDirectory, 'fam-ru-safe-agent-worker.timer'), 'utf8');
+if (!/^Persistent=false$/m.test(safeAgentWorker)) {
+  throw new Error('Safe agent worker must not catch up missed polling intervals after downtime.');
 }
 
 console.log(!validateCalendars

@@ -8,7 +8,7 @@ function req(body = {}, method = 'POST') {
   request.url = '/api/v1/listings';
   return request;
 }
-test('technical alerts are read-only, administrator-only, and contain only aggregate rows', async () => {
+test('school administrators cannot read global technical alerts', async () => {
   let reads = 0;
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'admin' }),
@@ -19,12 +19,10 @@ test('technical alerts are read-only, administrator-only, and contain only aggre
       getLatestSiteErrorDigest: async () => null,
     } });
   const list = req({}, 'GET'); list.url = '/api/v1/school/admin/technical-alerts';
-  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, alerts: [
-    { event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
-  ], digest: null } });
+  assert.equal((await handler(list)).status, 405);
   actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
-  assert.equal((await handler(list)).status, 403);
-  assert.equal(reads, 1);
+  assert.equal((await handler(list)).status, 405);
+  assert.equal(reads, 0);
 });
 
 test('school safety reports are administrator-only and acknowledgement is school-bound', async () => {
@@ -917,14 +915,14 @@ test('event occupancy is a public count for active events without registration i
   assert.deepEqual(await handler(request), { status: 404, body: { ok: false, error: 'event_unavailable' } });
 });
 
-test('idea image review queue and decisions are limited to school staff and the actor school', async () => {
+test('idea image review queue and decisions are limited to authorized same-school staff', async () => {
   let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
   let listedSchool; let listedReviewer; let reviewed;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolIdeas: async (schoolId, reviewerId) => { listedSchool = schoolId; listedReviewer = reviewerId; return [{ id: 'idea-a', image_status: 'pending' }]; },
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolIdeas: async (schoolId, reviewerId, role) => { listedSchool = schoolId; listedReviewer = reviewerId; assert.equal(role, actor.role); return [{ id: 'idea-a', ai_status: 'approved', image_status: 'pending' }]; },
       reviewSchoolIdeaImages: async value => { reviewed = value; return value.schoolId === 'school-a'; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/school/ideas';
-  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', image_status: 'pending' }] } });
+  assert.deepEqual(await handler(list), { status: 200, body: { ok: true, ideas: [{ id: 'idea-a', ai_status: 'approved', image_status: 'pending' }] } });
   assert.equal(listedSchool, 'school-a');
   assert.equal(listedReviewer, actor.id);
   const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images';
@@ -940,13 +938,15 @@ test('idea image review queue and decisions are limited to school staff and the 
 });
 
 test('idea text moderation requires school staff and records a decision only through the scoped repository', async () => {
-  let actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
+  let actor = { id: '55555555-5555-4555-8555-555555555555', school_id: 'school-a', role: 'school_admin' };
   let review;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'staff' }), resolveActor: async () => actor,
     repository: { getActiveAccountSuspension: async () => null, reviewSchoolIdeaText: async value => { review = value; return value.schoolId === actor.school_id; } } });
   const approve = req({ decision: 'approve' }, 'PATCH'); approve.url = '/api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation';
   assert.deepEqual(await handler(approve), { status: 200, body: { ok: true, ai_status: 'approved' } });
   assert.deepEqual(review, { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a', reviewerId: actor.id, decision: 'approve' });
+  actor = { id: '66666666-6666-4666-8666-666666666666', school_id: 'school-a', role: 'council_member' };
+  assert.equal((await handler(approve)).status, 403, 'council cannot directly decide AI-pending school text');
   actor = { id: 'student-a', school_id: 'school-a', role: 'student' };
   assert.equal((await handler(approve)).status, 403);
 });
@@ -971,7 +971,7 @@ test('school idea workflow is same-school staff only and accepts only bounded li
   assert.deepEqual(await handler(patch('done')), { status: 404, body: { ok: false, error: 'idea_unavailable' } });
 });
 
-test('idea deletion requires owner scope or a freshly confirmed same-school administrator action', async () => {
+test('idea deletion requires owner scope or explicit same-school administrator confirmation', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const owner = { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'school-a', role: 'student' };
   let actor = owner; let identity = { subject: 'owner' }; let deleted = 0; const removed = []; const finished = [];
@@ -990,12 +990,10 @@ test('idea deletion requires owner scope or a freshly confirmed same-school admi
 
   actor = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', school_id: 'school-a', role: 'school_admin' };
   identity = { subject: 'admin' };
-  assert.deepEqual(await handler(deletion({ confirmation: 'УДАЛИТЬ ИДЕЮ ШКОЛЫ' })), { status: 403, body: { ok: false, error: 'fresh_authentication_required' } });
-  assert.equal(deleted, 1, 'staff deletion is denied before touching the repository when fresh authentication is missing');
-  identity = { subject: 'admin', authenticated_at: 990 };
   assert.equal((await handler(deletion({ confirmation: 'неверно' }))).status, 400);
+  assert.equal(deleted, 1, 'the exact confirmation is required before repository deletion');
   assert.deepEqual(await handler(deletion({ confirmation: 'УДАЛИТЬ ИДЕЮ ШКОЛЫ' })), { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
-  assert.equal(deleted, 2);
+  assert.equal(deleted, 2, 'a same-school administrator can perform the source-authorized delete with explicit confirmation');
 
   actor = { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', school_id: 'school-a', role: 'council_member' };
   identity = { subject: 'council', authenticated_at: 990 };

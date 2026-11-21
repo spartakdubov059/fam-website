@@ -18,14 +18,17 @@ export function createSchoolAgentReports({ repository, schools, now = () => new 
       if (!school?.id) continue;
       const metrics = await repository.getSchoolAgentMetrics(school.id);
       const date = now().toISOString().slice(0, 10);
-      const summary = `FAM — сводка за ${date}: активных объявлений ${metrics.listings.active}, новых за сутки ${metrics.listings.new_24h}; непроверенных сигналов безопасности ${metrics.safety.unreviewed}; запросов на удаление ${metrics.account_requests.deletion_pending}; идеи ожидают Совет ${metrics.ideas.awaiting_council}; активных временных ограничений ${metrics.account_requests.active_suspensions}.`;
-      await repository.saveSchoolAgentReport({ schoolId: school.id, date, summary, metrics });
       for (const rule of RULES) {
         const count = rule.path.split('.').reduce((value, key) => value?.[key], metrics);
         if (!Number.isInteger(count) || !(rule.when ? rule.when(count) : count > 0)) continue;
         const id = createHash('sha256').update(`${school.id}:${date}:${rule.key}`).digest('hex');
         await repository.createSchoolAgentIdea({ id, schoolId: school.id, date, rule, count });
       }
+      const pendingProposals = await repository.countPendingSchoolAgentIdeas(school.id);
+      if (!Number.isSafeInteger(pendingProposals) || pendingProposals < 0) throw new TypeError('invalid pending school proposals count');
+      metrics.agent_proposals = { pending: pendingProposals };
+      const summary = `FAM — сводка за ${date}: активных объявлений ${metrics.listings.active}, новых за сутки ${metrics.listings.new_24h}; непроверенных сигналов безопасности ${metrics.safety.unreviewed}, высокого уровня ${metrics.safety.high_unreviewed}; запросов на удаление ${metrics.account_requests.deletion_pending}; идеи ожидают Совет ${metrics.ideas.awaiting_council}; предложений аналитических правил ждут решения ${pendingProposals}; активных временных ограничений ${metrics.account_requests.active_suspensions}.`;
+      await repository.saveSchoolAgentReport({ schoolId: school.id, date, summary, metrics });
       refreshed++;
     }
     return { refreshed };

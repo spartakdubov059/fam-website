@@ -88,6 +88,31 @@ test('school moderation UI moves approved ideas through work and completion stat
   assert.deepEqual(updatedPanel.children[1].children.at(-1).children.map(button => button.textContent), ['Отклонить', 'Отметить выполненной']);
 });
 
+test('school admin bulk idea cleanup uses source-authorized role and exact confirmation without auth_time', async () => {
+  const f = fixture(); const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; const calls = [];
+  const prompt = 'УДАЛИТЬ ИДЕЮ ШКОЛЫ';
+  let present = true;
+  await initializeListingModeration({ ...f, confirmImpl: () => true, promptImpl: () => prompt,
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, init });
+      if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'school_admin' } }) };
+      if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: present
+        ? [{ id, text: 'Идея участника', admin_status: 'in_progress', is_own: false }] : [] }) };
+      if (url === `/api/v1/ideas/${id}` && init.method === 'DELETE') {
+        present = false;
+        return { ok: true, json: async () => ({ ok: true, deleted: true, image_cleanup: 'complete' }) };
+      }
+      return { ok: true, json: async () => ({ ok: true, listings: [], applications: [], ideas: [], requests: [], targets: [], suspensions: [], reports: [], alerts: [], messages: [], users: [], audit: [], deletion_requests: [] }) };
+    } });
+  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Работа с одобренными идеями');
+  assert.ok(panel);
+  await panel.children[1].listeners.click();
+  const deletion = calls.find(call => call.url === `/api/v1/ideas/${id}` && call.init.method === 'DELETE');
+  assert.ok(deletion, 'Yandex cookie session can use the source-authorized same-school administrator action');
+  assert.deepEqual(JSON.parse(deletion.init.body), { confirmation: prompt });
+  assert.equal(f.status.textContent, 'Удалены идеи в работе: 1.');
+});
+
 test('school moderators can inspect and decide idea photos without rendering user text as HTML', async () => {
   const f = fixture(); const calls = [];
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -211,7 +236,7 @@ test('school admins can review rule-based analyst suggestions with safe text ren
   assert.equal(f.status.textContent, 'Предложение помощника принято к работе.');
 });
 
-test('school admins see only allowlisted aggregate technical alerts rendered as text', async () => {
+test('school admins do not request or see global technical alerts', async () => {
   const f = fixture(); const calls = [];
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
@@ -238,17 +263,8 @@ test('school admins see only allowlisted aggregate technical alerts rendered as 
     if (url === '/api/v1/suspensions/targets' || url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, targets: [] }) };
     throw new Error(`unexpected route ${url}`);
   } });
-  assert.ok(calls.some(call => call.url === '/api/v1/school/admin/technical-alerts' && call.init.credentials === 'same-origin'));
-  const panel = f.queue.children.find(item => item.children?.[0]?.textContent === 'Технические предупреждения FAM за сутки');
-  assert.ok(panel);
-  assert.equal(panel.children[1].textContent, 'Общие счётчики ошибок сайта. В них нет текста ошибок или сведений об аккаунтах.');
-  assert.equal(panel.children[3].textContent, '<script>unsafe</script>', 'digest summary is rendered as inert text');
-  const alert = panel.children.find(item => item.tagName === 'article');
-  assert.equal(alert.children[0].textContent, 'Критический сбой · Ошибка базы данных');
-  assert.equal(alert.children[1].textContent, 'Раздел: база данных · Событий за час: 3');
-  const rejectionAlert = panel.children.filter(item => item.tagName === 'article')[1];
-  assert.equal(rejectionAlert.children[0].textContent, 'Предупреждение · Сбой фоновой операции');
-  assert.equal(panel.children.some(item => item.tagName === 'script'), false, 'untrusted digest text does not create markup');
+  assert.equal(calls.some(call => call.url === '/api/v1/school/admin/technical-alerts'), false);
+  assert.equal(f.queue.children.some(item => item.children?.[0]?.textContent === 'Технические предупреждения FAM за сутки'), false);
   const overview = f.queue.children.find(item => item.children?.[0]?.textContent === 'Обзор школы');
   assert.ok(overview);
   assert.equal(overview.children[1].textContent, 'В выборке: активных профилей — 1, активных публикаций — 1, ожидают проверки — 1, заявок на удаление — 0, ограничений — 0.');
@@ -446,7 +462,7 @@ test('school role request review is claimed before only its reviewer can decide'
   await actions[0].listeners.click();
   const writes = calls.filter(call => call.url === `/api/v1/role-requests/${id}`);
   assert.deepEqual(writes.map(call => JSON.parse(call.init.body)), [{ action: 'start_review' }, { decision: 'approve' }]);
-  assert.equal(f.status.textContent, 'Очереди проверки пусты, но не удалось загрузить технические предупреждения.');
+  assert.equal(f.status.textContent, 'Не удалось загрузить школьные идеи.');
 });
 
 test('unreviewed student messages appear only in the same-school admin queue until approved', async () => {

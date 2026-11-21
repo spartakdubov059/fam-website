@@ -854,7 +854,7 @@
   bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   width: min(520px, calc(100% - 20px));
   padding: 6px;

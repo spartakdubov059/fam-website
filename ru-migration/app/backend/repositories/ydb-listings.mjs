@@ -1152,11 +1152,15 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
-    async listPendingSchoolIdeas(schoolId, reviewerId) {
-      if (!schoolId || !reviewerId) throw new TypeError('invalid idea review school');
-      const statement = sql`SELECT id, school_id, text, image_status, ai_status, created_at
-        FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status != 'rejected'
-        ORDER BY created_at DESC LIMIT 50;`;
+    async listPendingSchoolIdeas(schoolId, reviewerId, reviewerRole) {
+      if (!schoolId || !UUID.test(reviewerId || '') || !['school_admin', 'council_member'].includes(reviewerRole)) throw new TypeError('invalid idea review school');
+      const statement = reviewerRole === 'school_admin'
+        ? sql`SELECT id, school_id, text, image_status, ai_status, created_at
+          FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status != 'rejected'
+          ORDER BY created_at DESC LIMIT 50;`
+        : sql`SELECT id, school_id, text, image_status, ai_status, created_at
+          FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status = 'approved'
+          ORDER BY created_at DESC LIMIT 50;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const ideas = (await statement)?.[0] ?? [];
       return Promise.all(ideas.map(async idea => {
@@ -1264,7 +1268,7 @@ export function createYdbListingsRepository(sql) {
 
     async getSchoolIdeaImage(ideaId, imageIndex) {
       if (!UUID.test(ideaId || '') || !Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > 2) throw new TypeError('invalid idea image lookup');
-      const statement = sql`SELECT user_id, school_id, image_status FROM fam_ideas WHERE id = ${ideaId} LIMIT 1;`;
+      const statement = sql`SELECT user_id, school_id, image_status, ai_status FROM fam_ideas WHERE id = ${ideaId} LIMIT 1;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const row = (await statement)?.[0]?.[0];
       if (!row || !['pending', 'approved'].includes(row.image_status)) return null;
@@ -1273,7 +1277,7 @@ export function createYdbListingsRepository(sql) {
       if (typeof imageStatement?.on === 'function') imageStatement.on('error', () => {});
       const image = (await imageStatement)?.[0]?.[0];
       if (!image?.object_key) return null;
-      return { user_id: row.user_id, school_id: row.school_id, image_key: image.object_key, image_status: row.image_status };
+      return { user_id: row.user_id, school_id: row.school_id, image_key: image.object_key, image_status: row.image_status, ai_status: row.ai_status };
     },
 
     async reviewSchoolIdeaImages({ ideaId, schoolId, reviewerId, decision }) {
@@ -1282,9 +1286,10 @@ export function createYdbListingsRepository(sql) {
         const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
         const reviewer = reviewers?.[0]?.[0];
         if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
-        const rows = await tx`SELECT user_id, image_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
+        const rows = await tx`SELECT user_id, image_status, ai_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
         const idea = rows?.[0]?.[0];
         if (!idea || idea.user_id === reviewerId || idea.image_status !== 'pending') return false;
+        if (reviewer.role === 'council_member' && idea.ai_status !== 'approved') return false;
         const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
           ORDER BY image_index ASC LIMIT 3;`;
         const images = imageRows?.[0] ?? [];
@@ -1309,7 +1314,7 @@ export function createYdbListingsRepository(sql) {
       return sql.begin(async tx => {
         const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
         const reviewer = reviewers?.[0]?.[0];
-        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
+        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || reviewer.role !== 'school_admin') return false;
         const rows = await tx`SELECT user_id, ai_status, image_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
         const idea = rows?.[0]?.[0];
         if (!idea || idea.user_id === reviewerId || idea.ai_status !== 'pending') return false;
@@ -1356,17 +1361,15 @@ export function createYdbListingsRepository(sql) {
           || record.sender_id === record.receiver_id) throw new TypeError('invalid pending message');
       const id = randomUUID();
       return sql.begin(async tx => {
-        const recent = await tx`SELECT id FROM fam_pending_messages WHERE sender_id = ${record.sender_id}
-          AND school_id = ${record.school_id} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H') LIMIT 5;`;
-        if ((recent?.[0] ?? []).length >= 5) {
-          const error = new Error('pending message rate limit'); error.code = 'rate_limited'; throw error;
-        }
         const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
           WHERE (user_id = ${record.sender_id} OR user_id = ${record.receiver_id}) AND school_id = ${record.school_id};`;
         const byId = new Map((participants?.[0] ?? []).map(row => [row.user_id, row]));
         if (byId.get(record.sender_id)?.active !== true) throw new Error('sender unavailable');
         if (byId.get(record.receiver_id)?.active !== true) {
           const error = new Error('recipient unavailable'); error.code = 'recipient_unavailable'; throw error;
+        }
+        if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
+          const error = new Error('message rate limit'); error.code = 'rate_limited'; throw error;
         }
         await tx`INSERT INTO fam_pending_messages (id, sender_id, receiver_id, school_id, listing_id, body, created_at)
           VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, CurrentUtcTimestamp());`;
@@ -1716,7 +1719,7 @@ export function createYdbListingsRepository(sql) {
 
     async registerForEvent(eventId, userId) {
       if (!eventId || !userId) throw new TypeError('invalid event registration');
-      const outcome = await sql.begin(async tx => {
+      const outcome = await sql.begin({ idempotent: true }, async tx => {
         const listingResult = await tx`SELECT user_id, school_id, is_event, status, event_type, max_seats
           FROM fam_listings WHERE id = ${eventId} LIMIT 1;`;
         const event = listingResult?.[0]?.[0];
@@ -1767,7 +1770,7 @@ export function createYdbListingsRepository(sql) {
 
     async cancelEventRegistration(eventId, userId) {
       if (!eventId || !userId) throw new TypeError('invalid event registration');
-      return sql.begin(async tx => {
+      return sql.begin({ idempotent: true }, async tx => {
         const currentResult = await tx`SELECT status FROM fam_event_registrations
           WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
         const current = currentResult?.[0]?.[0];
@@ -1904,7 +1907,7 @@ export function createYdbListingsRepository(sql) {
       if (!eventId || !userId || !moderatorId || !schoolId || !['confirmed', 'rejected'].includes(decision)) {
         throw new TypeError('invalid event review');
       }
-      return sql.begin(async tx => {
+      return sql.begin({ idempotent: true }, async tx => {
         const eventResult = await tx`SELECT user_id, school_id, is_event FROM fam_listings
           WHERE id = ${eventId} LIMIT 1;`;
         const event = eventResult?.[0]?.[0];
@@ -1928,16 +1931,25 @@ export function createYdbListingsRepository(sql) {
     async getSchoolAgentMetrics(schoolId) {
       if (!schoolId) throw new TypeError('invalid agent report school');
       const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
-      const [active, fresh, safety, deletion, suspensions, ideas] = await Promise.all([
+      const [active, fresh, safety, highSafety, deletion, suspensions, ideas] = await Promise.all([
         count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND status = 'active';`),
         count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
         count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL;`),
+        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL AND severity = 'high';`),
         count(sql`SELECT COUNT(*) AS count FROM fam_account_deletion_requests WHERE school_id = ${schoolId} AND status IN ('pending', 'processing');`),
         count(sql`SELECT COUNT(*) AS count FROM fam_account_suspensions WHERE school_id = ${schoolId} AND status = 'active' AND expires_at > CurrentUtcTimestamp();`),
         count(sql`SELECT COUNT(*) AS count FROM fam_ideas WHERE school_id = ${schoolId} AND admin_status = 'new';`),
       ]);
-      return { listings: { active, new_24h: fresh }, safety: { unreviewed: safety },
+      return { listings: { active, new_24h: fresh }, safety: { unreviewed: safety, high_unreviewed: highSafety },
         account_requests: { deletion_pending: deletion, active_suspensions: suspensions }, ideas: { awaiting_council: ideas } };
+    },
+
+    async countPendingSchoolAgentIdeas(schoolId) {
+      if (!schoolId) throw new TypeError('invalid agent report school');
+      const rows = await sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE school_id = ${schoolId} AND status = 'pending';`;
+      const count = Number(rows?.[0]?.[0]?.count ?? 0);
+      if (!Number.isSafeInteger(count) || count < 0) throw new TypeError('invalid pending school proposals count');
+      return count;
     },
 
     async saveSchoolAgentReport({ schoolId, date, summary, metrics }) {

@@ -84,13 +84,38 @@ test('coder bridge claims only allowlisted aggregate payload and finishes the ma
   assert.deepEqual({ id: task.id, task_key: task.task_key, event_code: task.event_code,
     page_area: task.page_area, occurrences: task.occurrences },
   { id, task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 7 });
-  assert.match(calls[0], /task_type = 'coder_patch_request'/);
+  assert.ok(calls.some(query => query.includes("task_type = 'coder_patch_request'")));
   assert.match(task.claim_token, /^[0-9a-f-]{36}$/i);
   assert.equal(await queue.finishSafeCoderTask({ id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: task.claim_token, resultCode: 'model_completed' }), true);
   assert.equal(finished, true);
   await assert.rejects(queue.claimSafeCoderTask({ workerId: 'wrong-worker', leaseSeconds: 7200 }), /coder worker claim/);
   await assert.rejects(queue.finishSafeCoderTask({ id, workerId: 'wrong-worker', claimToken, resultCode: 'model_completed' }), /coder task result/);
+});
+
+test('coder claim closes only its own expired final system lease and records a terminal event', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const claimToken = '22222222-2222-4222-8222-222222222222';
+  const calls = [];
+  const { sql } = fakeSql((query, values) => {
+    calls.push({ query, values });
+    if (query.includes('SELECT id, claim_token FROM fam_agent_tasks')) return [[{ id, claim_token: claimToken }]];
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.equal(await queue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }), null);
+  const recovery = calls[0];
+  assert.match(recovery.query, /source IN \('system', 'scheduled_audit'\)/);
+  assert.match(recovery.query, /claimed_by = \?/);
+  assert.match(recovery.query, /attempt_count >= max_attempts/);
+  const update = calls.find(call => call.query.includes("SET status = Unwrap(CAST('failed'"));
+  assert.ok(update);
+  assert.ok(update.query.includes('claim_token = ?'));
+  assert.deepEqual(update.values.slice(0, 2), [
+    'Локальный анализатор исчерпал число попыток после истечения аренды.', id,
+  ]);
+  assert.ok(calls.some(call => call.query.includes('INSERT INTO fam_agent_task_events')
+    && call.query.includes('Задача закрыта после истечения аренды последней разрешённой попытки.')));
 });
 
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {

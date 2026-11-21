@@ -8,7 +8,8 @@ async function readJson(response) {
 }
 
 export async function initializeListingSubmission({ document = globalThis.document, fetchImpl = globalThis.fetch,
-  FormDataCtor = globalThis.FormData, location = globalThis.location } = {}) {
+  FormDataCtor = globalThis.FormData, location = globalThis.location,
+  confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message) } = {}) {
   if (!document || typeof fetchImpl !== 'function') return;
   const form = document.getElementById('ruListingForm');
   const status = document.getElementById('ruSubmitStatus');
@@ -102,6 +103,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
     }
     if (submit) submit.disabled = true;
     let imageKey = null;
+    let photoOmittedForQuota = false;
     try {
       status.textContent = 'Отправляем объявление на проверку…';
       if (file) {
@@ -110,8 +112,20 @@ export async function initializeListingSubmission({ document = globalThis.docume
           headers: { 'content-type': file.type }, body: file,
         });
         const uploaded = await readJson(upload);
-        if (!upload.ok || typeof uploaded?.image?.key !== 'string' || !PENDING_KEY.test(uploaded.image.key)) throw new Error('upload_failed');
-        imageKey = uploaded.image.key;
+        if (!upload.ok && upload.status === 429 && uploaded?.error === 'rate_limited') {
+          const accepted = typeof confirmImpl === 'function' && confirmImpl(
+            'Лимит загрузки фото исчерпан. Отправить объявление без фото? Оно появится после проверки школы.',
+          );
+          if (!accepted) {
+            status.textContent = 'Объявление не отправлено. Можно снять фото и отправить его позже.';
+            return;
+          }
+          photoOmittedForQuota = true;
+          status.textContent = 'Лимит фото исчерпан. Отправляем объявление без фото…';
+        } else {
+          if (!upload.ok || typeof uploaded?.image?.key !== 'string' || !PENDING_KEY.test(uploaded.image.key)) throw new Error('upload_failed');
+          imageKey = uploaded.image.key;
+        }
       }
       const payload = {
         title: String(data.get('title') || ''),
@@ -132,7 +146,9 @@ export async function initializeListingSubmission({ document = globalThis.docume
       const result = await readJson(submitted);
       if (!submitted.ok || !result?.ok || result.status !== 'pending') throw new Error('submit_failed');
       form.reset();
-      status.textContent = 'Объявление отправлено. Оно появится на доске после проверки; фото проверяется отдельно.';
+      status.textContent = photoOmittedForQuota
+        ? 'Объявление отправлено без фото. Оно появится на доске после проверки; фото можно добавить позже.'
+        : 'Объявление отправлено. Оно появится на доске после проверки; фото проверяется отдельно.';
     } catch {
       if (imageKey) {
         const photoId = imageKey.split('/').at(-1)?.replace(/\.webp$/i, '');

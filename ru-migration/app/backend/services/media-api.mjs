@@ -31,7 +31,9 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
           return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
         }
         const owner = actor.id === image.user_id;
-        const schoolModerator = ['school_admin', 'council_member'].includes(actor.role) && actor.school_id === image.school_id;
+        const sameSchool = actor.school_id === image.school_id;
+        const schoolModerator = sameSchool && (actor.role === 'school_admin'
+          || (actor.role === 'council_member' && image.ai_status === 'approved'));
         if (!owner && !schoolModerator) return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
         if (schoolModerator && !owner) {
           const suspensionBlock = await suspendedModeratorGate(actor);

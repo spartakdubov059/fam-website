@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { loadPublicBoard } from '../../web/public-board.js';
 
 class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; }
+  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.hidden = false; }
   get childNodes() { return this.children; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
@@ -13,15 +13,22 @@ class FakeNode {
 }
 function boardCard(root, index = 0) { return root.children.filter(node => node.className === 'ru-listing-card')[index]; }
 
-const fakeDocument = {
-  createElement: tag => new FakeNode(tag),
-  createDocumentFragment: () => new FakeNode('#fragment'),
-};
+function createFakeDocument() {
+  const listeners = {}; const pulseCards = [];
+  return {
+    pulseCards,
+    createElement: tag => new FakeNode(tag),
+    createDocumentFragment: () => new FakeNode('#fragment'),
+    querySelectorAll: selector => selector === '#ruPulse .ru-pulse-card' ? pulseCards : [],
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    dispatchEvent: event => listeners[event.type]?.(event),
+  };
+}
 
 test('guest board requests only the public endpoint and writes listing data as text', async () => {
   const root = new FakeNode('section');
   let options;
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, init) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, init) => {
     if (url === '/api/v1/listings') options = { url, init };
     return { ok: true, json: async () => ({ ok: true, listings: [{ id: 'listing-1', title: '<script>alert(1)</script>', description: 'Синтетическое описание', category: 'Учёба', price_text: 'Бесплатно', is_event: false }] }) };
   } });
@@ -37,7 +44,7 @@ test('guest board requests only the public endpoint and writes listing data as t
 test('public board filters the approved result set by Russian category and text without another request', async () => {
   const root = new FakeNode('section');
   let listingRequests = 0;
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async url => {
     if (url === '/api/v1/listings') {
       listingRequests++;
       return { ok: true, json: async () => ({ ok: true, listings: [
@@ -67,12 +74,43 @@ test('public board filters the approved result set by Russian category and text 
   assert.equal(listingRequests, 1, 'filters operate only on the already-authorized public response');
 });
 
+test('Afisha search, category and result count include school announcements and polls', async () => {
+  const root = new FakeNode('section'); const document = createFakeDocument();
+  await loadPublicBoard({ root, document, fetchImpl: async url => url === '/api/v1/listings'
+    ? { ok: true, json: async () => ({ ok: true, listings: [
+      { id: 'event-a', title: 'Встреча', description: 'Общий зал', category: 'Афиша', is_event: true },
+      { id: 'listing-a', title: 'Словарь', description: 'Учёба', category: 'Учёба', is_event: false },
+    ] }) }
+    : { ok: false, status: 401, json: async () => ({}) } });
+  const notice = new FakeNode('article'); notice.className = 'ru-pulse-card ru-pulse-news'; notice.textContent = 'Школьная новость о ярмарке';
+  notice.setAttribute('data-search', 'школьная новость о ярмарке');
+  const poll = new FakeNode('article'); poll.className = 'ru-pulse-card ru-pulse-poll'; poll.textContent = 'Какую книгу обсудим?'; poll.setAttribute('data-search', 'какую книгу обсудим?');
+  document.pulseCards.push(notice, poll);
+  document.dispatchEvent(new Event('famru:pulse-updated'));
+  const toolbar = root.children[0]; const search = toolbar.children[0];
+  const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
+  assert.equal(notice.hidden, true, 'school cards are shown only in the Afisha category');
+  assert.equal(poll.hidden, true);
+  filters.children.find(button => button.textContent === 'Афиша').listeners.click();
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Показано 3 материала/);
+  search.value = 'книгу'; search.listeners.input();
+  assert.equal(notice.hidden, true);
+  assert.equal(poll.hidden, false);
+  assert.equal(boardCard(root, 0).hidden, true);
+  assert.equal(boardCard(root, 1).hidden, true);
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Показан 1 материал/);
+  filters.children.find(button => button.textContent === 'Учёба').listeners.click();
+  assert.equal(poll.hidden, true, 'school pulse cards are shown with the general board or Afisha filter');
+  filters.children.find(button => button.textContent === 'Афиша').listeners.click();
+  assert.equal(poll.hidden, false, 'Afisha filter includes matching school polls');
+});
+
 test('authenticated board opens the saved favorites view and removes an item from it immediately', async () => {
   const root = new FakeNode('section');
   const favoriteId = '11111111-1111-4111-8111-111111111111';
   const otherId = '22222222-2222-4222-8222-222222222222';
   const calls = [];
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, options = {}) => {
     calls.push({ url, options });
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id: favoriteId, title: 'Сохранённая книга', description: 'В избранном', category: 'Учёба' },
@@ -102,7 +140,7 @@ test('favorite navigation selected during loading is applied when the board arri
   root.setAttribute('data-ru-board-view', 'favorites');
   const savedId = '11111111-1111-4111-8111-111111111111';
   const otherId = '22222222-2222-4222-8222-222222222222';
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async url => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id: savedId, title: 'Сохранённое', description: 'Да', category: 'Учёба' },
       { id: otherId, title: 'Обычное', description: 'Нет', category: 'Вещи' },
@@ -117,7 +155,7 @@ test('favorite navigation selected during loading is applied when the board arri
 
 test('guest board renders a useful empty state when there are no approved listings', async () => {
   const root = new FakeNode('section');
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, listings: [] }) }) });
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true, listings: [] }) }) });
   assert.match(root.children[0].textContent, /Пока нет опубликованных объявлений/);
 });
 
@@ -125,7 +163,7 @@ test('guest board offers retry when the Russian API is unavailable', async () =>
   const root = new FakeNode('section');
   let calls = 0;
   const fetchImpl = async () => { calls++; throw new Error('offline'); };
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl });
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl });
   assert.equal(root.children[0].attributes.role, 'status');
   assert.equal(root.children[1].textContent, 'Повторить');
   await root.children[1].listeners.click();
@@ -136,7 +174,7 @@ test('event card reads only the user own registrations and supports reservation 
   const root = new FakeNode('section');
   const calls = [];
   const eventId = '11111111-1111-4111-8111-111111111111';
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, options) => {
     calls.push({ url, options });
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id: eventId, title: 'Синтетический концерт', description: 'Проверка записи', category: 'Афиша', price_text: 'Бесплатно', is_event: true, event_type: 'limited', max_seats: 12, event_date: '2099-05-01', event_time: '12:00' },
@@ -172,7 +210,7 @@ test('authenticated board users can toggle favorites through their own Russian A
   const root = new FakeNode('section');
   const id = '11111111-1111-4111-8111-111111111111';
   const calls = [];
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, options = {}) => {
     calls.push({ url, options });
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id, title: 'Учебник', description: 'Описание', category: 'Учёба', is_event: false },
@@ -199,7 +237,7 @@ test('guest favorite action sends the user to Yandex login without a write', asy
   const id = '11111111-1111-4111-8111-111111111111';
   let loginUrl;
   let writes = 0;
-  await loadPublicBoard({ root, document: fakeDocument, location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
+  await loadPublicBoard({ root, document: createFakeDocument(), location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id, title: 'Учебник', description: '', category: 'Учёба' }] }) };
     if (url === '/api/v1/favorites' || url === '/api/v1/me/listings') return { ok: false, status: 401, json: async () => ({}) };
     if (options?.method === 'PUT' || options?.method === 'DELETE') writes++;
@@ -217,7 +255,7 @@ test('only the authenticated owner sees the own-listing delete action, and confi
   const id = '11111111-1111-4111-8111-111111111111';
   const calls = [];
   let allowed = false;
-  await loadPublicBoard({ root, document: fakeDocument, confirmImpl: () => allowed, fetchImpl: async (url, options = {}) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), confirmImpl: () => allowed, fetchImpl: async (url, options = {}) => {
     calls.push({ url, options });
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id, title: 'Моя книга', description: 'Описание', category: 'Учёба', price_text: 'Бесплатно' },
@@ -247,7 +285,7 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
   const makeRoot = () => new FakeNode('section');
   const root = makeRoot();
   let loginUrl;
-  await loadPublicBoard({ root, document: fakeDocument, location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
+  await loadPublicBoard({ root, document: createFakeDocument(), location: { assign: value => { loginUrl = value; } }, fetchImpl: async url => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) };
     return { ok: false, status: 401, json: async () => ({}) };
   } });
@@ -256,7 +294,7 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
   assert.equal(loginUrl, '/auth/yandex/start');
 
   const unavailableRoot = makeRoot();
-  await loadPublicBoard({ root: unavailableRoot, document: fakeDocument, fetchImpl: async url =>
+  await loadPublicBoard({ root: unavailableRoot, document: createFakeDocument(), fetchImpl: async url =>
     url === '/api/v1/listings'
       ? { ok: true, json: async () => ({ ok: true, listings: [{ id: eventId, title: 'Событие', description: '', category: 'Афиша', is_event: true }] }) }
       : { ok: false, status: 503, json: async () => ({}) },
@@ -269,7 +307,7 @@ test('guest event action redirects to Yandex login and unavailable event APIs di
 
 test('Afisha filter selects event listings by event flag and excludes ordinary listings', async () => {
   const root = new FakeNode('section');
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async url => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async url => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id: 'event-a', title: 'Концерт', description: 'Школьный концерт', category: 'Мероприятия', is_event: true },
       { id: 'listing-a', title: 'Обычное объявление', description: 'Текст', category: 'Мероприятия', is_event: false },
@@ -294,7 +332,7 @@ test('limited event checks live seat availability only when requested', async ()
   const eventId = '11111111-1111-4111-8111-111111111111';
   const root = new FakeNode('section');
   let occupancyRequest;
-  await loadPublicBoard({ root, document: fakeDocument, fetchImpl: async (url, options = {}) => {
+  await loadPublicBoard({ root, document: createFakeDocument(), fetchImpl: async (url, options = {}) => {
     if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
       { id: eventId, title: 'Синтетическое мероприятие', description: 'Событие', category: 'Мероприятия',
         is_event: true, event_type: 'limited', max_seats: 8 },

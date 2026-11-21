@@ -49,6 +49,43 @@ test('listing form authenticates first, then uploads a private photo and submits
   assert.match(f.status.textContent, /отправлено/);
 });
 
+test('listing can be submitted without its photo after an explicit image quota fallback', async () => {
+  const f = fixture();
+  const calls = [];
+  let confirmation;
+  await initializeListingSubmission({ ...f,
+    confirmImpl: message => { confirmation = message; return true; },
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, init });
+      if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'synthetic-user' } }) };
+      if (url === '/api/v1/media/pending') return { ok: false, status: 429, json: async () => ({ ok: false, error: 'rate_limited' }) };
+      if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
+      throw new Error(`unexpected route ${url}`);
+    } });
+  await f.listeners.submit({ preventDefault() {} });
+  assert.match(confirmation, /Отправить объявление без фото/);
+  assert.deepEqual(calls.map(call => call.url), ['/api/v1/me', '/api/v1/media/pending', '/api/v1/listings']);
+  const payload = JSON.parse(calls.at(-1).init.body);
+  assert.equal(Object.hasOwn(payload, 'image_key'), false);
+  assert.equal(f.form.wasReset, true);
+  assert.match(f.status.textContent, /отправлено без фото/);
+});
+
+test('declined image quota fallback keeps the listing unsent', async () => {
+  const f = fixture();
+  const calls = [];
+  await initializeListingSubmission({ ...f, confirmImpl: () => false, fetchImpl: async (url) => {
+    calls.push(url);
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'synthetic-user' } }) };
+    if (url === '/api/v1/media/pending') return { ok: false, status: 429, json: async () => ({ ok: false, error: 'rate_limited' }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  await f.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(calls, ['/api/v1/me', '/api/v1/media/pending']);
+  assert.equal(f.form.wasReset, undefined);
+  assert.match(f.status.textContent, /Объявление не отправлено/);
+});
+
 test('listing form removes an unlinked upload after a failed listing write', async () => {
   const f = fixture();
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

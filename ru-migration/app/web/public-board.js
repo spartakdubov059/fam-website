@@ -5,6 +5,14 @@ const BOARD_CATEGORIES = ['Все', 'Вещи', 'Услуги', 'Творчес�
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let messagesInitialized = false;
 
+function formatVisibleCount(count) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  const noun = last === 1 && lastTwo !== 11 ? 'материал'
+    : [2, 3, 4].includes(last) && !(lastTwo >= 12 && lastTwo <= 14) ? 'материала' : 'материалов';
+  return `${count === 1 ? 'Показан' : 'Показано'} ${count} ${noun}.`;
+}
+
 function element(document, tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -398,13 +406,21 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
         card.hidden = !viewMatches || !categoryMatches || !textMatches;
         if (!card.hidden) visible++;
       }
+      const pulseCards = [...(document.querySelectorAll?.('#ruPulse .ru-pulse-card') || [])];
+      const afishaActive = category === 'Афиша' && boardView !== 'favorites';
+      document.getElementById?.('ruPulse')?.setAttribute?.('data-afisha-active', String(afishaActive));
+      for (const card of pulseCards) {
+        const searchable = String(card.getAttribute?.('data-search') || '').toLocaleLowerCase('ru');
+        card.hidden = !afishaActive || Boolean(query && !searchable.includes(query));
+        if (!card.hidden) visible++;
+      }
       for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
       for (const [name, button] of viewButtons) button.setAttribute('aria-pressed', String(name === boardView));
       count.textContent = visible === 0
         ? boardView === 'favorites' && favorites.state !== 'authenticated'
           ? 'Войдите через Яндекс ID, чтобы открыть избранное.'
           : boardView === 'favorites' ? 'В избранном пока нет объявлений.' : 'Ничего не найдено. Измените запрос или категорию.'
-        : `Показано ${visible} объявлений.`;
+        : formatVisibleCount(visible);
     };
     for (const [name, label] of [['all', 'Все объявления'], ['favorites', 'Избранное']]) {
       const button = element(document, 'button', 'ru-board-category', label);
@@ -427,6 +443,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       filterButtons.set(name, button); filters.append(button);
     }
     search.addEventListener('input', updateResults);
+    document.addEventListener?.('famru:pulse-updated', updateResults);
     toolbar.append(search, views, filters, count);
     root.replaceChildren(toolbar, ...cards.map(item => item.card));
     updateResults();

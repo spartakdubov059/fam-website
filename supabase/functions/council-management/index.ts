@@ -218,7 +218,7 @@ async function recordAudit(
 
 async function getSchoolProfile(userId: string): Promise<any | null> {
   const result = await adminRequest(
-    "profiles?select=id,school_id,role,email,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
+    "profiles?select=id,school_id,role,created_at&id=eq." + encodeURIComponent(userId) + "&limit=1",
   );
   return result.ok && Array.isArray(result.data) ? result.data[0] ?? null : null;
 }
@@ -239,7 +239,7 @@ async function getActiveSuspension(userId: string): Promise<any | null> {
 async function listOverview(schoolId: string): Promise<Record<string, unknown>> {
   const [users, listings, audit, deletionRequests, suspensions] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role,created_at,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,role,created_at,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&order=created_at.desc&limit=100",
     ),
     adminRequest(
@@ -251,7 +251,7 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
       + encodeURIComponent(schoolId) + "&order=created_at.desc&limit=20",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_id,target_email_masked,target_role,requester_email_masked,reason_code,reason,status,created_at&school_id=eq."
+      "account_deletion_requests?select=id,target_id,target_role,requester_id,reason_code,reason,status,created_at&school_id=eq."
       + encodeURIComponent(schoolId) + "&status=in.(pending,processing)&order=created_at.asc&limit=50",
     ),
     adminRequest(
@@ -269,7 +269,6 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
   return {
     users: (users.data ?? []).map((row: any) => ({
       id: row.id,
-      email: maskEmail(row.email),
       role: row.role,
       first_name: typeof row.first_name === "string" ? row.first_name : null,
       last_name: typeof row.last_name === "string" ? row.last_name : null,
@@ -301,9 +300,8 @@ async function listOverview(schoolId: string): Promise<Record<string, unknown>> 
     deletion_requests: (deletionRequests.data ?? []).map((row: any) => ({
       id: row.id,
       target_id: row.target_id,
-      target_email: row.target_email_masked || "Аккаунт",
       target_role: row.target_role,
-      requester_email: row.requester_email_masked || "Участник совета",
+      requester_id: row.requester_id,
       reason_code: row.reason_code,
       reason: row.reason,
       status: row.status,
@@ -380,12 +378,12 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
     grouped.flatMap(row => [row.actor_id, row.target_id])
       .filter((id): id is string => typeof id === "string" && UUID_RE.test(id)),
   ));
-  const profilesById = new Map<string, { id: string; email: string | null; role: string | null; first_name: string | null; last_name: string | null; class_name: string | null }>();
+  const profilesById = new Map<string, { id: string; role: string | null; first_name: string | null; last_name: string | null; class_name: string | null }>();
   for (let offset = 0; offset < profileIds.length; offset += 50) {
     const batch = profileIds.slice(offset, offset + 50);
     if (!batch.length) continue;
     const people = await adminRequest(
-      "profiles?select=id,email,role,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
+      "profiles?select=id,role,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(schoolId)
       + "&id=in.(" + batch.map(id => encodeURIComponent(id)).join(",") + ")",
     );
     if (!people.ok || !Array.isArray(people.data)) {
@@ -396,8 +394,7 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
       if (typeof profile?.id === "string") {
         profilesById.set(profile.id, {
           id: profile.id,
-          email: typeof profile.email === "string" ? profile.email : null,
-          role: typeof profile.role === "string" ? profile.role : null,
+              role: typeof profile.role === "string" ? profile.role : null,
           first_name: typeof profile.first_name === "string" ? profile.first_name : null,
           last_name: typeof profile.last_name === "string" ? profile.last_name : null,
           class_name: typeof profile.class_name === "string" ? profile.class_name : null,
@@ -421,7 +418,6 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
       source_origin: row.source_origin,
       evidence_excerpt: row.evidence_excerpt,
       actor: actor ? {
-        email: actor.email,
         role: actor.role,
         first_name: actor.first_name,
         last_name: actor.last_name,
@@ -429,7 +425,6 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
         account_code: actor.id.slice(-6).toUpperCase(),
       } : null,
       target: target ? {
-        email: target.email,
         role: target.role,
         first_name: target.first_name,
         last_name: target.last_name,
@@ -446,12 +441,12 @@ async function listSafetyReports(schoolId: string): Promise<Record<string, unkno
 async function listCouncilTargets(actor: any, actorId: string): Promise<Record<string, unknown>> {
   const [targets, ownRequests] = await Promise.all([
     adminRequest(
-      "profiles?select=id,email,role&school_id=eq." + encodeURIComponent(actor.school_id)
+      "profiles?select=id,role,first_name,last_name,class_name&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&id=neq." + encodeURIComponent(actorId)
       + "&role=in.(student,council_member)&order=created_at.desc&limit=200",
     ),
     adminRequest(
-      "account_deletion_requests?select=id,target_email_masked,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
+      "account_deletion_requests?select=id,target_id,target_role,reason_code,reason,status,created_at,reviewed_at,review_note&requester_id=eq."
       + encodeURIComponent(actorId) + "&school_id=eq." + encodeURIComponent(actor.school_id)
       + "&order=created_at.desc&limit=10",
     ),
@@ -460,8 +455,10 @@ async function listCouncilTargets(actor: any, actorId: string): Promise<Record<s
   return {
     targets: (targets.data ?? []).map((row: any) => ({
       id: row.id,
-      email: maskEmail(row.email),
       role: row.role,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
+      class_name: row.class_name ?? null,
     })),
     my_requests: ownRequests.data ?? [],
   };
@@ -609,7 +606,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const existing = await adminRequest(
-        "account_deletion_requests?select=id,status,target_email_masked,created_at&school_id=eq."
+        "account_deletion_requests?select=id,status,created_at&school_id=eq."
         + encodeURIComponent(actor.school_id) + "&target_id=eq." + encodeURIComponent(targetId)
         + "&status=in.(pending,processing)&limit=1",
       );
@@ -861,7 +858,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const found = await adminRequest(
-        "account_deletion_requests?select=id,school_id,requester_id,target_id,target_email_masked,target_role,status,reason_code,reason&id=eq."
+        "account_deletion_requests?select=id,school_id,requester_id,target_id,target_role,status,reason_code,reason&id=eq."
         + encodeURIComponent(requestId) + "&school_id=eq." + encodeURIComponent(actor.school_id) + "&limit=1",
       );
       const request = found.ok && Array.isArray(found.data) ? found.data[0] ?? null : null;

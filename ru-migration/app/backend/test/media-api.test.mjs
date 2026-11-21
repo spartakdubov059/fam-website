@@ -258,18 +258,28 @@ test('failed pending-image delete releases its database lease for a later retry'
   ]]);
 });
 
-test('idea images use private no-store responses for their owner and same-school staff', async () => {
+test('idea images are private, and council members can read only AI-approved school ideas', async () => {
   let actor = { id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'school_admin' };
+  let ideaAiStatus = 'pending';
+  let imageReads = 0;
   const imageKey = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
   const api = createMediaApi({ authenticate: async () => ({ subject: 'verified' }), resolveActor: async () => actor,
     repository: { getActiveAccountSuspension: async () => null,
-      getSchoolIdeaImage: async () => ({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', image_key: imageKey, image_status: 'pending' }) },
-    pendingImages: { get: async key => { assert.equal(key, imageKey); return Buffer.from('synthetic-webp'); } } });
+      getSchoolIdeaImage: async () => ({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'school-a', image_key: imageKey, image_status: 'pending', ai_status: ideaAiStatus }) },
+    pendingImages: { get: async key => { imageReads++; assert.equal(key, imageKey); return Buffer.from('synthetic-webp'); } } });
   const req = request({ method: 'GET', path: '/api/v1/ideas/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/images/0', body: Buffer.alloc(0) });
   const result = await api(req);
   assert.equal(result.status, 200);
   assert.equal(result.headers['cache-control'], 'private, no-store');
   assert.equal(result.headers['content-type'], 'image/webp');
+  actor = { ...actor, role: 'council_member' };
+  assert.equal((await api(req)).status, 404, 'council cannot fetch pending idea images by direct URL');
+  assert.equal(imageReads, 1, 'blocked requests do not read object storage');
+  ideaAiStatus = 'approved';
+  assert.equal((await api(req)).status, 200, 'council can read an AI-approved idea image while it awaits image review');
+  assert.equal(imageReads, 2);
+  actor = { ...actor, role: 'school_admin' };
+  ideaAiStatus = 'pending';
   actor = { ...actor, school_id: 'school-b' };
   assert.equal((await api(req)).status, 404);
   actor = { id: '11111111-1111-4111-8111-111111111111', role: 'student', school_id: 'other-school' };

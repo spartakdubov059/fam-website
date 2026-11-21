@@ -139,7 +139,7 @@ test('server routes the internal coder bridge separately from public user APIs',
 });
 
 
-test('public HTTP allowlist never exposes private agent queue table routes', async () => {
+test('public HTTP allowlist never exposes private YDB table routes', async () => {
   let publicApiCalls = 0;
   await withServer({
     listingsApi: async () => { publicApiCalls++; return { status: 200, body: { ok: true } }; },
@@ -148,6 +148,11 @@ test('public HTTP allowlist never exposes private agent queue table routes', asy
       '/api/v1/fam-agent-ideas',
       '/api/v1/fam-agent-tasks',
       '/api/v1/fam-agent-task-events',
+      '/api/v1/events',
+      '/api/v1/school-accounts',
+      '/api/v1/message-limits',
+      '/api/v1/content-rate-limits',
+      '/api/v1/submission-quotas',
     ];
     for (const path of privatePaths) {
       for (const method of ['GET', 'POST']) {
@@ -517,10 +522,9 @@ test('isolated server routes anonymous site error counters only to its configure
   });
 });
 
-test('isolated server routes read-only technical alerts to the authenticated API handler', async () => {
+test('isolated server does not expose global technical alerts through a school-admin route', async () => {
   await withServer({ listingsApi: async request => ({ status: 200, body: { ok: true, route: request.url } }) }, async origin => {
     const response = await fetch(new URL('/api/v1/school/admin/technical-alerts', origin));
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, route: '/api/v1/school/admin/technical-alerts' });
+    assert.equal(response.status, 404);
   });
 });

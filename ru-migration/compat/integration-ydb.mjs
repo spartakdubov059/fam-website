@@ -502,9 +502,15 @@ try {
   assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
   assert.equal(ideaRows[0][0].ai_status, 'pending');
   assert.equal(ideaRows[0][0].admin_status, 'new');
+  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
+    .some(item => item.id === idea.id), false, 'council cannot read AI-pending idea text from the review queue');
+  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-council', { decision: 'reject' }))).status,
+    403, 'council cannot decide an AI-pending idea through the HTTP route');
   assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-admin', { decision: 'approve' })),
     { status: 200, body: { ok: true, ai_status: 'approved' } });
   const reviewedIdeaRows = await sql`SELECT ai_status FROM fam_ideas WHERE id = ${idea.id};`;  assert.equal(reviewedIdeaRows[0][0].ai_status, 'approved', 'school review publishes only an explicitly approved pending idea');
+  assert.ok((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
+    .some(item => item.id === idea.id), 'council can see the idea after administrator approval');
   assert.equal((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0][0].action,
     'idea_text_approved', 'school text decisions are auditable without recording the idea text');
   const ideaWorkflow = await listingsApi(apiRequest('GET', '/api/v1/school/ideas/workflow', 'synthetic-admin'));
@@ -544,11 +550,16 @@ try {
   assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }),
     { ok: false, code: 'recipient_unavailable' });
 
+  await sql`DELETE FROM fam_submission_quotas WHERE user_id = 'synthetic-user' AND action = 'message';`;
   const pendingMessageResponse = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-user', {
     receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Синтетическое сообщение ожидает школьной проверки',
   }));
   assert.equal(pendingMessageResponse.status, 201);
   assert.deepEqual({ ok: pendingMessageResponse.body.ok, status: pendingMessageResponse.body.status }, { ok: true, status: 'pending' });
+  const pendingMessageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
+    WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
+  assert.equal(pendingMessageQuota?.[0]?.[0]?.submission_count, 1,
+    'manual-review messages consume the same source-compatible message quota');
   const pendingMessageId = pendingMessageResponse.body.id;
   assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), false,
     'recipient inbox cannot see messages awaiting review');
@@ -781,7 +792,7 @@ try {
   const adminOwnIdea = await repo.createIdea({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     text: 'Идея администратора для самопроверки', image_keys: [adminIdeaImageKey], image_status: 'pending',
     ai_status: 'approved', admin_status: 'new' });
-  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '33333333-3333-4333-8333-333333333333'))
+  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '33333333-3333-4333-8333-333333333333', 'school_admin'))
     .some(idea => idea.id === adminOwnIdea.id), false, 'review queue omits the reviewer own submission');
   assert.equal(await repo.reviewSchoolIdeaImages({ ideaId: adminOwnIdea.id, schoolId: 'synthetic-school',
     reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'approve' }), false,
@@ -809,9 +820,12 @@ try {
   const submittedIdea = ideaQueue.body.ideas.find(idea => idea.id === ideaSubmission.body.id);
   assert.equal(submittedIdea.image_status, 'pending');  assert.deepEqual(submittedIdea.image_keys, [attachedIdeaImageKey]);
   assert.equal(Object.hasOwn(submittedIdea, 'user_id'), false, 'school review queue omits the submitter identity');
+  assert.equal(submittedIdea.ai_status, 'approved', 'unflagged text follows the free local fallback review path');
+  assert.ok((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
+    .some(item => item.id === ideaSubmission.body.id), 'council can review photos after the text passes the local safety gate');
   assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-lyceum-admin'))).body.ideas, [],
     'school idea queue is isolated by school');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${ideaSubmission.body.id}/images`, 'synthetic-admin', { decision: 'approve' })),
+  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${ideaSubmission.body.id}/images`, 'synthetic-council', { decision: 'approve' })),
     { status: 200, body: { ok: true, image_status: 'approved' } });
   assert.equal((await repo.getSchoolIdeaImage(ideaSubmission.body.id, 0)).image_status, 'approved');
   accountMediaKeys.add(rejectedIdeaImageKey);
@@ -824,7 +838,7 @@ try {
     { status: 200, body: { ok: true, image_status: 'rejected' } });
   const rejectedIdeaRow = await sql`SELECT image_status FROM fam_ideas WHERE id = ${rejectedIdea.body.id};`;
   assert.deepEqual(rejectedIdeaRow[0][0], { image_status: 'rejected' });
-  assert.deepEqual(await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666')
+  assert.deepEqual(await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666', 'council_member')
     .then(rows => rows.find(row => row.id === rejectedIdea.body.id)?.image_keys), []);
   assert.equal(await repo.getSchoolIdeaImage(rejectedIdea.body.id, 0), null,
     'rejected school idea image is no longer readable');
@@ -836,7 +850,7 @@ try {
     text: 'Идея отклоняется модератором школы', image_keys: [rejectedTextImageKey], image_status: 'pending',
     ai_status: 'pending', admin_status: 'new' });
   assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedTextIdea.id}/moderation`, 'synthetic-admin', { decision: 'reject' })),
-    { status: 200, body: { ok: true, ai_status: 'rejected' } });  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666'))
+    { status: 200, body: { ok: true, ai_status: 'rejected' } });  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666', 'council_member'))
     .some(row => row.id === rejectedTextIdea.id), false, 'rejected idea text leaves the school review queue');
   assert.equal(await repo.getSchoolIdeaImage(rejectedTextIdea.id, 0), null, 'text rejection prevents reading its attached photo');
   assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedTextImageKey};`)[0][0].status, 'pending',

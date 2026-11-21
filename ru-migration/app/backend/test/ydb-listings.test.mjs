@@ -302,30 +302,58 @@ test('idea image linkage rejects an object owned by another account before inser
   assert.equal(inserted, false);
 });
 
-test('school idea review listing excludes the current reviewer own submission', async () => {
+test('school idea review listing scopes pending text to admins and approved ideas to council', async () => {
   const calls = [];
   const sql = async (strings, ...values) => {
     const text = strings.join('?'); calls.push({ text, values });
-    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея', image_status: 'pending' }]];
+    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея', image_status: 'pending', ai_status: 'approved' }]];
     if (text.includes('FROM fam_idea_images')) return [[{ object_key: 'pending/user-id/photo.webp' }]];
     return [[]];
   };
   const reviewerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const ideas = await createYdbListingsRepository(sql).listPendingSchoolIdeas('school-a', reviewerId);
-  assert.deepEqual(ideas, [{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея',
+  const repo = createYdbListingsRepository(sql);
+  const councilIdeas = await repo.listPendingSchoolIdeas('school-a', reviewerId, 'council_member');
+  assert.deepEqual(councilIdeas, [{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея', ai_status: 'approved',
     image_status: 'pending', image_keys: ['pending/user-id/photo.webp'] }]);
-  const queue = calls.find(call => call.text.includes('FROM fam_ideas'));
-  assert.match(queue.text, /user_id != \?/);
-  assert.ok(queue.values.includes('school-a'));
-  assert.ok(queue.values.includes(reviewerId));
+  const councilQueue = calls.find(call => call.text.includes('FROM fam_ideas'));
+  assert.match(councilQueue.text, /ai_status = 'approved'/);
+  assert.match(councilQueue.text, /user_id != \?/);
+  assert.ok(councilQueue.values.includes('school-a'));
+  assert.ok(councilQueue.values.includes(reviewerId));
   assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images') && call.values.includes('idea-a')));
+  calls.length = 0;
+  await repo.listPendingSchoolIdeas('school-a', reviewerId, 'school_admin');
+  const adminQueue = calls.find(call => call.text.includes('FROM fam_ideas'));
+  assert.match(adminQueue.text, /ai_status != 'rejected'/, 'school admins retain access to AI-pending ideas for adult review');
+  assert.doesNotMatch(adminQueue.text, /ai_status = 'approved'/);
+  await assert.rejects(repo.listPendingSchoolIdeas('school-a', reviewerId, 'student'), TypeError);
 });
 
-test('school idea text review is same-school, excludes self review and audits a bounded decision', async () => {
+test('council cannot decide pending idea text or moderate its photo before AI approval', async () => {
+  const calls = [];
+  const tx = async strings => {
+    const text = strings.join('?'); calls.push(text);
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('FROM fam_ideas')) return [[{ user_id: 'student-id', ai_status: 'pending', image_status: 'pending' }]];
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const input = { ideaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', schoolId: 'school-a',
+    reviewerId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', decision: 'reject' };
+  assert.equal(await repo.reviewSchoolIdeaText(input), false);
+  assert.equal(await repo.reviewSchoolIdeaImages(input), false);
+  assert.equal(calls.filter(text => text.includes('FROM fam_ideas')).length, 1,
+    'text review is denied from the database-backed council role before reading the idea');
+  assert.ok(!calls.some(text => text.includes('FROM fam_idea_images')),
+    'council cannot enumerate photos attached to AI-pending text');
+});
+
+test('school admin can review AI-pending school idea text without storing its body in the audit', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); calls.push({ text, values });
-    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'council_member', active: true }]];
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
     if (text.includes('FROM fam_ideas')) return [[{ user_id: 'student-id', ai_status: 'pending', image_status: 'pending' }]];
     if (text.includes('FROM fam_idea_images')) return [[{ image_index: 0, object_key: 'pending/student-id/photo.webp' }]];
     return [[]];
@@ -369,6 +397,18 @@ test('school idea workflow lists only approved same-school ideas and permits onl
   assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'done' }), true);
   assert.equal(currentStatus, 'done');
   assert.equal(await repo.updateSchoolIdeaWorkflow({ ...input, status: 'rejected' }), false, 'terminal ideas cannot be re-opened');
+});
+
+test('school idea image lookup returns the AI review state for media authorization', async () => {
+  const calls = [];
+  const sql = async strings => {
+    const text = strings.join('?'); calls.push(text);
+    if (text.includes('FROM fam_ideas')) return [[{ user_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', image_status: 'pending', ai_status: 'pending' }]];
+    return [[{ object_key: 'pending/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' }]];
+  };
+  const result = await createYdbListingsRepository(sql).getSchoolIdeaImage('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 0);
+  assert.equal(result.ai_status, 'pending');
+  assert.match(calls[0], /ai_status/);
 });
 
 test('idea deletion is owner-bound or same-school-admin-only and claims linked photos for cleanup', async () => {
@@ -891,6 +931,34 @@ test('directly delivered messages enforce a rolling eight-per-minute durable acc
   assert.equal(count, 1, 'the counter resets after one minute without sending');
 });
 
+test('pending messages share the upstream eight-per-minute quota with delivered messages', async () => {
+  const statements = [];
+  let count = 0;
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?');
+    statements.push({ text, values });
+    if (text.includes('SELECT user_id, school_id, active FROM fam_user_profiles')) return [[
+      { user_id: 'sender-id', school_id: 'school-id', active: true },
+      { user_id: 'recipient-id', school_id: 'school-id', active: true },
+    ]];
+    if (text.includes('SELECT user_id AS user_id FROM fam_user_profiles')) return [[{ user_id: 'recipient-id' }]];
+    if (text.includes('SELECT submission_count FROM fam_submission_quotas')) return count ? [[{ submission_count: count }]] : [[]];
+    if (text.includes('DELETE FROM fam_submission_quotas')) { count = 0; return [[]]; }
+    if (text.includes('UPSERT INTO fam_submission_quotas')) { count = values.find(Number.isInteger); return [[]]; }
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const repo = createYdbListingsRepository(sql);
+  const pending = { sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-id', body: 'Нужно проверить' };
+  for (let index = 0; index < 8; index++) assert.ok((await repo.createPendingMessage(pending)).id);
+  await assert.rejects(repo.createPendingMessage(pending), error => error.code === 'rate_limited');
+  assert.equal(statements.filter(statement => statement.text.includes('INSERT INTO fam_pending_messages')).length, 8);
+  assert.equal(statements.filter(statement => statement.text.includes('SELECT submission_count FROM fam_submission_quotas')
+    && statement.values.includes('message')).length, 9);
+  assert.deepEqual(await repo.createMessage({ ...pending }), { ok: false, code: 'rate_limited' },
+    'pending submissions consume the same message quota as messages sent directly to the inbox');
+});
+
 test('message reads bind user and school and return only the bounded projection', async () => {
   let query;
   const sql = (strings, ...values) => {
@@ -979,6 +1047,7 @@ test('pending event review queue binds the school and exposes only minimal appli
 
 test('event registration reserves a seat and stores only the database actor identity in one transaction', async () => {
   const operations = [];
+  const beginOptions = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); operations.push({ text, values });
     if (text.includes('FROM fam_listings')) return [[{ user_id: 'organizer', school_id: 'school-a', is_event: true, status: 'active', event_type: 'limited', max_seats: 1 }]];
@@ -986,9 +1055,14 @@ test('event registration reserves a seat and stores only the database actor iden
     if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 0 }]];
     return [[]];
   };
-  const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
+  const sql = Object.assign(async () => [[]], { begin: async (options, work) => {
+    if (typeof options === 'function') return options(tx);
+    beginOptions.push(options);
+    return work(tx);
+  } });
   const repo = createYdbListingsRepository(sql);
   assert.deepEqual(await repo.registerForEvent('event-id', 'verified-user'), { event_id: 'event-id', user_id: 'verified-user', status: 'confirmed' });
+  assert.deepEqual(beginOptions, [{ idempotent: true }], 'capacity transactions retry serializable conflicts from a fresh snapshot');
   assert.ok(operations.some(operation => operation.text.includes('UPSERT INTO fam_event_occupancy')));
   const registration = operations.find(operation => operation.text.includes('UPSERT INTO fam_event_registrations'));
   assert.ok(registration.values.includes('verified-user'));
@@ -996,6 +1070,7 @@ test('event registration reserves a seat and stores only the database actor iden
 });
 
 test('event capacity and organizer rejection are returned after the YDB transaction instead of aborting it', async () => {
+  const options = [];
   const makeRepo = ({ owner = 'organizer', taken = 1, existing = [] } = {}) => {
     const tx = async strings => {
       const text = strings.join('');
@@ -1004,12 +1079,40 @@ test('event capacity and organizer rejection are returned after the YDB transact
       if (text.includes('FROM fam_event_occupancy')) return [[{ taken }]];
       return [[]];
     };
-    return createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(tx) }));
+    return createYdbListingsRepository(Object.assign(async () => [[]], { begin: async (settings, work) => {
+      if (typeof settings === 'function') return settings(tx);
+      options.push(settings);
+      return work(tx);
+    } }));
   };
   await assert.rejects(makeRepo().registerForEvent('event-id', 'student'), error => error.code === 'no_seats_available');
   await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student'), error => error.code === 'organizer_registration');
   await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student'), error => error.code === 'already_registered');
+  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }, { idempotent: true }]);
 });
+
+test('event cancellation and organizer review retry after YDB serialization conflicts', async () => {
+  const options = [];
+  const makeRepo = status => {
+    const tx = async strings => {
+      const text = strings.join('');
+      if (text.includes('FROM fam_listings')) return [[{ user_id: 'organizer', school_id: 'school-a', is_event: true }]];
+      if (text.includes('FROM fam_event_registrations')) return [[{ status }]];
+      if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 1 }]];
+      return [[]];
+    };
+    const sql = Object.assign(async () => [[]], { begin: async (settings, work) => {
+      options.push(settings);
+      return work(tx);
+    } });
+    return createYdbListingsRepository(sql);
+  };
+  assert.equal(await makeRepo('confirmed').cancelEventRegistration('event-id', 'student-id'), true);
+  assert.equal(await makeRepo('pending').moderateEventRegistration(
+    'event-id', 'student-id', 'organizer', 'school-a', 'rejected'), true);
+  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }]);
+});
+
 test('public event occupancy is visible only for active events', async () => {
   const calls = [];
   const sql = strings => {
@@ -1027,6 +1130,28 @@ test('public event occupancy is visible only for active events', async () => {
   await assert.rejects(repo.getPublicEventOccupancy(''), TypeError);
 });
 
+
+test('school report metrics include high safety signals and pending rule proposals, scoped to one school', async () => {
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    const count = text.includes("severity = 'high'") ? 1
+      : text.includes('fam_safety_incidents') ? 3
+        : text.includes('fam_agent_ideas') ? 4 : 2;
+    return [[{ count }]];
+  };
+  const repository = createYdbListingsRepository(sql);
+  const metrics = await repository.getSchoolAgentMetrics('school-a');
+  const pending = await repository.countPendingSchoolAgentIdeas('school-a');
+  assert.equal(metrics.safety.unreviewed, 3);
+  assert.equal(metrics.safety.high_unreviewed, 1);
+  assert.equal(metrics.ideas.awaiting_council, 2);
+  assert.equal(pending, 4);
+  assert.equal(calls.length, 8);
+  assert.ok(calls.every(call => call.values.includes('school-a')));
+  assert.ok(calls.some(call => call.text.includes("severity = 'high'")));
+  assert.ok(calls.some(call => call.text.includes("fam_agent_ideas WHERE school_id = ? AND status = 'pending'")));
+});
 
 test('own idea history is bounded and scopes both ideas and image counts to the actor school', async () => {
   const calls = [];
