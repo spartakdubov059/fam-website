@@ -146,6 +146,29 @@ test("cloud monitor validates both production hosts when both are available", as
   assert.equal(report.checks.some((check) => check.name.includes("sitemap.xml (Netlify)") && check.ok), true);
 });
 
+test("cloud monitor accepts the configured canonical host in cross-host robots and sitemap files", async () => {
+  const report = await runFAMCloudMonitor({
+    baseUrl: "https://example.invalid/fam-website/",
+    repository: "owner/repo",
+    token: "test-token",
+    retryDelayMs: 0,
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) {
+        return response("User-agent: *\nAllow: /\nSitemap: https://famru.netlify.app/sitemap.xml\n");
+      }
+      if (parsed.pathname.endsWith("/sitemap.xml")) {
+        return response("<urlset><url><loc>https://famru.netlify.app/</loc></url></urlset>");
+      }
+      return response(homepage);
+    },
+  });
+
+  assert.equal(report.checks.find((check) => check.name.includes("robots.txt")).ok, true);
+  assert.equal(report.checks.find((check) => check.name.includes("sitemap.xml")).ok, true);
+});
+
 test("cloud monitor reports bad homepage markup and recent failed workflows", async () => {
   const now = Date.parse("2026-11-11T05:00:00Z");
   const report = await runFAMCloudMonitor({

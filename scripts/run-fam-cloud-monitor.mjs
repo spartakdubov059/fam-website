@@ -271,13 +271,20 @@ export async function runFAMCloudMonitor({
     performanceBySite.push(performanceMetrics);
     await checkPage("robots.txt (" + site.label + ")", "robots.txt", (body) => {
       const sitemapUrl = body.match(/^Sitemap:\s*(\S+)/im)?.[1];
-      const expectedSitemaps = [new URL("sitemap.xml", base).href, new URL("sitemap.xml", SITE_BASE_URLS[0].url).href];
+      const expectedSitemaps = [...new Set([
+        new URL("sitemap.xml", base).href,
+        ...SITE_BASE_URLS.map((candidate) => new URL("sitemap.xml", candidate.url).href),
+      ])];
       if (!/^User-agent:\s*\*/im.test(body) || !expectedSitemaps.includes(sitemapUrl)) {
         throw new Error("robots.txt is missing the allow rule or sitemap link.");
       }
     }, base);
     await checkPage("sitemap.xml (" + site.label + ")", "sitemap.xml", (body) => {
-      if (!body.includes("<urlset") || (!body.includes(new URL("", base).href) && !body.includes(SITE_BASE_URLS[0].url))) {
+      const expectedHomepages = [...new Set([
+        new URL("", base).href,
+        ...SITE_BASE_URLS.map((candidate) => new URL("", candidate.url).href),
+      ])];
+      if (!body.includes("<urlset") || !expectedHomepages.some((url) => body.includes(url))) {
         throw new Error("sitemap.xml is missing the FAM homepage.");
       }
     }, base);
