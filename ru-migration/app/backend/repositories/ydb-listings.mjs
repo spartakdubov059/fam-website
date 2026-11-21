@@ -1155,18 +1155,20 @@ export function createYdbListingsRepository(sql) {
     async listPendingSchoolIdeas(schoolId, reviewerId, reviewerRole) {
       if (!schoolId || !UUID.test(reviewerId || '') || !['school_admin', 'council_member'].includes(reviewerRole)) throw new TypeError('invalid idea review school');
       const statement = reviewerRole === 'school_admin'
-        ? sql`SELECT id, school_id, text, image_status, ai_status, created_at
+        ? sql`SELECT id, school_id, user_id, text, image_status, ai_status, created_at
           FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status != 'rejected'
           ORDER BY created_at DESC LIMIT 50;`
-        : sql`SELECT id, school_id, text, image_status, ai_status, created_at
+        : sql`SELECT id, school_id, user_id, text, image_status, ai_status, created_at
           FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status = 'approved'
           ORDER BY created_at DESC LIMIT 50;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const ideas = (await statement)?.[0] ?? [];
       return Promise.all(ideas.map(async idea => {
         const images = await sql`SELECT object_key FROM fam_idea_images WHERE idea_id = ${idea.id}
+          AND user_id = ${idea.user_id} AND school_id = ${idea.school_id}
           ORDER BY image_index ASC LIMIT 3;`;
-        return { ...idea, image_keys: (images?.[0] ?? []).map(image => image.object_key) };
+        const { user_id: _userId, ...safeIdea } = idea;
+        return { ...safeIdea, image_keys: (images?.[0] ?? []).map(image => image.object_key) };
       }));
     },
 

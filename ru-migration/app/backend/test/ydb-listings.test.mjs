@@ -317,7 +317,7 @@ test('school idea review listing scopes pending text to admins and approved idea
   const calls = [];
   const sql = async (strings, ...values) => {
     const text = strings.join('?'); calls.push({ text, values });
-    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', text: 'Синтетическая идея', image_status: 'pending', ai_status: 'approved' }]];
+    if (text.includes('FROM fam_ideas')) return [[{ id: 'idea-a', school_id: 'school-a', user_id: 'student-a', text: 'Синтетическая идея', image_status: 'pending', ai_status: 'approved' }]];
     if (text.includes('FROM fam_idea_images')) return [[{ object_key: 'pending/user-id/photo.webp' }]];
     return [[]];
   };
@@ -332,12 +332,41 @@ test('school idea review listing scopes pending text to admins and approved idea
   assert.ok(councilQueue.values.includes('school-a'));
   assert.ok(councilQueue.values.includes(reviewerId));
   assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images') && call.values.includes('idea-a')));
+  const imageQuery = calls.find(call => call.text.includes('FROM fam_idea_images'));
+  assert.match(imageQuery.text, /user_id = \?/);
+  assert.match(imageQuery.text, /school_id = \?/);
+  assert.deepEqual(imageQuery.values, ['idea-a', 'student-a', 'school-a']);
+  assert.equal(Object.hasOwn(councilIdeas[0], 'user_id'), false, 'private owner id is not exposed to school reviewers');
   calls.length = 0;
   await repo.listPendingSchoolIdeas('school-a', reviewerId, 'school_admin');
   const adminQueue = calls.find(call => call.text.includes('FROM fam_ideas'));
   assert.match(adminQueue.text, /ai_status != 'rejected'/, 'school admins retain access to AI-pending ideas for adult review');
   assert.doesNotMatch(adminQueue.text, /ai_status = 'approved'/);
   await assert.rejects(repo.listPendingSchoolIdeas('school-a', reviewerId, 'student'), TypeError);
+});
+
+test('school idea review queue omits media keys from a row linked to another school or owner', async () => {
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  const foreignOwnerId = '22222222-2222-4222-8222-222222222222';
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_ideas')) return [[{
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a', user_id: ownerId,
+      text: 'Синтетическая идея', image_status: 'pending', ai_status: 'approved',
+    }]];
+    if (text.includes('FROM fam_idea_images')) {
+      assert.deepEqual(values, ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', ownerId, 'school-a']);
+      const corruptImageRow = { user_id: foreignOwnerId, school_id: 'school-b', object_key: `pending/${foreignOwnerId}/photo.webp` };
+      return corruptImageRow.user_id === values[1] && corruptImageRow.school_id === values[2] ? [[corruptImageRow]] : [[]];
+    }
+    return [[]];
+  };
+  const ideas = await createYdbListingsRepository(sql).listPendingSchoolIdeas(
+    'school-a', '33333333-3333-4333-8333-333333333333', 'school_admin');
+  assert.deepEqual(ideas[0].image_keys, []);
+  assert.equal(Object.hasOwn(ideas[0], 'user_id'), false);
+  assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images')));
 });
 
 test('council cannot decide pending idea text or moderate its photo before AI approval', async () => {
