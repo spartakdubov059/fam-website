@@ -152,6 +152,24 @@ function sourceContext(path, keywords, task, maxChars = 26000) {
 }
 
 
+function exactFunctionContext(path, functionName) {
+  const lines = readFileSync(resolve(path), "utf8").split(/\r?\n/);
+  const declaration = new RegExp("^\\s*function\\s+" + escapeRegExp(functionName) + "\\s*\\(");
+  const matches = lines.map((line, i) => declaration.test(line) ? i : -1).filter((i) => i >= 0);
+  if (matches.length !== 1) throw new Error("Expected exactly one declaration of " + functionName);
+  const start = matches[0];
+  // The target is a simple top-level function: fail closed if its end is ambiguous.
+  const end = lines.findIndex((line, i) => i > start && /^  \}$/.test(line));
+  if (end < start) throw new Error("Cannot locate end of " + functionName);
+  const contextStart = Math.max(0, start - 2);
+  const contextEnd = Math.min(lines.length, end + 3);
+  return "[Original file " + path + "; excerpt begins at line " + (contextStart + 1) +
+    "; function " + functionName + " begins at line " + (start + 1) +
+    " and ends at line " + (end + 1) +
+    ". Copy every unchanged context line verbatim; @@ coordinates refer to the original file.]\n" +
+    lines.slice(contextStart, contextEnd).join("\n");
+}
+
 function planningSourceContext(path, task) {
   const lines = readFileSync(resolve(path), "utf8").split(/\r?\n/);
   // Focus on an explicitly named function without assuming a code change.
@@ -298,6 +316,11 @@ const excerpts = selected.map((path) => {
       "; function timeAgo begins at line " + (start + 1) +
       ". Use original file line numbers in @@ headers, never assume line 1.]\n" +
       lines.slice(contextStart, contextEnd).join("\n");
+  } else if (path === "index.html" && /\\btimeAgo\\b/.test(task) &&
+             /\\btimeAgo\\b/.test(plan.plan) && selected.length === 1) {
+    // Real general planner still chooses the file and plan. Only the excerpt
+    // is focused on the named function, without inserting any replacement code.
+    body = exactFunctionContext(path, "timeAgo");
   } else {
     body = sourceContext(path, plan.keywords || [], task);
   }
