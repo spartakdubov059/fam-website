@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `87f1526f930d9b45a324c12ff238243562d45ae1` (`c12d57254f8921c63b50cb28c604b55cdabd876e`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `50fcc87ef77c0fba654f91722d48ffe84ca92618` (`98808bbed44ec0b920570de62bc6ee83bb423191`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
