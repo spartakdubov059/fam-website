@@ -83,3 +83,17 @@ test("ordinary avatar uploads still use the protected moderation queue", () => {
   assert.ok(avatarBranch.includes('rpc/enqueue_avatar_image_moderation_task'));
   assert.ok(avatarBranch.includes('status: "pending"'));
 });
+
+
+test("avatar submissions use a durable rate limit and clean staged files when denied", () => {
+  const avatarBranch = submitContent.slice(
+    submitContent.indexOf('if (kind === "avatar") {'),
+    submitContent.indexOf("const quotaResult"),
+  );
+  assert.ok(avatarBranch.includes('rpc/consume_content_quota'));
+  assert.ok(avatarBranch.includes('p_kind: "listing"'));
+  assert.ok(avatarBranch.includes('if (avatarQuota.data !== true)'));
+  assert.ok(avatarBranch.includes('await removePendingAvatarImage(imageUrl, userId)'));
+  assert.ok(avatarBranch.indexOf('rpc/consume_content_quota') < avatarBranch.indexOf('if (canSkipListingImageReview'));
+  assert.ok(avatarBranch.indexOf('rpc/consume_content_quota') < avatarBranch.indexOf('rpc/enqueue_avatar_image_moderation_task'));
+});
