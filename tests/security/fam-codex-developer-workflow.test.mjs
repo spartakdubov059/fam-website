@@ -131,3 +131,10 @@ test("Qwen benchmark mode remains opt-in and cannot bypass production approvals"
   assert.match(workflow, /gh pr create --draft/);
   assert.doesNotMatch(workflow, /FAM_NARROW_TIMEAGO_BENCHMARK: "1"/);
 });
+
+test("general patch uses real file line coordinates, never placeholder hunk offsets", () => {
+  assert.match(runner, /Фрагмент/);
+  assert.match(runner, /реальные номера строк оригинального файла/);
+  assert.match(runner, /Не подставляй произвольное/);
+  assert.match(runner, /normalizeUnifiedDiffHunkCounts/);
+});
