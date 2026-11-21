@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 21 ноября 2026 г. по GitHub refs: FAM `main` `8c89f17acf8c550a14e821e864254ee06a8d28f1`, код RU `migration/yandex-cloud` `54276aa6685ae2a89c86c27f65d4150d5d530291`. В актуальном дереве `main` — 78 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (дерево `9c34c27eb3deed9254ea6aa62964d65326e03ede`). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
@@ -19,7 +19,7 @@
 - Локально прошли **395/395** backend/UI тестов. [SDK/Sharp CI #44813820333](https://github.com/spartakdubov059/fam-website/actions/runs/44813820333) и [одноразовая YDB integration #44813820465](https://github.com/spartakdubov059/fam-website/actions/runs/44813820465) завершились успешно; YDB workflow использовала локальную disposable DB и синтетические записи. Локальный Docker недоступен, поэтому этот сценарий проверен только через CI.
 - Это закрывает один ранее отсутствовавший сценарий UI/API. Полный аудит всех 78 исходных SQL migrations, RLS, grants, RPC, triggers и оставшихся экранов не завершён; российский облачный staging и цена `0 ₽` не подтверждены. `main`, production и настоящие данные не использовались.
 
-## Текущее состояние upstream (21 ноября 2026)
+## Снимок upstream на 21 ноября 2026
 
 `main` продвинулась до `8c89f17acf8c550a14e821e864254ee06a8d28f1`. Между `af1f0086066d18b3d814dd535f06eda733ae58de` и этим tip изменились только `scripts/check-fam-domain-sync.mjs` и его security test; текущие 78 SQL migrations и 7 Edge Functions не менялись. Domain-sync workflow относится к согласованию production-доменов и не переносится в RU backend. Это сравнение не закрывает полный UI, RLS/RPC и маршрутный аудит.
 
@@ -80,3 +80,9 @@
 
 - Перенос добавил индексы запросов удаления аккаунта (requester, reviewer, target), выдачи/снятия блокировки, школьного admin audit (actor/target) и проверки школьных ролей (review_started_by/reviewed_by). Source suspension target index покрывается ведущим полем RU composite primary key.
 - Синтетический YDB workflow [#44799171636](https://github.com/spartakdubov059/fam-website/actions/runs/44799171636) применил схему и прошёл integration. Применение DDL подтверждено; планировщик запросов на реальном RU workload и квоты облачных write/storage units ещё не измерялись.
+
+## Сверка дельты upstream — 22 ноября 2026
+
+- Актуальный `main` `147ec7903148bfface274c4e681aabb299252dcf` содержит одну новую SQL migration сверх снимка 21 ноября: `20261121190000_restrict_listings_to_authenticated_same_school.sql`. Её поведение уже реализовано в RU API/repository и покрыто отдельной заметкой приватности и disposable YDB CI; строка добавлена в `SUPABASE_MIGRATION_INVENTORY_2026-11-20.md`.
+- Автоматическая сверка всех путей SQL migration в `main` с путями реестра дала **79/79 записей**, пропущенных файлов нет. Это подтверждает только полноту списка имён, не полноту эквивалентности объектов PostgreSQL/YDB, RLS, RPC, триггеров или полей API.
+- Source code, `main`, production и пользовательские данные не менялись.
