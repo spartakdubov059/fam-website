@@ -17,6 +17,6 @@
 
 ## Проверка
 
-На Node 22.15.0 локальный backend/UI suite: **430/430**. SDK/Sharp verifier: `SDK_COMPAT_PASS`. Переносимый validator расписаний: **8 timer-файлов**. `git diff --check` и синтаксическая проверка YDB integration script прошли. Последний удалённый YDB CI обнаружил один старый вызов без school scope; он исправлен вместе с проверкой occupancy между школами. Новый disposable YDB CI ещё не завершён; российский cloud staging не создавался.
+На Node 22.15.0 локальный backend/UI suite: **430/430**. SDK/Sharp verifier: `SDK_COMPAT_PASS`. Переносимый validator расписаний: **8 timer-файлов**. `git diff --check` и синтаксическая проверка YDB integration script прошли. На точном commit [`575491f`](https://github.com/spartakdubov059/fam-website/commit/575491ffe354472371205e59fb5da12790659229) успешно завершились [disposable YDB integration #44941925237](https://github.com/spartakdubov059/fam-website/actions/runs/44941925237) и [SDK/Sharp compatibility #44941925377](https://github.com/spartakdubov059/fam-website/actions/runs/44941925377). YDB workflow применила RU schemas `01–33`, выполнила сценарий на синтетических данных и удалила временный контейнер. Российский cloud staging не создавался.
 
 Проверен только новый upstream privacy control. Это не доказывает полный parity с FAM: прочие экраны, все SQL/RLS/RPC/trigger правила, фоновые задания и staging остаются предметом дальнейшей сверки. `main`, production и реальные пользовательские данные не изменялись.

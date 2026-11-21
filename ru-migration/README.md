@@ -17,7 +17,7 @@
 
 ## Обновление исходного FAM от 21 ноября 2026
 
-В свежем `main` `147ec7903148bfface274c4e681aabb299252dcf` появилась политика приватности доски: объявления видны только участникам своей школы; гостям показывается вход. Это поведение перенесено в RU API, YDB school-scoped запрос, выдачу фото и счётчик занятых мест. Локальные backend/UI тесты прошли `430/430`, SDK/Sharp verifier и таймеры прошли; одноразовый YDB CI повторяется после исправления интеграционного вызова. Подробности: [проверка ограничения доски](VALIDATION_2026-11-21_SCHOOL_LISTING_PRIVACY.md). Обновлённые Netlify production workflow и сборка выпуска намеренно не переносятся в российский staging.
+В свежем `main` `147ec7903148bfface274c4e681aabb299252dcf` появилась политика приватности доски: объявления видны только участникам своей школы; гостям показывается вход. Это поведение перенесено в RU API, YDB school-scoped запрос, выдачу фото и счётчик занятых мест. Локальные backend/UI тесты прошли `430/430`; на commit [`575491f`](https://github.com/spartakdubov059/fam-website/commit/575491ffe354472371205e59fb5da12790659229) успешны [disposable YDB integration](https://github.com/spartakdubov059/fam-website/actions/runs/44941925237) и [SDK/Sharp CI](https://github.com/spartakdubov059/fam-website/actions/runs/44941925377). Подробности: [проверка ограничения доски](VALIDATION_2026-11-21_SCHOOL_LISTING_PRIVACY.md). Обновлённые Netlify production workflow и сборка выпуска намеренно не переносятся в российский staging.
 
 ## Восстановление незавершённого удаления аккаунта (18 ноября 2026)
 
