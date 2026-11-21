@@ -49,6 +49,28 @@ test('listing form authenticates first, then uploads a private photo and submits
   assert.match(f.status.textContent, /отправлено/);
 });
 
+test('rapid duplicate submit events create only one listing while the first request is pending', async () => {
+  const f = fixture(null);
+  let finishListing;
+  let listingWrites = 0;
+  await initializeListingSubmission({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'synthetic-user' } }) };
+    if (url === '/api/v1/listings') {
+      listingWrites++;
+      return new Promise(resolve => { finishListing = resolve; });
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+
+  const first = f.listeners.submit({ preventDefault() {} });
+  await Promise.resolve();
+  await f.listeners.submit({ preventDefault() {} });
+  assert.equal(listingWrites, 1);
+  finishListing({ ok: true, json: async () => ({ ok: true, status: 'pending' }) });
+  await first;
+  assert.equal(f.form.wasReset, true);
+});
+
 test('listing can be submitted without its photo after an explicit image quota fallback', async () => {
   const f = fixture();
   const calls = [];
@@ -141,6 +163,31 @@ test('authenticated students can submit a school idea through the moderated Russ
   assert.equal(JSON.parse(calls[1].init.body).text, 'Открыть школьный книжный обмен');
   assert.equal(ideaForm.wasReset, true);
   assert.match(ideaForm.children.find(child => child.role === 'status').textContent, /ждёт проверки безопасности/);
+});
+
+test('rapid duplicate idea submit events create only one proposal while the first request is pending', async () => {
+  const f = fixture(null);
+  let finishIdea;
+  let ideaWrites = 0;
+  await initializeListingSubmission({ ...f, fetchImpl: async url => {
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-a' } }) };
+    if (url === '/api/v1/ideas') {
+      ideaWrites++;
+      return new Promise(resolve => { finishIdea = resolve; });
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const section = f.shellChildren.find(item => item['aria-label'] === 'Предложить школьную идею');
+  const ideaForm = section.children[2];
+  ideaForm.elements = { idea: { value: 'Открыть школьный книжный обмен' }, idea_images: { files: [] } };
+
+  const first = ideaForm.listeners.submit({ preventDefault() {} });
+  await Promise.resolve();
+  await ideaForm.listeners.submit({ preventDefault() {} });
+  assert.equal(ideaWrites, 1);
+  finishIdea({ ok: true, json: async () => ({ ok: true, status: 'pending' }) });
+  await first;
+  assert.equal(ideaForm.wasReset, true);
 });
 
 test('idea attachments use the bounded private upload route and are sent with the school proposal', async () => {

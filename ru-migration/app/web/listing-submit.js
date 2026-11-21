@@ -19,6 +19,8 @@ export async function initializeListingSubmission({ document = globalThis.docume
 
   let authenticatedProfile = false;
   let ideaForm;
+  let ideaSubmitting = false;
+  let listingSubmitting = false;
   try {
     const response = await fetchImpl('/api/v1/me', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
     const result = await readJson(response);
@@ -47,6 +49,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
 
   if (ideaForm) ideaForm.addEventListener('submit', async event => {
     event.preventDefault();
+    if (ideaSubmitting) return;
     const submit = ideaForm.querySelector('button[type="submit"]');
     const text = String(ideaForm.elements.idea?.value || '').trim();
     const files = Array.from(ideaForm.elements.idea_images?.files || []);
@@ -54,6 +57,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
       ideaForm.querySelector('[role="status"]').textContent = 'Добавьте не более 3 файлов JPEG, PNG или WebP размером до 2 МБ каждый.';
       return;
     }
+    ideaSubmitting = true;
     if (submit) submit.disabled = true;
     const ideaStatus = ideaForm.querySelector('[role="status"]');
     ideaStatus.textContent = 'Передаём предложение на проверку…';
@@ -89,11 +93,12 @@ export async function initializeListingSubmission({ document = globalThis.docume
         const match = key.match(/\/([0-9a-f-]{36})\.webp$/i);
         if (match) try { await fetchImpl(`/api/v1/media/pending/${match[1]}`, { method: 'DELETE', credentials: 'same-origin', cache: 'no-store' }); } catch { /* expiry cleanup can retry */ }
       }
-    } finally { if (submit) submit.disabled = false; }
+    } finally { ideaSubmitting = false; if (submit) submit.disabled = false; }
   });
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    if (listingSubmitting) return;
     const submit = form.querySelector('button[type="submit"]');
     const data = new FormDataCtor(form);
     const file = form.elements.photo.files?.[0] || null;
@@ -101,6 +106,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
       status.textContent = 'Выберите JPEG, PNG или WebP размером не более 5 МБ.';
       return;
     }
+    listingSubmitting = true;
     if (submit) submit.disabled = true;
     let imageKey = null;
     let photoOmittedForQuota = false;
@@ -158,7 +164,7 @@ export async function initializeListingSubmission({ document = globalThis.docume
           else status.textContent = 'Не удалось отправить объявление. Временное фото удалено.';
         } catch { status.textContent = 'Не удалось отправить объявление. Временное фото осталось закрытым.'; }
       } else status.textContent = 'Не удалось отправить объявление. Проверьте подключение и попробуйте снова.';
-    } finally { if (submit) submit.disabled = false; }
+    } finally { listingSubmitting = false; if (submit) submit.disabled = false; }
   });
 }
 
