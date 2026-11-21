@@ -1,5 +1,5 @@
 const WORKER_ID = 'fam-ru-site-error-digest-v1';
-const EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'supabase_sdk_unavailable',
+const EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection',
   'listings_load_failed', 'notifications_load_failed', 'database_request_failed', 'auth_backend_failed']);
 const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other']);
 

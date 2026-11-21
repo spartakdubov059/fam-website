@@ -1,6 +1,6 @@
 // Send only fixed error codes to the isolated Russian backend; never send error text.
 const FAM_RU_DIAGNOSTIC_CODES = new Set([
-  "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
+  "js_runtime", "unhandled_rejection",
   "listings_load_failed", "notifications_load_failed",
   "database_request_failed", "auth_backend_failed"
 ]);

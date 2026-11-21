@@ -23,6 +23,8 @@ test('site error telemetry accepts only fixed anonymous codes and discards extra
   assert.deepEqual(records, [{ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-15T12:34:56Z') }]);
   assert.deepEqual(await report(request({ event_code: 'arbitrary', page_area: 'other' })),
     { status: 400, body: { ok: false, error: 'invalid_event' } });
+  assert.deepEqual(await report(request({ event_code: 'supabase_sdk_unavailable', page_area: 'database' })),
+    { status: 400, body: { ok: false, error: 'invalid_event' } });
   assert.equal(records.length, 1);
 });
 

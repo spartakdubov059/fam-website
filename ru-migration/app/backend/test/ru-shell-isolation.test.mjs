@@ -8,6 +8,7 @@ const shell = `${html}\n${bootstrap}`;
 
 test('Russian shell has no dormant direct Supabase client path', () => {
   assert.doesNotMatch(shell, /window\.supabase|supabase\.createClient|\bsb\.(?:from|auth|functions|storage)\b/);
+  assert.doesNotMatch(shell, /supabase/i, 'the isolated Russian frontend has no Supabase code or stale diagnostics');
   assert.doesNotMatch(shell, /<script\b[^>]*\bsrc=["']https?:/i);
   assert.match(bootstrap, /fetch\(["']\/api\/v1\/site-errors["']/);
 });
