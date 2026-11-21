@@ -1,0 +1,67 @@
+name: FAM — publish Netlify production from main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-netlify-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check the isolated public release bundle
+        run: node --test tests/security/fam-netlify-release.test.mjs
+      - name: Build safe Netlify static release
+        run: node scripts/build-fam-netlify-release.mjs
+      - name: Check production deployment authorization
+        id: authorization
+        shell: bash
+        run: |
+          if [[ -n "$NETLIFY_AUTH_TOKEN" && -n "$NETLIFY_SITE_ID" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FAM Netlify deployment is not configured. Set NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID in repository Actions secrets; GitHub Pages remains independent."
+          fi
+      - name: Publish the same main revision to Netlify
+        if: steps.authorization.outputs.available == 'true'
+        run: npx --yes netlify-cli@27.20.1 deploy --prod --dir=dist --site="$NETLIFY_SITE_ID" --message="FAM ${GITHUB_SHA}"
+      - name: Confirm Netlify readiness marker
+        if: steps.authorization.outputs.available == 'true'
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const url = 'https://famru.netlify.app/fam-domain-health.json?t=' + Date.now();
+          for (let attempt = 1; attempt <= 12; attempt++) {
+            try {
+              const response = await fetch(url, {cache:'no-store', signal:AbortSignal.timeout(10000)});
+              if (response.ok) {
+                const data = await response.json();
+                if (data.site === 'famru' && data.ok === true) {
+                  console.log('FAM Netlify readiness marker reports healthy');
+                  process.exit(0);
+                }
+              }
+            } catch (error) {
+              console.warn('FAM Netlify readiness check attempt ' + attempt + ' failed');
+            }
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          console.error('Netlify did not publish the expected FAM readiness marker');
+          process.exit(1);
+          NODE
