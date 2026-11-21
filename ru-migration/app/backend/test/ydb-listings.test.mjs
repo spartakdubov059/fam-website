@@ -1124,14 +1124,15 @@ test('event applicant query binds event and school and exposes only profile disp
   let query;
   const sql = async (strings, ...values) => { query = { text: strings.join('?'), values }; return [[{ user_id: 'u1', first_name: 'Аня', class_name: '8А', status: 'pending' }]]; };
   const repo = createYdbListingsRepository(sql);
-  const rows = await repo.listEventApplicants('event-1', 'school-a');
+  const rows = await repo.listEventApplicants('event-1', 'school-a', 'owner-id');
   assert.equal(rows[0].user_id, 'u1');
-  assert.ok(query.values.includes('event-1'));
-  assert.ok(query.values.includes('school-a'));
+  assert.deepEqual(query.values, ['event-1', 'school-a', 'owner-id', 'owner-id', 'school-a']);
   assert.match(query.text, /r\.school_id = \?/);
+  assert.match(query.text, /l\.user_id = \? OR EXISTS/);
+  assert.match(query.text, /viewer\.active = true AND viewer\.role IN/);
   assert.match(query.text, /l\.status = 'active'/);
   assert.doesNotMatch(query.text, /email|phone|address/i);
-  await assert.rejects(repo.listEventApplicants('event-1', ''), TypeError);
+  await assert.rejects(repo.listEventApplicants('event-1', '', 'owner-id'), TypeError);
 });
 
 test('pending event review queue binds the school and exposes only minimal applicant fields', async () => {
@@ -1202,6 +1203,7 @@ test('event cancellation and organizer review retry after YDB serialization conf
   const makeRepo = status => {
     const tx = async strings => {
       const text = strings.join('');
+      if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'student', active: true }]];
       if (text.includes('FROM fam_listings')) return [[{ user_id: 'organizer', school_id: 'school-a', is_event: true }]];
       if (text.includes('FROM fam_event_registrations')) return [[{ status }]];
       if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 1 }]];
@@ -1217,6 +1219,34 @@ test('event cancellation and organizer review retry after YDB serialization conf
   assert.equal(await makeRepo('pending').moderateEventRegistration(
     'event-id', 'student-id', 'organizer', 'school-a', 'rejected'), true);
   assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }]);
+});
+
+test('event review allows its owner or an active same-school reviewer only', async () => {
+  const makeRepo = ({ moderatorId, profileSchool = 'school-a', role = 'student', active = true, ownerId = 'organizer' }) => {
+    const calls = [];
+    const tx = async (strings, ...values) => {
+      const text = strings.join('?'); calls.push({ text, values });
+      if (text.includes('FROM fam_user_profiles')) return [[{ school_id: profileSchool, role, active }]];
+      if (text.includes('FROM fam_listings')) return [[{ user_id: ownerId, school_id: 'school-a', is_event: true }]];
+      if (text.includes('FROM fam_event_registrations')) return [[{ status: 'pending' }]];
+      if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 1 }]];
+      return [[]];
+    };
+    const sql = Object.assign(async () => [[]], { begin: async (settings, work) => work(tx) });
+    return { repo: createYdbListingsRepository(sql), calls };
+  };
+  const owner = makeRepo({ moderatorId: 'organizer' });
+  assert.equal(await owner.repo.moderateEventRegistration('event-id', 'applicant', 'organizer', 'school-a', 'confirmed'), true);
+  const otherStudent = makeRepo({ moderatorId: 'student' });
+  assert.equal(await otherStudent.repo.moderateEventRegistration('event-id', 'applicant', 'student', 'school-a', 'confirmed'), false);
+  const schoolCouncil = makeRepo({ moderatorId: 'council', role: 'council_member' });
+  assert.equal(await schoolCouncil.repo.moderateEventRegistration('event-id', 'applicant', 'council', 'school-a', 'confirmed'), true);
+  const crossSchoolCouncil = makeRepo({ moderatorId: 'council', profileSchool: 'school-b', role: 'council_member' });
+  assert.equal(await crossSchoolCouncil.repo.moderateEventRegistration('event-id', 'applicant', 'council', 'school-a', 'confirmed'), false);
+  const inactiveCouncil = makeRepo({ moderatorId: 'council', role: 'council_member', active: false });
+  assert.equal(await inactiveCouncil.repo.moderateEventRegistration('event-id', 'applicant', 'council', 'school-a', 'confirmed'), false);
+  assert.ok(schoolCouncil.calls[0].text.includes('active'));
+  assert.ok(schoolCouncil.calls[0].values.includes('council'));
 });
 
 test('event occupancy query includes active status and authenticated school scope', async () => {

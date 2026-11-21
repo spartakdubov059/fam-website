@@ -1693,8 +1693,8 @@ export function createYdbListingsRepository(sql) {
       return (await statement)?.[0] ?? [];
     },
 
-    async listEventApplicants(eventId, schoolId) {
-      if (!eventId || !schoolId) throw new TypeError('invalid event applicant scope');
+    async listEventApplicants(eventId, schoolId, viewerId) {
+      if (!eventId || !schoolId || !viewerId) throw new TypeError('invalid event applicant scope');
       const statement = sql`SELECT r.user_id AS user_id, r.status AS status,
           r.created_at AS created_at, p.first_name AS first_name,
           p.last_name AS last_name, p.class_name AS class_name,
@@ -1703,6 +1703,11 @@ export function createYdbListingsRepository(sql) {
         INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
         INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
         WHERE r.event_id = ${eventId} AND r.school_id = ${schoolId}
+          AND (l.user_id = ${viewerId} OR EXISTS (
+            SELECT 1 FROM fam_user_profiles AS viewer
+            WHERE viewer.user_id = ${viewerId} AND viewer.school_id = ${schoolId}
+              AND viewer.active = true AND viewer.role IN ('school_admin', 'council_member')
+          ))
           AND l.is_event = true AND l.status = 'active'
         ORDER BY r.created_at ASC LIMIT 100;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
@@ -1915,10 +1920,16 @@ export function createYdbListingsRepository(sql) {
         throw new TypeError('invalid event review');
       }
       return sql.begin({ idempotent: true }, async tx => {
+        const profileResult = await tx`SELECT school_id, role, active FROM fam_user_profiles
+          WHERE user_id = ${moderatorId} LIMIT 1;`;
+        const profile = profileResult?.[0]?.[0];
+        if (!profile || profile.active !== true || profile.school_id !== schoolId) return false;
+        const isSchoolReviewer = ['school_admin', 'council_member'].includes(profile.role);
         const eventResult = await tx`SELECT user_id, school_id, is_event FROM fam_listings
           WHERE id = ${eventId} LIMIT 1;`;
         const event = eventResult?.[0]?.[0];
-        if (!event || event.is_event !== true || event.user_id !== moderatorId || event.school_id !== schoolId) return false;
+        if (!event || event.is_event !== true || event.school_id !== schoolId
+            || (event.user_id !== moderatorId && !isSchoolReviewer)) return false;
         const registrationResult = await tx`SELECT status FROM fam_event_registrations
           WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
         const registration = registrationResult?.[0]?.[0];
