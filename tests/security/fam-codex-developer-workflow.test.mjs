@@ -43,7 +43,10 @@ test("local FAM coding agent has scheduled and owner-only manual triggers", () =
 });
 
 test("agent uses local open weights and never needs a paid API key", () => {
-  assert.match(workflow, /Qwen2\.5-Coder-7B-Instruct-GGUF/);
+  assert.match(workflow, /sammyblues\/Qwen3\.8-27B-IQ2_XS-GGUF\/resolve\/0466a972ecb7e0711efd814b6f2e3856b4b4027b/);
+  assert.match(workflow, /eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23/);
+  assert.match(workflow, /FAM_MODEL_ID: Qwen3\.8-27B-IQ2_XS/);
+  assert.match(workflow, /--reasoning off/);
   assert.match(workflow, /ggml-org\/llama\.cpp/);
   assert.match(workflow, /127\.0\.0\.1:8080/);
   assert.match(runner, /127\.0\.0\.1:8080\/v1\/chat\/completions/);
@@ -98,6 +101,7 @@ test("independent verification runs without model or write credentials", () => {
 test("the test workflow can be explicitly dispatched for a token-created PR branch", () => {
   assert.match(testWorkflow, /workflow_dispatch:/);
   assert.match(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml --ref "\$BRANCH"/);
+  assert.match(workflow, /BRANCH="codex\/fam-run-\$\{GITHUB_RUN_ID\}"[\s\S]*?gh workflow run \.github\/workflows\/moderation-regression\.yml --ref "\$BRANCH"/);
   assert.match(workflow, /gh run watch "\$TEST_RUN_ID" --exit-status --interval 10/);
 });
 
@@ -118,4 +122,20 @@ test("all changes require owner approval before merge and production publication
 test("workflow does not run database migrations or modify production Supabase", () => {
   assert.doesNotMatch(workflow, /supabase db (?:push|reset|migrate)|supabase functions deploy/i);
   assert.doesNotMatch(workflow, /OPENAI_API_KEY|openai-api-key/i);
+});
+
+test("Qwen benchmark mode remains opt-in and cannot bypass production approvals", () => {
+  assert.match(runner, /FAM_NARROW_TIMEAGO_BENCHMARK === "1"/);
+  assert.match(runner, /narrowTimeAgo \? narrowPatchSchema : patchSchema/);
+  assert.match(runner, /requires_approval: true/);
+  assert.match(workflow, /timeout-minutes: 180/);
+  assert.match(workflow, /gh pr create --draft/);
+  assert.doesNotMatch(workflow, /FAM_NARROW_TIMEAGO_BENCHMARK: "1"/);
+});
+
+test("general patch uses real file line coordinates, never placeholder hunk offsets", () => {
+  assert.match(runner, /Фрагмент/);
+  assert.match(runner, /реальные номера строк оригинального файла/);
+  assert.match(runner, /Не подставляй произвольное/);
+  assert.match(runner, /normalizeUnifiedDiffHunkCounts/);
 });
