@@ -479,6 +479,26 @@ Deno.serve(async (req: Request) => {
         return fail("Аватар должен быть загружен в защищённое временное хранилище FAM.", 400, headers);
       }
 
+      // Use the existing durable five-per-hour content quota for avatar submissions too.
+      // The bucket upload happens before this function, so remove that staged file on rejection.
+      const avatarQuota = await adminRequest("rpc/consume_content_quota", "POST", {
+        p_user_id: userId,
+        p_kind: "listing",
+      });
+      if (!avatarQuota.ok) {
+        await removePendingAvatarImage(imageUrl, userId);
+        console.error("Avatar quota check failed:", avatarQuota.status);
+        return fail("Не удалось проверить лимит отправки. Попробуйте позже.", 503, headers);
+      }
+      if (avatarQuota.data !== true) {
+        await removePendingAvatarImage(imageUrl, userId);
+        return respond({
+          ok: false,
+          status: "rate_limited",
+          error: "Слишком много отправок. Попробуйте позже.",
+        }, 200, headers);
+      }
+
       // Use only the freshly loaded database profile, never a role sent by the browser.
       // Trusted school roles publish avatars immediately, without queueing AI image review.
       if (canSkipListingImageReview(profile, imageUrl)) {
