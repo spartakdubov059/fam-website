@@ -253,3 +253,9 @@ Runtime readiness выполняет короткий `SELECT 1 AS ready;` и б
 
 - На `migration/yandex-cloud` code commit `6497b402ad99a7808fde688f93d823968694aa7c` добавил schema 34; следующий code commit `87f1526f930d9b45a324c12ff238243562d45ae1` добавил RU просмотр подробностей объявления. `main` остаётся `147ec7903148bfface274c4e681aabb299252dcf`. Для schema 34 disposable YDB CI #44951135661 применил schema 01–34; для новой UI exact YDB CI #44951920097 и SDK/Sharp CI #44951920176 прошли на Node 22. Полный локальный backend suite после UI правки — 433/433 на Node 24.22.3.
 - Эти workflow не являются Yandex Cloud staging: live OAuth, YDB IAM, Object Storage, включённые systemd timers, жёсткое ограничение стоимости и полный security sign-off всё ещё отсутствуют.
+
+## Защита HTTPS session cookie от подмены соседним доменом (22 ноября 2026)
+
+- В HTTPS-среде cookie сессии Яндекс ID теперь имеет префикс `__Host-`, `Path=/`, атрибут `Secure` и не задаёт `Domain`. Это не позволяет соседнему поддомену установить cookie с тем же именем и перехватить выбор при разборе заголовка `Cookie`. Для локального HTTP на `localhost` сохранено имя без префикса и без `Secure`.
+- Точечные Yandex ID проверки прошли **7/7**, полный backend/UI suite — **435/435**. Exact commit [cbd6d90](https://github.com/spartakdubov059/fam-website/commit/cbd6d902ebf01245ad1604994c99bf5811556da2) прошёл [SDK/Sharp CI #44955101876](https://github.com/spartakdubov059/fam-website/actions/runs/44955101876) и [disposable YDB CI #44955101877](https://github.com/spartakdubov059/fam-website/actions/runs/44955101877). `main` и production не менялись; реальные данные и облако не использовались.
+- Автоматический независимый security scan копии пока не завершён: запуск Codex Security завершился внутренним 300-секундным тайм-аутом до выдачи scan ID. Ручной read-only аудит начат, поэтому это исправление не является общим security sign-off.

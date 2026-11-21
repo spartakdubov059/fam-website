@@ -17,7 +17,7 @@
 
 - На RU commit [`8ea7287`](https://github.com/spartakdubov059/fam-website/commit/8ea7287b3ef78a7fb9715f94509976bd8b7ebb76) добавлены те же пользовательские переходы статуса одобренных идей, которые исходный FAM предоставляет школьному совету: `new → in_progress → done` и отклонение из `new`/`in_progress`. YDB API требует активную роль школьного администратора или Совета и ограничивает чтение/изменение школой из DB-профиля. Каждое изменение записывает только метаданные действия, без текста идеи.
 - Локально прошли **395/395** backend/UI тестов. [SDK/Sharp CI #44813820333](https://github.com/spartakdubov059/fam-website/actions/runs/44813820333) и [одноразовая YDB integration #44813820465](https://github.com/spartakdubov059/fam-website/actions/runs/44813820465) завершились успешно; YDB workflow использовала локальную disposable DB и синтетические записи. Локальный Docker недоступен, поэтому этот сценарий проверен только через CI.
-- Это закрывает один ранее отсутствовавший сценарий UI/API. Полный аудит всех 78 исходных SQL migrations, RLS, grants, RPC, triggers и оставшихся экранов не завершён; российский облачный staging и цена `0 ₽` не подтверждены. `main`, production и настоящие данные не использовались.
+- Это закрывает один ранее отсутствовавший сценарий UI/API. Полный аудит всех 79 исходных SQL migrations, RLS, grants, RPC, triggers и оставшихся экранов не завершён; российский облачный staging и цена `0 ₽` не подтверждены. `main`, production и настоящие данные не использовались.
 
 ## Снимок upstream на 21 ноября 2026
 
@@ -27,8 +27,8 @@
 
 ## Проверенные сведения
 
-- RU schema охватывает базовые домены объявлений, профилей, избранного, идей, сообщений, регистраций, заявок, блокировок, школьных ролей, модерации медиа, опросов, квот и безопасных очередей (`01`–`33`).
-- В репозитории есть синтетический CI для YDB schema `01`–`33` и backend suite. Последние известные успешные CI записаны в [VALIDATION_2026-11-20_CI.md](VALIDATION_2026-11-20_CI.md); они доказывают только покрытые там сценарии.
+- RU schema охватывает базовые домены объявлений, профилей, избранного, идей, сообщений, регистраций, заявок, блокировок, школьных ролей, модерации медиа, опросов, квот и безопасных очередей (`01`–`34`).
+- На exact commit [cbd6d90](https://github.com/spartakdubov059/fam-website/commit/cbd6d902ebf01245ad1604994c99bf5811556da2) SDK/Sharp CI [#44955101876](https://github.com/spartakdubov059/fam-website/actions/runs/44955101876) завершился успешно, включая весь backend suite и timer-file verifier; disposable YDB CI [#44955101877](https://github.com/spartakdubov059/fam-website/actions/runs/44955101877) применила схемы `01`–`34`, проверила синтетические данные и удалила локальную тестовую базу. Эти workflow не являются российским cloud staging.
 - Семь актуальных/заменённых cron-заданий разобраны отдельно в [CRON_PORTING.md](CRON_PORTING.md). Ни один RU timer не устанавливается автоматически.
 - Ограниченный SQL crosswalk последних 9 миграций находится в [SOURCE_CROSSWALK_2026-11-20.md](SOURCE_CROSSWALK_2026-11-20.md); актуальный инвентарь всех 7 Edge Function entrypoints и их различий — в [EDGE_FUNCTION_COVERAGE_2026-11-20.md](EDGE_FUNCTION_COVERAGE_2026-11-20.md). Эти документы не заменяют аудит полного исходного набора migrations и runtime parity.
 - Ещё 12 upstream migration-файлов, появившихся после базового RU снимка, сопоставлены с текущими schema/API/tests в [SOURCE_PARITY_UPDATE_2026-11-20.md](SOURCE_PARITY_UPDATE_2026-11-20.md); облачные роли, полный SQL/RLS audit и staging там отмечены как незакрытые.
