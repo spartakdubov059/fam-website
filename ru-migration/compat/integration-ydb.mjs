@@ -431,7 +431,7 @@ try {
   }));
   assert.equal(apiSubmission.status, 201);
   assert.equal(apiSubmission.body.status, 'pending');
-  const pendingApiListings = await repo.listActiveListings();
+  const pendingApiListings = await repo.listActiveListings('synthetic-school');
   assert.equal(pendingApiListings.some(row => row.id === apiSubmission.body.id), false,
     'API submissions remain invisible before school moderation');
   assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-student', { decision: 'approve' }))).status, 403,
@@ -451,16 +451,17 @@ try {
   assert.equal(sets[0][0].school_id, 'synthetic-school');
   assert.equal(sets[0][0].status, 'pending');
   assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
-  const beforeDirectModeration = await repo.listActiveListings();
+  const beforeDirectModeration = await repo.listActiveListings('synthetic-school');
   assert.equal(beforeDirectModeration.some(row => row.id === apiSubmission.body.id), true,
     'the separately API-approved item remains public');
   assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
   assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
   assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
-  const publicListings = await repo.listActiveListings();
+  const publicListings = await repo.listActiveListings('synthetic-school');
   assert.equal(publicListings.some(row => row.id === apiSubmission.body.id), true);
   const publicDirectListing = publicListings.find(row => row.id === listing.id);
   assert.ok(publicDirectListing);
+  assert.deepEqual(await repo.listActiveListings('other-school'), [], 'the public feed never returns another school\'s listings');
   assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
     'a same-school member can contact the owner of an active listing');
   assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
@@ -490,7 +491,7 @@ try {
   const ownDelete = await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-registrant', null));
   assert.deepEqual(ownDelete, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
   assert.deepEqual(deletedMediaKeys, [deletionPhotoKey]);
-  assert.equal((await repo.listActiveListings()).some(row => row.id === deletable.id), false);
+  assert.equal((await repo.listActiveListings('synthetic-school')).some(row => row.id === deletable.id), false);
   assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
   assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletionPhotoKey};`)?.[0]?.length ?? 0, 0,
     'deleted listing cleanup removes its media registry entry after the object store confirms deletion');
@@ -675,7 +676,7 @@ try {
     'an uploaded image cannot be discarded after it is atomically linked to a listing');
   assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', 'active'), false,
     'listing with pending photo cannot become public');
-  assert.equal((await repo.listActiveListings()).some(row => row.id === photoListing.id), false,
+  assert.equal((await repo.listActiveListings('synthetic-school')).some(row => row.id === photoListing.id), false,
     'pending photo listing remains absent from the public projection');  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp';
   await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', avatarKey);
   const avatarSubmit = await listingsApi(apiRequest('POST', '/api/v1/me/avatar', 'synthetic-registrant', { image_key: avatarKey }));
