@@ -48,7 +48,7 @@ jobs:
       has_patch: ${{ steps.agent.outputs.has_patch }}
     steps:
       - name: Получить исходники FAM без GitHub credentials
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout v7.0.1
         with:
           ref: main
           persist-credentials: false
@@ -198,7 +198,7 @@ jobs:
       requires_approval: ${{ steps.safety.outputs.requires_approval }}
     steps:
       - name: Получить чистую основную ветку
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout v7.0.1
         with:
           ref: main
           persist-credentials: false
@@ -296,7 +296,7 @@ jobs:
       actions: write
     steps:
       - name: Получить чистую основную ветку
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout v7.0.1
         with:
           ref: main
           persist-credentials: false
