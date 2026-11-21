@@ -45,7 +45,7 @@ jobs:
         if: steps.authorization.outputs.available == 'true'
         shell: bash
         run: |
-          node - <<'NODE'
+          node --input-type=module - <<'NODE'
           const url = 'https://famru.netlify.app/fam-domain-health.json?t=' + Date.now();
           for (let attempt = 1; attempt <= 12; attempt++) {
             try {
