@@ -23,24 +23,29 @@ test("maps the same repository asset to each live domain", () => {
   );
 });
 
-test("only public static files are selected", () => {
+test("only shared public static assets are selected", () => {
   assert.equal(isPublicAssetPath("index.html"), true);
   assert.equal(isPublicAssetPath("assets/banner.webp"), true);
+  assert.equal(isPublicAssetPath("fam-domain-health.json"), false);
   assert.equal(isPublicAssetPath(".github/workflows/site.yml"), false);
   assert.equal(isPublicAssetPath("supabase/functions/moderate/index.ts"), false);
   assert.equal(isPublicAssetPath("../secrets.json"), false);
   assert.equal(isPublicAssetPath("/absolute/index.html"), false);
 });
 
-test("adds core FAM files and ignores non-public paths", () => {
+test("adds core FAM files and ignores host-specific and non-public paths", () => {
   const root = mkdtempSync(join(tmpdir(), "fam-domain-sync-"));
   try {
     mkdirSync(join(root, "scripts"));
     writeFileSync(join(root, "index.html"), "<main>FAM</main>");
     writeFileSync(join(root, "school-pulse.js"), "window.FAM = true;");
     writeFileSync(join(root, "school-pulse.css"), ".fam{}");
+    writeFileSync(join(root, "fam-domain-health.json"), '{"site":"famru"}');
     writeFileSync(join(root, "scripts", "check.mjs"), "console.log('test')");
-    const selected = selectPublicPaths(["scripts/check.mjs", "school-pulse.js"], root);
+    const selected = selectPublicPaths(
+      ["scripts/check.mjs", "school-pulse.js", "fam-domain-health.json"],
+      root,
+    );
     assert.deepEqual(selected, ["index.html", "school-pulse.css", "school-pulse.js"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
