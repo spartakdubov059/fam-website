@@ -46,6 +46,18 @@ window.supabase = {
         or: function () { return result; },
         order: function () { return result; },
         limit: function () { return result; },
+        range: function () { return result; },
+        in: function () { return result; },
+        gte: function () { return result; },
+        lte: function () { return result; },
+        maybeSingle: async function () {
+          return { data: table === "profiles" ? {
+            id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b",
+            role: "student", school_id: "lyceum_3", person_type: "student",
+            first_name: "Тест", last_name: "Ученик", class_name: "9А",
+            avatar_url: null, staff_verification_status: "not_required"
+          } : null, error: null };
+        },
         then: function (resolve, reject) {
           const data = table === "listings" ? [${JSON.stringify(listing)}, ${JSON.stringify(approvedListing)}] : [];
           return Promise.resolve({ data: data, error: null }).then(resolve, reject);
@@ -55,8 +67,12 @@ window.supabase = {
     }
     return {
       auth: {
-        getSession: async function () { return { data: { session: null }, error: null }; }
+        getSession: async function () { return { data: { session: window.__famAuditGuest ? null : {
+          user: { id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b", email: "test@example.invalid" }
+        } }, error: null }; }
       },
+      functions: { invoke: async function () { return { data: { ok: true, role: "student", request: null }, error: null }; } },
+      rpc: async function () { return { data: { announcements: [], polls: [] }, error: null }; },
       from: query
     };
   }
@@ -83,6 +99,28 @@ await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
 );
 
 try {
+  // Keep a separate signed-out scenario: anonymous visitors must not see
+  // school listings. The detailed responsive card audit uses a signed-in mock.
+  const guestPage = await browser.newPage({ viewport: { width: 360, height: 844 } });
+  const guestPageErrors = [];
+  guestPage.on("pageerror", error => guestPageErrors.push(error.message));
+  await guestPage.addInitScript(() => { window.__famAuditGuest = true; });
+  // setContent() does not guarantee init scripts are replayed. Fix the
+  // anonymous SDK fixture itself instead of relying on a window flag.
+  const guestSdkMock = sdkMock.replace("window.__famAuditGuest ? null", "true ? null");
+  assert.notEqual(guestSdkMock, sdkMock, "guest auth mock must be substituted");
+  await guestPage.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", route =>
+    route.fulfill({ status: 200, contentType: "application/javascript", body: guestSdkMock })
+  );
+  await guestPage.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+  );
+  await guestPage.setContent(html, { waitUntil: "domcontentloaded" });
+  await guestPage.locator('#listingsGrid [data-action="open-auth"]').waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await guestPage.locator("#listingsGrid .l-card").count(), 0, "guest must not see school listings");
+  assert.deepEqual(guestPageErrors, [], "guest board must not trigger JavaScript errors");
+  await guestPage.close();
+
   await page.setContent(html, { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
   assert.equal(
@@ -187,6 +225,23 @@ try {
   await page.locator('[data-action="close-description-helper"]').click();
   await page.locator('[data-action="close-listing-modal"]').click();
 
+  // setContent() has no base URL, so relative artwork URLs intentionally fail.
+  // Add a valid inline artwork fixture to test the real banner CSS geometry.
+  await page.evaluate(() => {
+    const stage = document.getElementById("bannerCarousel");
+    if (!stage || stage.querySelector(".hero-img")) return;
+    const slide = document.createElement("div");
+    slide.className = "hero-slide hero-img";
+    slide.setAttribute("aria-hidden", "true");
+    const img = document.createElement("img");
+    img.width = 1200;
+    img.height = 675;
+    img.alt = "Тестовый баннер";
+    img.src = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675"></svg>');
+    slide.appendChild(img);
+    stage.appendChild(slide);
+  });
+
   const widths = [
     { width: 360, height: 844, columns: 2 },
     { width: 360, height: 640, columns: 2 },
@@ -238,6 +293,29 @@ try {
     assert.ok(metrics.bodyWidth <= size.width + 1, `body has horizontal overflow at ${size.width}px: ${metrics.bodyWidth}px`);
     assert.ok(metrics.mainScrollWidth <= metrics.mainClientWidth + 1, `main content overflows horizontally at ${size.width}px`);
     assert.equal(metrics.columns, size.columns, `unexpected card column count at ${size.width}px`);
+
+    // Photo artwork is authored at 16:9. It must fill the banner without
+    // letterboxing, blurred top/bottom edges, or cropping on mobile devices.
+    if (size.width <= 767) {
+      const bannerMetrics = await page.locator("#bannerCarousel .hero-img").first().evaluate(slide => {
+        const image = slide.querySelector("img");
+        const box = slide.getBoundingClientRect();
+        const photo = image.getBoundingClientRect();
+        return {
+          frameHeight: box.height,
+          imageHeight: photo.height,
+          frameWidth: box.width,
+          imageWidth: photo.width,
+          fit: getComputedStyle(image).objectFit,
+          background: getComputedStyle(slide, "::before").content
+        };
+      });
+      assert.ok(Math.abs(bannerMetrics.frameHeight - bannerMetrics.imageHeight) < 2, "banner has vertical bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth - bannerMetrics.imageWidth) < 2, "banner has horizontal bands at " + size.width);
+      assert.ok(Math.abs(bannerMetrics.frameWidth / bannerMetrics.frameHeight - 16 / 9) < .035, "banner aspect is wrong at " + size.width);
+      assert.equal(bannerMetrics.fit, "cover", "mobile banner photo must fill its frame");
+      assert.equal(bannerMetrics.background, "none", "old blurred banner background must be absent");
+    }
 
     for (const [name, box] of Object.entries(metrics)) {
       if (!box || typeof box !== "object" || !("right" in box)) continue;
@@ -298,11 +376,11 @@ try {
     };
 
     await inspectSection("favorites", "favoritesSection", "#favoritesEmpty");
-    await inspectSection("profile", "profileSection", "#profileLoggedOut");
-    await inspectSection("messages", "messagesSection", "#dialogsGuest");
+    await inspectSection("profile", "profileSection", "#profileLoggedIn");
+    await inspectSection("messages", "messagesSection", "#dialogsList");
 
     // Login and listing forms are checked without submitting or creating real records.
-    await page.locator('#dialogsGuest [data-action="open-auth"]').click();
+    await page.evaluate(() => window.openModal("authModal"));
     const authMetrics = await page.locator("#authModal .modal-content").evaluate(node => {
       const box = node.getBoundingClientRect();
       return { open: node.closest(".modal").classList.contains("open"), left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width };
@@ -345,7 +423,8 @@ try {
       detailsModalWidth: Math.round(modalMetrics.width),
       authModalWidth: Math.round(authMetrics.width),
       listingFormWidth: Math.round(formMetrics.width),
-      guestSections: "PASS",
+      memberSections: "PASS",
+      signedOutBoard: "PASS",
       approvedPhoto: "PASS",
       categoryHints: "PASS"
     }));

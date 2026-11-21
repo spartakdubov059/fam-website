@@ -19,6 +19,7 @@ const reviewer = readFileSync(resolve(root, "supabase/functions/moderate/dispute
 const moderate = readFileSync(resolve(root, "supabase/functions/moderate/index.ts"), "utf8");
 const contentSafety = readFileSync(resolve(root, "supabase/functions/moderate/content-safety.js"), "utf8");
 const html = readFileSync(resolve(root, "index.html"), "utf8");
+const identityMigration = readFileSync(resolve(root, "supabase/migrations/20261116120000_fam_person_types_and_school_applicant_privacy.sql"), "utf8");
 
 test("avatar uploads are enqueued privately instead of being deleted on quota/provider errors", () => {
   const start = submit.indexOf('if (kind === "avatar") {');
@@ -109,15 +110,34 @@ test("a provider outage does not block a locally clean idea, while local risk st
   assert.match(contentSafety, /serious_hate_or_threat/);
 });
 
-test("student identity fields are gathered at registration and editable in the user's own profile", () => {
+test("person types collect the right registration data and remain editable only in the user's own profile", () => {
   assert.match(html, /id="authFirstName"/);
   assert.match(html, /id="authLastName"/);
+  assert.match(html, /id="authPersonType"/);
   assert.match(html, /id="authClassName"/);
-  assert.match(html, /first_name: firstName/);
-  assert.match(html, /last_name: lastName/);
-  assert.match(html, /class_name: className/);
+  assert.match(html, /id="authStaffPosition"/);
+  assert.match(html, /person_type: personType/);
+  assert.match(html, /class_name: className \|\| null/);
+  assert.match(html, /staff_position: staffPosition \|\| null/);
   assert.match(html, /id="profileStudentIdentityForm"/);
-  assert.match(html, /\.update\(\{ first_name, last_name, class_name \}\)/);
+  assert.match(html, /id="profilePersonType"/);
+  assert.match(html, /\.update\(\{ first_name, last_name, person_type, class_name, staff_position \}\)/);
+  assert.match(html, /staff_verification_status/);
+});
+
+test("person categories never grant roles and school personal data stays behind scoped RPCs", () => {
+  assert.match(identityMigration, /person_type in \('student', 'school_staff', 'parent'\)/);
+  assert.match(identityMigration, /values \([\s\S]*?'student',[\s\S]*?v_person_type[\s\S]*?\)/);
+  assert.match(identityMigration, /new\.role := old\.role/);
+  assert.match(identityMigration, /new\.school_id := old\.school_id/);
+  const applicants = identityMigration.slice(identityMigration.indexOf("create or replace function public.list_school_event_applicants"), identityMigration.indexOf("revoke all on function public.list_school_event_applicants"));
+  assert.match(applicants, /v_viewer\.role not in \('school_admin', 'council_member'\)/);
+  assert.match(applicants, /e\.school_id = v_viewer\.school_id/);
+  assert.match(applicants, /p\.school_id = v_viewer\.school_id/);
+  assert.doesNotMatch(applicants, /email/i);
+  const staffReview = identityMigration.slice(identityMigration.indexOf("create or replace function public.list_pending_school_staff_verifications"));
+  assert.match(staffReview, /v_admin\.role <> 'school_admin'/);
+  assert.match(staffReview, /grant execute on function public\.review_school_staff_verification\(uuid, text\) to authenticated/i);
 });
 
 test("student identity is visible to school admins only through same-school admin queries", () => {
