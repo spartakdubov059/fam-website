@@ -255,3 +255,12 @@
 - Полный локальный backend/UI suite: **392/392**; `ru-migration/compat/verify.mjs` прошёл. Тесты используют поддельный timer API и не ждут реальное время.
 - Точные GitHub push runs завершились успешно: [SDK/Sharp CI #44811673106](https://github.com/spartakdubov059/fam-website/actions/runs/44811673106) и [Disposable YDB integration #44811672840](https://github.com/spartakdubov059/fam-website/actions/runs/44811672840). Облачный Yandex Cloud не вызывался.
 - Ветка `main`, production, реальные данные и платные ресурсы не затронуты.
+
+
+## Lookup indexes и disposable YDB — 22 ноября 2026
+
+На точном code commit [`6497b402ad99a7808fde688f93d823968694aa7c`](https://github.com/spartakdubov059/fam-website/commit/6497b402ad99a7808fde688f93d823968694aa7c) добавлена `schema/34_source_lookup_indexes.yql`: owner index `fam_pending_media` и school/actor/target indexes `fam_safety_incidents`.
+
+- [Disposable YDB CI #44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) — success; применены схемы 01–34, пройдена synthetic repository integration, временная база удалена.
+- [SDK/Sharp CI #44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) — success; Node 22 backend suite, locked YDB/AWS/Sharp compatibility, Yandex Cloud Functions package и 8 timer/service definitions прошли.
+- Локальная повторная проверка: **432/432** backend/UI tests на Node 24.22.3; `SDK_COMPAT_PASS`, portable timer validator 8/8. Это не облачная YDB/IAM/S3 проверка, не работающий systemd и не гарантия расходов 0 ₽.

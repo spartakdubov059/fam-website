@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (дерево `9c34c27eb3deed9254ea6aa62964d65326e03ede`). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 33 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `6497b402ad99a7808fde688f93d823968694aa7c` (`05439fa70ababe9d4a2dc60cf7aeef5deca84ef4`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
@@ -86,3 +86,10 @@
 - Актуальный `main` `147ec7903148bfface274c4e681aabb299252dcf` содержит одну новую SQL migration сверх снимка 21 ноября: `20261121190000_restrict_listings_to_authenticated_same_school.sql`. Её поведение уже реализовано в RU API/repository и покрыто отдельной заметкой приватности и disposable YDB CI; строка добавлена в `SUPABASE_MIGRATION_INVENTORY_2026-11-20.md`.
 - Автоматическая сверка всех путей SQL migration в `main` с путями реестра дала **79/79 записей**, пропущенных файлов нет. Это подтверждает только полноту списка имён, не полноту эквивалентности объектов PostgreSQL/YDB, RLS, RPC, триггеров или полей API.
 - Source code, `main`, production и пользовательские данные не менялись.
+
+
+## Индексы очистки медиа и атрибуции safety — 22 ноября 2026
+
+- Добавлена `schema/34_source_lookup_indexes.yql`: индекс pending media по владельцу поддерживает безопасное удаление файлов аккаунта, два школьных индекса safety attribution покрывают actor/target lookup. Изменён только `migration/yandex-cloud`; main/production и пользовательские данные не затрагивались.
+- Точный disposable YDB CI [#44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) успешно применил схемы 01–34, прошёл synthetic integration и удалил контейнер. Точный SDK/Sharp CI [#44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) прошёл 432 backend tests на Node 22, timer validation и Cloud Functions package checks.
+- Ветка всё ещё не проверена на Yandex Cloud; запуск таймеров, включение worker, cloud IAM и расходы 0 ₽ не подтверждены.
