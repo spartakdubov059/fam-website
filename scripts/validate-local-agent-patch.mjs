@@ -19,6 +19,7 @@ export function isAllowedAgentPath(path) {
     // Only inert raster images are permitted; SVG/HTML/JS assets can contain executable content.
     return /\.(?:png|jpe?g|webp|avif|gif)$/i.test(path);
   }
+  if (/^tests\/(?:security|moderation|agent-benchmark)\//.test(path)) return false;
   return path.startsWith("css/") ||
     path.startsWith("js/") ||
     path.startsWith("docs/") ||
