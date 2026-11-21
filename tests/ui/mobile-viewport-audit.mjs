@@ -105,8 +105,12 @@ try {
   const guestPageErrors = [];
   guestPage.on("pageerror", error => guestPageErrors.push(error.message));
   await guestPage.addInitScript(() => { window.__famAuditGuest = true; });
+  // setContent() does not guarantee init scripts are replayed. Fix the
+  // anonymous SDK fixture itself instead of relying on a window flag.
+  const guestSdkMock = sdkMock.replace("window.__famAuditGuest ? null", "true ? null");
+  assert.notEqual(guestSdkMock, sdkMock, "guest auth mock must be substituted");
   await guestPage.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", route =>
-    route.fulfill({ status: 200, contentType: "application/javascript", body: sdkMock })
+    route.fulfill({ status: 200, contentType: "application/javascript", body: guestSdkMock })
   );
   await guestPage.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
