@@ -101,6 +101,7 @@ test("independent verification runs without model or write credentials", () => {
 test("the test workflow can be explicitly dispatched for a token-created PR branch", () => {
   assert.match(testWorkflow, /workflow_dispatch:/);
   assert.match(workflow, /gh workflow run \.github\/workflows\/moderation-regression\.yml --ref "\$BRANCH"/);
+  assert.match(workflow, /BRANCH="codex\/fam-run-\$\{GITHUB_RUN_ID\}"[\s\S]*?gh workflow run \.github\/workflows\/moderation-regression\.yml --ref "\$BRANCH"/);
   assert.match(workflow, /gh run watch "\$TEST_RUN_ID" --exit-status --interval 10/);
 });
 
