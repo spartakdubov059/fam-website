@@ -118,6 +118,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     if (!item || typeof item.title !== 'string' || typeof item.body !== 'string') return;
     const card = node(document, 'article', `ru-pulse-card ru-pulse-${item.kind === 'important' ? 'important' : item.kind === 'open_event' ? 'event' : 'news'}`);
     card.setAttribute('data-search', `${item.title} ${item.body}`.toLocaleLowerCase('ru-RU'));
+    card.setAttribute('data-sort-date', item.event_starts_at || item.published_at || '');
     const label = item.kind === 'important' ? 'Важно' : item.kind === 'open_event' ? 'Открытое мероприятие' : 'Новости школы';
     card.append(node(document, 'p', 'ru-pulse-kind', label), node(document, 'h3', '', item.title), node(document, 'p', 'ru-pulse-body', item.body));
     const dateValue = item.event_starts_at || item.published_at;
@@ -132,6 +133,7 @@ export async function initializeSchoolPulse({ document = globalThis.document, fe
     if (!poll || typeof poll.id !== 'string' || typeof poll.question !== 'string' || !Array.isArray(poll.options)) return;
     const card = node(document, 'article', 'ru-pulse-card ru-pulse-poll');
     card.setAttribute('data-search', poll.question.toLocaleLowerCase('ru-RU'));
+    card.setAttribute('data-sort-date', poll.closes_at || poll.published_at || '');
     card.append(node(document, 'p', 'ru-pulse-kind', 'Опрос'), node(document, 'h3', '', poll.question));
     const closes = new Date(poll.closes_at);
     const closed = !Number.isFinite(closes.getTime()) || closes.getTime() <= Date.now();

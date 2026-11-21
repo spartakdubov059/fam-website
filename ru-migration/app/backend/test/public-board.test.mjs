@@ -5,8 +5,9 @@ import { loadPublicBoard } from '../../web/public-board.js';
 class FakeNode {
   constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.hidden = false; this.open = false; }
   get childNodes() { return this.children; }
-  append(...nodes) { this.children.push(...nodes); }
+  append(...nodes) { this.children.push(...nodes); for (const node of nodes) node.parentNode = this; }
   replaceChildren(...nodes) { this.children = nodes; }
+  insertBefore(node, reference) { const index = this.children.indexOf(reference); this.children.splice(index < 0 ? this.children.length : index, 0, node); node.parentNode = this; }
   setAttribute(name, value) { this.attributes[name] = value; }
   getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
@@ -18,12 +19,17 @@ function boardCard(root, index = 0) { return root.children.filter(node => node.c
 
 function createFakeDocument() {
   const listeners = {}; const pulseCards = [];
+  const pulseRoot = new FakeNode('section'); pulseRoot.id = 'ruPulse';
+  const heading = new FakeNode('h2'); heading.textContent = 'Новости и опросы школы';
+  const pulseFeed = new FakeNode('div'); pulseFeed.className = 'ru-pulse-feed'; pulseRoot.append(heading, pulseFeed);
   return {
     pulseCards,
+    pulseRoot,
     body: new FakeNode('body'),
     createElement: tag => new FakeNode(tag),
     createDocumentFragment: () => new FakeNode('#fragment'),
     querySelectorAll: selector => selector === '#ruPulse .ru-pulse-card' ? pulseCards : [],
+    getElementById: id => id === 'ruPulse' ? pulseRoot : null,
     addEventListener: (name, handler) => { listeners[name] = handler; },
     dispatchEvent: event => listeners[event.type]?.(event),
   };
@@ -121,6 +127,7 @@ test('Afisha search, category and result count include school announcements and 
   notice.setAttribute('data-search', 'школьная новость о ярмарке');
   const poll = new FakeNode('article'); poll.className = 'ru-pulse-card ru-pulse-poll'; poll.textContent = 'Какую книгу обсудим?'; poll.setAttribute('data-search', 'какую книгу обсудим?');
   document.pulseCards.push(notice, poll);
+  document.pulseRoot.children[1].append(notice, poll);
   document.dispatchEvent(new Event('famru:pulse-updated'));
   const toolbar = root.children[0]; const search = toolbar.children[0];
   const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
@@ -138,6 +145,36 @@ test('Afisha search, category and result count include school announcements and 
   assert.equal(poll.hidden, true, 'school pulse cards are shown with the general board or Afisha filter');
   filters.children.find(button => button.textContent === 'Афиша').listeners.click();
   assert.equal(poll.hidden, false, 'Afisha filter includes matching school polls');
+});
+
+test('Afisha combines school posts and event listings in one ordered section and filters them together', async () => {
+  const root = new FakeNode('section'); const document = createFakeDocument();
+  const listings = [
+    { id: 'market', title: 'Весенняя ярмарка', description: 'Школьная ярмарка', category: 'Афиша', price_text: 'Бесплатно', is_event: true, event_date: '2026-12-20', event_time: '12:00' },
+    { id: 'lesson', title: 'Словарь', description: 'Для школы', category: 'Учёба', price_text: '300 ₽', is_event: false },
+    { id: 'concert', title: 'Концерт', description: 'Музыка', category: 'Афиша', price_text: 'Бесплатно', is_event: true, event_date: '2026-12-10', event_time: '18:00' },
+  ];
+  await loadPublicBoard({ root, document, fetchImpl: async url => url === '/api/v1/listings'
+    ? { ok: true, json: async () => ({ ok: true, listings }) }
+    : { ok: false, status: 401, json: async () => ({}) } });
+  const notice = new FakeNode('article'); notice.className = 'ru-pulse-card ru-pulse-news'; notice.setAttribute('data-search', 'школьная новость'); notice.setAttribute('data-sort-date', '2026-12-15T00:00:00Z');
+  const poll = new FakeNode('article'); poll.className = 'ru-pulse-card ru-pulse-poll'; poll.setAttribute('data-search', 'какую книгу'); poll.setAttribute('data-sort-date', '2026-12-25T00:00:00Z');
+  document.pulseCards.push(notice, poll);
+  document.pulseRoot.children[1].append(notice, poll);
+  document.dispatchEvent(new Event('famru:pulse-updated'));
+  const toolbar = root.children[0]; const search = toolbar.children[0];
+  const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
+  const afisha = filters.children.find(button => button.textContent === 'Афиша');
+  afisha.listeners.click();
+  assert.deepEqual(document.pulseRoot.children.slice(2), [boardCard(root, 2), notice, boardCard(root, 0), poll]);
+  assert.equal(boardCard(root, 1).hidden, true, 'ordinary listings stay out of Afisha');
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Показано 4 материала/);
+  search.value = 'концерт'; search.listeners.input();
+  assert.equal(boardCard(root, 0).hidden, true);
+  assert.equal(boardCard(root, 2).hidden, false);
+  assert.equal(notice.hidden, true);
+  assert.equal(poll.hidden, true);
+  assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Показан 1 материал/);
 });
 
 test('authenticated board opens the saved favorites view and removes an item from it immediately', async () => {

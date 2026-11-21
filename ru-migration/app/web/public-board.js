@@ -504,15 +504,47 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
           .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
         const textMatches = !query || searchable.includes(query);
         card.hidden = !viewMatches || !categoryMatches || !textMatches;
+        if (listing.is_event === true) card.hidden = card.hidden || category !== 'Афиша' || boardView === 'favorites';
         if (!card.hidden) visible++;
       }
       const pulseCards = [...(document.querySelectorAll?.('#ruPulse .ru-pulse-card') || [])];
       const afishaActive = category === 'Афиша' && boardView !== 'favorites';
-      document.getElementById?.('ruPulse')?.setAttribute?.('data-afisha-active', String(afishaActive));
+      const pulseRoot = document.getElementById?.('ruPulse');
+      pulseRoot?.setAttribute?.('data-afisha-active', String(afishaActive));
+      const pulseHeading = pulseRoot?.children?.find?.(child => child?.tagName === 'H2');
+      if (pulseHeading) pulseHeading.textContent = afishaActive ? 'Афиша' : 'Новости и опросы школы';
+      const eventCards = cards.filter(({ listing }) => listing.is_event === true);
+      const eventDate = listing => {
+        const raw = listing.event_date && listing.event_time ? `${listing.event_date}T${listing.event_time}` : listing.event_date;
+        const parsed = typeof raw === 'string' ? Date.parse(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      const pulseSortDate = card => Date.parse(card.getAttribute?.('data-sort-date') || '') || 0;
+      const afishaOrder = [
+        ...pulseCards.map(card => ({ card, at: pulseSortDate(card) })),
+        ...eventCards.map(({ card, listing }) => ({ card, at: eventDate(listing) })),
+      ].sort((left, right) => left.at - right.at);
       for (const card of pulseCards) {
         const searchable = String(card.getAttribute?.('data-search') || '').toLocaleLowerCase('ru');
         card.hidden = !afishaActive || Boolean(query && !searchable.includes(query));
         if (!card.hidden) visible++;
+      }
+      const publicListings = document.getElementById?.('publicListings');
+      const pulseFeed = pulseRoot?.children?.find?.(child => child?.className === 'ru-pulse-feed');
+      if (pulseRoot && pulseFeed && eventCards.length) {
+        const controls = [...root.children].filter(child => child?.className === 'ru-board-controls');
+        const currentPulseCards = [...pulseFeed.children].filter(child => pulseCards.includes(child));
+        pulseFeed.replaceChildren(...currentPulseCards);
+        pulseRoot.replaceChildren(pulseHeading, pulseFeed, ...afishaOrder.map(item => item.card));
+        for (const card of pulseCards) {
+          card.hidden = !afishaActive || Boolean(query && !String(card.getAttribute?.('data-search') || '').toLocaleLowerCase('ru').includes(query));
+        }
+        for (const item of eventCards) {
+          const searchable = [item.listing.title, item.listing.description, item.listing.category, item.listing.price_text]
+            .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
+          item.card.hidden = !afishaActive || Boolean(query && !searchable.includes(query));
+        }
+        if (publicListings) publicListings.replaceChildren(...controls);
       }
       for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
       for (const [name, button] of viewButtons) button.setAttribute('aria-pressed', String(name === boardView));
