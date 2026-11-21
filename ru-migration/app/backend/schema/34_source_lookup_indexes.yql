@@ -1,0 +1,5 @@
+-- Lookup indexes required by account-owned media cleanup and school-scoped
+-- safety incident attribution. These map to upstream queue/safety indexes.
+ALTER TABLE fam_pending_media ADD INDEX fam_pending_media_user_id_idx GLOBAL ON (user_id);
+ALTER TABLE fam_safety_incidents ADD INDEX fam_safety_incidents_school_actor_created_idx GLOBAL ON (school_id, actor_id, created_at);
+ALTER TABLE fam_safety_incidents ADD INDEX fam_safety_incidents_school_target_created_idx GLOBAL ON (school_id, target_id, created_at);
