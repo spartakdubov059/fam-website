@@ -12,3 +12,7 @@
 - Облачный staging не выполнялся. Disposable local YDB и проверки совместимости SDK не доказывают работоспособность OAuth, YDB IAM, российского S3, API Gateway или расписаний в облаке.
 - Полный security scan не завершился: Security workbench превысил 300-секундный таймаут и не вернул авторитетный scan ID/результат. Полного независимого security sign-off нет.
 - Временный Node runtime хранится вне репозитория в `/tmp/fam-ru-node22-check`. `main`, production, реальные данные учеников и облачные ресурсы не изменялись. Remote `migration/yandex-cloud` получил только кодовые изменения в своей изолированной ветке и последующие документы.
+
+## Повтор после защиты повторной отправки форм
+
+На кодовом commit [`ea7325e187887dddf47457b71acd97107dac3145`](https://github.com/spartakdubov059/fam-website/commit/ea7325e187887dddf47457b71acd97107dac3145) на Node 22.15.0 целевой `listing-submit-ui.test.mjs` прошёл **14/14**, весь backend/UI набор — **432/432**, а `compat/verify.mjs` выдал `SDK_COMPAT_PASS`. На том же точном GitHub commit [SDK/Sharp CI #44948441225](https://github.com/spartakdubov059/fam-website/actions/runs/44948441225) и [YDB synthetic CI #44948441262](https://github.com/spartakdubov059/fam-website/actions/runs/44948441262) завершились успешно. YDB job применила схемы 01–33, выполнила синтетические сценарии, вывела `YDB_LOCAL_INTEGRATION_PASS` и удалила disposable контейнер. Эти workflow не проверяют облачный OAuth, YDB IAM, S3 или zero-cost cloud staging.
