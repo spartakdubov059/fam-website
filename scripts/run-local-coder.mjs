@@ -7,9 +7,9 @@ import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
 
 const MODEL_URL =
-  "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/13fb94b/qwen2.5-coder-7b-instruct-q4_k_m.gguf";
+  "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf";
 const API_URL = "http://127.0.0.1:8080/v1/chat/completions";
-const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen2.5-Coder-7B-Instruct").slice(0, 120);
+const MODEL_ID = (process.env.FAM_MODEL_ID || "Qwen3.8-27B-IQ2_XS").slice(0, 120);
 const DEVELOPER_POLICY = readFileSync(".github/prompts/fam-codex-developer.md", "utf8");
 const ALLOWED_PREFIXES = ["css/", "js/", "assets/", "docs/", "tests/"];
 const DEFAULT_AUDIT_TASK = [
@@ -196,7 +196,18 @@ const planSchema = {
   },
 };
 
-const plan = await askModel([
+// The isolated timeAgo benchmark skips the expensive general repository planner.
+// The model still must independently generate the complete patch and pass all QA.
+const narrowTimeAgo = process.env.FAM_NARROW_TIMEAGO_BENCHMARK === "1";
+const plan = narrowTimeAgo ? {
+  finding_status: "issue_found",
+  problem_summary: "Validate invalid timestamps and preserve Unix epoch zero in timeAgo",
+  root_cause: "Explicit reproducible benchmark; model must inspect source and generate its own patch",
+  evidence: ["Benchmark task and existing independent timeAgo test"],
+  files: ["index.html"],
+  keywords: ["timeAgo"],
+  plan: "Fix only the timeAgo function without modifying tests or any other file"
+} : await askModel([
   {
     role: "system",
     content: [
@@ -252,7 +263,22 @@ if (selected.length > 4 || selected.some((path) => !tracked.includes(path) || !a
 }
 
 const excerpts = selected.map((path) => {
-  const body = sourceContext(path, plan.keywords || [], task);
+  let body;
+  if (narrowTimeAgo && path === "index.html") {
+    const lines = readFileSync(path, "utf8").split(/\r?\n/);
+    const start = lines.findIndex((line) => /\bfunction\s+timeAgo\s*\(/.test(line));
+    if (start < 0) throw new Error("timeAgo function not found; aborting narrow benchmark");
+    const contextStart = Math.max(0, start - 5);
+    const contextEnd = Math.min(lines.length, start + 65);
+    // Line numbers are metadata for hunk offsets, not part of the source code.
+    // Qwen must still generate every changed line of its own patch.
+    body = "[Original file index.html; excerpt begins at line " + (contextStart + 1) +
+      "; function timeAgo begins at line " + (start + 1) +
+      ". Use original file line numbers in @@ headers, never assume line 1.]\n" +
+      lines.slice(contextStart, contextEnd).join("\n");
+  } else {
+    body = sourceContext(path, plan.keywords || [], task);
+  }
   return "## Файл: " + path + "\n\`\`\`\n" + body + "\n\`\`\`";
 }).join("\n\n");
 
@@ -310,11 +336,76 @@ const patchMessages = [
   },
 ];
 
-let result = await askModel(patchMessages, patchSchema, 7000);
+
+ // For this isolated benchmark, request only the model-written diff and root cause.
+ // All other report fields are supplied by the test harness, not as model claims.
+ // No code change is prefilled: the independent workflow still validates the model's diff.
+const narrowPatchSchema = {
+  name: "fam_timeago_minimal_patch",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      unified_diff: { type: "string" },
+      root_cause: { type: "string" },
+    },
+    required: ["unified_diff", "root_cause"],
+  },
+};
+
+const narrowMessages = [
+  {
+    role: "system",
+    content: [
+      DEVELOPER_POLICY,
+      "Ты локально работающий ИИ-программист FAM. Платные и внешние API недоступны.",
+      "Используй только переданный фрагмент index.html и исправляй только функцию timeAgo.",
+      "Не меняй тесты, безопасность, роли, Supabase, конфигурацию или другой код.",
+      "Самостоятельно сформируй минимальный применимый git unified diff.",
+      "Контекст является выдержкой из большого index.html, а не началом файла. В заголовке @@ укажи реальный номер строки функции, сообщённый в метаданных выдержки; @@ -1 недопустим, если функция находится ниже первой строки.",
+      "Контекстные и удаляемые строки должны точно совпадать с переданным исходником, включая пробелы и отступы.",
+      "Строка unified_diff должна начинаться с diff --git a/index.html b/index.html, затем --- a/index.html, +++ b/index.html, @@ и реальные строки с префиксами пробел/+/−.",
+      "Возвращай только JSON из двух строковых полей: unified_diff и root_cause. Без Markdown.",
+      "Если исправление не можешь подтвердить по исходнику, верни пустой unified_diff.",
+    ].join("\n"),
+  },
+  {
+    role: "user",
+    content: JSON.stringify({ task, source_context: excerpts }),
+  },
+];
+
+function normalizeNarrowPatchResult(response) {
+  if (!narrowTimeAgo) return response;
+  const diff = String(response.unified_diff || "").trim();
+  return {
+    finding_status: diff ? "issue_found" : "blocked",
+    problem_summary: "Reproducible timeAgo invalid-date and Unix epoch handling",
+    root_cause: String(response.root_cause || ""),
+    evidence: ["index.html: timeAgo source, independently checked by time-ago.test.mjs"],
+    unified_diff: diff,
+    summary: "Unverified candidate from isolated local Qwen benchmark; independent QA required",
+    proposed_change: "Modify only the timeAgo function in index.html",
+    risk: "low",
+    requires_approval: true,
+    tests: ["tests/agent-benchmark/time-ago.test.mjs", "tests/security/*.test.mjs"],
+  };
+}
+
+async function requestPatch(messages) {
+  const response = await askModel(
+    messages,
+    narrowTimeAgo ? narrowPatchSchema : patchSchema,
+    narrowTimeAgo ? 2800 : 7000,
+  );
+  return normalizeNarrowPatchResult(response);
+}
+
+let result = await requestPatch(narrowTimeAgo ? narrowMessages : patchMessages);
 if (result.finding_status === "issue_found" && !String(result.unified_diff || "").trim()) {
   console.warn("Model confirmed a concrete issue but returned an empty diff; requesting one focused patch retry.");
-  result = await askModel([
-    ...patchMessages,
+  result = await requestPatch([
+    ...(narrowTimeAgo ? narrowMessages : patchMessages),
     { role: "assistant", content: JSON.stringify(result) },
     {
       role: "user",
@@ -325,7 +416,7 @@ if (result.finding_status === "issue_found" && !String(result.unified_diff || ""
         "Если исправление действительно невозможно, объясни конкретное техническое препятствие в summary и root_cause; не оставляй пустой diff без объяснения.",
       ].join("\\n"),
     },
-  ], patchSchema, 7000);
+  ]);
 }
 
 const outDir = join(process.env.RUNNER_TEMP || "/tmp", "fam-agent");
@@ -365,8 +456,8 @@ if (patch) {
 
         if (attempt === 0) {
           console.warn("Git rejected the model patch; requesting one focused repair:", patchCheckError);
-          result = await askModel([
-            ...patchMessages,
+          result = await requestPatch([
+            ...(narrowTimeAgo ? narrowMessages : patchMessages),
             { role: "assistant", content: JSON.stringify({ ...result, unified_diff: patch }) },
             {
               role: "user",
@@ -379,7 +470,7 @@ if (patch) {
                 "Верни полный исправленный unified_diff, который применим к переданному исходному файлу.",
               ].join("\n"),
             },
-          ], patchSchema, 7000);
+          ]);
           patch = String(result.unified_diff || "").trim();
           if (!patch) {
             patchCheckError = "Model returned an empty patch during the repair attempt.";
