@@ -155,3 +155,15 @@ test("PR126 general planner runtime test cannot write or alter production", () =
   assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
   assert.doesNotMatch(integrationTrialWorkflow, /secrets\.|contents: write|gh pr merge|supabase db push/);
 });
+
+test("general Qwen planner stays model-authored with compact JSON and independent approval", () => {
+  assert.match(runner, /function planningSourceContext\(path, task\)/);
+  assert.match(runner, /required: \["finding_status", "files", "plan"\]/);
+  assert.match(runner, /\], planSchema, 650\)/);
+  assert.match(runner, /required: \["unified_diff", "root_cause"\]/);
+  assert.match(runner, /if \(plan\.finding_status !== "issue_found"/);
+  assert.match(runner, /return isAllowedAgentPath\(path\)/);
+  assert.match(runner, /summary: "Unverified model-generated candidate; independent QA and owner approval required"/);
+  assert.match(runner, /requires_approval: true/);
+  assert.doesNotMatch(runner, /if \(narrowTimeAgo\) return \{ unified_diff:/);
+});
