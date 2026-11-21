@@ -113,9 +113,9 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function sourceContext(path, keywords, task) {
+function sourceContext(path, keywords, task, maxChars = 26000) {
   const source = readFileSync(resolve(path), "utf8");
-  if (source.length <= 26000) return source;
+  if (source.length <= maxChars) return source;
 
   const lines = source.split(/\r?\n/);
   const terms = [...new Set([
@@ -141,7 +141,7 @@ function sourceContext(path, keywords, task) {
   let output = "";
   for (const range of ranges) {
     const chunk = lines.slice(range.start, range.end + 1).join("\n");
-    if (output.length + chunk.length > 26000) break;
+    if (output.length + chunk.length > maxChars) break;
     output += (output ? "\n\n[...пропущен несвязанный участок...]\n\n" : "") +
       "[Фрагмент " + path + ", строки " + (range.start + 1) + "–" + (range.end + 1) + "]\n" + chunk;
   }
@@ -149,6 +149,23 @@ function sourceContext(path, keywords, task) {
     throw new Error("Не удалось выбрать фрагменты " + path + " по ключевым словам. Автоматическое изменение отменено.");
   }
   return output;
+}
+
+
+function planningSourceContext(path, task) {
+  const lines = readFileSync(resolve(path), "utf8").split(/\r?\n/);
+  // Focus on an explicitly named function without assuming a code change.
+  // Function offsets remain tied to the original full file.
+  for (const token of new Set(taskTokens(task))) {
+    const pattern = new RegExp("\\bfunction\\s+" + escapeRegExp(token) + "\\s*\\(", "i");
+    const index = lines.findIndex((line) => pattern.test(line));
+    if (index < 0) continue;
+    const start = Math.max(0, index - 5);
+    const end = Math.min(lines.length, index + 40);
+    return "[Фрагмент " + path + ", строки " + (start + 1) + "–" + end + "]\n" +
+      lines.slice(start, end).join("\n").slice(0, 5500);
+  }
+  return sourceContext(path, [], task, 6000);
 }
 
 const root = process.env.GITHUB_WORKSPACE || process.cwd();
@@ -175,7 +192,7 @@ const taskReferencedPaths = tracked
   .slice(0, 4);
 const taskReferencedSource = taskReferencedPaths.map((path) => ({
   path,
-  content: sourceContext(path, [], task),
+  content: planningSourceContext(path, task),
 }));
 
 const planSchema = {
@@ -185,14 +202,10 @@ const planSchema = {
     additionalProperties: false,
     properties: {
       finding_status: { type: "string", enum: ["no_issue", "needs_research", "blocked", "issue_found"] },
-      problem_summary: { type: "string" },
-      root_cause: { type: "string" },
-      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
       files: { type: "array", items: { type: "string" }, maxItems: 4 },
-      keywords: { type: "array", items: { type: "string" }, maxItems: 18 },
       plan: { type: "string" },
     },
-    required: ["finding_status", "problem_summary", "root_cause", "evidence", "files", "keywords", "plan"],
+    required: ["finding_status", "files", "plan"],
   },
 };
 
@@ -218,8 +231,8 @@ const plan = narrowTimeAgo ? {
       "Не выбирай .github/, scripts/, supabase/, миграции, SQL, Edge Functions, конфигурацию доступа, Auth, роли, платежи, секреты или деплой.",
       "Если задача затрагивает аккаунты, персональные данные, модерацию, права доступа, удаление/блокировки или необратимые операции — выбери пустой список файлов.",
       "Сначала выбери finding_status: no_issue, needs_research, blocked или issue_found. Ставь issue_found только при конкретном свидетельстве в задаче или инвентаре; предположение отмечай как needs_research.",
-      "Кратко заполни problem_summary, root_cause и evidence. Не выдумывай строки кода или факты, которых нет в переданных данных.",
-      "Для большого index.html укажи точные символы/строки поиска из списка symbols и keywords.",
+      "Кратко заполни только finding_status, files и plan. Нельзя придумывать факты; причина и доказательства будут проверены при генерации patch и независимой QA.",
+      "Для большого index.html используй переданные фрагменты с реальными номерами строк. При отсутствии нужного кода не утверждай, что проблема подтверждена.",
       "Если задача не даёт основания для конкретного исправления, верни files=[] и объясни это.",
        "Если пользователь прямо указал путь к файлу и его содержимое передано в task_referenced_source, сначала изучи это содержимое. Не запрашивай повторно уже переданные исходники и не считай файл недостаточным только по его размеру.",
        "Сопоставь описанный в задаче воспроизводимый дефект с фактической реализацией в переданном исходнике.",
@@ -228,11 +241,20 @@ const plan = narrowTimeAgo ? {
   },
   {
     role: "user",
-    content: JSON.stringify({ task, inventory, symbols, task_referenced_source: taskReferencedSource }),
+    content: JSON.stringify({ task, inventory: [...inventory.filter((x) => task.includes(x.path)), ...inventory.filter((x) => !task.includes(x.path)).slice(0, 100)].map(({path}) => path), symbols: symbols.slice(0, 65), task_referenced_source: taskReferencedSource }),
   },
-], planSchema, 1800);
+], planSchema, 650);
 
-if (!Array.isArray(plan.files) || plan.files.length === 0) {
+if (!narrowTimeAgo) {
+  // These fields come from the user's task or stay empty. The model's plan and
+  // selected files are never fabricated by the harness.
+  plan.problem_summary = task;
+  plan.root_cause = "";
+  plan.evidence = [];
+  plan.keywords = taskTokens(task).filter((term) => !STOP_WORDS.has(term)).slice(0, 14);
+}
+
+if (plan.finding_status !== "issue_found" || !Array.isArray(plan.files) || plan.files.length === 0) {
   const outDir = process.env.RUNNER_TEMP || "/tmp";
   mkdirSync(join(outDir, "fam-agent"), { recursive: true });
   writeFileSync(join(outDir, "fam-agent", "base.sha"), git(["rev-parse", "HEAD"]).trim() + "\n");
@@ -288,18 +310,10 @@ const patchSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
-      finding_status: { type: "string", enum: ["no_issue", "needs_research", "blocked", "issue_found"] },
-      problem_summary: { type: "string" },
-      root_cause: { type: "string" },
-      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
       unified_diff: { type: "string" },
-      summary: { type: "string" },
-      proposed_change: { type: "string" },
-      risk: { type: "string", enum: ["low", "medium", "high"] },
-      requires_approval: { type: "boolean" },
-      tests: { type: "array", items: { type: "string" }, maxItems: 12 },
+      root_cause: { type: "string" },
     },
-    required: ["finding_status", "problem_summary", "root_cause", "evidence", "unified_diff", "summary", "proposed_change", "risk", "requires_approval", "tests"],
+    required: ["unified_diff", "root_cause"],
   },
 };
 
@@ -316,14 +330,14 @@ const patchMessages = [
       "Запрещено менять аутентификацию, роли, безопасность, модерационные решения, действия над аккаунтами, персональные данные, секреты, базу данных, SQL, RLS, миграции, Edge Functions, CI/CD и деплой.",
       "Если для решения нужно затронуть запрещённую область или данных недостаточно, верни пустой unified_diff, risk=high и requires_approval=true.",
       "Для любой правки кода сайта сначала проверь существующие регрессионные тесты. Если тест уже покрывает дефект, не дублируй и не изменяй его. Добавляй новый тест только когда соответствующего теста нет. Не изменяй тесты ради маскировки ошибки.",
-      "Верни finding_status: no_issue, needs_research, blocked или issue_found. Ставь issue_found только при воспроизводимом дефекте с доказательствами из переданных фрагментов.",
-      "В evidence укажи точный путь и строку/фрагмент из переданных данных; если доказательства недостаточны, выбери needs_research и оставь diff пустым.",
+      "Если дефект не подтверждён переданным кодом, верни пустой unified_diff. Самостоятельно напиши исправление только если уверен в исходных строках.",
+      "В root_cause укажи конкретную причину на основе исходника. Если данных недостаточно, оставь unified_diff пустым.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
       "unified_diff должен быть применим git apply и содержать заголовки diff --git a/path b/path, --- a/path, +++ b/path и корректный @@ hunk.",
       "ВАЖНО: для больших файлов передаются фрагменты с метаданными [Фрагмент path, строки X–Y]. В заголовке @@ используй реальные номера строк оригинального файла: первый фрагмент НЕ означает строку 1. Считай смещения внутри фрагмента, сохраняй точные строки и пробелы; если координаты нельзя восстановить, оставь diff пустым. Не подставляй произвольное @@ -1.",
       "Если не можешь достоверно выполнить задачу по предоставленным фрагментам, верни пустой diff.",
-      "Укажи risk=low и requires_approval=false только для ясного, обратимого и строго ограниченного изменения пользовательского интерфейса или документации/тестов.",
-      "Верни только JSON по заданной схеме.",
+      "Все изменения проходят независимые тесты и ручное одобрение. Не меняй тесты безопасности или модерации.",
+      "Верни только два JSON-поля: unified_diff и root_cause.",
     ].join("\n"),
   },
   {
@@ -399,7 +413,20 @@ async function requestPatch(messages) {
     narrowTimeAgo ? narrowPatchSchema : patchSchema,
     narrowTimeAgo ? 2800 : 7000,
   );
-  return normalizeNarrowPatchResult(response);
+  if (narrowTimeAgo) return normalizeNarrowPatchResult(response);
+  const diff = String(response.unified_diff || "").trim();
+  return {
+    finding_status: diff ? "issue_found" : "blocked",
+    problem_summary: task,
+    root_cause: String(response.root_cause || ""),
+    evidence: [],
+    unified_diff: diff,
+    summary: "Unverified model-generated candidate; independent QA and owner approval required",
+    proposed_change: plan.plan,
+    risk: "high",
+    requires_approval: true,
+    tests: [],
+  };
 }
 
 let result = await requestPatch(narrowTimeAgo ? narrowMessages : patchMessages);
