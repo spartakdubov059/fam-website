@@ -1,6 +1,6 @@
 # Инвентарь Supabase Edge Functions → FAM RU (20 ноября 2026)
 
-Сверка выполнена по `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `d9a8f17e9825af386792191c00ef2905df38e1aa`; актуальный tip `migration/yandex-cloud` — `c570d530a9719fd3271a12ec66cb538b0274aebc` (документация). В source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
+Базовая сверка entrypoints сделана по source `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `d9a8f17e9825af386792191c00ef2905df38e1aa`; это историческая база таблицы, не текущая оценка паритета. Текущий RU code commit — `6527fe60f12f1a9e861ea2fb979bc6137cba1a6b`, ветка документации обновлена до `a2614cad63195aebf8b90ba7f478fddc64ea7a79`. В source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
 
 | Edge Function entrypoint (source SHA) | Source actions / обязанности | RU counterpart | Что не совпадает / статус |
 |---|---|---|---|
@@ -40,6 +40,11 @@
 - No Supabase production credentials, student data, paid model APIs, cloud staging or live schedules were used.
 - This inventory finds no missing entrypoint, but it does not close behavior parity. Remaining major differences include model-backed moderation/vision, Qwen execution, identity-provider reauthentication, UI parity, cloud IAM and enabled scheduled jobs.
 - Cloud staging cannot currently be certified at 0 ₽: no confirmed Yandex Cloud account/credentials or hard spending stop are connected. Do not install or enable timers until a safe staging account and cost controls are verified.
+
+### Обновление аудита (22 ноября 2026)
+
+- На кодовом коммите [`6527fe6`](https://github.com/spartakdubov059/fam-website/commit/6527fe60f12f1a9e861ea2fb979bc6137cba1a6b) восстановлена scoped review заявок на события: организатор ограничен собственным событием/школой, активные школьные роли — собственной школой; решение проверяется транзакционно. Backend suite прошёл **439/439** локально; [SDK/Sharp CI #44962759676](https://github.com/spartakdubov059/fam-website/actions/runs/44962759676) и [synthetic YDB CI #44962759592](https://github.com/spartakdubov059/fam-website/actions/runs/44962759592) успешны на точном коммите.
+- Этот результат не закрывает оставшиеся отличия таблицы: image vision worker, automated Qwen coder, подтверждение email и Yandex cloud/IAM staging по-прежнему не реализованы или не проверены. Платные ресурсы и таймеры не включались.
 
 ## UI and auth parity follow-up — 20 ноября 2026
 
