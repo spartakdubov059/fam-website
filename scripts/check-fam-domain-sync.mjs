@@ -35,7 +35,9 @@ export function isPublicAssetPath(value) {
 
 export function selectPublicPaths(changedPaths, root = process.cwd()) {
   const candidates = new Set((changedPaths ?? []).map(String));
-  for (const core of ["index.html", "school-pulse.js", "school-pulse.css", "fam-domain-health.json"]) {
+  // The health marker is a Netlify-only readiness endpoint, not part of the
+  // shared application. Check only files that both production hosts must serve.
+  for (const core of ["index.html", "school-pulse.js", "school-pulse.css"]) {
     if (existsSync(resolve(root, core))) candidates.add(core);
   }
   return [...candidates]
