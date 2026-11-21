@@ -27,7 +27,7 @@ export function sha256(bytes) {
 
 export function isPublicAssetPath(value) {
   const path = String(value ?? "").replaceAll("\\", "/").replace(/^\.\//, "");
-  if (!path || path.startsWith("/") || path.split("/").includes("..")) return false;
+  if (!path || path === "fam-domain-health.json" || path.startsWith("/") || path.split("/").includes("..")) return false;
   if (EXCLUDED_PREFIXES.some(prefix => path.startsWith(prefix))) return false;
   if (path.split("/").some(part => part.startsWith("."))) return false;
   return STATIC_EXTENSIONS.test(path);
