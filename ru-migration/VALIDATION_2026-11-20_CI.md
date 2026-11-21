@@ -264,3 +264,12 @@
 - [Disposable YDB CI #44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) — success; применены схемы 01–34, пройдена synthetic repository integration, временная база удалена.
 - [SDK/Sharp CI #44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) — success; Node 22 backend suite, locked YDB/AWS/Sharp compatibility, Yandex Cloud Functions package и 8 timer/service definitions прошли.
 - Локальная повторная проверка: **432/432** backend/UI tests на Node 24.22.3; `SDK_COMPAT_PASS`, portable timer validator 8/8. Это не облачная YDB/IAM/S3 проверка, не работающий systemd и не гарантия расходов 0 ₽.
+
+
+## UI карточки объявления и synthetic CI — 22 ноября 2026
+
+На точном code commit [`87f1526f930d9b45a324c12ff238243562d45ae1`](https://github.com/spartakdubov059/fam-website/commit/87f1526f930d9b45a324c12ff238243562d45ae1) реализовано окно подробностей объявления: видимый title, price/category/date/time/description и одобренное изображение RU media route. DOM вставляет пользовательский текст как text node; HTML строка не исполняется.
+
+- Точный [SDK/Sharp CI #44951920176](https://github.com/spartakdubov059/fam-website/actions/runs/44951920176) — success; backend suite **433/433** на Node 22, Cloud Functions package, закреплённые SDK/Sharp и timer checks прошли.
+- Точный [Disposable YDB CI #44951920097](https://github.com/spartakdubov059/fam-website/actions/runs/44951920097) — success; schema 01–34 применены, synthetic repository integration завершилась, тестовая база удалена.
+- Локально: public-board UI suite **16/16**, полный backend/UI набор **433/433** на Node 24.22.3, `SDK_COMPAT_PASS`, timer validator **8/8**. Визуальное browser QA, cloud IAM/OAuth/S3 и staging не выполнялись.

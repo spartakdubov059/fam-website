@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `6497b402ad99a7808fde688f93d823968694aa7c` (`05439fa70ababe9d4a2dc60cf7aeef5deca84ef4`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `87f1526f930d9b45a324c12ff238243562d45ae1` (`c12d57254f8921c63b50cb28c604b55cdabd876e`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
@@ -93,3 +93,10 @@
 - Добавлена `schema/34_source_lookup_indexes.yql`: индекс pending media по владельцу поддерживает безопасное удаление файлов аккаунта, два школьных индекса safety attribution покрывают actor/target lookup. Изменён только `migration/yandex-cloud`; main/production и пользовательские данные не затрагивались.
 - Точный disposable YDB CI [#44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) успешно применил схемы 01–34, прошёл synthetic integration и удалил контейнер. Точный SDK/Sharp CI [#44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) прошёл 432 backend tests на Node 22, timer validation и Cloud Functions package checks.
 - Ветка всё ещё не проверена на Yandex Cloud; запуск таймеров, включение worker, cloud IAM и расходы 0 ₽ не подтверждены.
+
+
+## Подробности объявления в RU-доске — 22 ноября 2026
+
+- В карточку добавлен экран подробностей: категория, цена, дата/время события, описание и только одобренное фото через RU same-origin media route. Текст объявления записывается через DOM `textContent`, а диалог имеет имя для assistive technology и возвращает фокус к кнопке после закрытия.
+- Тесты проверяют обычный текст, payload с HTML-подобной строкой, URL фото, event metadata, открытие и закрытие диалога. Локально: public-board **16/16**, полный backend/UI suite **433/433** на Node 24.22.3. Точные [SDK/Sharp CI #44951920176](https://github.com/spartakdubov059/fam-website/actions/runs/44951920176) и [disposable YDB CI #44951920097](https://github.com/spartakdubov059/fam-website/actions/runs/44951920097) прошли на Node 22 и synthetic database.
+- Визуальное сравнение с браузером и cloud staging не выполнялись.

@@ -251,5 +251,5 @@ Runtime readiness выполняет короткий `SELECT 1 AS ready;` и б
 
 ## Дополнение к проверке рабочей копии — 22 ноября 2026
 
-- Текущий кодовый commit `6497b402ad99a7808fde688f93d823968694aa7c` соответствует дереву `05439fa70ababe9d4a2dc60cf7aeef5deca84ef4`; `main` остаётся `147ec7903148bfface274c4e681aabb299252dcf`. Disposable YDB CI #44951135661 применил schema 01–34, успешно завершил synthetic integration и удалил базу; SDK/Sharp CI #44951135767 успешно прошёл backend tests и инфраструктурные проверки.
+- На `migration/yandex-cloud` code commit `6497b402ad99a7808fde688f93d823968694aa7c` добавил schema 34; следующий code commit `87f1526f930d9b45a324c12ff238243562d45ae1` добавил RU просмотр подробностей объявления. `main` остаётся `147ec7903148bfface274c4e681aabb299252dcf`. Для schema 34 disposable YDB CI #44951135661 применил schema 01–34; для новой UI exact YDB CI #44951920097 и SDK/Sharp CI #44951920176 прошли на Node 22. Полный локальный backend suite после UI правки — 433/433 на Node 24.22.3.
 - Эти workflow не являются Yandex Cloud staging: live OAuth, YDB IAM, Object Storage, включённые systemd timers, жёсткое ограничение стоимости и полный security sign-off всё ещё отсутствуют.
