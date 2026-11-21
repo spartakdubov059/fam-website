@@ -31,6 +31,11 @@ const reportRenderer = readFileSync(
   "utf8",
 );
 
+const integrationTrialWorkflow = readFileSync(
+  new URL("../../.github/workflows/fam-qwen38-pr126-general-planner.yml", import.meta.url),
+  "utf8",
+);
+
 test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /push:/);
@@ -138,4 +143,15 @@ test("general patch uses real file line coordinates, never placeholder hunk offs
   assert.match(runner, /реальные номера строк оригинального файла/);
   assert.match(runner, /Не подставляй произвольное/);
   assert.match(runner, /normalizeUnifiedDiffHunkCounts/);
+});
+
+test("PR126 general planner runtime test cannot write or alter production", () => {
+  assert.match(integrationTrialWorkflow, /^on:\n\s+pull_request:/m);
+  assert.match(integrationTrialWorkflow, /github\.event\.pull_request\.number == 126/);
+  assert.match(integrationTrialWorkflow, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(integrationTrialWorkflow, /permissions:\n\s+contents: read/);
+  assert.match(integrationTrialWorkflow, /FAM_NARROW_TIMEAGO_BENCHMARK: "0"/);
+  assert.match(integrationTrialWorkflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
+  assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
+  assert.doesNotMatch(integrationTrialWorkflow, /secrets\.|contents: write|gh pr merge|supabase db push/);
 });
