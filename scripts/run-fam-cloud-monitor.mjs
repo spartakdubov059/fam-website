@@ -67,6 +67,35 @@ async function fetchWithRetry(fetchImpl, url, options, retryDelayMs) {
   throw lastError ?? new Error("Network request failed.");
 }
 
+async function readTextLimited(response, maxBytes) {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const body = await response.text();
+    if (Buffer.byteLength(body, "utf8") > maxBytes) {
+      throw new Error("Response body exceeds " + maxBytes + " bytes.");
+    }
+    return body;
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        try { await reader.cancel(); } catch { /* The body may already be closed. */ }
+        throw new Error("Response body exceeds " + maxBytes + " bytes.");
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return Buffer.concat(chunks, totalBytes).toString("utf8");
+}
+
 function validateHomepage(html) {
   if (!/<title\b[^>]*>\s*FAM\s*[—-]\s*Свои рядом\s*<\/title>/i.test(html)) {
     throw new Error("Expected FAM homepage title was not found.");
@@ -211,7 +240,7 @@ export async function runFAMCloudMonitor({
         headers: { "User-Agent": "FAM-cloud-monitor" },
         signal: AbortSignal.timeout(15_000),
       }, retryDelayMs);
-      const body = await response.text();
+      const body = await readTextLimited(response, PERFORMANCE_LIMITS.html_bytes);
       if (response.status !== 200) throw new Error("HTTP " + response.status);
       if (validate) validate(body);
       const elapsedMs = Math.round(performance.now() - started);

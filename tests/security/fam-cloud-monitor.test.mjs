@@ -213,6 +213,40 @@ test("cloud monitor reports bad homepage markup and recent failed workflows", as
   assert.equal(report.recent_failures[0].url, "https://github.com/owner/repo/actions/runs/3");
 });
 
+test("cloud monitor stops reading an oversized response as soon as the byte limit is crossed", async () => {
+  let bodyCancelled = false;
+  const oversizedResponse = {
+    ...response(""),
+    body: {
+      getReader: () => ({
+        read: async () => ({ done: false, value: new Uint8Array(1_500_001) }),
+        cancel: async () => { bodyCancelled = true; },
+        releaseLock: () => {},
+      }),
+    },
+    text: async () => { throw new Error("The body should be read through its stream."); },
+  };
+
+  const report = await runFAMCloudMonitor({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.hostname === "api.github.com") return response({ workflow_runs: [] });
+      if (parsed.pathname.endsWith("/robots.txt")) return response(robots);
+      if (parsed.pathname.endsWith("/sitemap.xml")) return response(sitemap);
+      return oversizedResponse;
+    },
+    baseUrl: siteBase,
+    repository: "owner/repo",
+    token: "test-token",
+    retryDelayMs: 0,
+  });
+
+  const homepageCheck = report.checks.find((check) => check.name.startsWith("Главная"));
+  assert.equal(homepageCheck.ok, false);
+  assert.match(homepageCheck.detail, /exceeds 1500000 bytes/);
+  assert.equal(bodyCancelled, true);
+});
+
 test("cloud monitor reports main workflows still in progress after two hours", async () => {
   const now = Date.parse("2026-11-13T05:00:00Z");
   const report = await runFAMCloudMonitor({
