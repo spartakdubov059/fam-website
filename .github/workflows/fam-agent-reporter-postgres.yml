@@ -1,0 +1,48 @@
+name: FAM Reporter PostgreSQL integration
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20261113220233_fam_agent_report_snapshot_rpc.sql"
+      - "tests/sql/fam-agent-reporter-*"
+      - ".github/workflows/fam-agent-reporter-postgres.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reporter-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: fam_reporter_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fam_reporter_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: fam_reporter_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+
+      - name: Create isolated Supabase-shaped fixture
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-reporter-bootstrap.sql
+
+      - name: Apply Reporter migration to PostgreSQL 17
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113220233_fam_agent_report_snapshot_rpc.sql
+
+      - name: Verify snapshot, private persistence, bounds and grants
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/fam-agent-reporter-assert.sql

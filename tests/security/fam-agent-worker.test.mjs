@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { finishTaskAndCount } from "../../supabase/functions/fam-agent-worker/finish-task.mjs";
 
 const worker = readFileSync(
   new URL("../../supabase/functions/fam-agent-worker/index.ts", import.meta.url),
@@ -56,4 +57,45 @@ test("worker caps batch size and uses bounded task leases", () => {
 test("worker accepts POST only and rejects browser-origin requests", () => {
   assert.match(worker, /req\.method !== "POST"/);
   assert.match(worker, /req\.headers\.get\("origin"\)/);
+});
+
+test("worker reports failure if the task result was not saved", () => {
+  assert.match(worker, /import \{ finishTaskAndCount \} from "\.\/finish-task\.mjs"/);
+  assert.match(worker, /const savedStatus = await finishTaskAndCount\(rpc, \{/);
+  assert.match(worker, /if \(savedStatus === "completed"\) completed\+\+;\s*else blocked\+\+;/);
+});
+
+test("finish result is counted only after the finish RPC confirms persistence", async () => {
+  const calls = [];
+  const result = await finishTaskAndCount(async (...args) => {
+    calls.push(args);
+    return true;
+  }, {
+    taskId: "task-id",
+    workerId: "fam-agent-worker-v1",
+    status: "completed",
+    summary: "safe aggregate summary",
+  });
+
+  assert.equal(result, "completed");
+  assert.deepEqual(calls, [["finish_fam_agent_task", {
+    p_task_id: "task-id",
+    p_worker_id: "fam-agent-worker-v1",
+    p_status: "completed",
+    p_summary: "safe aggregate summary",
+  }]]);
+});
+
+test("false finish RPC response fails closed instead of reporting completion", async () => {
+  for (const response of [false, null, undefined, { ok: true }]) {
+    await assert.rejects(
+      finishTaskAndCount(async () => response, {
+        taskId: "task-id",
+        workerId: "fam-agent-worker-v1",
+        status: "completed",
+        summary: "safe aggregate summary",
+      }),
+      /task_finish_not_saved/,
+    );
+  }
 });
