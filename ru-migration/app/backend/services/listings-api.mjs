@@ -642,9 +642,13 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'GET' && eventOccupancyMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 404, body: { ok: false, error: 'event_unavailable' } };
       if (typeof repository.getPublicEventOccupancy !== 'function') return { status: 503, body: { ok: false, error: 'event_read_unavailable' } };
       try {
-        const taken = await repository.getPublicEventOccupancy(eventOccupancyMatch[1]);
+        const taken = await repository.getPublicEventOccupancy(eventOccupancyMatch[1], actor.school_id);
         return taken === null ? { status: 404, body: { ok: false, error: 'event_unavailable' } }
           : { status: 200, body: { ok: true, taken } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }

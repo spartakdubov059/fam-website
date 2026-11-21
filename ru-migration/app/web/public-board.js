@@ -204,7 +204,7 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
       capacityStatus.textContent = 'Проверяем занятость…';
       try {
         const response = await fetchImpl(`/api/v1/listings/${listing.id}/occupancy`, {
-          method: 'GET', credentials: 'omit', cache: 'no-store', headers: { accept: 'application/json' },
+          method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
         });
         const result = await response.json().catch(() => null);
         if (response.status === 404) capacityStatus.textContent = 'Мероприятие больше недоступно.';

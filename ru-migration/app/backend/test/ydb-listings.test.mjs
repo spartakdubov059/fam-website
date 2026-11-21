@@ -1124,21 +1124,23 @@ test('event cancellation and organizer review retry after YDB serialization conf
   assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }]);
 });
 
-test('public event occupancy is visible only for active events', async () => {
+test('event occupancy query includes active status and authenticated school scope', async () => {
   const calls = [];
-  const sql = strings => {
+  const sql = (strings, ...values) => {
     const text = strings.join('?');
-    calls.push(text);
+    calls.push({ text, values });
     return Promise.resolve(text.includes('INNER JOIN fam_listings')
       ? [[{ taken: 2 }]] : [[]]);
   };
   const repo = createYdbListingsRepository(sql);
-  assert.equal(await repo.getPublicEventOccupancy('active-event-id'), 2);
-  assert.match(calls[0], /INNER JOIN fam_listings AS l ON l\.id = o\.event_id/);
-  assert.match(calls[0], /l\.is_event = true AND l\.status = 'active'/);
+  assert.equal(await repo.getPublicEventOccupancy('active-event-id', 'school-a'), 2);
+  assert.deepEqual(calls[0].values, ['active-event-id', 'school-a']);
+  assert.match(calls[0].text, /INNER JOIN fam_listings AS l ON l\.id = o\.event_id/);
+  assert.match(calls[0].text, /l\.school_id = \? AND l\.is_event = true AND l\.status = 'active'/);
   const hiddenSql = strings => Promise.resolve([[]]);
-  assert.equal(await createYdbListingsRepository(hiddenSql).getPublicEventOccupancy('inactive-event-id'), null);
-  await assert.rejects(repo.getPublicEventOccupancy(''), TypeError);
+  assert.equal(await createYdbListingsRepository(hiddenSql).getPublicEventOccupancy('inactive-event-id', 'school-a'), null);
+  await assert.rejects(repo.getPublicEventOccupancy('', 'school-a'), TypeError);
+  await assert.rejects(repo.getPublicEventOccupancy('event-id', ''), TypeError);
 });
 
 

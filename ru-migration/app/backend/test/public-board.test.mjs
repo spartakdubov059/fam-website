@@ -364,7 +364,7 @@ test('limited event checks live seat availability only when requested', async ()
   assert.equal(occupancyRequest, undefined, 'occupancy is not fetched automatically for every event card');
   await check.listeners.click();
   assert.equal(occupancyRequest.url, `/api/v1/listings/${eventId}/occupancy`);
-  assert.equal(occupancyRequest.options.credentials, 'omit');
+  assert.equal(occupancyRequest.options.credentials, 'same-origin');
   assert.equal(occupancyRequest.options.cache, 'no-store');
   assert.equal(status.textContent, 'Свободно: 5 из 8 мест.');
 });

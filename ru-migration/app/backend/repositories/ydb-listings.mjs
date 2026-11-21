@@ -1664,11 +1664,11 @@ export function createYdbListingsRepository(sql) {
     },
 
 
-    async getPublicEventOccupancy(eventId) {
-      if (!eventId) throw new TypeError('invalid event id');
+    async getPublicEventOccupancy(eventId, schoolId) {
+      if (!eventId || typeof schoolId !== 'string' || !schoolId.trim()) throw new TypeError('event and school scope are required');
       const statement = sql`SELECT o.taken FROM fam_event_occupancy AS o
         INNER JOIN fam_listings AS l ON l.id = o.event_id
-        WHERE o.event_id = ${eventId} AND l.is_event = true AND l.status = 'active' LIMIT 1;`;
+        WHERE o.event_id = ${eventId} AND l.school_id = ${schoolId} AND l.is_event = true AND l.status = 'active' LIMIT 1;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const rows = await statement;
       const row = rows?.[0]?.[0];

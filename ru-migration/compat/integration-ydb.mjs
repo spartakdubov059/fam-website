@@ -438,7 +438,7 @@ try {
     'student cannot moderate even when using a valid database-backed identity');
   const apiApproval = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-admin', { decision: 'approve' }));
   assert.deepEqual(apiApproval, { status: 200, body: { ok: true, status: 'active' } });
-  const approvedApiListings = await repo.listActiveListings();
+  const approvedApiListings = await repo.listActiveListings('synthetic-school');
   assert.equal(approvedApiListings.some(row => row.id === apiSubmission.body.id), true,
     'approved API submission becomes visible through public projection');
   const title = "Синтетическая книга'); DELETE FROM fam_listings; --";
@@ -597,9 +597,11 @@ try {
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
   assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
     .filter(row => row.event_id === limitedEvent.id).map(row => row.status), ['cancelled']);
-  const cancelledOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school'));
+  const cancelledOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
   assert.deepEqual(cancelledOccupancy, { status: 200, body: { ok: true, taken: 0 } },
-    'public occupancy is available while its event is active');
+    'same-school occupancy is available while its event is active');
+  assert.deepEqual(await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school')),
+    { status: 404, body: { ok: false, error: 'event_unavailable' } }, 'another school cannot inspect occupancy');
   const reRegistration = await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
   assert.equal(reRegistration.status, 'confirmed', 'a cancelled registration can be created again');
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
@@ -616,7 +618,7 @@ try {
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
     'cancellation and re-registration remain consistent under a concurrent race');
   await sql`UPDATE fam_listings SET status = 'rejected' WHERE id = ${limitedEvent.id};`;
-  const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school'));
+  const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
   assert.deepEqual(hiddenOccupancy, { status: 404, body: { ok: false, error: 'event_unavailable' } },
     'occupancy is hidden after the event is no longer active');
   await sql`UPDATE fam_listings SET status = 'active' WHERE id = ${limitedEvent.id};`;

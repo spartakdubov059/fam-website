@@ -930,15 +930,25 @@ test('event registration review requires council role and delegates event-owner 
   assert.deepEqual(await makeHandler('council_member')(request), { status: 200, body: { ok: true, status: 'confirmed' } });
 });
 
-test('event occupancy is a public count for active events without registration identities', async () => {
+test('event occupancy requires an authenticated member of the event school', async () => {
   const eventId = '11111111-1111-4111-8111-111111111111';
   let active = true;
-  const handler = createListingsApi({ authenticate: async () => { throw new Error('public occupancy must not authenticate'); },
-    repository: { getActiveAccountSuspension: async () => null, getPublicEventOccupancy: async id => {
-      assert.equal(id, eventId); return active ? 3 : null;
+  let schoolId = 'school-a'; let requestedSchool;
+  let identity = null; let reads = 0;
+  const handler = createListingsApi({ authenticate: async () => identity,
+    resolveActor: async () => ({ id: 'synthetic-user', school_id: schoolId, role: 'student' }),
+    repository: { getActiveAccountSuspension: async () => null, getPublicEventOccupancy: async (id, scope) => {
+      reads++; assert.equal(id, eventId); requestedSchool = scope; return active && scope === 'school-a' ? 3 : null;
     } } });
   const request = req({}, 'GET'); request.url = `/api/v1/listings/${eventId}/occupancy`;
+  assert.deepEqual(await handler(request), { status: 404, body: { ok: false, error: 'event_unavailable' } });
+  assert.equal(reads, 0);
+  identity = { issuer: 'issuer', subject: 'member' };
   assert.deepEqual(await handler(request), { status: 200, body: { ok: true, taken: 3 } });
+  assert.equal(requestedSchool, 'school-a');
+  schoolId = 'school-b';
+  assert.deepEqual(await handler(request), { status: 404, body: { ok: false, error: 'event_unavailable' } });
+  schoolId = 'school-a';
   active = false;
   assert.deepEqual(await handler(request), { status: 404, body: { ok: false, error: 'event_unavailable' } });
 });
