@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   REPORT_MARKER,
   findDisputes,
@@ -9,6 +10,13 @@ import {
 } from "../../scripts/fam-agent-governance.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
+const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
+
+test("governance jobs pin Node 24-compatible checkout and disable persisted credentials", () => {
+  assert.equal((workflow.match(/actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 \# actions\/checkout v7\.0\.1/g) || []).length, 2);
+  assert.doesNotMatch(workflow, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/);
+  assert.equal((workflow.match(/persist-credentials: false/g) || []).length, 2);
+});
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
 test("ARBITER detects only real code-file overlaps, not docs noise", () => {
