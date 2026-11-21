@@ -86,3 +86,21 @@ Live source и SQL определения читались без вызова R
 - После снимка выше PR #65 обновлён до `6f66d95d54b75ab53734fbab399d8483b42460f2`; Regression suite, owner approval verifier, Russian content safety, coder QA/PostgreSQL, Reporter/PostgreSQL, telemetry/PostgreSQL и Netlify preview завершились успешно.
 - PR добавляет bounded-задачу `audit_notifications_resilience` только для агрегированного события `notifications_load_failed` с порогом не менее трёх событий. Промпт запрещает читать личное содержимое и менять Auth, RLS, backend и состояние уведомлений. PostgreSQL 17 QA проверил создание и claim этой задачи и подтвердил, что даже 100 `auth_backend_failed` не попадают в локальную coder-очередь. Изменение остаётся в draft PR; миграция не применена к production.
 - Изменения fail-closed для coder finish и report-save также прошли Regression suite; production bridge v1 не изменён и остаётся отдельным rollout-пробелом.
+
+## Актуальная сверка после обновления main — 22 ноября 2026, 01:13 МСК
+
+- `main` на `d60b159c1c861cf2288eb82db1b627cd93342e2b`. PR #65 обновлён merge-коммитом `c5e50b971b696cbf06d0e676454fc5d8952eb0be`, включает этот main, остаётся open/draft и снова mergeable.
+- На актуальном PR head успешно завершились Regression suite, Russian content safety tests, Verify agent PR owner approval, Coder QA PostgreSQL, Reporter PostgreSQL и telemetry PostgreSQL. Deploy Preview успешен; проверки заголовков успешны, Pages/Redirect checks дали neutral при отсутствии соответствующих изменений.
+- В изолированной копии объединённого дерева локально прошли 331/331 moderation/security тест и проверки синтаксиса workflow-скриптов. Один исходный локальный прогон выявил timezone-зависимое ожидание в проверке часов School Pulse; тест теперь вычисляет время в локальной зоне и больше не предполагает UTC.
+
+### Production Supabase, только чтение
+
+- Project `tfacqpljrvfpcrhdovbu` — `ACTIVE_HEALTHY`, PostgreSQL 17.11; последний production migration `20261121191342` (`restrict_listings_to_authenticated_same_school`).
+- Активны 7 Edge Functions. `fam-agent-worker` остаётся v17, `fam-agent-coder-bridge` — v1. В production нет RPC `get_fam_agent_report_snapshot`, `save_fam_agent_system_report` или `finish_fam_agent_coder_task_with_pr`; присутствует общий `finish_fam_agent_task`. Новая отчётная/QA-схема PR не развернута.
+- Все 6 FAM Cron активны. За 7 дней в доступной истории каждый запуск завершился `succeeded`: coder producer 7, ежедневный digest 7, school report 7, site-error audit 168, system health 7, worker 2016. Это подтверждает завершение расписаний, но не выполнение coder-модели.
+- В очереди остаются 1 завершённая и 3 проваленные старые `coder_patch_request` от 11 ноября; после них новых coder-задач нет. Есть 272 завершённых `site_error_digest`, 12 `daily_report_digest` и 12 `system_health_check`. За последние 24 часа агрегированных ошибок сайта не найдено.
+- `private.fam_agent_daily_reports` содержит отчёты по 21 ноября, по одному в каждый из последних 7 дней. Это legacy daily digest; наличие записи не подтверждает запуск нового GitHub Reporter workflow или работу новых bridge RPC.
+- Исходник coder workflow на main по-прежнему сначала восстанавливает/скачивает Qwen и собирает `llama.cpp`, а затем запрашивает задание очереди; ветка PR переносит claim перед дорогими шагами. Исправление ожидает review и не действует на main.
+- Активный ruleset `FAM — защита main` всё ещё требует 0 одобрений; устаревшее одобрение не отзывается и одобрение последнего push не требуется. Обязательный review для всех PR не настроен.
+
+Изменения PR остаются в draft. Миграции, функции, Cron, очередь, Auth/RLS, ruleset, production, сайт и пользовательские данные не менялись.
