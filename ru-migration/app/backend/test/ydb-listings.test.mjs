@@ -404,10 +404,41 @@ test('school admin can review AI-pending school idea text without storing its bo
   const updates = calls.filter(call => call.text.includes('UPDATE fam_pending_media') || call.text.includes('UPDATE fam_ideas'));
   assert.equal(updates.length, 2);
   assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')));
+  const imageSelect = calls.find(call => call.text.includes('FROM fam_idea_images'));
+  assert.match(imageSelect.text, /user_id = \?/);
+  assert.match(imageSelect.text, /school_id = \?/);
+  assert.ok(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')
+    && call.values.includes('student-id') && call.values.includes('school-a')));
   const audit = calls.find(call => call.text.includes('INSERT INTO fam_school_content_audit'));
   assert.ok(audit);
   assert.ok(audit.values.includes('idea_text_rejected'));
   assert.ok(!audit.values.includes('Синтетическая идея'));
+});
+
+test('school idea image review cannot approve or delete an image row linked to another owner or school', async () => {
+  const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  const foreignOwnerId = '22222222-2222-4222-8222-222222222222';
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_user_profiles')) return [[{ school_id: 'school-a', role: 'school_admin', active: true }]];
+    if (text.includes('FROM fam_ideas')) return [[{ user_id: ownerId, image_status: 'pending', ai_status: 'approved' }]];
+    if (text.includes('FROM fam_idea_images')) {
+      assert.deepEqual(values, [ideaId, ownerId, 'school-a']);
+      const corruptImageRow = { user_id: foreignOwnerId, school_id: 'school-b', image_index: 0,
+        object_key: `pending/${foreignOwnerId}/photo.webp` };
+      return corruptImageRow.user_id === values[1] && corruptImageRow.school_id === values[2] ? [[corruptImageRow]] : [[]];
+    }
+    return [[]];
+  };
+  const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
+  const approved = await createYdbListingsRepository(sql).reviewSchoolIdeaImages({
+    ideaId, schoolId: 'school-a', reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'approve',
+  });
+  assert.equal(approved, false);
+  assert.equal(calls.some(call => call.text.includes('UPDATE fam_ideas')), false);
+  assert.equal(calls.some(call => call.text.includes('DELETE FROM fam_idea_images')), false);
 });
 
 test('school idea workflow lists only approved same-school ideas and permits only valid status transitions', async () => {

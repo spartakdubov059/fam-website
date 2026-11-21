@@ -1294,6 +1294,7 @@ export function createYdbListingsRepository(sql) {
         if (!idea || idea.user_id === reviewerId || idea.image_status !== 'pending') return false;
         if (reviewer.role === 'council_member' && idea.ai_status !== 'approved') return false;
         const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
+          AND user_id = ${idea.user_id} AND school_id = ${schoolId}
           ORDER BY image_index ASC LIMIT 3;`;
         const images = imageRows?.[0] ?? [];
         if (!images.length) return false;
@@ -1304,7 +1305,7 @@ export function createYdbListingsRepository(sql) {
             await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
               WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
             await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId}
-              AND image_index = ${image.image_index};`;
+              AND image_index = ${image.image_index} AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
           }
           await tx`UPDATE fam_ideas SET image_status = 'rejected' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
         }
@@ -1323,11 +1324,13 @@ export function createYdbListingsRepository(sql) {
         if (!idea || idea.user_id === reviewerId || idea.ai_status !== 'pending') return false;
         const nextStatus = decision === 'approve' ? 'approved' : 'rejected';
         if (decision === 'reject' && ['pending', 'approved'].includes(idea.image_status)) {
-          const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId} ORDER BY image_index ASC LIMIT 3;`;
+          const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
+            AND user_id = ${idea.user_id} AND school_id = ${schoolId} ORDER BY image_index ASC LIMIT 3;`;
           for (const image of imageRows?.[0] ?? []) {
             await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
               WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
-            await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND image_index = ${image.image_index};`;
+            await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND image_index = ${image.image_index}
+              AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
           }
           await tx`UPDATE fam_ideas SET ai_status = ${nextStatus}, image_status = 'rejected' WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'pending';`;
         } else {
