@@ -1273,6 +1273,7 @@ export function createYdbListingsRepository(sql) {
       const row = (await statement)?.[0]?.[0];
       if (!row || !['pending', 'approved'].includes(row.image_status)) return null;
       const imageStatement = sql`SELECT object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
+        AND user_id = ${row.user_id} AND school_id = ${row.school_id}
         AND image_index = Unwrap(CAST(${imageIndex} AS Uint32)) LIMIT 1;`;
       if (typeof imageStatement?.on === 'function') imageStatement.on('error', () => {});
       const image = (await imageStatement)?.[0]?.[0];

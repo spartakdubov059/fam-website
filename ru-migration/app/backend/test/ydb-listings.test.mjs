@@ -420,6 +420,37 @@ test('school idea image lookup returns the AI review state for media authorizati
   const result = await createYdbListingsRepository(sql).getSchoolIdeaImage('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 0);
   assert.equal(result.ai_status, 'pending');
   assert.match(calls[0], /ai_status/);
+  assert.match(calls[1], /user_id = \?/);
+  assert.match(calls[1], /school_id = \?/);
+});
+
+test('school idea image lookup rejects an image row linked to another owner or school', async () => {
+  const ideaOwner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ideaSchool = 'school-a';
+  const imageOwner = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const imageSchool = 'school-b';
+  const calls = [];
+  const sql = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('FROM fam_ideas')) {
+      return [[{ user_id: ideaOwner, school_id: ideaSchool, image_status: 'pending', ai_status: 'pending' }]];
+    }
+    if (text.includes('FROM fam_idea_images')) {
+      assert.deepEqual(values, [
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc', ideaOwner, ideaSchool, 0,
+      ]);
+      // A corrupted cross-school row cannot match the owner and school filters.
+      return [[]];
+    }
+    return [[]];
+  };
+  const result = await createYdbListingsRepository(sql).getSchoolIdeaImage(
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 0);
+  assert.equal(result, null);
+  assert.notEqual(imageOwner, ideaOwner);
+  assert.notEqual(imageSchool, ideaSchool);
+  assert.match(calls[1].text, /user_id = \?/);
+  assert.match(calls[1].text, /school_id = \?/);
 });
 
 test('idea deletion is owner-bound or same-school-admin-only and claims linked photos for cleanup', async () => {
