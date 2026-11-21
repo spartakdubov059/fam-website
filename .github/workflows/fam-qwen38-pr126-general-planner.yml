@@ -9,7 +9,7 @@ permissions:
   contents: read
 concurrency:
   group: fam-qwen38-pr126-general-planner
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   qwen38:
     if: github.event.pull_request.number == 126 && github.event.pull_request.head.repo.full_name == github.repository
