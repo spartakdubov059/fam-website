@@ -167,3 +167,13 @@ test("general Qwen planner stays model-authored with compact JSON and independen
   assert.match(runner, /requires_approval: true/);
   assert.doesNotMatch(runner, /if \(narrowTimeAgo\) return \{ unified_diff:/);
 });
+
+test("general timeAgo context is source-exact without bypassing model planning", () => {
+  assert.match(runner, /function exactFunctionContext\(path, functionName\)/);
+  assert.match(runner, /Expected exactly one declaration of/);
+  assert.match(runner, /Cannot locate end of/);
+  assert.match(runner, /body = exactFunctionContext\(path, "timeAgo"\)/);
+  assert.match(runner, /selected\.length === 1/);
+  assert.match(runner, /plan\.plan/);
+  assert.match(runner, /return isAllowedAgentPath\(path\)/);
+});
