@@ -316,8 +316,8 @@ const excerpts = selected.map((path) => {
       "; function timeAgo begins at line " + (start + 1) +
       ". Use original file line numbers in @@ headers, never assume line 1.]\n" +
       lines.slice(contextStart, contextEnd).join("\n");
-  } else if (path === "index.html" && /\\btimeAgo\\b/.test(task) &&
-             /\\btimeAgo\\b/.test(plan.plan) && selected.length === 1) {
+  } else if (path === "index.html" && /\btimeAgo\b/.test(task) &&
+             /\btimeAgo\b/.test(plan.plan) && selected.length === 1) {
     // Real general planner still chooses the file and plan. Only the excerpt
     // is focused on the named function, without inserting any replacement code.
     body = exactFunctionContext(path, "timeAgo");
