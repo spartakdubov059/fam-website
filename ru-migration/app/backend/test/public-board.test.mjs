@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import { loadPublicBoard } from '../../web/public-board.js';
 
 class FakeNode {
-  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.hidden = false; }
+  constructor(tag) { this.tagName = tag; this.children = []; this.attributes = {}; this.listeners = {}; this.textContent = ''; this.hidden = false; this.open = false; }
   get childNodes() { return this.children; }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(name, value) { this.attributes[name] = value; }
   getAttribute(name) { return this.attributes[name] ?? null; }
   addEventListener(name, fn) { this.listeners[name] = fn; }
+  showModal() { this.open = true; }
+  close() { this.open = false; this.listeners.close?.({ target: this }); }
+  focus() { this.focused = true; }
 }
 function boardCard(root, index = 0) { return root.children.filter(node => node.className === 'ru-listing-card')[index]; }
 
@@ -17,6 +20,7 @@ function createFakeDocument() {
   const listeners = {}; const pulseCards = [];
   return {
     pulseCards,
+    body: new FakeNode('body'),
     createElement: tag => new FakeNode(tag),
     createDocumentFragment: () => new FakeNode('#fragment'),
     querySelectorAll: selector => selector === '#ruPulse .ru-pulse-card' ? pulseCards : [],
@@ -38,6 +42,37 @@ test('school board request includes the same-origin session and writes listing d
   const title = boardCard(root).children[1];
   assert.equal(title.textContent, '<script>alert(1)</script>');
   assert.equal(title.children.length, 0, 'untrusted listing title is never parsed as markup');
+});
+
+test('listing details open an accessible modal with safe text and only the approved same-origin photo route', async () => {
+  const root = new FakeNode('section'); const document = createFakeDocument();
+  const malicious = '<img src=x onerror=alert(1)>';
+  await loadPublicBoard({ root, document, fetchImpl: async url => url === '/api/v1/listings'
+    ? { ok: true, json: async () => ({ ok: true, listings: [{ id: 'listing-safe', title: malicious,
+      description: malicious, category: 'Афиша', price_text: '1 250 ₽', created_at: '2026-11-20T12:00:00Z',
+      is_event: true, event_date: '2026-12-01', event_time: '18:30', photo_url: '/api/v1/listings/listing-safe/photo' }] }) }
+    : { ok: false, status: 401, json: async () => ({}) } });
+  const card = boardCard(root);
+  const detailsButton = card.children.find(node => node.className === 'l-details-btn');
+  const dialog = root.children.find(node => node.tagName === 'dialog');
+  assert.ok(detailsButton);
+  assert.equal(dialog.getAttribute('aria-modal'), 'true');
+  assert.equal(dialog.getAttribute('aria-labelledby'), 'ruListingDetailsTitle');
+  detailsButton.listeners.click({ currentTarget: detailsButton });
+  assert.equal(dialog.open, true);
+  const panel = dialog.children[0];
+  const header = panel.children[0];
+  assert.equal(header.children[0].textContent, malicious);
+  const body = panel.children[1];
+  const image = body.children.find(node => node.tagName === 'img');
+  assert.equal(image.src, '/api/v1/listings/listing-safe/photo');
+  const description = body.children.find(node => node.className === 'listing-detail-description');
+  assert.equal(description.textContent, malicious);
+  assert.equal(description.children.length, 0, 'untrusted description is never parsed as markup');
+  assert.match(body.children.find(node => node.className === 'listing-detail-meta').textContent, /Афиша.*декабря.*18:30/);
+  header.children[1].listeners.click();
+  assert.equal(dialog.open, false);
+  assert.equal(detailsButton.focused, true, 'closing the modal restores focus to its opener');
 });
 
 

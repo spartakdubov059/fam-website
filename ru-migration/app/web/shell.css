@@ -811,6 +811,9 @@
     .l-photo-state.is-review { border-color: rgba(126,166,255,.3); background: rgba(91,140,255,.09); color: #A9C4FF; }
     .l-photo-state.is-rejected { border-color: rgba(255,107,107,.25); background: rgba(255,107,107,.08); color: #FF9B9B; }
     .listing-details-modal { padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); }
+    .ru-listing-details { margin: 0; border: 0; color: var(--text); }
+    .ru-listing-details[open] { display: flex; }
+    .ru-listing-details::backdrop { background: transparent; }
     .listing-details-content { width: min(100%, 560px); max-width: 560px; max-height: min(88dvh, 820px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 20px; }
     .listing-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .listing-detail-header h2 { min-width: 0; margin: 0; font-size: 20px; line-height: 1.25; overflow-wrap: anywhere; }

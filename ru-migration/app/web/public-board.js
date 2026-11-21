@@ -186,6 +186,92 @@ function formatEventTime(listing) {
   return parts.join(' · ');
 }
 
+function createListingDetailsDialog({ document }) {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'ruListingDetails';
+  dialog.className = 'modal listing-details-modal ru-listing-details';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'ruListingDetailsTitle');
+
+  const panel = element(document, 'div', 'modal-content listing-details-content', '');
+  const header = element(document, 'div', 'listing-detail-header', '');
+  const title = element(document, 'h2', '', 'Объявление');
+  title.id = 'ruListingDetailsTitle';
+  const close = element(document, 'button', 'listing-detail-close', '×');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Закрыть подробности объявления');
+  const body = element(document, 'div', '', '');
+  body.id = 'ruListingDetailsBody';
+  header.append(title, close);
+  panel.append(header, body);
+  dialog.append(panel);
+
+  let opener = null;
+  const closeDialog = () => {
+    if (typeof dialog.close === 'function') dialog.close();
+    else dialog.open = false;
+  };
+  close.addEventListener('click', closeDialog);
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog) closeDialog();
+  });
+  dialog.addEventListener('close', () => { opener?.focus?.(); });
+
+  const open = (listing, trigger) => {
+    opener = trigger;
+    title.textContent = listing.title || 'Объявление';
+    body.replaceChildren();
+
+    if (listing.photo_url === `/api/v1/listings/${listing.id}/photo`) {
+      const photo = document.createElement('img');
+      photo.className = 'listing-detail-image';
+      photo.src = listing.photo_url;
+      photo.alt = `Фото: ${listing.title || 'объявление'}`;
+      photo.loading = 'lazy';
+      photo.decoding = 'async';
+      photo.referrerPolicy = 'no-referrer';
+      body.append(photo);
+    } else {
+      const placeholder = element(document, 'div', 'listing-detail-photo-placeholder', '');
+      placeholder.setAttribute('role', 'status');
+      placeholder.append(element(document, 'strong', '', 'Фотография не добавлена'));
+      placeholder.append(element(document, 'span', '', 'К объявлению пока нет одобренного фото.'));
+      body.append(placeholder);
+    }
+
+    const price = element(document, 'p', 'listing-detail-price', '');
+    price.textContent = globalThis.FAMPrice?.formatListingPrice?.(listing.price_text || 'Бесплатно')
+      || listing.price_text || 'Бесплатно';
+    body.append(price);
+
+    const meta = [listing.category];
+    const created = Date.parse(listing.created_at || '');
+    if (Number.isFinite(created)) {
+      meta.push(new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' }).format(created));
+    }
+    if (listing.is_event === true && listing.event_date) {
+      const eventDate = Date.parse(`${listing.event_date}T00:00:00Z`);
+      meta.push(Number.isFinite(eventDate)
+        ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeZone: 'UTC' }).format(eventDate)
+        : listing.event_date);
+    }
+    if (listing.is_event === true && typeof listing.event_time === 'string' && listing.event_time) {
+      meta.push(listing.event_time.slice(0, 5));
+    }
+    const metaLine = element(document, 'div', 'listing-detail-meta', meta.filter(value => typeof value === 'string' && value).join(' · '));
+    if (metaLine.textContent) body.append(metaLine);
+
+    body.append(element(document, 'h3', 'listing-detail-description-title', 'Описание'));
+    body.append(element(document, 'p', 'listing-detail-description', listing.description || 'Описание не добавлено.'));
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.open = true;
+    close.focus?.();
+  };
+
+  return { dialog, open };
+}
+
 function addEventRegistrationControls({ card, listing, document, fetchImpl, session, location }) {
   if (!listing.is_event || !UUID.test(listing.id)) return;
   const details = formatEventTime(listing);
@@ -360,6 +446,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     const favorites = await loadMyFavorites(fetchImpl);
     const ownListingIds = await loadMyActiveListingIds(fetchImpl);
     const cards = [];
+    const details = createListingDetailsDialog({ document });
     let updateResults = () => {};
     for (const listing of result.listings) {
       if (!listing || typeof listing.id !== 'string' || typeof listing.title !== 'string'
@@ -378,6 +465,11 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       }
       card.append(element(document, 'p', 'ru-listing-description', listing.description));
       card.append(element(document, 'p', 'ru-listing-price', typeof listing.price_text === 'string' ? listing.price_text : ''));
+      const detailsButton = element(document, 'button', 'l-details-btn', 'Подробнее');
+      detailsButton.type = 'button';
+      detailsButton.setAttribute('aria-label', `Подробнее об объявлении ${listing.title}`);
+      detailsButton.addEventListener('click', event => details.open(listing, event.currentTarget || detailsButton));
+      card.append(detailsButton);
       addOwnListingDeleteControl({ card, listing, document, fetchImpl, ownListingIds, confirmImpl });
       addFavoriteControl({ card, listing, document, fetchImpl, favorites, location, onChange: () => updateResults() });
       addListingContactForm({ card, listing, document, fetchImpl, favorites, location });
@@ -453,7 +545,7 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     search.addEventListener('input', updateResults);
     document.addEventListener?.('famru:pulse-updated', updateResults);
     toolbar.append(search, views, filters, count);
-    root.replaceChildren(toolbar, ...cards.map(item => item.card));
+    root.replaceChildren(toolbar, ...cards.map(item => item.card), details.dialog);
     updateResults();
   } catch {
     const error = element(document, 'p', 'ru-board-status', 'Не удалось загрузить объявления. Проверьте подключение и попробуйте ещё раз.');
