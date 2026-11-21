@@ -35,7 +35,10 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.match(fetchCalls[0].options.body.toString(), /code_verifier=/);
   assert.equal(new URL(fetchCalls[1].url).search, '?format=json', 'the OAuth token never appears in a URL');
   assert.equal(fetchCalls[1].options.headers.authorization, 'OAuth temporary-yandex-access-token');
-  const sessionCookie = callback.headers['set-cookie'].find(value => value.startsWith('fam_ru_session='));
+  const sessionCookie = callback.headers['set-cookie'].find(value => value.startsWith('__Host-fam_ru_session='));
+  assert.match(sessionCookie, /^__Host-fam_ru_session=/);
+  assert.match(sessionCookie, /Path=\//);
+  assert.doesNotMatch(sessionCookie, /Domain=/i);
   assert.match(sessionCookie, /HttpOnly/);
   assert.match(sessionCookie, /Secure/);
   assert.match(sessionCookie, /SameSite=Lax/);
@@ -59,7 +62,7 @@ test('sensitive-action reauthentication requests explicit Yandex account confirm
   assert.equal(authorize.searchParams.get('force_confirm'), 'yes');
   assert.match(start.headers['set-cookie'], /HttpOnly/);
   const callback = await auth.handle(callbackRequest(authorize.searchParams.get('state'), cookiePair(start.headers['set-cookie'])));
-  const session = callback.headers['set-cookie'].find(value => value.startsWith('fam_ru_session='));
+  const session = callback.headers['set-cookie'].find(value => value.startsWith('__Host-fam_ru_session='));
   const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(session) } });
   assert.equal(identity.authenticated_at, null, 'a consent prompt is not an authentication timestamp');
   assert.equal(Object.hasOwn(identity, 'step_up_confirmed_at'), false);
@@ -101,6 +104,21 @@ test('Yandex profile must belong to the configured OAuth application', async () 
   const result = await auth.handle(callbackRequest(authorization.searchParams.get('state'), cookiePair(start.headers['set-cookie'])));
   assert.equal(result.headers.location, '/?auth_error=authorization_failed');
   assert.equal(result.headers['set-cookie'].startsWith('fam_ru_session='), false);
+});
+
+test('localhost development keeps a non-Secure session cookie while HTTPS production uses the host-only prefix', async () => {
+  const local = createYandexIdAuth({ clientId: 'client', redirectUri: 'http://localhost:4178/auth/yandex/callback', sessionSecret: 'test-session-secret-with-32-bytes-minimum',
+    fetchImpl: async url => String(url) === 'https://oauth.yandex.ru/token'
+      ? { ok: true, json: async () => ({ token_type: 'bearer', access_token: 'token' }) }
+      : { ok: true, json: async () => ({ id: '123456789', client_id: 'client' }) } });
+  const start = await local.handle({ method: 'GET', url: '/auth/yandex/start', headers: {} });
+  const state = new URL(start.headers.location).searchParams.get('state');
+  const callback = await local.handle(callbackRequest(state, cookiePair(start.headers['set-cookie'])));
+  const session = callback.headers['set-cookie'].find(value => value.startsWith('fam_ru_session='));
+  assert.ok(session);
+  assert.doesNotMatch(session, /Secure/);
+  const identity = await local.authenticate({ method: 'GET', headers: { cookie: cookiePair(session) } });
+  assert.equal(identity.subject, '123456789');
 });
 
 test('Yandex auth requires HTTPS off localhost and a strong session secret', () => {

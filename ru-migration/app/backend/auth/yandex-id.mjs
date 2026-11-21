@@ -59,6 +59,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
     throw new TypeError('Yandex ID redirect URI must use HTTPS outside localhost');
   }
   const secure = callback.protocol === 'https:';
+  // __Host- cookies reject Domain attributes, preventing sibling subdomains
+  // from planting a higher-precedence cookie with the same session name.
+  const sessionCookieName = secure ? '__Host-fam_ru_session' : SESSION_COOKIE;
   const secret = Buffer.from(sessionSecret);
   const nowSeconds = () => Math.floor(now() / 1000);
 
@@ -68,7 +71,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
       if (req.headers?.origin !== callback.origin) {
         return { status: 403, headers: { 'cache-control': 'no-store' }, body: { ok: false, error: 'invalid_origin' } };
       }
-      return { status: 204, headers: { 'set-cookie': cookie(SESSION_COOKIE, '', { path: '/', maxAge: 0, secure }), 'cache-control': 'no-store' }, body: null };
+      return { status: 204, headers: { 'set-cookie': cookie(sessionCookieName, '', { path: '/', maxAge: 0, secure }), 'cache-control': 'no-store' }, body: null };
     }
     if (req.method === 'GET' && url.pathname === '/auth/yandex/start') {
       const state = randomBytes(32).toString('base64url');
@@ -120,7 +123,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
         const session = encodeSigned({ kind: 'session', iss: YANDEX_ISSUER, sub: profile.id, iat: issued, exp: issued + SESSION_SECONDS }, secret);
         return { status: 303, headers: {
           location: '/',
-          'set-cookie': [clearState, cookie(SESSION_COOKIE, session, { path: '/', maxAge: SESSION_SECONDS, secure })],
+          'set-cookie': [clearState, cookie(sessionCookieName, session, { path: '/', maxAge: SESSION_SECONDS, secure })],
           'cache-control': 'no-store',
           'referrer-policy': 'no-referrer',
         }, body: null };
@@ -133,7 +136,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
 
   async function authenticate(req) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers?.origin !== callback.origin) return null;
-    const session = decodeSigned(getCookie(req, SESSION_COOKIE), secret, nowSeconds());
+    const session = decodeSigned(getCookie(req, sessionCookieName), secret, nowSeconds());
     if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string'
         || !Number.isInteger(session.iat) || session.iat > nowSeconds()) return null;
     return { issuer: YANDEX_ISSUER, subject: session.sub, authenticated_at: null, session_issued_at: session.iat };
