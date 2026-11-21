@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml
+Sitemap: https://famru.netlify.app/sitemap.xml
