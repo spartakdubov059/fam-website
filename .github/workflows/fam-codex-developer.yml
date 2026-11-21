@@ -369,6 +369,8 @@ jobs:
           PR_URL: ${{ steps.pr.outputs.pr_url }}
         run: |
           set -euo pipefail
+          # Step-local shell variables do not survive into this step.
+          BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
           BRANCH_SHA="$(git rev-parse HEAD)"
           gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
           TEST_RUN_ID=""
