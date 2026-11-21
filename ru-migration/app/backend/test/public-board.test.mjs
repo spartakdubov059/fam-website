@@ -165,9 +165,11 @@ test('Afisha combines school posts and event listings in one ordered section and
   const toolbar = root.children[0]; const search = toolbar.children[0];
   const filters = toolbar.children.find(node => node.className === 'ru-board-categories');
   const afisha = filters.children.find(button => button.textContent === 'Афиша');
+  const detailsDialog = root.children.find(node => node.tagName === 'dialog');
   afisha.listeners.click();
   assert.deepEqual(document.pulseRoot.children.slice(2), [boardCard(root, 2), notice, boardCard(root, 0), poll]);
   assert.equal(boardCard(root, 1).hidden, true, 'ordinary listings stay out of Afisha');
+  assert.ok(root.children.includes(detailsDialog), 'the event details dialog remains connected after its card moves into Afisha');
   assert.match(toolbar.children.find(node => node.className === 'ru-board-count').textContent, /Показано 4 материала/);
   search.value = 'концерт'; search.listeners.input();
   assert.equal(boardCard(root, 0).hidden, true);

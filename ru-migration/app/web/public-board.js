@@ -529,10 +529,8 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
         card.hidden = !afishaActive || Boolean(query && !searchable.includes(query));
         if (!card.hidden) visible++;
       }
-      const publicListings = document.getElementById?.('publicListings');
       const pulseFeed = pulseRoot?.children?.find?.(child => child?.className === 'ru-pulse-feed');
       if (pulseRoot && pulseFeed && eventCards.length) {
-        const controls = [...root.children].filter(child => child?.className === 'ru-board-controls');
         const currentPulseCards = [...pulseFeed.children].filter(child => pulseCards.includes(child));
         pulseFeed.replaceChildren(...currentPulseCards);
         pulseRoot.replaceChildren(pulseHeading, pulseFeed, ...afishaOrder.map(item => item.card));
@@ -544,7 +542,6 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
             .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase('ru');
           item.card.hidden = !afishaActive || Boolean(query && !searchable.includes(query));
         }
-        if (publicListings) publicListings.replaceChildren(...controls);
       }
       for (const [name, button] of filterButtons) button.setAttribute('aria-pressed', String(name === category));
       for (const [name, button] of viewButtons) button.setAttribute('aria-pressed', String(name === boardView));
