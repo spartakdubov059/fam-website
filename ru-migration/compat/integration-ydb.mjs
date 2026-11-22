@@ -93,6 +93,11 @@ try {
   const emailVerification = createRoleEmailVerification({ repository: repo, verificationKey: emailVerificationKey,
     sendEmail: async message => { syntheticVerificationEmail = message; }, now: () => 1_800_000_000_000, createCode: () => '135790' });
   assert.equal(emailVerification.available, true, 'YDB repository and synthetic email sender configure the verifier');
+  const reserveRoleEmailChallenge = repo.startRoleEmailVerification.bind(repo);
+  repo.startRoleEmailVerification = async input => {
+    try { return await reserveRoleEmailChallenge(input); }
+    catch (error) { console.error('YDB_ROLE_EMAIL_CHALLENGE_ERROR:', error?.name || 'Error', typeof error?.code === 'string' ? error.code : ''); throw error; }
+  };
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
     resolveActor,
