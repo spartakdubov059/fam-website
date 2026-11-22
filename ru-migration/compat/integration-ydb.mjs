@@ -1016,9 +1016,19 @@ try {
   const quotaAvatarKey = `pending/${quotaUserId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
   await repo.registerPendingImage(quotaUserId, quotaAvatarKey);
   privateObjects.set(quotaAvatarKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
+  const createQuotaAvatarReview = repo.createAvatarReview.bind(repo);
+  repo.createAvatarReview = async input => {
+    try { return await createQuotaAvatarReview(input); }
+    catch (error) { console.error('YDB_SYNTHETIC_AVATAR_REVIEW_ERROR:', error?.message || 'unknown'); throw error; }
+  };
+  const getQuotaAvatarImage = syntheticPendingImages.get.bind(syntheticPendingImages);
+  const quotaPendingImages = { ...syntheticPendingImages, get: async key => {
+    try { return await getQuotaAvatarImage(key); }
+    catch (error) { console.error('YDB_SYNTHETIC_AVATAR_IMAGE_ERROR:', error?.message || 'unknown'); throw error; }
+  } };
   const quotaAvatarApi = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.synthetic', subject: 'quota-avatar-user' }),
     resolveActor: async () => ({ id: quotaUserId, school_id: 'synthetic-school', role: 'student' }), repository: repo,
-    pendingImages: syntheticPendingImages });
+    pendingImages: quotaPendingImages });
   const quotaAvatarResponse = await quotaAvatarApi(apiRequest('POST', '/api/v1/me/avatar', 'quota-avatar', { image_key: quotaAvatarKey }));
   assert.equal(quotaAvatarResponse.status, 429, 'avatar submission shares the exhausted listing quota');
   assert.equal(privateObjects.has(quotaAvatarKey), false, 'the rejected avatar object is removed from private storage');
