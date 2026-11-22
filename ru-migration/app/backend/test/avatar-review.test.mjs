@@ -30,6 +30,14 @@ test('avatar request accepts only an owned private upload and puts it in school 
   assert.equal(oversizedQueued, false);
 });
 
+test('avatar request shares the hourly listing quota and rejects exhausted quota', async () => {
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
+    repository: { createAvatarReview: async () => ({ ok: false, code: 'rate_limited' }) },
+    pendingImages: { get: async () => Buffer.from('synthetic-webp') } });
+  const response = await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })));
+  assert.deepEqual(response, { status: 429, body: { ok: false, error: 'rate_limited' } });
+});
+
 test('avatar moderation list and decisions require same-school school staff', async () => {
   let listedSchool; let decisionArgs;
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => moderator,

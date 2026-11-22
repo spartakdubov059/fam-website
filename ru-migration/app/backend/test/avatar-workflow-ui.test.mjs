@@ -49,6 +49,22 @@ test('RU avatar form uploads privately and submits the Russian review route', as
   assert.match(section.children[1].textContent, /отправлено модераторам/);
 });
 
+test('RU avatar form deletes its staged upload when the shared quota is exhausted', async () => {
+  const f = fixture(); const calls = [];
+  await initializeAvatarWorkflow({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: student }) };
+    if (url === '/api/v1/avatars/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key: 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp' } }) };
+    if (url === '/api/v1/me/avatar') return { ok: false, status: 429, json: async () => ({ ok: false, error: 'rate_limited' }) };
+    if (url === '/api/v1/avatars/media/pending/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') return { ok: true, json: async () => ({ ok: true, deleted: true }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const form = f.elements.ruAvatarWorkflow.children.find(item => item.tagName === 'form');
+  form.children[0].children[0].files = [{ type: 'image/png', size: 42, name: 'synthetic.png' }];
+  await form.listeners.submit({ preventDefault() {} });
+  assert.ok(calls.some(call => call.url === '/api/v1/avatars/media/pending/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' && call.init.method === 'DELETE'));
+});
+
 test('RU staff avatar review uses only validated same-origin image routes and refreshes after approval', async () => {
   const f = fixture(); const calls = []; let queued = true;
   await initializeAvatarWorkflow({ ...f, fetchImpl: async (url, init = {}) => {
