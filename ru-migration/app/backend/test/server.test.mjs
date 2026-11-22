@@ -127,6 +127,19 @@ test('unconfigured isolated server fails closed for health and user API routes',
   });
 });
 
+test('step-up route is routed through the backend and preserves the HttpOnly Set-Cookie header', async () => {
+  await withServer({ listingsApi: async req => {
+    assert.equal(new URL(req.url, 'http://localhost').pathname, '/api/v1/me/step-up/email');
+    return { status: 200, body: { ok: true }, headers: { 'set-cookie': 'fam_ru_step_up=synthetic; Path=/; HttpOnly' } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/me/step-up/email', origin), { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'verify', code: '123456' }) });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  });
+});
+
 test('server routes the internal coder bridge separately from public user APIs', async () => {
   let calls = 0;
   await withServer({ coderTaskBridge: async req => {

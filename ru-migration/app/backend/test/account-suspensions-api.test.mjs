@@ -92,14 +92,14 @@ test('stale authentication, other roles, self action, invalid duration and conta
   const normalSession = api({ authenticatedAt: null, repository });
   assert.equal((await normalSession(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_authentication_required');
   const confirmed = api({ authenticatedAt: null, stepUpConfirmedAt: Math.floor(Date.now() / 1000), repository });
-  assert.equal((await confirmed(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'fresh_authentication_required', 'fresh OAuth consent is not fresh authentication');
+  assert.equal((await confirmed(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 201, 'the API accepts this field only after the runtime signed-cookie verifier attaches it');
   const student = api({ role: 'student', repository });
   assert.equal((await student(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).status, 403);
   const fresh = api({ repository });
   assert.equal((await fresh(request('PATCH', `/api/v1/suspensions/${admin.id}`, { action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'cannot_suspend_self');
   assert.equal((await fresh(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 48, reason: 'Repeatedly disrupted the school group.' }))).body.error, 'invalid_duration');
   assert.equal((await fresh(request('PATCH', `/api/v1/suspensions/${targetId}`, { action: 'issue', duration_hours: 24, reason: 'Reach me at 555 123 45678 for details.' }))).body.error, 'invalid_reason');
-  assert.equal(mutations, 0);
+  assert.equal(mutations, 1);
 });
 
 test('school suspension target list is administrator-only and bounded by repository school scope', async () => {
