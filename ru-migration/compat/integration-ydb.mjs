@@ -22,6 +22,7 @@ import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-h
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 let syntheticPendingImages;
+let quotaPendingImages;
 try {
   await driver.ready();
   const client = query(driver);
@@ -1021,11 +1022,18 @@ try {
     try { return await createQuotaAvatarReview(input); }
     catch (error) { console.error('YDB_SYNTHETIC_AVATAR_REVIEW_ERROR:', error?.message || 'unknown'); throw error; }
   };
-  const getQuotaAvatarImage = syntheticPendingImages.get.bind(syntheticPendingImages);
-  const quotaPendingImages = { ...syntheticPendingImages, get: async key => {
-    try { return await getQuotaAvatarImage(key); }
-    catch (error) { console.error('YDB_SYNTHETIC_AVATAR_IMAGE_ERROR:', error?.message || 'unknown'); throw error; }
-  } };
+  quotaPendingImages = createS3PendingImageStore({
+    FAM_RU_S3_ENDPOINT: 'http://127.0.0.1:9000', FAM_RU_S3_BUCKET: 'synthetic-private',
+    FAM_RU_S3_ACCESS_KEY_ID: 'synthetic-access', FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic-secret',
+  }, {
+    send: async input => { privateObjects.set(input.Key, { body: Buffer.from(input.Body), contentType: input.ContentType }); },
+    get: async input => {
+      const object = privateObjects.get(input.Key);
+      return object ? { ContentType: object.contentType, ContentLength: object.body.length,
+        Body: { transformToByteArray: async () => object.body } } : null;
+    },
+    remove: async input => { privateObjects.delete(input.Key); },
+  });
   const quotaAvatarApi = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.synthetic', subject: 'quota-avatar-user' }),
     resolveActor: async () => ({ id: quotaUserId, school_id: 'synthetic-school', role: 'student' }), repository: repo,
     pendingImages: quotaPendingImages });
@@ -1158,5 +1166,6 @@ try {
   process.exitCode = 1;
 } finally {
   syntheticPendingImages?.close();
+  quotaPendingImages?.close();
   await driver.close();
 }
