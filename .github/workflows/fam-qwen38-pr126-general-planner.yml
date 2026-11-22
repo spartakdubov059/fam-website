@@ -30,6 +30,11 @@ jobs:
           set -euo pipefail
           node --test tests/security/local-model-json.test.mjs
           node --test tests/security/local-model-patch.test.mjs
+      - name: Restore verified Qwen3.8 weights from cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf
+          key: fam-qwen38-27b-iq2xs-v1
       - name: Download and verify Qwen3.8 open weights
         env:
           MODEL_SHA256: eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23
@@ -72,7 +77,7 @@ jobs:
         env:
           FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
           FAM_NARROW_TIMEAGO_BENCHMARK: "0"
-          FAM_TASK: "Исправь воспроизводимый дефект функции timeAgo в index.html: невалидные даты сейчас отображаются некорректно, а числовой Unix timestamp 0 считается пустым значением. Для null, undefined, пустой строки, NaN, Infinity и невалидных дат возвращай пустую строку; временная метка 0 должна быть корректной датой. Сохрани прежние русские подписи для валидных дат. Правь только функцию timeAgo в index.html. Проверки находятся в tests/agent-benchmark/time-ago.test.mjs, тест изменять запрещено. Подготовь минимальный patch с доказательством причины. Поле unified_diff ОБЯЗАТЕЛЬНО должно начинаться буквально с diff --git a/index.html b/index.html, далее строки --- a/index.html, +++ b/index.html и корректный @@ -старые_строки +новые_строки @@; это полный git unified diff, а не только @@-hunk или фрагмент JavaScript. Не добавляй Markdown fences."
+          FAM_TASK: "Исправь воспроизводимый дефект функции timeAgo в index.html: невалидные даты сейчас отображаются некорректно, а числовой Unix timestamp 0 считается пустым значением. Для null, undefined, пустой строки, NaN, Infinity и невалидных дат возвращай пустую строку; временная метка 0 должна быть корректной датой. Сохрани прежние русские подписи для валидных дат, включая ISO-строки. Важно для JavaScript: НЕ вызывай isNaN(isoOrMs) и не проверяй ISO-строку как число — глобальный isNaN преобразует валидную строку даты в NaN. Сначала преобразуй строку даты в timestamp, затем проверь полученный timestamp через Number.isFinite(t); отдельно обработай null, undefined, пустую строку и невалидные числовые входы, сохранив 0 валидным. Правь только функцию timeAgo в index.html. Проверки находятся в tests/agent-benchmark/time-ago.test.mjs, тест изменять запрещено. Подготовь минимальный patch с доказательством причины. Поле unified_diff ОБЯЗАТЕЛЬНО должно начинаться буквально с diff --git a/index.html b/index.html, далее строки --- a/index.html, +++ b/index.html и корректный @@ -старые_строки +новые_строки @@; это полный git unified diff, а не только @@-hunk или фрагмент JavaScript. Не добавляй Markdown fences."
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/fam-candidate-benchmark"

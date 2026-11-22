@@ -151,6 +151,10 @@ test("PR126 general planner runtime test cannot write or alter production", () =
   assert.match(integrationTrialWorkflow, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(integrationTrialWorkflow, /permissions:\n\s+contents: read/);
   assert.match(integrationTrialWorkflow, /FAM_NARROW_TIMEAGO_BENCHMARK: "0"/);
+  assert.match(integrationTrialWorkflow, /uses: actions\/cache@[0-9a-f]{40} # actions\/cache v4/);
+  assert.match(integrationTrialWorkflow, /key: fam-qwen38-27b-iq2xs-v1/);
+  assert.match(integrationTrialWorkflow, /НЕ вызывай isNaN\(isoOrMs\)/);
+  assert.match(integrationTrialWorkflow, /Number\.isFinite\(t\)/);
   assert.match(integrationTrialWorkflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
   assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
   assert.match(integrationTrialWorkflow, /QA="report_generation_failed"/);
