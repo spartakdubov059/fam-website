@@ -129,7 +129,7 @@ export async function initializeNotifications({ document = globalThis.document, 
       const daysAgo = now() - 14 * 24 * 60 * 60 * 1000;
       const role = profile.role;
       const [inbox, listings, ideas, eventReviews, roleRequests, roleReview, deletionRequests] = await Promise.all([
-        request('/api/v1/messages'), optional('/api/v1/listings', 'listings'),
+        request('/api/v1/messages'), optional('/api/v1/notifications/listings', 'listings'),
         ['school_admin', 'council_member'].includes(role) ? optional('/api/v1/school/ideas', 'ideas') : Promise.resolve(null),
         ['school_admin', 'council_member'].includes(role) ? optional('/api/v1/event-registrations/review', 'applications') : Promise.resolve(null),
         role === 'student' ? optional('/api/v1/role-requests', 'request') : Promise.resolve(null),
@@ -140,7 +140,7 @@ export async function initializeNotifications({ document = globalThis.document, 
       if (!inbox.response.ok || !Array.isArray(inbox.result?.messages)) throw new Error('messages_unavailable');
       const items = RELEASES.map(item => ({ ...item, kind: 'release' }));
       const add = item => { if (item && typeof item.id === 'string' && item.id.length <= 210) items.push(item); };
-      if (Array.isArray(listings)) listings.filter(row => row && row.school_id === profile.school_id && row.user_id !== profile.id
+      if (Array.isArray(listings)) listings.filter(row => row && typeof row.id === 'string'
         && Number.isFinite(Date.parse(row.created_at || '')) && Date.parse(row.created_at) >= daysAgo)
         .slice(0, 8).forEach(row => add({ id: `school-listing:${row.id}`, kind: 'listing',
           title: row.is_event ? 'Новое мероприятие школы' : 'Новое объявление школы',

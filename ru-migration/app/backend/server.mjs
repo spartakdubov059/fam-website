@@ -104,6 +104,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       || (req.method === 'POST' && url.pathname === '/api/v1/site-errors')
       || (req.method === 'POST' && url.pathname === '/api/v1/messages')
       || ((req.method === 'GET' || req.method === 'POST') && url.pathname === '/api/v1/notification-reads')
+      || (req.method === 'GET' && url.pathname === '/api/v1/notifications/listings')
       || (req.method === 'POST' && url.pathname === '/api/v1/messages/read')
       || (req.method === 'POST' && /^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/contact$/i.test(url.pathname))
       || (req.method === 'GET' && ['/api/v1/me', '/api/v1/favorites', '/api/v1/messages'].includes(url.pathname))

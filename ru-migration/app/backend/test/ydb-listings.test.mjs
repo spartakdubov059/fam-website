@@ -39,6 +39,25 @@ test('active listing feed requires a school scope in the YDB query', async () =>
   await assert.rejects(repository.listActiveListings(''), TypeError);
 });
 
+test('school notification listing query excludes the active user and projects no ownership fields', async () => {
+  let query; let values;
+  const repository = createYdbListingsRepository((strings, ...bound) => {
+    query = strings.join('?'); values = bound;
+    return Promise.resolve([[{ id: 'listing-a', title: 'Новость', is_event: true, created_at: '2026-11-22T10:00:00Z' }]]);
+  });
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  assert.deepEqual(await repository.listRecentSchoolNotificationListings('school-a', ownerId), [
+    { id: 'listing-a', title: 'Новость', is_event: true, created_at: '2026-11-22T10:00:00Z' },
+  ]);
+  assert.deepEqual(values, ['school-a', ownerId]);
+  assert.match(query, /school_id = \? AND user_id != \? AND status = 'active'/);
+  assert.match(query, /Interval\('P14D'\)/);
+  assert.match(query, /LIMIT 8/);
+  assert.doesNotMatch(query, /image_key|email/);
+  await assert.rejects(repository.listRecentSchoolNotificationListings('', ownerId), TypeError);
+  await assert.rejects(repository.listRecentSchoolNotificationListings('school-a', 'invalid'), TypeError);
+});
+
 test('school role review queue joins only the same-school profile projection', async () => {
   let query;
   const row = { request_id: 'request-a', user_id: '11111111-1111-4111-8111-1234567890ab', requested_role: 'council_member',

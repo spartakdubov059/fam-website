@@ -9,6 +9,27 @@ function req(body = {}, method = 'POST') {
   request.url = '/api/v1/listings';
   return request;
 }
+test('school listing notifications use a private bounded projection scoped to the active user school', async () => {
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  let scope;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'student' }),
+    resolveActor: async () => ({ id: ownerId, school_id: 'school-a', role: 'student' }),
+    repository: { listRecentSchoolNotificationListings: async (...args) => {
+      scope = args;
+      return [{ id: 'listing-a', title: 'Синтетическая новость'.repeat(10), is_event: true,
+        created_at: '2026-11-22T10:00:00Z', school_id: 'private-school', user_id: 'private-owner', image_key: 'private-key' }];
+    } } });
+  const request = req({}, 'GET'); request.url = '/api/v1/notifications/listings';
+  const result = await handler(request);
+  assert.equal(result.status, 200);
+  assert.deepEqual(scope, ['school-a', ownerId]);
+  assert.deepEqual(Object.keys(result.body.listings[0]).sort(), ['created_at', 'id', 'is_event', 'title']);
+  assert.equal(result.body.listings[0].title.length, 80);
+
+  const guest = createListingsApi({ authenticate: async () => null, repository: { listRecentSchoolNotificationListings: async () => { throw new Error('must not read'); } } });
+  assert.equal((await guest(request)).status, 401);
+});
+
 test('school administrators cannot read global technical alerts', async () => {
   let reads = 0;
   let actor = { id: 'admin-a', school_id: 'school-a', role: 'school_admin' };

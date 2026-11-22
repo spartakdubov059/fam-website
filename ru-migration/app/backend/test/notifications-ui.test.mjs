@@ -20,6 +20,7 @@ function fixture() {
 
 test('Russian fallback notification center combines the signed-in inbox and release notices, then persists read state', async () => {
   const { document, values } = fixture();
+  const now = Date.parse('2026-01-02T00:00:00Z');
   const ownerId = '11111111-1111-4111-8111-111111111111';
   const peerId = '22222222-2222-4222-8222-222222222222';
   const messageId = '33333333-3333-4333-8333-333333333333';
@@ -32,7 +33,9 @@ test('Russian fallback notification center combines the signed-in inbox and rele
       { id: messageId, sender_id: peerId, receiver_id: ownerId, body: '<unsafe>', is_read: false, created_at: '2026-01-01T00:00:00Z' },
       { id: '44444444-4444-4444-8444-444444444444', sender_id: ownerId, receiver_id: peerId, body: 'Чужое', is_read: false },
     ] }) };
-    if (url === '/api/v1/listings') return { status: 200, ok: true, json: async () => ({ ok: true, listings: [] }) };
+    if (url === '/api/v1/notifications/listings') return { status: 200, ok: true, json: async () => ({ ok: true, listings: [
+      { id: 'listing-a', title: 'Новость школы', is_event: false, created_at: '2026-01-01T00:00:00Z' },
+    ] }) };
     if (url === '/api/v1/role-requests') return { status: 200, ok: true, json: async () => ({ ok: true, request: null }) };
     if (url === '/api/v1/notification-reads' && options.method === 'POST') {
       savedKeys.push(...JSON.parse(options.body).notification_keys);
@@ -42,12 +45,14 @@ test('Russian fallback notification center combines the signed-in inbox and rele
     if (url === '/api/v1/messages/read' && options.method === 'POST') return { status: 200, ok: true, json: async () => ({ ok: true, updated: 1 }) };
     throw new Error(`unexpected request ${url}`);
   };
-  await initializeNotifications({ document, fetchImpl });
+  await initializeNotifications({ document, fetchImpl, now: () => now });
   assert.equal(values.ruNotificationBadge.hidden, false);
-  assert.equal(values.ruNotificationBadge.textContent, '3');
+  assert.equal(values.ruNotificationBadge.textContent, '4');
   assert.equal(values.ruNotifications.hidden, true);
   await values.ruOpenNotifications.listeners.click();
-  assert.equal(values.ruNotificationList.children.length, 3);
+  assert.equal(values.ruNotificationList.children.length, 4);
+  assert.ok(calls.some(call => call.url === '/api/v1/notifications/listings'));
+  assert.ok(!calls.some(call => call.url === '/api/v1/listings'));
   const messageItem = values.ruNotificationList.children.find(item => item.children[1]?.textContent === '<unsafe>');
   assert.ok(messageItem);
   assert.equal(messageItem.children[1].tagName, 'p');

@@ -78,6 +78,26 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         return { status: 200, body: { ok: true } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
+    if (req.method === 'GET' && pathname === '/api/v1/notifications/listings') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.listRecentSchoolNotificationListings !== 'function') {
+        return { status: 503, body: { ok: false, error: 'notification_feed_unavailable' } };
+      }
+      try {
+        const rows = await repository.listRecentSchoolNotificationListings(actor.school_id, actor.id);
+        if (!Array.isArray(rows) || rows.length > 8) return { status: 503, body: { ok: false, error: 'notification_feed_incomplete' } };
+        const listings = rows.map(row => ({
+          id: typeof row?.id === 'string' ? row.id : '',
+          title: typeof row?.title === 'string' ? row.title.slice(0, 80) : '',
+          is_event: row?.is_event === true,
+          created_at: row?.created_at ?? null,
+        })).filter(row => row.id);
+        return { status: 200, body: { ok: true, listings } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
     if (pathname === '/api/v1/site-errors') return siteErrorTelemetry(req);
     if (pathname === '/api/v1/me/account') return accountDeletionApi(req);
     if (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
