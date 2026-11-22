@@ -12,6 +12,18 @@
 | `moderate/index.ts` (`32fe124`) | Text moderation, disputes/idea review and safety-signal workflows; calls OpenAI moderation endpoint | local `content-safety` policies, `submit-listing.mjs`, `submit-idea.mjs`, safety incident storage and school moderation APIs | Local checks plus human review replace paid OpenAI/model decisions. Safety categories and reviewer behavior need a separate category-by-category semantic/security audit; this is a functional difference. |
 | `submit-content/index.ts` (`84390a3`) | Authenticated listing/idea/message submission, content quotas and image signature/review workflow | `listings-api.mjs`, `submit-listing.mjs`, `submit-idea.mjs`, `submit-message.mjs`, `media-api.mjs`, Sharp and private S3 staging | RU uses Yandex/OIDC actor-bound APIs, server-generated private keys, Sharp WebP and school moderation. Tested input-size/type handling and quotas; real S3 bucket policy, IAM and full response parity remain unverified. |
 
+### Маршрутная сверка действий `school-admin-access` (22 ноября 2026)
+
+Проверены четыре исходных действия `status`, `request`, `start_review`, `review` в `supabase/functions/school-admin-access/index.ts` против RU API и имеющихся тестов.
+
+| Source action | RU route | Локальное покрытие | Отличие/ограничение |
+|---|---|---|---|
+| `status` | `GET /api/v1/profile-requests` для заявки на профиль; `GET /api/v1/role-requests` для дополнительной роли; очередь администратора читается через `GET /api/v1/profile-requests/review` и `GET /api/v1/role-requests/review` | `listings-api.test.mjs`, `listing-moderation-ui.test.mjs` | RU разделяет заявку на первичный профиль и запрос дополнительной роли; формы ответа и поля не совпадают напрямую с исходным `request`. |
+| `request` | `POST /api/v1/profile-requests` для заполнения школьного профиля; `POST /api/v1/role-requests/email-verification` и затем `POST /api/v1/role-requests` для запроса роли | `listings-api.test.mjs`, `role-email-verification.test.mjs`, `account-workflow-ui.test.mjs` | RU проверяет одноразовый код, отправляемый на адрес из Яндекс ID. Интеграция с реальным OAuth и Postbox не проверена; отправка выключена без `FAM_RU_POSTBOX_FROM_EMAIL`. |
+| `start_review` | `PATCH /api/v1/role-requests/:request_id` с `action: start_review` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | YDB транзакция резервирует заявку за активным администратором той же школы. Параметры и статусы отличаются от исходной RPC. |
+| `review` | `PATCH /api/v1/role-requests/:request_id` с решением; `PATCH /api/v1/profile-requests/:request_id` для первичного профиля; `PATCH /api/v1/staff-verifications/:user_id` для проверки сотрудника | `listings-api.test.mjs`, `ydb-listings.test.mjs`, `listing-moderation-ui.test.mjs` | Проверяющий и школа берутся из серверной identity. Дополнительные RU сценарии staff verification не имеют прямого действия в исходной функции. Точная семантика всех переходов и полей требует проверки на тестовой облачной интеграции. |
+
+
 ### Маршрутная сверка действий `council-management` (21 ноября 2026)
 
 Проверены все 15 исходных `action`-веток `supabase/functions/council-management/index.ts` против закрытого RU API в `app/backend/services/listings-api.mjs`, `account-deletion-api.mjs` и `account-suspensions-api.mjs`:
@@ -19,17 +31,17 @@
 | Source action | RU route | Локальные проверки | Отличие/ограничение |
 |---|---|---|---|
 | `my_suspension_status` | `GET /api/v1/me/suspension` | `account-suspensions-api.test.mjs`, `listings-api.test.mjs` | Статус берётся по аутентифицированному actor; YDB IAM не проверен в облаке. |
-| `delete_my_account` | `DELETE /api/v1/me/account` | `account-deletion-api.test.mjs`, `ydb-listings.test.mjs` | RU требует свежую сессию Яндекс ID и точную фразу; source Supabase проверяет свежую парольную сессию. Оба пути блокируют удаление последнего администратора. |
+| `delete_my_account` | `DELETE /api/v1/me/account` | `account-deletion-api.test.mjs`, `ydb-listings.test.mjs` | RU проверяет точную фразу и запрещает удалять последнего администратора, но Yandex OAuth не подтверждает время повторной аутентификации. Cookie-сессия получает отказ; безопасный рабочий step-up ещё не реализован. |
 | `list_request_targets` | `GET /api/v1/deletion-requests/targets` | `listings-api.test.mjs`, `listing-moderation-ui.test.mjs` | Список ограничен обычными аккаунтами своей школы; выдаются минимальные RU account codes/поля. |
 | `request_account_deletion` | `POST /api/v1/deletion-requests` | `listings-api.test.mjs`, `account-deletion-api.test.mjs` | Запрос не удаляет аккаунт автоматически; роль/школа заданы серверным профилем. |
 | `overview` | `GET /api/v1/school/admin/overview` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | RU отдаёт ограниченные проекции без email/OIDC subject; пределы выборки документированы в `PORTING_INVENTORY.md`. |
 | `agent_dashboard` | `GET /api/v1/school/admin/agent-dashboard` | `listings-api.test.mjs`, `school-agent-reports.test.mjs` | RU-отчёт и идеи детерминированные агрегаты без внешней модели; не эквивалентен произвольному исходному agent payload. |
 | `review_agent_idea` | `PATCH /api/v1/school/admin/agent-ideas/:digest` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | Решение одноразовое, scoped по школе и записывает минимальный аудит. |
-| `suspend_account` / `lift_suspension` | `PATCH /api/v1/suspensions/:user_id` (`action: issue|lift`) | `account-suspensions-api.test.mjs`, `listings-api.test.mjs` | RU требует свежую Яндекс ID сессию, фиксированный срок и same-school активную роль. |
+| `suspend_account` / `lift_suspension` | `PATCH /api/v1/suspensions/:user_id` (`action: issue|lift`) | `account-suspensions-api.test.mjs`, `listings-api.test.mjs` | RU проверяет фиксированный срок и активную роль той же школы. Для Yandex cookie свежая аутентификация недоступна, поэтому эти изменения сейчас fail closed. |
 | `list_safety_reports` / `acknowledge_safety_report` | `GET|PATCH /api/v1/school/admin/safety-reports` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | RU сохраняет только HMAC digest и агрегированные маркеры; исходные доказательства/сырой текст не выдаются. |
-| `review_account_deletion` | `PATCH /api/v1/deletion-requests/:request_id` | `listings-api.test.mjs`, `account-deletion-api.test.mjs` | RU может отклонить обычным решением; одобрение требует отдельного свежего подтверждения и фразы удаления. |
+| `review_account_deletion` | `PATCH /api/v1/deletion-requests/:request_id` | `listings-api.test.mjs`, `account-deletion-api.test.mjs` | RU может отклонить заявку; одобрение требует свежей аутентификации и точной фразы. Yandex OAuth не предоставляет проверяемый `auth_time`, поэтому одобрение сейчас fail closed для cookie-сессии. |
 | `revoke_role` | `GET /api/v1/role-management/targets`, `PATCH /api/v1/role-management/:user_id` (`action: revoke`) | `account-suspensions-api.test.mjs`, `ydb-listings.test.mjs` | RU сохраняет same-school/last-admin проверки в транзакционном repository; облачный service-account IAM отдельно не проверен. |
-| `delete_listing` | `DELETE /api/v1/school/listings/:listing_id` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | Чужое объявление удаляет только свежеподтверждённый администратор своей школы; медиа чистится через lease. |
+| `delete_listing` | `DELETE /api/v1/school/listings/:listing_id` | `listings-api.test.mjs`, `ydb-listings.test.mjs` | Чужое объявление доступно к удалению только администратору своей школы после свежей аутентификации. Yandex cookie не несёт проверяемого `auth_time`, поэтому такой запрос сейчас fail closed; медиа очищается через lease. |
 | `delete_account` | `DELETE /api/v1/school/accounts/:user_id` | `account-deletion-api.test.mjs`, `recover-account-deletions.test.mjs`, `ydb-listings.test.mjs` | RU допускает только eligible same-school student/council account, не самого администратора; очистка YDB/S3 реализована как durable job с повтором. |
 
 Проверка подтверждает наличие route-level counterpart для каждого action, но сама по себе не доказывает эквивалентность каждого исходного ответа, PostgreSQL RLS/grant или конкурентных сценариев в облачной YDB.
