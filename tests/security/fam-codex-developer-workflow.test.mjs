@@ -35,6 +35,11 @@ const integrationTrialWorkflow = readFileSync(
   new URL("../../.github/workflows/fam-qwen38-pr126-general-planner.yml", import.meta.url),
   "utf8",
 );
+const timeAgoScopeValidator = readFileSync(
+  new URL("../../scripts/validate-local-agent-time-ago.mjs", import.meta.url),
+  "utf8",
+);
+
 const noPatchValidator = readFileSync(
   new URL("../../scripts/validate-local-agent-no-patch.mjs", import.meta.url),
   "utf8",
@@ -210,4 +215,17 @@ test("general timeAgo context is source-exact without bypassing model planning",
   assert.match(runner, /selected\.length === 1/);
   assert.match(runner, /plan\.plan/);
   assert.match(runner, /return isAllowedAgentPath\(path\)/);
+});
+
+test("existing timeAgo benchmark is the only exception to the code-change test requirement", () => {
+  assert.ok(workflow.includes('if (( ${#changed_files[@]} == 1 )) && [[ "${changed_files[0]}" == "index.html" ]]'));
+  assert.match(workflow, /node scripts\/validate-local-agent-time-ago\.mjs/);
+  assert.match(workflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
+  assert.match(workflow, /node --check scripts\/validate-local-agent-time-ago\.mjs/);
+  assert.match(workflow, /Изменение HTML\/JavaScript не содержит регрессионного теста/);
+  assert.match(timeAgoScopeValidator, /export function onlyTimeAgoChanged/);
+  assert.match(timeAgoScopeValidator, /git/);
+  assert.match(timeAgoScopeValidator, /HEAD:index\.html/);
+  assert.match(timeAgoScopeValidator, /changed\.length !== 1/);
+  assert.doesNotMatch(workflow, /gh pr merge/);
 });
