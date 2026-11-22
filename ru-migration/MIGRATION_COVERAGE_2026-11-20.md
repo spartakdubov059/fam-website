@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU текущий code tree `a01d49c53f89f847524efb7394d630acee9d2d54`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 36 YDB schema files. Ранее проверен список имён миграций; новая `20261122012818_restrict_listing_image_reads_to_school_members.sql` отдельно сопоставлена с same-school/active/private API правилами чтения фото в RU. Полная сверка всех 80 миграций по объектам ещё не проведена; совпадение списков не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU текущий code tree `a5101a68148ef39255f06a760e96353a78e91045`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 36 YDB schema files. Ранее проверен список имён миграций; новая `20261122012818_restrict_listing_image_reads_to_school_members.sql` отдельно сопоставлена с same-school/active/private API правилами чтения фото в RU. Полная сверка всех 80 миграций по объектам ещё не проведена; совпадение списков не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 

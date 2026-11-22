@@ -1,6 +1,6 @@
 # Инвентарь Supabase Edge Functions → FAM RU (20 ноября 2026)
 
-Базовая сверка entrypoints сделана по source `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `d9a8f17e9825af386792191c00ef2905df38e1aa`; это историческая база таблицы, не текущая оценка паритета. Текущий RU code commit — `6527fe60f12f1a9e861ea2fb979bc6137cba1a6b`, ветка документации обновлена до `a2614cad63195aebf8b90ba7f478fddc64ea7a79`. В source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
+Базовая сверка entrypoints сделана по source `main` `af1f0086066d18b3d814dd535f06eda733ae58de` и RU code commit `d9a8f17e9825af386792191c00ef2905df38e1aa`; это историческая база таблицы, не текущая оценка паритета. Текущий RU code tree — `a5101a68148ef39255f06a760e96353a78e91045`. В актуальном source tree семь Edge Function entrypoints. Наличие RU endpoint/worker не означает полного паритета всех действий, полей, прав и внешних побочных эффектов.
 
 | Edge Function entrypoint (source SHA) | Source actions / обязанности | RU counterpart | Что не совпадает / статус |
 |---|---|---|---|
