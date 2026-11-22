@@ -18,7 +18,6 @@ import { createMediaApi } from '../app/backend/services/media-api.mjs';
 import { createS3PendingImageStore } from '../app/backend/media/s3-pending-store.mjs';
 import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
 import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
-import { createRoleEmailVerification } from '../app/backend/services/role-email-verification.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -90,8 +89,6 @@ try {
   const accountMediaKeys = new Set();
   let syntheticVerificationEmail;
   const emailVerificationKey = 'local-ci-only-synthetic-role-email-key-over-32-bytes';
-  const emailVerification = createRoleEmailVerification({ repository: repo, verificationKey: emailVerificationKey,
-    sendEmail: async message => { syntheticVerificationEmail = message; }, now: () => 1_800_000_000_000, createCode: () => '135790' });
   const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
     authenticate,
     resolveActor,
@@ -99,7 +96,6 @@ try {
     safetyKey: 'local-ci-only-synthetic-safety-key-over-32-bytes',
     verificationKey: emailVerificationKey,
     sendRoleVerificationEmail: async message => { syntheticVerificationEmail = message; },
-    emailVerification,
     pendingImages: {
       get: async () => Buffer.from('synthetic-webp'),
       delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
