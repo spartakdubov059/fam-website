@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `147ec7903148bfface274c4e681aabb299252dcf`, код RU `migration/yandex-cloud` (кодовое дерево на commit `d37cc7b6c10a8142c5608f8a884b4d6c3c5de381` (`31b9e718fe50b645e03d7a7dd3a9f67e2d79a77a`)). В актуальном дереве `main` — 79 файлов Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 34 YDB schema files. Количество файлов не подтверждает эквивалентность: Postgres RLS, RPC, триггеры, cron и очереди требуют проверки поведения отдельно.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `d60b159c1c861cf2288eb82db1b627cd93342e2b`, RU `migration/yandex-cloud` `04bab205a425ac1bd04271dc3fc2e3c270b10371`. В `main` — 79 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 35 YDB schema files. Сверка имён миграций даёт 79/79 в реестре, но количество файлов и имён не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
@@ -83,9 +83,10 @@
 
 ## Сверка дельты upstream — 22 ноября 2026
 
-- Актуальный `main` `147ec7903148bfface274c4e681aabb299252dcf` содержит одну новую SQL migration сверх снимка 21 ноября: `20261121190000_restrict_listings_to_authenticated_same_school.sql`. Её поведение уже реализовано в RU API/repository и покрыто отдельной заметкой приватности и disposable YDB CI; строка добавлена в `SUPABASE_MIGRATION_INVENTORY_2026-11-20.md`.
-- Автоматическая сверка всех путей SQL migration в `main` с путями реестра дала **79/79 записей**, пропущенных файлов нет. Это подтверждает только полноту списка имён, не полноту эквивалентности объектов PostgreSQL/YDB, RLS, RPC, триггеров или полей API.
-- Source code, `main`, production и пользовательские данные не менялись.
+- На source snapshot `147ec7903148bfface274c4e681aabb299252dcf` появилась migration `20261121190000_restrict_listings_to_authenticated_same_school.sql`; RU API/repository реализует same-school access, с отдельной заметкой приватности и synthetic YDB coverage.
+- Повторная сверка по текущему `main` `d60b159c1c861cf2288eb82db1b627cd93342e2b`: 79 SQL migration paths, все 79 имён найдены в migration inventory; пропусков и лишних SQL имён нет. RU branch tip `04bab205a425ac1bd04271dc3fc2e3c270b10371` содержит 35 YDB schema files. Это проверка перечней, не semantic equivalence.
+- Новый source diff в `submit-content/index.ts` применяет общий listing quota к avatar submissions и удаляет pending upload при отказе/ошибке. RU `createAvatarReview` расходует тот же hourly listing quota; commit `04bab20` дополнительно очищает незакреплённый pending upload через deletion lease и сохраняет объект, если он уже связан с review. Проверки точного commit: backend **449/449** и targeted avatar tests **6/6** локально. Для этого commit GitHub CI status пока не доступен.
+- `main`, production и пользовательские данные не менялись.
 
 
 ## Индексы очистки медиа и атрибуции safety — 22 ноября 2026
