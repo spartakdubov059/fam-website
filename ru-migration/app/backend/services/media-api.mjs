@@ -116,7 +116,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         if (!photo?.image_key || photo.school_id !== actor.school_id || photo.photo_status !== 'pending' || photo.status !== 'pending') return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
         const suspensionBlock = await suspendedModeratorGate(actor);
         if (suspensionBlock) return suspensionBlock;
-        const changed = await repository.moderateListingPhoto(photoMatch[1], actor.school_id, decision);
+        const changed = await repository.moderateListingPhoto(photoMatch[1], actor.school_id, actor.id, decision);
         return changed ? { status: 200, body: { ok: true, photo_status: decision } } : { status: 409, body: { ok: false, error: 'photo_review_conflict' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }

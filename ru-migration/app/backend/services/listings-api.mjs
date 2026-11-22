@@ -783,7 +783,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       const status = input?.decision === 'approve' ? 'active' : input?.decision === 'reject' ? 'rejected' : null;
       if (!status) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
       try {
-        const updated = await repository.moderateListing(moderationMatch[1], actor.school_id, status);
+        const updated = await repository.moderateListing(moderationMatch[1], actor.school_id, actor.id, status);
         return updated ? { status: 200, body: { ok: true, status } } : { status: 404, body: { ok: false, error: 'listing_not_found' } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }

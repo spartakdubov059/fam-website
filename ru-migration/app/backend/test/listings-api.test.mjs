@@ -861,7 +861,7 @@ test('listing moderation trusts database role and school scope, not token claims
   const request = req({ decision: 'approve', school_id: 'school-b', status: 'active' }, 'PATCH');
   request.url = `/api/v1/listings/${id}/moderation`;
   const response = await handler(request);
-  assert.deepEqual(call, [id, 'school-a', 'active']);
+  assert.deepEqual(call, [id, 'school-a', 'admin-id', 'active']);
   assert.deepEqual(response, { status: 200, body: { ok: true, status: 'active' } });
 });
 

@@ -1118,26 +1118,47 @@ test('mark-read scopes both the update and confirmation to recipient and school'
   assert.equal(writes, 2);
 });
 
-test('listing moderation checks school and pending state in one transaction before changing status', async () => {
+test('listing moderation revalidates reviewer role, school and suspension in its transaction', async () => {
   const operations = [];
   const tx = async (strings, ...values) => {
     const text = strings.join('?'); operations.push({ text, values });
+    if (text.includes('SELECT role')) return [[{ role: 'school_admin', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT suspension_id')) return [[]];
     return text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: '', photo_status: 'none' }]] : [[]];
   };
   const sql = Object.assign(async () => [[]], { begin: async work => work(tx) });
   const repo = createYdbListingsRepository(sql);
-  assert.equal(await repo.moderateListing('listing-id', 'school-a', 'active'), true);
-  assert.match(operations[0].text, /SELECT school_id, status, image_key, photo_status/);
-  assert.match(operations[1].text, /SET status = \?/);
-  assert.deepEqual(operations[1].values, ['active', 'listing-id']);
-  const photoPending = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async (strings) => strings.join('').includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }]] : [[]]) }));
-  assert.equal(await photoPending.moderateListing('photo-listing', 'school-a', 'active'), false, 'photo listings stay pending before photo approval');
+  assert.equal(await repo.moderateListing('listing-id', 'school-a', 'reviewer-id', 'active'), true);
+  assert.match(operations[0].text, /SELECT role, school_id, active/);
+  assert.match(operations[1].text, /fam_account_suspensions/);
+  assert.match(operations[2].text, /SELECT school_id, status, image_key, photo_status/);
+  assert.match(operations[3].text, /SET status = \?/);
+  assert.deepEqual(operations[3].values, ['active', 'listing-id']);
+  const transaction = responder => async (strings) => {
+    const text = strings.join('');
+    if (text.includes('SELECT role')) return [[{ role: 'school_admin', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT suspension_id')) return [[]];
+    return responder(text);
+  };
+  const photoPending = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(transaction(text => text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }]] : [[]])) }));
+  assert.equal(await photoPending.moderateListing('photo-listing', 'school-a', 'reviewer-id', 'active'), false, 'photo listings stay pending before photo approval');
   for (const row of [{ school_id: 'school-b', status: 'pending', image_key: '', photo_status: 'none' }, { school_id: 'school-a', status: 'active', image_key: '', photo_status: 'none' }, null]) {
-    const blockedTx = async (strings) => strings.join('').includes('SELECT school_id') ? [[row].filter(Boolean)] : [[]];
+    const blockedTx = transaction(text => text.includes('SELECT school_id') ? [[row].filter(Boolean)] : [[]]);
     const blocked = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(blockedTx) }));
-    assert.equal(await blocked.moderateListing('listing-id', 'school-a', 'rejected'), false);
+    assert.equal(await blocked.moderateListing('listing-id', 'school-a', 'reviewer-id', 'rejected'), false);
   }
-  await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'pending'), TypeError);
+  for (const reviewer of [null, { role: 'student', school_id: 'school-a', active: true }, { role: 'school_admin', school_id: 'school-b', active: true }, { role: 'school_admin', school_id: 'school-a', active: false }]) {
+    const guarded = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async strings => strings.join('').includes('SELECT role') ? [[reviewer].filter(Boolean)] : [[]]) }));
+    assert.equal(await guarded.moderateListing('listing-id', 'school-a', 'reviewer-id', 'active'), false);
+  }
+  const suspended = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async strings => {
+    const text = strings.join('');
+    if (text.includes('SELECT role')) return [[{ role: 'council_member', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT suspension_id')) return [[{ suspension_id: 'suspension-id' }]];
+    return [[]];
+  }) }));
+  assert.equal(await suspended.moderateListing('listing-id', 'school-a', 'reviewer-id', 'rejected'), false);
+  await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'reviewer-id', 'pending'), TypeError);
 });
 
 test('event applicant query binds event and school and exposes only profile display fields', async () => {

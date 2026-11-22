@@ -1022,9 +1022,16 @@ export function createYdbListingsRepository(sql) {
       });
     },
 
-    async moderateListing(listingId, schoolId, decision) {
-      if (!listingId || !schoolId || !['active', 'rejected'].includes(decision)) throw new TypeError('invalid listing decision');
+    async moderateListing(listingId, schoolId, reviewerId, decision) {
+      if (!listingId || !schoolId || !reviewerId || !['active', 'rejected'].includes(decision)) throw new TypeError('invalid listing decision');
       return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT role, school_id, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role) || reviewer.school_id !== schoolId) return false;
+        const suspensionRows = await tx`SELECT suspension_id FROM fam_account_suspensions
+          WHERE school_id = ${schoolId} AND target_id = ${reviewerId} AND status = 'active'
+            AND expires_at > CurrentUtcTimestamp() LIMIT 1;`;
+        if (suspensionRows?.[0]?.length) return false;
         const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
         const row = current?.[0]?.[0];
         if (!row || row.school_id !== schoolId || row.status !== 'pending') return false;
@@ -1049,9 +1056,16 @@ export function createYdbListingsRepository(sql) {
       return Boolean((await statement)?.[0]?.[0]?.id);
     },
 
-    async moderateListingPhoto(listingId, schoolId, decision) {
-      if (!listingId || !schoolId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
+    async moderateListingPhoto(listingId, schoolId, reviewerId, decision) {
+      if (!listingId || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
       return sql.begin(async tx => {
+        const reviewerRows = await tx`SELECT role, school_id, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
+        const reviewer = reviewerRows?.[0]?.[0];
+        if (!reviewer || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role) || reviewer.school_id !== schoolId) return false;
+        const suspensionRows = await tx`SELECT suspension_id FROM fam_account_suspensions
+          WHERE school_id = ${schoolId} AND target_id = ${reviewerId} AND status = 'active'
+            AND expires_at > CurrentUtcTimestamp() LIMIT 1;`;
+        if (suspensionRows?.[0]?.length) return false;
         const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
         const row = current?.[0]?.[0];
         if (!row || row.school_id !== schoolId || row.status !== 'pending' || !row.image_key || row.photo_status !== 'pending') return false;
