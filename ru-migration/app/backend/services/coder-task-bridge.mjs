@@ -3,6 +3,10 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 const WORKER_ID = 'fam-agent-qwen-coder-v1';
 const MAX_BODY_BYTES = 2048;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CODER_TASK_KEYS = new Set(['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility']);
+const CODER_EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'listings_load_failed',
+  'notifications_load_failed', 'database_request_failed', 'auth_backend_failed']);
+const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other']);
 
 function matchesSecret(provided, expected) {
   if (typeof provided !== 'string' || !provided || typeof expected !== 'string' || Buffer.byteLength(expected) < 32) return false;
@@ -41,9 +45,9 @@ export function createCoderTaskBridge({ queue, token } = {}) {
         const task = await queue.claimSafeCoderTask({ workerId: WORKER_ID, leaseSeconds: 7200 });
         if (!task) return json(200, { ok: true, task: null });
         if (!UUID.test(task.id || '') || !UUID.test(task.claim_token || '')
-            || !['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility'].includes(task.task_key)
-            || !['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(task.event_code)
-            || !['auth', 'listings', 'notifications', 'database', 'other'].includes(task.page_area)
+            || !CODER_TASK_KEYS.has(task.task_key)
+            || !CODER_EVENT_CODES.has(task.event_code)
+            || !PAGE_AREAS.has(task.page_area)
             || !Number.isInteger(task.occurrences) || task.occurrences < 0 || task.occurrences > 1000) {
           return json(502, { ok: false, error: 'invalid_task_shape' });
         }

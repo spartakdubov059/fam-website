@@ -45,3 +45,29 @@ test('coder bridge returns only the allowlisted aggregate task shape and finishe
   assert.equal((await bridge(request({ action: 'finish', task_id: 'not-a-uuid',
     claim_token: '22222222-2222-4222-8222-222222222222', result_code: 'model_completed' }))).status, 400);
 });
+
+test('coder bridge returns every supported technical event and rejects unknown event codes', async () => {
+  const cases = [
+    ['js_runtime', 'audit_frontend_runtime'],
+    ['unhandled_rejection', 'audit_frontend_runtime'],
+    ['listings_load_failed', 'audit_client_resilience'],
+    ['notifications_load_failed', 'audit_client_resilience'],
+    ['database_request_failed', 'audit_client_resilience'],
+    ['auth_backend_failed', 'audit_client_resilience'],
+  ];
+  for (const [event_code, task_key] of cases) {
+    const queue = { claimSafeCoderTask: async () => ({
+      id: '11111111-1111-4111-8111-111111111111', claim_token: '22222222-2222-4222-8222-222222222222',
+      task_key, event_code, page_area: 'other', occurrences: 3,
+    }), finishSafeCoderTask: async () => true };
+    const result = await createCoderTaskBridge({ queue, token })(request({ action: 'claim' }));
+    assert.equal(result.status, 200, event_code);
+    assert.equal(result.body.task.event_code, event_code);
+    assert.equal(result.body.task.task_key, task_key);
+  }
+  const invalidQueue = { claimSafeCoderTask: async () => ({
+    id: '11111111-1111-4111-8111-111111111111', claim_token: '22222222-2222-4222-8222-222222222222',
+    task_key: 'audit_client_resilience', event_code: 'unlisted_event', page_area: 'other', occurrences: 3,
+  }), finishSafeCoderTask: async () => true };
+  assert.equal((await createCoderTaskBridge({ queue: invalidQueue, token })(request({ action: 'claim' }))).status, 502);
+});

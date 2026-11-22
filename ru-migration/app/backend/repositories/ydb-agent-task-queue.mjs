@@ -10,6 +10,9 @@ const CODER_EVENT_CODES = Object.freeze({
   js_runtime: 'audit_frontend_runtime',
   unhandled_rejection: 'audit_frontend_runtime',
   listings_load_failed: 'audit_client_resilience',
+  notifications_load_failed: 'audit_client_resilience',
+  database_request_failed: 'audit_client_resilience',
+  auth_backend_failed: 'audit_client_resilience',
 });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = 'fam-ru-safe-worker-v1';
@@ -74,7 +77,8 @@ export function createYdbAgentTaskQueue(sql) {
         const rows = await tx`SELECT event_code, page_area, SUM(event_count) AS occurrences
           FROM fam_site_error_counts
           WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
-            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed')
+            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed',
+              'notifications_load_failed', 'database_request_failed', 'auth_backend_failed')
           GROUP BY event_code, page_area HAVING SUM(event_count) >= 3
           ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
         const event = rows?.[0]?.[0];

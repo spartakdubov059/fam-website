@@ -68,6 +68,38 @@ test('coder producer creates only one bounded task from allowlisted aggregate ev
   await assert.rejects(queue.enqueueSafeCoderTask('2026-11-20T03:11'), /coder slot/);
 });
 
+test('coder producer maps every upstream technical event to a fixed aggregate audit task', async () => {
+  const cases = [
+    ['js_runtime', 'audit_frontend_runtime'],
+    ['unhandled_rejection', 'audit_frontend_runtime'],
+    ['listings_load_failed', 'audit_client_resilience'],
+    ['notifications_load_failed', 'audit_client_resilience'],
+    ['database_request_failed', 'audit_client_resilience'],
+    ['auth_backend_failed', 'audit_client_resilience'],
+  ];
+  for (const [eventCode, expectedTaskKey] of cases) {
+    const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+      ? [[{ event_code: eventCode, page_area: 'other', occurrences: 3 }]] : [[]]);
+    const queue = createYdbAgentTaskQueue(sql);
+    const result = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+    const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks'));
+    const payload = JSON.parse(insert.values.find(value => typeof value === 'string' && value.includes('"task_key"')));
+    assert.equal(result.created, true, eventCode);
+    assert.equal(payload.task_key, expectedTaskKey, eventCode);
+    assert.equal(payload.event_code, eventCode, eventCode);
+    assert.match(calls.find(call => call.query.includes('SUM(event_count)')).query, /notifications_load_failed.*database_request_failed.*auth_backend_failed/s);
+  }
+});
+
+test('coder producer refuses unknown aggregate event codes even if returned by the database', async () => {
+  const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+    ? [[{ event_code: 'unlisted_event', page_area: 'other', occurrences: 3 }]] : [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.deepEqual(await queue.enqueueSafeCoderTask('2026-11-20T03:15'),
+    { created: false, reason: 'no_threshold_event' });
+  assert.equal(calls.some(call => call.query.includes('INSERT INTO fam_agent_tasks')), false);
+});
+
 test('coder producer caps 24-hour event aggregates to the bridge payload limit', async () => {
   const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
     ? [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 24_000 }]] : [[]]);
