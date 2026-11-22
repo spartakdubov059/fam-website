@@ -22,7 +22,7 @@
     if (failedScript.id === primaryId) {
       // A parser-blocking script is still being parsed here; document.write keeps
       // the fallback blocking too, so the app cannot run before Supabase exists.
-      document.write('<script id="famSupabaseSdkFallback" src="https://unpkg.com/@supabase/supabase-js@2.119.0"><\/script>');
+      document.write('<script id="famSupabaseSdkFallback" src="https://unpkg.com/@supabase/supabase-js@2.119.0" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"><\/script>');
       return;
     }
 
