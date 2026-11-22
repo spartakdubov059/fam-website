@@ -5,7 +5,7 @@ export function createYandexIamMetadataTokenProvider({ endpoint = DEFAULT_ENDPOI
   let cachedToken = null;
   let refreshAt = 0;
   let inFlight = null;
-  if (typeof endpoint !== 'string' || !endpoint.startsWith('http://169.254.169.254/')
+  if (endpoint !== DEFAULT_ENDPOINT
       || typeof fetchImpl !== 'function' || typeof now !== 'function'
       || !Number.isSafeInteger(refreshSkewMs) || refreshSkewMs < 0 || refreshSkewMs > 300_000) {
     throw new TypeError('invalid Yandex metadata token provider configuration');
@@ -17,6 +17,7 @@ export function createYandexIamMetadataTokenProvider({ endpoint = DEFAULT_ENDPOI
     inFlight = (async () => {
       const response = await fetchImpl(endpoint, {
         headers: { 'metadata-flavor': 'Google' },
+        redirect: 'error',
         signal: AbortSignal.timeout(2000),
       });
       if (!response.ok) throw new Error('Yandex metadata service rejected IAM token request');
