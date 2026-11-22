@@ -1195,6 +1195,37 @@ try {
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
+  await sql`DELETE FROM fam_site_error_counts
+    WHERE hour_bucket = Unwrap(CAST(${coderBucket.toISOString()} AS Timestamp))
+      AND event_code = 'js_runtime' AND page_area = 'auth';`;
+  for (const [index, [eventCode, pageArea, taskKey]] of [
+    ['notifications_load_failed', 'notifications', 'audit_client_resilience'],
+    ['database_request_failed', 'database', 'audit_client_resilience'],
+    ['auth_backend_failed', 'auth', 'audit_client_resilience'],
+  ].entries()) {
+    const eventBucket = new Date(Date.now() - (index + 1) * 60 * 60 * 1000);
+    eventBucket.setUTCMinutes(0, 0, 0);
+    for (let occurrence = 0; occurrence < 3; occurrence++) {
+      await repo.recordSiteError({ eventCode, pageArea, occurredAt: eventBucket });
+    }
+    const followupSlotDate = new Date(coderSlotDate.getTime() + (index + 1) * 15 * 60 * 1000);
+    const followupTask = await agentQueue.enqueueSafeCoderTask(followupSlotDate.toISOString().slice(0, 16));
+    assert.equal(followupTask.created, true, `${eventCode} aggregate creates a synthetic coder review task`);
+    assert.equal(followupTask.task_key, taskKey, `${eventCode} maps to its fixed task key`);
+    const followupPayloadRows = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${followupTask.id} LIMIT 1;`;
+    assert.equal(followupPayloadRows?.[0]?.[0]?.status, 'queued',
+      'new coder task remains outside the automated safe-worker allowlist');
+    const followupPayload = JSON.parse(followupPayloadRows?.[0]?.[0]?.payload_json ?? 'null');
+    assert.deepEqual(followupPayload, { task_key: taskKey, event_code: eventCode, page_area: pageArea, occurrences: 3 });
+    const followupClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+    assert.equal(followupClaim.id, followupTask.id);
+    assert.equal(followupClaim.event_code, eventCode);
+    assert.equal(await agentQueue.finishSafeCoderTask({ id: followupClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+      claimToken: followupClaim.claim_token, resultCode: 'model_no_patch' }), true);
+    await sql`DELETE FROM fam_site_error_counts
+      WHERE hour_bucket = Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp))
+        AND event_code = ${eventCode} AND page_area = ${pageArea};`;
+  }
   const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
   assert.equal(safeTask.created, true);
   assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,
