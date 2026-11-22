@@ -6,6 +6,12 @@ on:
       - "ru-migration/app/backend/**"
       - "ru-migration/compat/**"
       - ".github/workflows/fam-ru-ydb-local.yml"
+  pull_request:
+    branches: ["migration/yandex-cloud"]
+    paths:
+      - "ru-migration/app/backend/**"
+      - "ru-migration/compat/**"
+      - ".github/workflows/fam-ru-ydb-local.yml"
   workflow_dispatch:
 permissions:
   contents: read
