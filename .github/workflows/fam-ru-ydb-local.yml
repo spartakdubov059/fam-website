@@ -108,6 +108,8 @@ jobs:
         run: node ru-migration/compat/integration-school-agent-report.mjs
       - name: Exercise one-time school admin bootstrap on synthetic data
         run: node ru-migration/compat/integration-initial-school-admin-bootstrap.mjs
+      - name: Exercise the private S3 adapter over local HTTP with synthetic data
+        run: node ru-migration/compat/integration-s3-adapter.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true
