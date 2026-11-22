@@ -10,6 +10,7 @@ on:
       - 'index.html'
       - '.github/workflows/**'
   pull_request:
+    branches: [main]
     paths:
       - 'supabase/**'
       - 'tests/**'
