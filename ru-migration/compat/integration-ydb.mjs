@@ -104,7 +104,7 @@ try {
       }
       const diagnostic = chain.join(' <- ').replace(/https:\/\/issuer\.synthetic/g, '[issuer]')
         .replace(/subject-role-student/g, '[subject]').replace(/[a-f0-9]{64}/gi, '[digest]')
-        .replace(/\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi, '[id]').slice(0, 600);
+        .replace(/\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi, '[id]').slice(0, 2400);
       console.error('YDB_ROLE_EMAIL_CHALLENGE_ERROR:', diagnostic);
       throw error;
     }
