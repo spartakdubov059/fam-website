@@ -583,6 +583,8 @@ try {
   const otherSchoolNotificationFeed = await listingsApi(apiRequest('GET', '/api/v1/notifications/listings', 'synthetic-other-school'));
   assert.deepEqual(otherSchoolNotificationFeed, { status: 200, body: { ok: true, listings: [] } },
     'notification query does not return another school\'s active content');
+  assert.ok(await repo.deleteOwnListing('11111111-1111-4111-8111-111111111111', notificationOwnerListing.id),
+    'remove the isolated notification fixture before unrelated own-listing assertions');
   assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
     'a same-school member can contact the owner of an active listing');
   assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
