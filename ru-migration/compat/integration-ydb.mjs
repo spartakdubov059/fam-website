@@ -1205,9 +1205,10 @@ try {
   ].entries()) {
     const eventBucket = new Date(Date.now() - (index + 1) * 25 * 60 * 60 * 1000);
     eventBucket.setUTCMinutes(0, 0, 0);
-    for (let occurrence = 0; occurrence < 3; occurrence++) {
-      await repo.recordSiteError({ eventCode, pageArea, occurredAt: eventBucket });
-    }
+    await sql`UPSERT INTO fam_site_error_counts
+      (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
+      VALUES (Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp)), ${eventCode}, ${pageArea},
+        Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
     const followupSlotDate = new Date(coderSlotDate.getTime() + (index + 1) * 15 * 60 * 1000);
     const followupTask = await agentQueue.enqueueSafeCoderTask(followupSlotDate.toISOString().slice(0, 16));
     assert.equal(followupTask.created, true, `${eventCode} aggregate creates a synthetic coder review task`);
