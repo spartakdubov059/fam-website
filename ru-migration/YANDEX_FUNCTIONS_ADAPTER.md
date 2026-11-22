@@ -28,3 +28,12 @@ node ru-migration/deploy/package-yandex-function.mjs /tmp/fam-ru-yandex-function
 Yandex Cloud Functions предлагает месячную квоту бесплатных вызовов, но превышение квот тарифицируется. Квоты суммируются в рамках платёжного аккаунта. Бюджеты Yandex Cloud отправляют уведомления и сами не останавливают потребление. Поэтому наличие адаптера не разрешает создавать облачные ресурсы при требовании строго `0 ₽`. См. актуальные [условия free tier](https://yandex.cloud/ru/docs/billing/concepts/serverless-free-tier) и [поведение бюджета](https://yandex.cloud/ru/docs/billing/concepts/budget).
 
 До staging остаются необходимы: проверенный механизм жёсткого нулевого расхода для всей цепочки, закрытый API Gateway → приватная функция, секреты Yandex ID/YDB/S3, подходящий callback URI, настройки размера/таймаута функции, развёртывание static assets и интеграционные тесты только на синтетических данных. Ни один cloud resource или платный trial этим изменением не создавался.
+
+
+## API Gateway specification template
+
+The checked OpenAPI skeleton is [deploy/api-gateway.openapi.yaml](deploy/api-gateway.openapi.yaml). It maps / and /{proxy+} to the same private Cloud Function, uses payload format 0.1 (the adapter reads httpMethod, path, query parameters and headers), and requires an explicit immutable function version tag. Replace every REPLACE_WITH_... placeholder before creating a gateway; do not paste secrets into this file.
+
+Use two separate service accounts: the gateway caller gets functions.functionInvoker on this one function only; the function runtime account receives only the YDB database and Object Storage bucket permissions the backend needs. The gateway is public to serve the app, while the function stays private; end-user API authorization remains in the RU backend. Do not grant database or bucket permissions to the gateway caller.
+
+The YAML was parsed and its two route integrations checked locally. No gateway or function was created, and this template does not prove IAM, OAuth, YDB/S3 connectivity, or a 0 ₽ cost ceiling.
