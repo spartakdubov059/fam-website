@@ -1230,7 +1230,7 @@ test('event registration reserves a seat and stores only the database actor iden
     return work(tx);
   } });
   const repo = createYdbListingsRepository(sql);
-  assert.deepEqual(await repo.registerForEvent('event-id', 'verified-user'), { event_id: 'event-id', user_id: 'verified-user', status: 'confirmed' });
+  assert.deepEqual(await repo.registerForEvent('event-id', 'verified-user', 'school-a'), { event_id: 'event-id', user_id: 'verified-user', status: 'confirmed' });
   assert.deepEqual(beginOptions, [{ idempotent: true }], 'capacity transactions retry serializable conflicts from a fresh snapshot');
   assert.ok(operations.some(operation => operation.text.includes('UPSERT INTO fam_event_occupancy')));
   const registration = operations.find(operation => operation.text.includes('UPSERT INTO fam_event_registrations'));
@@ -1254,10 +1254,11 @@ test('event capacity and organizer rejection are returned after the YDB transact
       return work(tx);
     } }));
   };
-  await assert.rejects(makeRepo().registerForEvent('event-id', 'student'), error => error.code === 'no_seats_available');
-  await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student'), error => error.code === 'organizer_registration');
-  await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student'), error => error.code === 'already_registered');
-  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }, { idempotent: true }]);
+  await assert.rejects(makeRepo().registerForEvent('event-id', 'student', 'school-a'), error => error.code === 'no_seats_available');
+  await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student', 'school-a'), error => error.code === 'organizer_registration');
+  await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student', 'school-a'), error => error.code === 'already_registered');
+  await assert.rejects(makeRepo({ taken: 0 }).registerForEvent('event-id', 'student', 'school-b'), error => error.code === 'school_mismatch');
+  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }, { idempotent: true }, { idempotent: true }]);
 });
 
 test('event cancellation and organizer review retry after YDB serialization conflicts', async () => {

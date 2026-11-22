@@ -749,12 +749,12 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (!actor?.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
       try {
-        const registration = await repository.registerForEvent(eventRegistrationMatch[1], actor.id);
+        const registration = await repository.registerForEvent(eventRegistrationMatch[1], actor.id, actor.school_id);
         return { status: 201, body: { ok: true, registration } };
       } catch (error) {
-        if (error?.code === 'event_unavailable') return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+        if (error?.code === 'event_unavailable' || error?.code === 'school_mismatch') return { status: 404, body: { ok: false, error: 'event_unavailable' } };
         if (error?.code === 'organizer_registration') return { status: 403, body: { ok: false, error: 'organizer_cannot_register' } };
         if (error?.code === 'already_registered') return { status: 409, body: { ok: false, error: 'already_registered' } };
         if (error?.code === 'no_seats_available') return { status: 409, body: { ok: false, error: 'no_seats_available' } };

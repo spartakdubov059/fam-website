@@ -696,7 +696,11 @@ try {
   assert.equal(registrationResponse.status, 201);
   assert.equal(registrationResponse.body.registration.status, 'confirmed');
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
-  await assert.rejects(repo.registerForEvent(limitedEvent.id, '22222222-2222-4222-8222-222222222222'), error => error.code === 'no_seats_available');
+  const crossSchoolRegistration = await listingsApi(apiRequest('POST', `/api/v1/listings/${limitedEvent.id}/registrations`, 'synthetic-other-school', null));
+  assert.deepEqual(crossSchoolRegistration, { status: 404, body: { ok: false, error: 'event_unavailable' } },
+    'a student from another school cannot register for the event');
+  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1, 'a rejected cross-school registration does not consume a seat');
+  await assert.rejects(repo.registerForEvent(limitedEvent.id, '22222222-2222-4222-8222-222222222222', 'synthetic-school'), error => error.code === 'no_seats_available');
   assert.equal(await repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'), true);
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
   assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
@@ -706,18 +710,18 @@ try {
     'same-school occupancy is available while its event is active');
   assert.deepEqual(await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school')),
     { status: 404, body: { ok: false, error: 'event_unavailable' } }, 'another school cannot inspect occupancy');
-  const reRegistration = await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
+  const reRegistration = await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school');
   assert.equal(reRegistration.status, 'confirmed', 'a cancelled registration can be created again');
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
   const cancelRegisterRace = await Promise.allSettled([
     repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
-    repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
+    repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'),
   ]);
   assert.ok(cancelRegisterRace.some(result => result.status === 'fulfilled'), 'at least one serialized race operation completes');
   const registrationAfterRace = await sql`SELECT status FROM fam_event_registrations
     WHERE event_id = ${limitedEvent.id} AND user_id = '11111111-1111-4111-8111-111111111111' LIMIT 1;`;
   if (registrationAfterRace?.[0]?.[0]?.status === 'cancelled') {
-    await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
+    await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school');
   }
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
     'cancellation and re-registration remain consistent under a concurrent race');
@@ -731,8 +735,8 @@ try {
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
   assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
   const concurrentAttempts = await Promise.allSettled([
-    repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111'),
-    repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222'),
+    repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'),
+    repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222', 'synthetic-school'),
   ]);
   assert.equal(concurrentAttempts.filter(result => result.status === 'fulfilled').length, 1,
     'serializable capacity check permits at most one successful registration for the final seat');

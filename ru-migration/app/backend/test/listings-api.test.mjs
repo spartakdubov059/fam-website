@@ -926,10 +926,10 @@ test('event registration is bound to the authenticated profile and capacity erro
     repository: { getActiveAccountSuspension: async () => null, registerForEvent: async (...args) => { registeredAs = args; return { event_id: args[0], user_id: args[1], status: 'confirmed' }; } } });
   const request = registrationRequest();
   const response = await handler(request);
-  assert.deepEqual(registeredAs, [eventId, 'synthetic-registrant']);
+  assert.deepEqual(registeredAs, [eventId, 'synthetic-registrant', 'school-a']);
   assert.deepEqual(response, { status: 201, body: { ok: true, registration: { event_id: eventId, user_id: 'synthetic-registrant', status: 'confirmed' } } });
 
-  const full = createListingsApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: 'u', role: 'student' }),
+  const full = createListingsApi({ authenticate: async () => ({ subject: 'x' }), resolveActor: async () => ({ id: 'u', school_id: 'school-a', role: 'student' }),
     repository: { getActiveAccountSuspension: async () => null, registerForEvent: async () => { throw Object.assign(new Error('full'), { code: 'no_seats_available' }); } } });
   const fullResponse = await full(registrationRequest());
   assert.equal(fullResponse.status, 409);
