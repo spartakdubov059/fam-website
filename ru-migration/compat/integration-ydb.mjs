@@ -3,16 +3,20 @@ import { Readable } from 'node:stream';
 import { inspect } from 'node:util';
 import { Driver } from '@ydbjs/core';
 import { query, identifier, fragment, join } from '@ydbjs/query';
+import sharp from 'sharp';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
+import { createMediaApi } from '../app/backend/services/media-api.mjs';
+import { createS3PendingImageStore } from '../app/backend/media/s3-pending-store.mjs';
 import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
 import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
+let syntheticPendingImages;
 try {
   await driver.ready();
   const client = query(driver);
@@ -54,13 +58,15 @@ try {
     ('https://issuer.synthetic', 'subject-admin-target', '88888888-8888-4888-8888-888888888888', 'synthetic-school', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-delete-target', '99999999-9999-4999-8999-999999999999', 'synthetic-school', 'council_member', true),
     ('https://issuer.synthetic', 'subject-recovery', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac', 'synthetic-school', 'student', true),
-    ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true);`;
+    ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true),
+    ('https://issuer.synthetic', 'subject-media', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'synthetic-school', 'student', true);`;
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)    VALUES ('https://issuer.synthetic', 'subject-safety-actor', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'synthetic-school', 'student', true, 'Тест', 'Нарушитель', '8Б');`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null, person_type: 'student', staff_position: null, staff_verification_status: 'not_required' });
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
   const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: ['Bearer synthetic-registrant', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? 'subject-2'
       : req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
+        : req.headers.authorization === 'Bearer synthetic-media' ? 'subject-media'
         : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
         : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
         : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
@@ -89,6 +95,43 @@ try {
     const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
     request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
     return request;  };
+  const privateObjects = new Map();
+  syntheticPendingImages = createS3PendingImageStore({
+    FAM_RU_S3_ENDPOINT: 'http://127.0.0.1:9000',
+    FAM_RU_S3_BUCKET: 'synthetic-private',
+    FAM_RU_S3_ACCESS_KEY_ID: 'synthetic-access',
+    FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic-secret',
+  }, {
+    send: async input => { privateObjects.set(input.Key, { body: Buffer.from(input.Body), contentType: input.ContentType }); },
+    get: async input => {
+      const object = privateObjects.get(input.Key);
+      return object ? { ContentType: object.contentType, ContentLength: object.body.length,
+        Body: { transformToByteArray: async () => object.body } } : null;
+    },
+    remove: async input => { privateObjects.delete(input.Key); },
+    list: async input => ({ Contents: [...privateObjects.keys()].filter(key => key.startsWith(input.Prefix)).map(Key => ({ Key })), IsTruncated: false }),
+  });
+  const mediaApi = createMediaApi({ authenticate, resolveActor, repository: repo, pendingImages: syntheticPendingImages });
+  const syntheticPng = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 42, g: 90, b: 140 } } }).png().toBuffer();
+  const uploadRequest = Readable.from([syntheticPng]);
+  uploadRequest.method = 'POST'; uploadRequest.url = '/api/v1/media/pending';
+  uploadRequest.headers = { authorization: 'Bearer synthetic-media', 'content-type': 'image/png', 'content-length': String(syntheticPng.length) };
+  const mediaUpload = await mediaApi(uploadRequest);
+  assert.equal(mediaUpload.status, 201);
+  const mediaKey = mediaUpload.body.image.key;
+  const storedImage = privateObjects.get(mediaKey);
+  assert.equal(storedImage?.contentType, 'image/webp');
+  assert.equal((await sharp(storedImage.body).metadata()).format, 'webp', 'the synthetic upload is actually decoded and re-encoded');
+  const pendingMediaRow = await sql`SELECT user_id, status FROM fam_pending_media WHERE object_key = ${mediaKey} LIMIT 1;`;
+  assert.deepEqual(pendingMediaRow[0][0], { user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', status: 'pending' });
+  const mediaListing = await repo.createListing({ user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'synthetic-school',
+    title: 'Синтетическое фото', description: 'Проверка загрузки', category: 'Вещи', price_text: 'Бесплатно', is_event: false,
+    event_date: null, event_time: null, event_type: null, max_seats: 0, image_key: mediaKey, photo_status: 'pending', status: 'pending' });
+  assert.ok(mediaListing?.id, 'the verified uploader can link their own private image to a pending listing');
+  const linkedMediaRow = await sql`SELECT status FROM fam_pending_media WHERE object_key = ${mediaKey} LIMIT 1;`;
+  assert.equal(linkedMediaRow[0][0].status, 'linked');
+  await syntheticPendingImages.close();
+  syntheticPendingImages = null;
   const savedNotificationState = await listingsApi(apiRequest('POST', '/api/v1/notification-reads', 'synthetic-registrant', {
     notification_keys: ['release:synthetic', 'dismissed:school-listing:synthetic-id'],
   }));
@@ -1046,5 +1089,6 @@ try {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
 } finally {
+  syntheticPendingImages?.close();
   await driver.close();
 }
