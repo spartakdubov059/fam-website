@@ -229,3 +229,13 @@ test("existing timeAgo benchmark is the only exception to the code-change test r
   assert.match(timeAgoScopeValidator, /changed\.length !== 1/);
   assert.doesNotMatch(workflow, /gh pr merge/);
 });
+
+test("GitHub approval output uses one validated writer and protects PR creation", () => {
+  assert.match(workflow, /node scripts\/validate-local-agent-patch\.mjs/);
+  assert.doesNotMatch(workflow, /appendFileSync\(process\.env\.GITHUB_OUTPUT/);
+  assert.match(workflow, /requires_approval: \$\{\{ steps\.safety\.outputs\.requires_approval \}\}/);
+  assert.match(workflow, /REQUIRES_APPROVAL: \$\{\{ needs\.verify\.outputs\.requires_approval \}\}/);
+  assert.match(validator, /appendFileSync\(/);
+  assert.match(validator, /"requires_approval=" \+ String\(result\.requires_approval\) \+ "\\n"/);
+  assert.match(workflow, /gh pr create --draft/);
+});
