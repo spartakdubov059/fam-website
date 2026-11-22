@@ -1199,9 +1199,9 @@ try {
     WHERE hour_bucket = Unwrap(CAST(${coderBucket.toISOString()} AS Timestamp))
       AND event_code = 'js_runtime' AND page_area = 'auth';`;
   for (const [index, [eventCode, pageArea, taskKey]] of [
-    ['notifications_load_failed', 'notifications', 'audit_frontend_runtime'],
-    ['database_request_failed', 'database', 'audit_frontend_runtime'],
-    ['auth_backend_failed', 'auth', 'audit_frontend_runtime'],
+    ['notifications_load_failed', 'notifications', 'audit_client_resilience'],
+    ['database_request_failed', 'database', 'audit_client_resilience'],
+    ['auth_backend_failed', 'auth', 'audit_client_resilience'],
   ].entries()) {
     await sql`DELETE FROM fam_site_error_counts WHERE event_code IN
       ('js_runtime', 'unhandled_rejection', 'listings_load_failed', 'notifications_load_failed',
