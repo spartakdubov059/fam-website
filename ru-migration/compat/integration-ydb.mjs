@@ -1015,10 +1015,15 @@ try {
     'the sixth listing in one hour is rejected for this synthetic account');
   const quotaAvatarKey = `pending/${quotaUserId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
   await repo.registerPendingImage(quotaUserId, quotaAvatarKey);
-  assert.deepEqual(await repo.createAvatarReview({ userId: quotaUserId, schoolId: 'synthetic-school', imageKey: quotaAvatarKey }),
-    { ok: false, code: 'rate_limited' }, 'avatar submission shares the exhausted listing quota');
+  privateObjects.set(quotaAvatarKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
+  const quotaAvatarApi = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.synthetic', subject: 'quota-avatar-user' }),
+    resolveActor: async () => ({ id: quotaUserId, school_id: 'synthetic-school', role: 'student' }), repository: repo,
+    pendingImages: syntheticPendingImages });
+  const quotaAvatarResponse = await quotaAvatarApi(apiRequest('POST', '/api/v1/me/avatar', 'quota-avatar', { image_key: quotaAvatarKey }));
+  assert.equal(quotaAvatarResponse.status, 429, 'avatar submission shares the exhausted listing quota');
+  assert.equal(privateObjects.has(quotaAvatarKey), false, 'the rejected avatar object is removed from private storage');
   const quotaAvatarState = await sql`SELECT status FROM fam_pending_media WHERE object_key = ${quotaAvatarKey} LIMIT 1;`;
-  assert.equal(quotaAvatarState[0][0]?.status, 'pending', 'a rate-limited avatar upload remains unlinked for the client cleanup path');
+  assert.equal(quotaAvatarState[0].length, 0, 'the rejected avatar registration is removed through the cleanup lease');
   const rejectedAvatar = await sql`SELECT id FROM fam_avatar_reviews WHERE user_id = ${quotaUserId} AND status = 'pending';`;
   assert.equal(rejectedAvatar[0].length, 0, 'a rate-limited avatar is not queued for review');
   const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Синтетическая идея',
