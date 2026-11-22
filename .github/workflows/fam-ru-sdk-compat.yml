@@ -2,7 +2,7 @@ name: FAM RU SDK compatibility (staging only)
 
 on:
   push:
-    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next"]
+    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next", "codex/fam-ru-postbox-vm-token"]
     paths:
       - "ru-migration/compat/**"
       - "ru-migration/app/backend/**"
