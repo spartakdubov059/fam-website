@@ -1140,6 +1140,26 @@ test('listing moderation revalidates reviewer role, school and suspension in its
     if (text.includes('SELECT suspension_id')) return [[]];
     return responder(text);
   };
+  const photoOperations = [];
+  const photoRepo = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async (strings, ...values) => {
+    const text = strings.join('?'); photoOperations.push({ text, values });
+    if (text.includes('SELECT role')) return [[{ role: 'council_member', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT suspension_id')) return [[]];
+    if (text.includes('SELECT school_id')) return [[{ school_id: 'school-a', status: 'pending', image_key: 'pending/image.webp', photo_status: 'pending' }]];
+    return [[]];
+  }) }));
+  assert.equal(await photoRepo.moderateListingPhoto('listing-id', 'school-a', 'reviewer-id', 'approved'), true);
+  assert.match(photoOperations[0].text, /SELECT role, school_id, active/);
+  assert.match(photoOperations[1].text, /fam_account_suspensions/);
+  assert.match(photoOperations[2].text, /SELECT school_id, status, image_key, photo_status/);
+  assert.match(photoOperations[3].text, /SET photo_status = \?/);
+  const suspendedPhoto = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(async strings => {
+    const text = strings.join('');
+    if (text.includes('SELECT role')) return [[{ role: 'school_admin', school_id: 'school-a', active: true }]];
+    if (text.includes('SELECT suspension_id')) return [[{ suspension_id: 'active' }]];
+    return [[]];
+  }) }));
+  assert.equal(await suspendedPhoto.moderateListingPhoto('listing-id', 'school-a', 'reviewer-id', 'rejected'), false);
   const photoPending = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(transaction(text => text.includes('SELECT school_id') ? [[{ school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'pending' }]] : [[]])) }));
   assert.equal(await photoPending.moderateListing('photo-listing', 'school-a', 'reviewer-id', 'active'), false, 'photo listings stay pending before photo approval');
   for (const row of [{ school_id: 'school-b', status: 'pending', image_key: '', photo_status: 'none' }, { school_id: 'school-a', status: 'active', image_key: '', photo_status: 'none' }, null]) {
@@ -1159,6 +1179,7 @@ test('listing moderation revalidates reviewer role, school and suspension in its
   }) }));
   assert.equal(await suspended.moderateListing('listing-id', 'school-a', 'reviewer-id', 'rejected'), false);
   await assert.rejects(repo.moderateListing('listing-id', 'school-a', 'reviewer-id', 'pending'), TypeError);
+  await assert.rejects(repo.moderateListingPhoto('listing-id', 'school-a', 'reviewer-id', 'pending'), TypeError);
 });
 
 test('event applicant query binds event and school and exposes only profile display fields', async () => {
