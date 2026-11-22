@@ -1,0 +1,14 @@
+# Локальная перепроверка FAM RU — 22 ноября 2026
+
+Проверен code snapshot `51e42b42ded114a1f798aab0f806faadf1a651f4`, который входит в security-reviewed tree `4cd328ef9cf3f0b61475a21feb8c85cb07d7fd8b`. Ветка GitHub после него содержит только документальные изменения; сравнение refs не нашло изменений исходников.
+
+## Результаты
+
+- `node --test test/*.test.mjs` на Node `v24.22.3`: **447/447**, ошибок нет. Установленные зависимости уже присутствовали в изолированном checkout; установка пакетов в этом запуске не выполнялась.
+- `node compat/verify.mjs`: `SDK_COMPAT_PASS` для закреплённых Sharp/WebP, YDB query-client методов и AWS exports. Облачная интеграция не запускалась.
+- `node compat/verify-systemd-timers.mjs`: прошли все 8 timer-файлов. Полную проверку systemd выполняет Linux CI; локальные systemd units не установлены и не запускались.
+- Локальный HTTP smoke на loopback и без credential variables: RU shell вернул `200` и CSP; readiness и `/api/v1/listings` закрыты ответом `503`, пока российские сервисы не настроены.
+
+## Ограничения
+
+В текущей сессии в PATH отсутствует `npm`; поэтому тесты запускались напрямую тем же Node test runner, который указан в `package.json`, но без повторной `npm ci`. Проверка не затрагивала Yandex Cloud, production, Supabase, настоящие аккаунты или данные учеников. Это локальная перепроверка, а не облачный staging и не доказательство полного функционального паритета.
