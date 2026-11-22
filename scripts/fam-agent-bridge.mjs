@@ -3,11 +3,32 @@ import { readFile } from "node:fs/promises";
 
 export const TASK_PROMPTS = Object.freeze({
   audit_frontend_runtime:
-    "Проведи узкий аудит клиентской обработки ошибок JavaScript FAM. Код публичного интерфейса и встроенный JavaScript находятся в корневом index.html; каталогов js/ и css/ в репозитории нет. Обязательно включи index.html в список файлов для анализа. Проверь window.onerror, window.onunhandledrejection и reportFamSiteError. Ищи только воспроизводимые ошибки в публичном интерфейсе; не меняй Auth, безопасность, модерацию, серверные функции или базу данных.",
+    "Проведи узкий аудит клиентской обработки ошибок JavaScript FAM. Код публичного интерфейса и встроенный JavaScript находятся в корневом index.html; каталогов js/ и css/ в репозитории нет. Обязательно включи index.html в список файлов для анализа. Проверь window.onerror, window.onunhandledrejection и reportFamSiteError. Цель: найти подтверждённые ошибки только в публичной обработке ошибок. Scope: index.html; не меняй Auth, безопасность, модерацию, серверные функции, базу данных или данные пользователей. Evidence: checkout и безопасные агрегаты. Acceptance: конкретное место в коде для каждого дефекта; при отсутствии доказательств верни no_patch. Требуемые проверки: git apply --check и независимые security/moderation тесты. Риск низкий, но исполняемые изменения требуют решения владельца. Секреты и личные данные запрещены; миграции и публикация запрещены.",
   audit_client_resilience:
-    "Проведи узкий аудит устойчивости загрузки публичных объявлений FAM. Ищи только безопасную обработку сетевых ошибок и пустых ответов; не читай и не изменяй пользовательские записи.",
+    "Проведи узкий аудит устойчивости загрузки публичных объявлений FAM. Цель: найти подтверждённые ошибки сетевой обработки и пустых ответов. Scope: только публичный интерфейс; не читай записи пользователей. Evidence: checkout и безопасные агрегаты. Acceptance: конкретное место в коде для каждого дефекта; при отсутствии доказательств верни no_patch. Требуемые проверки: git apply --check и независимые security/moderation тесты. Риск низкий, изменения требуют решения владельца. Секреты и личные данные запрещены; миграции и публикация запрещены.",
   audit_accessibility:
-    "Проведи узкий аудит доступности публичного интерфейса FAM: клавиатурная навигация, подписи элементов и фокус. Не меняй Auth, безопасность, серверные функции или базу данных.",
+    "Проведи узкий аудит доступности публичного интерфейса FAM: клавиатурная навигация, подписи элементов и фокус. Цель: найти подтверждённые дефекты доступности. Scope: только публичный интерфейс; не меняй Auth, безопасность, серверные функции или базу данных. Evidence: checkout и безопасные агрегаты. Acceptance: конкретное место в коде для каждого дефекта; при отсутствии доказательств верни no_patch. Требуемые проверки: git apply --check и независимые security/moderation тесты. Риск низкий, изменения требуют решения владельца. Секреты и личные данные запрещены; миграции и публикация запрещены.",
+});
+
+export const TASK_CONTRACT = Object.freeze({
+  version: 1,
+  goal: "Проверить только заранее утверждённую техническую область без данных пользователей.",
+  scope: Object.freeze(["index.html", "tests/**"]),
+  evidence: "Только код из checkout и безопасные агрегаты: enum кодов событий, зона интерфейса, количество.",
+  acceptance: Object.freeze([
+    "Каждое утверждение о дефекте подтверждено конкретным местом в коде.",
+    "При отсутствии подтверждённого дефекта вернуть no_patch.",
+    "Не менять Auth, роли, модерацию, серверные функции, SQL или данные пользователей.",
+  ]),
+  required_checks: Object.freeze([
+    "git apply --check",
+    "allowlist and independent security/moderation regression suite",
+  ]),
+  risk: "low; любые исполняемые изменения требуют владельческого review",
+  limits: Object.freeze([
+    "Нет секретов, личных данных учеников, произвольных payload или пользовательских сообщений.",
+    "Нет auto-merge, публикации или миграций.",
+  ]),
 });
 
 const EVENT_CODES = new Set([
@@ -36,8 +57,10 @@ export function validateClaimResponse(data) {
   return Object.freeze({
     id: task.id,
     task_key: task.task_key,
+    contract: TASK_CONTRACT,
     prompt: TASK_PROMPTS[task.task_key] +
-      " Контекст: код события " + task.event_code +
+      " Карточка задачи: " + JSON.stringify(TASK_CONTRACT) +
+      ". Контекст: код события " + task.event_code +
       ", раздел " + task.page_area +
       ", агрегированное число событий " + task.occurrences + ".",
   });
@@ -57,7 +80,7 @@ export function chooseResultCode(summary, executionSucceeded = true) {
   if (!summary || typeof summary !== "object") return "model_failed";
   if (summary.finding_status === "blocked") return "model_blocked";
   if (summary.finding_status === "issue_found" && summary.patch_available === true) {
-    return "model_completed";
+    return "model_generated";
   }
   return "model_no_patch";
 }
@@ -83,31 +106,44 @@ async function main() {
   const envFile = process.env.GITHUB_ENV;
   const url = process.env.FAM_AGENT_BRIDGE_URL || "";
   const token = process.env.FAM_AGENT_WORKER_TOKEN || "";
-  const manualTask = (process.env.FAM_MANUAL_TASK || "").trim();
-
   if (mode === "claim") {
-    if (manualTask) {
-      if (manualTask.length > 3000) throw new Error("Manual task exceeds 3000 characters.");
-      if (envFile) appendFileSync(envFile, "FAM_TASK=" + manualTask.replace(/\r?\n/g, " ") + "\n");
-      if (output) appendFileSync(output, "claimed=false\n");
-      return;
-    }
-    if (!url || !token) {
-      if (output) appendFileSync(output, "claimed=false\n");
-      console.log("Bridge secrets are absent; using the existing scheduled audit.");
-      return;
-    }
+    if (!url || !token) throw new Error("Safe task bridge is unavailable; model execution is blocked.");
     const data = await bridgeRequest({ url, token, body: { action: "claim" } });
     const task = validateClaimResponse(data);
     if (!task) {
       if (output) appendFileSync(output, "claimed=false\n");
-      console.log("No queued coder task; using the existing scheduled audit.");
+      console.log("No queued coder task; model download and execution are skipped.");
       return;
     }
     if (envFile) appendFileSync(envFile,
       "FAM_TASK=" + task.prompt + "\nFAM_CODER_TASK_ID=" + task.id + "\n");
-    if (output) appendFileSync(output, "claimed=true\n");
+    if (output) appendFileSync(output, "claimed=true\ntask_id=" + task.id + "\n");
     console.log("Claimed one allowlisted technical task; task contents are aggregate-only.");
+    return;
+  }
+
+  if (mode === "start") {
+    const taskId = process.env.FAM_CODER_TASK_ID || "";
+    if (!taskId) return;
+    const result = await bridgeRequest({
+      url, token, body: { action: "start", task_id: taskId },
+    });
+    if (result?.ok !== true || result?.started !== true) {
+      throw new Error("Bridge did not start the claimed task.");
+    }
+    if (output) appendFileSync(output, "started=true\n");
+    console.log("Task started with a bounded lease.");
+    return;
+  }
+
+  if (mode === "heartbeat") {
+    const taskId = process.env.FAM_CODER_TASK_ID || "";
+    if (!taskId) return;
+    const result = await bridgeRequest({ url, token, body: { action: "heartbeat", task_id: taskId } });
+    if (result?.ok !== true || result?.renewed !== true) {
+      throw new Error("Bridge did not renew the task lease.");
+    }
+    console.log("Coder task lease renewed by the owning worker.");
     return;
   }
 
@@ -115,7 +151,17 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     if (!taskId) return;
     const summary = await readTaskSummary(process.env.FAM_SUMMARY_PATH || "");
-    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME === "success");
+    const code = chooseResultCode(summary, process.env.FAM_MODEL_STEP_OUTCOME !== "failure");
+    if (code === "model_generated") {
+      const result = await bridgeRequest({
+        url, token, body: { action: "advance", task_id: taskId, stage: code },
+      });
+      if (result?.ok !== true || result?.advanced !== true) {
+        throw new Error("Bridge did not accept the generated model stage.");
+      }
+      console.log("Model output recorded as a proposal pending independent QA.");
+      return;
+    }
     const result = await bridgeRequest({
       url, token, body: { action: "finish", task_id: taskId, result_code: code },
     });
@@ -126,7 +172,24 @@ async function main() {
     return;
   }
 
-  throw new Error("Usage: node scripts/fam-agent-bridge.mjs claim|finish");
+  if (mode === "advance") {
+    const taskId = process.env.FAM_CODER_TASK_ID || "";
+    const stage = process.env.FAM_RESULT_STAGE || "";
+    if (!taskId) return;
+    const body = { action: "advance", task_id: taskId, stage };
+    if (!body.stage) throw new Error("A lifecycle stage is required.");
+    if (["pr_created", "owner_approved", "merged", "postmerge_verified"].includes(stage)) {
+      body.pr_number = Number(process.env.FAM_PR_NUMBER);
+    }
+    const result = await bridgeRequest({ url, token, body });
+    if (result?.ok !== true || result?.advanced !== true) {
+      throw new Error("Bridge did not accept the task stage.");
+    }
+    console.log("Coder task lifecycle advanced to an allowlisted stage.");
+    return;
+  }
+
+  throw new Error("Usage: node scripts/fam-agent-bridge.mjs claim|start|heartbeat|advance|finish");
 }
 
 if (process.argv[1] && import.meta.url === new URL("file://" + process.argv[1]).href) {

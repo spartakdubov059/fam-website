@@ -167,11 +167,57 @@ Deno.serve(async (req: Request) => {
     }
 
     if (
+      body.action === "start" &&
+      Object.keys(body).length === 2 &&
+      typeof body.task_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id)
+    ) {
+      const started = await rpc("start_fam_agent_coder_task", {
+        p_task_id: body.task_id,
+        p_worker_id: WORKER_ID,
+        p_lease_seconds: 1800,
+      });
+      return json({ ok: true, started: started === true });
+    }
+
+    if (
+      body.action === "heartbeat" &&
+      Object.keys(body).length === 2 &&
+      typeof body.task_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id)
+    ) {
+      const renewed = await rpc("heartbeat_fam_agent_coder_task", {
+        p_task_id: body.task_id,
+        p_worker_id: WORKER_ID,
+        p_lease_seconds: 1800,
+      });
+      return json({ ok: true, renewed: renewed === true });
+    }
+
+    if (
+      body.action === "advance" &&
+      (Object.keys(body).length === 3 || Object.keys(body).length === 4) &&
+      typeof body.task_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
+      ["model_generated", "qa_passed", "pr_created", "qa_failed", "model_no_patch", "model_failed", "model_blocked"].includes(body.stage) &&
+      ((body.stage === "pr_created" && Number.isSafeInteger(body.pr_number) && body.pr_number > 0 && body.pr_number < 100_000_000) ||
+       (body.stage !== "pr_created" && body.pr_number === undefined))
+    ) {
+      const advanced = await rpc("advance_fam_agent_coder_task", {
+        p_task_id: body.task_id,
+        p_worker_id: WORKER_ID,
+        p_stage: body.stage,
+        p_pr_number: body.pr_number ?? null,
+      });
+      return json({ ok: true, advanced: advanced === true });
+    }
+
+    if (
       body.action === "finish" &&
       Object.keys(body).length === 3 &&
       typeof body.task_id === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
-      ["model_completed", "model_no_patch", "model_failed", "model_blocked"].includes(body.result_code)
+      ["model_no_patch", "model_failed", "model_blocked"].includes(body.result_code)
     ) {
       const saved = await rpc("finish_fam_agent_coder_task", {
         p_task_id: body.task_id,
