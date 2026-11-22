@@ -804,16 +804,23 @@ test('school administrators require fresh Yandex auth to delete another member l
   assert.equal((await handler(unavailableRemove)).status, 404, 'cross-school or missing listing remains unavailable');
 });
 
-test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
-  let actor = { id: 'staff-id', role: 'school_admin' };
-  let queries = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
+test('owners of any active school role can read only their own listing history', async () => {
+  for (const role of ['student', 'council_member', 'school_admin']) {
+    const userId = `synthetic-${role}`;
+    const scopes = [];
+    const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: role }),
+      resolveActor: async () => ({ id: userId, school_id: 'school-a', role }),
+      repository: { getActiveAccountSuspension: async () => null,
+        listOwnActiveListingIds: async ownerId => { scopes.push(ownerId); return [`${role}-active`]; },
+        listOwnListingSummaries: async ownerId => { scopes.push(ownerId); return [{ id: `${role}-pending`, status: 'pending' }]; } } });
+    const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
+    assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [`${role}-active`], listings: [{ id: `${role}-pending`, status: 'pending' }] } });
+    assert.deepEqual(scopes, [userId, userId]);
+  }
+  const unprofiled = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'missing' }), resolveActor: async () => null,
+    repository: { listOwnActiveListingIds: async () => { throw new Error('must not query'); } } });
   const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [], listings: [] } });
-  assert.equal(queries, 0);
-  actor = null;
-  assert.equal((await handler(request)).status, 403);
+  assert.equal((await unprofiled(request)).status, 403);
 });
 
 test('favorites fail closed when the database adapter is unavailable', async () => {

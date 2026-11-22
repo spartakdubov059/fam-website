@@ -120,13 +120,14 @@ test("student identity fields are gathered at registration and editable in the u
   assert.match(html, /\.update\(\{ first_name, last_name, class_name \}\)/);
 });
 
-test("student identity is visible to school admins only through same-school admin queries", () => {
+test("student identity fields are minimized in same-school admin queries", () => {
   assert.match(migration, /grant select \(first_name,last_name,class_name\) on public\.profiles to authenticated/i);
   assert.match(migration, /grant update \(first_name,last_name,class_name\) on public\.profiles to authenticated/i);
   assert.match(contentSafety, /serious_hate_or_threat/);
   const council = readFileSync(resolve(root, "supabase/functions/council-management/index.ts"), "utf8");
-  assert.match(council, /profiles\?select=id,email,role,created_at,first_name,last_name,class_name&school_id=eq\./);
-  assert.match(council, /profiles\?select=id,email,role,first_name,last_name,class_name&school_id=eq\./);
+  assert.match(council, /profiles\?select=id,role,first_name,last_name,class_name&school_id=eq\./);
+  assert.doesNotMatch(council, /profiles\?select=[^"\n]*email[^"\n]*&school_id=eq\./);
   assert.match(html, /Класс: \$\{esc\(studentClass\)\}/);
-  assert.match(html, /studentName \|\| row\.email/);
+  assert.match(html, /studentName \|\| "Аккаунт #" \+ accountCode/);
+  assert.doesNotMatch(html, /studentName \|\| row\.email/);
 });

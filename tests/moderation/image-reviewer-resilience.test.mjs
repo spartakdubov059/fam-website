@@ -15,6 +15,10 @@ const moderator = readFileSync(
   new URL("../../supabase/functions/moderate/index.ts", import.meta.url),
   "utf8",
 );
+const retryPolicy = readFileSync(
+  new URL("../../supabase/functions/moderate/image-reviewer-utils.js", import.meta.url),
+  "utf8",
+);
 
 test("retries one transient image-review rate limit but not exhausted provider quota", () => {
   assert.equal(shouldRetryImageReviewRateLimit(429, "rate_limit_exceeded", 0), true);
@@ -38,18 +42,20 @@ test("Retry-After is honored within a short bounded window", () => {
 });
 
 test("photo-review rate limits are reported as a provider problem, not a prohibited photo", () => {
-  assert.match(reviewer, /Фото не признано запрещённым/);
-  assert.match(reviewer, /image_review_quota_exceeded/);
-  assert.match(reviewer, /shouldRetryImageReviewRateLimit/);
-  assert.match(reviewer, /isExhaustedImageReviewQuota/);
-  assert.match(moderator, /image_review_rate_limited: \{ category: "unclear_safety_signal"/);
-  assert.match(moderator, /image_review_quota_exceeded: \{ category: "unclear_safety_signal"/);
-  assert.match(moderator, /Provider rate limits, quota, or outages are service failures, not user safety violations/);
+  assert.match(reviewer, /reason_code: response\?\.status === 429 \? "image_review_rate_limited"/);
+  assert.match(reviewer, /Сервис проверки временно недоступен\. Фото пока не опубликовано\./);
+  assert.doesNotMatch(reviewer, /Фото признано запрещённым/);
+  assert.match(retryPolicy, /shouldRetryImageReviewRateLimit/);
+  assert.match(retryPolicy, /isExhaustedImageReviewQuota/);
+  const cachedSignalMap = moderator.slice(moderator.indexOf("const map:"), moderator.indexOf("const signal = map[code]"));
+  assert.doesNotMatch(cachedSignalMap, /image_review_(?:rate_limited|quota_exceeded|unavailable|no_decision)/);
+  assert.match(moderator, /Provider failures describe infrastructure, not user conduct/);
 });
 
 test("real personal-data findings and unsafe image findings still create safety signals", () => {
-  assert.match(moderator, /personal_information", "private_document/);
-  assert.match(moderator, /imageReview\.action === "reject"/);
+  assert.match(moderator, /personal_information: \{ category: "personal_data_in_image"/);
+  assert.match(moderator, /private_document: \{ category: "personal_data_in_image"/);
+  assert.match(moderator, /image_requires_human_review: \{ category: "unclear_safety_signal", severity: "high"/);
   assert.match(moderator, /writeSafetySignal\(safetyContext, "unsafe_image", "high"\)/);
-  assert.match(moderator, /image_requires_review/,);
+  assert.match(reviewer, /reason_code: "image_requires_human_review"/);
 });
