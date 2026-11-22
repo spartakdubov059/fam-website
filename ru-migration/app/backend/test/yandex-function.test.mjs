@@ -42,6 +42,24 @@ test('Yandex function adapter preserves repeated Set-Cookie headers', async () =
   assert.equal(response.headers['set-cookie'], undefined);
 });
 
+test('Yandex function adapter suppresses HEAD and no-content response bodies', async () => {
+  const handler = createYandexFunctionHandler({ requestHandler: async (req, res) => {
+    res.writeHead(req.method === 'HEAD' ? 200 : 204, {
+      'content-type': 'text/plain; charset=utf-8', 'content-length': '12',
+    });
+    res.end('representation');
+  } });
+
+  const head = await handler({ httpMethod: 'HEAD', path: '/', headers: {}, body: '' });
+  assert.equal(head.statusCode, 200);
+  assert.equal(head.body, '');
+  assert.equal(head.headers['content-length'], '12');
+
+  const noContent = await handler({ httpMethod: 'GET', path: '/', headers: {}, body: '' });
+  assert.equal(noContent.statusCode, 204);
+  assert.equal(noContent.body, '');
+});
+
 test('Yandex function adapter decodes request bytes and returns binary media as base64', async () => {
   const observed = [];
   const handler = createYandexFunctionHandler({ requestHandler: async (req, res) => {
