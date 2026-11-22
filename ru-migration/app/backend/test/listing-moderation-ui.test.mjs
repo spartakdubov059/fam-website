@@ -332,7 +332,7 @@ test('school account deletion stays blocked when Yandex cannot attest fresh auth
   assert.match(prompts[0], /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
 });
 
-test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
+test('school suspension UI explains when provider-verified fresh authentication is unavailable', async () => {
   const f = fixture(); const calls = [];
   const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
@@ -352,6 +352,7 @@ test('school admins can issue and lift short account restrictions with safe text
   const panel = f.queue.children[0];
   const form = panel.children[2];
   const [targetSelect, duration, reason, submit] = form.children;
+  assert.match(panel.children[1].textContent, /не сообщает серверу время повторной аутентификации/);
   assert.equal(targetSelect.children[1].textContent, '<script> Имя · ученик', 'names are rendered as text');
   targetSelect.value = target; duration.value = '72'; reason.value = 'Repeatedly disrupted the shared school board.';
   await form.listeners.submit({ preventDefault() {} });

@@ -17,10 +17,10 @@ function fakeSql({ resultSets = REQUIRED_RU_TABLES.map(() => []) } = {}) {
 test('RU schema health checks all required tables with zero-row probes and returns aggregates only', async () => {
   const { sql, calls, identifier, fragment, join } = fakeSql();
   const result = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.equal(REQUIRED_RU_TABLES.length, 38);
+  assert.equal(REQUIRED_RU_TABLES.length, 39);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].values[0].items.length, 38);
-  assert.deepEqual(result, { ok: true, tables_checked: 38, content_read: false, write_permissions_checked: false });
+  assert.equal(calls[0].values[0].items.length, 39);
+  assert.deepEqual(result, { ok: true, tables_checked: 39, content_read: false, write_permissions_checked: false });
 });
 
 test('RU schema health rejects malformed, duplicate and empty table lists', () => {

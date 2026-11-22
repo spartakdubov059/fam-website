@@ -173,6 +173,8 @@ test('school profile request status is private to the authenticated identity and
   const result = await handler(request);
   assert.equal(result.status, 200);
   assert.equal(result.body.request.status, 'pending');
+  assert.equal(result.body.email_verified, false);
+  assert.equal(result.body.email_verification_available, false);
   assert.deepEqual(Object.keys(result.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
 });
 test('role requests use a fixed allowlist, active student profile, and school-admin review scope', async () => {
@@ -565,6 +567,7 @@ test('unprovisioned Yandex identities can request a participant profile but cann
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
     resolveActor: async () => null,
+    emailVerification: { available: true, isVerified: async () => true },
     repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
   const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8а', role: 'school_admin', user_id: 'forged' });
   request.url = '/api/v1/profile-requests';
@@ -575,10 +578,44 @@ test('unprovisioned Yandex identities can request a participant profile but cann
 
   let writes = 0;
   const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
+    emailVerification: { available: true, isVerified: async () => true },
     repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
   const invalid = req({ school_id: 'unlisted-school', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); invalid.url = '/api/v1/profile-requests';
   assert.equal((await denied(invalid)).status, 400);
   assert.equal(writes, 0);
+});
+
+test('school profile creation requires verified email and unprovisioned identity verification', async () => {
+  const identity = { issuer: 'https://login.yandex.ru', subject: 'new-subject', email: 'new@example.test' };
+  let isVerified = false; let writes = 0; let sent; let verified;
+  const repository = {
+    getActiveAccountSuspension: async () => null,
+    startRoleEmailVerification: async values => { sent = values; return { ok: true }; },
+    clearRoleEmailChallenge: async () => true,
+    verifyRoleEmailVerification: async values => { verified = values; isVerified = true; return { ok: true, verified: true }; },
+    isRoleEmailVerified: async () => isVerified,
+    createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending', request_id: 'request-a' }; },
+  };
+  const emailVerification = createRoleEmailVerification({ repository, verificationKey: 'test verification secret has at least thirty two bytes',
+    sendEmail: async value => { sent.email = value.to; }, now: () => 1_800_000_000_000, createCode: () => '135790' });
+  const handler = createListingsApi({ authenticate: async () => identity, resolveActor: async () => null, repository, emailVerification });
+  const submit = () => { const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); request.url = '/api/v1/profile-requests'; return request; };
+  assert.deepEqual(await handler(submit()), { status: 403, body: { ok: false, error: 'email_verification_required' } });
+  assert.equal(writes, 0);
+  const send = req({ action: 'send' }); send.url = '/api/v1/profile-requests/email-verification';
+  assert.deepEqual(await handler(send, { token: { access_token: 'synthetic-function-iam-token-0123456789' } }),
+    { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.equal(sent.email, identity.email);
+  const verify = req({ action: 'verify', code: '135790' }); verify.url = '/api/v1/profile-requests/email-verification';
+  assert.deepEqual(await handler(verify), { status: 200, body: { ok: true, email_verified: true } });
+  assert.equal(verified.userId, identity.subject);
+  assert.equal((await handler(submit())).status, 202);
+  assert.equal(writes, 1);
+
+  const provisioned = createListingsApi({ authenticate: async () => identity, resolveActor: async () => ({ id: 'active-user', role: 'student', school_id: 'lyceum_3' }),
+    emailVerification, repository });
+  const blockedSend = req({ action: 'send' }); blockedSend.url = '/api/v1/profile-requests/email-verification';
+  assert.equal((await provisioned(blockedSend, { token: { access_token: 'synthetic-function-iam-token-0123456789' } })).status, 409);
 });
 
 test('only same-school administrators can read or decide profile access requests', async () => {
@@ -804,16 +841,23 @@ test('school administrators require fresh Yandex auth to delete another member l
   assert.equal((await handler(unavailableRemove)).status, 404, 'cross-school or missing listing remains unavailable');
 });
 
-test('own listing identifiers are not exposed to staff or unprofiled identities', async () => {
-  let actor = { id: 'staff-id', role: 'school_admin' };
-  let queries = 0;
-  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'staff' }), resolveActor: async () => actor,
-    repository: { getActiveAccountSuspension: async () => null, listOwnActiveListingIds: async () => { queries++; return ['secret-listing-id']; } } });
+test('owners of any active school role can read only their own listing history', async () => {
+  for (const role of ['student', 'council_member', 'school_admin']) {
+    const userId = `synthetic-${role}`;
+    const scopes = [];
+    const handler = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: role }),
+      resolveActor: async () => ({ id: userId, school_id: 'school-a', role }),
+      repository: { getActiveAccountSuspension: async () => null,
+        listOwnActiveListingIds: async ownerId => { scopes.push(ownerId); return [`${role}-active`]; },
+        listOwnListingSummaries: async ownerId => { scopes.push(ownerId); return [{ id: `${role}-pending`, status: 'pending' }]; } } });
+    const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
+    assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [`${role}-active`], listings: [{ id: `${role}-pending`, status: 'pending' }] } });
+    assert.deepEqual(scopes, [userId, userId]);
+  }
+  const unprofiled = createListingsApi({ authenticate: async () => ({ issuer: 'issuer', subject: 'missing' }), resolveActor: async () => null,
+    repository: { listOwnActiveListingIds: async () => { throw new Error('must not query'); } } });
   const request = req({}, 'GET'); request.url = '/api/v1/me/listings';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, listing_ids: [], listings: [] } });
-  assert.equal(queries, 0);
-  actor = null;
-  assert.equal((await handler(request)).status, 403);
+  assert.equal((await unprofiled(request)).status, 403);
 });
 
 test('favorites fail closed when the database adapter is unavailable', async () => {

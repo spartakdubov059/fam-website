@@ -84,6 +84,8 @@ try {
           : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1';
     return { issuer: 'https://issuer.synthetic', subject,
       ...(subject === 'subject-role-student' ? { email: 'role-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new' ? { email: 'new-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new-staff' ? { email: 'new-staff@synthetic.example' } : {}),
       authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null };
   };
   const deletedMediaKeys = [];
@@ -421,6 +423,23 @@ try {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
   }))).status, 403);
   console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
+  }))).status, 403, 'an unverified identity cannot create a school profile request');
+  const sendProfileEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendProfileEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-student@synthetic.example', code: '135790' });
+  const storedProfileChallenge = await sql`SELECT email_digest, code_digest FROM fam_role_email_verifications
+    WHERE issuer = 'https://issuer.synthetic' AND subject = 'subject-new' LIMIT 1;`;
+  assert.match(storedProfileChallenge[0][0].email_digest, /^[a-f0-9]{64}$/);
+  assert.match(storedProfileChallenge[0][0].code_digest, /^[a-f0-9]{64}$/);
+  assert.equal(storedProfileChallenge[0][0].email_digest.includes('new-student@synthetic.example'), false);
+  assert.equal(storedProfileChallenge[0][0].code_digest.includes('135790'), false);
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
+  console.log('YDB_PROFILE_EMAIL_VERIFICATION_PASS: unverified identity is blocked, synthetic code verifies, and YDB stores only HMAC digests');
   const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
   }));
@@ -499,6 +518,16 @@ try {
   const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
   assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
+  }))).status, 403, 'an unverified school employee identity cannot create a profile request');
+  const sendStaffEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendStaffEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-staff@synthetic.example', code: '135790' });
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
   const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
   }));
@@ -1146,6 +1175,11 @@ try {
   const coderTask = await agentQueue.enqueueSafeCoderTask(coderSlot);
   assert.equal(coderTask.created, true, 'thresholded aggregate telemetry creates a synthetic manual-review task');
   assert.equal(coderTask.task_key, 'audit_frontend_runtime');
+  const initialCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(initialCoderQueueHealth.queued, 1);
+  assert.equal(initialCoderQueueHealth.claimed, 0);
+  assert.deepEqual(Object.keys(initialCoderQueueHealth).sort(),
+    ['claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued']);
   assert.equal((await agentQueue.enqueueSafeCoderTask(coderSlot)).created, false, 'coder task enqueue is idempotent per quarter-hour slot');
   const claimedBeforeCoder = await agentQueue.claimSafeTasks(5);
   assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
@@ -1162,10 +1196,48 @@ try {
   const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
   assert.equal(coderClaim.id, coderTask.id);
   assert.equal(coderClaim.task_key, coderPayload.task_key);
+  const claimedCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(claimedCoderQueueHealth.queued, 0);
+  assert.equal(claimedCoderQueueHealth.claimed, 1);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
+  await sql`DELETE FROM fam_site_error_counts
+    WHERE hour_bucket = Unwrap(CAST(${coderBucket.toISOString()} AS Timestamp))
+      AND event_code = 'js_runtime' AND page_area = 'auth';`;
+  for (const [index, [eventCode, pageArea, taskKey]] of [
+    ['notifications_load_failed', 'notifications', 'audit_client_resilience'],
+    ['database_request_failed', 'database', 'audit_client_resilience'],
+    ['auth_backend_failed', 'auth', 'audit_client_resilience'],
+  ].entries()) {
+    await sql`DELETE FROM fam_site_error_counts WHERE event_code IN
+      ('js_runtime', 'unhandled_rejection', 'listings_load_failed', 'notifications_load_failed',
+        'database_request_failed', 'auth_backend_failed');`;
+    const eventBucket = new Date();
+    eventBucket.setUTCMinutes(0, 0, 0);
+    await sql`UPSERT INTO fam_site_error_counts
+      (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
+      VALUES (Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp)), ${eventCode}, ${pageArea},
+        Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+    const followupSlotDate = new Date(coderSlotDate.getTime() + (index + 1) * 15 * 60 * 1000);
+    const followupTask = await agentQueue.enqueueSafeCoderTask(followupSlotDate.toISOString().slice(0, 16));
+    assert.equal(followupTask.created, true, `${eventCode} aggregate creates a synthetic coder review task`);
+    assert.equal(followupTask.task_key, taskKey, `${eventCode} maps to its fixed task key`);
+    const followupPayloadRows = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${followupTask.id} LIMIT 1;`;
+    assert.equal(followupPayloadRows?.[0]?.[0]?.status, 'queued',
+      'new coder task remains outside the automated safe-worker allowlist');
+    const followupPayload = JSON.parse(followupPayloadRows?.[0]?.[0]?.payload_json ?? 'null');
+    assert.deepEqual(followupPayload, { task_key: taskKey, event_code: eventCode, page_area: pageArea, occurrences: 3 });
+    const followupClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+    assert.equal(followupClaim.id, followupTask.id);
+    assert.equal(followupClaim.event_code, eventCode);
+    assert.equal(await agentQueue.finishSafeCoderTask({ id: followupClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+      claimToken: followupClaim.claim_token, resultCode: 'model_no_patch' }), true);
+    await sql`DELETE FROM fam_site_error_counts
+      WHERE hour_bucket = Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp))
+        AND event_code = ${eventCode} AND page_area = ${pageArea};`;
+  }
   const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
   assert.equal(safeTask.created, true);
   assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,

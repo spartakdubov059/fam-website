@@ -10,6 +10,9 @@ export async function reviewText(value, { review } = {}) {
     return { action: 'reject', reason_code: 'personal_contact_data' };
   }
   const flag = findLocalPolicyFlag(value);
+  if (flag?.code.endsWith('_safety_review')) {
+    return { action: 'pending', reason_code: flag.code, local_flag: flag.code };
+  }
   if (typeof review !== 'function') {
     return { action: 'pending', reason_code: 'review_unavailable', local_flag: flag?.code ?? null };
   }
