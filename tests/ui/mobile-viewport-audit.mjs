@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6658)
-Total output lines: 444
-
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -185,7 +182,109 @@ try {
   await page.locator("#evOption").evaluate(node => { node.style.display = "block"; });
   await checkHint({ title: "Квиз по робототехнике", currentCategory: "Вещи", expectedCategory: "Мероприятия", shouldSelect: true });
   await page.locator("#evOption").evaluate(node => { node.style.display = "none"; });
-  await checkHint({ title: "Квиз по робототе…1658 tokens truncated…"),
+  await checkHint({ title: "Квиз по робототехнике", currentCategory: "Вещи", expectedCategory: null });
+  await checkHint({ title: "Конспект по физике", currentCategory: "Вещи", expectedCategory: "Учёба", shouldSelect: true });
+  await checkHint({ title: "Люблю объяснять сложные темы", description: "Подготовка к контрольной по алгебре", currentCategory: "Вещи", expectedCategory: "Учёба" });
+  await checkHint({ title: "Необычная идея для вечера", expectedCategory: null });
+  await checkHint({ title: "Продам картину ручной работы", currentCategory: "Творчество", expectedCategory: "Вещи" });
+
+  // The local editor formats an existing description and displays category-specific missing details.
+  // When no description exists, it creates an editable template with placeholders.
+  await page.locator("#lCat").selectOption("Вещи");
+  await page.locator("#lTitle").fill("VR-шлем Meta Quest 3");
+  await page.locator("#lDesc").fill("");
+  const helperFetchesBefore = await page.evaluate(() => window.__helperFetchCalls);
+  await page.locator('[data-action="open-description-helper"]').click();
+  assert.equal(await page.locator("#descriptionHelperPanel").isVisible(), true, "description helper panel must open");
+  let draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("VR-шлем Meta Quest 3"), "template must use the entered title");
+  assert.ok(draft.includes("Состояние: [укажите реальное состояние]"), "item template must ask for real condition");
+  assert.ok((await page.locator("#descriptionHelperSuggestions").textContent()).includes("комплектацию"), "helper must show missing item details");
+  await page.locator('[data-action="apply-description-draft"]').click();
+  let inserted = await page.locator("#lDesc").inputValue();
+  assert.ok(inserted.includes("VR-шлем Meta Quest 3") && inserted.includes("Комплектация:"), "editable item template must be applied to the description");
+
+  await page.locator("#lDesc").fill("   новый    VR-шлем ,   работает!!\n комплектация полная");
+  await page.locator('[data-action="open-description-helper"]').click();
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.equal(draft, "Новый VR-шлем, работает!\nКомплектация полная.", "editor must fix spacing, punctuation and capitalization without inventing facts");
+  await page.locator('[data-action="apply-description-draft"]').click();
+  inserted = await page.locator("#lDesc").inputValue();
+  assert.equal(inserted, draft, "apply action must use the reviewed editable draft");
+  assert.ok((await page.locator("#descriptionHelperSuggestions").textContent()).includes("условия передачи"), "item helper should ask for relevant missing details");
+
+  await page.locator("#lDesc").fill("");
+  await page.locator("#lCat").selectOption("Учёба");
+  await page.locator('[data-action="open-description-helper"]').click();
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("Уровень:") && draft.includes("Формат:"), "study template must use study-specific prompts");
+
+  await page.locator("#lCat").selectOption("Услуги");
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("Что входит:"), "service template must update when category changes");
+
+  await page.locator("#lCat").selectOption("Творчество");
+  draft = await page.locator("#descriptionHelperDraft").inputValue();
+  assert.ok(draft.includes("Что именно будет создано:"), "creativity template must be available");
+
+  const helperFetchesAfter = await page.evaluate(() => window.__helperFetchCalls);
+  assert.equal(helperFetchesAfter, helperFetchesBefore, "category hints and description editor must not call any API");
+  await page.locator('[data-action="close-description-helper"]').click();
+  await page.locator('[data-action="close-listing-modal"]').click();
+
+  // setContent() has no base URL, so relative artwork URLs intentionally fail.
+  // Add a valid inline artwork fixture to test the real banner CSS geometry.
+  await page.evaluate(() => {
+    const stage = document.getElementById("bannerCarousel");
+    if (!stage || stage.querySelector(".hero-img")) return;
+    const slide = document.createElement("div");
+    slide.className = "hero-slide hero-img";
+    slide.setAttribute("aria-hidden", "true");
+    const img = document.createElement("img");
+    img.width = 1200;
+    img.height = 675;
+    img.alt = "Тестовый баннер";
+    img.src = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675"></svg>');
+    slide.appendChild(img);
+    stage.appendChild(slide);
+  });
+
+  const widths = [
+    { width: 360, height: 844, columns: 2 },
+    { width: 360, height: 640, columns: 2 },
+    { width: 375, height: 812, columns: 2 },
+    { width: 375, height: 667, columns: 2 },
+    { width: 390, height: 844, columns: 2 },
+    { width: 430, height: 932, columns: 2 },
+    { width: 667, height: 375, columns: 3 },
+    { width: 844, height: 390, columns: 3 },
+    { width: 768, height: 1024, columns: 3 },
+    { width: 820, height: 1180, columns: 3 },
+    { width: 834, height: 1112, columns: 3 },
+    { width: 1024, height: 768, columns: 4 },
+    { width: 1194, height: 834, columns: 4 },
+    { width: 1366, height: 900, columns: 4 }
+  ];
+
+  for (const size of widths) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    const metrics = await page.evaluate(() => {
+      const rect = selector => {
+        const node = document.querySelector(selector);
+        if (!node) return null;
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right, width: box.width, height: box.height };
+      };
+      const grid = document.querySelector("#listingsGrid");
+      const button = document.querySelector(".l-details-btn");
+      return {
+        viewport: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        bodyWidth: document.body.scrollWidth,
+        mainClientWidth: document.querySelector("main").clientWidth,
+        mainScrollWidth: document.querySelector("main").scrollWidth,
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length : 0,
+        header: rect(".header-inner"),
         main: rect("main"),
         categories: rect(".cat-tiles"),
         search: rect(".search-pill"),
