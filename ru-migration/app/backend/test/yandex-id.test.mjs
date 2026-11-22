@@ -15,7 +15,7 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
     fetchImpl: async (url, options = {}) => {
       fetchCalls.push({ url: String(url), options });
       if (String(url) === 'https://oauth.yandex.ru/token') return { ok: true, json: async () => ({ token_type: 'bearer', access_token: 'temporary-yandex-access-token', expires_in: 3600 }) };
-      if (String(url) === 'https://login.yandex.ru/info?format=json') return { ok: true, json: async () => ({ id: '123456789', client_id: 'synthetic-client' }) };
+      if (String(url) === 'https://login.yandex.ru/info?format=json') return { ok: true, json: async () => ({ id: '123456789', client_id: 'synthetic-client', default_email: 'student@example.test' }) };
       throw new Error('unexpected external URL');
     },
   });
@@ -24,7 +24,7 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   const authorization = new URL(start.headers.location);
   assert.equal(authorization.origin, 'https://oauth.yandex.ru');
   assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
-  assert.equal(authorization.searchParams.get('scope'), 'login:info');
+  assert.equal(authorization.searchParams.get('scope'), 'login:info login:email');
   assert.equal(authorization.searchParams.has('force_confirm'), false);
   const stateCookie = cookiePair(start.headers['set-cookie']);
   const state = authorization.searchParams.get('state');
@@ -43,8 +43,9 @@ test('Yandex ID login uses server-side PKCE, checks client identity, and issues 
   assert.match(sessionCookie, /Secure/);
   assert.match(sessionCookie, /SameSite=Lax/);
   assert.equal(sessionCookie.includes('temporary-yandex-access-token'), false);
+  assert.equal(sessionCookie.includes('student@example.test'), false, 'email is encrypted in the HttpOnly session cookie');
   const identity = await auth.authenticate({ method: 'GET', headers: { cookie: cookiePair(sessionCookie) } });
-  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789', authenticated_at: null, session_issued_at: 1_800_000_000 });
+  assert.deepEqual(identity, { issuer: 'https://login.yandex.ru', subject: '123456789', email: 'student@example.test', authenticated_at: null, session_issued_at: 1_800_000_000 });
   assert.deepEqual(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://fam.example' } }), identity);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie), origin: 'https://attacker.example' } }), null);
   assert.equal(await auth.authenticate({ method: 'POST', headers: { cookie: cookiePair(sessionCookie) } }), null, 'unsafe cookie requests require an Origin header');

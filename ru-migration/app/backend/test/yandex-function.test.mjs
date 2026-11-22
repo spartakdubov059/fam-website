@@ -31,6 +31,18 @@ test('Yandex function adapter routes readiness requests and preserves query para
   assert.deepEqual(JSON.parse(response.body), { ready: true, mode: 'synthetic' });
 });
 
+test('Yandex function adapter forwards invocation context only to the backend handler', async () => {
+  const context = { token: { access_token: 'synthetic-context-token' } };
+  let received;
+  const handler = createYandexFunctionHandler({ requestHandler: async (_req, res, invocation) => {
+    received = invocation;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{}');
+  } });
+  await handler({ httpMethod: 'GET', path: '/', headers: {}, body: '' }, context);
+  assert.equal(received, context);
+});
+
 test('Yandex function adapter preserves repeated Set-Cookie headers', async () => {
   const handler = createYandexFunctionHandler({ requestHandler: async (_req, res) => {
     res.writeHead(303, { location: '/', 'set-cookie': ['state=; Path=/; Max-Age=0', 'session=synthetic; Path=/; HttpOnly'] });

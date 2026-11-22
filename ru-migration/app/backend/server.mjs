@@ -50,7 +50,7 @@ function sendMediaResult(res, result) {
 }
 
 export function createRequestHandler({ listingsApi = null, authApi = null, mediaApi = null, coderTaskBridge = null, getReadiness = defaultReadiness } = {}) {
-  return async (req, res) => {
+  return async (req, res, functionContext = null) => {
   const url = new URL(req.url || '/', 'http://localhost');
   if (['/auth/yandex/start', '/auth/yandex/callback', '/auth/yandex/logout'].includes(url.pathname)) {
     if (!authApi) return sendJson(res, 503, { ok: false, error: 'auth_not_configured' });
@@ -137,6 +137,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       || (req.method === 'PATCH' && /^\/api\/v1\/deletion-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname))
       || (/^\/api\/v1\/profile-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname) && req.method === 'PATCH')
       || (req.method === 'POST' && url.pathname === '/api/v1/role-requests')
+      || (req.method === 'POST' && url.pathname === '/api/v1/role-requests/email-verification')
       || (req.method === 'GET' && ['/api/v1/role-requests', '/api/v1/role-requests/review'].includes(url.pathname))
       || (/^\/api\/v1\/role-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(url.pathname) && req.method === 'PATCH')
       || (req.method === 'GET' && url.pathname === '/api/v1/listings/moderation')
@@ -156,7 +157,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       || (/^\/api\/v1\/listings\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/favorite$/i.test(url.pathname) && ['PUT', 'DELETE'].includes(req.method)))) {
     if (!listingsApi) return sendJson(res, 503, { ok: false, error: 'backend_not_configured' });
     try {
-      const result = await listingsApi(req);
+      const result = await listingsApi(req, functionContext);
       return sendJson(res, result.status, result.body);
     } catch {
       return sendJson(res, 503, { ok: false, error: 'request_failed' });

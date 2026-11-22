@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createListingsApi } from '../services/listings-api.mjs';
+import { createRoleEmailVerification } from '../services/role-email-verification.mjs';
 function req(body = {}, method = 'POST') {
   const request = Readable.from(method === 'GET' ? [] : [Buffer.from(JSON.stringify(body))]);
   request.method = method;
@@ -159,6 +160,7 @@ test('role requests use a fixed allowlist, active student profile, and school-ad
   let actor = { id: 'student-id', school_id: 'school-a', role: 'student', active: true };
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'student' }),
     resolveActor: async () => actor,
+    emailVerification: { available: true, isVerified: async () => true },
     repository: {
       getActiveAccountSuspension: async () => null,
       createSchoolRoleRequest: async request => { savedRole = request.requested_role; return { ok: true, status: 'pending', request_id: id }; },
@@ -201,7 +203,8 @@ test('active suspension blocks school role request changes but allows status rea
     startSchoolRoleRequestReview: async () => { writes++; return true; },
   };
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
-    resolveActor: async () => actor, repository });
+    resolveActor: async () => actor, repository,
+    emailVerification: { available: true, isVerified: async () => true } });
   const status = req({}, 'GET'); status.url = '/api/v1/role-requests';
   assert.equal((await handler(status)).status, 200);
   assert.equal(lookups, 0, 'read-only request status remains available during suspension');
@@ -229,8 +232,41 @@ test('role request status includes the current database role for migrated school
     resolveActor: async () => ({ id: 'student-id', role: 'council_member', school_id: 'school-a' }),
     repository: { getActiveAccountSuspension: async () => null, getSchoolRoleRequest: async (issuer, subject) => ({ request_id: 'request-a', status: 'approved', requested_role: 'council_member' }) } });
   const request = req({}, 'GET'); request.url = '/api/v1/role-requests';
-  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, role: 'council_member',
+  assert.deepEqual(await handler(request), { status: 200, body: { ok: true, role: 'council_member', email_verified: false, email_verification_available: false,
     request: { request_id: 'request-a', status: 'approved', requested_role: 'council_member' } } });
+});
+
+test('school role requests require Yandex email verification and only the verification code completes it', async () => {
+  const identity = { issuer: 'https://login.yandex.ru', subject: 'synthetic-student', email: 'student@example.test' };
+  const actor = { id: 'student-id', school_id: 'school-a', role: 'student' };
+  let sent; let challenge; let isVerified = false; let roleRequests = 0;
+  const repository = {
+    getActiveAccountSuspension: async () => null,
+    startRoleEmailVerification: async values => { challenge = values; return { ok: true }; },
+    clearRoleEmailChallenge: async () => true,
+    verifyRoleEmailVerification: async values => { isVerified = values.codeDigest === challenge.codeDigest; return { ok: isVerified, verified: isVerified }; },
+    isRoleEmailVerified: async values => isVerified && values.emailDigest === challenge.emailDigest,
+    createSchoolRoleRequest: async () => { roleRequests++; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; },
+  };
+  const verification = createRoleEmailVerification({ repository, verificationKey: 'test verification secret has at least thirty two bytes',
+    sendEmail: async value => { sent = value; }, now: () => 1_800_000_000_000, createCode: () => '135790' });
+  const handler = createListingsApi({ authenticate: async () => identity, resolveActor: async () => actor, repository,
+    verificationKey: 'test verification secret has at least thirty two bytes', sendRoleVerificationEmail: async value => { sent = value; },
+    emailVerification: verification });
+  const submit = req({ requested_role: 'Администратор' }); submit.url = '/api/v1/role-requests';
+  assert.deepEqual(await handler(submit), { status: 403, body: { ok: false, error: 'email_verification_required' } });
+  assert.equal(roleRequests, 0);
+  const send = req({ action: 'send' }); send.url = '/api/v1/role-requests/email-verification';
+  assert.deepEqual(await handler(send, { token: { access_token: 'synthetic-function-iam-token-0123456789' } }),
+    { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.equal(sent.to, 'student@example.test');
+  assert.equal(JSON.stringify(challenge).includes('135790'), false);
+  assert.equal(JSON.stringify(challenge).includes('student@example.test'), false);
+  const verify = req({ action: 'verify', code: '135790' }); verify.url = '/api/v1/role-requests/email-verification';
+  assert.deepEqual(await handler(verify), { status: 200, body: { ok: true, email_verified: true } });
+  const retry = req({ requested_role: 'Администратор' }); retry.url = '/api/v1/role-requests';
+  assert.equal((await handler(retry)).status, 202);
+  assert.equal(roleRequests, 1);
 });
 
 test('role request submission and review fail closed for unprovisioned or non-admin profiles', async () => {

@@ -84,7 +84,7 @@ function toFunctionResponse(statusCode, headers, body) {
 
 export function createYandexFunctionHandler({ requestHandler = createRequestHandler() } = {}) {
   if (typeof requestHandler !== 'function') throw new TypeError('request handler is required');
-  return async function handleYandexFunction(event) {
+  return async function handleYandexFunction(event, context = null) {
     let body;
     try { body = eventBody(event); } catch {
       return toFunctionResponse(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
@@ -112,7 +112,7 @@ export function createYandexFunctionHandler({ requestHandler = createRequestHand
     };
 
     try {
-      await requestHandler(req, res);
+      await requestHandler(req, res, context);
       if (!ended) return toFunctionResponse(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
         JSON.stringify({ ok: false, error: 'empty_backend_response' }));
       const response = toFunctionResponse(statusCode, headers, responseBody);
@@ -145,8 +145,8 @@ async function getProductionHandler() {
   return productionHandler;
 }
 
-export async function handler(event) {
-  try { return await (await getProductionHandler())(event); } catch {
+export async function handler(event, context) {
+  try { return await (await getProductionHandler())(event, context); } catch {
     return toFunctionResponse(503, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       JSON.stringify({ ok: false, error: 'backend_not_ready' }));
   }

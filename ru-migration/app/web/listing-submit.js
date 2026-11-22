@@ -255,7 +255,7 @@ async function createSchoolRoleRequestForm(document, listingForm, fetchImpl) {
   section.setAttribute('aria-label', 'Заявка на роль школьного Совета');
   const heading = document.createElement('h2'); heading.textContent = 'Роль школьного Совета';
   const note = document.createElement('p'); note.className = 'ru-note';
-  note.textContent = 'Заявку рассмотрит администратор вашей школы. Роль назначается только сервером после решения школы.';
+  note.textContent = 'Перед заявкой подтвердите адрес электронной почты аккаунта Яндекс ID. Роль назначается только сервером после решения школы.';
   const form = document.createElement('form'); form.className = 'ru-listing-form';
   const label = document.createElement('label'); label.textContent = 'Что вы хотите запросить?';
   const select = document.createElement('select'); select.name = 'requested_role'; select.required = true;
@@ -264,24 +264,72 @@ async function createSchoolRoleRequestForm(document, listingForm, fetchImpl) {
   }
   label.append(select); const button = document.createElement('button'); button.type = 'submit'; button.className = 'ru-button'; button.textContent = 'Отправить заявку';
   form.append(label, button); section.append(heading, note, form); shell.append(section);
+  const sendCode = document.createElement('button'); sendCode.type = 'button'; sendCode.className = 'ru-button'; sendCode.textContent = 'Отправить код на почту Яндекс ID';
+  const codeForm = document.createElement('form'); codeForm.className = 'ru-listing-form'; codeForm.hidden = true;
+  const codeLabel = document.createElement('label'); codeLabel.textContent = 'Код из письма';
+  const codeInput = document.createElement('input'); codeInput.name = 'email_verification_code'; codeInput.type = 'text'; codeInput.inputMode = 'numeric';
+  codeInput.autocomplete = 'one-time-code'; codeInput.maxLength = 6; codeInput.pattern = '[0-9]{6}'; codeInput.required = true;
+  codeLabel.append(codeInput);
+  const verifyCode = document.createElement('button'); verifyCode.type = 'submit'; verifyCode.className = 'ru-button'; verifyCode.textContent = 'Подтвердить почту';
+  codeForm.append(codeLabel, verifyCode); section.append(sendCode, codeForm);
+  let emailVerified = false;
+  let emailVerificationAvailable = false;
+  let codeSent = false;
   async function refresh() {
     try {
       const response = await fetchImpl('/api/v1/role-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
       const result = await readJson(response);
       if (!response.ok || !result?.ok) throw new Error('role_request_status_unavailable');
       const request = result.request;
+      emailVerified = result.email_verified === true;
+      emailVerificationAvailable = result.email_verification_available === true;
+      sendCode.hidden = emailVerified || Boolean(request && ['pending', 'reviewing', 'approved'].includes(request.status));
+      sendCode.disabled = !emailVerificationAvailable;
+      codeForm.hidden = emailVerified || !codeSent || Boolean(request && ['pending', 'reviewing', 'approved'].includes(request.status));
       if (request && ['pending', 'reviewing'].includes(request.status)) {
         note.textContent = request.status === 'reviewing' ? 'Администратор школы уже рассматривает вашу заявку.' : 'Заявка отправлена и ожидает решения администратора школы.';
         form.hidden = true;
       } else if (request?.status === 'approved') {
         note.textContent = 'Школа одобрила запрос. Обновите страницу, чтобы увидеть новые возможности.'; form.hidden = true;
       } else if (request?.status === 'rejected') {
-        note.textContent = 'Предыдущий запрос отклонён. При необходимости можно подать заявку ещё раз.'; form.hidden = false;
+        note.textContent = emailVerified ? 'Предыдущий запрос отклонён. При необходимости можно подать заявку ещё раз.'
+          : emailVerificationAvailable ? 'Подтвердите почту Яндекс ID, чтобы подать заявку повторно.' : 'Подтверждение почты сейчас недоступно.';
+        form.hidden = !emailVerified;
       }
-    } catch { note.textContent = 'Не удалось загрузить статус заявки. Повторите попытку позже.'; form.hidden = true; }
+      else if (emailVerified) { note.textContent = 'Почта подтверждена. Заявку рассмотрит администратор вашей школы.'; form.hidden = false; }
+      else { note.textContent = emailVerificationAvailable ? 'Чтобы отправить заявку на школьную роль, подтвердите почту Яндекс ID.' : 'Подтверждение почты сейчас не настроено.'; form.hidden = true; }
+    } catch { note.textContent = 'Не удалось загрузить статус заявки. Повторите попытку позже.'; form.hidden = true; sendCode.hidden = true; codeForm.hidden = true; }
   }
+  sendCode.addEventListener('click', async () => {
+    sendCode.disabled = true; note.textContent = 'Отправляем код…';
+    try {
+      const response = await fetchImpl('/api/v1/role-requests/email-verification', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ action: 'send' }) });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'email_verification_failed');
+      codeSent = result.sent === true; codeForm.hidden = !codeSent;
+      note.textContent = result.already_verified ? 'Почта уже подтверждена.' : 'Код отправлен на почту аккаунта Яндекс ID. Он действует 10 минут.';
+      if (result.already_verified) await refresh();
+    } catch (error) {
+      note.textContent = error?.message === 'email_send_rate_limited' || error?.message === 'email_send_cooldown'
+        ? 'Лимит отправки кода достигнут. Попробуйте позже.' : 'Не удалось отправить код. Попробуйте позже.';
+    } finally { sendCode.disabled = !emailVerificationAvailable; }
+  });
+  codeForm.addEventListener('submit', async event => {
+    event.preventDefault(); verifyCode.disabled = true; note.textContent = 'Проверяем код…';
+    try {
+      const response = await fetchImpl('/api/v1/role-requests/email-verification', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ action: 'verify', code: codeInput.value }) });
+      const result = await readJson(response);
+      if (!response.ok || !result?.ok) throw new Error('email_code_invalid');
+      codeInput.value = ''; codeSent = false; await refresh();
+    } catch { note.textContent = 'Код неверен или срок его действия истёк. Проверьте код или запросите новый.'; }
+    finally { verifyCode.disabled = false; }
+  });
   form.addEventListener('submit', async event => {
-    event.preventDefault(); button.disabled = true; note.textContent = 'Отправляем заявку…';
+    event.preventDefault();
+    if (!emailVerified) { note.textContent = 'Сначала подтвердите почту Яндекс ID.'; return; }
+    button.disabled = true; note.textContent = 'Отправляем заявку…';
     try {
       const response = await fetchImpl('/api/v1/role-requests', { method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ requested_role: select.value }) });

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual, createHash, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const YANDEX_ISSUER = 'https://login.yandex.ru';
 const AUTHORIZATION_ENDPOINT = 'https://oauth.yandex.ru/authorize';
@@ -28,6 +28,38 @@ function decodeSigned(value, secret, nowSeconds) {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     return payload && Number.isInteger(payload.exp) && payload.exp > nowSeconds ? payload : null;
+  } catch { return null; }
+}
+
+function validEmail(value) {
+  return typeof value === 'string' && value.length <= 254 && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value);
+}
+
+function emailKey(secret) {
+  return createHash('sha256').update('fam-ru-yandex-session-email\0').update(secret).digest();
+}
+
+function encryptEmail(value, secret) {
+  if (!validEmail(value)) return null;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', emailKey(secret), iv);
+  const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  return [iv, cipher.getAuthTag(), ciphertext].map(part => part.toString('base64url')).join('.');
+}
+
+function decryptEmail(value, secret) {
+  if (typeof value !== 'string' || value.length > 768) return null;
+  const [ivPart, tagPart, bodyPart, extra] = value.split('.');
+  if (!ivPart || !tagPart || !bodyPart || extra !== undefined) return null;
+  try {
+    const iv = Buffer.from(ivPart, 'base64url');
+    const tag = Buffer.from(tagPart, 'base64url');
+    const body = Buffer.from(bodyPart, 'base64url');
+    if (iv.length !== 12 || tag.length !== 16 || body.length > 254) return null;
+    const decipher = createDecipheriv('aes-256-gcm', emailKey(secret), iv);
+    decipher.setAuthTag(tag);
+    const email = Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8');
+    return validEmail(email) ? email : null;
   } catch { return null; }
 }
 
@@ -85,7 +117,7 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
       const authorize = new URL(AUTHORIZATION_ENDPOINT);
       authorize.search = new URLSearchParams({
         response_type: 'code', client_id: clientId, redirect_uri: callback.toString(),
-        scope: 'login:info', state, code_challenge: challenge, code_challenge_method: 'S256',
+        scope: 'login:info login:email', state, code_challenge: challenge, code_challenge_method: 'S256',
         ...(consentRefresh ? { force_confirm: 'yes' } : {}),
       }).toString();
       return { status: 302, headers: {
@@ -120,7 +152,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
         const profile = await profileResponse.json();
         if (profile?.client_id !== clientId || typeof profile.id !== 'string' || !/^\d{1,40}$/.test(profile.id)) throw new Error('invalid_yandex_profile');
         const issued = nowSeconds();
-        const session = encodeSigned({ kind: 'session', iss: YANDEX_ISSUER, sub: profile.id, iat: issued, exp: issued + SESSION_SECONDS }, secret);
+        const email = encryptEmail(profile.default_email || profile.email, secret);
+        const session = encodeSigned({ kind: 'session', iss: YANDEX_ISSUER, sub: profile.id,
+          ...(email ? { email } : {}), iat: issued, exp: issued + SESSION_SECONDS }, secret);
         return { status: 303, headers: {
           location: '/',
           'set-cookie': [clearState, cookie(sessionCookieName, session, { path: '/', maxAge: SESSION_SECONDS, secure })],
@@ -139,7 +173,9 @@ export function createYandexIdAuth({ clientId, redirectUri, sessionSecret, fetch
     const session = decodeSigned(getCookie(req, sessionCookieName), secret, nowSeconds());
     if (!session || session.kind !== 'session' || session.iss !== YANDEX_ISSUER || typeof session.sub !== 'string'
         || !Number.isInteger(session.iat) || session.iat > nowSeconds()) return null;
-    return { issuer: YANDEX_ISSUER, subject: session.sub, authenticated_at: null, session_issued_at: session.iat };
+    const email = decryptEmail(session.email, secret);
+    return { issuer: YANDEX_ISSUER, subject: session.sub, ...(email ? { email } : {}),
+      authenticated_at: null, session_issued_at: session.iat };
   }
 
   return Object.freeze({ handle, authenticate });

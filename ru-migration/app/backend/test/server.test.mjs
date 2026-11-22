@@ -478,6 +478,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
       ['PATCH', `/api/v1/staff-verifications/${id}`],
       ['PATCH', `/api/v1/profile-requests/${id}`],
       ['POST', '/api/v1/role-requests'],
+      ['POST', '/api/v1/role-requests/email-verification'],
       ['GET', '/api/v1/role-requests'],
       ['GET', '/api/v1/role-requests/review'],
       ['PATCH', `/api/v1/role-requests/${id}`],
@@ -497,7 +498,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
   });
   assert.deepEqual(routed, [
     'GET /api/v1/schools', 'PATCH /api/v1/me', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', 'GET /api/v1/staff-verifications', `PATCH /api/v1/staff-verifications/${id}`, `PATCH /api/v1/profile-requests/${id}`,
-    'POST /api/v1/role-requests', 'GET /api/v1/role-requests', 'GET /api/v1/role-requests/review', `PATCH /api/v1/role-requests/${id}`,
+    'POST /api/v1/role-requests', 'POST /api/v1/role-requests/email-verification', 'GET /api/v1/role-requests', 'GET /api/v1/role-requests/review', `PATCH /api/v1/role-requests/${id}`,
     'GET /api/v1/messages/moderation', `PATCH /api/v1/messages/moderation/${id}`,
     'GET /api/v1/deletion-requests/targets', 'GET /api/v1/deletion-requests', 'GET /api/v1/deletion-requests/review', 'POST /api/v1/deletion-requests', `PATCH /api/v1/deletion-requests/${id}`, `DELETE /api/v1/school/accounts/${id}`,
   ]);

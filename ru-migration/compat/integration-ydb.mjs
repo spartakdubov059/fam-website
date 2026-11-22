@@ -1,1177 +1,36 @@
-import assert from 'node:assert/strict';
-import { Readable } from 'node:stream';
-import { inspect } from 'node:util';
-import { Driver } from '@ydbjs/core';
-import { query, identifier, fragment, join } from '@ydbjs/query';
-import sharp from 'sharp';
-import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
-import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
-import { createSafeAgentTaskWorker } from '../app/backend/services/safe-agent-task-worker.mjs';
-import { createSystemHealthTaskHandler } from '../app/backend/services/system-health-task.mjs';
-import { createOrchestratorDailyDigest } from '../app/backend/services/orchestrator-daily-digest.mjs';
-import { createSiteErrorDigest } from '../app/backend/services/site-error-digest.mjs';
-import { createScheduledSafeAgentRunner } from '../app/backend/services/scheduled-safe-agent-runner.mjs';
-import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
-import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
-import { createListingsApi } from '../app/backend/services/listings-api.mjs';
-import { createMediaApi } from '../app/backend/services/media-api.mjs';
-import { createS3PendingImageStore } from '../app/backend/media/s3-pending-store.mjs';
-import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
-import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
-
-// This script is intentionally hard-wired to the disposable local database.
-const driver = new Driver('grpc://127.0.0.1:2136/local');
-let syntheticPendingImages;
-let quotaPendingImages;
-try {
-  await driver.ready();
-  const client = query(driver);
-  const sql = (strings, ...values) => { const statement = client(strings, ...values); statement.on('error', () => {}); return statement; };
-  sql.begin = client.begin.bind(client);
-  const repo = createYdbListingsRepository(sql);
-  const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 37, content_read: false, write_permissions_checked: false });
-  const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
-  repo.beginAccountDeletion = async input => {
-    try {
-      const result = await beginAccountDeletion(input);
-      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_BEGIN_RESULT:', JSON.stringify({ ok: result?.ok, code: result?.code, hasClaimToken: Boolean(result?.claim_token) }));
-      return result;
-    } catch (error) {
-      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_BEGIN_ERROR:', error?.message || 'unknown');
-      throw error;
-    }
-  };
-  const finishAccountDeletion = repo.finishAccountDeletion.bind(repo);
-  repo.finishAccountDeletion = async input => {
-    try {
-      const result = await finishAccountDeletion(input);
-      if (!result?.ok) console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_FINALIZE_REJECTED:', result?.code || 'unknown');
-      return result;
-    } catch (error) {
-      console.error('YDB_SYNTHETIC_ACCOUNT_DELETION_FINALIZE_ERROR:', error?.message || 'unknown');
-      throw error;
-    }
-  };
-  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city) VALUES ('https://issuer.synthetic', 'subject-1', 'synthetic-user', 'synthetic-school', 'student', true, 'Ğ¢ĞµÑÑ‚', 'Ğ£Ñ‡ĞµĞ½Ğ¸Ğº', '8Ğ', 'ĞšĞ°Ğ·Ğ°Ğ½ÑŒ');`;
-  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
-    ('https://issuer.synthetic', 'subject-2', '11111111-1111-4111-8111-111111111111', 'synthetic-school', 'student', true),
-    ('https://issuer.synthetic', 'subject-admin', '33333333-3333-4333-8333-333333333333', 'synthetic-school', 'school_admin', true),
-    ('https://issuer.synthetic', 'subject-role-student', '55555555-5555-4555-8555-555555555555', 'synthetic-school', 'student', true),
-    ('https://issuer.synthetic', 'subject-3', '22222222-2222-4222-8222-222222222222', 'other-school', 'student', true),
-    ('https://issuer.synthetic', 'subject-council', '66666666-6666-4666-8666-666666666666', 'synthetic-school', 'council_member', true),
-    ('https://issuer.synthetic', 'subject-role-target', '77777777-7777-4777-8777-777777777777', 'synthetic-school', 'council_member', true),
-    ('https://issuer.synthetic', 'subject-admin-target', '88888888-8888-4888-8888-888888888888', 'synthetic-school', 'school_admin', true),
-    ('https://issuer.synthetic', 'subject-delete-target', '99999999-9999-4999-8999-999999999999', 'synthetic-school', 'council_member', true),
-    ('https://issuer.synthetic', 'subject-recovery', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac', 'synthetic-school', 'student', true),
-    ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true),
-    ('https://issuer.synthetic', 'subject-media', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'synthetic-school', 'student', true);`;
-  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)    VALUES ('https://issuer.synthetic', 'subject-safety-actor', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'synthetic-school', 'student', true, 'Ğ¢ĞµÑÑ‚', 'ĞĞ°Ñ€ÑƒÑˆĞ¸Ñ‚ĞµĞ»ÑŒ', '8Ğ‘');`;
-  const resolveActor = createDatabaseActorResolver(sql);
-  assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'Ğ£Ñ‡ĞµĞ½Ğ¸Ğº', class_name: '8Ğ', city: 'ĞšĞ°Ğ·Ğ°Ğ½ÑŒ', avatar_url: null, person_type: 'student', staff_position: null, staff_verification_status: 'not_required' });
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'unknown' }), null);
-  const authenticate = async req => ({ issuer: 'https://issuer.synthetic', subject: ['Bearer synthetic-registrant', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? 'subject-2'
-      : req.headers.authorization === 'Bearer synthetic-admin' ? 'subject-admin'
-        : req.headers.authorization === 'Bearer synthetic-media' ? 'subject-media'
-        : req.headers.authorization === 'Bearer synthetic-role-student' ? 'subject-role-student'
-        : req.headers.authorization === 'Bearer synthetic-council' ? 'subject-council'
-        : req.headers.authorization === 'Bearer synthetic-new-student' ? 'subject-new'
-          : req.headers.authorization === 'Bearer synthetic-new-staff' ? 'subject-new-staff'
-          : req.headers.authorization === 'Bearer synthetic-other-school' ? 'subject-3'
-          : req.headers.authorization === 'Bearer synthetic-lyceum-admin' ? 'subject-lyceum-admin'
-            : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1',
-    authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null });
-  const deletedMediaKeys = [];
-  const accountMediaKeys = new Set();
-  const listingsApi = createSuspensionWriteGuard({ authenticate, resolveActor, repository: repo })(createListingsApi({
-    authenticate,
-    resolveActor,
-    repository: repo,
-    safetyKey: 'local-ci-only-synthetic-safety-key-over-32-bytes',
-    pendingImages: {
-      get: async () => Buffer.from('synthetic-webp'),
-      delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
-      listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
-      listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
-        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
-      ])],
-    },
-  }));
-  const apiRequest = (method, url, token, body = {}) => {
-    const request = body === null ? Readable.from([]) : Readable.from([Buffer.from(JSON.stringify(body))]);
-    request.method = method; request.url = url; request.headers = { authorization: `Bearer ${token}` };
-    return request;  };
-  const privateObjects = new Map();
-  syntheticPendingImages = createS3PendingImageStore({
-    FAM_RU_S3_ENDPOINT: 'http://127.0.0.1:9000',
-    FAM_RU_S3_BUCKET: 'synthetic-private',
-    FAM_RU_S3_ACCESS_KEY_ID: 'synthetic-access',
-    FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic-secret',
-  }, {
-    send: async input => { privateObjects.set(input.Key, { body: Buffer.from(input.Body), contentType: input.ContentType }); },
-    get: async input => {
-      const object = privateObjects.get(input.Key);
-      return object ? { ContentType: object.contentType, ContentLength: object.body.length,
-        Body: { transformToByteArray: async () => object.body } } : null;
-    },
-    remove: async input => { privateObjects.delete(input.Key); },
-    list: async input => ({ Contents: [...privateObjects.keys()].filter(key => key.startsWith(input.Prefix)).map(Key => ({ Key })), IsTruncated: false }),
-  });
-  const mediaApi = createMediaApi({ authenticate, resolveActor, repository: repo, pendingImages: syntheticPendingImages });
-  const ownerPrivatePhotoKey = 'pending/11111111-1111-4111-8111-111111111111/12121212-1212-4212-8212-121212121212.webp';
-  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', ownerPrivatePhotoKey);
-  privateObjects.set(ownerPrivatePhotoKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
-  const ownerPrivateListing = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ½ĞµĞ¾Ğ¿ÑƒĞ±Ğ»Ğ¸ĞºĞ¾Ğ²Ğ°Ğ½Ğ½Ğ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ°', description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ° Ğº ÑĞ²Ğ¾ĞµĞ¼Ñƒ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ğ¾Ğ¼Ñƒ Ñ„Ğ¾Ñ‚Ğ¾',
-    category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°', price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: ownerPrivatePhotoKey,
-    photo_status: 'approved', status: 'pending' });
-  assert.equal((await mediaApi(apiRequest('GET', `/api/v1/listings/${ownerPrivateListing.id}/photo`, 'synthetic-registrant'))).status, 200,
-    'the listing author can read their approved photo before the listing becomes public');
-  assert.equal((await mediaApi(apiRequest('GET', `/api/v1/listings/${ownerPrivateListing.id}/photo`, 'synthetic-media'))).status, 404,
-    'another student in the same school cannot read a non-public listing photo');
-  const syntheticPng = await sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 42, g: 90, b: 140 } } }).png().toBuffer();
-  const uploadRequest = Readable.from([syntheticPng]);
-  uploadRequest.method = 'POST'; uploadRequest.url = '/api/v1/media/pending';
-  uploadRequest.headers = { authorization: 'Bearer synthetic-media', 'content-type': 'image/png', 'content-length': String(syntheticPng.length) };
-  const mediaUpload = await mediaApi(uploadRequest);
-  assert.equal(mediaUpload.status, 201);
-  const mediaKey = mediaUpload.body.image.key;
-  const storedImage = privateObjects.get(mediaKey);
-  assert.equal(storedImage?.contentType, 'image/webp');
-  assert.equal((await sharp(storedImage.body).metadata()).format, 'webp', 'the synthetic upload is actually decoded and re-encoded');
-  const pendingMediaRow = await sql`SELECT user_id, status FROM fam_pending_media WHERE object_key = ${mediaKey} LIMIT 1;`;
-  assert.deepEqual(pendingMediaRow[0][0], { user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', status: 'pending' });
-  const mediaListing = await repo.createListing({ user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ñ„Ğ¾Ñ‚Ğ¾', description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸', category: 'Ğ’ĞµÑ‰Ğ¸', price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false,
-    event_date: null, event_time: null, event_type: null, max_seats: 0, image_key: mediaKey, photo_status: 'pending', status: 'pending' });
-  assert.ok(mediaListing?.id, 'the verified uploader can link their own private image to a pending listing');
-  const linkedMediaRow = await sql`SELECT status FROM fam_pending_media WHERE object_key = ${mediaKey} LIMIT 1;`;
-  assert.equal(linkedMediaRow[0][0].status, 'linked');
-  await syntheticPendingImages.close();
-  syntheticPendingImages = null;
-  const savedNotificationState = await listingsApi(apiRequest('POST', '/api/v1/notification-reads', 'synthetic-registrant', {
-    notification_keys: ['release:synthetic', 'dismissed:school-listing:synthetic-id'],
-  }));
-  assert.deepEqual(savedNotificationState, { status: 200, body: { ok: true } });
-  const ownNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-registrant'));
-  assert.deepEqual(new Set(ownNotificationState.body.notification_keys), new Set(['release:synthetic', 'dismissed:school-listing:synthetic-id']));
-  const isolatedNotificationState = await listingsApi(apiRequest('GET', '/api/v1/notification-reads', 'synthetic-other-school'));
-  assert.deepEqual(isolatedNotificationState.body.notification_keys, [], 'notification read state is isolated by authenticated account');
-  const agentMetrics = await repo.getSchoolAgentMetrics('synthetic-school');
-  assert.ok(Number.isInteger(agentMetrics.listings.active));
-  const globalAgentMetrics = await repo.getGlobalAgentDailyMetrics();
-  assert.ok(Number.isInteger(globalAgentMetrics.listings.active));
-  assert.ok(Number.isInteger(globalAgentMetrics.safety.unreviewed));
-  assert.ok(Number.isInteger(globalAgentMetrics.ideas.pending));
-  await repo.saveGlobalAgentDailyReport({ date: '2026-11-14',
-    summary: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ²Ğ½ÑƒÑ‚Ñ€ĞµĞ½Ğ½ÑÑ ÑĞ²Ğ¾Ğ´ĞºĞ°', metrics: globalAgentMetrics });
-  const savedGlobalAgentReport = await sql`SELECT report_date, summary, metrics_json FROM fam_agent_daily_reports WHERE report_date = '2026-11-14';`;
-  assert.equal(savedGlobalAgentReport?.[0]?.[0]?.summary, 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ²Ğ½ÑƒÑ‚Ñ€ĞµĞ½Ğ½ÑÑ ÑĞ²Ğ¾Ğ´ĞºĞ°');
-  assert.deepEqual(JSON.parse(savedGlobalAgentReport[0][0].metrics_json), globalAgentMetrics);
-  const digestDate = new Date().toISOString().slice(0, 10);
-  assert.deepEqual(await repo.enqueueAgentDailyDigestTask(digestDate), { created: true, status: 'queued' });
-  assert.deepEqual(await repo.enqueueAgentDailyDigestTask(digestDate), { created: false, status: 'queued' },
-    'one durable aggregate digest task is created per UTC date');
-  const digestClaim = await repo.claimAgentDailyDigestTask('synthetic-digest-worker', digestDate);
-  assert.equal(digestClaim?.report_date, digestDate);
-  assert.match(digestClaim?.claim_token ?? '', /^[0-9a-f-]{36}$/i);
-  assert.equal(await repo.claimAgentDailyDigestTask('second-synthetic-worker', digestDate), null,
-    'a live lease prevents a second worker from claiming the task');
-  const digestMetrics = await repo.getAgentDailyDigestMetrics();  assert.deepEqual(Object.keys(digestMetrics).sort(), ['active_listings', 'blocked_tasks_24h', 'completed_tasks_24h',
-    'failed_tasks_24h', 'new_listings_24h', 'pending_ideas', 'queued_tasks'].sort());
-  assert.ok(Object.values(digestMetrics).every(Number.isSafeInteger));
-  assert.equal(await repo.completeAgentDailyDigestTask({ reportDate: digestDate, claimToken: digestClaim.claim_token,
-    metrics: digestMetrics, summary: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğ¹ digest.' }), true);
-  assert.equal(await repo.completeAgentDailyDigestTask({ reportDate: digestDate, claimToken: digestClaim.claim_token,
-    metrics: digestMetrics, summary: 'ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ¾Ğµ Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ¸Ğµ Ğ·Ğ°Ğ¿Ñ€ĞµÑ‰ĞµĞ½Ğ¾.' }), false,
-  'a completed task cannot be completed again with a stale lease token');
-  const savedDigest = await sql`SELECT status, metrics_json, summary FROM fam_agent_daily_digest_tasks WHERE report_date = ${digestDate};`;
-  assert.equal(savedDigest?.[0]?.[0]?.status, 'completed');
-  assert.deepEqual(JSON.parse(savedDigest[0][0].metrics_json), digestMetrics);
-  assert.equal(savedDigest[0][0].summary, 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğ¹ digest.');
-  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:34:00.000Z') }), 1);
-  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T12:59:00.000Z') }), 2);
-  assert.equal(await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'other', occurredAt: new Date('2026-11-14T13:00:00.000Z') }), 1);
-  const siteErrorBuckets = await sql`SELECT hour_bucket, event_code, page_area, event_count FROM fam_site_error_counts WHERE event_code = 'js_runtime' AND page_area = 'other' ORDER BY hour_bucket ASC;`;
-  assert.deepEqual(siteErrorBuckets?.[0] ?? [], [
-    { hour_bucket: new Date('2026-11-14T12:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 2 },
-    { hour_bucket: new Date('2026-11-14T13:00:00.000Z'), event_code: 'js_runtime', page_area: 'other', event_count: 1 },
-  ]);
-  const alertBucket = new Date();
-  alertBucket.setUTCMinutes(0, 0, 0);
-  for (let i = 0; i < 3; i++) {
-    const occurredAt = new Date(alertBucket.getTime() + i * 60_000);
-    await repo.recordSiteError({ eventCode: 'database_request_failed', pageArea: 'database', occurredAt });
-  }
-  for (let i = 0; i < 10; i++) {
-    const occurredAt = new Date(alertBucket.getTime() + i * 60_000);
-    await repo.recordSiteError({ eventCode: 'unhandled_rejection', pageArea: 'other', occurredAt });
-  }  const technicalAlerts = await repo.listSiteErrorAlerts();
-  assert.deepEqual(technicalAlerts, [
-    { hour_bucket: alertBucket, event_code: 'unhandled_rejection', page_area: 'other', event_count: 10, severity: 'warning' },
-    { hour_bucket: alertBucket, event_code: 'database_request_failed', page_area: 'database', event_count: 3, severity: 'critical' },
-  ]);
-  const digestSlot = new Date(); digestSlot.setUTCMinutes(Math.floor(digestSlot.getUTCMinutes() / 15) * 15, 0, 0);
-  const digestSlotKey = digestSlot.toISOString().slice(0, 16);
-  assert.deepEqual(await repo.enqueueSiteErrorDigestTask(digestSlotKey), { created: true, status: 'queued' });
-  assert.deepEqual(await repo.enqueueSiteErrorDigestTask(digestSlotKey), { created: false, status: 'queued' },
-    'only one aggregate site error digest task is queued per UTC quarter-hour');
-  const siteErrorClaim = await repo.claimSiteErrorDigestTask('synthetic-site-error-worker');
-  assert.equal(siteErrorClaim.digest_slot, digestSlotKey);
-  assert.match(siteErrorClaim.claim_token, /^[0-9a-f-]{36}$/i);
-  assert.equal(await repo.claimSiteErrorDigestTask('second-site-error-worker'), null,
-    'a live lease prevents another worker from claiming the digest');
-  const siteErrorMetrics = await repo.getSiteErrorDigestMetrics();
-  assert.equal(siteErrorMetrics.total_events_24h, 13);
-  assert.equal(siteErrorMetrics.events_last_hour, 13);
-  assert.deepEqual(siteErrorMetrics.events, [
-    { event_code: 'unhandled_rejection', page_area: 'other', occurrences: 10 },
-    { event_code: 'database_request_failed', page_area: 'database', occurrences: 3 },
-  ]);
-  assert.equal(await repo.completeSiteErrorDigestTask({ digestSlot: digestSlotKey, claimToken: siteErrorClaim.claim_token,
-    metrics: siteErrorMetrics, summary: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ°Ñ ÑĞ²Ğ¾Ğ´ĞºĞ° Ğ¾ÑˆĞ¸Ğ±Ğ¾Ğº.' }), true);
-  assert.equal(await repo.completeSiteErrorDigestTask({ digestSlot: digestSlotKey, claimToken: siteErrorClaim.claim_token,
-    metrics: siteErrorMetrics, summary: 'ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ğ·Ğ°Ğ¿Ñ€ĞµÑ‰ĞµĞ½Ğ°.' }), false, 'a completed task rejects a stale lease token');
-  const savedSiteErrorDigest = await sql`SELECT status, metrics_json, summary FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlotKey};`;
-  assert.equal(savedSiteErrorDigest?.[0]?.[0]?.status, 'completed');
-  assert.deepEqual(JSON.parse(savedSiteErrorDigest[0][0].metrics_json), siteErrorMetrics);
-  assert.doesNotMatch(savedSiteErrorDigest[0][0].summary, /student|user_id|https?:|stack|Ñ‚ĞµĞ»ĞµÑ„Ğ¾Ğ½|Ğ¿Ğ¾Ñ‡Ñ‚Ğ°/i);
-  const backgroundQueueHealth = await repo.getRuBackgroundQueueHealth();
-  assert.equal(backgroundQueueHealth.content_read, false);
-  assert.equal(backgroundQueueHealth.queues.daily_reports.statuses.completed, 1);
-  assert.equal(backgroundQueueHealth.queues.site_error_digests.statuses.completed, 1);
-  assert.equal(backgroundQueueHealth.queues.daily_reports.expired_leases, 0);
-  assert.equal(backgroundQueueHealth.queues.site_error_digests.expired_leases, 0);  await repo.saveSchoolAgentReport({ schoolId: 'synthetic-school', date: '2026-11-14',
-    summary: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ ÑĞ²Ğ¾Ğ´ĞºĞ° Ğ±ĞµĞ· Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»ÑŒÑĞºĞ¸Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…', metrics: agentMetrics });
-  const syntheticIdeaId = 'a'.repeat(64);
-  const insertedSyntheticAgentIdea = await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
-    rule: { key: 'integration_review', title: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ ÑĞ¸Ğ³Ğ½Ğ°Ğ»', summary: () => 'Ğ¢Ğ¾Ğ»ÑŒĞºĞ¾ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ°.',
-      benefit: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° YDB.', evidence: () => 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ.', proposedBy: 'integration_test' } });
-  assert.equal(insertedSyntheticAgentIdea, true);
-  assert.equal(await repo.createSchoolAgentIdea({ id: syntheticIdeaId, schoolId: 'synthetic-school', date: '2026-11-14', count: 1,
-    rule: { key: 'integration_review', title: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ ÑĞ¸Ğ³Ğ½Ğ°Ğ»', summary: () => 'ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€ Ğ½Ğµ Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½ ÑĞ¾Ğ·Ğ´Ğ°Ğ²Ğ°Ñ‚ÑŒ Ğ´ÑƒĞ±Ğ»ÑŒ.',
-      benefit: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° YDB.', evidence: () => 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ.', proposedBy: 'integration_test' } }), false,
-  'daily reruns must not duplicate a same-school same-day rule proposal');
-  const agentDashboard = await listingsApi(apiRequest('GET', '/api/v1/school/admin/agent-dashboard', 'synthetic-admin'));
-  assert.equal(agentDashboard.status, 200);
-  assert.equal(agentDashboard.body.report.summary, 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ ÑĞ²Ğ¾Ğ´ĞºĞ° Ğ±ĞµĞ· Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»ÑŒÑĞºĞ¸Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…');
-  assert.ok(agentDashboard.body.ideas.some(idea => idea.id === syntheticIdeaId));
-  const otherSchoolAgentDashboard = await listingsApi(apiRequest('GET', '/api/v1/school/admin/agent-dashboard', 'synthetic-lyceum-admin'));
-  assert.equal(otherSchoolAgentDashboard.status, 200);
-  assert.equal(otherSchoolAgentDashboard.body.ideas.some(idea => idea.id === syntheticIdeaId), false);
-  const reviewedAgentIdea = await listingsApi(apiRequest('PATCH', `/api/v1/school/admin/agent-ideas/${syntheticIdeaId}`, 'synthetic-admin', { decision: 'approve' }));
-  assert.deepEqual(reviewedAgentIdea, { status: 200, body: { ok: true, status: 'approved' } });
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/school/admin/agent-ideas/${syntheticIdeaId}`, 'synthetic-admin', { decision: 'reject' }))).status, 409);
-  const suspensionTargets = await listingsApi(apiRequest('GET', '/api/v1/suspensions/targets', 'synthetic-admin'));
-  assert.equal(suspensionTargets.status, 200);
-  assert.equal(suspensionTargets.body.targets.some(row => row.id === '22222222-2222-4222-8222-222222222222'), false,
-    'suspension target directory never includes another school');
-  assert.equal(suspensionTargets.body.targets.some(row => row.id === '33333333-3333-4333-8333-333333333333'), false,
-    'administrator cannot suspend self');
-  const suspensionIssue = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', {
-    action: 'issue', duration_hours: 24, reason: 'Repeatedly disrupted the shared school board.',
-  }));  assert.equal(suspensionIssue.status, 201);
-  assert.equal(suspensionIssue.body.suspension.target_role, 'student');
-  const openSuspension = await sql`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
-  assert.equal(openSuspension[0][0].suspension_id, suspensionIssue.body.suspension.suspension_id);
-  assert.equal((await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', {
-    action: 'issue', duration_hours: 72, reason: 'Repeatedly disrupted the shared school board.',
-  }))).status, 409, 'a second active restriction cannot be issued');
-  const suspensionAudit = await sql`SELECT action, duration_hours FROM fam_account_suspension_audit WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
-  assert.equal(suspensionAudit[0].length, 1);
-  assert.equal(suspensionAudit[0][0].action, 'issued');
-  const suspensionLift = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-admin', { action: 'lift' }));
-  assert.equal(suspensionLift.status, 200);
-  const liftedRecord = await sql`SELECT status, lifted_by FROM fam_account_suspensions WHERE suspension_id = ${suspensionIssue.body.suspension.suspension_id};`;
-  assert.equal(liftedRecord[0][0].status, 'lifted');
-  assert.equal(liftedRecord[0][0].lifted_by, '33333333-3333-4333-8333-333333333333');
-  const clearedSuspension = await sql`SELECT suspension_id FROM fam_account_suspension_open WHERE target_id = '11111111-1111-4111-8111-111111111111';`;
-  assert.equal(clearedSuspension[0].length, 0, 'lifting removes the open key atomically with the audit record');
-  const finalSuspensionAudit = await sql`SELECT action FROM fam_account_suspension_audit WHERE target_id = '11111111-1111-4111-8111-111111111111' ORDER BY created_at ASC;`;
-  assert.deepEqual(finalSuspensionAudit[0].map(row => row.action), ['issued', 'lifted']);
-  const staleAdminAuth = await listingsApi(apiRequest('PATCH', '/api/v1/suspensions/11111111-1111-4111-8111-111111111111', 'synthetic-stale-admin', { action: 'lift' }));
-  assert.equal(staleAdminAuth.status, 403);
-  const roleTargets = await listingsApi(apiRequest('GET', '/api/v1/role-management/targets', 'synthetic-admin'));
-  assert.equal(roleTargets.status, 200);
-  assert.ok(roleTargets.body.targets.some(row => row.id === '77777777-7777-4777-8777-777777777777'));
-  assert.ok(!roleTargets.body.targets.some(row => row.id === '33333333-3333-4333-8333-333333333333'), 'administrator cannot demote self');
-  const revokeCouncilRole = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/77777777-7777-4777-8777-777777777777', 'synthetic-admin', { action: 'revoke' }));
-  assert.deepEqual(revokeCouncilRole, { status: 200, body: { ok: true, target_id: '77777777-7777-4777-8777-777777777777', previous_role: 'council_member', role: 'student' } });
-  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' })).role, 'student');
-  const revokedAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = '77777777-7777-4777-8777-777777777777';`;
-  assert.equal(revokedAudit[0][0].action, 'role_revoked');  assert.equal(revokedAudit[0][0].previous_role, 'council_member');
-  const revokeSecondAdmin = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-admin', { action: 'revoke' }));
-  assert.deepEqual(revokeSecondAdmin, { status: 200, body: { ok: true, target_id: '88888888-8888-4888-8888-888888888888', previous_role: 'school_admin', role: 'student' } });
-  assert.equal((await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-admin-target' })).role, 'student');
-  const deniedStaleRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/88888888-8888-4888-8888-888888888888', 'synthetic-stale-admin', { action: 'revoke' }));
-  assert.equal(deniedStaleRevoke.status, 403, 'role revocation requires recent authentication');
-  const otherSchoolRevoke = await listingsApi(apiRequest('PATCH', '/api/v1/role-management/44444444-4444-4444-8444-444444444444', 'synthetic-admin', { action: 'revoke' }));
-  assert.equal(otherSchoolRevoke.status, 404, 'role revocation cannot cross school boundaries');
-  const pulseAnnouncement = await listingsApi(apiRequest('POST', '/api/v1/pulse/announcements', 'synthetic-admin', {
-    title: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° ÑˆĞºĞ¾Ğ»ÑŒĞ½Ğ¾Ğ¹ Ğ´Ğ¾ÑĞºĞ¸', body: 'Ğ’ÑÑ‚Ñ€ĞµÑ‡Ğ° ÑĞ¾ÑÑ‚Ğ¾Ğ¸Ñ‚ÑÑ Ğ² Ğ¿ÑÑ‚Ğ½Ğ¸Ñ†Ñƒ', kind: 'news', school_id: 'other-school', author_id: '22222222-2222-4222-8222-222222222222',
-  }));
-  assert.equal(pulseAnnouncement.status, 201, JSON.stringify(pulseAnnouncement.body));
-  const longOpenEventDescription = 'ĞÑ‚ĞºÑ€Ñ‹Ñ‚Ğ¾Ğµ ÑˆĞºĞ¾Ğ»ÑŒĞ½Ğ¾Ğµ ÑĞ¾Ğ±Ñ‹Ñ‚Ğ¸Ğµ. '.repeat(30);
-  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
-      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
-    VALUES ('synthetic-open-event', 'synthetic-user', 'synthetic-school', 'ĞÑ‚ĞºÑ€Ñ‹Ñ‚Ñ‹Ğ¹ Ğ´ĞµĞ½ÑŒ ÑˆĞºĞ¾Ğ»Ñ‹', ${longOpenEventDescription},
-      'ĞœĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ñ', 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', true, '2099-12-31', '12:00', 'open', 0, '', 'none', 'active', CurrentUtcTimestamp());`;
-  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
-      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
-    VALUES ('synthetic-limited-event', 'synthetic-user', 'synthetic-school', 'Ğ¡Ğ¾Ğ±Ñ‹Ñ‚Ğ¸Ğµ Ñ Ğ¼ĞµÑÑ‚Ğ°Ğ¼Ğ¸', 'Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚Ğ°Ñ Ñ€ĞµĞ³Ğ¸ÑÑ‚Ñ€Ğ°Ñ†Ğ¸Ñ',
-      'ĞœĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ñ', 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', true, '2099-12-31', '12:00', 'open', 10, '', 'none', 'active', CurrentUtcTimestamp());`;
-  await sql`INSERT INTO fam_listings (id, user_id, school_id, title, description, category, price_text,
-      is_event, event_date, event_time, event_type, max_seats, image_key, photo_status, status, created_at)
-    VALUES ('synthetic-expired-event', 'synthetic-user', 'synthetic-school', 'ĞŸÑ€Ğ¾ÑˆĞµĞ´ÑˆĞµĞµ ÑĞ¾Ğ±Ñ‹Ñ‚Ğ¸Ğµ', 'Ğ”Ğ°Ñ‚Ğ° ÑƒĞ¶Ğµ Ğ¿Ñ€Ğ¾ÑˆĞ»Ğ°',
-      'ĞœĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ñ', 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', true, '2000-01-01', '12:00', 'open', 0, '', 'none', 'active', CurrentUtcTimestamp());`;
-  const pulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
-    question: 'ĞšĞ°ĞºÑƒÑ ĞºĞ½Ğ¸Ğ³Ñƒ Ğ¾Ğ±ÑÑƒĞ´Ğ¸Ğ¼?', options: ['Ğ¡ĞºĞ°Ğ·ĞºĞ¸', 'Ğ¤Ğ°Ğ½Ñ‚Ğ°ÑÑ‚Ğ¸ĞºĞ°', 'ĞŸÑ€Ğ¸ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ', 'Ğ”ĞµÑ‚ĞµĞºÑ‚Ğ¸Ğ²', 'ĞĞ°ÑƒÑ‡Ğ½Ğ°Ñ Ñ„Ğ°Ğ½Ñ‚Ğ°ÑÑ‚Ğ¸ĞºĞ°', 'ĞŸĞ¾ÑĞ·Ğ¸Ñ', 'Ğ˜ÑÑ‚Ğ¾Ñ€Ğ¸Ñ', 'Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ'],
-  }));
-  assert.equal(pulsePoll.status, 201);
-  const invalidPulsePoll = await listingsApi(apiRequest('POST', '/api/v1/pulse/polls', 'synthetic-council', {
-    question: 'ĞšĞ°ĞºÑƒÑ ĞºĞ½Ğ¸Ğ³Ñƒ Ğ¾Ğ±ÑÑƒĞ´Ğ¸Ğ¼?', options: ['Ğ¡ĞºĞ°Ğ·ĞºĞ¸', ' ÑĞºĞ°Ğ·ĞºĞ¸ '],
-  }));
-  assert.equal(invalidPulsePoll.status, 400);
-  const pulseRead = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
-  assert.equal(pulseRead.status, 200);
-  assert.ok(pulseRead.body.announcements.some(row => row.id === pulseAnnouncement.body.id));
-  assert.equal(pulseRead.body.announcements[0].author_id, undefined, 'school pulse never exposes author identity');
-  const openEvent = pulseRead.body.announcements.find(row => row.id === 'synthetic-open-event');
-  assert.equal(openEvent?.kind, 'open_event', 'active no-capacity event is included in school pulse');
-  assert.equal(openEvent.event_date, '2099-12-31');
-  assert.ok(Array.from(openEvent.body).length <= 450, 'event description is capped by Unicode characters');
-  assert.equal(pulseRead.body.announcements.some(row => row.id === 'synthetic-limited-event'), false,
-    'events with a seat limit do not enter open-event feed');
-  assert.equal(pulseRead.body.announcements.some(row => row.id === 'synthetic-expired-event'), false,
-    'past events do not enter the feed');
-  assert.ok(pulseRead.body.polls.some(row => row.id === pulsePoll.body.id));
-  const pollVoters = ['synthetic-user', 'synthetic-registrant', 'synthetic-role-student', 'synthetic-admin', 'synthetic-council'];
-  for (const [index, token] of pollVoters.entries()) {
-    const vote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, token, { choice_index: index === 4 ? 7 : index * 2 }));
-    assert.equal(vote.status, 201);
-  }  const duplicatePollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-registrant', { choice_index: 0 }));
-  assert.equal(duplicatePollVote.status, 409);
-  const invalidUpperPollVote = await listingsApi(apiRequest('POST', `/api/v1/pulse/polls/${pulsePoll.body.id}/votes`, 'synthetic-admin', { choice_index: 8 }));
-  assert.equal(invalidUpperPollVote.status, 400);
-  const otherSchoolPulse = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-other-school'));
-  assert.equal(otherSchoolPulse.status, 200);
-  assert.equal(otherSchoolPulse.body.announcements.length, 0, 'school pulse feed cannot cross school boundaries');
-  const pulseAfterVotes = await listingsApi(apiRequest('GET', '/api/v1/pulse', 'synthetic-registrant'));
-  const visiblePoll = pulseAfterVotes.body.polls.find(row => row.id === pulsePoll.body.id);
-  assert.equal(visiblePoll.total_votes, 5);
-  assert.deepEqual(visiblePoll.counts, [1, 0, 1, 0, 1, 0, 1, 1], 'eight-choice totals appear only after five synthetic votes');
-  assert.equal(visiblePoll.my_vote, 2);
-  const deletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
-    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
-    reason: 'Repeated unrelated posts in the school group.',
-  }));
-  assert.equal(deletionRequest.status, 202);
-  assert.equal(deletionRequest.body.already_exists, false);
-  const duplicateDeletionRequest = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
-    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam',
-    reason: 'Repeated unrelated posts in the school group.',
-  }));
-  assert.equal(duplicateDeletionRequest.status, 200);
-  assert.equal(duplicateDeletionRequest.body.request_id, deletionRequest.body.request_id);
-  const deletionQueue = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'));
-  assert.equal(deletionQueue.status, 200);
-  assert.equal(deletionQueue.body.requests.length, 1);
-  assert.equal(Object.hasOwn(deletionQueue.body.requests[0], 'issuer'), false);
-  const ownDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
-  assert.equal(ownDeletionRequests.status, 200);
-  assert.equal(ownDeletionRequests.body.requests.length, 1);
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-lyceum-admin'))).body.requests.length, 0,    'the review queue is restricted to the administrator school');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/deletion-requests/${deletionRequest.body.request_id}`, 'synthetic-admin', {
-    decision: 'reject', review_note: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞµĞ½Ğ¾ Ğ² Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğ¹ ÑˆĞºĞ¾Ğ»Ğµ',
-  })), { status: 200, body: { ok: true, status: 'rejected' } });
-  const updatedOwnDeletionRequests = await listingsApi(apiRequest('GET', '/api/v1/deletion-requests', 'synthetic-council'));
-  assert.equal(updatedOwnDeletionRequests.body.requests[0].status, 'rejected');
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-admin'))).body.requests.length, 0);
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/deletion-requests/review', 'synthetic-registrant'))).status, 403);
-  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-registrant', {
-    target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
-  }))).status, 403);
-  console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
-  const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
-    school_id: 'lyceum_3', first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'ĞŸÑ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ', class_name: '7Ğ‘', role: 'school_admin',
-  }));
-  assert.equal(profileSubmission.status, 202);
-  assert.equal(profileSubmission.body.status, 'pending');
-  const privateProfileStatus = await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'));
-  assert.equal(privateProfileStatus.status, 200);
-  assert.equal(privateProfileStatus.body.request.status, 'pending');
-  assert.deepEqual(Object.keys(privateProfileStatus.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new' }), null,
-    'an access request alone never creates a profile');
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-student'))).status, 403,
-    'students cannot read access requests');
-  const profileQueue = await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-lyceum-admin'));
-  assert.equal(profileQueue.status, 200);
-  const profileRequest = profileQueue.body.requests.find(row => row.first_name === 'Ğ¢ĞµÑÑ‚' && row.last_name === 'ĞŸÑ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ');
-  assert.ok(profileRequest);
-  assert.equal(Object.hasOwn(profileRequest, 'subject'), false, 'review queue omits external identity subjects');  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${profileRequest.request_id}`, 'synthetic-admin', { decision: 'approve' }))).status, 404,
-    'an administrator from another school cannot approve the request');
-  const profileDecision = await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${profileRequest.request_id}`, 'synthetic-lyceum-admin', { decision: 'approve' }));
-  assert.deepEqual(profileDecision, { status: 200, body: { ok: true, status: 'approved' } });
-  const approvedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new' });
-  assert.ok(approvedActor);
-  assert.match(approvedActor.id, /^[0-9a-f-]{36}$/);
-  assert.deepEqual({ school_id: approvedActor.school_id, role: approvedActor.role, first_name: approvedActor.first_name,
-    last_name: approvedActor.last_name, class_name: approvedActor.class_name }, {
-    school_id: 'lyceum_3', role: 'student', first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'ĞŸÑ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ', class_name: '7Ğ‘',
-  });
-  const roleSubmission = await listingsApi(apiRequest('POST', '/api/v1/role-requests', 'synthetic-role-student', { requested_role: 'Ğ£Ñ‡Ğ°ÑÑ‚Ğ½Ğ¸Ğº Ğ£Ñ‡ĞµĞ½Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ³Ğ¾ ÑĞ¾Ğ²ĞµÑ‚Ğ°' }));
-  assert.equal(roleSubmission.status, 202, 'a verified student may request a fixed school role');
-  const roleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));
-  assert.equal(roleStatus.body.role, 'student');
-  assert.equal(roleStatus.body.request.request_id, roleSubmission.body.request_id);
-  await sql`UPDATE fam_user_profiles SET first_name = 'Ğ¢ĞµÑÑ‚', last_name = 'Ğ—Ğ°ÑĞ²Ğ¸Ñ‚ĞµĞ»ÑŒ', class_name = '8Ğ'
-    WHERE user_id = '55555555-5555-4555-8555-555555555555';`;
-  const roleQueue = await listingsApi(apiRequest('GET', '/api/v1/role-requests/review', 'synthetic-admin'));
-  assert.equal(roleQueue.status, 200);
-  const roleRequest = roleQueue.body.requests.find(row => row.request_id === roleSubmission.body.request_id);
-  assert.ok(roleRequest);
-  assert.equal(roleRequest.requested_role, 'council_member');
-  assert.deepEqual(roleRequest, { request_id: roleSubmission.body.request_id, account_code: '555555', applicant_name: 'Ğ¢ĞµÑÑ‚ Ğ—Ğ°ÑĞ²Ğ¸Ñ‚ĞµĞ»ÑŒ',
-    class_name: '8Ğ', requested_role: 'council_member', status: 'pending', created_at: roleRequest.created_at,
-    review_started_at: null, review_started_by_me: false });
-  assert.equal(Object.hasOwn(roleRequest, 'user_id'), false, 'same-school reviewer gets a short account code instead of the full Yandex-linked ID');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-lyceum-admin', { action: 'start_review' }))).status, 409,
-    'a different school cannot claim the role request');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { action: 'start_review' }))).status, 200);
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/role-requests/${roleRequest.request_id}`, 'synthetic-admin', { decision: 'approve' })),
-    { status: 200, body: { ok: true, status: 'approved' } });
-  const elevatedActor = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-student' });
-  assert.equal(elevatedActor.role, 'council_member', 'only the same-school administrator decision grants the role');
-  const elevatedRoleStatus = await listingsApi(apiRequest('GET', '/api/v1/role-requests', 'synthetic-role-student'));  assert.equal(elevatedRoleStatus.body.role, 'council_member', 'the profile UI can refresh its database-backed role after approval');
-  const profileEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-role-student', {
-    first_name: 'Ğ¡Ğ¾Ğ²ĞµÑ‚Ğ½Ğ¸Ğº', last_name: 'Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğ¹', class_name: '9Ğ‘', role: 'school_admin', school_id: 'other-school', user_id: 'forged-user',
-  }));
-  assert.equal(profileEdit.status, 200);
-  assert.deepEqual({ role: profileEdit.body.profile.role, school_id: profileEdit.body.profile.school_id,
-    first_name: profileEdit.body.profile.first_name, last_name: profileEdit.body.profile.last_name, class_name: profileEdit.body.profile.class_name }, {
-    role: 'council_member', school_id: 'synthetic-school', first_name: 'Ğ¡Ğ¾Ğ²ĞµÑ‚Ğ½Ğ¸Ğº', last_name: 'Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğ¹', class_name: '9Ğ‘',
-  });
-  const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
-  assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
-  const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
-    school_id: 'lyceum_3', first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'Ğ¡Ğ¾Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¸Ğº', person_type: 'school_staff', staff_position: 'Ğ£Ñ‡Ğ¸Ñ‚ĞµĞ»ÑŒ',
-  }));
-  assert.equal(staffProfileSubmission.status, 202);
-  const staffRequest = (await listingsApi(apiRequest('GET', '/api/v1/profile-requests/review', 'synthetic-lyceum-admin')))
-    .body.requests.find(row => row.first_name === 'Ğ¢ĞµÑÑ‚' && row.last_name === 'Ğ¡Ğ¾Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¸Ğº');
-  assert.equal(staffRequest.person_type, 'school_staff');
-  assert.equal(staffRequest.staff_position, 'Ğ£Ñ‡Ğ¸Ñ‚ĞµĞ»ÑŒ');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/profile-requests/${staffRequest.request_id}`, 'synthetic-lyceum-admin', { decision: 'approve' }))).status, 200);
-  const pendingStaff = await listingsApi(apiRequest('GET', '/api/v1/staff-verifications', 'synthetic-lyceum-admin'));
-  assert.equal(pendingStaff.status, 200);
-  const staffToVerify = pendingStaff.body.requests.find(row => row.first_name === 'Ğ¢ĞµÑÑ‚' && row.last_name === 'Ğ¡Ğ¾Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¸Ğº');
-  assert.ok(staffToVerify);
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/staff-verifications/${staffToVerify.user_id}`, 'synthetic-lyceum-admin', { decision: 'approved' }))).status, 200);
-  const verifiedStaff = await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-new-staff' });
-  assert.equal(verifiedStaff.person_type, 'school_staff');
-  assert.equal(verifiedStaff.staff_position, 'Ğ£Ñ‡Ğ¸Ñ‚ĞµĞ»ÑŒ');
-  assert.equal(verifiedStaff.staff_verification_status, 'approved');  const legacyStaffEdit = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
-    first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'Ğ¡Ğ¾Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¸Ğº Ğ¿Ğ¾ÑĞ»Ğµ Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸',
-  }));
-  assert.equal(legacyStaffEdit.status, 200);
-  assert.equal(legacyStaffEdit.body.profile.person_type, 'school_staff');
-  assert.equal(legacyStaffEdit.body.profile.staff_position, 'Ğ£Ñ‡Ğ¸Ñ‚ĞµĞ»ÑŒ');
-  assert.equal(legacyStaffEdit.body.profile.staff_verification_status, 'approved',
-    'an older profile form that omits category fields preserves verified staff status');
-  const changedStaffPosition = await listingsApi(apiRequest('PATCH', '/api/v1/me', 'synthetic-new-staff', {
-    first_name: 'Ğ¢ĞµÑÑ‚', last_name: 'Ğ¡Ğ¾Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¸Ğº', person_type: 'school_staff', staff_position: 'Ğ”Ğ¸Ñ€ĞµĞºÑ‚Ğ¾Ñ€', class_name: '',
-  }));
-  assert.equal(changedStaffPosition.status, 200);
-  assert.equal(changedStaffPosition.body.profile.staff_verification_status, 'pending',
-    'changing a verified staff position requires school administrator review again');
-  const apiSubmission = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-student', {
-    title: 'ĞĞ±Ğ¼ĞµĞ½ ÑƒÑ‡ĞµĞ±Ğ½Ğ¸ĞºĞ°Ğ¼Ğ¸', description: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ´Ğ»Ñ Ğ¸Ğ½Ñ‚ĞµĞ³Ñ€Ğ°Ñ†Ğ¸Ğ¾Ğ½Ğ½Ğ¾Ğ¹ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-  }));
-  assert.equal(apiSubmission.status, 201);
-  assert.equal(apiSubmission.body.status, 'pending');
-  const pendingApiListings = await repo.listActiveListings('synthetic-school');
-  assert.equal(pendingApiListings.some(row => row.id === apiSubmission.body.id), false,
-    'API submissions remain invisible before school moderation');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-student', { decision: 'approve' }))).status, 403,
-    'student cannot moderate even when using a valid database-backed identity');
-  const apiApproval = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${apiSubmission.body.id}/moderation`, 'synthetic-admin', { decision: 'approve' }));
-  assert.deepEqual(apiApproval, { status: 200, body: { ok: true, status: 'active' } });
-  const approvedApiListings = await repo.listActiveListings('synthetic-school');
-  assert.equal(approvedApiListings.some(row => row.id === apiSubmission.body.id), true,
-    'approved API submission becomes visible through public projection');
-  const title = "Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ ĞºĞ½Ğ¸Ğ³Ğ°'); DELETE FROM fam_listings; --";
-  const listing = await repo.createListing({ user_id: 'synthetic-user', school_id: 'synthetic-school', title,
-    description: 'Ğ£Ñ‡ĞµĞ±Ğ½Ğ¸Ğº', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°', price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false,
-    event_date: null, event_time: null, event_type: null, max_seats: 0, status: 'pending' });
-  const sets = await sql`SELECT id, user_id, school_id, title, status FROM fam_listings WHERE id = ${listing.id};`;  assert.equal(sets[0].length, 1);
-  assert.equal(sets[0][0].title, title);
-  assert.equal(sets[0][0].user_id, 'synthetic-user');
-  assert.equal(sets[0][0].school_id, 'synthetic-school');
-  assert.equal(sets[0][0].status, 'pending');
-  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), false, 'pending listings cannot be favorited');
-  const beforeDirectModeration = await repo.listActiveListings('synthetic-school');
-  assert.equal(beforeDirectModeration.some(row => row.id === apiSubmission.body.id), true,
-    'the separately API-approved item remains public');
-  assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
-  assert.equal(await repo.moderateListing(listing.id, 'other-school', '33333333-3333-4333-8333-333333333333', 'active'), false, 'other school cannot moderate');
-  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true, 'school moderator can approve pending listing');
-  const publicListings = await repo.listActiveListings('synthetic-school');
-  assert.equal(publicListings.some(row => row.id === apiSubmission.body.id), true);
-  const publicDirectListing = publicListings.find(row => row.id === listing.id);
-  assert.ok(publicDirectListing);
-  assert.deepEqual(await repo.listActiveListings('other-school'), [], 'the public feed never returns another school\'s listings');
-  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
-    'a same-school member can contact the owner of an active listing');
-  assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
-    'listing owners cannot open a self-conversation');
-  assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'other-school'), null,
-    'listing contact lookup cannot cross school boundaries');
-  assert.equal(publicDirectListing.title, title);
-  assert.equal(Object.hasOwn(publicDirectListing, 'user_id'), false);
-  assert.equal(Object.hasOwn(publicDirectListing, 'school_id'), false);
-  assert.equal(await repo.setFavorite('synthetic-user', listing.id, true), true);
-  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), [listing.id]);
-  assert.equal(await repo.setFavorite('synthetic-user', listing.id, false), true);
-  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
-
-  const deletionPhotoKey = 'pending/11111111-1111-4111-8111-111111111111/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp';  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', deletionPhotoKey);
-  const deletable = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ²Ğ¾Ñ‘ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ', description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ Ğ²Ğ»Ğ°Ğ´ĞµĞ»ÑŒÑ†ĞµĞ¼', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: deletionPhotoKey, photo_status: 'approved', status: 'pending' });
-  assert.equal(await repo.moderateListing(deletable.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
-  assert.equal(await repo.setFavorite('synthetic-user', deletable.id, true), true);
-  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/me/listings', 'synthetic-registrant'))).body.listing_ids, [deletable.id],
-    'private own-listing projection only returns the authenticated studentâ€™s active ids');
-  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-student', null))).status, 404,
-    'a different student cannot remove someone elseâ€™s listing');
-  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-admin', null))).status, 403,
-    'school staff cannot use the ordinary-student self-delete route');
-  const ownDelete = await listingsApi(apiRequest('DELETE', `/api/v1/listings/${deletable.id}`, 'synthetic-registrant', null));
-  assert.deepEqual(ownDelete, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
-  assert.deepEqual(deletedMediaKeys, [deletionPhotoKey]);
-  assert.equal((await repo.listActiveListings('synthetic-school')).some(row => row.id === deletable.id), false);
-  assert.deepEqual(await repo.listFavoriteIds('synthetic-user'), []);
-  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletionPhotoKey};`)?.[0]?.length ?? 0, 0,
-    'deleted listing cleanup removes its media registry entry after the object store confirms deletion');
-  const idea = await repo.createIdea({ user_id: 'synthetic-user', school_id: 'synthetic-school',
-    text: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¸Ğ´ĞµÑ ĞºĞ½Ğ¸Ğ¶Ğ½Ğ¾Ğ³Ğ¾ Ğ¾Ğ±Ğ¼ĞµĞ½Ğ°', ai_status: 'pending', ai_summary: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¸Ğ´ĞµÑ',
-    ai_reason: 'review_unavailable', admin_status: 'new' });
-  const ideaRows = await sql`SELECT user_id, school_id, text, ai_status, admin_status FROM fam_ideas WHERE id = ${idea.id};`;
-  assert.equal(ideaRows[0][0].user_id, 'synthetic-user');
-  assert.equal(ideaRows[0][0].school_id, 'synthetic-school');
-  assert.equal(ideaRows[0][0].ai_status, 'pending');
-  assert.equal(ideaRows[0][0].admin_status, 'new');
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
-    .some(item => item.id === idea.id), false, 'council cannot read AI-pending idea text from the review queue');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-council', { decision: 'reject' }))).status,
-    403, 'council cannot decide an AI-pending idea through the HTTP route');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${idea.id}/moderation`, 'synthetic-admin', { decision: 'approve' })),
-    { status: 200, body: { ok: true, ai_status: 'approved' } });
-  const reviewedIdeaRows = await sql`SELECT ai_status FROM fam_ideas WHERE id = ${idea.id};`;  assert.equal(reviewedIdeaRows[0][0].ai_status, 'approved', 'school review publishes only an explicitly approved pending idea');
-  assert.ok((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
-    .some(item => item.id === idea.id), 'council can see the idea after administrator approval');
-  assert.equal((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0][0].action,
-    'idea_text_approved', 'school text decisions are auditable without recording the idea text');
-  const ideaWorkflow = await listingsApi(apiRequest('GET', '/api/v1/school/ideas/workflow', 'synthetic-admin'));
-  assert.equal(ideaWorkflow.status, 200);
-  assert.ok(ideaWorkflow.body.ideas.some(item => item.id === idea.id), 'approved school ideas appear in the scoped workflow list');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/workflow/${idea.id}/status`, 'synthetic-admin', { status: 'in_progress' })),
-    { status: 200, body: { ok: true, admin_status: 'in_progress' } });
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/workflow/${idea.id}/status`, 'synthetic-admin', { status: 'done' })),
-    { status: 200, body: { ok: true, admin_status: 'done' } });
-  assert.equal((await sql`SELECT admin_status FROM fam_ideas WHERE id = ${idea.id};`)[0][0].admin_status, 'done');
-  assert.deepEqual(new Set((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0].map(row => row.action)),
-    new Set(['idea_text_approved', 'idea_workflow_in_progress', 'idea_workflow_done']), 'status transitions are audited without storing idea text');
-  const linkedListingId = '99999999-9999-4999-8999-999999999999';
-  const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ğ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ' });
-  for (let index = 0; index < 7; index++) {
-    await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-      school_id: 'synthetic-school', body: `Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ ${index}` });
-  }
-  assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-    school_id: 'synthetic-school', body: 'Ğ”ĞµĞ²ÑÑ‚Ğ¾Ğµ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ' }), { ok: false, code: 'rate_limited' });
-  const messageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
-    WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
-  assert.equal(messageQuota?.[0]?.[0]?.submission_count, 8, 'direct messages enforce the eight-per-minute bucket');
-  const messageRows = await sql`SELECT sender_id, receiver_id, school_id, listing_id, body, is_read FROM fam_messages WHERE id = ${message.id};`;
-  assert.equal(messageRows[0][0].receiver_id, '11111111-1111-4111-8111-111111111111');
-  assert.equal(messageRows[0][0].school_id, 'synthetic-school');
-  assert.equal(messageRows[0][0].listing_id, linkedListingId);
-  assert.equal(messageRows[0][0].is_read, false);
-  const ownRateLimitedMessages = await repo.listMessages('synthetic-user', 'synthetic-school');
-  assert.equal(ownRateLimitedMessages.length, 8, 'the sender inbox contains all eight allowed messages');
-  assert.ok(ownRateLimitedMessages.some(row => row.id === message.id));
-  assert.deepEqual(await repo.listMessages('unrelated-user', 'synthetic-school'), []);
-  assert.equal(await repo.markMessageRead('synthetic-user', 'synthetic-school', message.id), false, 'sender cannot mark the recipient inbox as read');
-  assert.equal(await repo.markMessageRead('11111111-1111-4111-8111-111111111111', 'synthetic-school', message.id), true);
-  const readRows = await sql`SELECT is_read FROM fam_messages WHERE id = ${message.id};`;
-  assert.equal(readRows[0][0].is_read, true);
-  assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '22222222-2222-4222-8222-222222222222', school_id: 'synthetic-school', body: 'cross-school synthetic' }),
-    { ok: false, code: 'recipient_unavailable' });
-
-  await sql`DELETE FROM fam_submission_quotas WHERE user_id = 'synthetic-user' AND action = 'message';`;
-  const pendingMessageResponse = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-user', {
-    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ Ğ¾Ğ¶Ğ¸Ğ´Ğ°ĞµÑ‚ ÑˆĞºĞ¾Ğ»ÑŒĞ½Ğ¾Ğ¹ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸',
-  }));
-  assert.equal(pendingMessageResponse.status, 201);
-  assert.deepEqual({ ok: pendingMessageResponse.body.ok, status: pendingMessageResponse.body.status }, { ok: true, status: 'pending' });
-  const pendingMessageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
-    WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
-  assert.equal(pendingMessageQuota?.[0]?.[0]?.submission_count, 1,
-    'manual-review messages consume the same source-compatible message quota');
-  const pendingMessageId = pendingMessageResponse.body.id;
-  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), false,
-    'recipient inbox cannot see messages awaiting review');
-  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), true);
-  assert.equal((await repo.listPendingMessages('lyceum_3')).some(row => row.id === pendingMessageId), false,
-    'pending messages are school-scoped');
-  assert.equal(await repo.decidePendingMessage({ messageId: pendingMessageId, schoolId: 'synthetic-school', reviewerId: '44444444-4444-4444-8444-444444444444', decision: 'approve' }), false,    'an administrator from another school cannot approve the message');
-  const messageReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/messages/moderation', 'synthetic-admin', null));
-  assert.equal(messageReviewQueue.status, 200);
-  assert.equal(messageReviewQueue.body.messages.some(row => row.id === pendingMessageId), true);
-  const messageReview = await listingsApi(apiRequest('PATCH', `/api/v1/messages/moderation/${pendingMessageId}`, 'synthetic-admin', { decision: 'approve' }));
-  assert.equal(messageReview.status, 200);
-  assert.equal((await repo.listPendingMessages('synthetic-school')).some(row => row.id === pendingMessageId), false);
-  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === pendingMessageId), true,
-    'approved message is atomically delivered to the recipient inbox');
-
-  const rejectedPending = await repo.createPendingMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-    school_id: 'synthetic-school', body: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ Ğ±ÑƒĞ´ĞµÑ‚ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾' });
-  assert.equal(await repo.decidePendingMessage({ messageId: rejectedPending.id, schoolId: 'synthetic-school', reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'reject' }), true);
-  assert.equal((await repo.listMessages('11111111-1111-4111-8111-111111111111', 'synthetic-school')).some(row => row.id === rejectedPending.id), false,
-    'rejected message is never delivered');
-
-  const limitedEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ²ÑÑ‚Ñ€ĞµÑ‡Ğ° Ñ Ğ¾Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ½Ñ‹Ğ¼ Ñ‡Ğ¸ÑĞ»Ğ¾Ğ¼ Ğ¼ĞµÑÑ‚', description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ°Ñ‚Ğ¾Ğ¼Ğ°Ñ€Ğ½Ğ¾Ğ¹ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸', category: 'ĞÑ„Ğ¸ÑˆĞ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: true, event_date: '2099-05-01', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
-  assert.equal(await repo.moderateListing(limitedEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
-  const eventApiRequest = apiRequest('POST', `/api/v1/listings/${limitedEvent.id}/registrations`, 'synthetic-registrant', null);
-  const registrationResponse = await listingsApi(eventApiRequest);
-  assert.equal(registrationResponse.status, 201);
-  assert.equal(registrationResponse.body.registration.status, 'confirmed');
-  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
-  await assert.rejects(repo.registerForEvent(limitedEvent.id, '22222222-2222-4222-8222-222222222222'), error => error.code === 'no_seats_available');
-  assert.equal(await repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'), true);
-  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 0);
-  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/event-registrations', 'synthetic-registrant'))).body.registrations
-    .filter(row => row.event_id === limitedEvent.id).map(row => row.status), ['cancelled']);
-  const cancelledOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
-  assert.deepEqual(cancelledOccupancy, { status: 200, body: { ok: true, taken: 0 } },
-    'same-school occupancy is available while its event is active');
-  assert.deepEqual(await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-other-school')),
-    { status: 404, body: { ok: false, error: 'event_unavailable' } }, 'another school cannot inspect occupancy');
-  const reRegistration = await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
-  assert.equal(reRegistration.status, 'confirmed', 'a cancelled registration can be created again');
-  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1);
-  const cancelRegisterRace = await Promise.allSettled([
-    repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
-    repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
-  ]);
-  assert.ok(cancelRegisterRace.some(result => result.status === 'fulfilled'), 'at least one serialized race operation completes');
-  const registrationAfterRace = await sql`SELECT status FROM fam_event_registrations
-    WHERE event_id = ${limitedEvent.id} AND user_id = '11111111-1111-4111-8111-111111111111' LIMIT 1;`;
-  if (registrationAfterRace?.[0]?.[0]?.status === 'cancelled') {
-    await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111');
-  }
-  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
-    'cancellation and re-registration remain consistent under a concurrent race');
-  await sql`UPDATE fam_listings SET status = 'rejected' WHERE id = ${limitedEvent.id};`;
-  const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
-  assert.deepEqual(hiddenOccupancy, { status: 404, body: { ok: false, error: 'event_unavailable' } },
-    'occupancy is hidden after the event is no longer active');
-  await sql`UPDATE fam_listings SET status = 'active' WHERE id = ${limitedEvent.id};`;
-  const concurrentEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¼ĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ğµ Ğ´Ğ»Ñ Ğ³Ğ¾Ğ½ĞºĞ¸ Ğ·Ğ° Ğ¼ĞµÑÑ‚Ğ¾Ğ¼', description: 'ĞŸĞ°Ñ€Ğ°Ğ»Ğ»ĞµĞ»ÑŒĞ½Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ²Ğ¼ĞµÑÑ‚Ğ¸Ğ¼Ğ¾ÑÑ‚Ğ¸', category: 'ĞÑ„Ğ¸ÑˆĞ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
-  assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
-  const concurrentAttempts = await Promise.allSettled([
-    repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111'),
-    repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222'),
-  ]);
-  assert.equal(concurrentAttempts.filter(result => result.status === 'fulfilled').length, 1,
-    'serializable capacity check permits at most one successful registration for the final seat');
-  assert.equal(await repo.getEventOccupancy(concurrentEvent.id), 1, 'concurrent requests cannot overbook or lose the occupancy count');
-
-  const reviewEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¼ĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ğµ Ğ¿Ğ¾ Ğ·Ğ°ÑĞ²ĞºĞ°Ğ¼', description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° ÑˆĞºĞ¾Ğ»ÑŒĞ½Ğ¾Ğ³Ğ¾ Ñ€ĞµÑˆĞµĞ½Ğ¸Ñ', category: 'ĞÑ„Ğ¸ÑˆĞ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: true, event_date: '2099-05-02', event_time: '12:00', event_type: 'request', max_seats: 0, status: 'pending' });
-  assert.equal(await repo.moderateListing(reviewEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
-  const requestResponse = await listingsApi(apiRequest('POST', `/api/v1/listings/${reviewEvent.id}/registrations`, 'synthetic-registrant', null));
-  assert.equal(requestResponse.status, 201);
-  assert.equal(requestResponse.body.registration.status, 'pending');
-  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 1);
-  const reviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-admin'));
-  assert.equal(reviewQueue.status, 200);
-  assert.equal(reviewQueue.body.applications.some(row => row.event_id === reviewEvent.id && row.user_id === '11111111-1111-4111-8111-111111111111'), true,
-    'same-school moderator can see the synthetic pending registration');
-  assert.equal(reviewQueue.body.applications.some(row => row.user_id === '22222222-2222-4222-8222-222222222222'), false,
-    'event review queue excludes registrations from other schools');
-  const studentReviewQueue = await listingsApi(apiRequest('GET', '/api/v1/event-registrations/review', 'synthetic-student'));
-  assert.equal(studentReviewQueue.status, 403, 'students cannot read the event review queue');
-  assert.equal(await repo.moderateEventRegistration(reviewEvent.id, '11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333', 'other-school', 'confirmed'), false,    'event registration review is scoped to the event owner school');
-  const reviewResponse = await listingsApi(apiRequest('PATCH', `/api/v1/listings/${reviewEvent.id}/registrations/11111111-1111-4111-8111-111111111111`, 'synthetic-admin', { decision: 'reject' }));
-  assert.deepEqual(reviewResponse, { status: 200, body: { ok: true, status: 'rejected' } });
-  assert.equal(await repo.getEventOccupancy(reviewEvent.id), 0, 'rejecting a pending request releases its reserved seat');
-  await sql`UPSERT INTO fam_account_suspensions
-    (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
-    VALUES ('synthetic-school', 'synthetic-user', 'synthetic-suspension', 'student', 24,
-      'Synthetic integration suspension', 'active', 'synthetic-admin', CurrentUtcTimestamp(),
-      Unwrap(CurrentUtcTimestamp() + Interval('PT24H')));`;
-  const suspendedWrite = await listingsApi(apiRequest('POST', '/api/v1/listings', 'synthetic-user', {
-    title: 'ĞĞµ Ğ´Ğ¾Ğ»Ğ¶Ğ½Ğ¾ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒÑÑ', description: 'Synthetic suspension guard', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-  }));
-  assert.equal(suspendedWrite.status, 403, 'active account suspension blocks authenticated writes');
-  assert.equal(suspendedWrite.body.error, 'account_suspended');
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/listings', 'synthetic-user'))).status, 200,
-    'account suspension leaves read access available');
-  assert.equal((await repo.getActiveAccountSuspension('synthetic-school', 'synthetic-user'))?.reason,
-    'Synthetic integration suspension');
-  const photoKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
-  await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', photoKey);
-  const photoListing = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ñ Ñ„Ğ¾Ñ‚Ğ¾', description: 'Ğ˜Ğ·Ğ¾Ğ±Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸Ğµ Ğ¾ÑÑ‚Ğ°Ñ‘Ñ‚ÑÑ Ğ·Ğ°ĞºÑ€Ñ‹Ñ‚Ñ‹Ğ¼ Ğ´Ğ¾ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ğ¾Ğ³Ğ¾ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ¸Ñ', category: 'Ğ¢Ğ²Ğ¾Ñ€Ñ‡ĞµÑÑ‚Ğ²Ğ¾',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: photoKey,
-    photo_status: 'pending', status: 'pending' });
-  assert.equal(await repo.claimPendingImageDeletion('33333333-3333-4333-8333-333333333333', photoKey), null,
-    'an uploaded image cannot be discarded after it is atomically linked to a listing');
-  assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), false,
-    'listing with pending photo cannot become public');
-  assert.equal((await repo.listActiveListings('synthetic-school')).some(row => row.id === photoListing.id), false,
-    'pending photo listing remains absent from the public projection');  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp';
-  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', avatarKey);
-  const avatarSubmit = await listingsApi(apiRequest('POST', '/api/v1/me/avatar', 'synthetic-registrant', { image_key: avatarKey }));
-  assert.equal(avatarSubmit.status, 202, 'avatar uploads stay private and enter manual school review');
-  const avatarQueue = await listingsApi(apiRequest('GET', '/api/v1/avatars/moderation', 'synthetic-admin', null));
-  assert.equal(avatarQueue.status, 200);
-  assert.ok(avatarQueue.body.requests.some(item => item.id === avatarSubmit.body.request_id));
-  assert.equal((await repo.listPendingAvatarReviews('other-school')).some(item => item.id === avatarSubmit.body.request_id), false,
-    'other schools cannot discover pending avatars');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-registrant', { decision: 'approve' }))).status, 403,
-    'students cannot approve an avatar');
-  assert.equal((await listingsApi(apiRequest('PATCH', `/api/v1/avatars/${avatarSubmit.body.request_id}/moderation`, 'synthetic-admin', { decision: 'approve' }))).status, 200);
-  assert.equal(await repo.isCurrentAvatar(avatarSubmit.body.request_id), true,
-    'approved avatar URL is associated with the reviewed profile');
-  const orphanKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
-  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', orphanKey);
-  await sql`UPDATE fam_pending_media SET created_at = Unwrap(CurrentUtcTimestamp() - Interval('P8D')) WHERE object_key = ${orphanKey};`;
-  const expiredMediaClaims = await repo.claimExpiredPendingImages(10);
-  assert.deepEqual(expiredMediaClaims.map(item => item.object_key), [orphanKey],
-    'stale unlinked uploads are claimed while the image attached to a listing is preserved');
-  assert.equal(await repo.finishPendingImageCleanup(orphanKey, expiredMediaClaims[0].claim_token, true), true);
-  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${orphanKey};`)?.[0]?.length ?? 0, 0,
-    'completed cleanup removes the private media registry row');
-  const otherSchoolPending = await repo.createListing({ user_id: '22222222-2222-4222-8222-222222222222', school_id: 'other-school',
-    title: 'Ğ§ÑƒĞ¶Ğ¾Ğµ ÑˆĞºĞ¾Ğ»ÑŒĞ½Ğ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ', description: 'ĞĞµ Ğ´Ğ¾Ğ»Ğ¶Ğ½Ğ¾ Ğ¿Ğ¾Ğ¿Ğ°ÑÑ‚ÑŒ Ğ² Ğ¾Ñ‡ĞµÑ€ĞµĞ´ÑŒ', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, status: 'pending' });
-  const moderationQueue = await listingsApi(apiRequest('GET', '/api/v1/listings/moderation', 'synthetic-admin'));
-  assert.equal(moderationQueue.status, 200);
-  assert.ok(moderationQueue.body.listings.some(row => row.id === photoListing.id), 'school queue includes its own pending photo listing');
-  assert.ok(!moderationQueue.body.listings.some(row => row.id === otherSchoolPending.id), 'school queue excludes other-school listings');  assert.equal(moderationQueue.body.listings.find(row => row.id === photoListing.id).photo_url, `/api/v1/listings/${photoListing.id}/photo`);
-  const schoolDeleteMedia = 'pending/55555555-5555-4555-8555-555555555555/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp';
-  await repo.registerPendingImage('55555555-5555-4555-8555-555555555555', schoolDeleteMedia);
-  const schoolDeleteListing = await repo.createListing({ user_id: '55555555-5555-4555-8555-555555555555', school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ´Ğ»Ñ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ¾Ğ¼', description: 'Ğ¢ĞµÑÑ‚Ğ¸Ñ€ÑƒĞµÑ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ½Ğ° Ğ¾Ğ´Ğ½Ğ¾Ñ€Ğ°Ğ·Ğ¾Ğ²Ğ¾Ğ¹ Ğ±Ğ°Ğ·Ğµ', category: 'ĞšĞ½Ğ¸Ğ³Ğ¸',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: schoolDeleteMedia, photo_status: 'pending', status: 'pending' });
-  accountMediaKeys.add(schoolDeleteMedia);
-  assert.equal((await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${otherSchoolPending.id}`, 'synthetic-admin', {
-    confirmation: 'Ğ£Ğ”ĞĞ›Ğ˜Ğ¢Ğ¬ ĞĞ‘ĞªĞ¯Ğ’Ğ›Ğ•ĞĞ˜Ğ• Ğ¨ĞšĞĞ›Ğ«',
-  }))).status, 404, 'administrator cannot delete another school listing');
-  const schoolDeleteResult = await listingsApi(apiRequest('DELETE', `/api/v1/school/listings/${schoolDeleteListing.id}`, 'synthetic-admin', {
-    confirmation: 'Ğ£Ğ”ĞĞ›Ğ˜Ğ¢Ğ¬ ĞĞ‘ĞªĞ¯Ğ’Ğ›Ğ•ĞĞ˜Ğ• Ğ¨ĞšĞĞ›Ğ«',
-  }));
-  assert.deepEqual(schoolDeleteResult, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } });
-  assert.ok(deletedMediaKeys.includes(schoolDeleteMedia), 'school listing deletion removes its registered private image');
-  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${schoolDeleteListing.id};`)?.[0]?.length ?? 0, 0);
-  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${schoolDeleteMedia};`)?.[0]?.length ?? 0, 0);
-  const schoolDeleteAudit = await sql`SELECT school_id, actor_id, entity_id, entity_type, action FROM fam_school_content_audit WHERE entity_id = ${schoolDeleteListing.id};`;
-  assert.deepEqual(schoolDeleteAudit?.[0]?.[0], { school_id: 'synthetic-school', actor_id: '33333333-3333-4333-8333-333333333333',
-    entity_id: schoolDeleteListing.id, entity_type: 'listing', action: 'listing_deleted' });
-  const adminOverview = await listingsApi(apiRequest('GET', '/api/v1/school/admin/overview', 'synthetic-admin'));
-  assert.equal(adminOverview.status, 200);
-  assert.ok(adminOverview.body.users.some(row => row.id === '33333333-3333-4333-8333-333333333333'));
-  assert.ok(!adminOverview.body.users.some(row => row.id === '22222222-2222-4222-8222-222222222222'), 'school overview excludes profiles from other schools');
-  assert.ok(adminOverview.body.listings.some(row => row.id === otherSchoolPending.id) === false, 'school overview excludes listings from another school');
-  assert.ok(adminOverview.body.audit.some(row => row.action === 'listing_deleted'), 'school overview returns the recent school action audit');
-  const safetyFingerprint = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  for (let i = 0; i < 3; i++) {
-    await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
-      created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)      VALUES ('synthetic-school', ${safetyFingerprint}, 'message', 'targeted_harassment', ${`aaaaaaaa-0000-4000-8000-${String(i).padStart(12, '0')}`},
-        ${i === 0 ? 'medium' : 'high'}, CurrentUtcTimestamp(), NULL, NULL, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        '11111111-1111-4111-8111-111111111111', 'fam.example.ru', 'synthetic sanitized excerpt');`;
-  }
-  const safetyReports = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
-  assert.equal(safetyReports.status, 200);
-  const safetyGroup = safetyReports.body.reports.find(row => row.fingerprint === safetyFingerprint);
-  assert.equal(safetyGroup.occurrences, 3);
-  assert.equal(safetyGroup.severity, 'high');
-  assert.equal(safetyGroup.actor.first_name, 'Ğ¢ĞµÑÑ‚');
-  const emittedSafety = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-safety-actor', {
-    receiver_id: '11111111-1111-4111-8111-111111111111', body: 'ĞŸĞ¾ÑÑ‚ÑƒĞ¿Ğ°Ğ»Ğ¸ ÑƒĞ³Ñ€Ğ¾Ğ·Ñ‹ Ğ² Ğ°Ğ´Ñ€ĞµÑ ÑƒÑ‡ĞµĞ½Ğ¸ĞºĞ°.',
-  }));
-  assert.equal(emittedSafety.status, 201);
-  assert.equal(emittedSafety.body.status, 'pending');
-  for (const body of ['Ğ”Ğ°Ğ²Ğ°Ğ¹Ñ‚Ğµ Ğ²ÑĞµ Ğ±ÑƒĞ´ĞµĞ¼ Ğ²Ñ‹ÑĞ¼ĞµĞ¸Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ´Ğ½Ğ¾Ğ³Ğ¾ ÑƒÑ‡ĞµĞ½Ğ¸ĞºĞ° Ğ² Ñ‡Ğ°Ñ‚Ğµ.',
-    'ĞĞ°Ğ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ ĞµĞ¼Ñƒ Ğ²ÑĞµ Ğ½ĞµĞ¿Ñ€Ğ¸ÑÑ‚Ğ½Ñ‹Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ¾Ğ½ ÑƒÑˆÑ‘Ğ» Ğ¸Ğ· Ñ‡Ğ°Ñ‚Ğ°.']) {
-    const reviewed = await listingsApi(apiRequest('POST', '/api/v1/messages', 'synthetic-safety-actor', {
-      receiver_id: '55555555-5555-4555-8555-555555555555', body,
-    }));
-    assert.equal(reviewed.status, 201);
-    assert.equal(reviewed.body.status, 'pending', 'new local safety markers remain pending for human review');
-  }
-  assert.equal((await sql`SELECT id FROM fam_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 0,
-    'unreviewed message stays out of the recipient inbox');
-  assert.equal((await sql`SELECT id FROM fam_pending_messages WHERE sender_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';`)?.[0]?.length ?? 0, 3,
-    'unreviewed message is kept in the school review queue');
-  const localIncidents = await sql`SELECT category, severity, evidence_excerpt FROM fam_safety_incidents
-    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-      AND target_id = '55555555-5555-4555-8555-555555555555' AND source_kind = 'message'
-      AND category IN ('targeted_harassment', 'negative_personal_call');`;
-  const localIncidentByCategory = new Map((localIncidents?.[0] ?? []).map(row => [row.category, row]));
-  assert.deepEqual([...localIncidentByCategory.keys()].sort(), ['negative_personal_call', 'targeted_harassment']);
-  for (const row of localIncidentByCategory.values()) {
-    assert.equal(row.severity, 'medium');
-    assert.equal(row.evidence_excerpt, null, 'local classifier never persists the source text');
-  }
-  const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
-    WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message'
-      AND category = 'threat_or_intimidation' ORDER BY created_at DESC LIMIT 1;`;
-  assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
-  assert.equal(emittedIncident?.[0]?.[0]?.category, 'threat_or_intimidation');
-  assert.equal(emittedIncident?.[0]?.[0]?.severity, 'high');
-  assert.equal(emittedIncident?.[0]?.[0]?.evidence_excerpt, null);
-  const emittedQueue = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
-  assert.ok(emittedQueue.body.reports.some(row => row.category === 'threat_or_intimidation'));
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-lyceum-admin'))).body.reports.length, 0,
-    'safety reports are isolated by school');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', '/api/v1/school/admin/safety-reports', 'synthetic-admin', {    fingerprint: safetyFingerprint, category: 'targeted_harassment', source_kind: 'message',
-  })), { status: 200, body: { ok: true } });
-  assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'))).body.reports.some(row => row.fingerprint === safetyFingerprint), false,
-    'acknowledged safety clusters leave the unreviewed queue');
-  const adminIdeaImageKey = 'pending/33333333-3333-4333-8333-333333333333/aaaaaaaa-0000-4000-8000-000000000001.webp';
-  accountMediaKeys.add(adminIdeaImageKey);
-  await repo.registerPendingImage('33333333-3333-4333-8333-333333333333', adminIdeaImageKey);
-  const adminOwnIdea = await repo.createIdea({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
-    text: 'Ğ˜Ğ´ĞµÑ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ° Ğ´Ğ»Ñ ÑĞ°Ğ¼Ğ¾Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸', image_keys: [adminIdeaImageKey], image_status: 'pending',
-    ai_status: 'approved', admin_status: 'new' });
-  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '33333333-3333-4333-8333-333333333333', 'school_admin'))
-    .some(idea => idea.id === adminOwnIdea.id), false, 'review queue omits the reviewer own submission');
-  assert.equal(await repo.reviewSchoolIdeaImages({ ideaId: adminOwnIdea.id, schoolId: 'synthetic-school',
-    reviewerId: '33333333-3333-4333-8333-333333333333', decision: 'approve' }), false,
-  'school staff cannot approve their own idea photo');
-  const deletedAdminIdea = await listingsApi(apiRequest('DELETE', `/api/v1/ideas/${adminOwnIdea.id}`, 'synthetic-admin', null));
-  assert.deepEqual(deletedAdminIdea, { status: 200, body: { ok: true, deleted: true, image_cleanup: 'complete' } },
-    'an idea author can delete their own idea and immediately clean linked private photos');
-  assert.ok(deletedMediaKeys.includes(adminIdeaImageKey));
-  assert.equal((await sql`SELECT id FROM fam_ideas WHERE id = ${adminOwnIdea.id};`)[0].length, 0);
-  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${adminIdeaImageKey};`)[0].length, 0);
-  const deletingUserId = '11111111-1111-4111-8111-111111111111';
-  const deletingImageKey = `pending/${deletingUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
-  const attachedIdeaImageKey = `pending/${deletingUserId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
-  const rejectedIdeaImageKey = `pending/${deletingUserId}/ffffffff-ffff-4fff-8fff-ffffffffffff.webp`;
-  accountMediaKeys.add(deletingImageKey);
-  await repo.registerPendingImage(deletingUserId, deletingImageKey);
-  accountMediaKeys.add(attachedIdeaImageKey);
-  await repo.registerPendingImage(deletingUserId, attachedIdeaImageKey);
-  const ideaSubmission = await listingsApi(apiRequest('POST', '/api/v1/ideas', 'synthetic-registrant', {
-    text: 'Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºÑƒÑ ĞºĞ½Ğ¸Ğ¶Ğ½ÑƒÑ Ğ¿Ğ¾Ğ»ĞºÑƒ Ğ² ÑˆĞºĞ¾Ğ»ÑŒĞ½ÑƒÑ Ğ±Ğ¸Ğ±Ğ»Ğ¸Ğ¾Ñ‚ĞµĞºÑƒ', image_keys: [attachedIdeaImageKey],
-  }));
-  assert.equal(ideaSubmission.status, 201);
-  assert.equal(ideaSubmission.body.image_status, 'pending');
-  const ideaQueue = await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-admin'));
-  const submittedIdea = ideaQueue.body.ideas.find(idea => idea.id === ideaSubmission.body.id);
-  assert.equal(submittedIdea.image_status, 'pending');  assert.deepEqual(submittedIdea.image_keys, [attachedIdeaImageKey]);
-  assert.equal(Object.hasOwn(submittedIdea, 'user_id'), false, 'school review queue omits the submitter identity');
-  assert.equal(submittedIdea.ai_status, 'approved', 'unflagged text follows the free local fallback review path');
-  assert.ok((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-council'))).body.ideas
-    .some(item => item.id === ideaSubmission.body.id), 'council can review photos after the text passes the local safety gate');
-  assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/school/ideas', 'synthetic-lyceum-admin'))).body.ideas, [],
-    'school idea queue is isolated by school');
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${ideaSubmission.body.id}/images`, 'synthetic-council', { decision: 'approve' })),
-    { status: 200, body: { ok: true, image_status: 'approved' } });
-  assert.equal((await repo.getSchoolIdeaImage(ideaSubmission.body.id, 0)).image_status, 'approved');
-  accountMediaKeys.add(rejectedIdeaImageKey);
-  await repo.registerPendingImage(deletingUserId, rejectedIdeaImageKey);
-  const rejectedIdea = await listingsApi(apiRequest('POST', '/api/v1/ideas', 'synthetic-registrant', {
-    text: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾Ğ³Ğ¾ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¸Ñ Ñ„Ğ¾Ñ‚Ğ¾', image_keys: [rejectedIdeaImageKey],
-  }));
-  assert.equal(rejectedIdea.status, 201);
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedIdea.body.id}/images`, 'synthetic-admin', { decision: 'reject' })),
-    { status: 200, body: { ok: true, image_status: 'rejected' } });
-  const rejectedIdeaRow = await sql`SELECT image_status FROM fam_ideas WHERE id = ${rejectedIdea.body.id};`;
-  assert.deepEqual(rejectedIdeaRow[0][0], { image_status: 'rejected' });
-  assert.deepEqual(await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666', 'council_member')
-    .then(rows => rows.find(row => row.id === rejectedIdea.body.id)?.image_keys), []);
-  assert.equal(await repo.getSchoolIdeaImage(rejectedIdea.body.id, 0), null,
-    'rejected school idea image is no longer readable');
-  assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedIdeaImageKey};`)[0][0].status, 'pending',
-    'rejected school idea image returns to the bounded orphan cleanup queue');
-  const rejectedTextImageKey = `pending/${deletingUserId}/12345678-1234-4234-8234-123456789012.webp`;
-  await repo.registerPendingImage(deletingUserId, rejectedTextImageKey);
-  const rejectedTextIdea = await repo.createIdea({ user_id: deletingUserId, school_id: 'synthetic-school',
-    text: 'Ğ˜Ğ´ĞµÑ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ÑĞµÑ‚ÑÑ Ğ¼Ğ¾Ğ´ĞµÑ€Ğ°Ñ‚Ğ¾Ñ€Ğ¾Ğ¼ ÑˆĞºĞ¾Ğ»Ñ‹', image_keys: [rejectedTextImageKey], image_status: 'pending',
-    ai_status: 'pending', admin_status: 'new' });
-  assert.deepEqual(await listingsApi(apiRequest('PATCH', `/api/v1/school/ideas/${rejectedTextIdea.id}/moderation`, 'synthetic-admin', { decision: 'reject' })),
-    { status: 200, body: { ok: true, ai_status: 'rejected' } });  assert.equal((await repo.listPendingSchoolIdeas('synthetic-school', '66666666-6666-4666-8666-666666666666', 'council_member'))
-    .some(row => row.id === rejectedTextIdea.id), false, 'rejected idea text leaves the school review queue');
-  assert.equal(await repo.getSchoolIdeaImage(rejectedTextIdea.id, 0), null, 'text rejection prevents reading its attached photo');
-  assert.equal((await sql`SELECT status FROM fam_pending_media WHERE object_key = ${rejectedTextImageKey};`)[0][0].status, 'pending',
-    'text rejection safely releases its photo to the bounded orphan cleanup queue');
-  const deletingListing = await repo.createListing({ user_id: deletingUserId, school_id: 'synthetic-school',
-    title: 'Ğ¡Ğ¾Ğ±ÑÑ‚Ğ²ĞµĞ½Ğ½Ğ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ´Ğ»Ñ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ Ğ°ĞºĞºĞ°ÑƒĞ½Ñ‚Ğ°', description: 'Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ÑĞµÑ‚ÑÑ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ½Ğ° ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ¹ Ğ±Ğ°Ğ·Ğµ', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: deletingImageKey, photo_status: 'pending', status: 'pending' });
-  const accountDeletion = await listingsApi(apiRequest('DELETE', '/api/v1/me/account', 'synthetic-recent-registrant', {
-    confirmation: 'Ğ£Ğ”ĞĞ›Ğ˜Ğ¢Ğ¬ ĞœĞĞ™ ĞĞšĞšĞĞ£ĞĞ¢',
-  }));
-  assert.deepEqual(accountDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 4 } });
-  assert.ok(deletedMediaKeys.includes(deletingImageKey), 'account deletion removes all private objects under its owner prefix');
-  assert.ok(deletedMediaKeys.includes(attachedIdeaImageKey), 'account deletion removes linked idea photos');
-  assert.ok(deletedMediaKeys.includes(rejectedIdeaImageKey), 'account deletion removes rejected idea photos awaiting orphan cleanup');
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-2' }), null,
-    'account deletion removes the identity mapping after cleanup');
-  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${deletingListing.id};`)?.[0]?.length ?? 0, 0);
-  assert.equal((await sql`SELECT object_key FROM fam_pending_media WHERE object_key = ${deletingImageKey};`)?.[0]?.length ?? 0, 0);
-  assert.equal((await sql`SELECT idea_id FROM fam_idea_images WHERE user_id = ${deletingUserId};`)?.[0]?.length ?? 0, 0,
-    'account deletion removes private idea image references');
-  const requestedTargetId = '99999999-9999-4999-8999-999999999999';
-  const requestedImageKey = `pending/${requestedTargetId}/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp`;
-  accountMediaKeys.add(requestedImageKey);
-  await repo.registerPendingImage(requestedTargetId, requestedImageKey);
-  const requestedAvatarKey = `pending/${requestedTargetId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
-  accountMediaKeys.add(requestedAvatarKey);
-  await repo.registerPendingImage(requestedTargetId, requestedAvatarKey);
-  await sql`INSERT INTO fam_avatar_reviews (id, user_id, school_id, image_key, status, created_at, reviewed_by, reviewed_at)
-    VALUES ('eeeeeeee-0000-4000-8000-000000000001', ${requestedTargetId}, 'synthetic-school', ${requestedAvatarKey}, 'pending', CurrentUtcTimestamp(), '', NULL);`;
-  await sql`INSERT INTO fam_notification_reads (user_id, notification_key, read_at)
-    VALUES (${requestedTargetId}, 'synthetic-notification', CurrentUtcTimestamp());`;
-  await sql`INSERT INTO fam_submission_quotas (user_id, action, window_start, submission_count)
-    VALUES (${requestedTargetId}, 'listing', CurrentUtcTimestamp(), Unwrap(CAST(1 AS Uint32)));`;
-  const deletionAuditId = 'eeeeeeee-0000-4000-8000-000000000002';
-  await sql`INSERT INTO fam_school_content_audit (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
-    VALUES (${deletionAuditId}, 'synthetic-school', ${requestedTargetId}, 'synthetic-entity', 'listing', 'synthetic_review', '{}', CurrentUtcTimestamp());`;
-  const deletionSafetyFingerprint = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-  const deletionSafetyId = 'eeeeeeee-0000-4000-8000-000000000003';
-  await sql`INSERT INTO fam_safety_incidents (school_id, pair_fingerprint, source_kind, category, incident_id, severity,
-    created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
-    VALUES ('synthetic-school', ${deletionSafetyFingerprint}, 'message', 'targeted_harassment', ${deletionSafetyId}, 'medium',
-      CurrentUtcTimestamp(), NULL, NULL, ${requestedTargetId}, '33333333-3333-4333-8333-333333333333', 'fam.example.ru', 'sanitized synthetic evidence');`;
-  const requestedDeletion = await listingsApi(apiRequest('POST', '/api/v1/deletion-requests', 'synthetic-council', {
-    target_id: requestedTargetId, reason_code: 'spam', reason: 'Repeated unrelated messages in the synthetic school test.',
-  }));
-  assert.equal(requestedDeletion.status, 202);
-  const approvedDeletion = await listingsApi(apiRequest('PATCH', `/api/v1/deletion-requests/${requestedDeletion.body.request_id}`, 'synthetic-admin', {    decision: 'approve', confirmation: 'Ğ£Ğ”ĞĞ›Ğ˜Ğ¢Ğ¬ ĞĞšĞšĞĞ£ĞĞ¢ Ğ£Ğ§ĞĞ¡Ğ¢ĞĞ˜ĞšĞ', review_note: 'ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¼ Ñ‚ĞµÑÑ‚Ğ¾Ğ¼',
-  }));
-  assert.deepEqual(approvedDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 2 } });
-  assert.ok(deletedMediaKeys.includes(requestedImageKey), 'approved deletion removes private media for the requested synthetic account');
-  assert.ok(deletedMediaKeys.includes(requestedAvatarKey), 'approved deletion also removes a linked avatar object');
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-delete-target' }), null,
-    'approved deletion removes the requested profile identity mapping');
-  assert.equal((await sql`SELECT id FROM fam_avatar_reviews WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
-  assert.equal((await sql`SELECT notification_key FROM fam_notification_reads WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
-  assert.equal((await sql`SELECT action FROM fam_submission_quotas WHERE user_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0);
-  const anonymizedAudit = await sql`SELECT actor_id FROM fam_school_content_audit WHERE event_id = ${deletionAuditId};`;
-  assert.equal(anonymizedAudit?.[0]?.[0]?.actor_id, 'deleted-account');
-  const anonymizedSafety = await sql`SELECT actor_id, target_id, source_origin, evidence_excerpt FROM fam_safety_incidents
-    WHERE school_id = 'synthetic-school' AND pair_fingerprint = ${deletionSafetyFingerprint} AND incident_id = ${deletionSafetyId};`;
-  assert.deepEqual(anonymizedSafety?.[0]?.[0], { actor_id: null, target_id: null, source_origin: null, evidence_excerpt: null });
-  const approvedRequest = await sql`SELECT status, reviewed_by, review_note FROM fam_account_deletion_requests WHERE request_id = ${requestedDeletion.body.request_id};`;
-  assert.deepEqual(approvedRequest[0][0], { status: 'approved', reviewed_by: '33333333-3333-4333-8333-333333333333', review_note: 'ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¾ ÑĞ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¼ Ñ‚ĞµÑÑ‚Ğ¾Ğ¼' });
-  assert.equal((await sql`SELECT request_id FROM fam_account_deletion_open WHERE target_id = ${requestedTargetId};`)?.[0]?.length ?? 0, 0,
-    'approved deletion closes the unique open request while retaining the decision record');
-  const adminDeleteTargetId = '77777777-7777-4777-8777-777777777777';
-  const adminDeleteImageKey = `pending/${adminDeleteTargetId}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp`;
-  accountMediaKeys.add(adminDeleteImageKey);
-  await repo.registerPendingImage(adminDeleteTargetId, adminDeleteImageKey);
-  const adminDeleteListing = await repo.createListing({ user_id: adminDeleteTargetId, school_id: 'synthetic-school',
-    title: 'ĞĞ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ°ĞºĞºĞ°ÑƒĞ½Ñ‚Ğ° Ğ´Ğ»Ñ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¸Ğ²Ğ½Ğ¾Ğ³Ğ¾ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ', description: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ YDB Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ°', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°',
-    price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false, max_seats: 0, image_key: adminDeleteImageKey, photo_status: 'pending', status: 'pending' });
-  const adminDeletion = await listingsApi(apiRequest('DELETE', `/api/v1/school/accounts/${adminDeleteTargetId}`, 'synthetic-admin', {
-    confirmation: 'Ğ£Ğ”ĞĞ›Ğ˜Ğ¢Ğ¬ ĞĞšĞšĞĞ£ĞĞ¢ Ğ£Ğ§ĞĞ¡Ğ¢ĞĞ˜ĞšĞ',
-  }));
-  assert.deepEqual(adminDeletion, { status: 200, body: { ok: true, deleted: true, removed_images: 1 } });
-  assert.ok(deletedMediaKeys.includes(adminDeleteImageKey), 'direct school-admin deletion removes the eligible synthetic target private image');
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-role-target' }), null,
-    'direct school-admin deletion removes only the same-school student identity mapping');
-  assert.equal((await sql`SELECT id FROM fam_listings WHERE id = ${adminDeleteListing.id};`)?.[0]?.length ?? 0, 0);
-  const adminDeleteAudit = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${adminDeleteTargetId};`;
-  assert.deepEqual(adminDeleteAudit[0], [{ action: 'account_deleted', previous_role: 'student' }],
-    'administrator deletion is preserved in the audit after the profile is removed');
-  const recoveryUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac';
-  const recoveryImageKey = `pending/${recoveryUserId}/cccccccc-cccc-4ccc-8ccc-cccccccccccc.webp`;
-  accountMediaKeys.add(recoveryImageKey);
-  await repo.registerPendingImage(recoveryUserId, recoveryImageKey);
-  const startedRecovery = await repo.beginAccountDeletion({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery', userId: recoveryUserId });
-  assert.equal(startedRecovery.ok, true);
-  await sql`UPDATE fam_account_deletion_jobs SET claim_until = Unwrap(CurrentUtcTimestamp() - Interval('PT1M')) WHERE user_id = ${recoveryUserId};`;
-  const recoverAccountDeletions = createAccountDeletionRecoveryOperation({ repository: repo, pendingImages: {
-    listUserObjects: async userId => [...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)),
-      listAccountObjects: async (userId, ownedKeys = []) => [...new Set([
-        ...[...accountMediaKeys].filter(key => key.startsWith(`pending/${userId}/`)), ...ownedKeys,
-      ])],
-    delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
-  } });
-  assert.deepEqual(await recoverAccountDeletions(10), { claimed: 1, completed: 1, failed: 0 },
-    'a durable account deletion job can be resumed after its lease expires');
-  assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery' }), null,
-    'manual recovery removes the synthetic account identity after deleting private media');
-  assert.equal((await sql`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${recoveryUserId};`)?.[0]?.length ?? 0, 0);
-  const quotaUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaab';
-  const quotaListing = { user_id: quotaUserId, school_id: 'synthetic-school', title: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ',    description: 'ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ¾Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸Ñ ĞºĞ¾Ğ»Ğ¸Ñ‡ĞµÑÑ‚Ğ²Ğ°', category: 'Ğ£Ñ‡Ñ‘Ğ±Ğ°', price_text: 'Ğ‘ĞµÑĞ¿Ğ»Ğ°Ñ‚Ğ½Ğ¾', is_event: false,
-    max_seats: 0, status: 'pending' };
-  for (let i = 0; i < 5; i++) await repo.createListing(quotaListing);
-  const listingQuotaState = await sql`SELECT action, submission_count, window_start FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
-  assert.equal(Number(listingQuotaState[0].find(row => row.action === 'listing')?.submission_count), 5,
-    'the serializable counter records the five allowed listings');
-  assert.deepEqual(await repo.createListing(quotaListing), { ok: false, code: 'rate_limited' },
-    'the sixth listing in one hour is rejected for this synthetic account');
-  const quotaAvatarKey = `pending/${quotaUserId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
-  await repo.registerPendingImage(quotaUserId, quotaAvatarKey);
-  privateObjects.set(quotaAvatarKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
-  quotaPendingImages = createS3PendingImageStore({
-    FAM_RU_S3_ENDPOINT: 'http://127.0.0.1:9000', FAM_RU_S3_BUCKET: 'synthetic-private',
-    FAM_RU_S3_ACCESS_KEY_ID: 'synthetic-access', FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic-secret',
-  }, {
-    send: async input => { privateObjects.set(input.Key, { body: Buffer.from(input.Body), contentType: input.ContentType }); },
-    get: async input => {
-      const object = privateObjects.get(input.Key);
-      return object ? { ContentType: object.contentType, ContentLength: object.body.length,
-        Body: { transformToByteArray: async () => object.body } } : null;
-    },
-    remove: async input => { privateObjects.delete(input.Key); },
-  });
-  const quotaAvatarApi = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.synthetic', subject: 'quota-avatar-user' }),
-    resolveActor: async () => ({ id: quotaUserId, school_id: 'synthetic-school', role: 'student' }), repository: repo,
-    pendingImages: quotaPendingImages });
-  const quotaAvatarResponse = await quotaAvatarApi(apiRequest('POST', '/api/v1/me/avatar', 'quota-avatar', { image_key: quotaAvatarKey }));
-  assert.equal(quotaAvatarResponse.status, 429, 'avatar submission shares the exhausted listing quota');
-  assert.equal(privateObjects.has(quotaAvatarKey), false, 'the rejected avatar object is removed from private storage');
-  const quotaAvatarState = await sql`SELECT status FROM fam_pending_media WHERE object_key = ${quotaAvatarKey} LIMIT 1;`;
-  assert.equal(quotaAvatarState[0].length, 0, 'the rejected avatar registration is removed through the cleanup lease');
-  const rejectedAvatar = await sql`SELECT id FROM fam_avatar_reviews WHERE user_id = ${quotaUserId} AND status = 'pending';`;
-  assert.equal(rejectedAvatar[0].length, 0, 'a rate-limited avatar is not queued for review');
-  const quotaIdea = { user_id: quotaUserId, school_id: 'synthetic-school', text: 'Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¸Ğ´ĞµÑ',
-    ai_status: 'pending', ai_summary: 'Ğ˜Ğ´ĞµÑ', ai_reason: 'review_unavailable', admin_status: 'new' };
-  for (let i = 0; i < 5; i++) await repo.createIdea(quotaIdea);
-  assert.deepEqual(await repo.createIdea(quotaIdea), { ok: false, code: 'rate_limited' },
-    'the sixth idea in one hour is rejected for this synthetic account');
-  for (let i = 0; i < 5; i++) await repo.reserveImageUpload(quotaUserId);
-  assert.equal(await repo.reserveImageUpload(quotaUserId), false,
-    'a sixth image decode reservation in one hour is rejected for this synthetic account');
-  const quotaRows = await sql`SELECT action, submission_count FROM fam_submission_quotas WHERE user_id = ${quotaUserId};`;
-  assert.deepEqual(Object.fromEntries(quotaRows[0].map(row => [row.action, Number(row.submission_count)])), { idea: 5, image_upload: 5, listing: 5 });
-  const indexProbes = await Promise.all([
-    sql`SELECT id FROM fam_avatar_reviews VIEW fam_avatar_reviews_user_id_idx WHERE user_id = ${quotaUserId};`,
-    sql`SELECT announcement_id FROM fam_school_announcements VIEW fam_school_announcements_author_id_idx WHERE author_id = ${quotaUserId};`,
-    sql`SELECT poll_id FROM fam_school_polls VIEW fam_school_polls_author_id_idx WHERE author_id = ${quotaUserId};`,
-    sql`SELECT choice_index FROM fam_school_poll_votes VIEW fam_school_poll_votes_voter_id_idx WHERE voter_id = ${quotaUserId};`,
-  ]);
-  assert.ok(indexProbes.every(rows => (rows?.[0]?.length ?? 0) === 0), 'all four FK lookup indexes are usable on the empty synthetic tables');
-  const agentQueue = createYdbAgentTaskQueue(sql);
-  const coderBucket = new Date();
-  coderBucket.setUTCMinutes(0, 0, 0);
-  for (let i = 0; i < 3; i++) {
-    await repo.recordSiteError({ eventCode: 'js_runtime', pageArea: 'auth', occurredAt: new Date(coderBucket.getTime() + i * 60_000) });
-  }
-  const coderSlotDate = new Date();
-  coderSlotDate.setUTCMinutes(Math.floor(coderSlotDate.getUTCMinutes() / 15) * 15, 0, 0);
-  const coderSlot = coderSlotDate.toISOString().slice(0, 16);
-  const coderTask = await agentQueue.enqueueSafeCoderTask(coderSlot);
-  assert.equal(coderTask.created, true, 'thresholded aggregate telemetry creates a synthetic manual-review task');
-  assert.equal(coderTask.task_key, 'audit_frontend_runtime');
-  assert.equal((await agentQueue.enqueueSafeCoderTask(coderSlot)).created, false, 'coder task enqueue is idempotent per quarter-hour slot');
-  const claimedBeforeCoder = await agentQueue.claimSafeTasks(5);
-  assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
-    'the automated worker allowlist never claims coder tasks');
-  const queuedCoder = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${coderTask.id};`;
-  assert.equal(queuedCoder?.[0]?.[0]?.status, 'queued', 'coder task stays out of the automated safe worker');
-  const coderPayload = JSON.parse(queuedCoder?.[0]?.[0]?.payload_json ?? 'null');
-  assert.deepEqual(Object.keys(coderPayload).sort(), ['event_code', 'occurrences', 'page_area', 'task_key'],
-    'coder task carries only the fixed aggregate schema');
-  assert.equal(coderPayload.task_key, coderTask.task_key);
-  assert.ok(['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(coderPayload.event_code));
-  assert.ok(['auth', 'listings', 'notifications', 'database', 'other'].includes(coderPayload.page_area));
-  assert.ok(Number.isInteger(coderPayload.occurrences) && coderPayload.occurrences >= 3 && coderPayload.occurrences <= 1000);
-  const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
-  assert.equal(coderClaim.id, coderTask.id);
-  assert.equal(coderClaim.task_key, coderPayload.task_key);
-  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
-    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
-  assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
-    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
-  const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
-  assert.equal(safeTask.created, true);
-  assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,
-    'safe scheduled task enqueue is idempotent');
-  const claimedSafeTasks = await agentQueue.claimSafeTasks(1);
-  assert.equal(claimedSafeTasks.length, 1);
-  assert.equal(claimedSafeTasks[0].task_type, 'queue_health_check');
-  assert.equal(Object.hasOwn(claimedSafeTasks[0], 'payload'), false, 'worker claim does not expose arbitrary task payload');
-  assert.equal(await agentQueue.finishSafeTask({ id: claimedSafeTasks[0].id, claimToken: claimedSafeTasks[0].claim_token,
-    status: 'completed', summary: 'Synthetic aggregate queue check completed.' }), true);
-  assert.equal(await agentQueue.finishSafeTask({ id: claimedSafeTasks[0].id, claimToken: claimedSafeTasks[0].claim_token,
-    status: 'completed', summary: 'Stale claim must not complete.' }), false, 'finished claims cannot be replayed');
-  const safeQueueHealth = await agentQueue.getSafeTaskQueueHealth();
-  assert.equal(safeQueueHealth.statuses.completed, 1);
-  assert.equal(safeQueueHealth.content_read, false);
-  const concurrentEnqueues = await Promise.all([
-    agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:15'),
-    agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:15'),
-  ]);
-  assert.equal(concurrentEnqueues.filter(result => result.created).length, 1,
-    'concurrent idempotent enqueues create one task');
-  const concurrentClaims = await Promise.all([agentQueue.claimSafeTasks(1), agentQueue.claimSafeTasks(1)]);
-  assert.equal(concurrentClaims.reduce((total, tasks) => total + tasks.length, 0), 1,
-    'a concurrent worker cannot claim the same task twice');
-  const racedClaim = concurrentClaims.flat()[0];
-  assert.equal(await agentQueue.finishSafeTask({ id: racedClaim.id, claimToken: racedClaim.claim_token,
-    status: 'completed', summary: 'Concurrent synthetic claim completed once.' }), true);
-  const syntheticSystemHealth = createSystemHealthTaskHandler({
-    readinessCheck: async () => ({ ready: true, services: { auth: true, database: true, objectStorage: true } }),
-    timerCheck: async () => ({ ok: true, timers: [{ unit: 'fam-ru-synthetic.timer', ok: true }] }),
-    queueHealthCheck: async () => {
-      const health = await repo.getRuBackgroundQueueHealth();
-      const safeTasks = await agentQueue.getSafeTaskQueueHealth();
-      return { ...health, queues: { ...health.queues, safe_agent_tasks: safeTasks }, content_read: false };
-    },
-    schemaCheck: async () => schemaHealth,
-  });
-  const scheduledWorker = createSafeAgentTaskWorker({ queue: agentQueue, handlers: {
-    queue_health_check: async () => {
-      const health = await agentQueue.getSafeTaskQueueHealth();
-      return `Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ¾Ñ‡ĞµÑ€ĞµĞ´ĞµĞ¹: Ğ¾Ğ¶Ğ¸Ğ´Ğ°ÑÑ‚ ${health.statuses.queued}; ÑĞ¾Ğ´ĞµÑ€Ğ¶Ğ¸Ğ¼Ğ¾Ğµ Ğ½Ğµ Ñ‡Ğ¸Ñ‚Ğ°Ğ»Ğ¾ÑÑŒ.`;
-    },
-    daily_report_digest: async () => {
-      const result = await createOrchestratorDailyDigest({ repository: repo, now: () => new Date('2026-11-20T04:00:00.000Z') })();
-      return `Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ ÑĞ²Ğ¾Ğ´ĞºĞ° Ğ·Ğ° ${result.date} Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ° Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ¾.`;
-    },
-    system_health_check: syntheticSystemHealth,
-    site_error_digest: async () => {
-      const result = await createSiteErrorDigest({ repository: repo, now: () => new Date('2026-11-20T04:30:00.000Z') })();
-      return `Ğ¡Ğ¸Ğ½Ñ‚ĞµÑ‚Ğ¸Ñ‡ĞµÑĞºĞ°Ñ ÑĞ²Ğ¾Ğ´ĞºĞ° Ğ¾ÑˆĞ¸Ğ±Ğ¾Ğº Ğ·Ğ° ${result.slot} Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ° Ğ°Ğ³Ñ€ĞµĞ³Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ¾.`;
-    },
-  } });
-  const scheduledRuns = [];
-  for (const slot of ['2026-11-20T03:40:00.000Z', '2026-11-20T04:00:00.000Z', '2026-11-20T04:30:00.000Z']) {
-    scheduledRuns.push(await createScheduledSafeAgentRunner({ queue: agentQueue, worker: scheduledWorker,
-      now: () => new Date(slot) })());
-  }
-  assert.deepEqual(scheduledRuns.map(result => ({ scheduled: result.scheduled, created: result.created,
-    claimed: result.claimed, completed: result.completed, blocked: result.blocked, failed: result.failed })), [
-    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
-    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
-    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
-  ], 'all three source schedule slots enqueue and complete through the real YDB queue and safe worker');
-  const scheduledRows = await sql`SELECT task_type, status FROM fam_agent_tasks WHERE source = 'scheduled_audit'
-    AND task_type IN ('system_health_check', 'daily_report_digest', 'site_error_digest');`;
-  assert.deepEqual(new Set((scheduledRows?.[0] ?? []).map(row => `${row.task_type}:${row.status}`)),
-    new Set(['system_health_check:completed', 'daily_report_digest:completed', 'site_error_digest:completed']));
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40/04:00/hourly :30 UTC schedule-to-worker flows with synthetic health checks and real digest handlers, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
-} catch (error) {
-  console.error(inspect(error, { depth: null }));
-  process.exitCode = 1;
-} finally {
-  syntheticPendingImages?.close();
-  quotaPendingImages?.close();
-  await driver.close();
-}
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíß¿7ñ:-jZ.¶›­–)Ş³V–×÷'B76W'Bg&öÒvæöFS¦76W'B÷7G&–7Bs°¦–×÷'B²&VF&ÆRÒg&öÒvæöFS§7G&VÒs°¦–×÷'B²–ç7V7BÒg&öÒvæöFS§WF–Âs°¦–×÷'B²G&—fW"Òg&öÒt–F&§2ö6÷&Rs°¦–×÷'B²VW'’Â–FVçF–f–W"Âg&vÖVçBÂ¦ö–âÒg&öÒt–F&§2÷VW'’s°¦–×÷'B6†'g&öÒw6†'s°¦–×÷'B²7&VFU–F$Æ—7F–æw5&W÷6—F÷'’Òg&öÒrââöö&6¶VæB÷&W÷6—F÷&–W2÷–F"ÖÆ—7F–æw2æÖ§2s°¦–×÷'B²7&VFU–F$vVçEF6µVWVRÒg&öÒrââöö&6¶VæB÷&W÷6—F÷&–W2÷–F"ÖvVçB×F6²×VWVRæÖ§2s°¦–×÷'B²7&VFU6fTvVçEF6µv÷&¶W"Òg&öÒrââöö&6¶VæB÷6W'f–6W2÷6fRÖvVçB×F6²×v÷&¶W"æÖ§2s°¦–×÷'B²7&VFU7—7FVÔ†VÇF…F6´†æFÆW"Òg&öÒrââöö&6¶VæB÷6W'f–6W2÷7—7FVÒÖ†VÇF‚×F6²æÖ§2s°¦–×÷'B²7&VFT÷&6†W7G&F÷$F–Ç”F–vW7BÒg&öÒrââöö&6¶VæB÷6W'f–6W2ö÷&6†W7G&F÷"ÖF–Ç’ÖF–vW7BæÖ§2s°¦–×÷'B²7&VFU6—FTW'&÷$F–vW7BÒg&öÒrââöö&6¶VæB÷6W'f–6W2÷6—FRÖW'&÷"ÖF–vW7BæÖ§2s°¦–×÷'B²7&VFU66†VGVÆVE6fTvVçE'VææW"Òg&öÒrââöö&6¶VæB÷6W'f–6W2÷66†VGVÆVB×6fRÖvVçB×'VææW"æÖ§2s°¦–×÷'B²7&VFTFF&6T7F÷%&W6öÇfW"Òg&öÒrââöö&6¶VæBöWF‚öFF&6RÖ7F÷"æÖ§2s°¦–×÷'B²7&VFU7W7Vç6–öåw&—FTwV&BÒg&öÒrââöö&6¶VæBöWF‚÷7W7Vç6–öâ×w&—FRÖwV&BæÖ§2s°¦–×÷'B²7&VFTÆ—7F–æw4’Òg&öÒrââöö&6¶VæB÷6W'f–6W2öÆ—7F–æw2Ö’æÖ§2s°¦–×÷'B²7&VFTÖVF–’Òg&öÒrââöö&6¶VæB÷6W'f–6W2öÖVF–Ö’æÖ§2s°¦–×÷'B²7&VFU35VæF–æt–ÖvU7F÷&RÒg&öÒrââöö&6¶VæBöÖVF–÷32×VæF–ær×7F÷&RæÖ§2s°¦–×÷'B²7&VFT66÷VçDFVÆWF–öå&V6÷fW'”÷W&F–öâÒg&öÒrââöö&6¶VæB÷6W'f–6W2÷&V6÷fW"Ö66÷VçBÖFVÆWF–öç2æÖ§2s°¦–×÷'B²7&VFU–F%66†VÖ†VÇF„6†V6²Òg&öÒrââöö&6¶VæB÷6W'f–6W2÷–F"×66†VÖÖ†VÇF‚æÖ§2s°¦–×÷'B²7&VFU&öÆTVÖ–ÅfW&–f–6F–öâÒg&öÒrââöö&6¶VæB÷6W'f–6W2÷&öÆRÖVÖ–Â×fW&–f–6F–öâæÖ§2s° ¢òòF†—267&—B—2–çFVçF–öæÆÇ’†&B×v—&VBFòF†RF—7÷6&ÆRÆö6ÂFF&6Rà¦6öç7BG&—fW"ÒæWrG&—fW"‚vw'3¢òó#rããã£#3böÆö6Âr“°¦ÆWB7–çF†WF–5VæF–æt–ÖvW3°¦ÆWBV÷FVæF–æt–ÖvW3°§G'’°¢v—BG&—fW"ç&VG’‚“°¢6öç7B6Æ–VçBÒVW'’†G&—fW"“°¢6öç7B7ÂÒ‡7G&–æw2ÂââçfÇVW2’Óâ²6öç7B7FFVÖVçBÒ6Æ–VçB‡7G&–æw2ÂââçfÇVW2“²7FFVÖVçBæöâ‚vW'&÷"rÂ‚’Óâ·Ò“²&WGW&â7FFVÖVçC²Ó°¢7Âæ&Vv–âÒ6Æ–VçBæ&Vv–âæ&–æB†6Æ–VçB“°¢6öç7B&WòÒ7&VFU–F$Æ—7F–æw5&W÷6—F÷'’‡7Â“°¢6öç7B66†VÖ†VÇF‚Òv—B7&VFU–F%66†VÖ†VÇF„6†V6²‡7ÂÂ²–FVçF–f–W"Âg&vÖVçBÂ¦ö–âÒ’‚“°¢76W'BæFVWWVÂ‡66†VÖ†VÇF‚Â²ö³¢G'VRÂF&ÆW5ö6†V6¶VC¢3rÂ6öçFVçE÷&VC¢fÇ6RÂw&—FU÷W&Ö—76–öç5ö6†V6¶VC¢fÇ6RÒ“°¢6öç7B&Vv–ä66÷VçDFVÆWF–öâÒ&Wòæ&Vv–ä66÷VçDFVÆWF–öâæ&–æB‡&Wò“°¢&Wòæ&Vv–ä66÷VçDFVÆWF–öâÒ7–æ2–çWBÓâ°¢G'’°¢6öç7B&W7VÇBÒv—B&Vv–ä66÷VçDFVÆWF–öâ†–çWB“°¢6öç6öÆRæW'&÷"‚u”D%õ5”åD„UD”5ô44õTåEôDTÄUD”ôåô$Tt”åõ$U5TÅC¢rÂ¥4ôâç7G&–æv–g’‡²ö³¢&W7VÇCòæö²Â6öFS¢&W7VÇCòæ6öFRÂ†46Æ–ÕFö¶Vã¢&ööÆVâ‡&W7VÇCòæ6Æ–Õ÷Fö¶Vâ’Ò’“°¢&WGW&â&W7VÇC°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚u”D%õ5”åD„UD”5ô44õTåEôDTÄUD”ôåô$Tt”åôU%$õ#¢rÂW'&÷#òæÖW76vRÇÂwVæ¶æ÷vâr“°¢F‡&÷rW'&÷#°¢Ğ¢Ó°¢6öç7Bf–æ—6„66÷VçDFVÆWF–öâÒ&Wòæf–æ—6„66÷VçDFVÆWF–öâæ&–æB‡&Wò“°¢&Wòæf–æ—6„66÷VçDFVÆWF–öâÒ7–æ2–çWBÓâ°¢G'’°¢6öç7B&W7VÇBÒv—Bf–æ—6„66÷VçDFVÆWF–öâ†–çWB“°¢–b‚&W7VÇCòæö²’6öç6öÆRæW'&÷"‚u”D%õ5”åD„UD”5ô44õTåEôDTÄUD”ôåôd”äÄ•¤Uõ$T¤T5DTC¢rÂ&W7VÇCòæ6öFRÇÂwVæ¶æ÷vâr“°¢&WGW&â&W7VÇC°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚u”D%õ5”åD„UD”5ô44õTåEôDTÄUD”ôåôd”äÄ•¤UôU%$õ#¢rÂW'&÷#òæÖW76vRÇÂwVæ¶æ÷vâr“°¢F‡&÷rW'&÷#°¢Ğ¢Ó°¢v—B7Æ”å4U%B”åDòfÕ÷W6W%÷&öf–ÆW2†—77VW"Â7V&¦V7BÂW6W%ö–BÂ66†ööÅö–BÂ&öÆRÂ7F—fRÂf—'7EöæÖRÂÆ7EöæÖRÂ6Æ75öæÖRÂ6—G’’dÅTU2‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÓrÂw7–çF†WF–2×W6W"rÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VRÂ}
+-]"rÂ}
+=}]İ¢rÂs	rÂ}	­}İÂr“¶°¢v—B7Æ”å4U%B”åDòfÕ÷W6W%÷&öf–ÆW2†—77VW"Â7V&¦V7BÂW6W%ö–BÂ66†ööÅö–BÂ&öÆRÂ7F—fR’dÅTU0¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÓ"rÂsÓÓCÓƒÓrÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖFÖ–ârÂs33333332Ó3332ÓC332Óƒ332Ó333333333332rÂw7–çF†WF–2×66†ööÂrÂw66†ööÅöFÖ–ârÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7B×&öÆR×7GVFVçBrÂsSSSSSSSRÓSSSRÓCSSRÓƒSSRÓSSSSSSSSSSSRrÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÓ2rÂs#######"Ó###"ÓC##"Óƒ##"Ó###########"rÂv÷F†W"×66†ööÂrÂw7GVFVçBrÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖ6÷Væ6–ÂrÂscccccccbÓcccbÓCccbÓƒccbÓcccccccccccbrÂw7–çF†WF–2×66†ööÂrÂv6÷Væ6–ÅöÖVÖ&W"rÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7B×&öÆR×F&vWBrÂssssssssrÓsssrÓCssrÓƒssrÓsssssssssssrrÂw7–çF†WF–2×66†ööÂrÂv6÷Væ6–ÅöÖVÖ&W"rÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖFÖ–â×F&vWBrÂsƒƒƒƒƒƒƒ‚Óƒƒƒ‚ÓCƒƒ‚Óƒƒƒ‚Óƒƒƒƒƒƒƒƒƒƒƒ‚rÂw7–çF†WF–2×66†ööÂrÂw66†ööÅöFÖ–ârÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖFVÆWFR×F&vWBrÂs“““““““’Ó“““’ÓC““’Óƒ““’Ó“““““““““““’rÂw7–çF†WF–2×66†ööÂrÂv6÷Væ6–ÅöÖVÖ&W"rÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7B×&V6÷fW'’rÂvÖÓFÓ†Ö2rÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖÇ–6WVÒÖFÖ–ârÂsCCCCCCCBÓCCCBÓCCCBÓƒCCBÓCCCCCCCCCCCBrÂvÇ–6WVÕó2rÂw66†ööÅöFÖ–ârÂG'VR’À¢‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7BÖÖVF–rÂv&&&&&&&"Ö&&&"ÓF&&"Ó†&&"Ö&&&&&&&&&&&"rÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VR“¶°¢v—B7Æ”å4U%B”åDòfÕ÷W6W%÷&öf–ÆW2†—77VW"Â7V&¦V7BÂW6W%ö–BÂ66†ööÅö–BÂ&öÆRÂ7F—fRÂf—'7EöæÖRÂÆ7EöæÖRÂ6Æ75öæÖR’dÅTU2‚v‡GG3¢òö—77VW"ç7–çF†WF–2rÂw7V&¦V7B×6fWG’Ö7F÷"rÂvÖÓFÓ†ÖrÂw7–çF†WF–2×66†ööÂrÂw7GVFVçBrÂG'VRÂ}
+-]"rÂ}	İ=-]½ÂrÂs	r“¶°¢6öç7B&W6öÇfT7F÷"Ò7&VFTFF&6T7F÷%&W6öÇfW"‡7Â“°¢76W'BæFVWWVÂ†v—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7BÓrÒ’Â²–C¢w7–çF†WF–2×W6W"rÂ66†ööÅö–C¢w7–çF†WF–2×66†ööÂrÂ&öÆS¢w7GVFVçBrÂf—'7EöæÖS¢}
+-]"rÂÆ7EöæÖS¢}
+=}]İ¢rÂ6Æ75öæÖS¢s	rÂ6—G“¢}	­}İÂrÂfF%÷W&Ã¢çVÆÂÂW'6öå÷G—S¢w7GVFVçBrÂ7Ffe÷÷6—F–öã¢çVÆÂÂ7Ffe÷fW&–f–6F–öå÷7FGW3¢væ÷E÷&WV—&VBrÒ“°¢76W'BæWVÂ†v—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢wVæ¶æ÷vârÒ’ÂçVÆÂ“°¢6öç7BWF†VçF–6FRÒ7–æ2&WÓâ°¢6öç7B7V&¦V7BÒ²t&V&W"7–çF†WF–2×&Vv—7G&çBrÂt&V&W"7–çF†WF–2×&V6VçB×&Vv—7G&çBuÒæ–æ6ÇVFW2‡&Wæ†VFW'2æWF†÷&—¦F–öâ’òw7V&¦V7BÓ"p¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2ÖFÖ–âròw7V&¦V7BÖFÖ–âp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2ÖÖVF–ròw7V&¦V7BÖÖVF–p¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2×&öÆR×7GVFVçBròw7V&¦V7B×&öÆR×7GVFVçBp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2Ö6÷Væ6–Âròw7V&¦V7BÖ6÷Væ6–Âp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2ÖæWr×7GVFVçBròw7V&¦V7BÖæWrp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2ÖæWr×7Ffbròw7V&¦V7BÖæWr×7Ffbp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2Ö÷F†W"×66†ööÂròw7V&¦V7BÓ2p¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2ÖÇ–6WVÒÖFÖ–âròw7V&¦V7BÖÇ–6WVÒÖFÖ–âp¢¢&Wæ†VFW'2æWF†÷&—¦F–öâÓÓÒt&V&W"7–çF†WF–2×6fWG’Ö7F÷"ròw7V&¦V7B×6fWG’Ö7F÷"r¢w7V&¦V7BÓs°¢&WGW&â²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7BÀ¢âââ‡7V&¦V7BÓÓÒw7V&¦V7B×&öÆR×7GVFVçBrò²VÖ–Ã¢w&öÆR×7GVFVçD7–çF†WF–2æW†×ÆRrÒ¢·Ò’À¢WF†VçF–6FVEöC¢²t&V&W"7–çF†WF–2ÖFÖ–ârÂt&V&W"7–çF†WF–2×&V6VçB×&Vv—7G&çBuÒæ–æ6ÇVFW2‡&Wæ†VFW'2æWF†÷&—¦F–öâ’òÖF‚æfÆö÷"„FFRææ÷r‚’ò’¢çVÆÂÓ°¢Ó°¢6öç7BFVÆWFVDÖVF–¶W—2ÒµÓ°¢6öç7B66÷VçDÖVF–¶W—2ÒæWr6WB‚“°¢ÆWB7–çF†WF–5fW&–f–6F–öäVÖ–Ã°¢6öç7BVÖ–ÅfW&–f–6F–öä¶W’ÒvÆö6ÂÖ6’ÖöæÇ’×7–çF†WF–2×&öÆRÖVÖ–ÂÖ¶W’Ö÷fW"Ó3"Ö'—FW2s°¢6öç7BVÖ–ÅfW&–f–6F–öâÒ7&VFU&öÆTVÖ–ÅfW&–f–6F–öâ‡²&W÷6—F÷'“¢&WòÂfW&–f–6F–öä¶W“¢VÖ–ÅfW&–f–6F–öä¶W’À¢6VæDVÖ–Ã¢7–æ2ÖW76vRÓâ²7–çF†WF–5fW&–f–6F–öäVÖ–ÂÒÖW76vS²ÒÂæ÷s¢‚’ÓâóƒóóóÂ7&VFT6öFS¢‚’Óâs3Ss“rÒ“°¢6öç7BÆ—7F–æw4’Ò7&VFU7W7Vç6–öåw&—FTwV&B‡²WF†VçF–6FRÂ&W6öÇfT7F÷"Â&W÷6—F÷'“¢&WòÒ’†7&VFTÆ—7F–æw4’‡°¢WF†VçF–6FRÀ¢&W6öÇfT7F÷"À¢&W÷6—F÷'“¢&WòÀ¢6fWG”¶W“¢vÆö6ÂÖ6’ÖöæÇ’×7–çF†WF–2×6fWG’Ö¶W’Ö÷fW"Ó3"Ö'—FW2rÀ¢fW&–f–6F–öä¶W“¢VÖ–ÅfW&–f–6F–öä¶W’À¢6VæE&öÆUfW&–f–6F–öäVÖ–Ã¢7–æ2ÖW76vRÓâ²7–çF†WF–5fW&–f–6F–öäVÖ–ÂÒÖW76vS²ÒÀ¢VÖ–ÅfW&–f–6F–öâÀ¢VæF–æt–ÖvW3¢°¢vWC¢7–æ2‚’Óâ'VffW"æg&öÒ‚w7–çF†WF–2×vV'r’À¢FVÆWFS¢7–æ2¶W’Óâ²FVÆWFVDÖVF–¶W—2çW6‚†¶W’“²66÷VçDÖVF–¶W—2æFVÆWFR†¶W’“²ÒÀ¢Æ—7EW6W$ö&¦V7G3¢7–æ2W6W$–BÓâ²ââæ66÷VçDÖVF–¶W—5Òæf–ÇFW"†¶W’Óâ¶W’ç7F'G5v—F‚†VæF–æròG·W6W$–GÒö’’À¢Æ—7D66÷VçDö&¦V7G3¢7–æ2‡W6W$–BÂ÷væVD¶W—2ÒµÒ’Óâ²ââææWr6WB…°¢ââå²ââæ66÷VçDÖVF–¶W—5Òæf–ÇFW"†¶W’Óâ¶W’ç7F'G5v—F‚†VæF–æròG·W6W$–GÒö’’Âââæ÷væVD¶W—2À¢Ò•ÒÀ¢ÒÀ¢Ò’“°¢6öç7B•&WVW7BÒ†ÖWF†öBÂW&ÂÂFö¶VâÂ&öG’Ò·Ò’Óâ°¢6öç7B&WVW7BÒ&öG’ÓÓÒçVÆÂò&VF&ÆRæg&öÒ…µÒ’¢&VF&ÆRæg&öÒ…´'VffW"æg&öÒ„¥4ôâç7G&–æv–g’†&öG’’•Ò“°¢&WVW7BæÖWF†öBÒÖWF†öC²&WVW7BçW&ÂÒW&Ã²&WVW7Bæ†VFW'2Ò²WF†÷&—¦F–öã¢&V&W"G·Fö¶VçÖÓ°¢&WGW&â&WVW7C²Ó°¢6öç7B&—fFTö&¦V7G2ÒæWrÖ‚“°¢7–çF†WF–5VæF–æt–ÖvW2Ò7&VFU35VæF–æt–ÖvU7F÷&R‡°¢dÕõ%Uõ35ôTäEô”åC¢v‡GG¢òó#rããã£“rÀ¢dÕõ%Uõ35ô%T4´UC¢w7–çF†WF–2×&—fFRrÀ¢dÕõ%Uõ35ô44U55ô´U•ô”C¢w7–çF†WF–2Ö66W72rÀ¢dÕõ%Uõ35õ4T5$UEô44U55ô´U“¢w7–çF†WF–2×6V7&WBrÀ¢ÒÂ°¢6VæC¢7–æ2–çWBÓâ²&—fFTö&¦V7G2ç6WB†–çWBä¶W’Â²&öG“¢'VffW"æg&öÒ†–çWBä&öG’’Â6öçFVçEG—S¢–çWBä6öçFVçEG—RÒ“²ÒÀ¢vWC¢7–æ2–çWBÓâ°¢6öç7Bö&¦V7BÒ&—fFTö&¦V7G2ævWB†–çWBä¶W’“°¢&WGW&âö&¦V7Bò²6öçFVçEG—S¢ö&¦V7Bæ6öçFVçEG—RÂ6öçFVçDÆVæwFƒ¢ö&¦V7Bæ&öG’æÆVæwF‚À¢&öG“¢²G&ç6f÷&ÕFô'—FT'&“¢7–æ2‚’Óâö&¦V7Bæ&öG’ÒÒ¢çVÆÃ°¢ÒÀ¢&VÖ÷fS¢7–æ2–çWBÓâ²&—fFTö&¦V7G2æFVÆWFR†–çWBä¶W’“²ÒÀ¢Æ—7C¢7–æ2–çWBÓâ‡²6öçFVçG3¢²ââç&—fFTö&¦V7G2æ¶W—2‚•Òæf–ÇFW"†¶W’Óâ¶W’ç7F'G5v—F‚†–çWBå&Vf—‚’’æÖ„¶W’Óâ‡²¶W’Ò’’Â—5G'Væ6FVC¢fÇ6RÒ’À¢Ò“°¢6öç7BÖVF–’Ò7&VFTÖVF–’‡²WF†VçF–6FRÂ&W6öÇfT7F÷"Â&W÷6—F÷'“¢&WòÂVæF–æt–ÖvW3¢7–çF†WF–5VæF–æt–ÖvW2Ò“°¢6öç7B÷væW%&—fFU†÷Fô¶W’ÒwVæF–æróÓÓCÓƒÓó###"Ó#"ÓC#"Óƒ#"Ó#####"çvV's°¢v—B&Wòç&Vv—7FW%VæF–æt–ÖvR‚sÓÓCÓƒÓrÂ÷væW%&—fFU†÷Fô¶W’“°¢&—fFTö&¦V7G2ç6WB†÷væW%&—fFU†÷Fô¶W’Â²&öG“¢'VffW"æg&öÒ‚w7–çF†WF–2×vV'r’Â6öçFVçEG—S¢v–ÖvR÷vV'rÒ“°¢6öç7B÷væW%&—fFTÆ—7F–ærÒv—B&Wòæ7&VFTÆ—7F–ær‡²W6W%ö–C¢sÓÓCÓƒÓrÂ66†ööÅö–C¢w7–çF†WF–2×66†ööÂrÀ¢F—FÆS¢}
+İ-]-}]­íRİ]íı=½­í-İİíRí­ı-½]İR--írÂFW67&—F–öã¢}	ıí-]­Mí-=ı--í¢-í]Í2íMí]İİíÍ2Mí-ârÀ¢6FVv÷'“¢}
+=}rÂ&–6U÷FW‡C¢}	]ı½-İârÂ—5öWfVçC¢fÇ6RÂÖ…÷6VG3¢Â–ÖvUö¶W“¢÷væW%&—fFU†÷Fô¶W’À¢†÷Fõ÷7FGW3¢v&÷fVBrÂ7FGW3¢wVæF–ærrÒ“°¢76W'BæWVÂ‚†v—BÖVF–’†•&WVW7B‚ttUBrÂö’÷cöÆ—7F–æw2òG¶÷væW%&—fFTÆ—7F–æræ–GÒ÷†÷FöÂw7–çF†WF–2×&Vv—7G&çBr’’’ç7FGW2Â#À¢wF†RÆ—7F–ærWF†÷"6â&VBF†V—"&÷fVB†÷Fò&Vf÷&RF†RÆ—7F–ær&V6öÖW2V&Æ–2r“°¢76W'BæWVÂ‚†v—BÖVF–’†•&WVW7B‚ttUBrÂö’÷cöÆ—7F–æw2òG¶÷væW%&—fFTÆ—7F–æræ–GÒ÷†÷FöÂw7–çF†WF–2ÖÖVF–r’’’ç7FGW2ÂCBÀ¢væ÷F†W"7GVFVçB–âF†R6ÖR66†ööÂ6ææ÷B&VBæöâ×V&Æ–2Æ—7F–ær†÷Fòr“°¢6öç7B7–çF†WF–5ærÒv—B6†'‡²7&VFS¢²v–GFƒ¢‚Â†V–v‡C¢‚Â6†ææVÇ3¢2Â&6¶w&÷VæC¢²#¢C"Âs¢“Â#¢CÒÒÒ’çær‚’çFô'VffW"‚“°¢6öç7BWÆöE&WVW7BÒ&VF&ÆRæg&öÒ…·7–çF†WF–5æuÒ“°¢WÆöE&WVW7BæÖWF†öBÒuõ5Bs²WÆöE&WVW7BçW&ÂÒrö’÷cöÖVF–÷VæF–ærs°¢WÆöE&WVW7Bæ†VFW'2Ò²WF†÷&—¦F–öã¢t&V&W"7–çF†WF–2ÖÖVF–rÂv6öçFVçB×G—Rs¢v–ÖvR÷ærrÂv6öçFVçBÖÆVæwF‚s¢7G&–ær‡7–çF†WF–5æræÆVæwF‚’Ó°¢6öç7BÖVF–WÆöBÒv—BÖVF–’‡WÆöE&WVW7B“°¢76W'BæWVÂ†ÖVF–WÆöBç7FGW2Â#“°¢6öç7BÖVF–¶W’ÒÖVF–WÆöBæ&öG’æ–ÖvRæ¶W“°¢6öç7B7F÷&VD–ÖvRÒ&—fFTö&¦V7G2ævWB†ÖVF–¶W’“°¢76W'BæWVÂ‡7F÷&VD–ÖvSòæ6öçFVçEG—RÂv–ÖvR÷vV'r“°¢76W'BæWVÂ‚†v—B6†'‡7F÷&VD–ÖvRæ&öG’’æÖWFFF‚’’æf÷&ÖBÂwvV'rÂwF†R7–çF†WF–2WÆöB—27GVÆÇ’FV6öFVBæB&RÖVæ6öFVBr“°¢6öç7BVæF–ætÖVF–&÷rÒv—B7Æ4TÄT5BW6W%ö–BÂ7FGW2e$ôÒfÕ÷VæF–æuöÖVF–t„U$Rö&¦V7Eö¶W’ÒG¶ÖVF–¶W—ÒÄ”Ô•B¶°¢76W'BæFVWWVÂ‡VæF–ætÖVF–&÷u³Õ³ÒÂ²W6W%ö–C¢v&&&&&&&"Ö&&&"ÓF&&"Ó†&&"Ö&&&&&&&&&&&"rÂ7FGW3¢wVæF–ærrÒ“°¢6öç7BÖVF–Æ—7F–ærÒv—B&Wòæ7&VFTÆ—7F–ær‡²W6W%ö–C¢v&&&&&&&"Ö&&&"ÓF&&"Ó†&&"Ö&&&&&&&&&&&"rÂ66†ööÅö–C¢w7–çF†WF–2×66†ööÂrÀ¢F—FÆS¢}
+İ-]-}]­íRMí-ârÂFW67&—F–öã¢}	ıí-]­}==}­‚rÂ6FVv÷'“¢}	-]‚rÂ&–6U÷FW‡C¢}	]ı½-İârÂ—5öWfVçC¢fÇ6RÀ¢WfVçEöFFS¢çVÆÂÂWfVçE÷F–ÖS¢çVÆÂÂWfVçE÷G—S¢çVÆÂÂÖ…÷6VG3¢Â–ÖvUö¶W“¢ÖVF–¶W’Â†÷Fõ÷7FGW3¢wVæF–ærrÂ7FGW3¢wVæF–ærrÒ“°¢76W'Bæö²†ÖVF–Æ—7F–æsòæ–BÂwF†RfW&–f–VBWÆöFW"6âÆ–æ²F†V—"÷vâ&—fFR–ÖvRFòVæF–ærÆ—7F–ærr“°¢6öç7BÆ–æ¶VDÖVF–&÷rÒv—B7Æ4TÄT5B7FGW2e$ôÒfÕ÷VæF–æuöÖVF–t„U$Rö&¦V7Eö¶W’ÒG¶ÖVF–¶W—ÒÄ”Ô•B¶°¢76W'BæWVÂ†Æ–æ¶VDÖVF–&÷u³Õ³Òç7FGW2ÂvÆ–æ¶VBr“°¢v—B7–çF†WF–5VæF–æt–ÖvW2æ6Æ÷6R‚“°¢7–çF†WF–5VæF–æt–ÖvW2ÒçVÆÃ°¢6öç7B6fVDæ÷F–f–6F–öå7FFRÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷cöæ÷F–f–6F–öâ×&VG2rÂw7–çF†WF–2×&Vv—7G&çBrÂ°¢æ÷F–f–6F–öåö¶W—3¢²w&VÆV6S§7–çF†WF–2rÂvF—6Ö—76VC§66†ööÂÖÆ—7F–æs§7–çF†WF–2Ö–BuÒÀ¢Ò’“°¢76W'BæFVWWVÂ‡6fVDæ÷F–f–6F–öå7FFRÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÒÒ“°¢6öç7B÷väæ÷F–f–6F–öå7FFRÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöæ÷F–f–6F–öâ×&VG2rÂw7–çF†WF–2×&Vv—7G&çBr’“°¢76W'BæFVWWVÂ†æWr6WB†÷väæ÷F–f–6F–öå7FFRæ&öG’ææ÷F–f–6F–öåö¶W—2’ÂæWr6WB…²w&VÆV6S§7–çF†WF–2rÂvF—6Ö—76VC§66†ööÂÖÆ—7F–æs§7–çF†WF–2Ö–BuÒ’“°¢6öç7B—6öÆFVDæ÷F–f–6F–öå7FFRÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöæ÷F–f–6F–öâ×&VG2rÂw7–çF†WF–2Ö÷F†W"×66†ööÂr’“°¢76W'BæFVWWVÂ†—6öÆFVDæ÷F–f–6F–öå7FFRæ&öG’ææ÷F–f–6F–öåö¶W—2ÂµÒÂvæ÷F–f–6F–öâ&VB7FFR—2—6öÆFVB'’WF†VçF–6FVB66÷VçBr“°¢6öç7BvVçDÖWG&–72Òv—B&WòævWE66†ööÄvVçDÖWG&–72‚w7–çF†WF–2×66†ööÂr“°¢76W'Bæö²„çVÖ&W"æ—4–çFVvW"†vVçDÖWG&–72æÆ—7F–æw2æ7F—fR’“°¢6öç7BvÆö&ÄvVçDÖWG&–72Òv—B&WòævWDvÆö&ÄvVçDF–Ç”ÖWG&–72‚“°¢76W'Bæö²„çVÖ&W"æ—4–çFVvW"†vÆö&ÄvVçDÖWG&–72æÆ—7F–æw2æ7F—fR’“°¢76W'Bæö²„çVÖ&W"æ—4–çFVvW"†vÆö&ÄvVçDÖWG&–72ç6fWG’çVç&Wf–WvVB’“°¢76W'Bæö²„çVÖ&W"æ—4–çFVvW"†vÆö&ÄvVçDÖWG&–72æ–FV2çVæF–ær’“°¢v—B&Wòç6fTvÆö&ÄvVçDF–Ç•&W÷'B‡²FFS¢s##bÓÓBrÀ¢7VÖÖ'“¢}
+İ-]-}]­ò-İ=-]İİıò-íM­rÂÖWG&–73¢vÆö&ÄvVçDÖWG&–72Ò“°¢6öç7B6fVDvÆö&ÄvVçE&W÷'BÒv—B7Æ4TÄT5B&W÷'EöFFRÂ7VÖÖ'’ÂÖWG&–75ö§6öâe$ôÒfÕövVçEöF–Ç•÷&W÷'G2t„U$R&W÷'EöFFRÒs##bÓÓBs¶°¢76W'BæWVÂ‡6fVDvÆö&ÄvVçE&W÷'Còå³Óòå³Óòç7VÖÖ'’Â}
+İ-]-}]­ò-İ=-]İİıò-íM­r“°¢76W'BæFVWWVÂ„¥4ôâç'6R‡6fVDvÆö&ÄvVçE&W÷'E³Õ³ÒæÖWG&–75ö§6öâ’ÂvÆö&ÄvVçDÖWG&–72“°¢6öç7BF–vW7DFFRÒæWrFFR‚’çFô•4õ7G&–ær‚’ç6Æ–6RƒÂ“°¢76W'BæFVWWVÂ†v—B&WòæVçVWVTvVçDF–Ç”F–vW7EF6²†F–vW7DFFR’Â²7&VFVC¢G'VRÂ7FGW3¢wVWVVBrÒ“°¢76W'BæFVWWVÂ†v—B&WòæVçVWVTvVçDF–Ç”F–vW7EF6²†F–vW7DFFR’Â²7&VFVC¢fÇ6RÂ7FGW3¢wVWVVBrÒÀ¢vöæRGW&&ÆRvw&VvFRF–vW7BF6²—27&VFVBW"UD2FFRr“°¢6öç7BF–vW7D6Æ–ÒÒv—B&Wòæ6Æ–ÔvVçDF–Ç”F–vW7EF6²‚w7–çF†WF–2ÖF–vW7B×v÷&¶W"rÂF–vW7DFFR“°¢76W'BæWVÂ†F–vW7D6Æ–Óòç&W÷'EöFFRÂF–vW7DFFR“°¢76W'BæÖF6‚†F–vW7D6Æ–Óòæ6Æ–Õ÷Fö¶VâóòrrÂõå³Ó–ÖbÕ×³3gÒBö’“°¢76W'BæWVÂ†v—B&Wòæ6Æ–ÔvVçDF–Ç”F–vW7EF6²‚w6V6öæB×7–çF†WF–2×v÷&¶W"rÂF–vW7DFFR’ÂçVÆÂÀ¢vÆ—fRÆV6R&WfVçG26V6öæBv÷&¶W"g&öÒ6Æ–Ö–ærF†RF6²r“°¢6öç7BF–vW7DÖWG&–72Òv—B&WòævWDvVçDF–Ç”F–vW7DÖWG&–72‚“²76W'BæFVWWVÂ„ö&¦V7Bæ¶W—2†F–vW7DÖWG&–72’ç6÷'B‚’Â²v7F—fUöÆ—7F–æw2rÂv&Æö6¶VE÷F6·5ó#F‚rÂv6ö×ÆWFVE÷F6·5ó#F‚rÀ¢vf–ÆVE÷F6·5ó#F‚rÂvæWuöÆ—7F–æw5ó#F‚rÂwVæF–æuö–FV2rÂwVWVVE÷F6·2uÒç6÷'B‚’“°¢76W'Bæö²„ö&¦V7BçfÇVW2†F–vW7DÖWG&–72’æWfW'’„çVÖ&W"æ—56fT–çFVvW"’“°¢76W'BæWVÂ†v—B&Wòæ6ö×ÆWFTvVçDF–Ç”F–vW7EF6²‡²&W÷'DFFS¢F–vW7DFFRÂ6Æ–ÕFö¶Vã¢F–vW7D6Æ–Òæ6Æ–Õ÷Fö¶VâÀ¢ÖWG&–73¢F–vW7DÖWG&–72Â7VÖÖ'“¢}
+İ-]-}]­’=]=í-İİ½’F–vW7BârÒ’ÂG'VR“°¢76W'BæWVÂ†v—B&Wòæ6ö×ÆWFTvVçDF–Ç”F–vW7EF6²‡²&W÷'DFFS¢F–vW7DFFRÂ6Æ–ÕFö¶Vã¢F–vW7D6Æ–Òæ6Æ–Õ÷Fö¶VâÀ¢ÖWG&–73¢F–vW7DÖWG&–72Â7VÖÖ'“¢}	ıí--íİíR}-]]İR}ı]]İâârÒ’ÂfÇ6RÀ¢v6ö×ÆWFVBF6²6ææ÷B&R6ö×ÆWFVBv–âv—F‚7FÆRÆV6RFö¶Vâr“°¢6öç7B6fVDF–vW7BÒv—B7Æ4TÄT5B7FGW2ÂÖWG&–75ö§6öâÂ7VÖÖ'’e$ôÒfÕövVçEöF–Ç•öF–vW7E÷F6·2t„U$R&W÷'EöFFRÒG¶F–vW7DFFWÓ¶°¢76W'BæWVÂ‡6fVDF–vW7Còå³Óòå³Óòç7FGW2Âv6ö×ÆWFVBr“°¢76W'BæFVWWVÂ„¥4ôâç'6R‡6fVDF–vW7E³Õ³ÒæÖWG&–75ö§6öâ’ÂF–vW7DÖWG&–72“°¢76W'BæWVÂ‡6fVDF–vW7E³Õ³Òç7VÖÖ'’Â}
+İ-]-}]­’=]=í-İİ½’F–vW7Bâr“°¢76W'BæWVÂ†v—B&Wòç&V6÷&E6—FTW'&÷"‡²WfVçD6öFS¢v§5÷'VçF–ÖRrÂvT&V¢v÷F†W"rÂö67W'&VDC¢æWrFFR‚s##bÓÓEC#£3C£ã¢r’Ò’Â“°¢76W'BæWVÂ†v—B&Wòç&V6÷&E6—FTW'&÷"‡²WfVçD6öFS¢v§5÷'VçF–ÖRrÂvT&V¢v÷F†W"rÂö67W'&VDC¢æWrFFR‚s##bÓÓEC#£S“£ã¢r’Ò’Â"“°¢76W'BæWVÂ†v—B&Wòç&V6÷&E6—FTW'&÷"‡²WfVçD6öFS¢v§5÷'VçF–ÖRrÂvT&V¢v÷F†W"rÂö67W'&VDC¢æWrFFR‚s##bÓÓEC3££ã¢r’Ò’Â“°¢6öç7B6—FTW'&÷$'V6¶WG2Òv—B7Æ4TÄT5B†÷W%ö'V6¶WBÂWfVçEö6öFRÂvUö&VÂWfVçEö6÷VçBe$ôÒfÕ÷6—FUöW'&÷%ö6÷VçG2t„U$RWfVçEö6öFRÒv§5÷'VçF–ÖRräBvUö&VÒv÷F†W"rõ$DU"%’†÷W%ö'V6¶WB43¶°¢76W'BæFVWWVÂ‡6—FTW'&÷$'V6¶WG3òå³ÒóòµÒÂ°¢²†÷W%ö'V6¶WC¢æWrFFR‚s##bÓÓEC#££ã¢r’ÂWfVçEö6öFS¢v§5÷'VçF–ÖRrÂvUö&V¢v÷F†W"rÂWfVçEö6÷VçC¢"ÒÀ¢²†÷W%ö'V6¶WC¢æWrFFR‚s##bÓÓEC3££ã¢r’ÂWfVçEö6öFS¢v§5÷'VçF–ÖRrÂvUö&V¢v÷F†W"rÂWfVçEö6÷VçC¢ÒÀ¢Ò“°¢6öç7BÆW'D'V6¶WBÒæWrFFR‚“°¢ÆW'D'V6¶WBç6WEUD4Ö–çWFW2ƒÂÂ“°¢f÷"†ÆWB’Ò²’Â3²’²²’°¢6öç7Bö67W'&VDBÒæWrFFR†ÆW'D'V6¶WBævWEF–ÖR‚’²’¢có“°¢v—B&Wòç&V6÷&E6—FTW'&÷"‡²WfVçD6öFS¢vFF&6U÷&WVW7Eöf–ÆVBrÂvT&V¢vFF&6RrÂö67W'&VDBÒ“°¢Ğ¢f÷"†ÆWB’Ò²’Â²’²²’°¢6öç7Bö67W'&VDBÒæWrFFR†ÆW'D'V6¶WBævWEF–ÖR‚’²’¢có“°¢v—B&Wòç&V6÷&E6—FTW'&÷"‡²WfVçD6öFS¢wVæ†æFÆVE÷&V¦V7F–öârÂvT&V¢v÷F†W"rÂö67W'&VDBÒ“°¢Ò6öç7BFV6†æ–6ÄÆW'G2Òv—B&WòæÆ—7E6—FTW'&÷$ÆW'G2‚“°¢76W'BæFVWWVÂ‡FV6†æ–6ÄÆW'G2Â°¢²†÷W%ö'V6¶WC¢ÆW'D'V6¶WBÂWfVçEö6öFS¢wVæ†æFÆVE÷&V¦V7F–öârÂvUö&V¢v÷F†W"rÂWfVçEö6÷VçC¢Â6WfW&—G“¢wv&æ–ærrÒÀ¢²†÷W%ö'V6¶WC¢ÆW'D'V6¶WBÂWfVçEö6öFS¢vFF&6U÷&WVW7Eöf–ÆVBrÂvUö&V¢vFF&6RrÂWfVçEö6÷VçC¢2Â6WfW&—G“¢v7&—F–6ÂrÒÀ¢Ò“°¢6öç7BF–vW7E6Æ÷BÒæWrFFR‚“²F–vW7E6Æ÷Bç6WEUD4Ö–çWFW2„ÖF‚æfÆö÷"†F–vW7E6Æ÷BævWEUD4Ö–çWFW2‚’òR’¢RÂÂ“°¢6öç7BF–vW7E6Æ÷D¶W’ÒF–vW7E6Æ÷BçFô•4õ7G&–ær‚’ç6Æ–6RƒÂb“°¢76W'BæFVWWVÂ†v—B&WòæVçVWVU6—FTW'&÷$F–vW7EF6²†F–vW7E6Æ÷D¶W’’Â²7&VFVC¢G'VRÂ7FGW3¢wVWVVBrÒ“°¢76W'BæFVWWVÂ†v—B&WòæVçVWVU6—FTW'&÷$F–vW7EF6²†F–vW7E6Æ÷D¶W’’Â²7&VFVC¢fÇ6RÂ7FGW3¢wVWVVBrÒÀ¢vöæÇ’öæRvw&VvFR6—FRW'&÷"F–vW7BF6²—2VWVVBW"UD2V'FW"Ö†÷W"r“°¢6öç7B6—FTW'&÷$6Æ–ÒÒv—B&Wòæ6Æ–Õ6—FTW'&÷$F–vW7EF6²‚w7–çF†WF–2×6—FRÖW'&÷"×v÷&¶W"r“°¢76W'BæWVÂ‡6—FTW'&÷$6Æ–ÒæF–vW7E÷6Æ÷BÂF–vW7E6Æ÷D¶W’“°¢76W'BæÖF6‚‡6—FTW'&÷$6Æ–Òæ6Æ–Õ÷Fö¶VâÂõå³Ó–ÖbÕ×³3gÒBö’“°¢76W'BæWVÂ†v—B&Wòæ6Æ–Õ6—FTW'&÷$F–vW7EF6²‚w6V6öæB×6—FRÖW'&÷"×v÷&¶W"r’ÂçVÆÂÀ¢vÆ—fRÆV6R&WfVçG2æ÷F†W"v÷&¶W"g&öÒ6Æ–Ö–ærF†RF–vW7Br“°¢6öç7B6—FTW'&÷$ÖWG&–72Òv—B&WòævWE6—FTW'&÷$F–vW7DÖWG&–72‚“°¢76W'BæWVÂ‡6—FTW'&÷$ÖWG&–72çF÷FÅöWfVçG5ó#F‚Â2“°¢76W'BæWVÂ‡6—FTW'&÷$ÖWG&–72æWfVçG5öÆ7Eö†÷W"Â2“°¢76W'BæFVWWVÂ‡6—FTW'&÷$ÖWG&–72æWfVçG2Â°¢²WfVçEö6öFS¢wVæ†æFÆVE÷&V¦V7F–öârÂvUö&V¢v÷F†W"rÂö67W'&Væ6W3¢ÒÀ¢²WfVçEö6öFS¢vFF&6U÷&WVW7Eöf–ÆVBrÂvUö&V¢vFF&6RrÂö67W'&Væ6W3¢2ÒÀ¢Ò“°¢76W'BæWVÂ†v—B&Wòæ6ö×ÆWFU6—FTW'&÷$F–vW7EF6²‡²F–vW7E6Æ÷C¢F–vW7E6Æ÷D¶W’Â6Æ–ÕFö¶Vã¢6—FTW'&÷$6Æ–Òæ6Æ–Õ÷Fö¶VâÀ¢ÖWG&–73¢6—FTW'&÷$ÖWG&–72Â7VÖÖ'“¢}
+İ-]-}]­ò=]=í-İİò-íM­íí¢ârÒ’ÂG'VR“°¢76W'BæWVÂ†v—B&Wòæ6ö×ÆWFU6—FTW'&÷$F–vW7EF6²‡²F–vW7E6Æ÷C¢F–vW7E6Æ÷D¶W’Â6Æ–ÕFö¶Vã¢6—FTW'&÷$6Æ–Òæ6Æ–Õ÷Fö¶VâÀ¢ÖWG&–73¢6—FTW'&÷$ÖWG&–72Â7VÖÖ'“¢}	ıí--íİò}ıÂ}ı]]İârÒ’ÂfÇ6RÂv6ö×ÆWFVBF6²&V¦V7G27FÆRÆV6RFö¶Vâr“°¢6öç7B6fVE6—FTW'&÷$F–vW7BÒv—B7Æ4TÄT5B7FGW2ÂÖWG&–75ö§6öâÂ7VÖÖ'’e$ôÒfÕ÷6—FUöW'&÷%öF–vW7E÷F6·2t„U$RF–vW7E÷6Æ÷BÒG¶F–vW7E6Æ÷D¶W—Ó¶°¢76W'BæWVÂ‡6fVE6—FTW'&÷$F–vW7Còå³Óòå³Óòç7FGW2Âv6ö×ÆWFVBr“°¢76W'BæFVWWVÂ„¥4ôâç'6R‡6fVE6—FTW'&÷$F–vW7E³Õ³ÒæÖWG&–75ö§6öâ’Â6—FTW'&÷$ÖWG&–72“°¢76W'BæFöW4æ÷DÖF6‚‡6fVE6—FTW'&÷$F–vW7E³Õ³Òç7VÖÖ'’Â÷7GVFVçGÇW6W%ö–GÆ‡GG3ó§Ç7F6·Í-]½]Mí×Íıí}-ö’“°¢6öç7B&6¶w&÷VæEVWVT†VÇF‚Òv—B&WòævWE'T&6¶w&÷VæEVWVT†VÇF‚‚“°¢76W'BæWVÂ†&6¶w&÷VæEVWVT†VÇF‚æ6öçFVçE÷&VBÂfÇ6R“°¢76W'BæWVÂ†&6¶w&÷VæEVWVT†VÇF‚çVWVW2æF–Ç•÷&W÷'G2ç7FGW6W2æ6ö×ÆWFVBÂ“°¢76W'BæWVÂ†&6¶w&÷VæEVWVT†VÇF‚çVWVW2ç6—FUöW'&÷%öF–vW7G2ç7FGW6W2æ6ö×ÆWFVBÂ“°¢76W'BæWVÂ†&6¶w&÷VæEVWVT†VÇF‚çVWVW2æF–Ç•÷&W÷'G2æW‡—&VEöÆV6W2Â“°¢76W'BæWVÂ†&6¶w&÷VæEVWVT†VÇF‚çVWVW2ç6—FUöW'&÷%öF–vW7G2æW‡—&VEöÆV6W2Â“²v—B&Wòç6fU66†ööÄvVçE&W÷'B‡²66†ööÄ–C¢w7–çF†WF–2×66†ööÂrÂFFS¢s##bÓÓBrÀ¢7VÖÖ'“¢}
+İ-]-}]­ò-íM­]rıí½Í}í--]½Í­RMİİ½RrÂÖWG&–73¢vVçDÖWG&–72Ò“°¢6öç7B7–çF†WF–4–FV–BÒvrç&WVBƒcB“°¢6öç7B–ç6W'FVE7–çF†WF–4vVçD–FVÒv—B&Wòæ7&VFU66†ööÄvVçD–FV‡²–C¢7–çF†WF–4–FV–BÂ66†ööÄ–C¢w7–çF†WF–2×66†ööÂrÂFFS¢s##bÓÓBrÂ6÷VçC¢À¢'VÆS¢²¶W“¢v–çFVw&F–öå÷&Wf–WrrÂF—FÆS¢}	ıí-]-Âİ-]-}]­’=İ²rÂ7VÖÖ'“¢‚’Óâ}
+-í½Í­âİ-]-}]­òıí-]­ârÀ¢&VæVf—C¢}	ıí-]­”D"ârÂWf–FVæ6S¢‚’Óâ}
+İ-]-}]­ò=]=í-İİò}ıÂârÂ&÷÷6VD'“¢v–çFVw&F–öå÷FW7BrÒÒ“°¢76W'BæWVÂ†–ç6W'FVE7–çF†WF–4vVçD–FVÂG'VR“°¢76W'BæWVÂ†v—B&Wòæ7&VFU66†ööÄvVçD–FV‡²–C¢7–çF†WF–4–FV–BÂ66†ööÄ–C¢w7–çF†WF–2×66†ööÂrÂFFS¢s##bÓÓBrÂ6÷VçC¢À¢'VÆS¢²¶W“¢v–çFVw&F–öå÷&Wf–WrrÂF—FÆS¢}	ıí-]-Âİ-]-}]­’=İ²rÂ7VÖÖ'“¢‚’Óâ}	ıí--íİRMí½m]Òí}M--ÂM=½ÂârÀ¢&VæVf—C¢}	ıí-]­”D"ârÂWf–FVæ6S¢‚’Óâ}
+İ-]-}]­ò=]=í-İİò}ıÂârÂ&÷÷6VD'“¢v–çFVw&F–öå÷FW7BrÒÒ’ÂfÇ6RÀ¢vF–Ç’&W'Vç2×W7Bæ÷BGWÆ–6FR6ÖR×66†ööÂ6ÖRÖF’'VÆR&÷÷6Âr“°¢6öç7BvVçDF6†&ö&BÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷66†ööÂöFÖ–âövVçBÖF6†&ö&BrÂw7–çF†WF–2ÖFÖ–âr’“°¢76W'BæWVÂ†vVçDF6†&ö&Bç7FGW2Â#“°¢76W'BæWVÂ†vVçDF6†&ö&Bæ&öG’ç&W÷'Bç7VÖÖ'’Â}
+İ-]-}]­ò-íM­]rıí½Í}í--]½Í­RMİİ½Rr“°¢76W'Bæö²†vVçDF6†&ö&Bæ&öG’æ–FV2ç6öÖR†–FVÓâ–FVæ–BÓÓÒ7–çF†WF–4–FV–B’“°¢6öç7B÷F†W%66†ööÄvVçDF6†&ö&BÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷66†ööÂöFÖ–âövVçBÖF6†&ö&BrÂw7–çF†WF–2ÖÇ–6WVÒÖFÖ–âr’“°¢76W'BæWVÂ†÷F†W%66†ööÄvVçDF6†&ö&Bç7FGW2Â#“°¢76W'BæWVÂ†÷F†W%66†ööÄvVçDF6†&ö&Bæ&öG’æ–FV2ç6öÖR†–FVÓâ–FVæ–BÓÓÒ7–çF†WF–4–FV–B’ÂfÇ6R“°¢6öç7B&Wf–WvVDvVçD–FVÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷66†ööÂöFÖ–âövVçBÖ–FV2òG·7–çF†WF–4–FV–GÖÂw7–çF†WF–2ÖFÖ–ârÂ²FV6—6–öã¢v&÷fRrÒ’“°¢76W'BæFVWWVÂ‡&Wf–WvVDvVçD–FVÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ7FGW3¢v&÷fVBrÒÒ“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷66†ööÂöFÖ–âövVçBÖ–FV2òG·7–çF†WF–4–FV–GÖÂw7–çF†WF–2ÖFÖ–ârÂ²FV6—6–öã¢w&V¦V7BrÒ’’’ç7FGW2ÂC’“°¢6öç7B7W7Vç6–öåF&vWG2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷7W7Vç6–öç2÷F&vWG2rÂw7–çF†WF–2ÖFÖ–âr’“°¢76W'BæWVÂ‡7W7Vç6–öåF&vWG2ç7FGW2Â#“°¢76W'BæWVÂ‡7W7Vç6–öåF&vWG2æ&öG’çF&vWG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒs#######"Ó###"ÓC##"Óƒ##"Ó###########"r’ÂfÇ6RÀ¢w7W7Vç6–öâF&vWBF—&V7F÷'’æWfW"–æ6ÇVFW2æ÷F†W"66†ööÂr“°¢76W'BæWVÂ‡7W7Vç6–öåF&vWG2æ&öG’çF&vWG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒs33333332Ó3332ÓC332Óƒ332Ó333333333332r’ÂfÇ6RÀ¢vFÖ–æ—7G&F÷"6ææ÷B7W7VæB6VÆbr“°¢6öç7B7W7Vç6–öä—77VRÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷7W7Vç6–öç2óÓÓCÓƒÓrÂw7–çF†WF–2ÖFÖ–ârÂ°¢7F–öã¢v—77VRrÂGW&F–öåö†÷W'3¢#BÂ&V6öã¢u&WVFVFÇ’F—7'WFVBF†R6†&VB66†ööÂ&ö&BârÀ¢Ò’“²76W'BæWVÂ‡7W7Vç6–öä—77VRç7FGW2Â#“°¢76W'BæWVÂ‡7W7Vç6–öä—77VRæ&öG’ç7W7Vç6–öâçF&vWE÷&öÆRÂw7GVFVçBr“°¢6öç7B÷Vå7W7Vç6–öâÒv—B7Æ4TÄT5B7W7Vç6–öåö–Be$ôÒfÕö66÷VçE÷7W7Vç6–öåö÷Vât„U$RF&vWEö–BÒsÓÓCÓƒÓs¶°¢76W'BæWVÂ†÷Vå7W7Vç6–öå³Õ³Òç7W7Vç6–öåö–BÂ7W7Vç6–öä—77VRæ&öG’ç7W7Vç6–öâç7W7Vç6–öåö–B“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷7W7Vç6–öç2óÓÓCÓƒÓrÂw7–çF†WF–2ÖFÖ–ârÂ°¢7F–öã¢v—77VRrÂGW&F–öåö†÷W'3¢s"Â&V6öã¢u&WVFVFÇ’F—7'WFVBF†R6†&VB66†ööÂ&ö&BârÀ¢Ò’’’ç7FGW2ÂC’Âv6V6öæB7F—fR&W7G&–7F–öâ6ææ÷B&R—77VVBr“°¢6öç7B7W7Vç6–öäVF—BÒv—B7Æ4TÄT5B7F–öâÂGW&F–öåö†÷W'2e$ôÒfÕö66÷VçE÷7W7Vç6–öåöVF—Bt„U$RF&vWEö–BÒsÓÓCÓƒÓs¶°¢76W'BæWVÂ‡7W7Vç6–öäVF—E³ÒæÆVæwF‚Â“°¢76W'BæWVÂ‡7W7Vç6–öäVF—E³Õ³Òæ7F–öâÂv—77VVBr“°¢6öç7B7W7Vç6–öäÆ–gBÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷7W7Vç6–öç2óÓÓCÓƒÓrÂw7–çF†WF–2ÖFÖ–ârÂ²7F–öã¢vÆ–gBrÒ’“°¢76W'BæWVÂ‡7W7Vç6–öäÆ–gBç7FGW2Â#“°¢6öç7BÆ–gFVE&V6÷&BÒv—B7Æ4TÄT5B7FGW2ÂÆ–gFVEö'’e$ôÒfÕö66÷VçE÷7W7Vç6–öç2t„U$R7W7Vç6–öåö–BÒG·7W7Vç6–öä—77VRæ&öG’ç7W7Vç6–öâç7W7Vç6–öåö–GÓ¶°¢76W'BæWVÂ†Æ–gFVE&V6÷&E³Õ³Òç7FGW2ÂvÆ–gFVBr“°¢76W'BæWVÂ†Æ–gFVE&V6÷&E³Õ³ÒæÆ–gFVEö'’Âs33333332Ó3332ÓC332Óƒ332Ó333333333332r“°¢6öç7B6ÆV&VE7W7Vç6–öâÒv—B7Æ4TÄT5B7W7Vç6–öåö–Be$ôÒfÕö66÷VçE÷7W7Vç6–öåö÷Vât„U$RF&vWEö–BÒsÓÓCÓƒÓs¶°¢76W'BæWVÂ†6ÆV&VE7W7Vç6–öå³ÒæÆVæwF‚ÂÂvÆ–gF–ær&VÖ÷fW2F†R÷Vâ¶W’FöÖ–6ÆÇ’v—F‚F†RVF—B&V6÷&Br“°¢6öç7Bf–æÅ7W7Vç6–öäVF—BÒv—B7Æ4TÄT5B7F–öâe$ôÒfÕö66÷VçE÷7W7Vç6–öåöVF—Bt„U$RF&vWEö–BÒsÓÓCÓƒÓrõ$DU"%’7&VFVEöB43¶°¢76W'BæFVWWVÂ†f–æÅ7W7Vç6–öäVF—E³ÒæÖ‡&÷rÓâ&÷ræ7F–öâ’Â²v—77VVBrÂvÆ–gFVBuÒ“°¢6öç7B7FÆTFÖ–äWF‚Òv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷7W7Vç6–öç2óÓÓCÓƒÓrÂw7–çF†WF–2×7FÆRÖFÖ–ârÂ²7F–öã¢vÆ–gBrÒ’“°¢76W'BæWVÂ‡7FÆTFÖ–äWF‚ç7FGW2ÂC2“°¢6öç7B&öÆUF&vWG2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öÆRÖÖævVÖVçB÷F&vWG2rÂw7–çF†WF–2ÖFÖ–âr’“°¢76W'BæWVÂ‡&öÆUF&vWG2ç7FGW2Â#“°¢76W'Bæö²‡&öÆUF&vWG2æ&öG’çF&vWG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒssssssssrÓsssrÓCssrÓƒssrÓsssssssssssrr’“°¢76W'Bæö²‚&öÆUF&vWG2æ&öG’çF&vWG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒs33333332Ó3332ÓC332Óƒ332Ó333333333332r’ÂvFÖ–æ—7G&F÷"6ææ÷BFVÖ÷FR6VÆbr“°¢6öç7B&Wfö¶T6÷Væ6–Å&öÆRÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷&öÆRÖÖævVÖVçBósssssssrÓsssrÓCssrÓƒssrÓsssssssssssrrÂw7–çF†WF–2ÖFÖ–ârÂ²7F–öã¢w&Wfö¶RrÒ’“°¢76W'BæFVWWVÂ‡&Wfö¶T6÷Væ6–Å&öÆRÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÂF&vWEö–C¢ssssssssrÓsssrÓCssrÓƒssrÓsssssssssssrrÂ&Wf–÷W5÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ&öÆS¢w7GVFVçBrÒÒ“°¢76W'BæWVÂ‚†v—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7B×&öÆR×F&vWBrÒ’’ç&öÆRÂw7GVFVçBr“°¢6öç7B&Wfö¶VDVF—BÒv—B7Æ4TÄT5B7F–öâÂ&Wf–÷W5÷&öÆRe$ôÒfÕ÷66†ööÅöFÖ–åöVF—Bt„U$RF&vWEö–BÒssssssssrÓsssrÓCssrÓƒssrÓsssssssssssrs¶°¢76W'BæWVÂ‡&Wfö¶VDVF—E³Õ³Òæ7F–öâÂw&öÆU÷&Wfö¶VBr“²76W'BæWVÂ‡&Wfö¶VDVF—E³Õ³Òç&Wf–÷W5÷&öÆRÂv6÷Væ6–ÅöÖVÖ&W"r“°¢6öç7B&Wfö¶U6V6öæDFÖ–âÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷&öÆRÖÖævVÖVçBóƒƒƒƒƒƒƒ‚Óƒƒƒ‚ÓCƒƒ‚Óƒƒƒ‚Óƒƒƒƒƒƒƒƒƒƒƒ‚rÂw7–çF†WF–2ÖFÖ–ârÂ²7F–öã¢w&Wfö¶RrÒ’“°¢76W'BæFVWWVÂ‡&Wfö¶U6V6öæDFÖ–âÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÂF&vWEö–C¢sƒƒƒƒƒƒƒ‚Óƒƒƒ‚ÓCƒƒ‚Óƒƒƒ‚Óƒƒƒƒƒƒƒƒƒƒƒ‚rÂ&Wf–÷W5÷&öÆS¢w66†ööÅöFÖ–ârÂ&öÆS¢w7GVFVçBrÒÒ“°¢76W'BæWVÂ‚†v—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7BÖFÖ–â×F&vWBrÒ’’ç&öÆRÂw7GVFVçBr“°¢6öç7BFVæ–VE7FÆU&Wfö¶RÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷&öÆRÖÖævVÖVçBóƒƒƒƒƒƒƒ‚Óƒƒƒ‚ÓCƒƒ‚Óƒƒƒ‚Óƒƒƒƒƒƒƒƒƒƒƒ‚rÂw7–çF†WF–2×7FÆRÖFÖ–ârÂ²7F–öã¢w&Wfö¶RrÒ’“°¢76W'BæWVÂ†FVæ–VE7FÆU&Wfö¶Rç7FGW2ÂC2Âw&öÆR&Wfö6F–öâ&WV—&W2&V6VçBWF†VçF–6F–öâr“°¢6öç7B÷F†W%66†ööÅ&Wfö¶RÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷c÷&öÆRÖÖævVÖVçBóCCCCCCCBÓCCCBÓCCCBÓƒCCBÓCCCCCCCCCCCBrÂw7–çF†WF–2ÖFÖ–ârÂ²7F–öã¢w&Wfö¶RrÒ’“°¢76W'BæWVÂ†÷F†W%66†ööÅ&Wfö¶Rç7FGW2ÂCBÂw&öÆR&Wfö6F–öâ6ææ÷B7&÷7266†ööÂ&÷VæF&–W2r“°¢6öç7BVÇ6Tææ÷Væ6VÖVçBÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷VÇ6Röææ÷Væ6VÖVçG2rÂw7–çF†WF–2ÖFÖ–ârÂ°¢F—FÆS¢}	ıí-]­­í½Íİí’Mí­‚rÂ&öG“¢}	--]}í-í-ò"ıı-İm2rÂ¶–æC¢væWw2rÂ66†ööÅö–C¢v÷F†W"×66†ööÂrÂWF†÷%ö–C¢s#######"Ó###"ÓC##"Óƒ##"Ó###########"rÀ¢Ò’“°¢76W'BæWVÂ‡VÇ6Tææ÷Væ6VÖVçBç7FGW2Â#Â¥4ôâç7G&–æv–g’‡VÇ6Tææ÷Væ6VÖVçBæ&öG’’“°¢6öç7BÆöæt÷VäWfVçDFW67&—F–öâÒ}	í-­½-íR­í½ÍİíRí½-Rârç&WVBƒ3“°¢v—B7Æ”å4U%B”åDòfÕöÆ—7F–æw2†–BÂW6W%ö–BÂ66†ööÅö–BÂF—FÆRÂFW67&—F–öâÂ6FVv÷'’Â&–6U÷FW‡BÀ¢—5öWfVçBÂWfVçEöFFRÂWfVçE÷F–ÖRÂWfVçE÷G—RÂÖ…÷6VG2Â–ÖvUö¶W’Â†÷Fõ÷7FGW2Â7FGW2Â7&VFVEöB¢dÅTU2‚w7–çF†WF–2Ö÷VâÖWfVçBrÂw7–çF†WF–2×W6W"rÂw7–çF†WF–2×66†ööÂrÂ}	í-­½-½’M]İÂ­í½²rÂG¶Æöæt÷VäWfVçDFW67&—F–öçÒÀ¢}	Í]íıı-òrÂ}	]ı½-İârÂG'VRÂs#“’Ó"Ó3rÂs#£rÂv÷VârÂÂrrÂvæöæRrÂv7F—fRrÂ7W'&VçEWF5F–ÖW7F×‚’“¶°¢v—B7Æ”å4U%B”åDòfÕöÆ—7F–æw2†–BÂW6W%ö–BÂ66†ööÅö–BÂF—FÆRÂFW67&—F–öâÂ6FVv÷'’Â&–6U÷FW‡BÀ¢—5öWfVçBÂWfVçEöFFRÂWfVçE÷F–ÖRÂWfVçE÷G—RÂÖ…÷6VG2Â–ÖvUö¶W’Â†÷Fõ÷7FGW2Â7FGW2Â7&VFVEöB¢dÅTU2‚w7–çF†WF–2ÖÆ–Ö—FVBÖWfVçBrÂw7–çF†WF–2×W6W"rÂw7–çF†WF–2×66†ööÂrÂ}
+í½-RÍ]-Í‚rÂ}	}­½-ò]=-mòrÀ¢}	Í]íıı-òrÂ}	]ı½-İârÂG'VRÂs#“’Ó"Ó3rÂs#£rÂv÷VârÂÂrrÂvæöæRrÂv7F—fRrÂ7W'&VçEWF5F–ÖW7F×‚’“¶°¢v—B7Æ”å4U%B”åDòfÕöÆ—7F–æw2†–BÂW6W%ö–BÂ66†ööÅö–BÂF—FÆRÂFW67&—F–öâÂ6FVv÷'’Â&–6U÷FW‡BÀ¢—5öWfVçBÂWfVçEöFFRÂWfVçE÷F–ÖRÂWfVçE÷G—RÂÖ…÷6VG2Â–ÖvUö¶W’Â†÷Fõ÷7FGW2Â7FGW2Â7&VFVEöB¢dÅTU2‚w7–çF†WF–2ÖW‡—&VBÖWfVçBrÂw7–çF†WF–2×W6W"rÂw7–çF†WF–2×66†ööÂrÂ}	ıí]M]Rí½-RrÂ}	M-=mRıí½rÀ¢}	Í]íıı-òrÂ}	]ı½-İârÂG'VRÂs#ÓÓrÂs#£rÂv÷VârÂÂrrÂvæöæRrÂv7F—fRrÂ7W'&VçEWF5F–ÖW7F×‚’“¶°¢6öç7BVÇ6UöÆÂÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷VÇ6R÷öÆÇ2rÂw7–çF†WF–2Ö6÷Væ6–ÂrÂ°¢VW7F–öã¢}	­­=â­İ=2í=MÃòrÂ÷F–öç3¢²}
+­}­‚rÂ}
+Mİ--­rÂ}	ı­½í}]İòrÂ}	M]-]­-"rÂ}	İ=}İòMİ--­rÂ}	ıíİ}òrÂ}	-íòrÂ}	M==íRuÒÀ¢Ò’“°¢76W'BæWVÂ‡VÇ6UöÆÂç7FGW2Â#“°¢6öç7B–çfÆ–EVÇ6UöÆÂÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷VÇ6R÷öÆÇ2rÂw7–çF†WF–2Ö6÷Væ6–ÂrÂ°¢VW7F–öã¢}	­­=â­İ=2í=MÃòrÂ÷F–öç3¢²}
+­}­‚rÂr­}­‚uÒÀ¢Ò’“°¢76W'BæWVÂ†–çfÆ–EVÇ6UöÆÂç7FGW2ÂC“°¢6öç7BVÇ6U&VBÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷VÇ6RrÂw7–çF†WF–2×&Vv—7G&çBr’“°¢76W'BæWVÂ‡VÇ6U&VBç7FGW2Â#“°¢76W'Bæö²‡VÇ6U&VBæ&öG’æææ÷Væ6VÖVçG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒVÇ6Tææ÷Væ6VÖVçBæ&öG’æ–B’“°¢76W'BæWVÂ‡VÇ6U&VBæ&öG’æææ÷Væ6VÖVçG5³ÒæWF†÷%ö–BÂVæFVf–æVBÂw66†ööÂVÇ6RæWfW"W‡÷6W2WF†÷"–FVçF—G’r“°¢6öç7B÷VäWfVçBÒVÇ6U&VBæ&öG’æææ÷Væ6VÖVçG2æf–æB‡&÷rÓâ&÷ræ–BÓÓÒw7–çF†WF–2Ö÷VâÖWfVçBr“°¢76W'BæWVÂ†÷VäWfVçCòæ¶–æBÂv÷VåöWfVçBrÂv7F—fRæòÖ66—G’WfVçB—2–æ6ÇVFVB–â66†ööÂVÇ6Rr“°¢76W'BæWVÂ†÷VäWfVçBæWfVçEöFFRÂs#“’Ó"Ó3r“°¢76W'Bæö²„'&’æg&öÒ†÷VäWfVçBæ&öG’’æÆVæwF‚ÃÒCSÂvWfVçBFW67&—F–öâ—26VB'’Væ–6öFR6†&7FW'2r“°¢76W'BæWVÂ‡VÇ6U&VBæ&öG’æææ÷Væ6VÖVçG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒw7–çF†WF–2ÖÆ–Ö—FVBÖWfVçBr’ÂfÇ6RÀ¢vWfVçG2v—F‚6VBÆ–Ö—BFòæ÷BVçFW"÷VâÖWfVçBfVVBr“°¢76W'BæWVÂ‡VÇ6U&VBæ&öG’æææ÷Væ6VÖVçG2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒw7–çF†WF–2ÖW‡—&VBÖWfVçBr’ÂfÇ6RÀ¢w7BWfVçG2Fòæ÷BVçFW"F†RfVVBr“°¢76W'Bæö²‡VÇ6U&VBæ&öG’çöÆÇ2ç6öÖR‡&÷rÓâ&÷ræ–BÓÓÒVÇ6UöÆÂæ&öG’æ–B’“°¢6öç7BöÆÅf÷FW'2Ò²w7–çF†WF–2×W6W"rÂw7–çF†WF–2×&Vv—7G&çBrÂw7–çF†WF–2×&öÆR×7GVFVçBrÂw7–çF†WF–2ÖFÖ–ârÂw7–çF†WF–2Ö6÷Væ6–ÂuÓ°¢f÷"†6öç7B¶–æFW‚ÂFö¶VåÒöböÆÅf÷FW'2æVçG&–W2‚’’°¢6öç7Bf÷FRÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂö’÷c÷VÇ6R÷öÆÇ2òG·VÇ6UöÆÂæ&öG’æ–GÒ÷f÷FW6ÂFö¶VâÂ²6†ö–6Uö–æFWƒ¢–æFW‚ÓÓÒBòr¢–æFW‚¢"Ò’“°¢76W'BæWVÂ‡f÷FRç7FGW2Â#“°¢Ò6öç7BGWÆ–6FUöÆÅf÷FRÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂö’÷c÷VÇ6R÷öÆÇ2òG·VÇ6UöÆÂæ&öG’æ–GÒ÷f÷FW6Âw7–çF†WF–2×&Vv—7G&çBrÂ²6†ö–6Uö–æFWƒ¢Ò’“°¢76W'BæWVÂ†GWÆ–6FUöÆÅf÷FRç7FGW2ÂC’“°¢6öç7B–çfÆ–EWW%öÆÅf÷FRÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂö’÷c÷VÇ6R÷öÆÇ2òG·VÇ6UöÆÂæ&öG’æ–GÒ÷f÷FW6Âw7–çF†WF–2ÖFÖ–ârÂ²6†ö–6Uö–æFWƒ¢‚Ò’“°¢76W'BæWVÂ†–çfÆ–EWW%öÆÅf÷FRç7FGW2ÂC“°¢6öç7B÷F†W%66†ööÅVÇ6RÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷VÇ6RrÂw7–çF†WF–2Ö÷F†W"×66†ööÂr’“°¢76W'BæWVÂ†÷F†W%66†ööÅVÇ6Rç7FGW2Â#“°¢76W'BæWVÂ†÷F†W%66†ööÅVÇ6Ræ&öG’æææ÷Væ6VÖVçG2æÆVæwF‚ÂÂw66†ööÂVÇ6RfVVB6ææ÷B7&÷7266†ööÂ&÷VæF&–W2r“°¢6öç7BVÇ6TgFW%f÷FW2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷VÇ6RrÂw7–çF†WF–2×&Vv—7G&çBr’“°¢6öç7Bf—6–&ÆUöÆÂÒVÇ6TgFW%f÷FW2æ&öG’çöÆÇ2æf–æB‡&÷rÓâ&÷ræ–BÓÓÒVÇ6UöÆÂæ&öG’æ–B“°¢76W'BæWVÂ‡f—6–&ÆUöÆÂçF÷FÅ÷f÷FW2ÂR“°¢76W'BæFVWWVÂ‡f—6–&ÆUöÆÂæ6÷VçG2Â³ÂÂÂÂÂÂÂÒÂvV–v‡BÖ6†ö–6RF÷FÇ2V"öæÇ’gFW"f—fR7–çF†WF–2f÷FW2r“°¢76W'BæWVÂ‡f—6–&ÆUöÆÂæ×•÷f÷FRÂ"“°¢6öç7BFVÆWF–öå&WVW7BÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷cöFVÆWF–öâ×&WVW7G2rÂw7–çF†WF–2Ö6÷Væ6–ÂrÂ°¢F&vWEö–C¢sÓÓCÓƒÓrÂ&V6öåö6öFS¢w7ÒrÀ¢&V6öã¢u&WVFVBVç&VÆFVB÷7G2–âF†R66†ööÂw&÷WârÀ¢Ò’“°¢76W'BæWVÂ†FVÆWF–öå&WVW7Bç7FGW2Â#"“°¢76W'BæWVÂ†FVÆWF–öå&WVW7Bæ&öG’æÇ&VG•öW†—7G2ÂfÇ6R“°¢6öç7BGWÆ–6FTFVÆWF–öå&WVW7BÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷cöFVÆWF–öâ×&WVW7G2rÂw7–çF†WF–2Ö6÷Væ6–ÂrÂ°¢F&vWEö–C¢sÓÓCÓƒÓrÂ&V6öåö6öFS¢w7ÒrÀ¢&V6öã¢u&WVFVBVç&VÆFVB÷7G2–âF†R66†ööÂw&÷WârÀ¢Ò’“°¢76W'BæWVÂ†GWÆ–6FTFVÆWF–öå&WVW7Bç7FGW2Â#“°¢76W'BæWVÂ†GWÆ–6FTFVÆWF–öå&WVW7Bæ&öG’ç&WVW7Eö–BÂFVÆWF–öå&WVW7Bæ&öG’ç&WVW7Eö–B“°¢6öç7BFVÆWF–öåVWVRÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2ÖFÖ–âr’“°¢76W'BæWVÂ†FVÆWF–öåVWVRç7FGW2Â#“°¢76W'BæWVÂ†FVÆWF–öåVWVRæ&öG’ç&WVW7G2æÆVæwF‚Â“°¢76W'BæWVÂ„ö&¦V7Bæ†4÷vâ†FVÆWF–öåVWVRæ&öG’ç&WVW7G5³ÒÂv—77VW"r’ÂfÇ6R“°¢6öç7B÷väFVÆWF–öå&WVW7G2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2rÂw7–çF†WF–2Ö6÷Væ6–Âr’“°¢76W'BæWVÂ†÷väFVÆWF–öå&WVW7G2ç7FGW2Â#“°¢76W'BæWVÂ†÷väFVÆWF–öå&WVW7G2æ&öG’ç&WVW7G2æÆVæwF‚Â“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2ÖÇ–6WVÒÖFÖ–âr’’’æ&öG’ç&WVW7G2æÆVæwF‚ÂÂwF†R&Wf–WrVWVR—2&W7G&–7FVBFòF†RFÖ–æ—7G&F÷"66†ööÂr“°¢76W'BæFVWWVÂ†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷cöFVÆWF–öâ×&WVW7G2òG¶FVÆWF–öå&WVW7Bæ&öG’ç&WVW7Eö–GÖÂw7–çF†WF–2ÖFÖ–ârÂ°¢FV6—6–öã¢w&V¦V7BrÂ&Wf–Wuöæ÷FS¢}	ıí-]]İâ"-]-í-í’­í½RrÀ¢Ò’’Â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ7FGW3¢w&V¦V7FVBrÒÒ“°¢6öç7BWFFVD÷väFVÆWF–öå&WVW7G2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2rÂw7–çF†WF–2Ö6÷Væ6–Âr’“°¢76W'BæWVÂ‡WFFVD÷väFVÆWF–öå&WVW7G2æ&öG’ç&WVW7G5³Òç7FGW2Âw&V¦V7FVBr“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2ÖFÖ–âr’’’æ&öG’ç&WVW7G2æÆVæwF‚Â“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷cöFVÆWF–öâ×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2×&Vv—7G&çBr’’’ç7FGW2ÂC2“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷cöFVÆWF–öâ×&WVW7G2rÂw7–çF†WF–2×&Vv—7G&çBrÂ°¢F&vWEö–C¢sÓÓCÓƒÓrÂ&V6öåö6öFS¢w7ÒrÂ&V6öã¢u&WVFVBVç&VÆFVB÷7G2–âw&÷WârÀ¢Ò’’’ç7FGW2ÂC2“°¢6öç6öÆRæÆör‚u”D%ô44õTåEôDTÄUD”ôåõ$UTU5Eõ53¢6÷Væ6–Â7V&Ö—76–öâö†—7F÷'’Â66†ööÂ×66÷VBFÖ–âVWVR÷&V¦V7F–öâÂGWÆ–6FRwV&BÂæB&öÆRVæf÷&6VÖVçBr“°¢6öç7B&öf–ÆU7V&Ö—76–öâÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öf–ÆR×&WVW7G2rÂw7–çF†WF–2ÖæWr×7GVFVçBrÂ°¢66†ööÅö–C¢vÇ–6WVÕó2rÂf—'7EöæÖS¢}
+-]"rÂÆ7EöæÖS¢}	ıíM½ÂrÂ6Æ75öæÖS¢s}	rÂ&öÆS¢w66†ööÅöFÖ–ârÀ¢Ò’“°¢76W'BæWVÂ‡&öf–ÆU7V&Ö—76–öâç7FGW2Â#"“°¢76W'BæWVÂ‡&öf–ÆU7V&Ö—76–öâæ&öG’ç7FGW2ÂwVæF–ærr“°¢6öç7B&—fFU&öf–ÆU7FGW2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öf–ÆR×&WVW7G2rÂw7–çF†WF–2ÖæWr×7GVFVçBr’“°¢76W'BæWVÂ‡&—fFU&öf–ÆU7FGW2ç7FGW2Â#“°¢76W'BæWVÂ‡&—fFU&öf–ÆU7FGW2æ&öG’ç&WVW7Bç7FGW2ÂwVæF–ærr“°¢76W'BæFVWWVÂ„ö&¦V7Bæ¶W—2‡&—fFU&öf–ÆU7FGW2æ&öG’ç&WVW7B’ç6÷'B‚’Â²v7&VFVEöBrÂw&WVW7Eö–BrÂw66†ööÅö–BrÂw7FGW2uÒ“°¢76W'BæWVÂ†v—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7BÖæWrrÒ’ÂçVÆÂÀ¢vâ66W72&WVW7BÆöæRæWfW"7&VFW2&öf–ÆRr“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öf–ÆR×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2×7GVFVçBr’’’ç7FGW2ÂC2À¢w7GVFVçG26ææ÷B&VB66W72&WVW7G2r“°¢6öç7B&öf–ÆUVWVRÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öf–ÆR×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2ÖÇ–6WVÒÖFÖ–âr’“°¢76W'BæWVÂ‡&öf–ÆUVWVRç7FGW2Â#“°¢6öç7B&öf–ÆU&WVW7BÒ&öf–ÆUVWVRæ&öG’ç&WVW7G2æf–æB‡&÷rÓâ&÷ræf—'7EöæÖRÓÓÒ}
+-]"rbb&÷ræÆ7EöæÖRÓÓÒ}	ıíM½Âr“°¢76W'Bæö²‡&öf–ÆU&WVW7B“°¢76W'BæWVÂ„ö&¦V7Bæ†4÷vâ‡&öf–ÆU&WVW7BÂw7V&¦V7Br’ÂfÇ6RÂw&Wf–WrVWVRöÖ—G2W‡FW&æÂ–FVçF—G’7V&¦V7G2r“²76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷&öf–ÆR×&WVW7G2òG·&öf–ÆU&WVW7Bç&WVW7Eö–GÖÂw7–çF†WF–2ÖFÖ–ârÂ²FV6—6–öã¢v&÷fRrÒ’’’ç7FGW2ÂCBÀ¢vâFÖ–æ—7G&F÷"g&öÒæ÷F†W"66†ööÂ6ææ÷B&÷fRF†R&WVW7Br“°¢6öç7B&öf–ÆTFV6—6–öâÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷&öf–ÆR×&WVW7G2òG·&öf–ÆU&WVW7Bç&WVW7Eö–GÖÂw7–çF†WF–2ÖÇ–6WVÒÖFÖ–ârÂ²FV6—6–öã¢v&÷fRrÒ’“°¢76W'BæFVWWVÂ‡&öf–ÆTFV6—6–öâÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ7FGW3¢v&÷fVBrÒÒ“°¢6öç7B&÷fVD7F÷"Òv—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7BÖæWrrÒ“°¢76W'Bæö²†&÷fVD7F÷"“°¢76W'BæÖF6‚†&÷fVD7F÷"æ–BÂõå³Ó–ÖbÕ×³3gÒBò“°¢76W'BæFVWWVÂ‡²66†ööÅö–C¢&÷fVD7F÷"ç66†ööÅö–BÂ&öÆS¢&÷fVD7F÷"ç&öÆRÂf—'7EöæÖS¢&÷fVD7F÷"æf—'7EöæÖRÀ¢Æ7EöæÖS¢&÷fVD7F÷"æÆ7EöæÖRÂ6Æ75öæÖS¢&÷fVD7F÷"æ6Æ75öæÖRÒÂ°¢66†ööÅö–C¢vÇ–6WVÕó2rÂ&öÆS¢w7GVFVçBrÂf—'7EöæÖS¢}
+-]"rÂÆ7EöæÖS¢}	ıíM½ÂrÂ6Æ75öæÖS¢s}	rÀ¢Ò“°¢6öç7BVçfW&–f–VE&öÆU7V&Ö—76–öâÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öÆR×&WVW7G2rÂw7–çF†WF–2×&öÆR×7GVFVçBrÂ²&WVW7FVE÷&öÆS¢}
+=}-İ¢
+=}]İ}]­í=âí-]-rÒ’“°¢76W'BæWVÂ‡VçfW&–f–VE&öÆU7V&Ö—76–öâç7FGW2ÂC2Âw66†ööÂ&öÆR&WVW7B7F—26Æ÷6VB&Vf÷&RF†R66÷VçBVÖ–Â—2fW&–f–VBr“°¢6öç7B6VæE&öÆTVÖ–ÂÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öÆR×&WVW7G2öVÖ–Â×fW&–f–6F–öârÂw7–çF†WF–2×&öÆR×7GVFVçBrÂ²7F–öã¢w6VæBrÒ’À¢²Fö¶Vã¢²66W75÷Fö¶Vã¢w7–çF†WF–2×–æFW‚ÖgVæ7F–öâÖ–Ò×Fö¶VâÓ#3CScsƒ’rÒÒ“°¢76W'BæFVWWVÂ‡6VæE&öÆTVÖ–ÂÂ²7FGW3¢#"Â&öG“¢²ö³¢G'VRÂ6VçC¢G'VRÂÇ&VG•÷fW&–f–VC¢fÇ6RÒÒ“°¢76W'BæFVWWVÂ‡²Fó¢7–çF†WF–5fW&–f–6F–öäVÖ–ÂçFòÂ6öFS¢7–çF†WF–5fW&–f–6F–öäVÖ–Âæ6öFRÒÀ¢²Fó¢w&öÆR×7GVFVçD7–çF†WF–2æW†×ÆRrÂ6öFS¢s3Ss“rÒ“°¢6öç7B7F÷&VD6†ÆÆVævRÒv—B7Æ4TÄT5BVÖ–ÅöF–vW7BÂ6öFUöF–vW7BÂGFV×Eö6÷VçBe$ôÒfÕ÷&öÆUöVÖ–Å÷fW&–f–6F–öç0¢t„U$R—77VW"Òv‡GG3¢òö—77VW"ç7–çF†WF–2räB7V&¦V7BÒw7V&¦V7B×&öÆR×7GVFVçBrÄ”Ô•B¶°¢76W'BæÖF6‚‡7F÷&VD6†ÆÆVævU³Õ³ÒæVÖ–ÅöF–vW7BÂõå¶ÖcÓ•×³cGÒBò“°¢76W'BæÖF6‚‡7F÷&VD6†ÆÆVævU³Õ³Òæ6öFUöF–vW7BÂõå¶ÖcÓ•×³cGÒBò“°¢76W'BæWVÂ‡7F÷&VD6†ÆÆVævU³Õ³Òæ6öFUöF–vW7Bæ–æ6ÇVFW2‚s3Ss“r’ÂfÇ6R“°¢76W'BæWVÂ‡7F÷&VD6†ÆÆVævU³Õ³ÒæVÖ–ÅöF–vW7Bæ–æ6ÇVFW2‚w&öÆR×7GVFVçD7–çF†WF–2æW†×ÆRr’ÂfÇ6R“°¢6öç7BfW&–g•&öÆTVÖ–ÂÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öÆR×&WVW7G2öVÖ–Â×fW&–f–6F–öârÂw7–çF†WF–2×&öÆR×7GVFVçBrÂ²7F–öã¢wfW&–g’rÂ6öFS¢s3Ss“rÒ’“°¢76W'BæFVWWVÂ‡fW&–g•&öÆTVÖ–ÂÂ²7FGW3¢#Â&öG“¢²ö³¢G'VRÂVÖ–Å÷fW&–f–VC¢G'VRÒÒ“°¢6öç7B&öÆU7V&Ö—76–öâÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öÆR×&WVW7G2rÂw7–çF†WF–2×&öÆR×7GVFVçBrÂ²&WVW7FVE÷&öÆS¢}
+=}-İ¢
+=}]İ}]­í=âí-]-rÒ’“°¢76W'BæWVÂ‡&öÆU7V&Ö—76–öâç7FGW2Â#"ÂvfW&–f–VB7GVFVçBÖ’&WVW7Bf—†VB66†ööÂ&öÆRr“°¢6öç7B&öÆU7FGW2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öÆR×&WVW7G2rÂw7–çF†WF–2×&öÆR×7GVFVçBr’“°¢76W'BæWVÂ‡&öÆU7FGW2æ&öG’ç&öÆRÂw7GVFVçBr“°¢76W'BæWVÂ‡&öÆU7FGW2æ&öG’ç&WVW7Bç&WVW7Eö–BÂ&öÆU7V&Ö—76–öâæ&öG’ç&WVW7Eö–B“°¢v—B7ÆUDDRfÕ÷W6W%÷&öf–ÆW24UBf—'7EöæÖRÒ}
+-]"rÂÆ7EöæÖRÒ}	}ı--]½ÂrÂ6Æ75öæÖRÒs	p¢t„U$RW6W%ö–BÒsSSSSSSSRÓSSSRÓCSSRÓƒSSRÓSSSSSSSSSSSRs¶°¢6öç7B&öÆUVWVRÒv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öÆR×&WVW7G2÷&Wf–WrrÂw7–çF†WF–2ÖFÖ–âr’“°¢76W'BæWVÂ‡&öÆUVWVRç7FGW2Â#“°¢6öç7B&öÆU&WVW7BÒ&öÆUVWVRæ&öG’ç&WVW7G2æf–æB‡&÷rÓâ&÷rç&WVW7Eö–BÓÓÒ&öÆU7V&Ö—76–öâæ&öG’ç&WVW7Eö–B“°¢76W'Bæö²‡&öÆU&WVW7B“°¢76W'BæWVÂ‡&öÆU&WVW7Bç&WVW7FVE÷&öÆRÂv6÷Væ6–ÅöÖVÖ&W"r“°¢76W'BæFVWWVÂ‡&öÆU&WVW7BÂ²&WVW7Eö–C¢&öÆU7V&Ö—76–öâæ&öG’ç&WVW7Eö–BÂ66÷VçEö6öFS¢sSSSSSRrÂÆ–6çEöæÖS¢}
+-]"	}ı--]½ÂrÀ¢6Æ75öæÖS¢s	rÂ&WVW7FVE÷&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ7FGW3¢wVæF–ærrÂ7&VFVEöC¢&öÆU&WVW7Bæ7&VFVEöBÀ¢&Wf–Wu÷7F'FVEöC¢çVÆÂÂ&Wf–Wu÷7F'FVEö'•öÖS¢fÇ6RÒ“°¢76W'BæWVÂ„ö&¦V7Bæ†4÷vâ‡&öÆU&WVW7BÂwW6W%ö–Br’ÂfÇ6RÂw6ÖR×66†ööÂ&Wf–WvW"vWG26†÷'B66÷VçB6öFR–ç7FVBöbF†RgVÆÂ–æFW‚ÖÆ–æ¶VB”Br“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷&öÆR×&WVW7G2òG·&öÆU&WVW7Bç&WVW7Eö–GÖÂw7–çF†WF–2ÖÇ–6WVÒÖFÖ–ârÂ²7F–öã¢w7F'E÷&Wf–WrrÒ’’’ç7FGW2ÂC’À¢vF–ffW&VçB66†ööÂ6ææ÷B6Æ–ÒF†R&öÆR&WVW7Br“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷&öÆR×&WVW7G2òG·&öÆU&WVW7Bç&WVW7Eö–GÖÂw7–çF†WF–2ÖFÖ–ârÂ²7F–öã¢w7F'E÷&Wf–WrrÒ’’’ç7FGW2Â#“°¢76W'BæFVWWVÂ†v—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂö’÷c÷&öÆR×&WVW7G2òG·&öÆU&WVW7Bç&WVW7Eö–GÖÂw7–çF†WF–2ÖFÖ–ârÂ²FV6—6–öã¢v&÷fRrÒ’’À¢²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ7FGW3¢v&÷fVBrÒÒ“°¢6öç7BVÆWfFVD7F÷"Òv—B&W6öÇfT7F÷"‡²—77VW#¢v‡GG3¢òö—77VW"ç7–çF†WF–2rÂ7V&¦V7C¢w7V&¦V7B×&öÆR×7GVFVçBrÒ“°¢76W'BæWVÂ†VÆWfFVD7F÷"ç&öÆRÂv6÷Væ6–ÅöÖVÖ&W"rÂvöæÇ’F†R6ÖR×66†ööÂFÖ–æ—7G&F÷"FV6—6–öâw&çG2F†R&öÆRr“°¢6öç7BVÆWfFVE&öÆU7FGW2Òv—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öÆR×&WVW7G2rÂw7–çF†WF–2×&öÆR×7GVFVçBr’“²76W'BæWVÂ†VÆWfFVE&öÆU7FGW2æ&öG’ç&öÆRÂv6÷Væ6–ÅöÖVÖ&W"rÂwF†R&öf–ÆRT’6â&Vg&W6‚—G2FF&6RÖ&6¶VB&öÆRgFW"&÷fÂr“°¢6öç7B&öf–ÆTVF—BÒv—BÆ—7F–æw4’†•&WVW7B‚uD4‚rÂrö’÷cöÖRrÂw7–çF†WF–2×&öÆR×7GVFVçBrÂ°¢f—'7EöæÖS¢}
+í-]-İ¢rÂÆ7EöæÖS¢}
+-]-í-½’rÂ6Æ75öæÖS¢s	rÂ&öÆS¢w66†ööÅöFÖ–ârÂ66†ööÅö–C¢v÷F†W"×66†ööÂrÂW6W%ö–C¢vf÷&vVB×W6W"rÀ¢Ò’“°¢76W'BæWVÂ‡&öf–ÆTVF—Bç7FGW2Â#“°¢76W'BæFVWWVÂ‡²&öÆS¢&öf–ÆTVF—Bæ&öG’ç&öf–ÆRç&öÆRÂ66†ööÅö–C¢&öf–ÆTVF—Bæ&öG’ç&öf–ÆRç66†ööÅö–BÀ¢f—'7EöæÖS¢&öf–ÆTVF—Bæ&öG’ç&öf–ÆRæf—'7EöæÖRÂÆ7EöæÖS¢&öf–ÆTVF—Bæ&öG’ç&öf–ÆRæÆ7EöæÖRÂ6Æ75öæÖS¢&öf–ÆTVF—Bæ&öG’ç&öf–ÆRæ6Æ75öæÖRÒÂ°¢&öÆS¢v6÷Væ6–ÅöÖVÖ&W"rÂ66†ööÅö–C¢w7–çF†WF–2×66†ööÂrÂf—'7EöæÖS¢}
+í-]-İ¢rÂÆ7EöæÖS¢}
+-]-í-½’rÂ6Æ75öæÖS¢s	rÀ¢Ò“°¢6öç7BVF—E&÷w2Òv—B7Æ4TÄT5B7F–öâÂ7FGW2e$ôÒfÕ÷66†ööÅ÷&öÆU÷&WVW7EöVF—Bt„U$R&WVW7Eö–BÒG·&öÆU&WVW7Bç&WVW7Eö–GÓ¶°¢76W'BæWVÂ†VF—E&÷w3òå³ÓòæÆVæwF‚Â2Âw7V&Ö—76–öâÂ&Wf–Wr6Æ–ÒÂæBFV6—6–öâ&R&WF–æVB–âF†RVF—BF&ÆRr“°¢76W'BæWVÂ‚†v—BÆ—7F–æw4’†•&WVW7B‚ttUBrÂrö’÷c÷&öf–ÆR×&WVW7G2rÂw7–çF†WF–2ÖæWr×7GVFVçBr’’’æ&öG’ç&WVW7Bç7FGW2Âv&÷fVBr“°¢6öç7B7Ffe&öf–ÆU7V&Ö—76–öâÒv—BÆ—7F–æw4’†•&WVW7B‚uõ5BrÂrö’÷c÷&öf–ÆR×&WVW7G2rÂw7–çF†WF–2ÖæWr×7FfbrÂ°¢66†ööÅö–C¢vÇ–6WVÕşüßËh‘éì¶»§q«^uÑ¥¹œ¡É•Ù¥•İÙ•¹Ğ¹¥°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°€…Ñ¥Ù”œ¤°ÑÉÕ”¤ì(€½¹ÍĞÉ•ÅÕ•ÍÑI•ÍÁ½¹Í”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘íÉ•Ù¥•İÙ•¹Ğ¹¥‘ô½É•¥ÍÑÉ…Ñ¥½¹Í€°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ğœ°¹Õ±°¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•ÅÕ•ÍÑI•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•ÅÕ•ÍÑI•ÍÁ½¹Í”¹‰½‘ä¹É•¥ÍÑÉ…Ñ¥½¸¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹•ÑÙ•¹Ñ=ÕÁ…¹ä¡É•Ù¥•İÙ•¹Ğ¹¥¤°€Ä¤ì(€½¹ÍĞÉ•Ù¥•İEÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½•Ù•¹ĞµÉ•¥ÍÑÉ…Ñ¥½¹Ì½É•Ù¥•Üœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•Ù¥•İEÕ•Õ”¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•Ù¥•İEÕ•Õ”¹‰½‘ä¹…ÁÁ±¥…Ñ¥½¹Ì¹Í½µ”¡É½Ü€ôøÉ½Ü¹•Ù•¹Ñ}¥€ôôôÉ•Ù¥•İÙ•¹Ğ¹¥€˜˜É½Ü¹ÕÍ•É}¥€ôôô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ¤°ÑÉÕ”°(€€€€Í…µ”µÍ¡½½°µ½‘•É…Ñ½È…¸Í•”Ñ¡”Íå¹Ñ¡•Ñ¥ŒÁ•¹‘¥¹œÉ•¥ÍÑÉ…Ñ¥½¸œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•Ù¥•İEÕ•Õ”¹‰½‘ä¹…ÁÁ±¥…Ñ¥½¹Ì¹Í½µ”¡É½Ü€ôøÉ½Ü¹ÕÍ•É}¥€ôôô€œÈÈÈÈÈÈÈÈ´ÈÈÈÈ´ĞÈÈÈ´àÈÈÈ´ÈÈÈÈÈÈÈÈÈÈÈÈœ¤°™…±Í”°(€€€€•Ù•¹ĞÉ•Ù¥•ÜÅÕ•Õ”•á±Õ‘•ÌÉ•¥ÍÑÉ…Ñ¥½¹Ì™É½´½Ñ¡•ÈÍ¡½½±Ìœ¤ì(€½¹ÍĞÍÑÕ‘•¹ÑI•Ù¥•İEÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½•Ù•¹ĞµÉ•¥ÍÑÉ…Ñ¥½¹Ì½É•Ù¥•Üœ°€Íå¹Ñ¡•Ñ¥ŒµÍÑÕ‘•¹Ğœ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÑÕ‘•¹ÑI•Ù¥•İEÕ•Õ”¹ÍÑ…ÑÕÌ°€ĞÀÌ°€ÍÑÕ‘•¹ÑÌ…¹¹½ĞÉ•…Ñ¡”•Ù•¹ĞÉ•Ù¥•ÜÅÕ•Õ”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹µ½‘•É…Ñ•Ù•¹ÑI•¥ÍÑÉ…Ñ¥½¸¡É•Ù¥•İÙ•¹Ğ¹¥°€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°€½Ñ¡•ÈµÍ¡½½°œ°€½¹™¥Éµ•œ¤°™…±Í”°€€€€•Ù•¹ĞÉ•¥ÍÑÉ…Ñ¥½¸É•Ù¥•Ü¥ÌÍ½Á•Ñ¼Ñ¡”•Ù•¹Ğ½İ¹•ÈÍ¡½½°œ¤ì(€½¹ÍĞÉ•Ù¥•İI•ÍÁ½¹Í”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘íÉ•Ù¥•İÙ•¹Ğ¹¥‘ô½É•¥ÍÑÉ…Ñ¥½¹Ì¼ÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÅ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì‘•¥Í¥½¸è€É•©•Ğœô¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡É•Ù¥•İI•ÍÁ½¹Í”°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°ÍÑ…ÑÕÌè€É•©•Ñ•œôô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹•ÑÙ•¹Ñ=ÕÁ…¹ä¡É•Ù¥•İÙ•¹Ğ¹¥¤°€À°€É•©•Ñ¥¹œ„Á•¹‘¥¹œÉ•ÅÕ•ÍĞÉ•±•…Í•Ì¥ÑÌÉ•Í•ÉÙ•Í•…Ğœ¤ì(€…İ…¥ĞÍÅ±UAMIP%9Q<™…µ}…½Õ¹Ñ}ÍÕÍÁ•¹Í¥½¹Ì(€€€€¡Í¡½½±}¥°Ñ…É•Ñ}¥°ÍÕÍÁ•¹Í¥½¹}¥°Ñ…É•Ñ}É½±”°‘ÕÉ…Ñ¥½¹}¡½ÕÉÌ°É•…Í½¸°ÍÑ…ÑÕÌ°¥ÍÍÕ•‘}‰ä°É•…Ñ•‘}…Ğ°•áÁ¥É•Í}…Ğ¤(€€€Y1UL€ Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°€Íå¹Ñ¡•Ñ¥ŒµÍÕÍÁ•¹Í¥½¸œ°€ÍÑÕ‘•¹Ğœ°€ÈĞ°(€€€€€€Må¹Ñ¡•Ñ¥Œ¥¹Ñ•É…Ñ¥½¸ÍÕÍÁ•¹Í¥½¸œ°€…Ñ¥Ù”œ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤°(€€€€€U¹İÉ…À¡ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤€¬%¹Ñ•ÉÙ…° APÈÑ œ¤¤¤í€ì(€½¹ÍĞÍÕÍÁ•¹‘•‘]É¥Ñ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½±¥ÍÑ¥¹Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ°ì(€€€Ñ¥Ñ±”è€ŸBwBÔƒBÓBûBïBÛB÷BøƒFBûFFBÃB÷BãFF3FF<œ°‘•ÍÉ¥ÁÑ¥½¸è€Må¹Ñ¡•Ñ¥ŒÍÕÍÁ•¹Í¥½¸Õ…Éœ°…Ñ•½Éäè€ŸBFFGBÇBÀœ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÕÍÁ•¹‘•‘]É¥Ñ”¹ÍÑ…ÑÕÌ°€ĞÀÌ°€…Ñ¥Ù”…½Õ¹ĞÍÕÍÁ•¹Í¥½¸‰±½­Ì…ÕÑ¡•¹Ñ¥…Ñ•İÉ¥Ñ•Ìœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÕÍÁ•¹‘•‘]É¥Ñ”¹‰½‘ä¹•ÉÉ½È°€…½Õ¹Ñ}ÍÕÍÁ•¹‘•œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½±¥ÍÑ¥¹Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ¤¤¤¹ÍÑ…ÑÕÌ°€ÈÀÀ°(€€€€…½Õ¹ĞÍÕÍÁ•¹Í¥½¸±•…Ù•ÌÉ•……•ÍÌ…Ù…¥±…‰±”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹•ÑÑ¥Ù•½Õ¹ÑMÕÍÁ•¹Í¥½¸ Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€Íå¹Ñ¡•Ñ¥ŒµÕÍ•Èœ¤¤ü¹É•…Í½¸°(€€€€Må¹Ñ¡•Ñ¥Œ¥¹Ñ•É…Ñ¥½¸ÍÕÍÁ•¹Í¥½¸œ¤ì(€½¹ÍĞÁ¡½Ñ½-•ä€ô€Á•¹‘¥¹œ¼ÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌ½…………………„µ………„´Ñ……„´á……„µ……………………………„¹İ•‰Àœì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…” œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°Á¡½Ñ½-•ä¤ì(€½¹ÍĞÁ¡½Ñ½1¥ÍÑ¥¹œ€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ìÕÍ•É}¥è€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ¥Ñ±”è€ŸB‡BãB÷FB×FBãFB×FBëBûBÔƒBûBÇF+F?BËBïB×B÷BãBÔƒFƒFBûFBøœ°‘•ÍÉ¥ÁÑ¥½¸è€ŸBcBßBûBÇFBÃBÛB×B÷BãBÔƒBûFFBÃFGFFF<ƒBßBÃBëFF/FF/BğƒBÓBøƒBûFBÓB×BïF3B÷BûBÏBøƒBûBÓBûBÇFB×B÷BãF<œ°…Ñ•½Éäè€ŸB‹BËBûFFB×FFBËBøœ°(€€€ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°µ…á}Í•…ÑÌè€À°¥µ…•}­•äèÁ¡½Ñ½-•ä°(€€€Á¡½Ñ½}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹±…¥µA•¹‘¥¹%µ…••±•Ñ¥½¸ œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°Á¡½Ñ½-•ä¤°¹Õ±°°(€€€€…¸ÕÁ±½…‘•¥µ…”…¹¹½Ğ‰”‘¥Í…É‘•…™Ñ•È¥Ğ¥Ì…Ñ½µ¥…±±ä±¥¹­•Ñ¼„±¥ÍÑ¥¹œœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹µ½‘•É…Ñ•1¥ÍÑ¥¹œ¡Á¡½Ñ½1¥ÍÑ¥¹œ¹¥°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°€…Ñ¥Ù”œ¤°™…±Í”°(€€€€±¥ÍÑ¥¹œİ¥Ñ Á•¹‘¥¹œÁ¡½Ñ¼…¹¹½Ğ‰•½µ”ÁÕ‰±¥Œœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹±¥ÍÑÑ¥Ù•1¥ÍÑ¥¹Ì Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ¤¤¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôôÁ¡½Ñ½1¥ÍÑ¥¹œ¹¥¤°™…±Í”°(€€€€Á•¹‘¥¹œÁ¡½Ñ¼±¥ÍÑ¥¹œÉ•µ…¥¹Ì…‰Í•¹Ğ™É½´Ñ¡”ÁÕ‰±¥ŒÁÉ½©•Ñ¥½¸œ¤ì€½¹ÍĞ…Ù…Ñ…É-•ä€ô€Á•¹‘¥¹œ¼ÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄ½•••••••”µ•••”´Ñ••”´á••”µ•••••••••••”¹İ•‰Àœì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…” œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°…Ù…Ñ…É-•ä¤ì(€½¹ÍĞ…Ù…Ñ…ÉMÕ‰µ¥Ğ€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½µ”½…Ù…Ñ…Èœ°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ğœ°ì¥µ…•}­•äè…Ù…Ñ…É-•äô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…Ù…Ñ…ÉMÕ‰µ¥Ğ¹ÍÑ…ÑÕÌ°€ÈÀÈ°€…Ù…Ñ…ÈÕÁ±½…‘ÌÍÑ…äÁÉ¥Ù…Ñ”…¹•¹Ñ•Èµ…¹Õ…°Í¡½½°É•Ù¥•Üœ¤ì(€½¹ÍĞ…Ù…Ñ…ÉEÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½…Ù…Ñ…ÉÌ½µ½‘•É…Ñ¥½¸œ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°¹Õ±°¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…Ù…Ñ…ÉEÕ•Õ”¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€…ÍÍ•ÉĞ¹½¬¡…Ù…Ñ…ÉEÕ•Õ”¹‰½‘ä¹É•ÅÕ•ÍÑÌ¹Í½µ”¡¥Ñ•´€ôø¥Ñ•´¹¥€ôôô…Ù…Ñ…ÉMÕ‰µ¥Ğ¹‰½‘ä¹É•ÅÕ•ÍÑ}¥¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹±¥ÍÑA•¹‘¥¹Ù…Ñ…ÉI•Ù¥•İÌ ½Ñ¡•ÈµÍ¡½½°œ¤¤¹Í½µ”¡¥Ñ•´€ôø¥Ñ•´¹¥€ôôô…Ù…Ñ…ÉMÕ‰µ¥Ğ¹‰½‘ä¹É•ÅÕ•ÍÑ}¥¤°™…±Í”°(€€€€½Ñ¡•ÈÍ¡½½±Ì…¹¹½Ğ‘¥Í½Ù•ÈÁ•¹‘¥¹œ…Ù…Ñ…ÉÌœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½…Ù…Ñ…ÉÌ¼‘í…Ù…Ñ…ÉMÕ‰µ¥Ğ¹‰½‘ä¹É•ÅÕ•ÍÑ}¥‘ô½µ½‘•É…Ñ¥½¹€°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ğœ°ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô¤¤¤¹ÍÑ…ÑÕÌ°€ĞÀÌ°(€€€€ÍÑÕ‘•¹ÑÌ…¹¹½Ğ…ÁÁÉ½Ù”…¸…Ù…Ñ…Èœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½…Ù…Ñ…ÉÌ¼‘í…Ù…Ñ…ÉMÕ‰µ¥Ğ¹‰½‘ä¹É•ÅÕ•ÍÑ}¥‘ô½µ½‘•É…Ñ¥½¹€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô¤¤¤¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹¥ÍÕÉÉ•¹ÑÙ…Ñ…È¡…Ù…Ñ…ÉMÕ‰µ¥Ğ¹‰½‘ä¹É•ÅÕ•ÍÑ}¥¤°ÑÉÕ”°(€€€€…ÁÁÉ½Ù•…Ù…Ñ…ÈUI0¥Ì…ÍÍ½¥…Ñ•İ¥Ñ Ñ¡”É•Ù¥•İ•ÁÉ½™¥±”œ¤ì(€½¹ÍĞ½ÉÁ¡…¹-•ä€ô€Á•¹‘¥¹œ¼ÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄ½‰‰‰‰‰‰‰ˆµ‰‰‰ˆ´Ñ‰‰ˆ´á‰‰ˆµ‰‰‰‰‰‰‰‰‰‰‰ˆ¹İ•‰Àœì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…” œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°½ÉÁ¡…¹-•ä¤ì(€…İ…¥ĞÍÅ±UAQ™…µ}Á•¹‘¥¹}µ•‘¥„MPÉ•…Ñ•‘}…Ğ€ôU¹İÉ…À¡ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤€´%¹Ñ•ÉÙ…° @áœ¤¤]!I½‰©•Ñ}­•ä€ô€‘í½ÉÁ¡…¹-•åôí€ì(€½¹ÍĞ•áÁ¥É•‘5•‘¥…±…¥µÌ€ô…İ…¥ĞÉ•Á¼¹±…¥µáÁ¥É•‘A•¹‘¥¹%µ…•Ì ÄÀ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡•áÁ¥É•‘5•‘¥…±…¥µÌ¹µ…À¡¥Ñ•´€ôø¥Ñ•´¹½‰©•Ñ}­•ä¤°m½ÉÁ¡…¹-•åt°(€€€€ÍÑ…±”Õ¹±¥¹­•ÕÁ±½…‘Ì…É”±…¥µ•İ¡¥±”Ñ¡”¥µ…”…ÑÑ…¡•Ñ¼„±¥ÍÑ¥¹œ¥ÌÁÉ•Í•ÉÙ•œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹™¥¹¥Í¡A•¹‘¥¹%µ…•±•…¹ÕÀ¡½ÉÁ¡…¹-•ä°•áÁ¥É•‘5•‘¥…±…¥µÍlÁt¹±…¥µ}Ñ½­•¸°ÑÉÕ”¤°ÑÉÕ”¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P½‰©•Ñ}­•äI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘í½ÉÁ¡…¹-•åôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À°(€€€€½µÁ±•Ñ•±•…¹ÕÀÉ•µ½Ù•ÌÑ¡”ÁÉ¥Ù…Ñ”µ•‘¥„É•¥ÍÑÉäÉ½Üœ¤ì(€½¹ÍĞ½Ñ¡•ÉM¡½½±A•¹‘¥¹œ€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ìÕÍ•É}¥è€œÈÈÈÈÈÈÈÈ´ÈÈÈÈ´ĞÈÈÈ´àÈÈÈ´ÈÈÈÈÈÈÈÈÈÈÈÈœ°Í¡½½±}¥è€½Ñ¡•ÈµÍ¡½½°œ°(€€€Ñ¥Ñ±”è€ŸBŸFBÛBûBÔƒF#BëBûBïF3B÷BûBÔƒBûBÇF+F?BËBïB×B÷BãBÔœ°‘•ÍÉ¥ÁÑ¥½¸è€ŸBwBÔƒBÓBûBïBÛB÷BøƒBÿBûBÿBÃFFF0ƒBÈƒBûFB×FB×BÓF0œ°…Ñ•½Éäè€ŸBFFGBÇBÀœ°(€€€ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°µ…á}Í•…ÑÌè€À°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœô¤ì(€½¹ÍĞµ½‘•É…Ñ¥½¹EÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½±¥ÍÑ¥¹Ì½µ½‘•É…Ñ¥½¸œ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡µ½‘•É…Ñ¥½¹EÕ•Õ”¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€…ÍÍ•ÉĞ¹½¬¡µ½‘•É…Ñ¥½¹EÕ•Õ”¹‰½‘ä¹±¥ÍÑ¥¹Ì¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôôÁ¡½Ñ½1¥ÍÑ¥¹œ¹¥¤°€Í¡½½°ÅÕ•Õ”¥¹±Õ‘•Ì¥ÑÌ½İ¸Á•¹‘¥¹œÁ¡½Ñ¼±¥ÍÑ¥¹œœ¤ì(€…ÍÍ•ÉĞ¹½¬ …µ½‘•É…Ñ¥½¹EÕ•Õ”¹‰½‘ä¹±¥ÍÑ¥¹Ì¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôô½Ñ¡•ÉM¡½½±A•¹‘¥¹œ¹¥¤°€Í¡½½°ÅÕ•Õ”•á±Õ‘•Ì½Ñ¡•ÈµÍ¡½½°±¥ÍÑ¥¹Ìœ¤ì€…ÍÍ•ÉĞ¹•ÅÕ…°¡µ½‘•É…Ñ¥½¹EÕ•Õ”¹‰½‘ä¹±¥ÍÑ¥¹Ì¹™¥¹¡É½Ü€ôøÉ½Ü¹¥€ôôôÁ¡½Ñ½1¥ÍÑ¥¹œ¹¥¤¹Á¡½Ñ½}ÕÉ°°€½…Á¤½ØÄ½±¥ÍÑ¥¹Ì¼‘íÁ¡½Ñ½1¥ÍÑ¥¹œ¹¥‘ô½Á¡½Ñ½€¤ì(€½¹ÍĞÍ¡½½±•±•Ñ•5•‘¥„€ô€Á•¹‘¥¹œ¼ÔÔÔÔÔÔÔÔ´ÔÔÔÔ´ĞÔÔÔ´àÔÔÔ´ÔÔÔÔÔÔÔÔÔÔÔÔ½‘‘‘‘‘‘‘µ‘‘‘´Ñ‘‘´á‘‘µ‘‘‘‘‘‘‘‘‘‘‘¹İ•‰Àœì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…” œÔÔÔÔÔÔÔÔ´ÔÔÔÔ´ĞÔÔÔ´àÔÔÔ´ÔÔÔÔÔÔÔÔÔÔÔÔœ°Í¡½½±•±•Ñ•5•‘¥„¤ì(€½¹ÍĞÍ¡½½±•±•Ñ•1¥ÍÑ¥¹œ€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ìÕÍ•É}¥è€œÔÔÔÔÔÔÔÔ´ÔÔÔÔ´ĞÔÔÔ´àÔÔÔ´ÔÔÔÔÔÔÔÔÔÔÔÔœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ¥Ñ±”è€ŸB‡BãB÷FB×FBãFB×FBëBûBÔƒBûBÇF+F?BËBïB×B÷BãBÔƒBÓBïF<ƒFBÓBÃBïB×B÷BãF<ƒBÃBÓBóBãB÷BãFFFBÃFBûFBûBğœ°‘•ÍÉ¥ÁÑ¥½¸è€ŸB‹B×FFBãFFB×FFF<ƒFBûBïF3BëBøƒB÷BÀƒBûBÓB÷BûFBÃBßBûBËBûBäƒBÇBÃBßBÔœ°…Ñ•½Éäè€ŸBkB÷BãBÏBàœ°(€€€ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°µ…á}Í•…ÑÌè€À°¥µ…•}­•äèÍ¡½½±•±•Ñ•5•‘¥„°Á¡½Ñ½}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœô¤ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡Í¡½½±•±•Ñ•5•‘¥„¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ 1Qœ°€½…Á¤½ØÄ½Í¡½½°½±¥ÍÑ¥¹Ì¼‘í½Ñ¡•ÉM¡½½±A•¹‘¥¹œ¹¥‘õ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì(€€€½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒB{BGB«B¿BKBoBWBwBcBTƒB£BkB{BoB¬œ°(€ô¤¤¤¹ÍÑ…ÑÕÌ°€ĞÀĞ°€…‘µ¥¹¥ÍÑÉ…Ñ½È…¹¹½Ğ‘•±•Ñ”…¹½Ñ¡•ÈÍ¡½½°±¥ÍÑ¥¹œœ¤ì(€½¹ÍĞÍ¡½½±•±•Ñ•I•ÍÕ±Ğ€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ 1Qœ°€½…Á¤½ØÄ½Í¡½½°½±¥ÍÑ¥¹Ì¼‘íÍ¡½½±•±•Ñ•1¥ÍÑ¥¹œ¹¥‘õ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì(€€€½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒB{BGB«B¿BKBoBWBwBcBTƒB£BkB{BoB¬œ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡Í¡½½±•±•Ñ•I•ÍÕ±Ğ°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°‘•±•Ñ•èÑÉÕ”°¥µ…•}±•…¹ÕÀè€½µÁ±•Ñ”œôô¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡Í¡½½±•±•Ñ•5•‘¥„¤°€Í¡½½°±¥ÍÑ¥¹œ‘•±•Ñ¥½¸É•µ½Ù•Ì¥ÑÌÉ•¥ÍÑ•É•ÁÉ¥Ù…Ñ”¥µ…”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}±¥ÍÑ¥¹Ì]!I¥€ô€‘íÍ¡½½±•±•Ñ•1¥ÍÑ¥¹œ¹¥‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P½‰©•Ñ}­•äI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘íÍ¡½½±•±•Ñ•5•‘¥…ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€½¹ÍĞÍ¡½½±•±•Ñ•Õ‘¥Ğ€ô…İ…¥ĞÍÅ±M1PÍ¡½½±}¥°…Ñ½É}¥°•¹Ñ¥Ñå}¥°•¹Ñ¥Ñå}ÑåÁ”°…Ñ¥½¸I=4™…µ}Í¡½½±}½¹Ñ•¹Ñ}…Õ‘¥Ğ]!I•¹Ñ¥Ñå}¥€ô€‘íÍ¡½½±•±•Ñ•1¥ÍÑ¥¹œ¹¥‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡Í¡½½±•±•Ñ•Õ‘¥Ğü¹lÁtü¹lÁt°ìÍ¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°…Ñ½É}¥è€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°(€€€•¹Ñ¥Ñå}¥èÍ¡½½±•±•Ñ•1¥ÍÑ¥¹œ¹¥°•¹Ñ¥Ñå}ÑåÁ”è€±¥ÍÑ¥¹œœ°…Ñ¥½¸è€±¥ÍÑ¥¹}‘•±•Ñ•œô¤ì(€½¹ÍĞ…‘µ¥¹=Ù•ÉÙ¥•Ü€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½½Ù•ÉÙ¥•Üœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…‘µ¥¹=Ù•ÉÙ¥•Ü¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€…ÍÍ•ÉĞ¹½¬¡…‘µ¥¹=Ù•ÉÙ¥•Ü¹‰½‘ä¹ÕÍ•ÉÌ¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôô€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ¤¤ì(€…ÍÍ•ÉĞ¹½¬ ……‘µ¥¹=Ù•ÉÙ¥•Ü¹‰½‘ä¹ÕÍ•ÉÌ¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôô€œÈÈÈÈÈÈÈÈ´ÈÈÈÈ´ĞÈÈÈ´àÈÈÈ´ÈÈÈÈÈÈÈÈÈÈÈÈœ¤°€Í¡½½°½Ù•ÉÙ¥•Ü•á±Õ‘•ÌÁÉ½™¥±•Ì™É½´½Ñ¡•ÈÍ¡½½±Ìœ¤ì(€…ÍÍ•ÉĞ¹½¬¡…‘µ¥¹=Ù•ÉÙ¥•Ü¹‰½‘ä¹±¥ÍÑ¥¹Ì¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôô½Ñ¡•ÉM¡½½±A•¹‘¥¹œ¹¥¤€ôôô™…±Í”°€Í¡½½°½Ù•ÉÙ¥•Ü•á±Õ‘•Ì±¥ÍÑ¥¹Ì™É½´…¹½Ñ¡•ÈÍ¡½½°œ¤ì(€…ÍÍ•ÉĞ¹½¬¡…‘µ¥¹=Ù•ÉÙ¥•Ü¹‰½‘ä¹…Õ‘¥Ğ¹Í½µ”¡É½Ü€ôøÉ½Ü¹…Ñ¥½¸€ôôô€±¥ÍÑ¥¹}‘•±•Ñ•œ¤°€Í¡½½°½Ù•ÉÙ¥•ÜÉ•ÑÕÉ¹ÌÑ¡”É••¹ĞÍ¡½½°…Ñ¥½¸…Õ‘¥Ğœ¤ì(€½¹ÍĞÍ…™•Ñå¥¹•ÉÁÉ¥¹Ğ€ô€………………………………………………………………………………………………………………………………………………………………………„œì(€™½È€¡±•Ğ¤€ô€Àì¤€ğ€Ìì¤¬¬¤ì(€€€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}Í…™•Ñå}¥¹¥‘•¹ÑÌ€¡Í¡½½±}¥°Á…¥É}™¥¹•ÉÁÉ¥¹Ğ°Í½ÕÉ•}­¥¹°…Ñ•½Éä°¥¹¥‘•¹Ñ}¥°Í•Ù•É¥Ñä°(€€€€€É•…Ñ•‘}…Ğ°É•Ù¥•İ•‘}…Ğ°É•Ù¥•İ•‘}‰ä°…Ñ½É}¥°Ñ…É•Ñ}¥°Í½ÕÉ•}½É¥¥¸°•Ù¥‘•¹•}•á•ÉÁĞ¤€€€€€Y1UL€ Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€‘íÍ…™•Ñå¥¹•ÉÁÉ¥¹Ñô°€µ•ÍÍ…”œ°€Ñ…É•Ñ•‘}¡…É…ÍÍµ•¹Ğœ°€‘í…………………„´ÀÀÀÀ´ĞÀÀÀ´àÀÀÀ´‘íMÑÉ¥¹œ¡¤¤¹Á…‘MÑ…ÉĞ ÄÈ°€œÀœ¥õô°(€€€€€€€€‘í¤€ôôô€À€ü€µ•‘¥Õ´œ€è€¡¥ ô°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤°9U10°9U10°€…………………„µ………„´Ñ……„´á……„µ……………………………„œ°(€€€€€€€€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°€™…´¹•á…µÁ±”¹ÉÔœ°€Íå¹Ñ¡•Ñ¥ŒÍ…¹¥Ñ¥é••á•ÉÁĞœ¤í€ì(€ô(€½¹ÍĞÍ…™•ÑåI•Á½ÉÑÌ€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½Í…™•ÑäµÉ•Á½ÉÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•ÑåI•Á½ÉÑÌ¹ÍÑ…ÑÕÌ°€ÈÀÀ¤ì(€½¹ÍĞÍ…™•ÑåÉ½ÕÀ€ôÍ…™•ÑåI•Á½ÉÑÌ¹‰½‘ä¹É•Á½ÉÑÌ¹™¥¹¡É½Ü€ôøÉ½Ü¹™¥¹•ÉÁÉ¥¹Ğ€ôôôÍ…™•Ñå¥¹•ÉÁÉ¥¹Ğ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•ÑåÉ½ÕÀ¹½ÕÉÉ•¹•Ì°€Ì¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•ÑåÉ½ÕÀ¹Í•Ù•É¥Ñä°€¡¥ œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•ÑåÉ½ÕÀ¹…Ñ½È¹™¥ÉÍÑ}¹…µ”°€ŸB‹B×FFœ¤ì(€½¹ÍĞ•µ¥ÑÑ•‘M…™•Ñä€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÍ…™•Ñäµ…Ñ½Èœ°ì(€€€É••¥Ù•É}¥è€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœ°‰½‘äè€ŸBBûFFFBÿBÃBïBàƒFBÏFBûBßF,ƒBÈƒBÃBÓFB×FƒFFB×B÷BãBëBÀ¸œ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡•µ¥ÑÑ•‘M…™•Ñä¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡•µ¥ÑÑ•‘M…™•Ñä¹‰½‘ä¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ¤ì(€™½È€¡½¹ÍĞ‰½‘ä½˜lŸBSBÃBËBÃBçFBÔƒBËFBÔƒBÇFBÓB×BğƒBËF/FBóB×BãBËBÃFF0ƒBûBÓB÷BûBÏBøƒFFB×B÷BãBëBÀƒBÈƒFBÃFBÔ¸œ°(€€€€ŸBwBÃBÿBãF#BãFBÔƒB×BóFƒBËFBÔƒB÷B×BÿFBãF?FB÷F/BÔƒFBûBûBÇF'B×B÷BãF<°ƒFFBûBÇF,ƒBûBôƒFF#FGBìƒBãBÜƒFBÃFBÀ¸t¤ì(€€€½¹ÍĞÉ•Ù¥•İ•€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½µ•ÍÍ…•Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÍ…™•Ñäµ…Ñ½Èœ°ì(€€€€€É••¥Ù•É}¥è€œÔÔÔÔÔÔÔÔ´ÔÔÔÔ´ĞÔÔÔ´àÔÔÔ´ÔÔÔÔÔÔÔÔÔÔÔÔœ°‰½‘ä°(€€€ô¤¤ì(€€€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•Ù¥•İ•¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€€€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•Ù¥•İ•¹‰½‘ä¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ°€¹•Ü±½…°Í…™•Ñäµ…É­•ÉÌÉ•µ…¥¸Á•¹‘¥¹œ™½È¡Õµ…¸É•Ù¥•Üœ¤ì(€ô(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}µ•ÍÍ…•Ì]!IÍ•¹‘•É}¥€ô€…………………„µ………„´Ñ……„´á……„µ……………………………„œí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À°(€€€€Õ¹É•Ù¥•İ•µ•ÍÍ…”ÍÑ…åÌ½ÕĞ½˜Ñ¡”É•¥Á¥•¹Ğ¥¹‰½àœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}Á•¹‘¥¹}µ•ÍÍ…•Ì]!IÍ•¹‘•É}¥€ô€…………………„µ………„´Ñ……„´á……„µ……………………………„œí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€Ì°(€€€€Õ¹É•Ù¥•İ•µ•ÍÍ…”¥Ì­•ÁĞ¥¸Ñ¡”Í¡½½°É•Ù¥•ÜÅÕ•Õ”œ¤ì(€½¹ÍĞ±½…±%¹¥‘•¹ÑÌ€ô…İ…¥ĞÍÅ±M1P…Ñ•½Éä°Í•Ù•É¥Ñä°•Ù¥‘•¹•}•á•ÉÁĞI=4™…µ}Í…™•Ñå}¥¹¥‘•¹ÑÌ(€€€]!I…Ñ½É}¥€ô€…………………„µ………„´Ñ……„´á……„µ……………………………„œ(€€€€€9Ñ…É•Ñ}¥€ô€œÔÔÔÔÔÔÔÔ´ÔÔÔÔ´ĞÔÔÔ´àÔÔÔ´ÔÔÔÔÔÔÔÔÔÔÔÔœ9Í½ÕÉ•}­¥¹€ô€µ•ÍÍ…”œ(€€€€€9…Ñ•½Éä%8€ Ñ…É•Ñ•‘}¡…É…ÍÍµ•¹Ğœ°€¹•…Ñ¥Ù•}Á•ÉÍ½¹…±}…±°œ¤í€ì(€½¹ÍĞ±½…±%¹¥‘•¹Ñ	å…Ñ•½Éä€ô¹•Ü5…À ¡±½…±%¹¥‘•¹ÑÌü¹lÁt€üümt¤¹µ…À¡É½Ü€ôømÉ½Ü¹…Ñ•½Éä°É½İt¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡l¸¸¹±½…±%¹¥‘•¹Ñ	å…Ñ•½Éä¹­•åÌ ¥t¹Í½ÉĞ ¤°l¹•…Ñ¥Ù•}Á•ÉÍ½¹…±}…±°œ°€Ñ…É•Ñ•‘}¡…É…ÍÍµ•¹Ğt¤ì(€™½È€¡½¹ÍĞÉ½Ü½˜±½…±%¹¥‘•¹Ñ	å…Ñ•½Éä¹Ù…±Õ•Ì ¤¤ì(€€€…ÍÍ•ÉĞ¹•ÅÕ…°¡É½Ü¹Í•Ù•É¥Ñä°€µ•‘¥Õ´œ¤ì(€€€…ÍÍ•ÉĞ¹•ÅÕ…°¡É½Ü¹•Ù¥‘•¹•}•á•ÉÁĞ°¹Õ±°°€±½…°±…ÍÍ¥™¥•È¹•Ù•ÈÁ•ÉÍ¥ÍÑÌÑ¡”Í½ÕÉ”Ñ•áĞœ¤ì(€ô(€½¹ÍĞ•µ¥ÑÑ•‘%¹¥‘•¹Ğ€ô…İ…¥ĞÍÅ±M1PÁ…¥É}™¥¹•ÉÁÉ¥¹Ğ°…Ñ•½Éä°Í•Ù•É¥Ñä°•Ù¥‘•¹•}•á•ÉÁĞI=4™…µ}Í…™•Ñå}¥¹¥‘•¹ÑÌ(€€€]!I…Ñ½É}¥€ô€…………………„µ………„´Ñ……„´á……„µ……………………………„œ9Í½ÕÉ•}­¥¹€ô€µ•ÍÍ…”œ(€€€€€9…Ñ•½Éä€ô€Ñ¡É•…Ñ}½É}¥¹Ñ¥µ¥‘…Ñ¥½¸œ=IH	dÉ•…Ñ•‘}…ĞM1%5%P€Äí€ì(€…ÍÍ•ÉĞ¹µ…Ñ ¡•µ¥ÑÑ•‘%¹¥‘•¹Ğü¹lÁtü¹lÁtü¹Á…¥É}™¥¹•ÉÁÉ¥¹Ğñğ€œœ°€½ylÀ´å„µ™uìØÑô¼¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡•µ¥ÑÑ•‘%¹¥‘•¹Ğü¹lÁtü¹lÁtü¹…Ñ•½Éä°€Ñ¡É•…Ñ}½É}¥¹Ñ¥µ¥‘…Ñ¥½¸œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡•µ¥ÑÑ•‘%¹¥‘•¹Ğü¹lÁtü¹lÁtü¹Í•Ù•É¥Ñä°€¡¥ œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡•µ¥ÑÑ•‘%¹¥‘•¹Ğü¹lÁtü¹lÁtü¹•Ù¥‘•¹•}•á•ÉÁĞ°¹Õ±°¤ì(€½¹ÍĞ•µ¥ÑÑ•‘EÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½Í…™•ÑäµÉ•Á½ÉÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€…ÍÍ•ÉĞ¹½¬¡•µ¥ÑÑ•‘EÕ•Õ”¹‰½‘ä¹É•Á½ÉÑÌ¹Í½µ”¡É½Ü€ôøÉ½Ü¹…Ñ•½Éä€ôôô€Ñ¡É•…Ñ}½É}¥¹Ñ¥µ¥‘…Ñ¥½¸œ¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½Í…™•ÑäµÉ•Á½ÉÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ±å•Õ´µ…‘µ¥¸œ¤¤¤¹‰½‘ä¹É•Á½ÉÑÌ¹±•¹Ñ °€À°(€€€€Í…™•ÑäÉ•Á½ÉÑÌ…É”¥Í½±…Ñ•‰äÍ¡½½°œ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½Í…™•ÑäµÉ•Á½ÉÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì€€€™¥¹•ÉÁÉ¥¹ĞèÍ…™•Ñå¥¹•ÉÁÉ¥¹Ğ°…Ñ•½Éäè€Ñ…É•Ñ•‘}¡…É…ÍÍµ•¹Ğœ°Í½ÕÉ•}­¥¹è€µ•ÍÍ…”œ°(€ô¤¤°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”ôô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½…‘µ¥¸½Í…™•ÑäµÉ•Á½ÉÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤¤¹‰½‘ä¹É•Á½ÉÑÌ¹Í½µ”¡É½Ü€ôøÉ½Ü¹™¥¹•ÉÁÉ¥¹Ğ€ôôôÍ…™•Ñå¥¹•ÉÁÉ¥¹Ğ¤°™…±Í”°(€€€€…­¹½İ±•‘•Í…™•Ñä±ÕÍÑ•ÉÌ±•…Ù”Ñ¡”Õ¹É•Ù¥•İ•ÅÕ•Õ”œ¤ì(€½¹ÍĞ…‘µ¥¹%‘•…%µ…•-•ä€ô€Á•¹‘¥¹œ¼ÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌ½…………………„´ÀÀÀÀ´ĞÀÀÀ´àÀÀÀ´ÀÀÀÀÀÀÀÀÀÀÀÄ¹İ•‰Àœì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡…‘µ¥¹%‘•…%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…” œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°…‘µ¥¹%‘•…%µ…•-•ä¤ì(€½¹ÍĞ…‘µ¥¹=İ¹%‘•„€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•%‘•„¡ìÕÍ•É}¥è€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ•áĞè€ŸBcBÓB×F<ƒBÃBÓBóBãB÷BãFFFBÃFBûFBÀƒBÓBïF<ƒFBÃBóBûBÿFBûBËB×FBëBàœ°¥µ…•}­•åÌèm…‘µ¥¹%‘•…%µ…•-•åt°¥µ…•}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°(€€€…¥}ÍÑ…ÑÕÌè€…ÁÁÉ½Ù•œ°…‘µ¥¹}ÍÑ…ÑÕÌè€¹•Üœô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹±¥ÍÑA•¹‘¥¹M¡½½±%‘•…Ì Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°€Í¡½½±}…‘µ¥¸œ¤¤(€€€€¹Í½µ”¡¥‘•„€ôø¥‘•„¹¥€ôôô…‘µ¥¹=İ¹%‘•„¹¥¤°™…±Í”°€É•Ù¥•ÜÅÕ•Õ”½µ¥ÑÌÑ¡”É•Ù¥•İ•È½İ¸ÍÕ‰µ¥ÍÍ¥½¸œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹É•Ù¥•İM¡½½±%‘•…%µ…•Ì¡ì¥‘•…%è…‘µ¥¹=İ¹%‘•„¹¥°Í¡½½±%è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€É•Ù¥•İ•É%è€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô¤°™…±Í”°(€€Í¡½½°ÍÑ…™˜…¹¹½Ğ…ÁÁÉ½Ù”Ñ¡•¥È½İ¸¥‘•„Á¡½Ñ¼œ¤ì(€½¹ÍĞ‘•±•Ñ•‘‘µ¥¹%‘•„€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ 1Qœ°€½…Á¤½ØÄ½¥‘•…Ì¼‘í…‘µ¥¹=İ¹%‘•„¹¥‘õ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°¹Õ±°¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡‘•±•Ñ•‘‘µ¥¹%‘•„°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°‘•±•Ñ•èÑÉÕ”°¥µ…•}±•…¹ÕÀè€½µÁ±•Ñ”œôô°(€€€€…¸¥‘•„…ÕÑ¡½È…¸‘•±•Ñ”Ñ¡•¥È½İ¸¥‘•„…¹¥µµ•‘¥…Ñ•±ä±•…¸±¥¹­•ÁÉ¥Ù…Ñ”Á¡½Ñ½Ìœ¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡…‘µ¥¹%‘•…%µ…•-•ä¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}¥‘•…Ì]!I¥€ô€‘í…‘µ¥¹=İ¹%‘•„¹¥‘ôí€¥lÁt¹±•¹Ñ °€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P½‰©•Ñ}­•äI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘í…‘µ¥¹%‘•…%µ…•-•åôí€¥lÁt¹±•¹Ñ °€À¤ì(€½¹ÍĞ‘•±•Ñ¥¹UÍ•É%€ô€œÄÄÄÄÄÄÄÄ´ÄÄÄÄ´ĞÄÄÄ´àÄÄÄ´ÄÄÄÄÄÄÄÄÄÄÄÄœì(€½¹ÍĞ‘•±•Ñ¥¹%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘í‘•±•Ñ¥¹UÍ•É%‘ô½ŒµŒ´ÑŒ´áŒµŒ¹İ•‰Á€ì(€½¹ÍĞ…ÑÑ…¡•‘%‘•…%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘í‘•±•Ñ¥¹UÍ•É%‘ô½‘‘‘‘‘‘‘µ‘‘‘´Ñ‘‘´á‘‘µ‘‘‘‘‘‘‘‘‘‘‘¹İ•‰Á€ì(€½¹ÍĞÉ•©•Ñ•‘%‘•…%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘í‘•±•Ñ¥¹UÍ•É%‘ô½™™™™™™™˜µ™™™˜´Ñ™™˜´á™™˜µ™™™™™™™™™™™˜¹İ•‰Á€ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡‘•±•Ñ¥¹%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡‘•±•Ñ¥¹UÍ•É%°‘•±•Ñ¥¹%µ…•-•ä¤ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡…ÑÑ…¡•‘%‘•…%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡‘•±•Ñ¥¹UÍ•É%°…ÑÑ…¡•‘%‘•…%µ…•-•ä¤ì(€½¹ÍĞ¥‘•…MÕ‰µ¥ÍÍ¥½¸€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½¥‘•…Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ğœ°ì(€€€Ñ•áĞè€ŸBSBûBÇBÃBËBãFF0ƒFBãB÷FB×FBãFB×FBëFF8ƒBëB÷BãBÛB÷FF8ƒBÿBûBïBëFƒBÈƒF#BëBûBïF3B÷FF8ƒBÇBãBÇBïBãBûFB×BëFœ°¥µ…•}­•åÌèm…ÑÑ…¡•‘%‘•…%µ…•-•åt°(€ô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡¥‘•…MÕ‰µ¥ÍÍ¥½¸¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡¥‘•…MÕ‰µ¥ÍÍ¥½¸¹‰½‘ä¹¥µ…•}ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ¤ì(€½¹ÍĞ¥‘•…EÕ•Õ”€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ìœ°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ¤¤ì(€½¹ÍĞÍÕ‰µ¥ÑÑ•‘%‘•„€ô¥‘•…EÕ•Õ”¹‰½‘ä¹¥‘•…Ì¹™¥¹¡¥‘•„€ôø¥‘•„¹¥€ôôô¥‘•…MÕ‰µ¥ÍÍ¥½¸¹‰½‘ä¹¥¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÕ‰µ¥ÑÑ•‘%‘•„¹¥µ…•}ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ¤ì€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡ÍÕ‰µ¥ÑÑ•‘%‘•„¹¥µ…•}­•åÌ°m…ÑÑ…¡•‘%‘•…%µ…•-•åt¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡=‰©•Ğ¹¡…Í=İ¸¡ÍÕ‰µ¥ÑÑ•‘%‘•„°€ÕÍ•É}¥œ¤°™…±Í”°€Í¡½½°É•Ù¥•ÜÅÕ•Õ”½µ¥ÑÌÑ¡”ÍÕ‰µ¥ÑÑ•È¥‘•¹Ñ¥Ñäœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÕ‰µ¥ÑÑ•‘%‘•„¹…¥}ÍÑ…ÑÕÌ°€…ÁÁÉ½Ù•œ°€Õ¹™±…•Ñ•áĞ™½±±½İÌÑ¡”™É•”±½…°™…±±‰…¬É•Ù¥•ÜÁ…Ñ œ¤ì(€…ÍÍ•ÉĞ¹½¬ ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ìœ°€Íå¹Ñ¡•Ñ¥Œµ½Õ¹¥°œ¤¤¤¹‰½‘ä¹¥‘•…Ì(€€€€¹Í½µ”¡¥Ñ•´€ôø¥Ñ•´¹¥€ôôô¥‘•…MÕ‰µ¥ÍÍ¥½¸¹‰½‘ä¹¥¤°€½Õ¹¥°…¸É•Ù¥•ÜÁ¡½Ñ½Ì…™Ñ•ÈÑ¡”Ñ•áĞÁ…ÍÍ•ÌÑ¡”±½…°Í…™•Ñä…Ñ”œ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…° ¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ Pœ°€œ½…Á¤½ØÄ½Í¡½½°½¥‘•…Ìœ°€Íå¹Ñ¡•Ñ¥Œµ±å•Õ´µ…‘µ¥¸œ¤¤¤¹‰½‘ä¹¥‘•…Ì°mt°(€€€€Í¡½½°¥‘•„ÅÕ•Õ”¥Ì¥Í½±…Ñ•‰äÍ¡½½°œ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½Í¡½½°½¥‘•…Ì¼‘í¥‘•…MÕ‰µ¥ÍÍ¥½¸¹‰½‘ä¹¥‘ô½¥µ…•Í€°€Íå¹Ñ¡•Ñ¥Œµ½Õ¹¥°œ°ì‘•¥Í¥½¸è€…ÁÁÉ½Ù”œô¤¤°(€€€ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°¥µ…•}ÍÑ…ÑÕÌè€…ÁÁÉ½Ù•œôô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹•ÑM¡½½±%‘•…%µ…”¡¥‘•…MÕ‰µ¥ÍÍ¥½¸¹‰½‘ä¹¥°€À¤¤¹¥µ…•}ÍÑ…ÑÕÌ°€…ÁÁÉ½Ù•œ¤ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡É•©•Ñ•‘%‘•…%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡‘•±•Ñ¥¹UÍ•É%°É•©•Ñ•‘%‘•…%µ…•-•ä¤ì(€½¹ÍĞÉ•©•Ñ•‘%‘•„€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½¥‘•…Ìœ°€Íå¹Ñ¡•Ñ¥ŒµÉ•¥ÍÑÉ…¹Ğœ°ì(€€€Ñ•áĞè€ŸBFBûBËB×FBëBÀƒBÇB×BßBûBÿBÃFB÷BûBÏBøƒBûFBëBïBûB÷B×B÷BãF<ƒFBûFBøœ°¥µ…•}­•åÌèmÉ•©•Ñ•‘%‘•…%µ…•-•åt°(€ô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•©•Ñ•‘%‘•„¹ÍÑ…ÑÕÌ°€ÈÀÄ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½Í¡½½°½¥‘•…Ì¼‘íÉ•©•Ñ•‘%‘•„¹‰½‘ä¹¥‘ô½¥µ…•Í€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì‘•¥Í¥½¸è€É•©•Ğœô¤¤°(€€€ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°¥µ…•}ÍÑ…ÑÕÌè€É•©•Ñ•œôô¤ì(€½¹ÍĞÉ•©•Ñ•‘%‘•…I½Ü€ô…İ…¥ĞÍÅ±M1P¥µ…•}ÍÑ…ÑÕÌI=4™…µ}¥‘•…Ì]!I¥€ô€‘íÉ•©•Ñ•‘%‘•„¹‰½‘ä¹¥‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡É•©•Ñ•‘%‘•…I½İlÁulÁt°ì¥µ…•}ÍÑ…ÑÕÌè€É•©•Ñ•œô¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥ĞÉ•Á¼¹±¥ÍÑA•¹‘¥¹M¡½½±%‘•…Ì Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œØØØØØØØØ´ØØØØ´ĞØØØ´àØØØ´ØØØØØØØØØØØØœ°€½Õ¹¥±}µ•µ‰•Èœ¤(€€€€¹Ñ¡•¸¡É½İÌ€ôøÉ½İÌ¹™¥¹¡É½Ü€ôøÉ½Ü¹¥€ôôôÉ•©•Ñ•‘%‘•„¹‰½‘ä¹¥¤ü¹¥µ…•}­•åÌ¤°mt¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹•ÑM¡½½±%‘•…%µ…”¡É•©•Ñ•‘%‘•„¹‰½‘ä¹¥°€À¤°¹Õ±°°(€€€€É•©•Ñ•Í¡½½°¥‘•„¥µ…”¥Ì¹¼±½¹•ÈÉ•…‘…‰±”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1PÍÑ…ÑÕÌI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘íÉ•©•Ñ•‘%‘•…%µ…•-•åôí€¥lÁulÁt¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ°(€€€€É•©•Ñ•Í¡½½°¥‘•„¥µ…”É•ÑÕÉ¹ÌÑ¼Ñ¡”‰½Õ¹‘•½ÉÁ¡…¸±•…¹ÕÀÅÕ•Õ”œ¤ì(€½¹ÍĞÉ•©•Ñ•‘Q•áÑ%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘í‘•±•Ñ¥¹UÍ•É%‘ô¼ÄÈÌĞÔØÜà´ÄÈÌĞ´ĞÈÌĞ´àÈÌĞ´ÄÈÌĞÔØÜàäÀÄÈ¹İ•‰Á€ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡‘•±•Ñ¥¹UÍ•É%°É•©•Ñ•‘Q•áÑ%µ…•-•ä¤ì(€½¹ÍĞÉ•©•Ñ•‘Q•áÑ%‘•„€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•%‘•„¡ìÕÍ•É}¥è‘•±•Ñ¥¹UÍ•É%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ•áĞè€ŸBcBÓB×F<ƒBûFBëBïBûB÷F?B×FFF<ƒBóBûBÓB×FBÃFBûFBûBğƒF#BëBûBïF,œ°¥µ…•}­•åÌèmÉ•©•Ñ•‘Q•áÑ%µ…•-•åt°¥µ…•}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°(€€€…¥}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°…‘µ¥¹}ÍÑ…ÑÕÌè€¹•Üœô¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½Í¡½½°½¥‘•…Ì¼‘íÉ•©•Ñ•‘Q•áÑ%‘•„¹¥‘ô½µ½‘•É…Ñ¥½¹€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì‘•¥Í¥½¸è€É•©•Ğœô¤¤°(€€€ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°…¥}ÍÑ…ÑÕÌè€É•©•Ñ•œôô¤ì€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÉ•Á¼¹±¥ÍÑA•¹‘¥¹M¡½½±%‘•…Ì Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€œØØØØØØØØ´ØØØØ´ĞØØØ´àØØØ´ØØØØØØØØØØØØœ°€½Õ¹¥±}µ•µ‰•Èœ¤¤(€€€€¹Í½µ”¡É½Ü€ôøÉ½Ü¹¥€ôôôÉ•©•Ñ•‘Q•áÑ%‘•„¹¥¤°™…±Í”°€É•©•Ñ•¥‘•„Ñ•áĞ±•…Ù•ÌÑ¡”Í¡½½°É•Ù¥•ÜÅÕ•Õ”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹•ÑM¡½½±%‘•…%µ…”¡É•©•Ñ•‘Q•áÑ%‘•„¹¥°€À¤°¹Õ±°°€Ñ•áĞÉ•©•Ñ¥½¸ÁÉ•Ù•¹ÑÌÉ•…‘¥¹œ¥ÑÌ…ÑÑ…¡•Á¡½Ñ¼œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1PÍÑ…ÑÕÌI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘íÉ•©•Ñ•‘Q•áÑ%µ…•-•åôí€¥lÁulÁt¹ÍÑ…ÑÕÌ°€Á•¹‘¥¹œœ°(€€€€Ñ•áĞÉ•©•Ñ¥½¸Í…™•±äÉ•±•…Í•Ì¥ÑÌÁ¡½Ñ¼Ñ¼Ñ¡”‰½Õ¹‘•½ÉÁ¡…¸±•…¹ÕÀÅÕ•Õ”œ¤ì(€½¹ÍĞ‘•±•Ñ¥¹1¥ÍÑ¥¹œ€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ìÕÍ•É}¥è‘•±•Ñ¥¹UÍ•É%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ¥Ñ±”è€ŸB‡BûBÇFFBËB×B÷B÷BûBÔƒBûBÇF+F?BËBïB×B÷BãBÔƒBÓBïF<ƒFBÓBÃBïB×B÷BãF<ƒBÃBëBëBÃFB÷FBÀœ°‘•ÍÉ¥ÁÑ¥½¸è€ŸBBÓBÃBïB×B÷BãBÔƒBÿFBûBËB×FF?B×FFF<ƒFBûBïF3BëBøƒB÷BÀƒFBãB÷FB×FBãFB×FBëBûBäƒBÇBÃBßBÔœ°…Ñ•½Éäè€ŸBFFGBÇBÀœ°(€€€ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°µ…á}Í•…ÑÌè€À°¥µ…•}­•äè‘•±•Ñ¥¹%µ…•-•ä°Á¡½Ñ½}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœô¤ì(€½¹ÍĞ…½Õ¹Ñ•±•Ñ¥½¸€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ 1Qœ°€œ½…Á¤½ØÄ½µ”½…½Õ¹Ğœ°€Íå¹Ñ¡•Ñ¥ŒµÉ••¹ĞµÉ•¥ÍÑÉ…¹Ğœ°ì(€€€½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒBsB{BdƒBCBkBkBCBBwBˆœ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…½Õ¹Ñ•±•Ñ¥½¸°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°‘•±•Ñ•èÑÉÕ”°É•µ½Ù•‘}¥µ…•Ìè€Ğôô¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡‘•±•Ñ¥¹%µ…•-•ä¤°€…½Õ¹Ğ‘•±•Ñ¥½¸É•µ½Ù•Ì…±°ÁÉ¥Ù…Ñ”½‰©•ÑÌÕ¹‘•È¥ÑÌ½İ¹•ÈÁÉ•™¥àœ¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡…ÑÑ…¡•‘%‘•…%µ…•-•ä¤°€…½Õ¹Ğ‘•±•Ñ¥½¸É•µ½Ù•Ì±¥¹­•¥‘•„Á¡½Ñ½Ìœ¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡É•©•Ñ•‘%‘•…%µ…•-•ä¤°€…½Õ¹Ğ‘•±•Ñ¥½¸É•µ½Ù•ÌÉ•©•Ñ•¥‘•„Á¡½Ñ½Ì…İ…¥Ñ¥¹œ½ÉÁ¡…¸±•…¹ÕÀœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Í½±Ù•Ñ½È¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÍÕ‰©•Ğ´Èœô¤°¹Õ±°°(€€€€…½Õ¹Ğ‘•±•Ñ¥½¸É•µ½Ù•ÌÑ¡”¥‘•¹Ñ¥Ñäµ…ÁÁ¥¹œ…™Ñ•È±•…¹ÕÀœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}±¥ÍÑ¥¹Ì]!I¥€ô€‘í‘•±•Ñ¥¹1¥ÍÑ¥¹œ¹¥‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P½‰©•Ñ}­•äI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘í‘•±•Ñ¥¹%µ…•-•åôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥‘•…}¥I=4™…µ}¥‘•…}¥µ…•Ì]!IÕÍ•É}¥€ô€‘í‘•±•Ñ¥¹UÍ•É%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À°(€€€€…½Õ¹Ğ‘•±•Ñ¥½¸É•µ½Ù•ÌÁÉ¥Ù…Ñ”¥‘•„¥µ…”É•™•É•¹•Ìœ¤ì(€½¹ÍĞÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%€ô€œääääääää´ääää´Ğäää´àäää´ääääääääääääœì(€½¹ÍĞÉ•ÅÕ•ÍÑ•‘%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô½‘‘‘‘‘‘‘µ‘‘‘´Ñ‘‘´á‘‘µ‘‘‘‘‘‘‘‘‘‘‘¹İ•‰Á€ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡É•ÅÕ•ÍÑ•‘%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡É•ÅÕ•ÍÑ•‘Q…É•Ñ%°É•ÅÕ•ÍÑ•‘%µ…•-•ä¤ì(€½¹ÍĞÉ•ÅÕ•ÍÑ•‘Ù…Ñ…É-•ä€ôÁ•¹‘¥¹œ¼‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô½•••••••”µ•••”´Ñ••”´á••”µ•••••••••••”¹İ•‰Á€ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡É•ÅÕ•ÍÑ•‘Ù…Ñ…É-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡É•ÅÕ•ÍÑ•‘Q…É•Ñ%°É•ÅÕ•ÍÑ•‘Ù…Ñ…É-•ä¤ì(€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}…Ù…Ñ…É}É•Ù¥•İÌ€¡¥°ÕÍ•É}¥°Í¡½½±}¥°¥µ…•}­•ä°ÍÑ…ÑÕÌ°É•…Ñ•‘}…Ğ°É•Ù¥•İ•‘}‰ä°É•Ù¥•İ•‘}…Ğ¤(€€€Y1UL€ •••••••”´ÀÀÀÀ´ĞÀÀÀ´àÀÀÀ´ÀÀÀÀÀÀÀÀÀÀÀÄœ°€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€‘íÉ•ÅÕ•ÍÑ•‘Ù…Ñ…É-•åô°€Á•¹‘¥¹œœ°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤°€œœ°9U10¤í€ì(€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}¹½Ñ¥™¥…Ñ¥½¹}É•…‘Ì€¡ÕÍ•É}¥°¹½Ñ¥™¥…Ñ¥½¹}­•ä°É•…‘}…Ğ¤(€€€Y1UL€ ‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô°€Íå¹Ñ¡•Ñ¥Œµ¹½Ñ¥™¥…Ñ¥½¸œ°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤¤í€ì(€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}ÍÕ‰µ¥ÍÍ¥½¹}ÅÕ½Ñ…Ì€¡ÕÍ•É}¥°…Ñ¥½¸°İ¥¹‘½İ}ÍÑ…ÉĞ°ÍÕ‰µ¥ÍÍ¥½¹}½Õ¹Ğ¤(€€€Y1UL€ ‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô°€±¥ÍÑ¥¹œœ°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤°U¹İÉ…À¡MP ÄLU¥¹ĞÌÈ¤¤¤í€ì(€½¹ÍĞ‘•±•Ñ¥½¹Õ‘¥Ñ%€ô€•••••••”´ÀÀÀÀ´ĞÀÀÀ´àÀÀÀ´ÀÀÀÀÀÀÀÀÀÀÀÈœì(€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}Í¡½½±}½¹Ñ•¹Ñ}…Õ‘¥Ğ€¡•Ù•¹Ñ}¥°Í¡½½±}¥°…Ñ½É}¥°•¹Ñ¥Ñå}¥°•¹Ñ¥Ñå}ÑåÁ”°…Ñ¥½¸°‘•Ñ…¥±Ì°É•…Ñ•‘}…Ğ¤(€€€Y1UL€ ‘í‘•±•Ñ¥½¹Õ‘¥Ñ%‘ô°€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô°€Íå¹Ñ¡•Ñ¥Œµ•¹Ñ¥Ñäœ°€±¥ÍÑ¥¹œœ°€Íå¹Ñ¡•Ñ¥}É•Ù¥•Üœ°€íôœ°ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤¤í€ì(€½¹ÍĞ‘•±•Ñ¥½¹M…™•Ñå¥¹•ÉÁÉ¥¹Ğ€ô€‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰‰ˆœì(€½¹ÍĞ‘•±•Ñ¥½¹M…™•Ñå%€ô€•••••••”´ÀÀÀÀ´ĞÀÀÀ´àÀÀÀ´ÀÀÀÀÀÀÀÀÀÀÀÌœì(€…İ…¥ĞÍÅ±%9MIP%9Q<™…µ}Í…™•Ñå}¥¹¥‘•¹ÑÌ€¡Í¡½½±}¥°Á…¥É}™¥¹•ÉÁÉ¥¹Ğ°Í½ÕÉ•}­¥¹°…Ñ•½Éä°¥¹¥‘•¹Ñ}¥°Í•Ù•É¥Ñä°(€€€É•…Ñ•‘}…Ğ°É•Ù¥•İ•‘}…Ğ°É•Ù¥•İ•‘}‰ä°…Ñ½É}¥°Ñ…É•Ñ}¥°Í½ÕÉ•}½É¥¥¸°•Ù¥‘•¹•}•á•ÉÁĞ¤(€€€Y1UL€ Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°€‘í‘•±•Ñ¥½¹M…™•Ñå¥¹•ÉÁÉ¥¹Ñô°€µ•ÍÍ…”œ°€Ñ…É•Ñ•‘}¡…É…ÍÍµ•¹Ğœ°€‘í‘•±•Ñ¥½¹M…™•Ñå%‘ô°€µ•‘¥Õ´œ°(€€€€€ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤°9U10°9U10°€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ô°€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°€™…´¹•á…µÁ±”¹ÉÔœ°€Í…¹¥Ñ¥é•Íå¹Ñ¡•Ñ¥Œ•Ù¥‘•¹”œ¤í€ì(€½¹ÍĞÉ•ÅÕ•ÍÑ•‘•±•Ñ¥½¸€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½‘•±•Ñ¥½¸µÉ•ÅÕ•ÍÑÌœ°€Íå¹Ñ¡•Ñ¥Œµ½Õ¹¥°œ°ì(€€€Ñ…É•Ñ}¥èÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%°É•…Í½¹}½‘”è€ÍÁ…´œ°É•…Í½¸è€I•Á•…Ñ•Õ¹É•±…Ñ•µ•ÍÍ…•Ì¥¸Ñ¡”Íå¹Ñ¡•Ñ¥ŒÍ¡½½°Ñ•ÍĞ¸œ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•ÅÕ•ÍÑ•‘•±•Ñ¥½¸¹ÍÑ…ÑÕÌ°€ÈÀÈ¤ì(€½¹ÍĞ…ÁÁÉ½Ù•‘•±•Ñ¥½¸€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ AQ œ°€½…Á¤½ØÄ½‘•±•Ñ¥½¸µÉ•ÅÕ•ÍÑÌ¼‘íÉ•ÅÕ•ÍÑ•‘•±•Ñ¥½¸¹‰½‘ä¹É•ÅÕ•ÍÑ}¥‘õ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì€€€‘•¥Í¥½¸è€…ÁÁÉ½Ù”œ°½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒBCBkBkBCBBwBˆƒBBŸBCB‡B‹BwBcBkB@œ°É•Ù¥•İ}¹½Ñ”è€ŸBBûBÓFBËB×FBÛBÓB×B÷BøƒFBãB÷FB×FBãFB×FBëBãBğƒFB×FFBûBğœ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…ÁÁÉ½Ù•‘•±•Ñ¥½¸°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°‘•±•Ñ•èÑÉÕ”°É•µ½Ù•‘}¥µ…•Ìè€Èôô¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡É•ÅÕ•ÍÑ•‘%µ…•-•ä¤°€…ÁÁÉ½Ù•‘•±•Ñ¥½¸É•µ½Ù•ÌÁÉ¥Ù…Ñ”µ•‘¥„™½ÈÑ¡”É•ÅÕ•ÍÑ•Íå¹Ñ¡•Ñ¥Œ…½Õ¹Ğœ¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡É•ÅÕ•ÍÑ•‘Ù…Ñ…É-•ä¤°€…ÁÁÉ½Ù•‘•±•Ñ¥½¸…±Í¼É•µ½Ù•Ì„±¥¹­•…Ù…Ñ…È½‰©•Ğœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Í½±Ù•Ñ½È¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÍÕ‰©•Ğµ‘•±•Ñ”µÑ…É•Ğœô¤°¹Õ±°°(€€€€…ÁÁÉ½Ù•‘•±•Ñ¥½¸É•µ½Ù•ÌÑ¡”É•ÅÕ•ÍÑ•ÁÉ½™¥±”¥‘•¹Ñ¥Ñäµ…ÁÁ¥¹œœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}…Ù…Ñ…É}É•Ù¥•İÌ]!IÕÍ•É}¥€ô€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¹½Ñ¥™¥…Ñ¥½¹}­•äI=4™…µ}¹½Ñ¥™¥…Ñ¥½¹}É•…‘Ì]!IÕÍ•É}¥€ô€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P…Ñ¥½¸I=4™…µ}ÍÕ‰µ¥ÍÍ¥½¹}ÅÕ½Ñ…Ì]!IÕÍ•É}¥€ô€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€½¹ÍĞ…¹½¹åµ¥é•‘Õ‘¥Ğ€ô…İ…¥ĞÍÅ±M1P…Ñ½É}¥I=4™…µ}Í¡½½±}½¹Ñ•¹Ñ}…Õ‘¥Ğ]!I•Ù•¹Ñ}¥€ô€‘í‘•±•Ñ¥½¹Õ‘¥Ñ%‘ôí€ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…¹½¹åµ¥é•‘Õ‘¥Ğü¹lÁtü¹lÁtü¹…Ñ½É}¥°€‘•±•Ñ•µ…½Õ¹Ğœ¤ì(€½¹ÍĞ…¹½¹åµ¥é•‘M…™•Ñä€ô…İ…¥ĞÍÅ±M1P…Ñ½É}¥°Ñ…É•Ñ}¥°Í½ÕÉ•}½É¥¥¸°•Ù¥‘•¹•}•á•ÉÁĞI=4™…µ}Í…™•Ñå}¥¹¥‘•¹ÑÌ(€€€]!IÍ¡½½±}¥€ô€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ9Á…¥É}™¥¹•ÉÁÉ¥¹Ğ€ô€‘í‘•±•Ñ¥½¹M…™•Ñå¥¹•ÉÁÉ¥¹Ñô9¥¹¥‘•¹Ñ}¥€ô€‘í‘•±•Ñ¥½¹M…™•Ñå%‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…¹½¹åµ¥é•‘M…™•Ñäü¹lÁtü¹lÁt°ì…Ñ½É}¥è¹Õ±°°Ñ…É•Ñ}¥è¹Õ±°°Í½ÕÉ•}½É¥¥¸è¹Õ±°°•Ù¥‘•¹•}•á•ÉÁĞè¹Õ±°ô¤ì(€½¹ÍĞ…ÁÁÉ½Ù•‘I•ÅÕ•ÍĞ€ô…İ…¥ĞÍÅ±M1PÍÑ…ÑÕÌ°É•Ù¥•İ•‘}‰ä°É•Ù¥•İ}¹½Ñ”I=4™…µ}…½Õ¹Ñ}‘•±•Ñ¥½¹}É•ÅÕ•ÍÑÌ]!IÉ•ÅÕ•ÍÑ}¥€ô€‘íÉ•ÅÕ•ÍÑ•‘•±•Ñ¥½¸¹‰½‘ä¹É•ÅÕ•ÍÑ}¥‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…ÁÁÉ½Ù•‘I•ÅÕ•ÍÑlÁulÁt°ìÍÑ…ÑÕÌè€…ÁÁÉ½Ù•œ°É•Ù¥•İ•‘}‰äè€œÌÌÌÌÌÌÌÌ´ÌÌÌÌ´ĞÌÌÌ´àÌÌÌ´ÌÌÌÌÌÌÌÌÌÌÌÌœ°É•Ù¥•İ}¹½Ñ”è€ŸBBûBÓFBËB×FBÛBÓB×B÷BøƒFBãB÷FB×FBãFB×FBëBãBğƒFB×FFBûBğœô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1PÉ•ÅÕ•ÍÑ}¥I=4™…µ}…½Õ¹Ñ}‘•±•Ñ¥½¹}½Á•¸]!IÑ…É•Ñ}¥€ô€‘íÉ•ÅÕ•ÍÑ•‘Q…É•Ñ%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À°(€€€€…ÁÁÉ½Ù•‘•±•Ñ¥½¸±½Í•ÌÑ¡”Õ¹¥ÅÕ”½Á•¸É•ÅÕ•ÍĞİ¡¥±”É•Ñ…¥¹¥¹œÑ¡”‘•¥Í¥½¸É•½Éœ¤ì(€½¹ÍĞ…‘µ¥¹•±•Ñ•Q…É•Ñ%€ô€œÜÜÜÜÜÜÜÜ´ÜÜÜÜ´ĞÜÜÜ´àÜÜÜ´ÜÜÜÜÜÜÜÜÜÜÜÜœì(€½¹ÍĞ…‘µ¥¹•±•Ñ•%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘í…‘µ¥¹•±•Ñ•Q…É•Ñ%‘ô½•••••••”µ•••”´Ñ••”´á••”µ•••••••••••”¹İ•‰Á€ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡…‘µ¥¹•±•Ñ•%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡…‘µ¥¹•±•Ñ•Q…É•Ñ%°…‘µ¥¹•±•Ñ•%µ…•-•ä¤ì(€½¹ÍĞ…‘µ¥¹•±•Ñ•1¥ÍÑ¥¹œ€ô…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ìÕÍ•É}¥è…‘µ¥¹•±•Ñ•Q…É•Ñ%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°(€€€Ñ¥Ñ±”è€ŸB{BÇF+F?BËBïB×B÷BãBÔƒBÃBëBëBÃFB÷FBÀƒBÓBïF<ƒBÃBÓBóBãB÷BãFFFBÃFBãBËB÷BûBÏBøƒFBÓBÃBïB×B÷BãF<œ°‘•ÍÉ¥ÁÑ¥½¸è€ŸB‡BãB÷FB×FBãFB×FBëBÃF<eƒBÿFBûBËB×FBëBÀœ°…Ñ•½Éäè€ŸBFFGBÇBÀœ°(€€€ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°µ…á}Í•…ÑÌè€À°¥µ…•}­•äè…‘µ¥¹•±•Ñ•%µ…•-•ä°Á¡½Ñ½}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœô¤ì(€½¹ÍĞ…‘µ¥¹•±•Ñ¥½¸€ô…İ…¥Ğ±¥ÍÑ¥¹ÍÁ¤¡…Á¥I•ÅÕ•ÍĞ 1Qœ°€½…Á¤½ØÄ½Í¡½½°½…½Õ¹ÑÌ¼‘í…‘µ¥¹•±•Ñ•Q…É•Ñ%‘õ€°€Íå¹Ñ¡•Ñ¥Œµ…‘µ¥¸œ°ì(€€€½¹™¥Éµ…Ñ¥½¸è€ŸBBSBCBoBcB‹B°ƒBCBkBkBCBBwBˆƒBBŸBCB‡B‹BwBcBkB@œ°(€ô¤¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…‘µ¥¹•±•Ñ¥½¸°ìÍÑ…ÑÕÌè€ÈÀÀ°‰½‘äèì½¬èÑÉÕ”°‘•±•Ñ•èÑÉÕ”°É•µ½Ù•‘}¥µ…•Ìè€Äôô¤ì(€…ÍÍ•ÉĞ¹½¬¡‘•±•Ñ•‘5•‘¥…-•åÌ¹¥¹±Õ‘•Ì¡…‘µ¥¹•±•Ñ•%µ…•-•ä¤°€‘¥É•ĞÍ¡½½°µ…‘µ¥¸‘•±•Ñ¥½¸É•µ½Ù•ÌÑ¡”•±¥¥‰±”Íå¹Ñ¡•Ñ¥ŒÑ…É•ĞÁÉ¥Ù…Ñ”¥µ…”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Í½±Ù•Ñ½È¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÍÕ‰©•ĞµÉ½±”µÑ…É•Ğœô¤°¹Õ±°°(€€€€‘¥É•ĞÍ¡½½°µ…‘µ¥¸‘•±•Ñ¥½¸É•µ½Ù•Ì½¹±äÑ¡”Í…µ”µÍ¡½½°ÍÑÕ‘•¹Ğ¥‘•¹Ñ¥Ñäµ…ÁÁ¥¹œœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1P¥I=4™…µ}±¥ÍÑ¥¹Ì]!I¥€ô€‘í…‘µ¥¹•±•Ñ•1¥ÍÑ¥¹œ¹¥‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€½¹ÍĞ…‘µ¥¹•±•Ñ•Õ‘¥Ğ€ô…İ…¥ĞÍÅ±M1P…Ñ¥½¸°ÁÉ•Ù¥½ÕÍ}É½±”I=4™…µ}Í¡½½±}…‘µ¥¹}…Õ‘¥Ğ]!IÑ…É•Ñ}¥€ô€‘í…‘µ¥¹•±•Ñ•Q…É•Ñ%‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…‘µ¥¹•±•Ñ•Õ‘¥ÑlÁt°mì…Ñ¥½¸è€…½Õ¹Ñ}‘•±•Ñ•œ°ÁÉ•Ù¥½ÕÍ}É½±”è€ÍÑÕ‘•¹Ğœõt°(€€€€…‘µ¥¹¥ÍÑÉ…Ñ½È‘•±•Ñ¥½¸¥ÌÁÉ•Í•ÉÙ•¥¸Ñ¡”…Õ‘¥Ğ…™Ñ•ÈÑ¡”ÁÉ½™¥±”¥ÌÉ•µ½Ù•œ¤ì(€½¹ÍĞÉ•½Ù•ÉåUÍ•É%€ô€…………………„µ………„´Ñ……„´á……„µ……………………………Œœì(€½¹ÍĞÉ•½Ù•Éå%µ…•-•ä€ôÁ•¹‘¥¹œ¼‘íÉ•½Ù•ÉåUÍ•É%‘ô½ŒµŒ´ÑŒ´áŒµŒ¹İ•‰Á€ì(€…½Õ¹Ñ5•‘¥…-•åÌ¹…‘¡É•½Ù•Éå%µ…•-•ä¤ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡É•½Ù•ÉåUÍ•É%°É•½Ù•Éå%µ…•-•ä¤ì(€½¹ÍĞÍÑ…ÉÑ•‘I•½Ù•Éä€ô…İ…¥ĞÉ•Á¼¹‰•¥¹½Õ¹Ñ•±•Ñ¥½¸¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÍÕ‰©•ĞµÉ•½Ù•Éäœ°ÕÍ•É%èÉ•½Ù•ÉåUÍ•É%ô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÍÑ…ÉÑ•‘I•½Ù•Éä¹½¬°ÑÉÕ”¤ì(€…İ…¥ĞÍÅ±UAQ™…µ}…½Õ¹Ñ}‘•±•Ñ¥½¹}©½‰ÌMP±…¥µ}Õ¹Ñ¥°€ôU¹İÉ…À¡ÕÉÉ•¹ÑUÑQ¥µ•ÍÑ…µÀ ¤€´%¹Ñ•ÉÙ…° APÅ4œ¤¤]!IÕÍ•É}¥€ô€‘íÉ•½Ù•ÉåUÍ•É%‘ôí€ì(€½¹ÍĞÉ•½Ù•É½Õ¹Ñ•±•Ñ¥½¹Ì€ôÉ•…Ñ•½Õ¹Ñ•±•Ñ¥½¹I•½Ù•Éå=Á•É…Ñ¥½¸¡ìÉ•Á½Í¥Ñ½ÉäèÉ•Á¼°Á•¹‘¥¹%µ…•Ìèì(€€€±¥ÍÑUÍ•É=‰©•ÑÌè…Íå¹ŒÕÍ•É%€ôøl¸¸¹…½Õ¹Ñ5•‘¥…-•åÍt¹™¥±Ñ•È¡­•ä€ôø­•ä¹ÍÑ…ÉÑÍ]¥Ñ ¡Á•¹‘¥¹œ¼‘íÕÍ•É%‘ô½€¤¤°(€€€€€±¥ÍÑ½Õ¹Ñ=‰©•ÑÌè…Íå¹Œ€¡ÕÍ•É%°½İ¹•‘-•åÌ€ômt¤€ôøl¸¸¹¹•ÜM•Ğ¡l(€€€€€€€€¸¸¹l¸¸¹…½Õ¹Ñ5•‘¥…-•åÍt¹™¥±Ñ•È¡­•ä€ôø­•ä¹ÍÑ…ÉÑÍ]¥Ñ ¡Á•¹‘¥¹œ¼‘íÕÍ•É%‘ô½€¤¤°€¸¸¹½İ¹•‘-•åÌ°(€€€€€t¥t°(€€€‘•±•Ñ”è…Íå¹Œ­•ä€ôøì‘•±•Ñ•‘5•‘¥…-•åÌ¹ÁÕÍ ¡­•ä¤ì…½Õ¹Ñ5•‘¥…-•åÌ¹‘•±•Ñ”¡­•ä¤ìô°(€ôô¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥ĞÉ•½Ù•É½Õ¹Ñ•±•Ñ¥½¹Ì ÄÀ¤°ì±…¥µ•è€Ä°½µÁ±•Ñ•è€Ä°™…¥±•è€Àô°(€€€€„‘ÕÉ…‰±”…½Õ¹Ğ‘•±•Ñ¥½¸©½ˆ…¸‰”É•ÍÕµ•…™Ñ•È¥ÑÌ±•…Í”•áÁ¥É•Ìœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Í½±Ù•Ñ½È¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÍÕ‰©•ĞµÉ•½Ù•Éäœô¤°¹Õ±°°(€€€€µ…¹Õ…°É•½Ù•ÉäÉ•µ½Ù•ÌÑ¡”Íå¹Ñ¡•Ñ¥Œ…½Õ¹Ğ¥‘•¹Ñ¥Ñä…™Ñ•È‘•±•Ñ¥¹œÁÉ¥Ù…Ñ”µ•‘¥„œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥ĞÍÅ±M1PÕÍ•É}¥I=4™…µ}…½Õ¹Ñ}‘•±•Ñ¥½¹}©½‰Ì]!IÕÍ•É}¥€ô€‘íÉ•½Ù•ÉåUÍ•É%‘ôí€¤ü¹lÁtü¹±•¹Ñ €üü€À°€À¤ì(€½¹ÍĞÅÕ½Ñ…UÍ•É%€ô€…………………„µ………„´Ñ……„´á……„µ……………………………ˆœì(€½¹ÍĞÅÕ½Ñ…1¥ÍÑ¥¹œ€ôìÕÍ•É}¥èÅÕ½Ñ…UÍ•É%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°Ñ¥Ñ±”è€ŸB‡BãB÷FB×FBãFB×FBëBûBÔƒBûBÇF+F?BËBïB×B÷BãBÔœ°€€€‘•ÍÉ¥ÁÑ¥½¸è€ŸBFBûBËB×FBëBÀƒBûBÏFBÃB÷BãFB×B÷BãF<ƒBëBûBïBãFB×FFBËBÀœ°…Ñ•½Éäè€ŸBFFGBÇBÀœ°ÁÉ¥•}Ñ•áĞè€ŸBGB×FBÿBïBÃFB÷Bøœ°¥Í}•Ù•¹Ğè™…±Í”°(€€€µ…á}Í•…ÑÌè€À°ÍÑ…ÑÕÌè€Á•¹‘¥¹œœôì(€™½È€¡±•Ğ¤€ô€Àì¤€ğ€Ôì¤¬¬¤…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ÅÕ½Ñ…1¥ÍÑ¥¹œ¤ì(€½¹ÍĞ±¥ÍÑ¥¹EÕ½Ñ…MÑ…Ñ”€ô…İ…¥ĞÍÅ±M1P…Ñ¥½¸°ÍÕ‰µ¥ÍÍ¥½¹}½Õ¹Ğ°İ¥¹‘½İ}ÍÑ…ÉĞI=4™…µ}ÍÕ‰µ¥ÍÍ¥½¹}ÅÕ½Ñ…Ì]!IÕÍ•É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡9Õµ‰•È¡±¥ÍÑ¥¹EÕ½Ñ…MÑ…Ñ•lÁt¹™¥¹¡É½Ü€ôøÉ½Ü¹…Ñ¥½¸€ôôô€±¥ÍÑ¥¹œœ¤ü¹ÍÕ‰µ¥ÍÍ¥½¹}½Õ¹Ğ¤°€Ô°(€€€€Ñ¡”Í•É¥…±¥é…‰±”½Õ¹Ñ•ÈÉ•½É‘ÌÑ¡”™¥Ù”…±±½İ•±¥ÍÑ¥¹Ìœ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥ĞÉ•Á¼¹É•…Ñ•1¥ÍÑ¥¹œ¡ÅÕ½Ñ…1¥ÍÑ¥¹œ¤°ì½¬è™…±Í”°½‘”è€É…Ñ•}±¥µ¥Ñ•œô°(€€€€Ñ¡”Í¥áÑ ±¥ÍÑ¥¹œ¥¸½¹”¡½ÕÈ¥ÌÉ•©•Ñ•™½ÈÑ¡¥ÌÍå¹Ñ¡•Ñ¥Œ…½Õ¹Ğœ¤ì(€½¹ÍĞÅÕ½Ñ…Ù…Ñ…É-•ä€ôÁ•¹‘¥¹œ¼‘íÅÕ½Ñ…UÍ•É%‘ô½…………………„µ………„´Ñ……„´á……„µ……………………………„¹İ•‰Á€ì(€…İ…¥ĞÉ•Á¼¹É•¥ÍÑ•ÉA•¹‘¥¹%µ…”¡ÅÕ½Ñ…UÍ•É%°ÅÕ½Ñ…Ù…Ñ…É-•ä¤ì(€ÁÉ¥Ù…Ñ•=‰©•ÑÌ¹Í•Ğ¡ÅÕ½Ñ…Ù…Ñ…É-•ä°ì‰½‘äè	Õ™™•È¹™É½´ Íå¹Ñ¡•Ñ¥Œµİ•‰Àœ¤°½¹Ñ•¹ÑQåÁ”è€¥µ…”½İ•‰Àœô¤ì(€ÅÕ½Ñ…A•¹‘¥¹%µ…•Ì€ôÉ•…Ñ•LÍA•¹‘¥¹%µ…•MÑ½É”¡ì(€€€5}IU}LÍ}9A=%9Pè€¡ÑÑÀè¼¼ÄÈÜ¸À¸À¸ÄèäÀÀÀœ°5}IU}LÍ}	U-Pè€Íå¹Ñ¡•Ñ¥ŒµÁÉ¥Ù…Ñ”œ°(€€€5}IU}LÍ}MM}-e}%è€Íå¹Ñ¡•Ñ¥Œµ…•ÍÌœ°5}IU}LÍ}MIQ}MM}-dè€Íå¹Ñ¡•Ñ¥ŒµÍ•É•Ğœ°(€ô°ì(€€€Í•¹è…Íå¹Œ¥¹ÁÕĞ€ôøìÁÉ¥Ù…Ñ•=‰©•ÑÌ¹Í•Ğ¡¥¹ÁÕĞ¹-•ä°ì‰½‘äè	Õ™™•È¹™É½´¡¥¹ÁÕĞ¹	½‘ä¤°½¹Ñ•¹ÑQåÁ”è¥¹ÁÕĞ¹½¹Ñ•¹ÑQåÁ”ô¤ìô°(€€€•Ğè…Íå¹Œ¥¹ÁÕĞ€ôøì(€€€€€½¹ÍĞ½‰©•Ğ€ôÁÉ¥Ù…Ñ•=‰©•ÑÌ¹•Ğ¡¥¹ÁÕĞ¹-•ä¤ì(€€€€€É•ÑÕÉ¸½‰©•Ğ€üì½¹Ñ•¹ÑQåÁ”è½‰©•Ğ¹½¹Ñ•¹ÑQåÁ”°½¹Ñ•¹Ñ1•¹Ñ è½‰©•Ğ¹‰½‘ä¹±•¹Ñ °(€€€€€€€	½‘äèìÑÉ…¹Í™½ÉµQ½	åÑ•ÉÉ…äè…Íå¹Œ€ ¤€ôø½‰©•Ğ¹‰½‘äôô€è¹Õ±°ì(€€€ô°(€€€É•µ½Ù”è…Íå¹Œ¥¹ÁÕĞ€ôøìÁÉ¥Ù…Ñ•=‰©•ÑÌ¹‘•±•Ñ”¡¥¹ÁÕĞ¹-•ä¤ìô°(€ô¤ì(€½¹ÍĞÅÕ½Ñ…Ù…Ñ…ÉÁ¤€ôÉ•…Ñ•1¥ÍÑ¥¹ÍÁ¤¡ì…ÕÑ¡•¹Ñ¥…Ñ”è…Íå¹Œ€ ¤€ôø€¡ì¥ÍÍÕ•Èè€¡ÑÑÁÌè¼½¥ÍÍÕ•È¹Íå¹Ñ¡•Ñ¥Œœ°ÍÕ‰©•Ğè€ÅÕ½Ñ„µ…Ù…Ñ…ÈµÕÍ•Èœô¤°(€€€É•Í½±Ù•Ñ½Èè…Íå¹Œ€ ¤€ôø€¡ì¥èÅÕ½Ñ…UÍ•É%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°É½±”è€ÍÑÕ‘•¹Ğœô¤°É•Á½Í¥Ñ½ÉäèÉ•Á¼°(€€€Á•¹‘¥¹%µ…•ÌèÅÕ½Ñ…A•¹‘¥¹%µ…•Ìô¤ì(€½¹ÍĞÅÕ½Ñ…Ù…Ñ…ÉI•ÍÁ½¹Í”€ô…İ…¥ĞÅÕ½Ñ…Ù…Ñ…ÉÁ¤¡…Á¥I•ÅÕ•ÍĞ A=MPœ°€œ½…Á¤½ØÄ½µ”½…Ù…Ñ…Èœ°€ÅÕ½Ñ„µ…Ù…Ñ…Èœ°ì¥µ…•}­•äèÅÕ½Ñ…Ù…Ñ…É-•äô¤¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÅÕ½Ñ…Ù…Ñ…ÉI•ÍÁ½¹Í”¹ÍÑ…ÑÕÌ°€ĞÈä°€…Ù…Ñ…ÈÍÕ‰µ¥ÍÍ¥½¸Í¡…É•ÌÑ¡”•á¡…ÕÍÑ•±¥ÍÑ¥¹œÅÕ½Ñ„œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÁÉ¥Ù…Ñ•=‰©•ÑÌ¹¡…Ì¡ÅÕ½Ñ…Ù…Ñ…É-•ä¤°™…±Í”°€Ñ¡”É•©•Ñ•…Ù…Ñ…È½‰©•Ğ¥ÌÉ•µ½Ù•™É½´ÁÉ¥Ù…Ñ”ÍÑ½É…”œ¤ì(€½¹ÍĞÅÕ½Ñ…Ù…Ñ…ÉMÑ…Ñ”€ô…İ…¥ĞÍÅ±M1PÍÑ…ÑÕÌI=4™…µ}Á•¹‘¥¹}µ•‘¥„]!I½‰©•Ñ}­•ä€ô€‘íÅÕ½Ñ…Ù…Ñ…É-•åô1%5%P€Äí€ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÅÕ½Ñ…Ù…Ñ…ÉMÑ…Ñ•lÁt¹±•¹Ñ °€À°€Ñ¡”É•©•Ñ•…Ù…Ñ…ÈÉ•¥ÍÑÉ…Ñ¥½¸¥ÌÉ•µ½Ù•Ñ¡É½Õ Ñ¡”±•…¹ÕÀ±•…Í”œ¤ì(€½¹ÍĞÉ•©•Ñ•‘Ù…Ñ…È€ô…İ…¥ĞÍÅ±M1P¥I=4™…µ}…Ù…Ñ…É}É•Ù¥•İÌ]!IÕÍ•É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ô9ÍÑ…ÑÕÌ€ô€Á•¹‘¥¹œœí€ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡É•©•Ñ•‘Ù…Ñ…ÉlÁt¹±•¹Ñ °€À°€„É…Ñ”µ±¥µ¥Ñ•…Ù…Ñ…È¥Ì¹½ĞÅÕ•Õ•™½ÈÉ•Ù¥•Üœ¤ì(€½¹ÍĞÅÕ½Ñ…%‘•„€ôìÕÍ•É}¥èÅÕ½Ñ…UÍ•É%°Í¡½½±}¥è€Íå¹Ñ¡•Ñ¥ŒµÍ¡½½°œ°Ñ•áĞè€ŸB‡BãB÷FB×FBãFB×FBëBÃF<ƒBãBÓB×F<œ°(€€€…¥}ÍÑ…ÑÕÌè€Á•¹‘¥¹œœ°…¥}ÍÕµµ…Éäè€ŸBcBÓB×F<œ°…¥}É•…Í½¸è€É•Ù¥•İ}Õ¹…Ù…¥±…‰±”œ°…‘µ¥¹}ÍÑ…ÑÕÌè€¹•Üœôì(€™½È€¡±•Ğ¤€ô€Àì¤€ğ€Ôì¤¬¬¤…İ…¥ĞÉ•Á¼¹É•…Ñ•%‘•„¡ÅÕ½Ñ…%‘•„¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡…İ…¥ĞÉ•Á¼¹É•…Ñ•%‘•„¡ÅÕ½Ñ…%‘•„¤°ì½¬è™…±Í”°½‘”è€É…Ñ•}±¥µ¥Ñ•œô°(€€€€Ñ¡”Í¥áÑ ¥‘•„¥¸½¹”¡½ÕÈ¥ÌÉ•©•Ñ•™½ÈÑ¡¥ÌÍå¹Ñ¡•Ñ¥Œ…½Õ¹Ğœ¤ì(€™½È€¡±•Ğ¤€ô€Àì¤€ğ€Ôì¤¬¬¤…İ…¥ĞÉ•Á¼¹É•Í•ÉÙ•%µ…•UÁ±½…¡ÅÕ½Ñ…UÍ•É%¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥ĞÉ•Á¼¹É•Í•ÉÙ•%µ…•UÁ±½…¡ÅÕ½Ñ…UÍ•É%¤°™…±Í”°(€€€€„Í¥áÑ ¥µ…”‘•½‘”É•Í•ÉÙ…Ñ¥½¸¥¸½¹”¡½ÕÈ¥ÌÉ•©•Ñ•™½ÈÑ¡¥ÌÍå¹Ñ¡•Ñ¥Œ…½Õ¹Ğœ¤ì(€½¹ÍĞÅÕ½Ñ…I½İÌ€ô…İ…¥ĞÍÅ±M1P…Ñ¥½¸°ÍÕ‰µ¥ÍÍ¥½¹}½Õ¹ĞI=4™…µ}ÍÕ‰µ¥ÍÍ¥½¹}ÅÕ½Ñ…Ì]!IÕÍ•É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡=‰©•Ğ¹™É½µ¹ÑÉ¥•Ì¡ÅÕ½Ñ…I½İÍlÁt¹µ…À¡É½Ü€ôømÉ½Ü¹…Ñ¥½¸°9Õµ‰•È¡É½Ü¹ÍÕ‰µ¥ÍÍ¥½¹}½Õ¹Ğ¥t¤¤°ì¥‘•„è€Ô°¥µ…•}ÕÁ±½…è€Ô°±¥ÍÑ¥¹œè€Ôô¤ì(€½¹ÍĞ¥¹‘•áAÉ½‰•Ì€ô…İ…¥ĞAÉ½µ¥Í”¹…±°¡l(€€€ÍÅ±M1P¥I=4™…µ}…Ù…Ñ…É}É•Ù¥•İÌY%\™…µ}…Ù…Ñ…É}É•Ù¥•İÍ}ÕÍ•É}¥‘}¥‘à]!IÕÍ•É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€°(€€€ÍÅ±M1P…¹¹½Õ¹•µ•¹Ñ}¥I=4™…µ}Í¡½½±}…¹¹½Õ¹•µ•¹ÑÌY%\™…µ}Í¡½½±}…¹¹½Õ¹•µ•¹ÑÍ}…ÕÑ¡½É}¥‘}¥‘à]!I…ÕÑ¡½É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€°(€€€ÍÅ±M1PÁ½±±}¥I=4™…µ}Í¡½½±}Á½±±ÌY%\™…µ}Í¡½½±}Á½±±Í}…ÕÑ¡½É}¥‘}¥‘à]!I…ÕÑ¡½É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€°(€€€ÍÅ±M1P¡½¥•}¥¹‘•àI=4™…µ}Í¡½½±}Á½±±}Ù½Ñ•ÌY%\™…µ}Í¡½½±}Á½±±}Ù½Ñ•Í}Ù½Ñ•É}¥‘}¥‘à]!IÙ½Ñ•É}¥€ô€‘íÅÕ½Ñ…UÍ•É%‘ôí€°(€t¤ì(€…ÍÍ•ÉĞ¹½¬¡¥¹‘•áAÉ½‰•Ì¹•Ù•Éä¡É½İÌ€ôø€¡É½İÌü¹lÁtü¹±•¹Ñ €üü€À¤€ôôô€À¤°€…±°™½ÕÈ,±½½­ÕÀ¥¹‘•á•Ì…É”ÕÍ…‰±”½¸Ñ¡”•µÁÑäÍå¹Ñ¡•Ñ¥ŒÑ…‰±•Ìœ¤ì(€½¹ÍĞ…•¹ÑEÕ•Õ”€ôÉ•…Ñ•e‘‰•¹ÑQ…Í­EÕ•Õ”¡ÍÅ°¤ì(€½¹ÍĞ½‘•É	Õ­•Ğ€ô¹•Ü…Ñ” ¤ì(€½‘•É	Õ­•Ğ¹Í•ÑUQ5¥¹ÕÑ•Ì À°€À°€À¤ì(€™½È€¡±•Ğ¤€ô€Àì¤€ğ€Ìì¤¬¬¤ì(€€€…İ…¥ĞÉ•Á¼¹É•½É‘M¥Ñ•ÉÉ½È¡ì•Ù•¹Ñ½‘”è€©Í}ÉÕ¹Ñ¥µ”œ°Á…•É•„è€…ÕÑ œ°½ÕÉÉ•‘Ğè¹•Ü…Ñ”¡½‘•É	Õ­•Ğ¹•ÑQ¥µ” ¤€¬¤€¨€ØÁ|ÀÀÀ¤ô¤ì(€ô(€½¹ÍĞ½‘•ÉM±½Ñ…Ñ”€ô¹•Ü…Ñ” ¤ì(€½‘•ÉM±½Ñ…Ñ”¹Í•ÑUQ5¥¹ÕÑ•Ì¡5…Ñ ¹™±½½È¡½‘•ÉM±½Ñ…Ñ”¹•ÑUQ5¥¹ÕÑ•Ì ¤€¼€ÄÔ¤€¨€ÄÔ°€À°€À¤ì(€½¹ÍĞ½‘•ÉM±½Ğ€ô½‘•ÉM±½Ñ…Ñ”¹Ñ½%M=MÑÉ¥¹œ ¤¹Í±¥” À°€ÄØ¤ì(€½¹ÍĞ½‘•ÉQ…Í¬€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•½‘•ÉQ…Í¬¡½‘•ÉM±½Ğ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½‘•ÉQ…Í¬¹É•…Ñ•°ÑÉÕ”°€Ñ¡É•Í¡½±‘•…É•…Ñ”Ñ•±•µ•ÑÉäÉ•…Ñ•Ì„Íå¹Ñ¡•Ñ¥Œµ…¹Õ…°µÉ•Ù¥•ÜÑ…Í¬œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½‘•ÉQ…Í¬¹Ñ…Í­}­•ä°€…Õ‘¥Ñ}™É½¹Ñ•¹‘}ÉÕ¹Ñ¥µ”œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•½‘•ÉQ…Í¬¡½‘•ÉM±½Ğ¤¤¹É•…Ñ•°™…±Í”°€½‘•ÈÑ…Í¬•¹ÅÕ•Õ”¥Ì¥‘•µÁ½Ñ•¹ĞÁ•ÈÅÕ…ÉÑ•Èµ¡½ÕÈÍ±½Ğœ¤ì(€½¹ÍĞ±…¥µ•‘	•™½É•½‘•È€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹±…¥µM…™•Q…Í­Ì Ô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡±…¥µ•‘	•™½É•½‘•È¹Í½µ”¡Ñ…Í¬€ôøÑ…Í¬¹Ñ…Í­}ÑåÁ”€ôôô€½‘•É}Á…Ñ¡}É•ÅÕ•ÍĞœ¤°™…±Í”°(€€€€Ñ¡”…ÕÑ½µ…Ñ•İ½É­•È…±±½İ±¥ÍĞ¹•Ù•È±…¥µÌ½‘•ÈÑ…Í­Ìœ¤ì(€½¹ÍĞÅÕ•Õ•‘½‘•È€ô…İ…¥ĞÍÅ±M1PÍÑ…ÑÕÌ°Á…å±½…‘}©Í½¸I=4™…µ}…•¹Ñ}Ñ…Í­Ì]!I¥€ô€‘í½‘•ÉQ…Í¬¹¥‘ôí€ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡ÅÕ•Õ•‘½‘•Èü¹lÁtü¹lÁtü¹ÍÑ…ÑÕÌ°€ÅÕ•Õ•œ°€½‘•ÈÑ…Í¬ÍÑ…åÌ½ÕĞ½˜Ñ¡”…ÕÑ½µ…Ñ•Í…™”İ½É­•Èœ¤ì(€½¹ÍĞ½‘•ÉA…å±½…€ô)M=8¹Á…ÉÍ”¡ÅÕ•Õ•‘½‘•Èü¹lÁtü¹lÁtü¹Á…å±½…‘}©Í½¸€üü€¹Õ±°œ¤ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡=‰©•Ğ¹­•åÌ¡½‘•ÉA…å±½…¤¹Í½ÉĞ ¤°l•Ù•¹Ñ}½‘”œ°€½ÕÉÉ•¹•Ìœ°€Á…•}…É•„œ°€Ñ…Í­}­•ät°(€€€€½‘•ÈÑ…Í¬…ÉÉ¥•Ì½¹±äÑ¡”™¥á•…É•…Ñ”Í¡•µ„œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½‘•ÉA…å±½…¹Ñ…Í­}­•ä°½‘•ÉQ…Í¬¹Ñ…Í­}­•ä¤ì(€…ÍÍ•ÉĞ¹½¬¡l©Í}ÉÕ¹Ñ¥µ”œ°€Õ¹¡…¹‘±•‘}É•©•Ñ¥½¸œ°€±¥ÍÑ¥¹Í}±½…‘}™…¥±•t¹¥¹±Õ‘•Ì¡½‘•ÉA…å±½…¹•Ù•¹Ñ}½‘”¤¤ì(€…ÍÍ•ÉĞ¹½¬¡l…ÕÑ œ°€±¥ÍÑ¥¹Ìœ°€¹½Ñ¥™¥…Ñ¥½¹Ìœ°€‘…Ñ…‰…Í”œ°€½Ñ¡•Èt¹¥¹±Õ‘•Ì¡½‘•ÉA…å±½…¹Á…•}…É•„¤¤ì(€…ÍÍ•ÉĞ¹½¬¡9Õµ‰•È¹¥Í%¹Ñ••È¡½‘•ÉA…å±½…¹½ÕÉÉ•¹•Ì¤€˜˜½‘•ÉA…å±½…¹½ÕÉÉ•¹•Ì€øô€Ì€˜˜½‘•ÉA…å±½…¹½ÕÉÉ•¹•Ì€ğô€ÄÀÀÀ¤ì(€½¹ÍĞ½‘•É±…¥´€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹±…¥µM…™•½‘•ÉQ…Í¬¡ìİ½É­•É%è€™…´µ…•¹ĞµÅİ•¸µ½‘•ÈµØÄœ°±•…Í•M•½¹‘Ìè€ÜÈÀÀô¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½‘•É±…¥´¹¥°½‘•ÉQ…Í¬¹¥¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½‘•É±…¥´¹Ñ…Í­}­•ä°½‘•ÉA…å±½…¹Ñ…Í­}­•ä¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹™¥¹¥Í¡M…™•½‘•ÉQ…Í¬¡ì¥è½‘•É±…¥´¹¥°İ½É­•É%è€™…´µ…•¹ĞµÅİ•¸µ½‘•ÈµØÄœ°(€€€±…¥µQ½­•¸è½‘•É±…¥´¹±…¥µ}Ñ½­•¸°É•ÍÕ±Ñ½‘”è€µ½‘•±}¹½}Á…Ñ œô¤°ÑÉÕ”¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹™¥¹¥Í¡M…™•½‘•ÉQ…Í¬¡ì¥è½‘•É±…¥´¹¥°İ½É­•É%è€™…´µ…•¹ĞµÅİ•¸µ½‘•ÈµØÄœ°(€€€±…¥µQ½­•¸è½‘•É±…¥´¹±…¥µ}Ñ½­•¸°É•ÍÕ±Ñ½‘”è€µ½‘•±}¹½}Á…Ñ œô¤°™…±Í”°€™¥¹¥Í¡•½‘•È±•…Í•Ì…¹¹½Ğ‰”É•Á±…å•œ¤ì(€½¹ÍĞÍ…™•Q…Í¬€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•Q…Í¬ ÅÕ•Õ•}¡•…±Ñ¡}¡•¬œ°€œÈÀÈØ´ÄÄ´ÈÁPÀÌèÀÀœ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•Q…Í¬¹É•…Ñ•°ÑÉÕ”¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…° ¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•Q…Í¬ ÅÕ•Õ•}¡•…±Ñ¡}¡•¬œ°€œÈÀÈØ´ÄÄ´ÈÁPÀÌèÀÀœ¤¤¹É•…Ñ•°™…±Í”°(€€€€Í…™”Í¡•‘Õ±•Ñ…Í¬•¹ÅÕ•Õ”¥Ì¥‘•µÁ½Ñ•¹Ğœ¤ì(€½¹ÍĞ±…¥µ•‘M…™•Q…Í­Ì€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹±…¥µM…™•Q…Í­Ì Ä¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡±…¥µ•‘M…™•Q…Í­Ì¹±•¹Ñ °€Ä¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡±…¥µ•‘M…™•Q…Í­ÍlÁt¹Ñ…Í­}ÑåÁ”°€ÅÕ•Õ•}¡•…±Ñ¡}¡•¬œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡=‰©•Ğ¹¡…Í=İ¸¡±…¥µ•‘M…™•Q…Í­ÍlÁt°€Á…å±½…œ¤°™…±Í”°€İ½É­•È±…¥´‘½•Ì¹½Ğ•áÁ½Í”…É‰¥ÑÉ…ÉäÑ…Í¬Á…å±½…œ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹™¥¹¥Í¡M…™•Q…Í¬¡ì¥è±…¥µ•‘M…™•Q…Í­ÍlÁt¹¥°±…¥µQ½­•¸è±…¥µ•‘M…™•Q…Í­ÍlÁt¹±…¥µ}Ñ½­•¸°(€€€ÍÑ…ÑÕÌè€½µÁ±•Ñ•œ°ÍÕµµ…Éäè€Må¹Ñ¡•Ñ¥Œ…É•…Ñ”ÅÕ•Õ”¡•¬½µÁ±•Ñ•¸œô¤°ÑÉÕ”¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹™¥¹¥Í¡M…™•Q…Í¬¡ì¥è±…¥µ•‘M…™•Q…Í­ÍlÁt¹¥°±…¥µQ½­•¸è±…¥µ•‘M…™•Q…Í­ÍlÁt¹±…¥µ}Ñ½­•¸°(€€€ÍÑ…ÑÕÌè€½µÁ±•Ñ•œ°ÍÕµµ…Éäè€MÑ…±”±…¥´µÕÍĞ¹½Ğ½µÁ±•Ñ”¸œô¤°™…±Í”°€™¥¹¥Í¡•±…¥µÌ…¹¹½Ğ‰”É•Á±…å•œ¤ì(€½¹ÍĞÍ…™•EÕ•Õ•!•…±Ñ €ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹•ÑM…™•Q…Í­EÕ•Õ•!•…±Ñ  ¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•EÕ•Õ•!•…±Ñ ¹ÍÑ…ÑÕÍ•Ì¹½µÁ±•Ñ•°€Ä¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡Í…™•EÕ•Õ•!•…±Ñ ¹½¹Ñ•¹Ñ}É•…°™…±Í”¤ì(€½¹ÍĞ½¹ÕÉÉ•¹Ñ¹ÅÕ•Õ•Ì€ô…İ…¥ĞAÉ½µ¥Í”¹…±°¡l(€€€…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•Q…Í¬ ÅÕ•Õ•}¡•…±Ñ¡}¡•¬œ°€œÈÀÈØ´ÄÄ´ÈÁPÀÌèÄÔœ¤°(€€€…•¹ÑEÕ•Õ”¹•¹ÅÕ•Õ•M…™•Q…Í¬ ÅÕ•Õ•}¡•…±Ñ¡}¡•¬œ°€œÈÀÈØ´ÄÄ´ÈÁPÀÌèÄÔœ¤°(€t¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½¹ÕÉÉ•¹Ñ¹ÅÕ•Õ•Ì¹™¥±Ñ•È¡É•ÍÕ±Ğ€ôøÉ•ÍÕ±Ğ¹É•…Ñ•¤¹±•¹Ñ °€Ä°(€€€€½¹ÕÉÉ•¹Ğ¥‘•µÁ½Ñ•¹Ğ•¹ÅÕ•Õ•ÌÉ•…Ñ”½¹”Ñ…Í¬œ¤ì(€½¹ÍĞ½¹ÕÉÉ•¹Ñ±…¥µÌ€ô…İ…¥ĞAÉ½µ¥Í”¹…±°¡m…•¹ÑEÕ•Õ”¹±…¥µM…™•Q…Í­Ì Ä¤°…•¹ÑEÕ•Õ”¹±…¥µM…™•Q…Í­Ì Ä¥t¤ì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡½¹ÕÉÉ•¹Ñ±…¥µÌ¹É•‘Õ” ¡Ñ½Ñ…°°Ñ…Í­Ì¤€ôøÑ½Ñ…°€¬Ñ…Í­Ì¹±•¹Ñ °€À¤°€Ä°(€€€€„½¹ÕÉÉ•¹Ğİ½É­•È…¹¹½Ğ±…¥´Ñ¡”Í…µ”Ñ…Í¬Ñİ¥”œ¤ì(€½¹ÍĞÉ…•‘±…¥´€ô½¹ÕÉÉ•¹Ñ±…¥µÌ¹™±…Ğ ¥lÁtì(€…ÍÍ•ÉĞ¹•ÅÕ…°¡…İ…¥Ğ…•¹ÑEÕ•Õ”¹™¥¹¥Í¡M…™•Q…Í¬¡ì¥èÉ…•‘±…¥´¹¥°±…¥µQ½­•¸èÉ…•‘±…¥´¹±…¥µ}Ñ½­•¸°(€€€ÍÑ…ÑÕÌè€½µÁ±•Ñ•œ°ÍÕµµ…Éäè€½¹ÕÉÉ•¹ĞÍå¹Ñ¡•Ñ¥Œ±…¥´½µÁ±•Ñ•½¹”¸œô¤°ÑÉÕ”¤ì(€½¹ÍĞÍå¹Ñ¡•Ñ¥MåÍÑ•µ!•…±Ñ €ôÉ•…Ñ•MåÍÑ•µ!•…±Ñ¡Q…Í­!…¹‘±•È¡ì(€€€É•…‘¥¹•ÍÍ¡•¬è…Íå¹Œ€ ¤€ôø€¡ìÉ•…‘äèÑÉÕ”°Í•ÉÙ¥•Ìèì…ÕÑ èÑÉÕ”°‘…Ñ…‰…Í”èÑÉÕ”°½‰©•ÑMÑ½É…”èÑÉÕ”ôô¤°(€€€Ñ¥µ•É¡•¬è…Íå¹Œ€ ¤€ôø€¡ì½¬èÑÉÕ”°Ñ¥µ•ÉÌèmìÕ¹¥Ğè€™…´µÉÔµÍå¹Ñ¡•Ñ¥Œ¹Ñ¥µ•Èœ°½¬èÑÉÕ”õtô¤°(€€€ÅÕ•Õ•!•…±Ñ¡¡•¬è…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍĞ¡•…±Ñ €ô…İ…¥ĞÉ•Á¼¹•ÑIÕ	…­É½Õ¹‘EÕ•Õ•!•…±Ñ  ¤ì(€€€€€½¹ÍĞÍ…™•Q…Í­Ì€ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹•ÑM…™•Q…Í­EÕ•Õ•!•…±Ñ  ¤ì(€€€€€É•ÑÕÉ¸ì€¸¸¹¡•…±Ñ °ÅÕ•Õ•Ìèì€¸¸¹¡•…±Ñ ¹ÅÕ•Õ•Ì°Í…™•}…•¹Ñ}Ñ…Í­ÌèÍ…™•Q…Í­Ìô°½¹Ñ•¹Ñ}É•…è™…±Í”ôì(€€€ô°(€€€Í¡•µ…¡•¬è…Íå¹Œ€ ¤€ôøÍ¡•µ…!•…±Ñ °(€ô¤ì(€½¹ÍĞÍ¡•‘Õ±•‘]½É­•È€ôÉ•…Ñ•M…™••¹ÑQ…Í­]½É­•È¡ìÅÕ•Õ”è…•¹ÑEÕ•Õ”°¡…¹‘±•ÉÌèì(€€€ÅÕ•Õ•}¡•…±Ñ¡}¡•¬è…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍĞ¡•…±Ñ €ô…İ…¥Ğ…•¹ÑEÕ•Õ”¹•ÑM…™•Q…Í­EÕ•Õ•!•…±Ñ  ¤ì(€€€€€É•ÑÕÉ¸ƒB‡BãB÷FB×FBãFB×FBëBÃF<ƒBÿFBûBËB×FBëBÀƒBûFB×FB×BÓB×BäèƒBûBÛBãBÓBÃF;F€‘í¡•…±Ñ ¹ÍÑ…ÑÕÍ•Ì¹ÅÕ•Õ•‘ôìƒFBûBÓB×FBÛBãBóBûBÔƒB÷BÔƒFBãFBÃBïBûFF0¹€ì(€€€ô°(€€€‘…¥±å}É•Á½ÉÑ}‘¥•ÍĞè…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍĞÉ•ÍÕ±Ğ€ô…İ…¥ĞÉ•…Ñ•=É¡•ÍÑÉ…Ñ½É…¥±å¥•ÍĞ¡ìÉ•Á½Í¥Ñ½ÉäèÉ•Á¼°¹½Üè€ ¤€ôø¹•Ü…Ñ” œÈÀÈØ´ÄÄ´ÈÁPÀĞèÀÀèÀÀ¸ÀÀÁhœ¤ô¤ ¤ì(€€€€€É•ÑÕÉ¸ƒB‡BãB÷FB×FBãFB×FBëBÃF<ƒFBËBûBÓBëBÀƒBßBÀ€‘íÉ•ÍÕ±Ğ¹‘…Ñ•ôƒBûBÇFBÃBÇBûFBÃB÷BÀƒBÃBÏFB×BÏBãFBûBËBÃB÷B÷Bø¹€ì(€€€ô°(€€€ÍåÍÑ•µ}¡•…±Ñ¡}¡•¬èÍå¹Ñ¡•Ñ¥MåÍÑ•µ!•…±Ñ °(€€€Í¥Ñ•}•ÉÉ½É}‘¥•ÍĞè…Íå¹Œ€ ¤€ôøì(€€€€€½¹ÍĞÉ•ÍÕ±Ğ€ô…İ…¥ĞÉ•…Ñ•M¥Ñ•ÉÉ½É¥•ÍĞ¡ìÉ•Á½Í¥Ñ½ÉäèÉ•Á¼°¹½Üè€ ¤€ôø¹•Ü…Ñ” œÈÀÈØ´ÄÄ´ÈÁPÀĞèÌÀèÀÀ¸ÀÀÁhœ¤ô¤ ¤ì(€€€€€É•ÑÕÉ¸ƒB‡BãB÷FB×FBãFB×FBëBÃF<ƒFBËBûBÓBëBÀƒBûF#BãBÇBûBèƒBßBÀ€‘íÉ•ÍÕ±Ğ¹Í±½ÑôƒBûBÇFBÃBÇBûFBÃB÷BÀƒBÃBÏFB×BÏBãFBûBËBÃB÷B÷Bø¹€ì(€€€ô°(€ôô¤ì(€½¹ÍĞÍ¡•‘Õ±•‘IÕ¹Ì€ômtì(€™½È€¡½¹ÍĞÍ±½Ğ½˜lœÈÀÈØ´ÄÄ´ÈÁPÀÌèĞÀèÀÀ¸ÀÀÁhœ°€œÈÀÈØ´ÄÄ´ÈÁPÀĞèÀÀèÀÀ¸ÀÀÁhœ°€œÈÀÈØ´ÄÄ´ÈÁPÀĞèÌÀèÀÀ¸ÀÀÁht¤ì(€€€Í¡•‘Õ±•‘IÕ¹Ì¹ÁÕÍ ¡…İ…¥ĞÉ•…Ñ•M¡•‘Õ±•‘M…™••¹ÑIÕ¹¹•È¡ìÅÕ•Õ”è…•¹ÑEÕ•Õ”°İ½É­•ÈèÍ¡•‘Õ±•‘]½É­•È°(€€€€€¹½Üè€ ¤€ôø¹•Ü…Ñ”¡Í±½Ğ¤ô¤ ¤¤ì(€ô(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡Í¡•‘Õ±•‘IÕ¹Ì¹µ…À¡É•ÍÕ±Ğ€ôø€¡ìÍ¡•‘Õ±•èÉ•ÍÕ±Ğ¹Í¡•‘Õ±•°É•…Ñ•èÉ•ÍÕ±Ğ¹É•…Ñ•°(€€€±…¥µ•èÉ•ÍÕ±Ğ¹±…¥µ•°½µÁ±•Ñ•èÉ•ÍÕ±Ğ¹½µÁ±•Ñ•°‰±½­•èÉ•ÍÕ±Ğ¹‰±½­•°™…¥±•èÉ•ÍÕ±Ğ¹™…¥±•ô¤¤°l(€€€ìÍ¡•‘Õ±•è€Ä°É•…Ñ•è€Ä°±…¥µ•è€Ä°½µÁ±•Ñ•è€Ä°‰±½­•è€À°™…¥±•è€Àô°(€€€ìÍ¡•‘Õ±•è€Ä°É•…Ñ•è€Ä°±…¥µ•è€Ä°½µÁ±•Ñ•è€Ä°‰±½­•è€À°™…¥±•è€Àô°(€€€ìÍ¡•‘Õ±•è€Ä°É•…Ñ•è€Ä°±…¥µ•è€Ä°½µÁ±•Ñ•è€Ä°‰±½­•è€À°™…¥±•è€Àô°(€t°€…±°Ñ¡É•”Í½ÕÉ”Í¡•‘Õ±”Í±½ÑÌ•¹ÅÕ•Õ”…¹½µÁ±•Ñ”Ñ¡É½Õ Ñ¡”É•…°eÅÕ•Õ”…¹Í…™”İ½É­•Èœ¤ì(€½¹ÍĞÍ¡•‘Õ±•‘I½İÌ€ô…İ…¥ĞÍÅ±M1PÑ…Í­}ÑåÁ”°ÍÑ…ÑÕÌI=4™…µ}…•¹Ñ}Ñ…Í­Ì]!IÍ½ÕÉ”€ô€Í¡•‘Õ±•‘}…Õ‘¥Ğœ(€€€9Ñ…Í­}ÑåÁ”%8€ ÍåÍÑ•µ}¡•…±Ñ¡}¡•¬œ°€‘…¥±å}É•Á½ÉÑ}‘¥•ÍĞœ°€Í¥Ñ•}•ÉÉ½É}‘¥•ÍĞœ¤í€ì(€…ÍÍ•ÉĞ¹‘••ÁÅÕ…°¡¹•ÜM•Ğ ¡Í¡•‘Õ±•‘I½İÌü¹lÁt€üümt¤¹µ…À¡É½Ü€ôø€‘íÉ½Ü¹Ñ…Í­}ÑåÁ•ôè‘íÉ½Ü¹ÍÑ…ÑÕÍõ€¤¤°(€€€¹•ÜM•Ğ¡lÍåÍÑ•µ}¡•…±Ñ¡}¡•¬é½µÁ±•Ñ•œ°€‘…¥±å}É•Á½ÉÑ}‘¥•ÍĞé½µÁ±•Ñ•œ°€Í¥Ñ•}•ÉÉ½É}‘¥•ÍĞé½µÁ±•Ñ•t¤¤ì(€½¹Í½±”¹±½œ e	}1=1}%9QIQ%=9}AMLèÍ¡½½°ÁÉ½™¥±”½É½±”½‘•±•Ñ¥½¸É•ÅÕ•ÍÑÌ°Í…µ”µÍ¡½½°…½Õ¹Ğ…¹±¥ÍÑ¥¹œ‘•±•Ñ¥½¸°Í¡½½°½¹Ñ•¹Ğ½Á½±±Ì°½İ¸µÁÉ½™¥±”¥‘•¹Ñ¥Ñä°ÁÉ¥Ù…Ñ”µ•‘¥„±•…¹ÕÀ°µ…¹Õ…°Í¡½½°µÍ½Á•…Ù…Ñ…ÈÉ•Ù¥•Ü…¹…ÁÁÉ½Ù…°°…É•…Ñ”…•¹ĞÉ•Á½ÉÑÌ…¹Í¡½½°µ‰½Õ¹¥‘•„É•Ù¥•Ü°…±±½İ±¥ÍÑ•¡½ÕÉ±ä•ÉÉ½ÈÑ•±•µ•ÑÉä°¥‘•µÁ½Ñ•¹Ğ½¹ÕÉÉ•¹Ğ•¹ÅÕ•Õ”…¹•á±ÕÍ¥Ù”±•…Í”µ‰…Í•Í…™”…•¹ĞÅÕ•Õ”°€ÀÌèĞÀ¼ÀĞèÀÀ½¡½ÕÉ±ä€èÌÀUQÍ¡•‘Õ±”µÑ¼µİ½É­•È™±½İÌİ¥Ñ Íå¹Ñ¡•Ñ¥Œ¡•…±Ñ ¡•­Ì…¹É•…°‘¥•ÍĞ¡…¹‘±•ÉÌ°Á•ÉÍ¥ÍÑ•¹Ğ¡½ÕÉ±ä±¥ÍÑ¥¹œ½¥‘•„½¥µ…”µÕÁ±½…ÅÕ½Ñ…Ì°™½ÕÈÍ•½¹‘…Éä±½½­ÕÀ¥¹‘•á•Ì°±¥ÍÑ¥¹Ì°™…Ù½É¥Ñ•Ì°¥‘•…Ì°µ•ÍÍ…•Ì°•Ù•¹ÑÌ°…±°½¸‘¥ÍÁ½Í…‰±”Íå¹Ñ¡•Ñ¥Œ±½…°‘…Ñ…‰…Í”œ¤ì)ô…Ñ €¡•ÉÉ½È¤ì(€½¹Í½±”¹•ÉÉ½È¡¥¹ÍÁ•Ğ¡•ÉÉ½È°ì‘•ÁÑ è¹Õ±°ô¤¤ì(€ÁÉ½•ÍÌ¹•á¥Ñ½‘”€ô€Äì)ô™¥¹…±±äì(€Íå¹Ñ¡•Ñ¥A•¹‘¥¹%µ…•Ìü¹±½Í” ¤ì(€ÅÕ½Ñ…A•¹‘¥¹%µ…•Ìü¹±½Í” ¤ì(€…İ…¥Ğ‘É¥Ù•È¹±½Í” ¤ì)ô(

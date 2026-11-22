@@ -11,6 +11,8 @@ const shell = `${html}\n${submission}\n${moderation}\n${notifications}`;
 test('Russian school role request screen uses only the same-origin YDB API', () => {
   assert.doesNotMatch(shell, /school-admin-access|sb\.functions\.invoke\(\s*["']school-admin-access/);
   assert.match(shell, /fetchImpl\(["']\/api\/v1\/role-requests["']/);
+  assert.match(shell, /fetchImpl\(["']\/api\/v1\/role-requests\/email-verification["']/);
+  assert.match(shell, /Подтвердите почту Яндекс ID/);
   assert.match(shell, /fetchImpl\(["']\/api\/v1\/role-requests\/review["']/);
   assert.match(shell, /requested_role:\s*select\.value/);
   assert.match(shell, /action:\s*["']start_review["']/);

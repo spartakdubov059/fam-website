@@ -251,22 +251,35 @@ test('school council can create a dated limited event while students cannot sele
 });
 
 test('student role request UI refreshes status and never sends a browser-selected school or identity', async () => {
-  const f = fixture(null); const calls = []; let submitted = false;
+  const f = fixture(null); const calls = []; let submitted = false; let emailVerified = false; let codeSent = false;
   await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'student-id', role: 'student' } }) };
     if (url === '/api/v1/role-requests' && init.method === 'POST') { submitted = true; return { ok: true, status: 202, json: async () => ({ ok: true, status: 'pending' }) }; }
-    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, request: submitted ? { status: 'pending' } : null }) };
+    if (url === '/api/v1/role-requests/email-verification' && JSON.parse(init.body).action === 'send') { codeSent = true; return { ok: true, status: 202, json: async () => ({ ok: true, sent: true }) }; }
+    if (url === '/api/v1/role-requests/email-verification') { emailVerified = true; return { ok: true, status: 200, json: async () => ({ ok: true, email_verified: true }) }; }
+    if (url === '/api/v1/role-requests') return { ok: true, json: async () => ({ ok: true, email_verified: emailVerified, email_verification_available: true,
+      request: submitted ? { status: 'pending' } : null }) };
     if (url === '/api/v1/ideas') return { ok: true, json: async () => ({ ok: true }) };
     throw new Error(`unexpected route ${url}`);
   } });
   const section = f.shellChildren.find(item => item['aria-label'] === 'Заявка на роль школьного Совета');
   assert.ok(section);
   const form = section.children[2];
+  const sendButton = section.children[3];
+  await sendButton.listeners.click();
+  assert.equal(codeSent, true);
+  assert.equal(section.children[4].hidden, false);
+  const codeForm = section.children[4];
+  const codeInput = codeForm.children[0].children[0]; codeInput.value = '246810';
+  await codeForm.listeners.submit({ preventDefault() {} });
+  assert.equal(emailVerified, true);
+  assert.equal(form.hidden, false);
   const select = form.children[0].children[0]; select.value = 'Участник Ученического совета';
   await form.listeners.submit({ preventDefault() {} });
   const submittedCall = calls.find(call => call.url === '/api/v1/role-requests' && call.init.method === 'POST');
   assert.deepEqual(JSON.parse(submittedCall.init.body), { requested_role: 'Участник Ученического совета' });
+  assert.equal(calls.find(call => call.url === '/api/v1/role-requests/email-verification' && JSON.parse(call.init.body).action === 'verify').init.credentials, 'same-origin');
   assert.equal(form.hidden, true);
   assert.match(section.children[1].textContent, /ожидает решения/);
 });
