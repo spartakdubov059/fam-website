@@ -22,10 +22,20 @@ function deterministicId(taskType, slot) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function isUtcSlot(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(value)) return false;
+function parseUtcMinuteSlot(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
   const date = new Date(`${value}:00.000Z`);
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value;
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value ? date : null;
+}
+
+function isUtcTaskSlot(taskType, value) {
+  const date = parseUtcMinuteSlot(value);
+  if (!date) return false;
+  const hour = date.getUTCHours(); const minute = date.getUTCMinutes();
+  if (taskType === 'system_health_check') return hour === 3 && minute === 40;
+  if (taskType === 'daily_report_digest') return hour === 4 && minute === 0;
+  if (taskType === 'site_error_digest') return minute === 30;
+  return taskType === 'queue_health_check' && [0, 15, 30, 45].includes(minute);
 }
 
 export function createYdbAgentTaskQueue(sql) {
@@ -33,7 +43,7 @@ export function createYdbAgentTaskQueue(sql) {
   return Object.freeze({
     async enqueueSafeTask(taskType, slot) {
       const task = Object.hasOwn(TASKS, taskType) ? TASKS[taskType] : null;
-      if (!task || !isUtcSlot(slot)) throw new TypeError('invalid safe agent task');
+      if (!task || !isUtcTaskSlot(taskType, slot)) throw new TypeError('invalid safe agent task');
       const id = deterministicId(taskType, slot);
       return sql.begin(async tx => {
         const existing = await tx`SELECT status FROM fam_agent_tasks WHERE id = ${id} LIMIT 1;`;
@@ -52,7 +62,8 @@ export function createYdbAgentTaskQueue(sql) {
     },
 
     async enqueueSafeCoderTask(slot) {
-      if (!isUtcSlot(slot)) throw new TypeError('invalid safe coder slot');
+      const date = parseUtcMinuteSlot(slot);
+      if (!date || ![0, 15, 30, 45].includes(date.getUTCMinutes())) throw new TypeError('invalid safe coder slot');
       return sql.begin(async tx => {
         const taskId = deterministicId('coder_patch_request', slot);
         const prior = await tx`SELECT status FROM fam_agent_tasks WHERE id = ${taskId} LIMIT 1;`;

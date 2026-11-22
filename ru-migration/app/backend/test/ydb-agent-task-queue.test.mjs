@@ -12,7 +12,7 @@ function fakeSql(respond) {
   return { sql, calls };
 }
 
-test('safe task enqueue is idempotent and accepts only fixed task types and UTC slots', async () => {
+test('safe task enqueue is idempotent and accepts only fixed task types and their scheduled UTC slots', async () => {
   let exists = false;
   const { sql, calls } = fakeSql((query) => {
     if (query.includes('SELECT status FROM fam_agent_tasks')) return exists ? [[{ status: 'queued' }]] : [[]];
@@ -28,6 +28,22 @@ test('safe task enqueue is idempotent and accepts only fixed task types and UTC 
   assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 1);
   await assert.rejects(queue.enqueueSafeTask('coder_patch_request', '2026-11-20T03:00'), /safe agent task/);
   await assert.rejects(queue.enqueueSafeTask('queue_health_check', '2026-11-20T03:07'), /safe agent task/);
+});
+
+test('safe scheduled tasks accept their source UTC schedule slots, including 03:40 system health', async () => {
+  const { sql, calls } = fakeSql(() => [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  for (const [taskType, slot] of [
+    ['system_health_check', '2026-11-20T03:40'],
+    ['daily_report_digest', '2026-11-20T04:00'],
+    ['site_error_digest', '2026-11-20T04:30'],
+  ]) {
+    assert.equal((await queue.enqueueSafeTask(taskType, slot)).created, true);
+  }
+  assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 3);
+  await assert.rejects(queue.enqueueSafeTask('system_health_check', '2026-11-20T03:45'), /safe agent task/);
+  await assert.rejects(queue.enqueueSafeTask('daily_report_digest', '2026-11-20T04:15'), /safe agent task/);
+  await assert.rejects(queue.enqueueSafeTask('site_error_digest', '2026-11-20T04:15'), /safe agent task/);
 });
 
 test('coder producer creates only one bounded task from allowlisted aggregate events', async () => {
@@ -121,7 +137,7 @@ test('coder claim closes only its own expired final system lease and records a t
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {
   const { sql, calls } = fakeSql(() => [[]]);
   const queue = createYdbAgentTaskQueue(sql);
-  await queue.enqueueSafeTask('site_error_digest', '2026-11-20T03:15');
+  await queue.enqueueSafeTask('site_error_digest', '2026-11-20T03:30');
   const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks'));
   assert.ok(insert);
   assert.ok(insert.values.includes('site_error_digest'));

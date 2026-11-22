@@ -6,6 +6,8 @@ import { query, identifier, fragment, join } from '@ydbjs/query';
 import sharp from 'sharp';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
+import { createSafeAgentTaskWorker } from '../app/backend/services/safe-agent-task-worker.mjs';
+import { createScheduledSafeAgentRunner } from '../app/backend/services/scheduled-safe-agent-runner.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
 import { createListingsApi } from '../app/backend/services/listings-api.mjs';
@@ -1084,7 +1086,20 @@ try {
   const racedClaim = concurrentClaims.flat()[0];
   assert.equal(await agentQueue.finishSafeTask({ id: racedClaim.id, claimToken: racedClaim.claim_token,
     status: 'completed', summary: 'Concurrent synthetic claim completed once.' }), true);
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  const scheduledWorker = createSafeAgentTaskWorker({ queue: agentQueue, handlers: {
+    system_health_check: async () => 'Синтетическая техническая проверка завершена без чтения пользовательских данных.',
+  } });
+  const scheduledRunner = createScheduledSafeAgentRunner({ queue: agentQueue, worker: scheduledWorker,
+    now: () => new Date('2026-11-20T03:40:00.000Z') });
+  const scheduledHealthRun = await scheduledRunner();
+  assert.deepEqual(scheduledHealthRun, { claimed: 1, completed: 1, blocked: 0, failed: 0, content_read: false,
+    worker_id: 'fam-ru-safe-worker-v1', scheduled: 1, created: 1 },
+  'the 03:40 UTC source schedule can enqueue and complete its health task through the real YDB queue and worker');
+  const scheduledHealthRow = await sql`SELECT task_type, status, result_summary FROM fam_agent_tasks
+    WHERE task_type = 'system_health_check' AND source = 'scheduled_audit' LIMIT 1;`;
+  assert.deepEqual(scheduledHealthRow?.[0]?.[0], { task_type: 'system_health_check', status: 'completed',
+    result_summary: 'Синтетическая техническая проверка завершена без чтения пользовательских данных.' });
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40 UTC scheduled health enqueue-to-worker flow, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
