@@ -31,11 +31,43 @@ test('avatar request accepts only an owned private upload and puts it in school 
 });
 
 test('avatar request shares the hourly listing quota and rejects exhausted quota', async () => {
+  const cleanup = [];
   const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
-    repository: { createAvatarReview: async () => ({ ok: false, code: 'rate_limited' }) },
-    pendingImages: { get: async () => Buffer.from('synthetic-webp') } });
+    repository: { createAvatarReview: async () => ({ ok: false, code: 'rate_limited' }),
+      claimPendingImageDeletion: async (...args) => { cleanup.push(['claim', ...args]); return 'lease-token'; },
+      finishPendingImageCleanup: async (...args) => { cleanup.push(['finish', ...args]); return true; } },
+    pendingImages: { get: async () => Buffer.from('synthetic-webp'), delete: async imageKey => { cleanup.push(['delete', imageKey]); } } });
   const response = await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })));
   assert.deepEqual(response, { status: 429, body: { ok: false, error: 'rate_limited' } });
+  assert.deepEqual(cleanup, [
+    ['claim', student.id, key], ['delete', key], ['finish', key, 'lease-token', true],
+  ]);
+});
+
+test('avatar quota storage failure discards only an unlinked pending upload', async () => {
+  const cleanup = [];
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
+    repository: { createAvatarReview: async () => { throw new Error('synthetic database failure'); },
+      claimPendingImageDeletion: async (...args) => { cleanup.push(['claim', ...args]); return 'lease-token'; },
+      finishPendingImageCleanup: async (...args) => { cleanup.push(['finish', ...args]); return true; } },
+    pendingImages: { get: async () => Buffer.from('synthetic-webp'), delete: async imageKey => { cleanup.push(['delete', imageKey]); } } });
+  const response = await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })));
+  assert.deepEqual(response, { status: 503, body: { ok: false, error: 'database_unavailable' } });
+  assert.deepEqual(cleanup, [
+    ['claim', student.id, key], ['delete', key], ['finish', key, 'lease-token', true],
+  ]);
+});
+
+test('avatar quota rejection does not delete an upload already linked by a committed review', async () => {
+  let deleteCalls = 0;
+  const handler = createListingsApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => student,
+    repository: { createAvatarReview: async () => ({ ok: false, code: 'rate_limited' }),
+      claimPendingImageDeletion: async () => null,
+      finishPendingImageCleanup: async () => { throw new Error('must not finish an unclaimed deletion'); } },
+    pendingImages: { get: async () => Buffer.from('synthetic-webp'), delete: async () => { deleteCalls++; } } });
+  const response = await handler(request('POST', '/api/v1/me/avatar', JSON.stringify({ image_key: key })));
+  assert.equal(response.status, 429);
+  assert.equal(deleteCalls, 0);
 });
 
 test('avatar moderation list and decisions require same-school school staff', async () => {

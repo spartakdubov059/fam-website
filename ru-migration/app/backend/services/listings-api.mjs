@@ -13,6 +13,22 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
   const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
+  const discardUnlinkedPendingImage = async (userId, imageKey) => {
+    if (typeof pendingImages?.delete !== 'function' || typeof repository?.claimPendingImageDeletion !== 'function'
+        || typeof repository?.finishPendingImageCleanup !== 'function') return false;
+    let claimToken = null;
+    try {
+      claimToken = await repository.claimPendingImageDeletion(userId, imageKey);
+      if (!claimToken) return false;
+      await pendingImages.delete(imageKey);
+      return await repository.finishPendingImageCleanup(imageKey, claimToken, true);
+    } catch {
+      if (claimToken) {
+        try { await repository.finishPendingImageCleanup(imageKey, claimToken, false); } catch { /* lease expiry permits retry */ }
+      }
+      return false;
+    }
+  };
   const schoolRoleSuspensionGate = async (actor) => {
     if (typeof repository?.getActiveAccountSuspension !== 'function') {
       return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
@@ -170,10 +186,16 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.createAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
       try {
         const reviewRequest = await repository.createAvatarReview({ userId: actor.id, schoolId: actor.school_id, imageKey: key });
-        if (reviewRequest?.code === 'rate_limited') return { status: 429, body: { ok: false, error: 'rate_limited' } };
+        if (reviewRequest?.code === 'rate_limited') {
+          await discardUnlinkedPendingImage(actor.id, key);
+          return { status: 429, body: { ok: false, error: 'rate_limited' } };
+        }
         return reviewRequest ? { status: 202, body: { ok: true, status: 'pending', request_id: reviewRequest.id } }
           : { status: 409, body: { ok: false, error: 'avatar_review_already_pending_or_image_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      } catch {
+        await discardUnlinkedPendingImage(actor.id, key);
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
     }
     if (req.method === 'GET' && pathname === '/api/v1/avatars/moderation') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
