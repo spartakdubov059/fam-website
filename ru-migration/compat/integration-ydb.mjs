@@ -7,6 +7,9 @@ import sharp from 'sharp';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
 import { createYdbAgentTaskQueue } from '../app/backend/repositories/ydb-agent-task-queue.mjs';
 import { createSafeAgentTaskWorker } from '../app/backend/services/safe-agent-task-worker.mjs';
+import { createSystemHealthTaskHandler } from '../app/backend/services/system-health-task.mjs';
+import { createOrchestratorDailyDigest } from '../app/backend/services/orchestrator-daily-digest.mjs';
+import { createSiteErrorDigest } from '../app/backend/services/site-error-digest.mjs';
 import { createScheduledSafeAgentRunner } from '../app/backend/services/scheduled-safe-agent-runner.mjs';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createSuspensionWriteGuard } from '../app/backend/auth/suspension-write-guard.mjs';
@@ -1086,20 +1089,47 @@ try {
   const racedClaim = concurrentClaims.flat()[0];
   assert.equal(await agentQueue.finishSafeTask({ id: racedClaim.id, claimToken: racedClaim.claim_token,
     status: 'completed', summary: 'Concurrent synthetic claim completed once.' }), true);
+  const syntheticSystemHealth = createSystemHealthTaskHandler({
+    readinessCheck: async () => ({ ready: true, services: { auth: true, database: true, objectStorage: true } }),
+    timerCheck: async () => ({ ok: true, timers: [{ unit: 'fam-ru-synthetic.timer', ok: true }] }),
+    queueHealthCheck: async () => {
+      const health = await repo.getRuBackgroundQueueHealth();
+      const safeTasks = await agentQueue.getSafeTaskQueueHealth();
+      return { ...health, queues: { ...health.queues, safe_agent_tasks: safeTasks }, content_read: false };
+    },
+    schemaCheck: async () => schemaHealth,
+  });
   const scheduledWorker = createSafeAgentTaskWorker({ queue: agentQueue, handlers: {
-    system_health_check: async () => 'Синтетическая техническая проверка завершена без чтения пользовательских данных.',
+    queue_health_check: async () => {
+      const health = await agentQueue.getSafeTaskQueueHealth();
+      return `Синтетическая проверка очередей: ожидают ${health.statuses.queued}; содержимое не читалось.`;
+    },
+    daily_report_digest: async () => {
+      const result = await createOrchestratorDailyDigest({ repository: repo, now: () => new Date('2026-11-20T04:00:00.000Z') })();
+      return `Синтетическая сводка за ${result.date} обработана агрегированно.`;
+    },
+    system_health_check: syntheticSystemHealth,
+    site_error_digest: async () => {
+      const result = await createSiteErrorDigest({ repository: repo, now: () => new Date('2026-11-20T04:30:00.000Z') })();
+      return `Синтетическая сводка ошибок за ${result.slot} обработана агрегированно.`;
+    },
   } });
-  const scheduledRunner = createScheduledSafeAgentRunner({ queue: agentQueue, worker: scheduledWorker,
-    now: () => new Date('2026-11-20T03:40:00.000Z') });
-  const scheduledHealthRun = await scheduledRunner();
-  assert.deepEqual(scheduledHealthRun, { claimed: 1, completed: 1, blocked: 0, failed: 0, content_read: false,
-    worker_id: 'fam-ru-safe-worker-v1', scheduled: 1, created: 1 },
-  'the 03:40 UTC source schedule can enqueue and complete its health task through the real YDB queue and worker');
-  const scheduledHealthRow = await sql`SELECT task_type, status, result_summary FROM fam_agent_tasks
-    WHERE task_type = 'system_health_check' AND source = 'scheduled_audit' LIMIT 1;`;
-  assert.deepEqual(scheduledHealthRow?.[0]?.[0], { task_type: 'system_health_check', status: 'completed',
-    result_summary: 'Синтетическая техническая проверка завершена без чтения пользовательских данных.' });
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40 UTC scheduled health enqueue-to-worker flow, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  const scheduledRuns = [];
+  for (const slot of ['2026-11-20T03:40:00.000Z', '2026-11-20T04:00:00.000Z', '2026-11-20T04:30:00.000Z']) {
+    scheduledRuns.push(await createScheduledSafeAgentRunner({ queue: agentQueue, worker: scheduledWorker,
+      now: () => new Date(slot) })());
+  }
+  assert.deepEqual(scheduledRuns.map(result => ({ scheduled: result.scheduled, created: result.created,
+    claimed: result.claimed, completed: result.completed, blocked: result.blocked, failed: result.failed })), [
+    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
+    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
+    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
+  ], 'all three source schedule slots enqueue and complete through the real YDB queue and safe worker');
+  const scheduledRows = await sql`SELECT task_type, status FROM fam_agent_tasks WHERE source = 'scheduled_audit'
+    AND task_type IN ('system_health_check', 'daily_report_digest', 'site_error_digest');`;
+  assert.deepEqual(new Set((scheduledRows?.[0] ?? []).map(row => `${row.task_type}:${row.status}`)),
+    new Set(['system_health_check:completed', 'daily_report_digest:completed', 'site_error_digest:completed']));
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40/04:00/hourly :30 UTC schedule-to-worker flows with synthetic health checks and real digest handlers, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;
