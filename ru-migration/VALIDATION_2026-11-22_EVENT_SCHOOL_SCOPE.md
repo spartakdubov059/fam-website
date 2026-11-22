@@ -17,7 +17,8 @@
 - `node --check` для изменённых модулей и интеграционного сценария — успешно.
 - `node --test test/ydb-listings.test.mjs test/listings-api.test.mjs` — 124/124 успешно на Node 24.22.3.
 - Полный backend suite — 437 успешных, 5 сбоев окружения из 442: четыре теста не загрузили нативный Sharp из-за несовпадения Team ID подписи бинарного модуля с приложенным Node; тест загрузки Yandex Function вернул 503 вследствие этого ограничения. Это не утверждение о прохождении полного набора.
-- Синтетическую YDB интеграцию и GitHub Actions для нового изменения в этой сессии не запускали. Локальный Docker/Podman/YDB CLI не обнаружен; соответствующая интеграционная проверка добавлена для CI.
+- На исправленном коммите `93f8feea` GitHub Actions завершили обе проверки успешно: [synthetic YDB integration #45039372097](https://github.com/spartakdubov059/fam-website/actions/runs/45039372097) создала одноразовую YDB, применила схему, прогнала интеграцию на synthetic данных и удалила БД; [SDK/Sharp compatibility #45039372127](https://github.com/spartakdubov059/fam-website/actions/runs/45039372127) установила зафиксированные зависимости, прошла полный backend suite, упаковку Yandex Function, таймеры и native Sharp smoke test.
+- В рабочей локальной среде Docker/Podman/YDB CLI не обнаружены; облачный staging не создавался.
 - Облачный staging не создавался: его безусловная стоимость 0 ₽ не подтверждена. Production и реальные данные не использовались.
 
 Изменение подготовлено в отдельной локальной ветке `codex/famru-event-school-guard`, созданной от `origin/migration/yandex-cloud`; основная ветка не менялась.
