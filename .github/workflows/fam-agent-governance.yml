@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/fam-agent-governance.yml"
       - "scripts/fam-agent-governance.mjs"
+      - "scripts/fam-governance-bridge.mjs"
       - "scripts/fam-integration-coordinator.mjs"
       - "tests/security/fam-agent-governance.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
@@ -31,7 +32,7 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs
+      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs
 
   governance:
     name: Арбитр, инспектор и рекрутер
@@ -54,4 +55,6 @@ jobs:
       - name: Собрать доказательные сигналы из метаданных GitHub
         env:
           GH_TOKEN: ${{ github.token }}
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
         run: node scripts/fam-agent-governance.mjs
