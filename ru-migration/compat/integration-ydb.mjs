@@ -84,6 +84,8 @@ try {
           : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1';
     return { issuer: 'https://issuer.synthetic', subject,
       ...(subject === 'subject-role-student' ? { email: 'role-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new' ? { email: 'new-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new-staff' ? { email: 'new-staff@synthetic.example' } : {}),
       authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null };
   };
   const deletedMediaKeys = [];
@@ -421,6 +423,23 @@ try {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
   }))).status, 403);
   console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
+  }))).status, 403, 'an unverified identity cannot create a school profile request');
+  const sendProfileEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendProfileEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-student@synthetic.example', code: '135790' });
+  const storedProfileChallenge = await sql`SELECT email_digest, code_digest FROM fam_role_email_verifications
+    WHERE issuer = 'https://issuer.synthetic' AND subject = 'subject-new' LIMIT 1;`;
+  assert.match(storedProfileChallenge[0][0].email_digest, /^[a-f0-9]{64}$/);
+  assert.match(storedProfileChallenge[0][0].code_digest, /^[a-f0-9]{64}$/);
+  assert.equal(storedProfileChallenge[0][0].email_digest.includes('new-student@synthetic.example'), false);
+  assert.equal(storedProfileChallenge[0][0].code_digest.includes('135790'), false);
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
+  console.log('YDB_PROFILE_EMAIL_VERIFICATION_PASS: unverified identity is blocked, synthetic code verifies, and YDB stores only HMAC digests');
   const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
   }));
@@ -499,6 +518,16 @@ try {
   const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
   assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
+  }))).status, 403, 'an unverified school employee identity cannot create a profile request');
+  const sendStaffEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendStaffEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-staff@synthetic.example', code: '135790' });
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
   const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
   }));
