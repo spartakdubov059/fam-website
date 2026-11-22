@@ -43,6 +43,8 @@
 
 ### Обновление аудита (22 ноября 2026)
 
+- Продолжена категорийная сверка `moderate`: RU теперь создаёт обезличенный школьный сигнал `unclear_safety_signal` средней важности для локальных маркеров самоповреждения, сексуального насилия и насилия, одновременно оставляя материал на ручной проверке. Сырой текст и выдержки в запись сигнала не попадают. Проверки `safety-signal`, `content-safety`, `submit-idea`, `submit-message` и `submit-listing`: **35/35**.
+
 - На кодовом коммите [`6527fe6`](https://github.com/spartakdubov059/fam-website/commit/6527fe60f12f1a9e861ea2fb979bc6137cba1a6b) восстановлена scoped review заявок на события: организатор ограничен собственным событием/школой, активные школьные роли — собственной школой; решение проверяется транзакционно. Backend suite прошёл **439/439** локально; [SDK/Sharp CI #44962759676](https://github.com/spartakdubov059/fam-website/actions/runs/44962759676) и [synthetic YDB CI #44962759592](https://github.com/spartakdubov059/fam-website/actions/runs/44962759592) успешны на точном коммите.
 - Этот результат не закрывает оставшиеся отличия таблицы: image vision worker и automated Qwen coder не реализованы; email confirmation is implemented with a synthetic test but not verified against live Yandex ID/Postbox; Yandex cloud/IAM staging remains unverified. Paid resources and timers were not enabled.
 

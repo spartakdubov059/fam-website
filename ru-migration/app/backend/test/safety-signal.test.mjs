@@ -38,12 +38,14 @@ test('non-safety local moderation flags do not create incident reports', () => {
 });
 
 test('sensitive-topic review stores only a medium school safety marker without text', () => {
-  const signal = buildLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
-    localFlag: 'self_harm_safety_review', text: 'Разговор о суициде.', safetyKey: key });
-  assert.equal(signal.category, 'unclear_safety_signal');
-  assert.equal(signal.severity, 'medium');
-  assert.equal(Object.hasOwn(signal, 'text'), false);
-  assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+  for (const localFlag of ['self_harm_safety_review', 'sexual_safety_review', 'violence_safety_review']) {
+    const signal = buildLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
+      localFlag, text: 'Синтетический чувствительный материал.', safetyKey: key });
+    assert.equal(signal.category, 'unclear_safety_signal', localFlag);
+    assert.equal(signal.severity, 'medium', localFlag);
+    assert.equal(Object.hasOwn(signal, 'text'), false);
+    assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+  }
 });
 
 test('harassment and negative personal calls create medium redacted school incidents', () => {

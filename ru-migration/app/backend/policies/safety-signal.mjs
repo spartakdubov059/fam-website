@@ -19,7 +19,8 @@ export function buildLocalSafetySignal({ actor, targetId = null, sourceKind, sou
   const normalized = String(text || '').normalize('NFKC').toLocaleLowerCase('ru-RU');
   const category = localFlag === 'targeted_harassment' ? 'targeted_harassment'
     : localFlag === 'negative_personal_call' ? 'negative_personal_call'
-      : localFlag !== 'serious_hate_or_threat' ? 'unclear_safety_signal'
+      : ['self_harm_safety_review', 'sexual_safety_review', 'violence_safety_review'].includes(localFlag) ? 'unclear_safety_signal'
+        : localFlag !== 'serious_hate_or_threat' ? 'unclear_safety_signal'
         : /ненавист|дискриминац|расист|нацист/u.test(normalized) ? 'hate_or_discrimination'
           : /угроз|убей|убить|расправ/u.test(normalized) ? 'threat_or_intimidation'
             : 'unclear_safety_signal';
