@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU текущий code tree `a5101a68148ef39255f06a760e96353a78e91045`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 36 YDB schema files. Ранее проверен список имён миграций; новая `20261122012818_restrict_listing_image_reads_to_school_members.sql` отдельно сопоставлена с same-school/active/private API правилами чтения фото в RU. Полная сверка всех 80 миграций по объектам ещё не проведена; совпадение списков не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU текущий commit [`42a39ba`](https://github.com/spartakdubov059/fam-website/commit/42a39baaaa69204bc9d40b2241da7439cc5e5490), tree `e989a8b83b77b71cd3b1c5f151b3d00a4fe8259d`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 36 YDB schema files и health probe для 38 таблиц. Новая `20261122012818_restrict_listing_image_reads_to_school_members.sql` сопоставлена с same-school/active/private API правилами чтения фото в RU. Полная семантическая сверка всех 80 миграций по объектам не проведена; совпадение списков не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
