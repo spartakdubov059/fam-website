@@ -100,6 +100,7 @@ try {
       const chain = [];
       for (let current = error, depth = 0; current && depth < 3; current = current.cause, depth += 1) {
         chain.push(`${current?.name || 'Error'}: ${String(current?.message || 'unknown')}`);
+        if (Array.isArray(current?.issues)) chain.push(JSON.stringify(current.issues));
       }
       const diagnostic = chain.join(' <- ').replace(/https:\/\/issuer\.synthetic/g, '[issuer]')
         .replace(/subject-role-student/g, '[subject]').replace(/[a-f0-9]{64}/gi, '[digest]')
