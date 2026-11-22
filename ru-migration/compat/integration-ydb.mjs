@@ -566,6 +566,23 @@ try {
   const publicDirectListing = publicListings.find(row => row.id === listing.id);
   assert.ok(publicDirectListing);
   assert.deepEqual(await repo.listActiveListings('other-school'), [], 'the public feed never returns another school\'s listings');
+  const notificationOwnerListing = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
+    title: 'Синтетический материал для личной фильтрации уведомлений', description: 'Этот материал не должен попасть автору в новые объявления',
+    category: 'Учёба', price_text: 'Бесплатно', is_event: false, event_date: null, event_time: null, event_type: null,
+    max_seats: 0, status: 'pending' });
+  assert.equal(await repo.moderateListing(notificationOwnerListing.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
+  const schoolNotificationFeed = await listingsApi(apiRequest('GET', '/api/v1/notifications/listings', 'synthetic-registrant'));
+  assert.equal(schoolNotificationFeed.status, 200);
+  assert.ok(schoolNotificationFeed.body.listings.some(row => row.id === apiSubmission.body.id),
+    'a member receives notifications for another active listing from their school');
+  assert.ok(schoolNotificationFeed.body.listings.some(row => row.id === listing.id));
+  assert.ok(!schoolNotificationFeed.body.listings.some(row => row.id === notificationOwnerListing.id),
+    'the author never receives a new-listing notification for their own material');
+  assert.ok(schoolNotificationFeed.body.listings.every(row => !Object.hasOwn(row, 'school_id') && !Object.hasOwn(row, 'user_id')),
+    'the notification projection omits school and author identifiers');
+  const otherSchoolNotificationFeed = await listingsApi(apiRequest('GET', '/api/v1/notifications/listings', 'synthetic-other-school'));
+  assert.deepEqual(otherSchoolNotificationFeed, { status: 200, body: { ok: true, listings: [] } },
+    'notification query does not return another school\'s active content');
   assert.equal(await repo.getListingContactRecipient(listing.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'), 'synthetic-user',
     'a same-school member can contact the owner of an active listing');
   assert.equal(await repo.getListingContactRecipient(listing.id, 'synthetic-user', 'synthetic-school'), null,
