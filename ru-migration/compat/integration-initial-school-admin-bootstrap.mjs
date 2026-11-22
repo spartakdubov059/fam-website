@@ -14,7 +14,7 @@ try {
   };
   sql.begin = client.begin.bind(client);
   const repository = createYdbListingsRepository(sql);
-  const identity = { issuer: 'https://login.yandex.ru', subject: 'synthetic-bootstrap-subject',
+  const identity = { issuer: 'https://login.yandex.ru', subject: '12345678901234567890',
     userId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', schoolId: 'gymnasium_4', firstName: 'Синтетический', lastName: 'Администратор' };
   assert.deepEqual(await repository.bootstrapInitialSchoolAdmin(identity), { ok: true, user_id: identity.userId });
   assert.deepEqual(await repository.bootstrapInitialSchoolAdmin({ ...identity, userId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }),
