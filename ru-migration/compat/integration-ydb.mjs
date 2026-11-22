@@ -1203,7 +1203,7 @@ try {
     ['database_request_failed', 'database', 'audit_frontend_runtime'],
     ['auth_backend_failed', 'auth', 'audit_frontend_runtime'],
   ].entries()) {
-    const eventBucket = new Date(Date.now() - (index + 1) * 60 * 60 * 1000);
+    const eventBucket = new Date(Date.now() - (index + 1) * 25 * 60 * 60 * 1000);
     eventBucket.setUTCMinutes(0, 0, 0);
     for (let occurrence = 0; occurrence < 3; occurrence++) {
       await repo.recordSiteError({ eventCode, pageArea, occurredAt: eventBucket });
