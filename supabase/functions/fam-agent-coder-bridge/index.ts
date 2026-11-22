@@ -110,6 +110,27 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Read-only control tower link: no task IDs, descriptions or user information.
+    if (body.action === "health" && Object.keys(body).length === 1) {
+      const stats = await rpc("get_fam_agent_queue_health", {});
+      const fields = [
+        "queued", "claimed", "in_progress", "failed_last_24h",
+        "expired_leases", "oldest_queued_minutes",
+      ] as const;
+      if (!stats || typeof stats !== "object" || Array.isArray(stats)) {
+        return json({ ok: false, error: "invalid_queue_health" }, 502);
+      }
+      const safe: Record<string, number> = {};
+      for (const key of fields) {
+        const value = stats[key];
+        if (!Number.isSafeInteger(value) || value < 0 || value > 10_000_000) {
+          return json({ ok: false, error: "invalid_queue_health" }, 502);
+        }
+        safe[key] = value;
+      }
+      return json({ ok: true, queue: safe });
+    }
+
     if (body.action === "claim" && Object.keys(body).length === 1) {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,
