@@ -29,7 +29,7 @@ try {
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
   const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false });
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 37, content_read: false, write_permissions_checked: false });
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {
     try {

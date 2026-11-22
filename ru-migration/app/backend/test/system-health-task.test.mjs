@@ -4,7 +4,7 @@ import { createSystemHealthTaskHandler } from '../services/system-health-task.mj
 
 const readiness = { ready: true, services: { auth: true, database: true, objectStorage: true } };
 const timers = { ok: true, timers: [{ unit: 'fam-ru-runtime-health.timer', ok: true }] };
-const schema = { ok: true, tables_checked: 36, content_read: false, write_permissions_checked: false };
+const schema = { ok: true, tables_checked: 37, content_read: false, write_permissions_checked: false };
 const queue = { content_read: false, queues: {
   daily_reports: { statuses: { queued: 0, claimed: 0, completed: 2, blocked: 0, failed: 0 }, expired_leases: 0, failed_or_blocked_24h: 0, oldest_queued_age_minutes: 0 },
   site_error_digests: { statuses: { queued: 0, claimed: 0, completed: 2, blocked: 0, failed: 0 }, expired_leases: 0, failed_or_blocked_24h: 0, oldest_queued_age_minutes: 0 },
@@ -21,7 +21,7 @@ test('scheduled system health checks readiness, timers and aggregate queues with
   });
   const summary = await handler();
   assert.deepEqual(calls.sort(), ['queues', 'readiness', 'schema', 'timers']);
-  assert.match(summary, /таблицы — 36\/36; расписания — 1\/1; очереди — 3\/3/);
+  assert.match(summary, /таблицы — 37\/37; расписания — 1\/1; очереди — 3\/3/);
   assert.doesNotMatch(summary, /payload|student|ученик/i);
 });
 

@@ -25,6 +25,29 @@ test('school profile request accepts catalog schools and enforces participant-sp
   assert.equal((await requestSchoolProfile({ identity: { issuer: 'i', subject: 'bad-parent' }, input: { school_id: 'lyceum_3', first_name: 'Анна', last_name: 'Иванова', person_type: 'parent', class_name: '8А' }, repository })).code, 'invalid_profile_request');
 });
 
+test('initial school admin bootstrap is one-time, school-scoped, and audited', async () => {
+  const calls = [];
+  const tx = async (strings, ...values) => {
+    const text = strings.join('?'); calls.push({ text, values });
+    if (text.includes('fam_initial_school_admin_bootstrap')) return calls.filter(call => call.text.includes('fam_initial_school_admin_bootstrap')).length === 1 ? [[]] : [[{ school_id: 'gymnasium_4' }]];
+    if (text.includes("role = 'school_admin'")) return [[]];
+    if (text.includes('FROM fam_user_profiles') && text.includes('issuer =')) return [[]];
+    return [[]];
+  };
+  const repo = createYdbListingsRepository(Object.assign(async () => [[]], { begin: async work => work(tx) }));
+  const input = { issuer: 'https://login.yandex.ru', subject: '123456789', userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    schoolId: 'gymnasium_4', firstName: 'Тест', lastName: 'Администратор' };
+  assert.deepEqual(await repo.bootstrapInitialSchoolAdmin(input), { ok: true, user_id: input.userId });
+  assert.deepEqual(await repo.bootstrapInitialSchoolAdmin(input), { ok: false, code: 'already_bootstrapped' });
+  assert.ok(calls.some(call => call.text.includes("'school_admin'")));
+  assert.ok(calls.some(call => call.text.includes("'initial_admin_bootstrap'")));
+  for (const value of [input.subject, input.userId, input.schoolId, input.firstName, input.lastName]) {
+    assert.equal(calls.some(call => call.text.includes(value)), false, 'identity and profile values stay bound parameters');
+  }
+  await assert.rejects(repo.bootstrapInitialSchoolAdmin({ ...input, issuer: 'https://attacker.example' }), TypeError);
+  await assert.rejects(repo.bootstrapInitialSchoolAdmin({ ...input, schoolId: 'unapproved_school' }), TypeError);
+});
+
 test('profile request repository is idempotent and binds Yandex identity values', async () => {
   const calls = [];
   const tx = async (strings, ...values) => {

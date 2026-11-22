@@ -4,7 +4,7 @@ export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_agent_daily_digest_tasks', 'fam_agent_daily_reports', 'fam_agent_ideas',
   'fam_agent_school_daily_reports', 'fam_agent_task_events', 'fam_agent_tasks',
   'fam_avatar_reviews', 'fam_event_occupancy', 'fam_event_registrations', 'fam_favorites',
-  'fam_idea_images', 'fam_ideas', 'fam_listings', 'fam_messages', 'fam_notification_reads',
+  'fam_idea_images', 'fam_ideas', 'fam_initial_school_admin_bootstrap', 'fam_listings', 'fam_messages', 'fam_notification_reads',
   'fam_pending_media', 'fam_pending_messages', 'fam_profile_requests', 'fam_safety_incidents',
   'fam_school_admin_audit', 'fam_school_content_audit', 'fam_school_announcements',
   'fam_school_poll_votes', 'fam_school_polls', 'fam_school_role_request_audit',

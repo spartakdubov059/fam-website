@@ -1,0 +1,7 @@
+-- One-time, operator-controlled first school-admin bootstrap. Retain marker even if all admins are later removed.
+CREATE TABLE fam_initial_school_admin_bootstrap (
+  school_id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  provisioned_at Timestamp NOT NULL,
+  PRIMARY KEY (school_id)
+);

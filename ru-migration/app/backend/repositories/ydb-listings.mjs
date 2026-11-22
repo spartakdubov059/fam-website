@@ -45,6 +45,32 @@ const isQuarterHourSlot = value => {
 export function createYdbListingsRepository(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return {
+    async bootstrapInitialSchoolAdmin({ issuer, subject, userId, schoolId, firstName, lastName }) {
+      if (issuer !== 'https://login.yandex.ru' || typeof subject !== 'string' || !/^\d{1,32}$/.test(subject)
+          || !UUID.test(userId) || !['lyceum_3', 'gymnasium_4'].includes(schoolId)
+          || typeof firstName !== 'string' || firstName.trim() !== firstName || firstName.length < 1 || firstName.length > 80
+          || typeof lastName !== 'string' || lastName.trim() !== lastName || lastName.length < 1 || lastName.length > 80) {
+        throw new TypeError('invalid initial school admin bootstrap');
+      }
+      return sql.begin(async tx => {
+        const markerRows = await tx`SELECT school_id FROM fam_initial_school_admin_bootstrap WHERE school_id = ${schoolId} LIMIT 1;`;
+        if (markerRows?.[0]?.length) return { ok: false, code: 'already_bootstrapped' };
+        const identityRows = await tx`SELECT user_id FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        if (identityRows?.[0]?.length) return { ok: false, code: 'identity_exists' };
+        const adminRows = await tx`SELECT user_id FROM fam_user_profiles
+          WHERE school_id = ${schoolId} AND role = 'school_admin' AND active = true LIMIT 1;`;
+        if (adminRows?.[0]?.length) return { ok: false, code: 'admin_exists' };
+        await tx`INSERT INTO fam_user_profiles
+          (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name, city, avatar_url)
+          VALUES (${issuer}, ${subject}, ${userId}, ${schoolId}, 'school_admin', true, ${firstName}, ${lastName}, '', '', '');`;
+        await tx`INSERT INTO fam_initial_school_admin_bootstrap (school_id, user_id, provisioned_at)
+          VALUES (${schoolId}, ${userId}, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_school_admin_audit
+          (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
+          VALUES (${randomUUID()}, ${schoolId}, ${userId}, ${userId}, 'initial_admin_bootstrap', 'none', CurrentUtcTimestamp());`;
+        return { ok: true, user_id: userId };
+      });
+    },
     async updateOwnProfileIdentity(issuer, subject, fields) {
       if (!issuer || !subject || !fields || typeof fields.first_name !== 'string' || typeof fields.last_name !== 'string'
           || typeof fields.class_name !== 'string' || !['student', 'school_staff', 'parent'].includes(fields.person_type)
