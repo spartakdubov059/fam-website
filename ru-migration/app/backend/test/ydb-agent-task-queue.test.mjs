@@ -100,6 +100,37 @@ test('coder producer refuses unknown aggregate event codes even if returned by t
   assert.equal(calls.some(call => call.query.includes('INSERT INTO fam_agent_tasks')), false);
 });
 
+test('coder queue health returns only bounded aggregate status fields', async () => {
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('GROUP BY status')) return [[
+      { status: 'queued', count: '4' }, { status: 'claimed', count: 1 }, { status: 'in_progress', count: 2 },
+      { status: 'failed', count: 7 }, { status: 'completed', count: 10 },
+    ]];
+    if (query.includes("status = 'failed'")) return [[{ count: '3' }]];
+    if (query.includes("lease_expires_at <= CurrentUtcTimestamp()")) return [[{ count: 1 }]];
+    if (query.includes('MIN(created_at)')) return [[{ oldest_queued_at: new Date(Date.now() - 17 * 60_000) }]];
+    return [[]];
+  });
+  const health = await createYdbAgentTaskQueue(sql).getAgentTaskQueueHealth();
+  assert.deepEqual(Object.keys(health).sort(), [
+    'claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued',
+  ]);
+  assert.equal(health.queued, 4);
+  assert.equal(health.claimed, 1);
+  assert.equal(health.in_progress, 2);
+  assert.equal(health.failed_last_24h, 3);
+  assert.equal(health.expired_leases, 1);
+  assert.ok(health.oldest_queued_minutes >= 17 && health.oldest_queued_minutes <= 18);
+  assert.ok(calls.every(({ query }) => !/payload_json|result_summary|school_id|user_id/.test(query)));
+});
+
+test('coder queue health rejects invalid statuses and unbounded counts', async () => {
+  const invalidStatus = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'unknown', count: 1 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(invalidStatus).getAgentTaskQueueHealth(), /invalid agent task status/);
+  const excessiveCount = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'queued', count: 10_000_001 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(excessiveCount).getAgentTaskQueueHealth(), /invalid agent task count/);
+});
+
 test('coder producer caps 24-hour event aggregates to the bridge payload limit', async () => {
   const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
     ? [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 24_000 }]] : [[]]);

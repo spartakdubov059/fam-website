@@ -235,6 +235,48 @@ export function createYdbAgentTaskQueue(sql) {
       });
     },
 
+    async getAgentTaskQueueHealth() {
+      const [statuses, failed, expired, oldest] = await Promise.all([
+        sql`SELECT status, COUNT(*) AS count FROM fam_agent_tasks GROUP BY status;`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status = 'failed'
+          AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status IN ('claimed', 'in_progress')
+          AND lease_expires_at <= CurrentUtcTimestamp();`,
+        sql`SELECT MIN(created_at) AS oldest_queued_at FROM fam_agent_tasks WHERE status = 'queued';`,
+      ]);
+      const counts = { queued: 0, claimed: 0, in_progress: 0 };
+      for (const row of statuses?.[0] ?? []) {
+        if (!Object.hasOwn(counts, row.status) && !['failed', 'blocked', 'completed', 'cancelled'].includes(row.status)) {
+          throw new TypeError('invalid agent task status');
+        }
+        if (Object.hasOwn(counts, row.status)) {
+          const value = Number(row.count);
+          if (!Number.isSafeInteger(value) || value < 0 || value > 10_000_000) throw new TypeError('invalid agent task count');
+          counts[row.status] = value;
+        }
+      }
+      const failedLast24 = Number(failed?.[0]?.[0]?.count ?? 0);
+      const expiredLeases = Number(expired?.[0]?.[0]?.count ?? 0);
+      if (![failedLast24, expiredLeases].every(value => Number.isSafeInteger(value) && value >= 0 && value <= 10_000_000)) {
+        throw new TypeError('invalid agent task health count');
+      }
+      const oldestValue = oldest?.[0]?.[0]?.oldest_queued_at;
+      const oldestMs = oldestValue instanceof Date ? oldestValue.getTime()
+        : typeof oldestValue === 'string' ? Date.parse(oldestValue) : NaN;
+      const health = {
+        queued: counts.queued,
+        claimed: counts.claimed,
+        in_progress: counts.in_progress,
+        failed_last_24h: failedLast24,
+        expired_leases: expiredLeases,
+        oldest_queued_minutes: Number.isFinite(oldestMs) ? Math.max(0, Math.floor((Date.now() - oldestMs) / 60_000)) : 0,
+      };
+      if (Object.values(health).some(value => !Number.isSafeInteger(value) || value < 0 || value > 10_000_000)) {
+        throw new TypeError('invalid agent task health age');
+      }
+      return health;
+    },
+
     async getSafeTaskQueueHealth() {
       const [statuses, expired, recentFailures, oldest] = await Promise.all([
         sql`SELECT status, COUNT(*) AS count FROM fam_agent_tasks

@@ -1175,6 +1175,11 @@ try {
   const coderTask = await agentQueue.enqueueSafeCoderTask(coderSlot);
   assert.equal(coderTask.created, true, 'thresholded aggregate telemetry creates a synthetic manual-review task');
   assert.equal(coderTask.task_key, 'audit_frontend_runtime');
+  const initialCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(initialCoderQueueHealth.queued, 1);
+  assert.equal(initialCoderQueueHealth.claimed, 0);
+  assert.deepEqual(Object.keys(initialCoderQueueHealth).sort(),
+    ['claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued']);
   assert.equal((await agentQueue.enqueueSafeCoderTask(coderSlot)).created, false, 'coder task enqueue is idempotent per quarter-hour slot');
   const claimedBeforeCoder = await agentQueue.claimSafeTasks(5);
   assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
@@ -1191,6 +1196,9 @@ try {
   const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
   assert.equal(coderClaim.id, coderTask.id);
   assert.equal(coderClaim.task_key, coderPayload.task_key);
+  const claimedCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(claimedCoderQueueHealth.queued, 0);
+  assert.equal(claimedCoderQueueHealth.claimed, 1);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',

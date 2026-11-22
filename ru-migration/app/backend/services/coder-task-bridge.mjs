@@ -27,7 +27,8 @@ async function readBody(req) {
 }
 
 export function createCoderTaskBridge({ queue, token } = {}) {
-  if (typeof queue?.claimSafeCoderTask !== 'function' || typeof queue?.finishSafeCoderTask !== 'function') {
+  if (typeof queue?.claimSafeCoderTask !== 'function' || typeof queue?.finishSafeCoderTask !== 'function'
+      || typeof queue?.getAgentTaskQueueHealth !== 'function') {
     throw new TypeError('coder task queue is required');
   }
   return async function handleCoderTaskBridge(req) {
@@ -41,6 +42,15 @@ export function createCoderTaskBridge({ queue, token } = {}) {
     const body = parsed.value;
     if (!body || typeof body !== 'object' || Array.isArray(body)) return json(400, { ok: false, error: 'invalid_body' });
     try {
+      if (body.action === 'health' && Object.keys(body).length === 1) {
+        const queueHealth = await queue.getAgentTaskQueueHealth();
+        const fields = ['queued', 'claimed', 'in_progress', 'failed_last_24h', 'expired_leases', 'oldest_queued_minutes'];
+        if (!queueHealth || typeof queueHealth !== 'object' || Array.isArray(queueHealth)
+            || fields.some(field => !Number.isSafeInteger(queueHealth[field]) || queueHealth[field] < 0 || queueHealth[field] > 10_000_000)) {
+          return json(502, { ok: false, error: 'invalid_queue_health' });
+        }
+        return json(200, { ok: true, queue: Object.fromEntries(fields.map(field => [field, queueHealth[field]])) });
+      }
       if (body.action === 'claim' && Object.keys(body).length === 1) {
         const task = await queue.claimSafeCoderTask({ workerId: WORKER_ID, leaseSeconds: 7200 });
         if (!task) return json(200, { ok: true, task: null });
