@@ -503,8 +503,8 @@ try {
   assert.equal(beforeDirectModeration.some(row => row.id === apiSubmission.body.id), true,
     'the separately API-approved item remains public');
   assert.equal(beforeDirectModeration.some(row => row.id === listing.id), false, 'pending content must not appear publicly');
-  assert.equal(await repo.moderateListing(listing.id, 'other-school', 'active'), false, 'other school cannot moderate');
-  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', 'active'), true, 'school moderator can approve pending listing');
+  assert.equal(await repo.moderateListing(listing.id, 'other-school', '33333333-3333-4333-8333-333333333333', 'active'), false, 'other school cannot moderate');
+  assert.equal(await repo.moderateListing(listing.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true, 'school moderator can approve pending listing');
   const publicListings = await repo.listActiveListings('synthetic-school');
   assert.equal(publicListings.some(row => row.id === apiSubmission.body.id), true);
   const publicDirectListing = publicListings.find(row => row.id === listing.id);
@@ -528,7 +528,7 @@ try {
   const deletable = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
     title: 'Своё синтетическое объявление', description: 'Проверка удаления владельцем', category: 'Учёба',
     price_text: 'Бесплатно', is_event: false, max_seats: 0, image_key: deletionPhotoKey, photo_status: 'approved', status: 'pending' });
-  assert.equal(await repo.moderateListing(deletable.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.moderateListing(deletable.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
   assert.equal(await repo.setFavorite('synthetic-user', deletable.id, true), true);
   assert.deepEqual((await listingsApi(apiRequest('GET', '/api/v1/me/listings', 'synthetic-registrant'))).body.listing_ids, [deletable.id],
     'private own-listing projection only returns the authenticated student’s active ids');
@@ -634,7 +634,7 @@ try {
   const limitedEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическая встреча с ограниченным числом мест', description: 'Проверка атомарной записи', category: 'Афиша',
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-01', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
-  assert.equal(await repo.moderateListing(limitedEvent.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.moderateListing(limitedEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
   const eventApiRequest = apiRequest('POST', `/api/v1/listings/${limitedEvent.id}/registrations`, 'synthetic-registrant', null);
   const registrationResponse = await listingsApi(eventApiRequest);
   assert.equal(registrationResponse.status, 201);
@@ -673,7 +673,7 @@ try {
   const concurrentEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическое мероприятие для гонки за местом', description: 'Параллельная проверка вместимости', category: 'Афиша',
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-03', event_time: '12:00', event_type: 'limited', max_seats: 1, status: 'pending' });
-  assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.moderateListing(concurrentEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
   const concurrentAttempts = await Promise.allSettled([
     repo.registerForEvent(concurrentEvent.id, '11111111-1111-4111-8111-111111111111'),
     repo.registerForEvent(concurrentEvent.id, '22222222-2222-4222-8222-222222222222'),
@@ -685,7 +685,7 @@ try {
   const reviewEvent = await repo.createListing({ user_id: '33333333-3333-4333-8333-333333333333', school_id: 'synthetic-school',
     title: 'Синтетическое мероприятие по заявкам', description: 'Проверка школьного решения', category: 'Афиша',
     price_text: 'Бесплатно', is_event: true, event_date: '2099-05-02', event_time: '12:00', event_type: 'request', max_seats: 0, status: 'pending' });
-  assert.equal(await repo.moderateListing(reviewEvent.id, 'synthetic-school', 'active'), true);
+  assert.equal(await repo.moderateListing(reviewEvent.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), true);
   const requestResponse = await listingsApi(apiRequest('POST', `/api/v1/listings/${reviewEvent.id}/registrations`, 'synthetic-registrant', null));
   assert.equal(requestResponse.status, 201);
   assert.equal(requestResponse.body.registration.status, 'pending');
@@ -724,7 +724,7 @@ try {
     photo_status: 'pending', status: 'pending' });
   assert.equal(await repo.claimPendingImageDeletion('33333333-3333-4333-8333-333333333333', photoKey), null,
     'an uploaded image cannot be discarded after it is atomically linked to a listing');
-  assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', 'active'), false,
+  assert.equal(await repo.moderateListing(photoListing.id, 'synthetic-school', '33333333-3333-4333-8333-333333333333', 'active'), false,
     'listing with pending photo cannot become public');
   assert.equal((await repo.listActiveListings('synthetic-school')).some(row => row.id === photoListing.id), false,
     'pending photo listing remains absent from the public projection');  const avatarKey = 'pending/11111111-1111-4111-8111-111111111111/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.webp';
