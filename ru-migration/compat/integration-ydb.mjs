@@ -1203,7 +1203,10 @@ try {
     ['database_request_failed', 'database', 'audit_frontend_runtime'],
     ['auth_backend_failed', 'auth', 'audit_frontend_runtime'],
   ].entries()) {
-    const eventBucket = new Date(Date.now() - (index + 1) * 25 * 60 * 60 * 1000);
+    await sql`DELETE FROM fam_site_error_counts WHERE event_code IN
+      ('js_runtime', 'unhandled_rejection', 'listings_load_failed', 'notifications_load_failed',
+        'database_request_failed', 'auth_backend_failed');`;
+    const eventBucket = new Date();
     eventBucket.setUTCMinutes(0, 0, 0);
     await sql`UPSERT INTO fam_site_error_counts
       (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
