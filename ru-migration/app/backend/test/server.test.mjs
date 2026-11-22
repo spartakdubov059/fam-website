@@ -17,6 +17,11 @@ test('isolated server serves the local FAM RU shell and its price formatter with
   await withServer({}, async origin => {
     const page = await fetch(origin);
     assert.equal(page.status, 200);
+    assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(page.headers.get('x-frame-options'), 'DENY');
+    assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(page.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+    assert.equal(page.headers.get('strict-transport-security'), 'max-age=31536000');
     const html = await page.text();
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'(?:;|$)/);
     assert.doesNotMatch(page.headers.get('content-security-policy'), /script-src[^;]*unsafe-inline/);
@@ -174,6 +179,11 @@ test('configured server reports full readiness only when object storage is confi
     for (const path of ['/api/health', '/api/v1/status']) {
       const response = await fetch(new URL(path, origin));
       assert.equal(response.status, 200);
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(response.headers.get('x-frame-options'), 'DENY');
+      assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+      assert.equal(response.headers.get('strict-transport-security'), 'max-age=31536000');
       assert.deepEqual(await response.json(), state);
     }
   });
@@ -290,6 +300,8 @@ test('isolated server returns Yandex OAuth redirects without proxying credential
     assert.equal(response.status, 302);
     assert.match(response.headers.get('location'), /^https:\/\/oauth\.yandex\.ru\/authorize/);
     assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
   });
   await withServer({}, async origin => {
     const response = await fetch(new URL('/auth/yandex/start', origin));
@@ -378,6 +390,8 @@ test('isolated server sends photo bytes with verified image headers instead of J
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'image/webp');
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
     assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0x52, 0x49, 0x46, 0x46]);
   });
 });
