@@ -97,9 +97,13 @@ try {
   repo.startRoleEmailVerification = async input => {
     try { return await reserveRoleEmailChallenge(input); }
     catch (error) {
-      const diagnostic = String(error?.message || 'unknown').replace(/https:\/\/issuer\.synthetic/g, '[issuer]')
+      const chain = [];
+      for (let current = error, depth = 0; current && depth < 3; current = current.cause, depth += 1) {
+        chain.push(`${current?.name || 'Error'}: ${String(current?.message || 'unknown')}`);
+      }
+      const diagnostic = chain.join(' <- ').replace(/https:\/\/issuer\.synthetic/g, '[issuer]')
         .replace(/subject-role-student/g, '[subject]').replace(/[a-f0-9]{64}/gi, '[digest]')
-        .replace(/\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi, '[id]').slice(0, 240);
+        .replace(/\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi, '[id]').slice(0, 600);
       console.error('YDB_ROLE_EMAIL_CHALLENGE_ERROR:', diagnostic);
       throw error;
     }
