@@ -86,6 +86,20 @@ window.supabase = {
 };
 `;
 
+function withSdkMockIntegrity(source, mock) {
+  const hash = `sha384-${createHash("sha384").update(mock).digest("base64")}`;
+  const withIntegrity = source.replace(
+    /(<script id="famSupabaseSdk" src="[^"]+") integrity="[^"]+"/,
+    `$1 integrity="${hash}"`
+  );
+  const withPolicy = withIntegrity.replace(
+    /(http-equiv="Content-Security-Policy" content="[^"]*script-src )/,
+    `$1'${hash}' `
+  );
+  assert.ok(withPolicy.includes(hash), "mock Supabase SDK must use matching SRI and CSP hashes");
+  return withPolicy;
+}
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 360, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const pageErrors = [];
@@ -122,13 +136,13 @@ try {
   await guestPage.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
-  await guestPage.setContent(html, { waitUntil: "domcontentloaded" });
+  await guestPage.setContent(withSdkMockIntegrity(html, guestSdkMock), { waitUntil: "domcontentloaded" });
   await guestPage.locator('#listingsGrid [data-action="open-auth"]').waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await guestPage.locator("#listingsGrid .l-card").count(), 0, "guest must not see school listings");
   assert.deepEqual(guestPageErrors, [], "guest board must not trigger JavaScript errors");
   await guestPage.close();
 
-  await page.setContent(html, { waitUntil: "domcontentloaded" });
+  await page.setContent(withSdkMockIntegrity(html, sdkMock), { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
   assert.equal(
     await page.locator("#listingsGrid .l-card").first().locator(".l-price").textContent(),
