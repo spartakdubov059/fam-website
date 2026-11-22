@@ -155,6 +155,7 @@ test("PR126 general planner runtime test cannot write or alter production", () =
   assert.match(integrationTrialWorkflow, /key: fam-qwen38-27b-iq2xs-v1/);
   assert.match(integrationTrialWorkflow, /НЕ вызывай isNaN\(isoOrMs\)/);
   assert.match(integrationTrialWorkflow, /Number\.isFinite\(t\)/);
+  assert.match(integrationTrialWorkflow, /evidence обязательно верни минимум одну точную ссылку/);
   assert.match(integrationTrialWorkflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
   assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
   assert.match(integrationTrialWorkflow, /QA="report_generation_failed"/);
@@ -167,6 +168,8 @@ test("general Qwen planner stays model-authored with compact JSON and independen
   assert.match(runner, /required: \["finding_status", "files", "plan"\]/);
   assert.match(runner, /\], planSchema, 650\)/);
   assert.match(runner, /required: \["unified_diff", "root_cause", "evidence"\]/);
+  assert.match(runner, /evidence: \{ type: "array", items: \{ type: "string" \}, minItems: 1, maxItems: 8 \}/);
+  assert.match(runner, /Если предлагаешь непустой unified_diff, evidence обязательно содержит минимум одну проверяемую ссылку/);
   assert.match(runner, /verifyModelEvidence\(response\.evidence, sourceByPath\)/);
   assert.match(runner, /Model proposed a patch without verifiable source evidence; patch withheld/);
   assert.match(runner, /if \(plan\.finding_status !== "issue_found"/);
