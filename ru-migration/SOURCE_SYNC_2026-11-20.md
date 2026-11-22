@@ -1,5 +1,11 @@
 # Сверка FAM source → RU на 20 ноября 2026
 
+## Дополнение: синхронизация двух последних миграций (22 ноября 2026)
+
+Повторная проверка текущих refs выявила, что reference-каталог в `migration/yandex-cloud` содержал 78 файлов `supabase/migrations`, хотя `origin/main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4` содержит 80. В RU-ветку добавлены два отсутствовавших исходника: `20261121190000_restrict_listings_to_authenticated_same_school.sql` и `20261122012818_restrict_listing_image_reads_to_school_members.sql`. Git blob SHA каждого файла побайтно совпадает с blob того же пути в `origin/main`; итоговый каталог содержит 80 файлов.
+
+Файлы добавлены как исходные reference-миграции для аудита переноса. SQL не запускался, Supabase не подключался, никакие production/RU данные или политики не менялись. Поведенческие соответствия в RU backend описаны в `SUPABASE_MIGRATION_INVENTORY_2026-11-20.md` и покрыты имеющимися API/media тестами; это не доказывает полноту облачного PostgreSQL RLS или S3 IAM.
+
 ## Source reference sync (21 ноября 2026)
 
 `origin/main` сейчас указывает на `8c89f17acf8c550a14e821e864254ee06a8d28f1`. Для точной сверки в изолированную ветку восстановлены девять отсутствовавших SQL migration-файлов и обновлены шесть различавшихся Supabase Edge Function source-файлов. SHA Git blob каждого из 15 файлов совпадает с `origin/main`; SQL snapshot теперь содержит все 78 миграций. Это обновляет только исходные reference-файлы на этой ветке: production, `main` и RU YDB backend не менялись, новые Supabase функции не развёртывались. Важно: актуальный `fam-listing-image-worker` сохраняет обработчик очереди фото идей, хотя миграция `20261117120000` удалила отдельный orphan cron, который вызывал отсутствовавший endpoint. Наличие кода функции не означает активного расписания; RU-копия по-прежнему использует ручную проверку и не вызывает этот worker или внешнюю модель. Синхронизация исходников не закрывает поведенческий паритет: RU варианты и оставшиеся отличия по этим объектам указаны в [SUPABASE_MIGRATION_INVENTORY_2026-11-20.md](SUPABASE_MIGRATION_INVENTORY_2026-11-20.md), [SOURCE_PARITY_UPDATE_2026-11-20.md](SOURCE_PARITY_UPDATE_2026-11-20.md) и [EDGE_FUNCTION_COVERAGE_2026-11-20.md](EDGE_FUNCTION_COVERAGE_2026-11-20.md).
