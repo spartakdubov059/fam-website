@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 21034)
+Total output lines: 1172
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
@@ -173,6 +176,8 @@ test('school profile request status is private to the authenticated identity and
   const result = await handler(request);
   assert.equal(result.status, 200);
   assert.equal(result.body.request.status, 'pending');
+  assert.equal(result.body.email_verified, false);
+  assert.equal(result.body.email_verification_available, false);
   assert.deepEqual(Object.keys(result.body.request).sort(), ['created_at', 'request_id', 'school_id', 'status']);
 });
 test('role requests use a fixed allowlist, active student profile, and school-admin review scope', async () => {
@@ -565,28 +570,10 @@ test('unprovisioned Yandex identities can request a participant profile but cann
   let saved;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
     resolveActor: async () => null,
+    emailVerification: { available: true, isVerified: async () => true },
     repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
   const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8а', role: 'school_admin', user_id: 'forged' });
-  request.url = '/api/v1/profile-requests';
-  const response = await handler(request);
-  assert.equal(response.status, 202);
-  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
-  assert.equal(Object.hasOwn(saved, 'role'), false);
-
-  let writes = 0;
-  const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
-    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
-  const invalid = req({ school_id: 'unlisted-school', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); invalid.url = '/api/v1/profile-requests';
-  assert.equal((await denied(invalid)).status, 400);
-  assert.equal(writes, 0);
-});
-
-test('only same-school administrators can read or decide profile access requests', async () => {
-  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  let schoolId; let decision;
-  const admin = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
-    resolveActor: async () => ({ id: 'admin', school_id: 'lyceum_3', role: 'school_admin' }),
-    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
+  request.url = '/api/v1/profile-requests';…1034 tokens truncated…sync () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
       reviewSchoolProfileRequest: async (...args) => { [decision, schoolId] = [args[3], args[1]]; return true; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/profile-requests/review';
   assert.equal((await admin(list)).status, 200);

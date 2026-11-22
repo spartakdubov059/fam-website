@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 25084)
+Total output lines: 1215
+
 import { submitListing } from './submit-listing.mjs';
 import { submitIdea } from './submit-idea.mjs';
 import { submitMessage } from './submit-message.mjs';
@@ -259,8 +262,41 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.getSchoolProfileRequest !== 'function') return { status: 503, body: { ok: false, error: 'profile_request_status_unavailable' } };
       try {
         const request = await repository.getSchoolProfileRequest(identity.issuer, identity.subject);
-        return { status: 200, body: { ok: true, request } };
+        return { status: 200, body: { ok: true, request,
+          email_verified: await roleEmailVerification.isVerified(identity),
+          email_verification_available: roleEmailVerification.available === true } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/profile-requests/email-verification') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.id) return { status: 409, body: { ok: false, error: 'profile_exists' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      try {
+        if (input?.action === 'send') {
+          const result = await roleEmailVerification.startForIdentity(identity, functionContext?.token?.access_token);
+          if (result?.ok) return { status: result.already_verified ? 200 : 202,
+            body: { ok: true, sent: result.sent === true, already_verified: result.already_verified === true } };
+          const status = ['email_send_cooldown', 'email_send_rate_limited'].includes(result?.code) ? 429
+            : result?.code === 'verified_email_required' ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable',
+            ...(Number.isSafeInteger(result?.retry_after_seconds) ? { retry_after_seconds: result.retry_after_seconds } : {}) } };
+        }
+        if (input?.action === 'verify') {
+          const result = await roleEmailVerification.verifyForIdentity(identity, input.code);
+          if (result?.ok && result.verified) return { status: 200, body: { ok: true, email_verified: true } };
+          const status = ['verification_code_expired', 'verification_code_locked'].includes(result?.code) ? 410
+            : result?.code === 'invalid_verification_code' ? 400 : result?.code === 'verified_email_required' ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable' } };
+        }
+        return { status: 400, body: { ok: false, error: 'invalid_email_verification_action' } };
+      } catch { return { status: 503, body: { ok: false, error: 'email_verification_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/role-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
@@ -431,236 +467,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
         const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
         const digits = (reason.match(/[0-9]/g) || []).length;
         const hasContact = /https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(reason) || digits >= 11;
-        if (![24, 72, 168].includes(durationHours)) return { status: 400, body: { ok: false, error: 'invalid_duration' } };
-        if (reason.length < 15 || reason.length > 400 || hasContact) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
-        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_suspend_self' } };
-        if (typeof repository?.issueAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
-        try {
-          const result = await repository.issueAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id, durationHours, reason });
-          return result?.ok ? { status: 201, body: { ok: true, suspension: result.suspension } }
-            : { status: result?.code === 'target_unavailable' ? 404 : result?.code === 'already_suspended' ? 409 : 403, body: { ok: false, error: result?.code || 'suspension_failed' } };
-        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-      }
-      if (input?.action === 'lift') {
-        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_manage_self' } };
-        if (typeof repository?.liftAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
-        try {
-          const lifted = await repository.liftAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id });
-          return lifted ? { status: 200, body: { ok: true, status: 'lifted' } }
-            : { status: 409, body: { ok: false, error: 'suspension_unavailable' } };
-        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-      }
-      return { status: 400, body: { ok: false, error: 'invalid_action' } };
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/me/suspension') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
-      if (typeof repository?.getActiveAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
-      try {
-        const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
-        return { status: 200, body: { ok: true, suspended: Boolean(suspension), suspension } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/targets') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      if (typeof repository?.listAccountDeletionTargets !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
-      try { return { status: 200, body: { ok: true, targets: await repository.listAccountDeletionTargets(actor.school_id, actor.id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      if (typeof repository?.listOwnAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
-      try { return { status: 200, body: { ok: true, requests: await repository.listOwnAccountDeletionRequests(actor.school_id, actor.id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/review') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listPendingAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
-      try { return { status: 200, body: { ok: true, requests: await repository.listPendingAccountDeletionRequests(actor.school_id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    const deletionReview = pathname.match(/^\/api\/v1\/deletion-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
-    if (req.method === 'PATCH' && deletionReview) {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      let input;
-      try {
-        const chunks = []; let bytes = 0;
-        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
-        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      if (input?.decision !== 'reject') return { status: 400, body: { ok: false, error: 'unsupported_decision' } };
-      const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
-      if (typeof repository?.rejectAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
-      try {
-        const rejected = await repository.rejectAccountDeletionRequest(deletionReview[1], actor.school_id, actor.id, note);
-        return rejected ? { status: 200, body: { ok: true, status: 'rejected' } }
-          : { status: 409, body: { ok: false, error: 'request_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'POST' && pathname === '/api/v1/deletion-requests') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      let input;
-      try {
-        const chunks = []; let bytes = 0;
-        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
-        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      const targetId = typeof input?.target_id === 'string' ? input.target_id : '';
-      const reasonCode = input?.reason_code;
-      const reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetId) || targetId === actor.id) {
-        return { status: 400, body: { ok: false, error: 'invalid_target' } };
-      }
-      if (!['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(reasonCode)) return { status: 400, body: { ok: false, error: 'invalid_reason_code' } };
-      if (reason.length < 15 || reason.length > 500) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
-      const digits = reason.replace(/\D/g, '');
-      if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason) || digits.length >= 11) {
-        return { status: 400, body: { ok: false, error: 'personal_contact_not_allowed' } };
-      }
-      if (typeof repository?.createAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
-      try {
-        const result = await repository.createAccountDeletionRequest({ schoolId: actor.school_id, requesterId: actor.id, targetId, reasonCode, reason });
-        return result?.ok ? { status: result.already_exists ? 200 : 202, body: result }
-          : { status: result?.code === 'requester_unavailable' ? 403 : 404, body: { ok: false, error: result?.code || 'request_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'PATCH' && roleRequestMatch) {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      let input;
-      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      try {
-        if (input?.action === 'start_review') {
-          const started = await repository.startSchoolRoleRequestReview(roleRequestMatch[1], actor.school_id, actor.id);
-          return started ? { status: 200, body: { ok: true, status: 'reviewing' } } : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
-        }
-        if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
-        const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
-        const updated = await repository.reviewSchoolRoleRequest(roleRequestMatch[1], actor.school_id, actor.id, input.decision, note);
-        return updated ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
-          : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let input;
-      try {
-        const chunks = []; let bytes = 0;
-        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
-        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      const result = await requestSchoolProfile({ identity, input, repository });
-      const status = result.ok ? 202 : result.code === 'profile_exists' ? 409
-        : result.code === 'database_unavailable' ? 503 : 400;
-      return { status, body: result };
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/profile-requests/review') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listPendingSchoolProfileRequests !== 'function') return { status: 503, body: { ok: false, error: 'profile_review_unavailable' } };
-      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolProfileRequests(actor.school_id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/staff-verifications') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listPendingSchoolStaffVerifications !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
-      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolStaffVerifications(actor.school_id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'PATCH' && staffVerificationMatch) {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      let input;
-      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      if (!['approved', 'rejected'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
-      if (typeof repository?.reviewSchoolStaffVerification !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
-      try {
-        const changed = await repository.reviewSchoolStaffVerification({ userId: staffVerificationMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
-        return changed ? { status: 200, body: { ok: true, status: input.decision } }
-          : { status: 404, body: { ok: false, error: 'staff_verification_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'PATCH' && profileRequestMatch) {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      let input;
-      try {
-        const chunks = []; let bytes = 0;
-        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
-        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
-      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
-      try {
-        const changed = await repository.reviewSchoolProfileRequest(profileRequestMatch[1], actor.school_id, actor.id, input.decision);
-        return changed ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
-          : { status: 404, body: { ok: false, error: 'profile_request_unavailable' } };
-      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/listings/moderation') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listPendingListings !== 'function') return { status: 503, body: { ok: false, error: 'moderation_unavailable' } };
-      try { return { status: 200, body: { ok: true, listings: await repository.listPendingListings(actor.school_id) } }; }
-      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
-    }
-    if (req.method === 'GET' && pathname === '/api/v1/school/ideas') {
-      let identity; try { identity = await authenticate(req); } catch { identity = null; }
-      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
-      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
-      const suspensionBlock = await schoolRoleSuspensionGate(actor);
-      if (suspensionBlock) return suspensionBlock;
-      if (typeof repository?.listPendingSchoolIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
-      try { return { status: 200, body: { ok: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id, actor.role) } }; }
+        if (![24, 72, 168].includes(durationHours)) return { status: 400, body: { ok: false, e…5084 tokens truncated…: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id, actor.role) } }; }
       catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/school/ideas/workflow') {

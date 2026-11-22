@@ -125,6 +125,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/schools')
       || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests')
+      || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests/email-verification')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/staff-verifications')
