@@ -68,6 +68,69 @@ test('coder producer creates only one bounded task from allowlisted aggregate ev
   await assert.rejects(queue.enqueueSafeCoderTask('2026-11-20T03:11'), /coder slot/);
 });
 
+test('coder producer maps every upstream technical event to a fixed aggregate audit task', async () => {
+  const cases = [
+    ['js_runtime', 'audit_frontend_runtime'],
+    ['unhandled_rejection', 'audit_frontend_runtime'],
+    ['listings_load_failed', 'audit_client_resilience'],
+    ['notifications_load_failed', 'audit_client_resilience'],
+    ['database_request_failed', 'audit_client_resilience'],
+    ['auth_backend_failed', 'audit_client_resilience'],
+  ];
+  for (const [eventCode, expectedTaskKey] of cases) {
+    const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+      ? [[{ event_code: eventCode, page_area: 'other', occurrences: 3 }]] : [[]]);
+    const queue = createYdbAgentTaskQueue(sql);
+    const result = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+    const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks'));
+    const payload = JSON.parse(insert.values.find(value => typeof value === 'string' && value.includes('"task_key"')));
+    assert.equal(result.created, true, eventCode);
+    assert.equal(payload.task_key, expectedTaskKey, eventCode);
+    assert.equal(payload.event_code, eventCode, eventCode);
+    assert.match(calls.find(call => call.query.includes('SUM(event_count)')).query, /notifications_load_failed.*database_request_failed.*auth_backend_failed/s);
+  }
+});
+
+test('coder producer refuses unknown aggregate event codes even if returned by the database', async () => {
+  const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+    ? [[{ event_code: 'unlisted_event', page_area: 'other', occurrences: 3 }]] : [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.deepEqual(await queue.enqueueSafeCoderTask('2026-11-20T03:15'),
+    { created: false, reason: 'no_threshold_event' });
+  assert.equal(calls.some(call => call.query.includes('INSERT INTO fam_agent_tasks')), false);
+});
+
+test('coder queue health returns only bounded aggregate status fields', async () => {
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('GROUP BY status')) return [[
+      { status: 'queued', count: '4' }, { status: 'claimed', count: 1 }, { status: 'in_progress', count: 2 },
+      { status: 'failed', count: 7 }, { status: 'completed', count: 10 },
+    ]];
+    if (query.includes("status = 'failed'")) return [[{ count: '3' }]];
+    if (query.includes("lease_expires_at <= CurrentUtcTimestamp()")) return [[{ count: 1 }]];
+    if (query.includes('MIN(created_at)')) return [[{ oldest_queued_at: new Date(Date.now() - 17 * 60_000) }]];
+    return [[]];
+  });
+  const health = await createYdbAgentTaskQueue(sql).getAgentTaskQueueHealth();
+  assert.deepEqual(Object.keys(health).sort(), [
+    'claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued',
+  ]);
+  assert.equal(health.queued, 4);
+  assert.equal(health.claimed, 1);
+  assert.equal(health.in_progress, 2);
+  assert.equal(health.failed_last_24h, 3);
+  assert.equal(health.expired_leases, 1);
+  assert.ok(health.oldest_queued_minutes >= 17 && health.oldest_queued_minutes <= 18);
+  assert.ok(calls.every(({ query }) => !/payload_json|result_summary|school_id|user_id/.test(query)));
+});
+
+test('coder queue health rejects invalid statuses and unbounded counts', async () => {
+  const invalidStatus = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'unknown', count: 1 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(invalidStatus).getAgentTaskQueueHealth(), /invalid agent task status/);
+  const excessiveCount = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'queued', count: 10_000_001 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(excessiveCount).getAgentTaskQueueHealth(), /invalid agent task count/);
+});
+
 test('coder producer caps 24-hour event aggregates to the bridge payload limit', async () => {
   const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
     ? [[{ event_code: 'js_runtime', page_area: 'other', occurrences: 24_000 }]] : [[]]);

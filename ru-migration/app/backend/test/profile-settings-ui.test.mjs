@@ -34,6 +34,18 @@ test('unauthenticated profile request stays quiet and exposes no account control
   assert.deepEqual(f.shell.children, [f.listingForm]);
 });
 
+test('profile directs email management to Yandex ID without storing the provider email in FAM', async () => {
+  const f = fixture();
+  await initializeProfileSettings({ ...f, fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true,
+    profile: { id: 'student-user', first_name: 'Аня', person_type: 'student' } }) }) });
+  const section = f.shell.children[0];
+  assert.match(section.children[2].textContent, /использует адрес из Яндекс ID.*не сохраняет его в школьном профиле/);
+  const link = section.children.find(item => item.tagName === 'a');
+  assert.equal(link.href, 'https://id.yandex.ru/');
+  assert.equal(link.target, '_blank');
+  assert.equal(link.rel, 'noopener noreferrer');
+});
+
 test('unavailable profile response does not expose profile editing controls', async () => {
   const f = fixture();
   await initializeProfileSettings({ ...f, fetchImpl: async () => ({ status: 503, ok: false, json: async () => ({ ok: false }) }) });

@@ -15,6 +15,8 @@ test('Yandex Postbox receives only a plaintext verification code over the fixed 
   assert.deepEqual(body.Destination.ToAddresses, ['student@example.test']);
   assert.match(body.Content.Simple.Body.Text.Data, /123456/);
   assert.equal(Object.hasOwn(body, 'CcAddresses'), false);
+  await send({ to: 'student@example.test', code: '654321', accessToken: 'synthetic-function-iam-token-0123456789', purpose: 'step_up' });
+  assert.equal(JSON.parse(call[1].body).Content.Simple.Subject.Data, 'Код подтверждения входа FAM');
 });
 
 test('Yandex Postbox sender rejects unsafe addresses, codes and non-success responses', async () => {

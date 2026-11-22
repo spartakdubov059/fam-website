@@ -93,9 +93,7 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
         if (!identity) return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
         let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
         const isOwner = Boolean(actor?.id && listing.user_id && actor.id === listing.user_id);
-        if (!actor || (!isOwner
-            && (actor.school_id !== listing.school_id || (listing.status !== 'active'
-              && !['school_admin', 'council_member'].includes(actor.role))))) {
+        if (!actor || (!isOwner && (actor.school_id !== listing.school_id || listing.status !== 'active'))) {
           return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
         }
       }

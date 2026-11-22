@@ -13,6 +13,10 @@ test('fresh confirmation accepts only a recent provider-authenticated timestamp'
 
 test('OAuth consent and local session issuance never count as fresh authentication', () => {
   const consentAt = now / 1000;
-  assert.equal(hasFreshConfirmation({ authenticated_at: null, step_up_confirmed_at: consentAt }, now), false);
   assert.equal(hasFreshConfirmation({ authenticated_at: null, session_issued_at: consentAt }, now), false);
+});
+
+test('fresh signed step-up confirmation is accepted only within its short window', () => {
+  assert.equal(hasFreshConfirmation({ step_up_confirmed_at: now / 1000 }, now), true);
+  assert.equal(hasFreshConfirmation({ step_up_confirmed_at: now / 1000 - 601 }, now), false);
 });

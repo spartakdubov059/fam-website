@@ -2,7 +2,15 @@ name: FAM RU SDK compatibility (staging only)
 
 on:
   push:
-    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next"]
+    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next", "codex/fam-ru-photo-access-guard"]
+    paths:
+      - "ru-migration/compat/**"
+      - "ru-migration/app/backend/**"
+      - "ru-migration/app/web/**"
+      - "ru-migration/deploy/**"
+      - ".github/workflows/fam-ru-sdk-compat.yml"
+  pull_request:
+    branches: ["migration/yandex-cloud"]
     paths:
       - "ru-migration/compat/**"
       - "ru-migration/app/backend/**"

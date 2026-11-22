@@ -11,6 +11,7 @@ const POSTCODE_RE = /(?:почтов(?:ый|ого)\s+индекс|индекс)
 // Offline screening is only a reason to hold material for a trusted human;
 // these rules never approve or reject safety-sensitive content by themselves.
 const SENSITIVE_SAFETY_REVIEW_RULES = [
+  { code: "sensitive_data_safety_review", pattern: /(?:^|[^\p{L}\p{N}])(?:пришли|пришлите|скинь|скиньте|сообщи|сообщите|отправь|отправьте|продиктуй|продиктуйте|покажи|покажите|назови|назовите)(?=$|[^\p{L}\p{N}])[\s\S]{0,60}(?:парол[\p{L}]*|код(?:\s+(?:из\s+)?смс)?|код подтверждения|cvv|cvc|пин(?:-?код)?|номер(?:\s+банковской)?\s+карты|паспорт[\p{L}]*|адрес прописки|домашний адрес)/iu },
   { code: "self_harm_safety_review", pattern: /(?:самоубийств[\p{L}]*|суицид[\p{L}]*|самоповрежден[\p{L}]*|покончить\s+с\s+собой|(?:хочу|планирую|думаю)\s+(?:убить|лишить\s+жизни)\s+себя|режу\s+себя|порезал(?:а|и)?\s+себя)/iu },
   { code: "sexual_safety_review", pattern: /(?:сексуальн[\p{L}]*\s+(?:насили[\p{L}]*|домогательств[\p{L}]*|принуждени[\p{L}]*|эксплуатац[\p{L}]*)|изнасилован[\p{L}]*|непристойн[\p{L}]*\s+(?:предложени[\p{L}]*|прикосновени[\p{L}]*))/iu },
   { code: "violence_safety_review", pattern: /(?:насили[\p{L}]*|нападени[\p{L}]*|побо[\p{L}]*|избил[\p{L}]*|травл[\p{L}]*|буллинг)/iu },

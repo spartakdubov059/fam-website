@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import { createRequestHandler } from './server.mjs';
+import { createRequestHandler, SECURITY_HEADERS } from './server.mjs';
 
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9a-z-]+$/i;
 
@@ -70,7 +70,7 @@ function responseHeaders(headers) {
 }
 
 function toFunctionResponse(statusCode, headers, body) {
-  const normalized = responseHeaders(headers);
+  const normalized = responseHeaders({ ...(headers || {}), ...SECURITY_HEADERS });
   const bytes = Buffer.isBuffer(body) || body instanceof Uint8Array ? Buffer.from(body) : Buffer.from(body ?? '');
   const contentType = Object.entries(normalized.headers).find(([name]) => name.toLowerCase() === 'content-type')?.[1] || '';
   const binary = /^(?:image\/|application\/octet-stream|application\/pdf)/i.test(contentType);

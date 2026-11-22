@@ -259,8 +259,41 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (typeof repository?.getSchoolProfileRequest !== 'function') return { status: 503, body: { ok: false, error: 'profile_request_status_unavailable' } };
       try {
         const request = await repository.getSchoolProfileRequest(identity.issuer, identity.subject);
-        return { status: 200, body: { ok: true, request } };
+        return { status: 200, body: { ok: true, request,
+          email_verified: await roleEmailVerification.isVerified(identity),
+          email_verification_available: roleEmailVerification.available === true } };
       } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/profile-requests/email-verification') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.id) return { status: 409, body: { ok: false, error: 'profile_exists' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      try {
+        if (input?.action === 'send') {
+          const result = await roleEmailVerification.startForIdentity(identity, functionContext?.token?.access_token);
+          if (result?.ok) return { status: result.already_verified ? 200 : 202,
+            body: { ok: true, sent: result.sent === true, already_verified: result.already_verified === true } };
+          const status = ['email_send_cooldown', 'email_send_rate_limited'].includes(result?.code) ? 429
+            : result?.code === 'verified_email_required' ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable',
+            ...(Number.isSafeInteger(result?.retry_after_seconds) ? { retry_after_seconds: result.retry_after_seconds } : {}) } };
+        }
+        if (input?.action === 'verify') {
+          const result = await roleEmailVerification.verifyForIdentity(identity, input.code);
+          if (result?.ok && result.verified) return { status: 200, body: { ok: true, email_verified: true } };
+          const status = ['verification_code_expired', 'verification_code_locked'].includes(result?.code) ? 410
+            : result?.code === 'invalid_verification_code' ? 400 : result?.code === 'verified_email_required' ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable' } };
+        }
+        return { status: 400, body: { ok: false, error: 'invalid_email_verification_action' } };
+      } catch { return { status: 503, body: { ok: false, error: 'email_verification_unavailable' } }; }
     }
     if (req.method === 'GET' && pathname === '/api/v1/role-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
@@ -570,6 +603,11 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
     if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let emailVerified;
+      try { emailVerified = await roleEmailVerification.isVerified(identity); }
+      catch { return { status: 503, body: { ok: false, error: 'email_verification_unavailable' } }; }
+      if (!emailVerified) return { status: roleEmailVerification.available ? 403 : 503,
+        body: { ok: false, error: roleEmailVerification.available ? 'email_verification_required' : 'email_verification_unavailable' } };
       let input;
       try {
         const chunks = []; let bytes = 0;
@@ -941,8 +979,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
-      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [], listings: [] } };
+      if (!actor?.id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
       if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
       try {
         const listing_ids = await repository.listOwnActiveListingIds(actor.id);

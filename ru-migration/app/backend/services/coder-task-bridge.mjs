@@ -3,6 +3,10 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 const WORKER_ID = 'fam-agent-qwen-coder-v1';
 const MAX_BODY_BYTES = 2048;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CODER_TASK_KEYS = new Set(['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility']);
+const CODER_EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'listings_load_failed',
+  'notifications_load_failed', 'database_request_failed', 'auth_backend_failed']);
+const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other']);
 
 function matchesSecret(provided, expected) {
   if (typeof provided !== 'string' || !provided || typeof expected !== 'string' || Buffer.byteLength(expected) < 32) return false;
@@ -23,7 +27,8 @@ async function readBody(req) {
 }
 
 export function createCoderTaskBridge({ queue, token } = {}) {
-  if (typeof queue?.claimSafeCoderTask !== 'function' || typeof queue?.finishSafeCoderTask !== 'function') {
+  if (typeof queue?.claimSafeCoderTask !== 'function' || typeof queue?.finishSafeCoderTask !== 'function'
+      || typeof queue?.getAgentTaskQueueHealth !== 'function') {
     throw new TypeError('coder task queue is required');
   }
   return async function handleCoderTaskBridge(req) {
@@ -37,13 +42,22 @@ export function createCoderTaskBridge({ queue, token } = {}) {
     const body = parsed.value;
     if (!body || typeof body !== 'object' || Array.isArray(body)) return json(400, { ok: false, error: 'invalid_body' });
     try {
+      if (body.action === 'health' && Object.keys(body).length === 1) {
+        const queueHealth = await queue.getAgentTaskQueueHealth();
+        const fields = ['queued', 'claimed', 'in_progress', 'failed_last_24h', 'expired_leases', 'oldest_queued_minutes'];
+        if (!queueHealth || typeof queueHealth !== 'object' || Array.isArray(queueHealth)
+            || fields.some(field => !Number.isSafeInteger(queueHealth[field]) || queueHealth[field] < 0 || queueHealth[field] > 10_000_000)) {
+          return json(502, { ok: false, error: 'invalid_queue_health' });
+        }
+        return json(200, { ok: true, queue: Object.fromEntries(fields.map(field => [field, queueHealth[field]])) });
+      }
       if (body.action === 'claim' && Object.keys(body).length === 1) {
         const task = await queue.claimSafeCoderTask({ workerId: WORKER_ID, leaseSeconds: 7200 });
         if (!task) return json(200, { ok: true, task: null });
         if (!UUID.test(task.id || '') || !UUID.test(task.claim_token || '')
-            || !['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility'].includes(task.task_key)
-            || !['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(task.event_code)
-            || !['auth', 'listings', 'notifications', 'database', 'other'].includes(task.page_area)
+            || !CODER_TASK_KEYS.has(task.task_key)
+            || !CODER_EVENT_CODES.has(task.event_code)
+            || !PAGE_AREAS.has(task.page_area)
             || !Number.isInteger(task.occurrences) || task.occurrences < 0 || task.occurrences > 1000) {
           return json(502, { ok: false, error: 'invalid_task_shape' });
         }

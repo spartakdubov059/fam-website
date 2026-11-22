@@ -53,3 +53,23 @@ test('email delivery failure clears the active challenge and never returns code 
   assert.equal(JSON.stringify(result).includes('654321'), false);
   assert.equal(JSON.stringify(result).includes('student@example.test'), false);
 });
+
+test('unprovisioned Yandex identities can confirm their mailbox before creating a school profile', async () => {
+  let challenge; let sent;
+  const repository = {
+    startRoleEmailVerification: async value => { challenge = value; return { ok: true }; },
+    clearRoleEmailChallenge: async () => true,
+    verifyRoleEmailVerification: async value => ({ ok: value.codeDigest === challenge.codeDigest, verified: value.codeDigest === challenge.codeDigest }),
+    isRoleEmailVerified: async value => value.emailDigest === challenge.emailDigest,
+  };
+  const service = createRoleEmailVerification({ repository, verificationKey: 'synthetic verification key longer than 32 bytes',
+    sendEmail: async value => { sent = value; }, now: () => 1_800_000_000_000, createCode: () => '246810' });
+  const newIdentity = { issuer: 'https://login.yandex.ru', subject: 'new-yandex-user', email: 'new@example.test' };
+  assert.deepEqual(await service.startForIdentity(newIdentity, 'synthetic-yandex-function-token-0123456789'), { ok: true, sent: true });
+  assert.equal(challenge.userId, newIdentity.subject, 'pre-profile challenge is bound to the Yandex subject');
+  assert.equal(sent.to, newIdentity.email);
+  assert.equal(JSON.stringify(challenge).includes(newIdentity.email), false);
+  assert.equal(JSON.stringify(challenge).includes('246810'), false);
+  assert.deepEqual(await service.verifyForIdentity(newIdentity, '246810'), { ok: true, verified: true });
+  assert.equal(await service.isVerified(newIdentity), true);
+});
