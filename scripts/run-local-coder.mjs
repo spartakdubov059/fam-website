@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { postJson } from "./local-model-http.mjs";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildAgentReport } from "./fam-agent-report.mjs";
 import { assertRequiredFields, parseJson } from "./local-model-json.mjs";
 import { normalizeUnifiedDiffHunkCounts } from "./local-model-patch.mjs";
 import { isAllowedAgentPath } from "./validate-local-agent-patch.mjs";
+import { verifyModelEvidence } from "./local-model-evidence.mjs";
 
 const MODEL_URL =
   "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf";
@@ -335,8 +336,9 @@ const patchSchema = {
     properties: {
       unified_diff: { type: "string" },
       root_cause: { type: "string" },
+      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
     },
-    required: ["unified_diff", "root_cause"],
+    required: ["unified_diff", "root_cause", "evidence"],
   },
 };
 
@@ -355,12 +357,13 @@ const patchMessages = [
       "Для любой правки кода сайта сначала проверь существующие регрессионные тесты. Если тест уже покрывает дефект, не дублируй и не изменяй его. Добавляй новый тест только когда соответствующего теста нет. Не изменяй тесты ради маскировки ошибки.",
       "Если дефект не подтверждён переданным кодом, верни пустой unified_diff. Самостоятельно напиши исправление только если уверен в исходных строках.",
       "В root_cause укажи конкретную причину на основе исходника. Если данных недостаточно, оставь unified_diff пустым.",
+      "В evidence приведи не более 8 точных ссылок вида path:номер_строки: полный текст строки, скопированный из переданного source_context. Номер строки относится к реальному исходному файлу. Не указывай тесты или сведения, которых нет в source_context.",
       "Делай минимальный diff. Не переписывай целые файлы. Не придумывай невидимый код или API.",
       "unified_diff должен быть применим git apply и содержать заголовки diff --git a/path b/path, --- a/path, +++ b/path и корректный @@ hunk.",
       "ВАЖНО: для больших файлов передаются фрагменты с метаданными [Фрагмент path, строки X–Y]. В заголовке @@ используй реальные номера строк оригинального файла: первый фрагмент НЕ означает строку 1. Считай смещения внутри фрагмента, сохраняй точные строки и пробелы; если координаты нельзя восстановить, оставь diff пустым. Не подставляй произвольное @@ -1.",
       "Если не можешь достоверно выполнить задачу по предоставленным фрагментам, верни пустой diff.",
       "Все изменения проходят независимые тесты и ручное одобрение. Не меняй тесты безопасности или модерации.",
-      "Верни только два JSON-поля: unified_diff и root_cause.",
+      "Верни только три JSON-поля: unified_diff, root_cause и evidence.",
     ].join("\n"),
   },
   {
@@ -438,13 +441,18 @@ async function requestPatch(messages) {
   );
   if (narrowTimeAgo) return normalizeNarrowPatchResult(response);
   const diff = String(response.unified_diff || "").trim();
+  const sourceByPath = Object.fromEntries(selected.map((path) => [path, readFileSync(path, "utf8")]));
+  const evidence = verifyModelEvidence(response.evidence, sourceByPath);
+  const acceptedDiff = diff && evidence.length ? diff : "";
   return {
-    finding_status: diff ? "issue_found" : "blocked",
+    finding_status: acceptedDiff ? "issue_found" : (diff ? "needs_research" : "blocked"),
     problem_summary: task,
     root_cause: String(response.root_cause || ""),
-    evidence: [],
-    unified_diff: diff,
-    summary: "Unverified model-generated candidate; independent QA and owner approval required",
+    evidence,
+    unified_diff: acceptedDiff,
+    summary: diff && !evidence.length
+      ? "Model proposed a patch without verifiable source evidence; patch withheld"
+      : "Unverified model-generated candidate; independent QA and owner approval required",
     proposed_change: plan.plan,
     risk: "high",
     requires_approval: true,
@@ -567,6 +575,7 @@ const summary = buildAgentReport({
   requires_approval: patch ? result.requires_approval : true,
   tests: result.tests,
 });
+if (!patch) rmSync(join(outDir, "fam-agent.patch"), { force: true });
 writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 2) + "\n");
 
 if (!patch) {

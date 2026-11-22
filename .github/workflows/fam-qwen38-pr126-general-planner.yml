@@ -89,6 +89,9 @@ jobs:
           SUMMARY="$OUT/fam-agent/summary.json"
           PATCH="$OUT/fam-agent/fam-agent.patch"
           QA="model_or_inference_failed"
+          if [[ ! -s "$SUMMARY" && -s "$PATCH" ]]; then
+            QA="report_generation_failed"
+          fi
           if [[ -s "$SUMMARY" ]]; then
             HAS_PATCH="$(node -e "const s=require(process.argv[1]);process.stdout.write(String(s.patch_available===true))" "$SUMMARY")"
             if [[ "$HAS_PATCH" == true && -s "$PATCH" ]]; then
