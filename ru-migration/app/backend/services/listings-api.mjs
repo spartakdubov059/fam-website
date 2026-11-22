@@ -941,8 +941,7 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       let identity; try { identity = await authenticate(req); } catch { identity = null; }
       if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
-      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
-      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [], listings: [] } };
+      if (!actor?.id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
       if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
       try {
         const listing_ids = await repository.listOwnActiveListingIds(actor.id);
