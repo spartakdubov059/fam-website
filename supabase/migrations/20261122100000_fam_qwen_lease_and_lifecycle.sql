@@ -135,8 +135,12 @@ begin
   set status = v_status,
       result_summary = v_summary,
       finished_at = case when v_status = 'completed' then pg_catalog.now() else null end,
-      lease_expires_at = case when v_status in ('completed','failed','blocked') or p_stage = 'pr_created'
-        then null else t.lease_expires_at end,
+      lease_expires_at = case
+        when v_status in ('completed','failed','blocked') or p_stage = 'pr_created' then null
+        when p_stage in ('model_generated','qa_passed') then
+          pg_catalog.now() + pg_catalog.make_interval(secs => 7200)
+        else t.lease_expires_at
+      end,
       updated_at = pg_catalog.now()
   where t.id = p_task_id and t.agent_key = 'technical'
     and t.task_type = 'coder_patch_request' and t.approval_required = false

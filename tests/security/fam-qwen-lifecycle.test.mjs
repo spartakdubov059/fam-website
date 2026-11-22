@@ -27,6 +27,7 @@ test("model generation and QA do not mark an issue with a patch completed", () =
   const prStage = migration.match(/when 'pr_created' then([\s\S]*?)(?=when 'qa_failed')/)?.[1] ?? "";
   assert.ok(modelStage && qaStage && prStage);
   assert.doesNotMatch(modelStage + qaStage + prStage, /v_status := 'completed'/);
+  assert.match(migration, /when p_stage in \('model_generated','qa_passed'\) then[\s\S]*?make_interval\(secs => 7200\)/);
 });
 
 test("Qwen's bridge cannot claim owner approval, merge, or post-merge verification", () => {
