@@ -4,6 +4,7 @@ import { stdin, stdout } from 'node:process';
 import { Driver } from '@ydbjs/core';
 import { MetadataCredentialsProvider } from '@ydbjs/auth/metadata';
 import { query } from '@ydbjs/query';
+import { resolveYandexIdentityFromAccessToken } from './auth/yandex-access-token.mjs';
 import { createYdbListingsRepository } from './repositories/ydb-listings.mjs';
 
 const CONFIRMATION = 'I_CONFIRM_ONE_TIME_INITIAL_ADMIN_SETUP';
@@ -12,9 +13,39 @@ if (process.env.FAM_RU_ALLOW_INITIAL_ADMIN_BOOTSTRAP !== CONFIRMATION) {
   process.exit(2);
 }
 const databaseUrl = process.env.FAM_RU_DATABASE_URL;
-if (!databaseUrl) {
-  console.error('FAM_RU_DATABASE_URL is required.');
+const clientId = process.env.FAM_RU_YANDEX_CLIENT_ID;
+if (!databaseUrl || !clientId) {
+  console.error('FAM_RU_DATABASE_URL and FAM_RU_YANDEX_CLIENT_ID are required.');
   process.exit(2);
+}
+
+function readHidden(promptText) {
+  if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') throw new Error('interactive_terminal_required');
+  stdout.write(promptText);
+  return new Promise((resolve, reject) => {
+    const wasRaw = stdin.isRaw;
+    let value = '';
+    const finish = (error = null) => {
+      stdin.off('data', onData);
+      stdin.setRawMode(wasRaw);
+      stdin.pause();
+      stdout.write('\n');
+      if (error) reject(error); else resolve(value);
+    };
+    const onData = chunk => {
+      for (const character of String(chunk)) {
+        if (character === '\u0003') return finish(new Error('input_cancelled'));
+        if (character === '\r' || character === '\n') return finish();
+        if (character === '\u007f' || character === '\b') value = value.slice(0, -1);
+        else if (character >= ' ' && character !== '\u007f') value += character;
+        if (value.length > 4096) return finish(new Error('input_too_long'));
+      }
+    };
+    stdin.setRawMode(true);
+    stdin.setEncoding('utf8');
+    stdin.resume();
+    stdin.on('data', onData);
+  });
 }
 
 const prompt = createInterface({ input: stdin, output: stdout });
@@ -22,10 +53,12 @@ let driver;
 try {
   console.log('This creates the first school administrator in one Russian FAM school. It cannot be repeated for that school.');
   const schoolId = (await prompt.question('School ID (lyceum_3 or gymnasium_4): ')).trim();
-  const subject = (await prompt.question('Verified numeric Yandex ID subject: ')).trim();
   const firstName = (await prompt.question('First name: ')).trim();
   const lastName = (await prompt.question('Last name: ')).trim();
-  if (!['lyceum_3', 'gymnasium_4'].includes(schoolId) || !/^\d{1,32}$/.test(subject)
+  prompt.close();
+  const accessToken = await readHidden('Temporary Yandex OAuth access token (input hidden): ');
+  const identity = await resolveYandexIdentityFromAccessToken({ accessToken, clientId });
+  if (!['lyceum_3', 'gymnasium_4'].includes(schoolId)
       || !firstName || firstName.length > 80 || !lastName || lastName.length > 80) {
     throw new Error('invalid_operator_input');
   }
@@ -37,7 +70,7 @@ try {
   await driver.ready();
   const repository = createYdbListingsRepository(query(driver));
   const result = await repository.bootstrapInitialSchoolAdmin({
-    issuer: 'https://login.yandex.ru', subject, userId: randomUUID(), schoolId, firstName, lastName,
+    ...identity, userId: randomUUID(), schoolId, firstName, lastName,
   });
   if (!result.ok) {
     console.error(`Bootstrap refused: ${result.code}`);
