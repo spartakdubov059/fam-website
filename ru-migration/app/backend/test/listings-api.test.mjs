@@ -306,7 +306,7 @@ test('VM role email verification obtains a server IAM token without Cloud Functi
     verificationKey: 'test verification secret has at least thirty two bytes',
     sendRoleVerificationEmail: async value => { sent = value; },
     getPostboxAccessToken: async () => 'synthetic-vm-iam-token-0123456789',
-    now: () => 1_800_000_000_000 });
+    now: () => 1_800_000_000_000, createCode: () => '246810' });
   const request = req({ action: 'send' }); request.url = '/api/v1/role-requests/email-verification';
   assert.deepEqual(await handler(request), { status: 202, body: { ok: true, sent: true, already_verified: false } });
   assert.equal(sent.accessToken, 'synthetic-vm-iam-token-0123456789');
