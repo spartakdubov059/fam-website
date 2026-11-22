@@ -290,7 +290,6 @@ test('school role requests require Yandex email verification and only the verifi
   assert.equal(roleRequests, 1);
 });
 
-
 test('VM role email verification obtains a server IAM token without Cloud Functions context', async () => {
   const identity = { issuer: 'https://login.yandex.ru', subject: 'vm-synthetic-student', email: 'student@example.test' };
   const actor = { id: 'student-id', school_id: 'school-a', role: 'student' };
