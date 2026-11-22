@@ -1,4 +1,9 @@
 import test from "node:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import {
   extractPatchPaths,
@@ -35,7 +40,10 @@ test("local agent only accepts website, docs and safe test paths", () => {
   assert.equal(isAllowedAgentPath("index.html"), true);
   assert.equal(isAllowedAgentPath("css/style.css"), true);
   assert.equal(isAllowedAgentPath("js/app.js"), true);
-  assert.equal(isAllowedAgentPath("tests/security/example.test.mjs"), true);
+  assert.equal(isAllowedAgentPath("tests/ui/example.test.mjs"), true);
+  assert.equal(isAllowedAgentPath("tests/security/example.test.mjs"), false);
+  assert.equal(isAllowedAgentPath("tests/moderation/example.test.mjs"), false);
+  assert.equal(isAllowedAgentPath("tests/agent-benchmark/time-ago.test.mjs"), false);
   assert.equal(isAllowedAgentPath("assets/banner.webp"), true);
   assert.equal(isAllowedAgentPath("assets/vector.svg"), false);
   for (const path of [
@@ -77,7 +85,7 @@ test("CSS visual changes can be automated, but external resources need review", 
 test("HTML, JavaScript and test-suite changes always require review", () => {
   assert.equal(requiresManualApproval(lowRisk, filePatch("js/app.js", "const a = 1;", "const a = 2;")), true);
   assert.equal(requiresManualApproval(lowRisk, filePatch("index.html", "<title>Old</title>", "<title>New</title>")), true);
-  assert.equal(requiresManualApproval(lowRisk, filePatch("tests/security/test.mjs", "assert.ok(true);", "assert.ok(false);")), true);
+  assert.equal(requiresManualApproval(lowRisk, filePatch("tests/ui/test.mjs", "assert.ok(true);", "assert.ok(false);")), true);
 });
 
 test("critical output or active HTML content requires manual approval", () => {
@@ -105,4 +113,46 @@ test("validator rejects forbidden paths and approves only verified low-risk diff
     () => validateAgentPatch(forbidden, lowRisk),
     /outside the FAM agent allowlist/,
   );
+});
+
+test("generated patches cannot rewrite independent test suites", () => {
+  for (const path of [
+    "tests/security/fam-local-agent.test.mjs",
+    "tests/moderation/moderation-policy.test.mjs",
+    "tests/agent-benchmark/time-ago.test.mjs",
+  ]) {
+    assert.equal(isAllowedAgentPath(path), false, path);
+    assert.throws(
+      () => validateAgentPatch(filePatch(path, "assert.ok(true);", "assert.ok(false);"), lowRisk),
+      /outside the FAM agent allowlist/,
+      path,
+    );
+  }
+});
+
+test("validator CLI writes a single clean approval status for downstream PR jobs", () => {
+  const root = mkdtempSync(join(tmpdir(), "fam-validator-output-"));
+  try {
+    const patchPath = join(root, "candidate.patch");
+    const reportPath = join(root, "summary.json");
+    const outputPath = join(root, "github-output.txt");
+    writeFileSync(patchPath, validPatch + "\n");
+    writeFileSync(reportPath, JSON.stringify(lowRisk));
+    writeFileSync(outputPath, "");
+    const cliPath = fileURLToPath(new URL("../../scripts/validate-local-agent-patch.mjs", import.meta.url));
+    const run = spawnSync(process.execPath, [cliPath, patchPath, reportPath], {
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_OUTPUT: outputPath },
+    });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    assert.deepEqual(readFileSync(outputPath, "utf8").split("\n"), [
+      "requires_approval=false",
+      "changed_paths=docs/help.md",
+      "",
+    ]);
+    const parsed = JSON.parse(run.stdout);
+    assert.equal(parsed.requires_approval, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
