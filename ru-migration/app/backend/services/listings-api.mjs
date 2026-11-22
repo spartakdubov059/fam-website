@@ -1,1 +1,1182 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßnyÝ:-jZ.¶›­–)Þ³V–×÷'B²7V&Ö—DÆ—7F–ærÒg&öÒrâ÷7V&Ö—BÖÆ—7F–æræÖ§2s°¦–×÷'B²7V&Ö—D–FVÒg&öÒrâ÷7V&Ö—BÖ–FVæÖ§2s°¦–×÷'B²7V&Ö—DÖW76vRÒg&öÒrâ÷7V&Ö—BÖÖW76vRæÖ§2s°¦–×÷'B²—566†ööÄ6Æ74æÖRÒg&öÒrââ÷öÆ–6–W2÷66†ööÂÖ6FÆöræÖ§2s°¦–×÷'B²&WVW7E66†ööÅ&öf–ÆRÒg&öÒrâ÷&WVW7B×66†ööÂ×&öf–ÆRæÖ§2s°¦–×÷'B²7&VFU66†ööÅVÇ6T’Òg&öÒrâ÷66†ööÂ×VÇ6RÖ’æÖ§2s°¦–×÷'B²7&VFT66÷VçDFVÆWF–öä’Òg&öÒrâö66÷VçBÖFVÆWF–öâÖ’æÖ§2s°¦–×÷'B²44„ôôÅô4DÄôrÒg&öÒrââ÷öÆ–6–W2÷66†ööÂÖ6FÆöræÖ§2s°¦–×÷'B²7&VFU6—FTW'&÷%FVÆVÖWG'’Òg&öÒrâ÷6—FRÖW'&÷"×FVÆVÖWG'’æÖ§2s°¦–×÷'B²†4g&W6„6öæf—&ÖF–öâÒg&öÒrââöWF‚ög&W6‚Ö6öæf—&ÖF–öâæÖ§2s°¦–×÷'B²7&VFU&öÆTVÖ–ÅfW&–f–6F–öâÒg&öÒrâ÷&öÆRÖVÖ–Â×fW&–f–6F–öâæÖ§2s° ¦W‡÷'BgVæ7F–öâ7&VFTÆ—7F–æw4’‡²WF†VçF–6FRÂ&W6öÇfT7F÷"Â&W÷6—F÷'’Â&Wf–WrÂ6fWG”¶W’Â66†ööÇ2Ò44„ôôÅô4DÄôrÀ¢VæF–æt–ÖvW2ÒçVÆÂÂæ÷rÒFFRææ÷rÂfW&–f–6F–öä¶W’Â6VæE&öÆUfW&–f–6F–öäVÖ–ÂÂvWE÷7F&÷„66W75Fö¶VâÒçVÆÂÂVÖ–ÅfW&–f–6F–öâÒçVÆÂÒ’°¢6öç7B66†ööÅVÇ6T’Ò7&VFU66†ööÅVÇ6T’‡²WF†VçF–6FRÂ&W6öÇfT7F÷"Â&W÷6—F÷'’Âæ÷rÒ“°¢6öç7B66÷VçDFVÆWF–öä’Ò7&VFT66÷VçDFVÆWF–öä’‡²WF†VçF–6FRÂ&W6öÇfT7F÷"Â&W÷6—F÷'’ÂVæF–æt–ÖvW2Âæ÷rÒ“°¢6öç7B6—FTW'&÷%FVÆVÖWG'’Ò7&VFU6—FTW'&÷%FVÆVÖWG'’‡²&W÷6—F÷'’Âæ÷s¢‚’ÓâæWrFFR†æ÷r‚’’Ò“°¢6öç7B&öÆTVÖ–ÅfW&–f–6F–öâÒVÖ–ÅfW&–f–6F–öâÇÂ7&VFU&öÆTVÖ–ÅfW&–f–6F–öâ‡²&W÷6—F÷'’ÂfW&–f–6F–öä¶W’À¢6VæDVÖ–Ã¢6VæE&öÆUfW&–f–6F–öäVÖ–ÂÂæ÷rÒ“°¢6öç7BF—66&EVæÆ–æ¶VEVæF–æt–ÖvRÒ7–æ2‡W6W$–BÂ–ÖvT¶W’’Óâ°¢–b‡G—VöbVæF–æt–ÖvW3òæFVÆWFRÓÒvgVæ7F–öârÇÂG—Vöb&W÷6—F÷'“òæ6Æ–ÕVæF–æt–ÖvTFVÆWF–öâÓÒvgVæ7F–öâp¢ÇÂG—Vöb&W÷6—F÷'“òæf–æ—6…VæF–æt–ÖvT6ÆVçWÓÒvgVæ7F–öâr’&WGW&âfÇ6S°¢ÆWB6Æ–ÕFö¶VâÒçVÆÃ°¢G'’°¢6Æ–ÕFö¶VâÒv—B&W÷6—F÷'’æ6Æ–ÕVæF–æt–ÖvTFVÆWF–öâ‡W6W$–BÂ–ÖvT¶W’“°¢–b‚6Æ–ÕFö¶Vâ’&WGW&âfÇ6S°¢v—BVæF–æt–ÖvW2æFVÆWFR†–ÖvT¶W’“°¢&WGW&âv—B&W÷6—F÷'’æf–æ—6…VæF–æt–ÖvT6ÆVçW†–ÖvT¶W’Â6Æ–ÕFö¶VâÂG'VR“°¢Ò6F6‚°¢–b†6Æ–ÕFö¶Vâ’°¢G'’²v—B&W÷6—F÷'’æf–æ—6…VæF–æt–ÖvT6ÆVçW†–ÖvT¶W’Â6Æ–ÕFö¶VâÂfÇ6R“²Ò6F6‚²ò¢ÆV6RW‡—'’W&Ö—G2&WG'’¢òÐ¢Ð¢&WGW&âfÇ6S°¢Ð¢Ó°¢6öç7B66†ööÅ&öÆU7W7Vç6–öävFRÒ7–æ2†7F÷"’Óâ°¢–b‡G—Vöb&W÷6—F÷'“òævWD7F—fT66÷VçE7W7Vç6–öâÓÒvgVæ7F–öâr’°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w7W7Vç6–öå÷7FGW5÷Væf–Æ&ÆRrÒÓ°¢Ð¢G'’°¢6öç7B7W7Vç6–öâÒv—B&W÷6—F÷'’ævWD7F—fT66÷VçE7W7Vç6–öâ†7F÷"ç66†ööÅö–BÂ7F÷"æ–B“°¢&WGW&â7W7Vç6–öâò²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v66÷VçE÷7W7VæFVBrÒÒ¢çVÆÃ°¢Ò6F6‚°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ°¢Ð¢Ó°¢&WGW&â7–æ2gVæ7F–öâ†æFÆR‡&WÂgVæ7F–öä6öçFW‡BÒçVÆÂ’°¢6öç7BF†æÖRÒæWrU$Â‡&WçW&ÂÇÂròrÂv‡GG¢òöÆö6Æ†÷7Br’çF†æÖS°¢–b‡F†æÖRÓÓÒrö’÷cöæ÷F–f–6F–öâ×&VG2rbb‡&WæÖWF†öBÓÓÒttUBrÇÂ&WæÖWF†öBÓÓÒuõ5Br’’°¢ÆWB–FVçF—G“²G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#²G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷#òæ–B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢–b‡&WæÖWF†öBÓÓÒttUBr’°¢–b‡G—Vöb&W÷6—F÷'“òæÆ—7Dæ÷F–f–6F–öå&VE7FFW2ÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷F–f–6F–öå÷7FFU÷Væf–Æ&ÆRrÒÓ°¢G'’°¢6öç7Bæ÷F–f–6F–öä¶W—2Òv—B&W÷6—F÷'’æÆ—7Dæ÷F–f–6F–öå&VE7FFW2†7F÷"æ–B“°¢–b‚'&’æ—4'&’†æ÷F–f–6F–öä¶W—2’ÇÂæ÷F–f–6F–öä¶W—2æÆVæwF‚âó’°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷F–f–6F–öå÷7FFUö–æ6ö×ÆWFRrÒÓ°¢Ð¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂæ÷F–f–6F–öåö¶W—3¢æ÷F–f–6F–öä¶W—2æÖ‡&÷rÓâ&÷rææ÷F–f–6F–öåö¶W’’ÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢ÆWB–çWC°¢G'’°¢6öç7B6‡Væ·2ÒµÓ²ÆWB'—FW2Ò°¢f÷"v—B†6öç7B6‡Væ²öb&W’²'—FW2³Ò6‡Væ²æÆVæwFƒ²–b†'—FW2âb¢#B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&WVW7E÷FöõöÆ&vRrÒÓ²6‡Væ·2çW6‚†6‡Væ²“²Ð¢–çWBÒ¥4ôâç'6R„'VffW"æ6öæ6B†6‡Væ·2’çFõ7G&–ær‚wWFc‚r’“°¢Ò6F6‚²&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–çfÆ–Eö§6öârÒÓ²Ð¢6öç7B¶W—2Ò–çWCòææ÷F–f–6F–öåö¶W—3°¢–b‚'&’æ—4'&’†¶W—2’ÇÂ¶W—2æÆVæwF‚âÇÂ¶W—2ç6öÖR†¶W’ÓâG—Vöb¶W’ÓÒw7G&–ærp¢ÇÂ¶W’æÆVæwF‚ÂÇÂ¶W’æÆVæwF‚â##ÇÂõµÇSÕÇSeÇSveÒ÷RçFW7B†¶W’’’’°¢&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–çfÆ–Eöæ÷F–f–6F–öåö¶W—2rÒÓ°¢Ð¢–b‡G—Vöb&W÷6—F÷'“òç6fTæ÷F–f–6F–öå&VE7FFW2ÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷F–f–6F–öå÷7FFU÷Væf–Æ&ÆRrÒÓ°¢G'’°¢v—B&W÷6—F÷'’ç6fTæ÷F–f–6F–öå&VE7FFW2†7F÷"æ–BÂ²ââææWr6WB†¶W—2•Ò“°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b‡&WæÖWF†öBÓÓÒttUBrbbF†æÖRÓÓÒrö’÷cöæ÷F–f–6F–öç2öÆ—7F–æw2r’°¢ÆWB–FVçF—G“²G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#²G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷#òæ–BÇÂ7F÷"ç66†ööÅö–B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢–b‡G—Vöb&W÷6—F÷'“òæÆ—7E&V6VçE66†ööÄæ÷F–f–6F–öäÆ—7F–æw2ÓÒvgVæ7F–öâr’°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷F–f–6F–öåöfVVE÷Væf–Æ&ÆRrÒÓ°¢Ð¢G'’°¢6öç7B&÷w2Òv—B&W÷6—F÷'’æÆ—7E&V6VçE66†ööÄæ÷F–f–6F–öäÆ—7F–æw2†7F÷"ç66†ööÅö–BÂ7F÷"æ–B“°¢–b‚'&’æ—4'&’‡&÷w2’ÇÂ&÷w2æÆVæwF‚â‚’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷F–f–6F–öåöfVVEö–æ6ö×ÆWFRrÒÓ°¢6öç7BÆ—7F–æw2Ò&÷w2æÖ‡&÷rÓâ‡°¢–C¢G—Vöb&÷sòæ–BÓÓÒw7G&–ærrò&÷ræ–B¢rrÀ¢F—FÆS¢G—Vöb&÷sòçF—FÆRÓÓÒw7G&–ærrò&÷rçF—FÆRç6Æ–6RƒÂƒ’¢rrÀ¢—5öWfVçC¢&÷sòæ—5öWfVçBÓÓÒG'VRÀ¢7&VFVEöC¢&÷sòæ7&VFVEöBóòçVÆÂÀ¢Ò’’æf–ÇFW"‡&÷rÓâ&÷ræ–B“°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆ—7F–æw2ÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b‡F†æÖRÓÓÒrö’÷c÷6—FRÖW'&÷'2r’&WGW&â6—FTW'&÷%FVÆVÖWG'’‡&W“°¢–b‡F†æÖRÓÓÒrö’÷cöÖRö66÷VçBr’&WGW&â66÷VçDFVÆWF–öä’‡&W“°¢–b‡&WæÖWF†öBÓÓÒtDTÄUDRrbbõåÂö•Â÷cÂ÷66†ööÅÂö66÷VçG5Âõ³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'ÒBö’çFW7B‡F†æÖR’’&WGW&â66÷VçDFVÆWF–öä’‡&W“°¢–b‡&WæÖWF†öBÓÓÒuD4‚rbbõåÂö•Â÷cÂöFVÆWF–öâ×&WVW7G5Âõ³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'ÒBö’çFW7B‡F†æÖR’’&WGW&â66÷VçDFVÆWF–öä’‡&W“°¢–b‡F†æÖRÓÓÒrö’÷c÷VÇ6RrÇÂF†æÖRç7F'G5v—F‚‚rö’÷c÷VÇ6Ròr’’&WGW&â66†ööÅVÇ6T’‡&W“°¢6öç7B&VDÖW76vTÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöÖW76vW5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•Â÷&VBBö’“°¢6öç7BfF%&Wf–WtÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöfF'5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•ÂöÖöFW&F–öâBö’“°¢6öç7BVæF–ætÖW76vU&Wf–WtÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöÖW76vW5ÂöÖöFW&F–öåÂò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò’Bö’“°¢6öç7B7FfefW&–f–6F–öäÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂ÷7Ffb×fW&–f–6F–öç5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò’Bö’“°¢6öç7B66†ööÄ–FV–ÖvU&Wf–WtÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂ÷66†ööÅÂö–FV5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•Âö–ÖvW2Bö’“°¢6öç7B66†ööÄ–FVFW‡E&Wf–WtÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂ÷66†ööÅÂö–FV5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•ÂöÖöFW&F–öâBö’“°¢6öç7B66†ööÄ–FVv÷&¶fÆ÷tÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂ÷66†ööÅÂö–FV5Â÷v÷&¶fÆ÷uÂò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•Â÷7FGW2Bö’“°¢6öç7BÆ—7F–æt6öçF7DÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöÆ—7F–æw5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•Âö6öçF7BBö’“°¢6öç7B66†ööÄÆ—7F–ætFVÆWFTÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂ÷66†ööÅÂöÆ—7F–æw5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò’Bö’“°¢6öç7B÷väÆ—7F–ætÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöÆ—7F–æw5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò’Bö’“°¢6öç7B66†ööÄ–FVFVÆWFTÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂö–FV5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò’Bö’“°¢6öíºçí¢G§²ÚîÆ­yÖçWÒ6ö×ÆWFRòv6ö×ÆWFRr¢wVWVVBs°¢Ð¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂFVÆWFVC¢G'VRÂ–ÖvUö6ÆVçW¢–ÖvT6ÆVçWÒÓ°¢Ð¢6öç7Bff÷&—FTÖF6‚ÒF†æÖRæÖF6‚‚õåÂö•Â÷cÂöÆ—7F–æw5Âò…³Ó–Öe×³‡ÒÕ³Ó–Öe×³GÒÕ³Ó…Õ³Ó–Öe×³7ÒÕ³ƒ–%Õ³Ó–Öe×³7ÒÕ³Ó–Öe×³'Ò•Âöff÷&—FRBö’“°¢–b‡&WæÖWF†öBÓÓÒttUBrbbF†æÖRÓÓÒrö’÷cöff÷&—FW2r’°¢ÆWB–FVçF—G“°¢G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#°¢G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷"’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢–b‡G—Vöb&W÷6—F÷'’æÆ—7Dff÷&—FT–G2ÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vff÷&—FU÷&VE÷Væf–Æ&ÆRrÒÓ°¢G'’²&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂff÷&—FUö–G3¢v—B&W÷6—F÷'’æÆ—7Dff÷&—FT–G2†7F÷"æ–B’ÒÓ²Ð¢6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b†ff÷&—FTÖF6‚bb²uUBrÂtDTÄUDRuÒæ–æ6ÇVFW2‡&WæÖWF†öB’’°¢ÆWB–FVçF—G“°¢G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#°¢G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷"’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢–b‡G—Vöb&W÷6—F÷'’ç6WDff÷&—FRÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vff÷&—FU÷w&—FU÷Væf–Æ&ÆRrÒÓ°¢G'’°¢6öç7Bff÷&—FVBÒv—B&W÷6—F÷'’ç6WDff÷&—FR†7F÷"æ–BÂff÷&—FTÖF6…³ÒÂ&WæÖWF†öBÓÓÒuUBr“°¢–b‚ff÷&—FVB’&WGW&â²7FGW3¢CBÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢vÆ—7F–æuöæ÷Eöf÷VæBrÒÓ°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆ—7F–æuö–C¢ff÷&—FTÖF6…³ÒÂff÷&—FVC¢&WæÖWF†öBÓÓÒuUBrÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b‡&WæÖWF†öBÓÓÒuD4‚rbbF†æÖRÓÓÒrö’÷cöÖRr’°¢ÆWB–FVçF—G“²G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB–çWC°¢G'’²6öç7B6‡Væ·2ÒµÓ²ÆWB'—FW2Ò²f÷"v—B†6öç7B6‡Væ²öb&W’²'—FW2³Ò6‡Væ²æÆVæwFƒ²–b†'—FW2âB¢#B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&WVW7E÷FöõöÆ&vRrÒÓ²6‡Væ·2çW6‚†6‡Væ²“²Ò–çWBÒ¥4ôâç'6R„'VffW"æ6öæ6B†6‡Væ·2’çFõ7G&–ær‚wWFc‚r’“²Ð¢6F6‚²&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–çfÆ–Eö§6öârÒÓ²Ð¢6öç7Bf—'7EöæÖRÒG—Vöb–çWCòæf—'7EöæÖRÓÓÒw7G&–ærrò–çWBæf—'7EöæÖRçG&–Ò‚’¢rs°¢6öç7BÆ7EöæÖRÒG—Vöb–çWCòæÆ7EöæÖRÓÓÒw7G&–ærrò–çWBæÆ7EöæÖRçG&–Ò‚’¢rs°¢ÆWB7W'&VçE&öf–ÆS°¢–b†–çWCòçW'6öå÷G—RÓÒçVÆÂÇÂ–çWCòç7Ffe÷÷6—F–öâÓÒçVÆÂÇÂ–çWCòæ6Æ75öæÖRÓÒçVÆÂ’°¢G'’²7W'&VçE&öf–ÆRÒv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7W'&VçE&öf–ÆRÒçVÆÃ²Ð¢Ð¢6öç7BW'6öå÷G—RÒ–çWCòçW'6öå÷G—Róò7W'&VçE&öf–ÆSòçW'6öå÷G—Róòw7GVFVçBs°¢6öç7B7Ffe÷÷6—F–öâÒG—Vöb–çWCòç7Ffe÷÷6—F–öâÓÓÒw7G&–ærrò–çWBç7Ffe÷÷6—F–öâçG&–Ò‚’¢†7W'&VçE&öf–ÆSòç7Ffe÷÷6—F–öâóòrr“°¢6öç7B6Æ75öæÖRÒG—Vöb–çWCòæ6Æ75öæÖRÓÓÒw7G&–ærrò–çWBæ6Æ75öæÖRçG&–Ò‚’çFõWW$66R‚’ç&WÆ6R‚õÇ2²öwRÂrr¢¢†7W'&VçE&öf–ÆSòæ6Æ75öæÖRóòrr“°¢6öç7BfÆ–DæÖRÒfÇVRÓâfÇVRæÆVæwF‚ãÒbbfÇVRæÆVæwF‚ÃÒcbbõ³ÃåÇSÕÇSeÒ÷RçFW7B‡fÇVR“°¢–b‚fÆ–DæÖR†f—'7EöæÖR’ÇÂfÆ–DæÖR†Æ7EöæÖR’ÇÂ²w7GVFVçBrÂw66†ööÅ÷7FfbrÂw&VçBuÒæ–æ6ÇVFW2‡W'6öå÷G—R¢ÇÂ‡W'6öå÷G—RÓÓÒw7GVFVçBrbb—566†ööÄ6Æ74æÖR†6Æ75öæÖR’¢ÇÂ‡W'6öå÷G—RÓÒw7GVFVçBrbb6Æ75öæÖRÓÒrr¢ÇÂ‡W'6öå÷G—RÓÓÒw66†ööÅ÷7Ffbrbb‡7Ffe÷÷6—F–öâæÆVæwF‚ÂÇÂ7Ffe÷÷6—F–öâæÆVæwF‚âÇÂõ³ÃåÇSÕÇSeÒ÷RçFW7B‡7Ffe÷÷6—F–öâ’’¢ÇÂ‡W'6öå÷G—RÓÒw66†ööÅ÷7Ffbrbb7Ffe÷÷6—F–öâÓÒrr’’°¢&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–çfÆ–E÷&öf–ÆUö–FVçF—G’rÒÓ°¢Ð¢–b‡G—Vöb&W÷6—F÷'“òçWFFT÷vå&öf–ÆT–FVçF—G’ÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷WFFU÷Væf–Æ&ÆRrÒÓ°¢G'’°¢6öç7B&öf–ÆRÒv—B&W÷6—F÷'’çWFFT÷vå&öf–ÆT–FVçF—G’†–FVçF—G’æ—77VW"Â–FVçF—G’ç7V&¦V7BÀ¢²f—'7EöæÖRÂÆ7EöæÖRÂ6Æ75öæÖRÂW'6öå÷G—RÂ7Ffe÷÷6—F–öâÒ“°¢&WGW&â&öf–ÆRò²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ&öf–ÆRÒÒ¢²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b‡&WæÖWF†öBÓÓÒttUBrbbF†æÖRÓÓÒrö’÷cöÖRr’°¢ÆWB–FVçF—G“°¢G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#°¢G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷"’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ&öf–ÆS¢7F÷"ÒÓ°¢Ð¢–b‡&WæÖWF†öBÓÓÒttUBrbbF†æÖRÓÓÒrö’÷cöÆ—7F–æw2r’°¢òòÖF6‚F†R6÷W&6RdÒ&ö&BöÆ–7“¢7F—fRÆ—7F–æw2&Rf—6–&ÆRöæÇ¢òòFò6–væVBÖ–â&öf–ÆW2g&öÒF†R6ÖR66†ööÂâwVW7G2&V6V—fRâV×G¢òòfVVB6òF†RT’6â6†÷r—G2Æöv–â&ö×Bv—F†÷WBÆV¶–ær66†ööÂFFà¢ÆWB–FVçF—G“°¢G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆ—7F–æw3¢µÒÒÓ°¢ÆWB7F÷#°¢G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷#òç66†ööÅö–B’&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆ—7F–æw3¢µÒÒÓ°¢–b‡G—Vöb&W÷6—F÷'’æÆ—7D7F—fTÆ—7F–æw2ÓÒvgVæ7F–öâr’°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vÆ—7F–æu÷&VE÷Væf–Æ&ÆRrÒÓ°¢Ð¢G'’°¢6öç7BÆ—7F–æw2Òv—B&W÷6—F÷'’æÆ—7D7F—fTÆ—7F–æw2†7F÷"ç66†ööÅö–B“°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÆ—7F–æw2ÒÓ°¢Ò6F6‚°¢&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ°¢Ð¢Ð¢–b‡&WæÖWF†öBÓÓÒttUBrbbF†æÖRÓÓÒrö’÷cöÖRö–FV2r’°¢ÆWB–FVçF—G“²G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#²G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷"ÇÂG—Vöb7F÷"æ–BÓÒw7G&–ærrÇÂ7F÷"ç66†ööÅö–B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢–b‡G—Vöb&W÷6—F÷'“òæÆ—7D÷vä–FV2ÓÒvgVæ7F–öâr’&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–FV5÷Væf–Æ&ÆRrÒÓ°¢G'’°¢6öç7B–FV2Òv—B&W÷6—F÷'’æÆ—7D÷vä–FV2†7F÷"æ–BÂ7F÷"ç66†ööÅö–B“°¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂ–FV3¢'&’æ—4'&’†–FV2’ò–FV2ç6Æ–6RƒÂS’¢µÒÒÓ°¢Ò6F6‚²&WGW&â²7FGW3¢S2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢vFF&6U÷Væf–Æ&ÆRrÒÓ²Ð¢Ð¢–b‡&WæÖWF†öBÓÒuõ5Br’&WGW&â²7FGW3¢CRÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢vÖWF†öEöæ÷EöÆÆ÷vVBrÒÓ°¢–b‚²rö’÷cöÆ—7F–æw2rÂrö’÷cö–FV2rÂrö’÷cöÖW76vW2uÒæ–æ6ÇVFW2‡F†æÖR’’&WGW&â²7FGW3¢CBÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢væ÷Eöf÷VæBrÒÓ° ¢ÆWB–FVçF—G“°¢G'’²–FVçF—G’Òv—BWF†VçF–6FR‡&W“²Ò6F6‚²–FVçF—G’ÒçVÆÃ²Ð¢–b‚–FVçF—G’’&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢wVæWF†÷&—¦VBrÒÓ°¢ÆWB7F÷#°¢G'’²7F÷"Òv—B&W6öÇfT7F÷"†–FVçF—G’“²Ò6F6‚²7F÷"ÒçVÆÃ²Ð¢–b‚7F÷"’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&öf–ÆU÷Væf–Æ&ÆRrÒÓ°¢ÆWB–çWC°¢G'’°¢6öç7B6‡Væ·2ÒµÓ²ÆWB'—FW2Ò°¢f÷"v—B†6öç7B6‡Væ²öb&W’°¢'—FW2³Ò6‡Væ²æÆVæwFƒ°¢–b†'—FW2âcB¢#B’&WGW&â²7FGW3¢C2Â&öG“¢²ö³¢fÇ6RÂW'&÷#¢w&WVW7E÷FöõöÆ&vRrÒÓ°¢6‡Væ·2çW6‚†6‡Væ²“°¢Ð¢–çWBÒ¥4ôâç'6R„'VffW"æ6öæ6B†6‡Væ·2’çFõ7G&–ær‚wWFc‚r’“°¢Ò6F6‚²&WGW&â²7FGW3¢CÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢v–çfÆ–Eö§6öârÒÓ²Ð¢6öç7B&W7VÇBÒF†æÖRÓÓÒrö’÷cö–FV2p¢òv—B7V&Ö—D–FV‡²7F÷"Â–çWBÂ&W÷6—F÷'’Â&Wf–WrÂ6fWG”¶W’Ò¢¢F†æÖRÓÓÒrö’÷cöÖW76vW2p¢òv—B7V&Ö—DÖW76vR‡²7F÷"Â–çWBÂ&W÷6—F÷'’Â&Wf–WrÂ6fWG”¶W’Ò¢¢v—B7V&Ö—DÆ—7F–ær‡²7F÷"Â–çWBÂ&W÷6—F÷'’Â&Wf–WrÂ6fWG”¶W’Ò“°¢6öç7B7FGW2Ò&W7VÇBæö²ò#¢¢&W7VÇBæ6öFRÓÓÒvFF&6U÷Væf–Æ&ÆRrÇÂ&W7VÇBç7FGW2ÓÓÒwVæF–ærròS0¢¢&W7VÇBæ6öFRÓÓÒvf÷&&–FFVâròC0¢¢&W7VÇBæ6öFRÓÓÒw&V6—–VçE÷Væf–Æ&ÆRròCB¢&W7VÇBæ6öFRÓÓÒw&FUöÆ–Ö—FVBròC#’¢C°¢&WGW&â²7FGW2Â&öG“¢&W7VÇBÓ°¢Ó°§Ð
+import { submitListing } from './submit-listing.mjs';
+import { submitIdea } from './submit-idea.mjs';
+import { submitMessage } from './submit-message.mjs';
+import { isSchoolClassName } from '../policies/school-catalog.mjs';
+import { requestSchoolProfile } from './request-school-profile.mjs';
+import { createSchoolPulseApi } from './school-pulse-api.mjs';
+import { createAccountDeletionApi } from './account-deletion-api.mjs';
+import { SCHOOL_CATALOG } from '../policies/school-catalog.mjs';
+import { createSiteErrorTelemetry } from './site-error-telemetry.mjs';
+import { hasFreshConfirmation } from '../auth/fresh-confirmation.mjs';
+import { createRoleEmailVerification } from './role-email-verification.mjs';
+
+export function createListingsApi({ authenticate, resolveActor, repository, review, safetyKey, schools = SCHOOL_CATALOG,
+  pendingImages = null, now = Date.now, verificationKey, sendRoleVerificationEmail, getPostboxAccessToken = null, emailVerification = null }) {
+  const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
+  const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
+  const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
+  const roleEmailVerification = emailVerification || createRoleEmailVerification({ repository, verificationKey,
+    sendEmail: sendRoleVerificationEmail, now });
+  const discardUnlinkedPendingImage = async (userId, imageKey) => {
+    if (typeof pendingImages?.delete !== 'function' || typeof repository?.claimPendingImageDeletion !== 'function'
+        || typeof repository?.finishPendingImageCleanup !== 'function') return false;
+    let claimToken = null;
+    try {
+      claimToken = await repository.claimPendingImageDeletion(userId, imageKey);
+      if (!claimToken) return false;
+      await pendingImages.delete(imageKey);
+      return await repository.finishPendingImageCleanup(imageKey, claimToken, true);
+    } catch {
+      if (claimToken) {
+        try { await repository.finishPendingImageCleanup(imageKey, claimToken, false); } catch { /* lease expiry permits retry */ }
+      }
+      return false;
+    }
+  };
+  const schoolRoleSuspensionGate = async (actor) => {
+    if (typeof repository?.getActiveAccountSuspension !== 'function') {
+      return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+    }
+    try {
+      const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
+      return suspension ? { status: 403, body: { ok: false, error: 'account_suspended' } } : null;
+    } catch {
+      return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+    }
+  };
+  return async function handle(req, functionContext = null) {
+    const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    if (pathname === '/api/v1/notification-reads' && (req.method === 'GET' || req.method === 'POST')) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (req.method === 'GET') {
+        if (typeof repository?.listNotificationReadStates !== 'function') return { status: 503, body: { ok: false, error: 'notification_state_unavailable' } };
+        try {
+          const notificationKeys = await repository.listNotificationReadStates(actor.id);
+          if (!Array.isArray(notificationKeys) || notificationKeys.length > 10_000) {
+            return { status: 503, body: { ok: false, error: 'notification_state_incomplete' } };
+          }
+          return { status: 200, body: { ok: true, notification_keys: notificationKeys.map(row => row.notification_key) } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const keys = input?.notification_keys;
+      if (!Array.isArray(keys) || keys.length > 100 || keys.some(key => typeof key !== 'string'
+          || key.length < 1 || key.length > 220 || /[\u0000-\u001f\u007f]/u.test(key))) {
+        return { status: 400, body: { ok: false, error: 'invalid_notification_keys' } };
+      }
+      if (typeof repository?.saveNotificationReadStates !== 'function') return { status: 503, body: { ok: false, error: 'notification_state_unavailable' } };
+      try {
+        await repository.saveNotificationReadStates(actor.id, [...new Set(keys)]);
+        return { status: 200, body: { ok: true } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/notifications/listings') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.listRecentSchoolNotificationListings !== 'function') {
+        return { status: 503, body: { ok: false, error: 'notification_feed_unavailable' } };
+      }
+      try {
+        const rows = await repository.listRecentSchoolNotificationListings(actor.school_id, actor.id);
+        if (!Array.isArray(rows) || rows.length > 8) return { status: 503, body: { ok: false, error: 'notification_feed_incomplete' } };
+        const listings = rows.map(row => ({
+          id: typeof row?.id === 'string' ? row.id : '',
+          title: typeof row?.title === 'string' ? row.title.slice(0, 80) : '',
+          is_event: row?.is_event === true,
+          created_at: row?.created_at ?? null,
+        })).filter(row => row.id);
+        return { status: 200, body: { ok: true, listings } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (pathname === '/api/v1/site-errors') return siteErrorTelemetry(req);
+    if (pathname === '/api/v1/me/account') return accountDeletionApi(req);
+    if (req.method === 'DELETE' && /^\/api\/v1\/school\/accounts\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
+    if (req.method === 'PATCH' && /^\/api\/v1\/deletion-requests\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pathname)) return accountDeletionApi(req);
+    if (pathname === '/api/v1/pulse' || pathname.startsWith('/api/v1/pulse/')) return schoolPulseApi(req);
+    const readMessageMatch = pathname.match(/^\/api\/v1\/messages\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/read$/i);
+    const avatarReviewMatch = pathname.match(/^\/api\/v1\/avatars\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    const pendingMessageReviewMatch = pathname.match(/^\/api\/v1\/messages\/moderation\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const staffVerificationMatch = pathname.match(/^\/api\/v1\/staff-verifications\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const schoolIdeaImageReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/images$/i);
+    const schoolIdeaTextReviewMatch = pathname.match(/^\/api\/v1\/school\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    const schoolIdeaWorkflowMatch = pathname.match(/^\/api\/v1\/school\/ideas\/workflow\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/status$/i);
+    const listingContactMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/contact$/i);
+    const schoolListingDeleteMatch = pathname.match(/^\/api\/v1\/school\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const ownListingMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const schoolIdeaDeleteMatch = pathname.match(/^\/api\/v1\/ideas\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const moderationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/moderation$/i);
+    const eventOccupancyMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/occupancy$/i);
+    const eventRegistrationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations$/i);
+    const eventReviewMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const eventCancellationMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/registrations\/me$/i);
+    const profileRequestMatch = pathname.match(/^\/api\/v1\/profile-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    const roleRequestMatch = pathname.match(/^\/api\/v1\/role-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if ((req.method === 'GET' || req.method === 'PATCH') && pathname === '/api/v1/school/admin/safety-reports') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (req.method === 'GET') {
+        if (typeof repository?.listSchoolSafetyReports !== 'function') return { status: 503, body: { ok: false, error: 'safety_reports_unavailable' } };
+        try { return { status: 200, body: { ok: true, ...(await repository.listSchoolSafetyReports(actor.school_id)) } }; }
+        catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const validFingerprint = typeof input?.fingerprint === 'string' && /^[0-9a-f]{64}$/.test(input.fingerprint);
+      const validCategory = ['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation', 'negative_personal_call',
+        'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal'].includes(input?.category);
+      const validSource = ['message', 'idea', 'listing', 'image'].includes(input?.source_kind);
+      if (!validFingerprint || !validCategory || !validSource) return { status: 400, body: { ok: false, error: 'invalid_safety_report' } };
+      if (typeof repository?.acknowledgeSchoolSafetyReport !== 'function') return { status: 503, body: { ok: false, error: 'safety_reports_unavailable' } };
+      try {
+        const updated = await repository.acknowledgeSchoolSafetyReport({ schoolId: actor.school_id, reviewerId: actor.id,
+          fingerprint: input.fingerprint, category: input.category, sourceKind: input.source_kind });
+        return updated ? { status: 200, body: { ok: true } } : { status: 404, body: { ok: false, error: 'safety_report_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/school/admin/overview') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.getSchoolAdminOverview !== 'function') return { status: 503, body: { ok: false, error: 'overview_unavailable' } };
+      try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAdminOverview(actor.school_id)) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/school/admin/agent-dashboard') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.getSchoolAgentDashboard !== 'function') return { status: 503, body: { ok: false, error: 'agent_dashboard_unavailable' } };
+      try { return { status: 200, body: { ok: true, ...(await repository.getSchoolAgentDashboard(actor.school_id)) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const agentIdeaReview = pathname.match(/^\/api\/v1\/school\/admin\/agent-ideas\/([a-f0-9]{64})$/);
+    if (req.method === 'PATCH' && agentIdeaReview) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'approved' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolAgentIdea !== 'function') return { status: 503, body: { ok: false, error: 'agent_dashboard_unavailable' } };
+      try { const changed = await repository.reviewSchoolAgentIdea({ id: agentIdeaReview[1], schoolId: actor.school_id, reviewerId: actor.id, decision });
+        return changed ? { status: 200, body: { ok: true, status: decision } } : { status: 409, body: { ok: false, error: 'idea_unavailable' } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/me/avatar') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try { const chunks = []; let size = 0; for await (const chunk of req) { size += chunk.length; if (size > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const key = input?.image_key;
+      if (typeof key !== 'string' || !new RegExp(`^pending/${actor.id}/[0-9a-f-]{36}\\.webp$`, 'i').test(key)) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (!pendingImages || typeof pendingImages.get !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      let pendingImage;
+      try { pendingImage = await pendingImages.get(key); } catch { return { status: 503, body: { ok: false, error: 'media_unavailable' } }; }
+      if (!Buffer.isBuffer(pendingImage) && !(pendingImage instanceof Uint8Array)) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (pendingImage.byteLength === 0) return { status: 400, body: { ok: false, error: 'invalid_image' } };
+      if (pendingImage.byteLength > 2 * 1024 * 1024) return { status: 413, body: { ok: false, error: 'image_too_large' } };
+      if (typeof repository?.createAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try {
+        const reviewRequest = await repository.createAvatarReview({ userId: actor.id, schoolId: actor.school_id, imageKey: key });
+        if (reviewRequest?.code === 'rate_limited') {
+          await discardUnlinkedPendingImage(actor.id, key);
+          return { status: 429, body: { ok: false, error: 'rate_limited' } };
+        }
+        return reviewRequest ? { status: 202, body: { ok: true, status: 'pending', request_id: reviewRequest.id } }
+          : { status: 409, body: { ok: false, error: 'avatar_review_already_pending_or_image_unavailable' } };
+      } catch {
+        await discardUnlinkedPendingImage(actor.id, key);
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/avatars/moderation') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingAvatarReviews !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingAvatarReviews(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && avatarReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let size = 0; for await (const chunk of req) { size += chunk.length; if (size > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'approved' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.moderateAvatarReview !== 'function') return { status: 503, body: { ok: false, error: 'avatar_review_unavailable' } };
+      try {
+        const changed = await repository.moderateAvatarReview(avatarReviewMatch[1], actor.school_id, actor.id, decision);
+        return changed ? { status: 200, body: { ok: true, status: decision } } : { status: 409, body: { ok: false, error: 'avatar_review_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/schools') {
+      return { status: 200, body: { ok: true, schools: schools.filter(item => item && typeof item.id === 'string' && typeof item.name === 'string').map(({ id, name }) => ({ id, name })) } };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/profile-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (typeof repository?.getSchoolProfileRequest !== 'function') return { status: 503, body: { ok: false, error: 'profile_request_status_unavailable' } };
+      try {
+        const request = await repository.getSchoolProfileRequest(identity.issuer, identity.subject);
+        return { status: 200, body: { ok: true, request } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/role-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (typeof repository?.getSchoolRoleRequest !== 'function') return { status: 503, body: { ok: false, error: 'role_request_unavailable' } };
+      try {
+        let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+        return { status: 200, body: { ok: true, role: actor?.role ?? null,
+          email_verified: await roleEmailVerification.isVerified(identity),
+          email_verification_available: roleEmailVerification.available === true,
+          request: await repository.getSchoolRoleRequest(identity.issuer, identity.subject) } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/role-requests/email-verification') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student' || !actor.school_id) return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (input?.action === 'send') {
+        try {
+          let accessToken = functionContext?.token?.access_token;
+          if (!accessToken && typeof getPostboxAccessToken === 'function') {
+            try { accessToken = await getPostboxAccessToken(); } catch { accessToken = null; }
+          }
+          const result = await roleEmailVerification.start(identity, actor, accessToken);
+          if (result?.ok) return { status: result.already_verified ? 200 : 202, body: { ok: true, sent: result.sent === true, already_verified: result.already_verified === true } };
+          const status = ['email_send_cooldown', 'email_send_rate_limited'].includes(result?.code) ? 429
+            : ['student_profile_required', 'verified_email_required'].includes(result?.code) ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable',
+            ...(Number.isSafeInteger(result?.retry_after_seconds) ? { retry_after_seconds: result.retry_after_seconds } : {}) } };
+        } catch { return { status: 503, body: { ok: false, error: 'email_verification_unavailable' } }; }
+      }
+      if (input?.action === 'verify') {
+        try {
+          const result = await roleEmailVerification.verify(identity, actor, input.code);
+          if (result?.ok && result.verified) return { status: 200, body: { ok: true, email_verified: true } };
+          const status = ['verification_code_expired', 'verification_code_locked'].includes(result?.code) ? 410
+            : result?.code === 'invalid_verification_code' ? 400
+              : result?.code === 'student_profile_required' || result?.code === 'verified_email_required' ? 403 : 503;
+          return { status, body: { ok: false, error: result?.code || 'email_verification_unavailable' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      return { status: 400, body: { ok: false, error: 'invalid_email_verification_action' } };
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/role-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student' || !actor.school_id) return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      const requested_role = input?.requested_role === 'Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº Ð£Ñ‡ÐµÐ½Ð¸Ñ‡ÐµÑÐºÐ¾Ð³Ð¾ ÑÐ¾Ð²ÐµÑ‚Ð°' ? 'council_member'
+        : input?.requested_role === 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€' ? 'school_admin' : null;
+      if (!requested_role) return { status: 400, body: { ok: false, error: 'invalid_requested_role' } };
+      try {
+        if (!await roleEmailVerification.isVerified(identity)) return { status: 403, body: { ok: false, error: 'email_verification_required' } };
+      } catch { return { status: 503, body: { ok: false, error: 'email_verification_unavailable' } }; }
+      if (typeof repository?.createSchoolRoleRequest !== 'function') return { status: 503, body: { ok: false, error: 'role_request_unavailable' } };
+      try {
+        const result = await repository.createSchoolRoleRequest({ issuer: identity.issuer, subject: identity.subject, requested_role });
+        return result?.ok ? { status: result.already_exists ? 200 : 202, body: result }
+          : { status: result?.code === 'student_profile_required' ? 403 : 503, body: { ok: false, error: result?.code || 'database_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/role-requests/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingSchoolRoleRequests !== 'function') return { status: 503, body: { ok: false, error: 'role_review_unavailable' } };
+      try {
+        const requests = await repository.listPendingSchoolRoleRequests(actor.school_id);
+        return { status: 200, body: { ok: true, requests: requests.map(request => ({
+          request_id: request.request_id,
+          account_code: typeof request.user_id === 'string' ? request.user_id.slice(-6).toUpperCase() : '',
+          applicant_name: [request.first_name, request.last_name].filter(value => typeof value === 'string' && value.trim())
+            .map(value => value.trim().slice(0, 60)).join(' '),
+          class_name: typeof request.class_name === 'string' ? request.class_name.slice(0, 8) : '',
+          requested_role: request.requested_role,
+          status: request.status,
+          created_at: request.created_at ?? null,
+          review_started_at: request.review_started_at ?? null,
+          review_started_by_me: request.review_started_by === actor.id,
+        })) } };
+      }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/role-management/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listSchoolRoleTargets !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listSchoolRoleTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const roleManagementTarget = pathname.match(/^\/api\/v1\/role-management\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && roleManagementTarget) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (!hasFreshConfirmation(identity, now())) return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.revokeSchoolRole !== 'function') return { status: 503, body: { ok: false, error: 'role_management_unavailable' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.action !== 'revoke') return { status: 400, body: { ok: false, error: 'invalid_action' } };
+      try {
+        const result = await repository.revokeSchoolRole({ schoolId: actor.school_id, actorId: actor.id, targetId: roleManagementTarget[1] });
+        if (result?.ok) return { status: 200, body: result };
+        const status = result?.code === 'target_unavailable' ? 404 : result?.code === 'forbidden' ? 403
+          : result?.code === 'last_school_admin' || result?.code === 'role_unavailable' ? 409 : 400;
+        return { status, body: { ok: false, error: result?.code || 'role_update_failed' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/suspensions') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listActiveAccountSuspensions !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+      try { return { status: 200, body: { ok: true, suspensions: await repository.listActiveAccountSuspensions(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/suspensions/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listSuspensionTargets !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listSuspensionTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const suspensionAction = pathname.match(/^\/api\/v1\/suspensions\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && suspensionAction) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      if (!hasFreshConfirmation(identity, now())) {
+        return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
+      }
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.action === 'issue') {
+        const durationHours = Number(input.duration_hours);
+        const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+        const digits = (reason.match(/[0-9]/g) || []).length;
+        const hasContact = /https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(reason) || digits >= 11;
+        if (![24, 72, 168].includes(durationHours)) return { status: 400, body: { ok: false, error: 'invalid_duration' } };
+        if (reason.length < 15 || reason.length > 400 || hasContact) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
+        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_suspend_self' } };
+        if (typeof repository?.issueAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+        try {
+          const result = await repository.issueAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id, durationHours, reason });
+          return result?.ok ? { status: 201, body: { ok: true, suspension: result.suspension } }
+            : { status: result?.code === 'target_unavailable' ? 404 : result?.code === 'already_suspended' ? 409 : 403, body: { ok: false, error: result?.code || 'suspension_failed' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      if (input?.action === 'lift') {
+        if (suspensionAction[1] === actor.id) return { status: 400, body: { ok: false, error: 'cannot_manage_self' } };
+        if (typeof repository?.liftAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspensions_unavailable' } };
+        try {
+          const lifted = await repository.liftAccountSuspension({ schoolId: actor.school_id, targetId: suspensionAction[1], actorId: actor.id });
+          return lifted ? { status: 200, body: { ok: true, status: 'lifted' } }
+            : { status: 409, body: { ok: false, error: 'suspension_unavailable' } };
+        } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      return { status: 400, body: { ok: false, error: 'invalid_action' } };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/suspension') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.getActiveAccountSuspension !== 'function') return { status: 503, body: { ok: false, error: 'suspension_status_unavailable' } };
+      try {
+        const suspension = await repository.getActiveAccountSuspension(actor.school_id, actor.id);
+        return { status: 200, body: { ok: true, suspended: Boolean(suspension), suspension } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/targets') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listAccountDeletionTargets !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, targets: await repository.listAccountDeletionTargets(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      if (typeof repository?.listOwnAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listOwnAccountDeletionRequests(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/deletion-requests/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingAccountDeletionRequests !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingAccountDeletionRequests(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    const deletionReview = pathname.match(/^\/api\/v1\/deletion-requests\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i);
+    if (req.method === 'PATCH' && deletionReview) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.decision !== 'reject') return { status: 400, body: { ok: false, error: 'unsupported_decision' } };
+      const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
+      if (typeof repository?.rejectAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try {
+        const rejected = await repository.rejectAccountDeletionRequest(deletionReview[1], actor.school_id, actor.id, note);
+        return rejected ? { status: 200, body: { ok: true, status: 'rejected' } }
+          : { status: 409, body: { ok: false, error: 'request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/deletion-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'council_member' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const targetId = typeof input?.target_id === 'string' ? input.target_id : '';
+      const reasonCode = input?.reason_code;
+      const reason = typeof input?.reason === 'string' ? input.reason.trim() : '';
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetId) || targetId === actor.id) {
+        return { status: 400, body: { ok: false, error: 'invalid_target' } };
+      }
+      if (!['rules_violation', 'harassment', 'fake_account', 'spam', 'other'].includes(reasonCode)) return { status: 400, body: { ok: false, error: 'invalid_reason_code' } };
+      if (reason.length < 15 || reason.length > 500) return { status: 400, body: { ok: false, error: 'invalid_reason' } };
+      const digits = reason.replace(/\D/g, '');
+      if (/(?:https?:\/\/|www\.|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.test(reason) || digits.length >= 11) {
+        return { status: 400, body: { ok: false, error: 'personal_contact_not_allowed' } };
+      }
+      if (typeof repository?.createAccountDeletionRequest !== 'function') return { status: 503, body: { ok: false, error: 'deletion_requests_unavailable' } };
+      try {
+        const result = await repository.createAccountDeletionRequest({ schoolId: actor.school_id, requesterId: actor.id, targetId, reasonCode, reason });
+        return result?.ok ? { status: result.already_exists ? 200 : 202, body: result }
+          : { status: result?.code === 'requester_unavailable' ? 403 : 404, body: { ok: false, error: result?.code || 'request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && roleRequestMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      try {
+        if (input?.action === 'start_review') {
+          const started = await repository.startSchoolRoleRequestReview(roleRequestMatch[1], actor.school_id, actor.id);
+          return started ? { status: 200, body: { ok: true, status: 'reviewing' } } : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
+        }
+        if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+        const note = typeof input.review_note === 'string' ? input.review_note.trim().slice(0, 240) : '';
+        const updated = await repository.reviewSchoolRoleRequest(roleRequestMatch[1], actor.school_id, actor.id, input.decision, note);
+        return updated ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 409, body: { ok: false, error: 'role_request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/profile-requests') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const result = await requestSchoolProfile({ identity, input, repository });
+      const status = result.ok ? 202 : result.code === 'profile_exists' ? 409
+        : result.code === 'database_unavailable' ? 503 : 400;
+      return { status, body: result };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/profile-requests/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingSchoolProfileRequests !== 'function') return { status: 503, body: { ok: false, error: 'profile_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolProfileRequests(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/staff-verifications') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingSchoolStaffVerifications !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, requests: await repository.listPendingSchoolStaffVerifications(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && staffVerificationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approved', 'rejected'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolStaffVerification !== 'function') return { status: 503, body: { ok: false, error: 'staff_review_unavailable' } };
+      try {
+        const changed = await repository.reviewSchoolStaffVerification({ userId: staffVerificationMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return changed ? { status: 200, body: { ok: true, status: input.decision } }
+          : { status: 404, body: { ok: false, error: 'staff_verification_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && profileRequestMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      try {
+        const changed = await repository.reviewSchoolProfileRequest(profileRequestMatch[1], actor.school_id, actor.id, input.decision);
+        return changed ? { status: 200, body: { ok: true, status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 404, body: { ok: false, error: 'profile_request_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/listings/moderation') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingListings !== 'function') return { status: 503, body: { ok: false, error: 'moderation_unavailable' } };
+      try { return { status: 200, body: { ok: true, listings: await repository.listPendingListings(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/school/ideas') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingSchoolIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try { return { status: 200, body: { ok: true, ideas: await repository.listPendingSchoolIdeas(actor.school_id, actor.id, actor.role) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/school/ideas/workflow') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listSchoolIdeaWorkflow !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try { return { status: 200, body: { ok: true, ideas: await repository.listSchoolIdeaWorkflow(actor.school_id, actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && schoolIdeaWorkflowMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['in_progress', 'done', 'rejected'].includes(input?.status)) return { status: 400, body: { ok: false, error: 'invalid_status' } };
+      if (typeof repository?.updateSchoolIdeaWorkflow !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const changed = await repository.updateSchoolIdeaWorkflow({ ideaId: schoolIdeaWorkflowMatch[1], schoolId: actor.school_id, reviewerId: actor.id, status: input.status });
+        return changed ? { status: 200, body: { ok: true, admin_status: input.status } }
+          : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && schoolIdeaImageReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolIdeaImages !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const changed = await repository.reviewSchoolIdeaImages({ ideaId: schoolIdeaImageReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return changed ? { status: 200, body: { ok: true, image_status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && schoolIdeaTextReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'school_admin' || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.reviewSchoolIdeaText !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const changed = await repository.reviewSchoolIdeaText({ ideaId: schoolIdeaTextReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return changed ? { status: 200, body: { ok: true, ai_status: input.decision === 'approve' ? 'approved' : 'rejected' } }
+          : { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && eventOccupancyMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+      if (typeof repository.getPublicEventOccupancy !== 'function') return { status: 503, body: { ok: false, error: 'event_read_unavailable' } };
+      try {
+        const taken = await repository.getPublicEventOccupancy(eventOccupancyMatch[1], actor.school_id);
+        return taken === null ? { status: 404, body: { ok: false, error: 'event_unavailable' } }
+          : { status: 200, body: { ok: true, taken } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/event-registrations') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try { return { status: 200, body: { ok: true, registrations: await repository.listEventRegistrations(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/event-registrations/review') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || !['school_admin', 'council_member'].includes(actor.role) || !actor.school_id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.listPendingEventReviews !== 'function') return { status: 503, body: { ok: false, error: 'event_review_unavailable' } };
+      try { return { status: 200, body: { ok: true, applications: await repository.listPendingEventReviews(actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && eventRegistrationMatch) {
+      let bodyBytes = 0;
+      for await (const chunk of req) {
+        bodyBytes += chunk.length;
+        if (bodyBytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } };
+      }
+      if (bodyBytes > 0) return { status: 400, body: { ok: false, error: 'unexpected_body' } };
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const registration = await repository.registerForEvent(eventRegistrationMatch[1], actor.id, actor.school_id);
+        return { status: 201, body: { ok: true, registration } };
+      } catch (error) {
+        if (error?.code === 'event_unavailable' || error?.code === 'school_mismatch') return { status: 404, body: { ok: false, error: 'event_unavailable' } };
+        if (error?.code === 'organizer_registration') return { status: 403, body: { ok: false, error: 'organizer_cannot_register' } };
+        if (error?.code === 'already_registered') return { status: 409, body: { ok: false, error: 'already_registered' } };
+        if (error?.code === 'no_seats_available') return { status: 409, body: { ok: false, error: 'no_seats_available' } };
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
+    }
+    if (req.method === 'GET' && eventRegistrationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) {
+        return { status: 403, body: { ok: false, error: 'forbidden' } };
+      }
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository.listEventApplicants !== 'function') {
+        return { status: 503, body: { ok: false, error: 'applicant_read_unavailable' } };
+      }
+      try {
+        const applicants = await repository.listEventApplicants(eventRegistrationMatch[1], actor.school_id, actor.id);
+        return { status: 200, body: { ok: true, applicants } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && eventCancellationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const cancelled = await repository.cancelEventRegistration(eventCancellationMatch[1], actor.id);
+        return cancelled ? { status: 200, body: { ok: true, status: 'cancelled' } }
+          : { status: 404, body: { ok: false, error: 'registration_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && eventReviewMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 16 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const decision = input?.decision === 'approve' ? 'confirmed' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      try {
+        const updated = await repository.moderateEventRegistration(eventReviewMatch[1], eventReviewMatch[2], actor.id, actor.school_id, decision);
+        return updated ? { status: 200, body: { ok: true, status: decision } }
+          : { status: 404, body: { ok: false, error: 'registration_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && moderationMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (!['school_admin', 'council_member'].includes(actor.role)) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 64 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const status = input?.decision === 'approve' ? 'active' : input?.decision === 'reject' ? 'rejected' : null;
+      if (!status) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      try {
+        const updated = await repository.moderateListing(moderationMatch[1], actor.school_id, actor.id, status);
+        return updated ? { status: 200, body: { ok: true, status } } : { status: 404, body: { ok: false, error: 'listing_not_found' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && pathname === '/api/v1/messages/read') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 12 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const ids = input?.message_ids;
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!Array.isArray(ids) || ids.length > 100 || ids.some(id => typeof id !== 'string' || !uuid.test(id))) {
+        return { status: 400, body: { ok: false, error: 'invalid_message_ids' } };
+      }
+      if (typeof repository?.markMessagesRead !== 'function') return { status: 503, body: { ok: false, error: 'message_read_unavailable' } };
+      try {
+        const count = await repository.markMessagesRead(actor.id, actor.school_id, [...new Set(ids)]);
+        return { status: 200, body: { ok: true, updated: count } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && readMessageMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try {
+        const updated = await repository.markMessageRead(actor.id, actor.school_id, readMessageMatch[1]);
+        return updated ? { status: 200, body: { ok: true, is_read: true } } : { status: 404, body: { ok: false, error: 'message_not_found' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/messages') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try { return { status: 200, body: { ok: true, messages: await repository.listMessages(actor.id, actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if ((req.method === 'GET' && pathname === '/api/v1/messages/moderation') || (req.method === 'PATCH' && pendingMessageReviewMatch)) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (req.method === 'GET') {
+        if (typeof repository?.listPendingMessages !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+        try { return { status: 200, body: { ok: true, messages: await repository.listPendingMessages(actor.school_id) } }; }
+        catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.decidePendingMessage !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+      try {
+        const updated = await repository.decidePendingMessage({ messageId: pendingMessageReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return updated ? { status: 200, body: { ok: true } } : { status: 404, body: { ok: false, error: 'pending_message_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && listingContactMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (typeof repository?.getListingContactRecipient !== 'function') return { status: 503, body: { ok: false, error: 'contact_unavailable' } };
+      try {
+        const receiver_id = await repository.getListingContactRecipient(listingContactMatch[1], actor.id, actor.school_id);
+        if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id, listing_id: listingContactMatch[1] }, repository, review, safetyKey });
+        const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
+        return { status, body: result };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/listings') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (actor.role !== 'student') return { status: 200, body: { ok: true, listing_ids: [], listings: [] } };
+      if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
+      try {
+        const listing_ids = await repository.listOwnActiveListingIds(actor.id);
+        const listings = typeof repository.listOwnListingSummaries === 'function'
+          ? await repository.listOwnListingSummaries(actor.id) : [];
+        return { status: 200, body: { ok: true, listing_ids, listings } };
+      }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolListingDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.getSchoolListingDeletionContext !== 'function' || typeof repository?.deleteSchoolListing !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
+      }
+      let context;
+      try { context = await repository.getSchoolListingDeletionContext({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+      if (context.user_id !== actor.id) {
+        if (!hasFreshConfirmation(identity, now())) {
+          return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
+        }
+      }
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 2 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.confirmation !== 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ ÐžÐ‘ÐªÐ¯Ð’Ð›Ð•ÐÐ˜Ð• Ð¨ÐšÐžÐ›Ð«') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      try {
+        const deleted = await repository.deleteSchoolListing({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] });
+        if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function' && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && ownListingMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student') return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      if (typeof repository?.deleteOwnListing !== 'function') return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
+      try {
+        const deleted = await repository.deleteOwnListing(actor.id, ownListingMatch[1]);
+        if (!deleted) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function'
+            && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolIdeaDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'school_profile_required' } };
+      if (typeof repository?.getSchoolIdeaDeletionContext !== 'function' || typeof repository?.deleteSchoolIdea !== 'function') {
+        return { status: 503, body: { ok: false, error: 'idea_delete_unavailable' } };
+      }
+      let context;
+      try { context = await repository.getSchoolIdeaDeletionContext({ ideaId: schoolIdeaDeleteMatch[1], schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      if (context.user_id !== actor.id) {
+        if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
+        let input;
+        try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+        catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+        if (input?.confirmation !== 'Ð£Ð”ÐÐ›Ð˜Ð¢Ð¬ Ð˜Ð”Ð•Ð® Ð¨ÐšÐžÐ›Ð«') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      }
+      let deleted;
+      try { deleted = await repository.deleteSchoolIdea({ ideaId: schoolIdeaDeleteMatch[1], actorId: actor.id, schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'idea_unavailable' } };
+      let imageCleanup = deleted.media_cleanup?.length ? 'queued' : 'not_needed';
+      if (deleted.media_cleanup?.length && typeof pendingImages?.delete === 'function'
+          && typeof repository.finishPendingImageCleanup === 'function') {
+        let complete = true;
+        for (const media of deleted.media_cleanup) {
+          try {
+            await pendingImages.delete(media.object_key);
+            if (!await repository.finishPendingImageCleanup(media.object_key, media.claim_token, true)) complete = false;
+          } catch { complete = false; }
+        }
+        imageCleanup = complete ? 'complete' : 'queued';
+      }
+      return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+    }
+    const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);
+    if (req.method === 'GET' && pathname === '/api/v1/favorites') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.listFavoriteIds !== 'function') return { status: 503, body: { ok: false, error: 'favorite_read_unavailable' } };
+      try { return { status: 200, body: { ok: true, favorite_ids: await repository.listFavoriteIds(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (favoriteMatch && ['PUT', 'DELETE'].includes(req.method)) {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.setFavorite !== 'function') return { status: 503, body: { ok: false, error: 'favorite_write_unavailable' } };
+      try {
+        const favorited = await repository.setFavorite(actor.id, favoriteMatch[1], req.method === 'PUT');
+        if (!favorited) return { status: 404, body: { ok: false, error: 'listing_not_found' } };
+        return { status: 200, body: { ok: true, listing_id: favoriteMatch[1], favorited: req.method === 'PUT' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && pathname === '/api/v1/me') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const first_name = typeof input?.first_name === 'string' ? input.first_name.trim() : '';
+      const last_name = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
+      let currentProfile;
+      if (input?.person_type == null || input?.staff_position == null || input?.class_name == null) {
+        try { currentProfile = await resolveActor(identity); } catch { currentProfile = null; }
+      }
+      const person_type = input?.person_type ?? currentProfile?.person_type ?? 'student';
+      const staff_position = typeof input?.staff_position === 'string' ? input.staff_position.trim() : (currentProfile?.staff_position ?? '');
+      const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '')
+        : (currentProfile?.class_name ?? '');
+      const validName = value => value.length >= 1 && value.length <= 60 && !/[<>\u0000-\u001f]/u.test(value);
+      if (!validName(first_name) || !validName(last_name) || !['student', 'school_staff', 'parent'].includes(person_type)
+          || (person_type === 'student' && !isSchoolClassName(class_name))
+          || (person_type !== 'student' && class_name !== '')
+          || (person_type === 'school_staff' && (staff_position.length < 1 || staff_position.length > 100 || /[<>\u0000-\u001f]/u.test(staff_position)))
+          || (person_type !== 'school_staff' && staff_position !== '')) {
+        return { status: 400, body: { ok: false, error: 'invalid_profile_identity' } };
+      }
+      if (typeof repository?.updateOwnProfileIdentity !== 'function') return { status: 503, body: { ok: false, error: 'profile_update_unavailable' } };
+      try {
+        const profile = await repository.updateOwnProfileIdentity(identity.issuer, identity.subject,
+          { first_name, last_name, class_name, person_type, staff_position });
+        return profile ? { status: 200, body: { ok: true, profile } } : { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      return { status: 200, body: { ok: true, profile: actor } };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/listings') {
+      // Match the source FAM board policy: active listings are visible only
+      // to signed-in profiles from the same school. Guests receive an empty
+      // feed so the UI can show its login prompt without leaking school data.
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 200, body: { ok: true, listings: [] } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 200, body: { ok: true, listings: [] } };
+      if (typeof repository.listActiveListings !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_read_unavailable' } };
+      }
+      try {
+        const listings = await repository.listActiveListings(actor.school_id);
+        return { status: 200, body: { ok: true, listings } };
+      } catch {
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
+      }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/ideas') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || typeof actor.id !== 'string' || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.listOwnIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const ideas = await repository.listOwnIdeas(actor.id, actor.school_id);
+        return { status: 200, body: { ok: true, ideas: Array.isArray(ideas) ? ideas.slice(0, 50) : [] } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
+    if (!['/api/v1/listings', '/api/v1/ideas', '/api/v1/messages'].includes(pathname)) return { status: 404, body: { ok: false, error: 'not_found' } };
+
+    let identity;
+    try { identity = await authenticate(req); } catch { identity = null; }
+    if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+    let actor;
+    try { actor = await resolveActor(identity); } catch { actor = null; }
+    if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+    let input;
+    try {
+      const chunks = []; let bytes = 0;
+      for await (const chunk of req) {
+        bytes += chunk.length;
+        if (bytes > 64 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } };
+        chunks.push(chunk);
+      }
+      input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+    const result = pathname === '/api/v1/ideas'
+      ? await submitIdea({ actor, input, repository, review, safetyKey })
+      : pathname === '/api/v1/messages'
+        ? await submitMessage({ actor, input, repository, review, safetyKey })
+        : await submitListing({ actor, input, repository, review, safetyKey });
+    const status = result.ok ? 201
+      : result.code === 'database_unavailable' || result.status === 'pending' ? 503
+        : result.code === 'forbidden' ? 403
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
+    return { status, body: result };
+  };
+}
