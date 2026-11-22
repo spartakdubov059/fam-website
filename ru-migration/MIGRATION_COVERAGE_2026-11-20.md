@@ -1,6 +1,6 @@
 # Карта покрытия схемы FAM RU
 
-Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU проверенный код `1f01073fa1540edefb814a7ad175f0ce835216c0`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 35 YDB schema files. Реестр 79 миграций был сверен раньше; добавленная `20261122012818_restrict_listing_image_reads_to_school_members.sql` отдельно сопоставлена с уже существующими same-school/active/private API проверками фото в RU. Полная сверка всех 80 миграций по объектам ещё не проведена; количество файлов и имён не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
+Снимок перепроверен 22 ноября 2026 г. по GitHub refs: FAM `main` `e0616c5cbd6448cc0cf231ec7957f0c2ec4338a4`, RU текущий code tree `a01d49c53f89f847524efb7394d630acee9d2d54`. В `main` — 80 Supabase SQL migrations и 7 Edge Function entrypoints; RU содержит 36 YDB schema files. Ранее проверен список имён миграций; новая `20261122012818_restrict_listing_image_reads_to_school_members.sql` отдельно сопоставлена с same-school/active/private API правилами чтения фото в RU. Полная сверка всех 80 миграций по объектам ещё не проведена; совпадение списков не доказывает эквивалентность PostgreSQL RLS, RPC, триггеров, cron или поведения Edge Functions.
 
 ## Видимость проверки должности сотрудника школы (21 ноября 2026)
 
@@ -108,3 +108,9 @@
 - В новой migration `20261122012818_restrict_listing_image_reads_to_school_members.sql` владелец может читать своё одобренное фото, а другой участник школы — фото только активного объявления. Ранее RU пропускал same-school moderator для неопубликованного объявления, но не его автора. Исправлено: `getListingPhoto` выбирает `user_id`, owner проверяется отдельно, а другой обычный ученик той же школы получает `404`.
 - На точном RU tip [`19c7764`](https://github.com/spartakdubov059/fam-website/commit/19c7764a2a53ac1b7643a520cab2f96f6c6df7cc) disposable YDB CI [#45028027012](https://github.com/spartakdubov059/fam-website/actions/runs/45028027012) прошёл сценарий владельца и отказ same-school non-owner, используя синтетические записи; [SDK/Sharp CI #45028027048](https://github.com/spartakdubov059/fam-website/actions/runs/45028027048) также прошёл. Локально backend **450/450**, SDK verifier `SDK_COMPAT_PASS`; это не проверка облачного IAM/S3.
 - Это подтверждает конкретное правило приватности фото, но не полный пересмотр всех 80 SQL migrations, UI, auth или jobs. Реальный Yandex Cloud integration и staging не запускались; `127.0.0.1:2136` локально отсутствует. Публичные/production данные не использовались.
+
+## Подтверждение email для школьных ролей — 22 ноября 2026
+
+- На кодовом commit `a01d49c` содержится Yandex ID email scope, зашифрованный адрес в серверной сессии и одноразовый Postbox код перед подачей заявки. В YDB сохраняются HMAC digest, время истечения и ограничения отправки/попыток; добавлена таблица 36. Синтетический integration сценарий добавлен, но на этом code tree он не был выполнен в YDB CI.
+- Локально полный набор прошёл **457/457** на Node 22.15.0; `compat/verify.mjs` вернул `SDK_COMPAT_PASS`, пакет Node 22 собран (134 файла). GitHub branch tree сравнен с локальным деревом и совпадает. Точный CI status отсутствует.
+- Yandex ID/Postbox, IAM/YDB/S3 в облаке и стоимость `0 ₽` не проверялись. Это реализация потока в коде, не доказательство работы email-провайдера или российского staging.
