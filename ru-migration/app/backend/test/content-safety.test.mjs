@@ -47,6 +47,8 @@ test("clear targeted harassment and personal insults enter human review", async 
 test("sensitive safety topics go to human review instead of automatic approval or rejection", async () => {
   const { reviewIdeaText } = await import("../policies/review-text.mjs");
   for (const [text, code] of [
+    ["Скинь мне код из СМС для входа в аккаунт.", "sensitive_data_safety_review"],
+    ["Пришлите номер паспорта для оформления.", "sensitive_data_safety_review"],
     ["Разговор о суициде и поиске помощи.", "self_harm_safety_review"],
     ["Поступили сообщения о сексуальном насилии.", "sexual_safety_review"],
     ["Как сообщить о травле в школе?", "violence_safety_review"],
@@ -54,6 +56,7 @@ test("sensitive safety topics go to human review instead of automatic approval o
     assert.equal(findLocalPolicyFlag(text)?.code, code);
     assert.deepEqual(reviewIdeaText(text), { action: "pending", reason_code: code, local_flag: code });
   }
+  assert.equal(findLocalPolicyFlag("Чтобы восстановить пароль, откройте настройки аккаунта."), null);
   assert.equal(reviewIdeaText("Посадим траву возле школы.").action, "ok");
 });
 
