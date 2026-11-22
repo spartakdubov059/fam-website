@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
 const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
-const script = html.match(/<head>\s*<script>([\s\S]*?)<\/script>/i)?.[1];
+const script = html.match(/<head\b[\s\S]*?<script>([\s\S]*?)<\/script>/i)?.[1];
 assert.ok(script, "fallback redirect must have an inline startup script");
 
 function simulate({ session = null, search = "", hash = "", deferHealth = false, healthOk = true, markerReady = true } = {}) {
