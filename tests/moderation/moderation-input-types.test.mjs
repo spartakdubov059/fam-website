@@ -48,6 +48,7 @@ test("cleared text still goes through a separate image review", () => {
   assert.match(moderator, /category_applied_input_types/);
   assert.match(moderator, /requiresImageHumanReview/);
   assert.match(moderator, /text_only_flags: flaggedByInput\.text/);
-  assert.match(moderator, /if \(!imageUrl\)[\s\S]*?return cacheAndRespond[\s\S]*?if \(imageUrl\)/);
+  assert.match(moderator, /input: imageUrl\s*\?[\s\S]*type: "image_url"/);
+  assert.match(moderator, /if \(!imageUrl\)\s*\{\s*return cacheAndRespond/);
   assert.match(moderator, /categories_applied_to_image/);
 });
