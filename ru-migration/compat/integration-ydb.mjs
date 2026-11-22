@@ -118,7 +118,7 @@ try {
     list: async input => ({ Contents: [...privateObjects.keys()].filter(key => key.startsWith(input.Prefix)).map(Key => ({ Key })), IsTruncated: false }),
   });
   const mediaApi = createMediaApi({ authenticate, resolveActor, repository: repo, pendingImages: syntheticPendingImages });
-  const ownerPrivatePhotoKey = 'pending/11111111-1111-4111-8111-111111111111/dddddddd-dddd-4ddd-8ddd-dddddddddddd.webp';
+  const ownerPrivatePhotoKey = 'pending/11111111-1111-4111-8111-111111111111/12121212-1212-4212-8212-121212121212.webp';
   await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', ownerPrivatePhotoKey);
   privateObjects.set(ownerPrivatePhotoKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
   const ownerPrivateListing = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
