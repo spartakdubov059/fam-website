@@ -12,6 +12,7 @@
     "agent:enqueue": "node enqueue-safe-agent-task.mjs",
     "agent:process": "node process-safe-agent-tasks.mjs",
     "agent:run": "node run-safe-agent-worker.mjs",
+    "bootstrap:initial-school-admin": "node bootstrap-initial-school-admin.mjs",
     "test": "node --test test/*.test.mjs",
     "check:system": "node check-ru-system-health.mjs"
   },
