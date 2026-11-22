@@ -1017,11 +1017,6 @@ try {
   const quotaAvatarKey = `pending/${quotaUserId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`;
   await repo.registerPendingImage(quotaUserId, quotaAvatarKey);
   privateObjects.set(quotaAvatarKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
-  const createQuotaAvatarReview = repo.createAvatarReview.bind(repo);
-  repo.createAvatarReview = async input => {
-    try { return await createQuotaAvatarReview(input); }
-    catch (error) { console.error('YDB_SYNTHETIC_AVATAR_REVIEW_ERROR:', error?.message || 'unknown'); throw error; }
-  };
   quotaPendingImages = createS3PendingImageStore({
     FAM_RU_S3_ENDPOINT: 'http://127.0.0.1:9000', FAM_RU_S3_BUCKET: 'synthetic-private',
     FAM_RU_S3_ACCESS_KEY_ID: 'synthetic-access', FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic-secret',
