@@ -151,11 +151,26 @@ test("PR126 general planner runtime test cannot write or alter production", () =
   assert.match(integrationTrialWorkflow, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(integrationTrialWorkflow, /permissions:\n\s+contents: read/);
   assert.match(integrationTrialWorkflow, /FAM_NARROW_TIMEAGO_BENCHMARK: "0"/);
-  assert.match(integrationTrialWorkflow, /uses: actions\/cache@[0-9a-f]{40} # actions\/cache v4/);
+  assert.match(integrationTrialWorkflow, /uses: actions\/cache\/restore@[0-9a-f]{40} # actions\/cache restore v4/);
+  assert.doesNotMatch(integrationTrialWorkflow, /uses: actions\/cache@[0-9a-f]{40}/);
   assert.match(integrationTrialWorkflow, /key: fam-qwen38-27b-iq2xs-v1/);
+  assert.match(integrationTrialWorkflow, /if \[\[ "\$CACHED_SHA" == "\$MODEL_SHA256" \]\]/);
+  assert.match(integrationTrialWorkflow, /Using verified cached Qwen3\.8 weights/);
+  assert.match(integrationTrialWorkflow, /No valid cached weights; downloading pinned Qwen3\.8 file/);
+  const cacheDownloadBranch = integrationTrialWorkflow.match(
+    /if \[\[ "\$CACHED_SHA" == "\$MODEL_SHA256" \]\][\s\S]*?\n          fi\n          SIZE=/,
+  )?.[0];
+  assert.ok(cacheDownloadBranch, "weight download must be guarded by cache verification");
+  assert.match(cacheDownloadBranch, /then[\s\S]*Using verified cached Qwen3\.8 weights[\s\S]*else[\s\S]*curl --fail[\s\S]*\n          fi/);
+  assert.equal(
+    (integrationTrialWorkflow.match(/https:\/\/huggingface\.co\/sammyblues\/Qwen3\.8-27B-IQ2_XS-GGUF/g) ?? []).length,
+    1,
+    "only one model-download URL should exist, inside the cache-miss branch",
+  );
   assert.match(integrationTrialWorkflow, /НЕ вызывай isNaN\(isoOrMs\)/);
   assert.match(integrationTrialWorkflow, /Number\.isFinite\(t\)/);
-  assert.match(integrationTrialWorkflow, /evidence обязательно верни минимум одну точную ссылку/);
+  assert.match(integrationTrialWorkflow, /Если unified_diff непустой, evidence обязательно содержит минимум одну точную ссылку/);
+  assert.match(integrationTrialWorkflow, /верни пустые unified_diff и evidence и укажи конкретное препятствие в root_cause/);
   assert.match(integrationTrialWorkflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
   assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
   assert.match(integrationTrialWorkflow, /QA="report_generation_failed"/);
@@ -168,7 +183,7 @@ test("general Qwen planner stays model-authored with compact JSON and independen
   assert.match(runner, /required: \["finding_status", "files", "plan"\]/);
   assert.match(runner, /\], planSchema, 650\)/);
   assert.match(runner, /required: \["unified_diff", "root_cause", "evidence"\]/);
-  assert.match(runner, /evidence: \{ type: "array", items: \{ type: "string" \}, minItems: 1, maxItems: 8 \}/);
+  assert.match(runner, /evidence: \{ type: "array", items: \{ type: "string" \}, maxItems: 8 \}/);
   assert.match(runner, /Если предлагаешь непустой unified_diff, evidence обязательно содержит минимум одну проверяемую ссылку/);
   assert.match(runner, /verifyModelEvidence\(response\.evidence, sourceByPath\)/);
   assert.match(runner, /Model proposed a patch without verifiable source evidence; patch withheld/);

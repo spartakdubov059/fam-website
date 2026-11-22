@@ -336,7 +336,7 @@ const patchSchema = {
     properties: {
       unified_diff: { type: "string" },
       root_cause: { type: "string" },
-      evidence: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 8 },
+      evidence: { type: "array", items: { type: "string" }, maxItems: 8 },
     },
     required: ["unified_diff", "root_cause", "evidence"],
   },
