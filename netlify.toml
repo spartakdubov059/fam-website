@@ -26,6 +26,9 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Frame-Options = "DENY"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'sha256-qR4uU/hqJ98DQPtPZA0DVR+3xOFL/I2nNEXebsQbB3Y=' 'sha256-mlnLxMC28X1DbBbiNia9ED0UTVh1K9NEaO/GxOGCX0Q=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content"
 
 
 # Allow the GitHub Pages fallback to verify that the primary host is ready.
