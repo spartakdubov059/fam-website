@@ -35,6 +35,10 @@ const integrationTrialWorkflow = readFileSync(
   new URL("../../.github/workflows/fam-qwen38-pr126-general-planner.yml", import.meta.url),
   "utf8",
 );
+const noPatchValidator = readFileSync(
+  new URL("../../scripts/validate-local-agent-no-patch.mjs", import.meta.url),
+  "utf8",
+);
 
 test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
   assert.match(workflow, /workflow_dispatch:/);
@@ -172,7 +176,11 @@ test("PR126 general planner runtime test cannot write or alter production", () =
   assert.match(integrationTrialWorkflow, /Если unified_diff непустой, evidence обязательно содержит минимум одну точную ссылку/);
   assert.match(integrationTrialWorkflow, /верни пустые unified_diff и evidence и укажи конкретное препятствие в root_cause/);
   assert.match(integrationTrialWorkflow, /node --test tests\/agent-benchmark\/time-ago\.test\.mjs/);
-  assert.match(integrationTrialWorkflow, /test "\$QA" = passed/);
+  assert.match(integrationTrialWorkflow, /node scripts\/validate-local-agent-no-patch\.mjs "\$SUMMARY"/);
+  assert.match(integrationTrialWorkflow, /QA="no_patch_validated"/);
+  assert.match(integrationTrialWorkflow, /\[\[ "\$QA" == passed \|\| "\$QA" == no_patch_validated \]\]/);
+  assert.match(noPatchValidator, /report\.verification_status === "not_run_no_patch"/);
+  assert.match(noPatchValidator, /report\.patch_available === false/);
   assert.match(integrationTrialWorkflow, /QA="report_generation_failed"/);
   assert.match(integrationTrialWorkflow, /\[\[ ! -s "\$SUMMARY" && -s "\$PATCH" \]\]/);
   assert.doesNotMatch(integrationTrialWorkflow, /secrets\.|contents: write|gh pr merge|supabase db push/);

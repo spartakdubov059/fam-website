@@ -30,6 +30,7 @@ jobs:
           set -euo pipefail
           node --test tests/security/local-model-json.test.mjs
           node --test tests/security/local-model-patch.test.mjs
+          node --test tests/security/local-model-no-patch.test.mjs
       - name: Restore verified Qwen3.8 weights from cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache restore v4
         with:
@@ -149,14 +150,18 @@ jobs:
                 QA="patch_invalid_or_not_applicable"
               fi
             else
-              QA="no_patch"
+              if [[ -s "$SUMMARY" ]] && node scripts/validate-local-agent-no-patch.mjs "$SUMMARY"; then
+                QA="no_patch_validated"
+              else
+                QA="invalid_no_patch_report"
+              fi
             fi
           fi
           echo "## Qwen3.8-27B IQ2_XS" >> "$GITHUB_STEP_SUMMARY"
           echo "- Independent QA: $QA" >> "$GITHUB_STEP_SUMMARY"
           if [[ -s "$SUMMARY" ]]; then cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"; fi
           echo "Qwen3.8 independent QA: $QA"
-          test "$QA" = passed
+          [[ "$QA" == passed || "$QA" == no_patch_validated ]]
       - name: Stop model server
         if: always()
         run: |
