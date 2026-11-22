@@ -1,5 +1,5 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { Uint64 } from '@ydbjs/value/primitive';
+import { Uint32, Uint64 } from '@ydbjs/value/primitive';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -153,7 +153,7 @@ export function createYdbListingsRepository(sql) {
           (issuer, subject, user_id, email_digest, code_digest, issued_seconds, expires_seconds,
            attempt_count, window_started_seconds, send_count, sent_seconds, verified_seconds)
           VALUES (${issuer}, ${subject}, ${userId}, ${emailDigest}, ${codeDigest}, ${new Uint64(BigInt(currentSeconds))}, ${new Uint64(BigInt(expiresSeconds))},
-            0, ${new Uint64(BigInt(nextWindowStart))}, ${nextSendCount}, ${new Uint64(BigInt(currentSeconds))}, 0);`;
+            ${new Uint32(0)}, ${new Uint64(BigInt(nextWindowStart))}, ${new Uint32(nextSendCount)}, ${new Uint64(BigInt(currentSeconds))}, ${new Uint64(0n)});`;
         return { ok: true, already_verified: false };
       });
     },
@@ -180,7 +180,7 @@ export function createYdbListingsRepository(sql) {
         const expected = Buffer.from(String(current.code_digest || ''), 'hex');
         const provided = Buffer.from(codeDigest, 'hex');
         if (expected.length !== 32 || !timingSafeEqual(expected, provided)) {
-          await tx`UPDATE fam_role_email_verifications SET attempt_count = ${attempts + 1}
+          await tx`UPDATE fam_role_email_verifications SET attempt_count = ${new Uint32(attempts + 1)}
             WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId}
               AND email_digest = ${emailDigest} AND verified_seconds = 0;`;
           return { ok: false, code: attempts + 1 >= 5 ? 'verification_code_locked' : 'invalid_verification_code' };
