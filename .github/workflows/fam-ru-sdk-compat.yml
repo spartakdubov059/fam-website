@@ -9,6 +9,14 @@ on:
       - "ru-migration/app/web/**"
       - "ru-migration/deploy/**"
       - ".github/workflows/fam-ru-sdk-compat.yml"
+  pull_request:
+    branches: ["migration/yandex-cloud"]
+    paths:
+      - "ru-migration/compat/**"
+      - "ru-migration/app/backend/**"
+      - "ru-migration/app/web/**"
+      - "ru-migration/deploy/**"
+      - ".github/workflows/fam-ru-sdk-compat.yml"
   workflow_dispatch:
 
 permissions:
