@@ -1,4 +1,8 @@
 import test from "node:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, fileURLToPath } from "node:path";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import {
   extractPatchPaths,
@@ -122,5 +126,32 @@ test("generated patches cannot rewrite independent test suites", () => {
       /outside the FAM agent allowlist/,
       path,
     );
+  }
+});
+
+test("validator CLI writes a single clean approval status for downstream PR jobs", () => {
+  const root = mkdtempSync(join(tmpdir(), "fam-validator-output-"));
+  try {
+    const patchPath = join(root, "candidate.patch");
+    const reportPath = join(root, "summary.json");
+    const outputPath = join(root, "github-output.txt");
+    writeFileSync(patchPath, validPatch + "\n");
+    writeFileSync(reportPath, JSON.stringify(lowRisk));
+    writeFileSync(outputPath, "");
+    const cliPath = fileURLToPath(new URL("../../scripts/validate-local-agent-patch.mjs", import.meta.url));
+    const run = spawnSync(process.execPath, [cliPath, patchPath, reportPath], {
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_OUTPUT: outputPath },
+    });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    assert.deepEqual(readFileSync(outputPath, "utf8").split("\n"), [
+      "requires_approval=false",
+      "changed_paths=docs/help.md",
+      "",
+    ]);
+    const parsed = JSON.parse(run.stdout);
+    assert.equal(parsed.requires_approval, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
