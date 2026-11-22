@@ -1199,9 +1199,9 @@ try {
     WHERE hour_bucket = Unwrap(CAST(${coderBucket.toISOString()} AS Timestamp))
       AND event_code = 'js_runtime' AND page_area = 'auth';`;
   for (const [index, [eventCode, pageArea, taskKey]] of [
-    ['notifications_load_failed', 'notifications', 'audit_client_resilience'],
-    ['database_request_failed', 'database', 'audit_client_resilience'],
-    ['auth_backend_failed', 'auth', 'audit_client_resilience'],
+    ['notifications_load_failed', 'notifications', 'audit_frontend_runtime'],
+    ['database_request_failed', 'database', 'audit_frontend_runtime'],
+    ['auth_backend_failed', 'auth', 'audit_frontend_runtime'],
   ].entries()) {
     const eventBucket = new Date(Date.now() - (index + 1) * 60 * 60 * 1000);
     eventBucket.setUTCMinutes(0, 0, 0);
