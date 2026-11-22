@@ -77,13 +77,6 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - name: Начать аренду после дорогой подготовки модели
-        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.coder-queue.outputs.claimed == 'true'
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ steps.coder-queue.outputs.task_id }}
-        run: node scripts/fam-agent-bridge.mjs start
       - name: Восстановить бесплатные веса модели из кэша
         if: steps.preflight.outputs.schedule_enabled == 'true'
         id: model-cache
@@ -152,6 +145,14 @@ jobs:
             -DLLAMA_USE_PREBUILT_UI=OFF
           cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
           mkdir -p "$RUNNER_TEMP/llama.cpp/build/bin"
+
+      - name: Начать аренду после дорогой подготовки модели
+        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.coder-queue.outputs.claimed == 'true'
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ steps.coder-queue.outputs.task_id }}
+        run: node scripts/fam-agent-bridge.mjs start
 
       - name: Запустить локальную модель и подготовить patch
         if: steps.preflight.outputs.schedule_enabled == 'true'

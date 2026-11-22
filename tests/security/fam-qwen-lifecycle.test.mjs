@@ -40,4 +40,6 @@ test("scheduled runs without a queued task skip model download and build", () =>
   assert.match(workflow, /steps\.coder-queue\.outputs\.claimed/);
   assert.match(workflow, /Разрешённой задачи нет; загрузка модели и сборка пропущены/);
   assert.match(workflow, /steps\.preflight\.outputs\.schedule_enabled == 'true'/);
+  assert.ok(workflow.indexOf("Собрать llama.cpp") < workflow.indexOf("Начать аренду после дорогой подготовки модели"));
+  assert.ok(workflow.indexOf("Начать аренду после дорогой подготовки модели") < workflow.indexOf("Запустить локальную модель"));
 });
