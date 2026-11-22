@@ -102,6 +102,8 @@ jobs:
           done
       - name: Exercise schema and repository with synthetic data
         run: node ru-migration/compat/integration-ydb.mjs
+      - name: Exercise the scheduled school agent report on synthetic data
+        run: node ru-migration/compat/integration-school-agent-report.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true
