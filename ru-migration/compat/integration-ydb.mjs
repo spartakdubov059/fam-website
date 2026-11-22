@@ -119,6 +119,7 @@ try {
   });
   const mediaApi = createMediaApi({ authenticate, resolveActor, repository: repo, pendingImages: syntheticPendingImages });
   const ownerPrivatePhotoKey = 'pending/11111111-1111-4111-8111-111111111111/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.webp';
+  await repo.registerPendingImage('11111111-1111-4111-8111-111111111111', ownerPrivatePhotoKey);
   privateObjects.set(ownerPrivatePhotoKey, { body: Buffer.from('synthetic-webp'), contentType: 'image/webp' });
   const ownerPrivateListing = await repo.createListing({ user_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school',
     title: 'Синтетическое неопубликованное объявление автора', description: 'Проверка доступа автора к своему одобренному фото',
