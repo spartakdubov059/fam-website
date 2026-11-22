@@ -228,11 +228,10 @@ jobs:
             exit 1
           fi
           git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          # Validator CLI already writes requires_approval and changed_paths to GITHUB_OUTPUT.
           node scripts/validate-local-agent-patch.mjs \
             "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
             "$RUNNER_TEMP/fam-agent/summary.json" > "$RUNNER_TEMP/fam-agent/safety.json"
-          node -e "const s=require(process.argv[1]); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'requires_approval='+String(s.requires_approval)+'\\n')" \
-            "$RUNNER_TEMP/fam-agent/safety.json"
           git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
           mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
           if (( ${#changed_files[@]} == 0 )); then
