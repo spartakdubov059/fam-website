@@ -1,0 +1,36 @@
+openapi: 3.0.0
+info:
+  title: FAM RU
+  description: >-
+    Public HTTP entry point for the isolated Russian FAM deployment. The
+    Cloud Function behind this gateway must be private; application routes
+    enforce user authentication and school authorization.
+  version: 1.0.0
+paths:
+  /:
+    x-yc-apigateway-any-method:
+      summary: FAM RU root and static shell
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_PRIVATE_FUNCTION_ID
+        tag: REPLACE_WITH_IMMUTABLE_FUNCTION_VERSION_TAG
+        service_account_id: REPLACE_WITH_GATEWAY_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
+  /{proxy+}:
+    x-yc-apigateway-any-method:
+      summary: FAM RU application routes and static assets
+      parameters:
+        - name: proxy
+          in: path
+          required: false
+          schema:
+            type: string
+            default: "-"
+          style: simple
+          explode: false
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_PRIVATE_FUNCTION_ID
+        tag: REPLACE_WITH_IMMUTABLE_FUNCTION_VERSION_TAG
+        service_account_id: REPLACE_WITH_GATEWAY_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
