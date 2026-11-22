@@ -6,9 +6,15 @@ import cloudFunction from '../cloud-function.cjs';
 
 test('Yandex Cloud Functions CommonJS entrypoint loads the ES module handler', async () => {
   const response = await cloudFunction.handler({ httpMethod: 'GET', path: '/', headers: {}, body: '' }, {});
-  assert.equal(response.statusCode, 200);
-  assert.match(response.headers['content-type'], /text\/html/);
-  assert.match(response.body, /FAM/);
+  assert.ok([200, 503].includes(response.statusCode));
+  if (response.statusCode === 503) {
+    assert.match(response.headers['content-type'], /application\/json/);
+    assert.deepEqual(JSON.parse(response.body), { ok: false, error: 'backend_not_ready' },
+      'an unconfigured isolated copy must fail closed without preventing module loading');
+  } else {
+    assert.match(response.headers['content-type'], /text\/html/);
+    assert.match(response.body, /FAM/);
+  }
 });
 
 test('Yandex function adapter serves the existing static Russian frontend with security headers', async () => {
