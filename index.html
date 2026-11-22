@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-qR4uU/hqJ98DQPtPZA0DVR+3xOFL/I2nNEXebsQbB3Y=' 'sha256-mlnLxMC28X1DbBbiNia9ED0UTVh1K9NEaO/GxOGCX0Q=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
   <script>
     // Netlify is the primary FAM address. Probe it before leaving this fallback copy.
     // If the phone's network cannot reach Netlify, keep the GitHub Pages app open.
@@ -75,7 +76,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
   <script src="./supabase-cdn-fallback.js"></script>
-  <script id="famSupabaseSdk" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script id="famSupabaseSdk" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0" integrity="sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb" crossorigin="anonymous"></script>
   <script src="price-format.js"></script>
   <script src="./school-pulse.js"></script>
   <link rel="stylesheet" href="./school-pulse.css">
@@ -1653,7 +1654,7 @@
         <div class="form-group"><label for="authPersonType">Кто вы?</label><select id="authPersonType" class="form-control" disabled><option value="student">Ученик</option><option value="school_staff">Учитель или другой сотрудник школы</option><option value="parent">Родитель или законный представитель</option></select></div><div class="form-group" id="authClassGroup"><label for="authClassName">Класс</label><select id="authClassName" class="form-control" disabled><option value="">Выберите класс</option></select></div><div class="form-group hidden" id="authStaffPositionGroup"><label for="authStaffPosition">Должность в школе</label><input id="authStaffPosition" class="form-control" maxlength="100" disabled placeholder="Например, учитель математики"></div>
       </div>
       <div class="form-group"><label for="authEmail">Почта</label><input type="email" id="authEmail" class="form-control" required maxlength="100"></div>
-      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required minlength="6"></div>
+      <div class="form-group"><label for="authPassword">Пароль</label><input type="password" id="authPassword" class="form-control" required maxlength="128" autocomplete="current-password"></div>
       <button type="submit" class="button button-primary" style="width:100%;">Войти</button>
       <div style="text-align:center; margin-top:10px;"><button type="button" id="switchAuthBtn" style="background:none; border:none; color:var(--violet); font-size:12px; font-weight:700;">Создать аккаунт</button></div>
       <div id="authMsg" style="text-align:center; color:var(--danger); margin-top:8px; font-size:12px;"></div>
@@ -1752,8 +1753,8 @@
 </div>
 
 <script>
-const FAM_DIAGNOSTICS_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-const FAM_DIAGNOSTICS_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+const FAM_SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
+const FAM_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
 const FAM_DIAGNOSTIC_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
   "listings_load_failed", "notifications_load_failed",
@@ -1764,10 +1765,10 @@ const FAM_DIAGNOSTIC_AREAS = new Set(["auth", "listings", "notifications", "data
 function reportFamSiteError(eventCode, pageArea) {
   if (!FAM_DIAGNOSTIC_CODES.has(eventCode) || !FAM_DIAGNOSTIC_AREAS.has(pageArea)) return;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-  fetch(FAM_DIAGNOSTICS_URL + "/rest/v1/rpc/report_fam_site_error", {
+  fetch(FAM_SUPABASE_URL + "/rest/v1/rpc/report_fam_site_error", {
     method: "POST",
     headers: {
-      "apikey": FAM_DIAGNOSTICS_KEY,
+      "apikey": FAM_SUPABASE_PUBLISHABLE_KEY,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ p_event_code: eventCode, p_page_area: pageArea }),
@@ -1792,8 +1793,8 @@ window.onunhandledrejection = function() {
     return;
   }
 
-  const SUPABASE_URL = "https://tfacqpljrvfpcrhdovbu.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_r-hL_4KacupEsWa4v0BLPQ_O5drs3aG";
+  const SUPABASE_URL = FAM_SUPABASE_URL;
+  const SUPABASE_KEY = FAM_SUPABASE_PUBLISHABLE_KEY;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let user = null, profile = null;
@@ -2789,7 +2790,15 @@ window.onunhandledrejection = function() {
 
   function showAIThinking(containerId, text = "ИИ анализирует") {
     const c = $(containerId);
-    if (c) c.innerHTML = `<div class="ai-thinking"><span>${text}</span><span>...</span></div>`;
+    if (!c) return;
+    const status = document.createElement("div");
+    status.className = "ai-thinking";
+    const message = document.createElement("span");
+    message.textContent = String(text);
+    const dots = document.createElement("span");
+    dots.textContent = "...";
+    status.append(message, dots);
+    c.replaceChildren(status);
   }
   function hideAIThinking(containerId) { const c = $(containerId); if (c) c.innerHTML = ''; }
 
@@ -2816,7 +2825,10 @@ window.onunhandledrejection = function() {
       if (results[1]?.error || results.slice(2).some(result => result?.error)) {
         reportFamSiteError("database_request_failed", "database");
       }
-      if (!results[0].error) listings = results[0].data || [];
+      if (!results[0].error) {
+        listings = results[0].data || [];
+        await hydrateListingImages(listings);
+      }
       if (!results[1].error) occupancy = results[1].data || [];
       if (user && user.id) {
         // A single failed request must not erase already-loaded account data.
@@ -2871,7 +2883,15 @@ window.onunhandledrejection = function() {
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stopHeroTimer();
-    else if (currentTab === "board") startHeroTimer();
+    else {
+      if (currentTab === "board") startHeroTimer();
+      if (user && listings.some(listing => listing.image_url && listing._listingImageSignedUntil <= Date.now() + 60_000)) {
+        void hydrateListingImages(listings).then(() => {
+          renderListings();
+          renderFavorites();
+        });
+      }
+    }
   });
 
   function renderHero() {
@@ -2944,8 +2964,8 @@ window.onunhandledrejection = function() {
       failed: "Файл фотографии больше недоступен для проверки. Текст объявления сохранён — чтобы добавить изображение, загрузите его повторно.",
       none: "К объявлению пока не добавлена фотография."
     };
-    const photoHTML = listing.image_url
-      ? '<img class="listing-detail-image" src="' + esc(listing.image_url) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">'
+    const photoHTML = listing._listingImageSignedUrl
+      ? '<img class="listing-detail-image" src="' + esc(listing._listingImageSignedUrl) + '" alt="' + esc(listing.title || "Фото объявления") + '" decoding="async">'
       : '<div class="listing-detail-photo-placeholder" role="status"><strong>' + (photoStatus === "pending" ? "Фото проверяется" : "Фотография пока недоступна") + '</strong><span>' + esc(photoMessages[photoStatus] || photoMessages.none) + '</span></div>';
     const description = String(listing.description || "").trim();
     const eventDate = listing.is_event && listing.event_date ? new Date(listing.event_date + "T00:00:00").toLocaleDateString("ru-RU") : "";
@@ -2964,7 +2984,7 @@ window.onunhandledrejection = function() {
     const photoLabel = listingPhotoStatusText(photoStatus);
     const photoStateClass = photoStatus === "manual_review" ? "is-review" : (photoStatus === "rejected" || photoStatus === "failed" ? "is-rejected" : "");
     const photoStateHTML = photoLabel ? '<div class="l-photo-state ' + photoStateClass + '">' + esc(photoLabel) + '</div>' : "";
-    const img = l.image_url ? '<img src="' + esc(l.image_url) + '" loading="lazy" alt="' + esc(l.title) + '" decoding="async">' : '<div class="card-placeholder"></div>';
+    const img = l._listingImageSignedUrl ? '<img src="' + esc(l._listingImageSignedUrl) + '" loading="lazy" alt="' + esc(l.title) + '" decoding="async">' : '<div class="card-placeholder"></div>';
     const description = String(l.description || "").trim();
     const descriptionHTML = description ? '<p class="l-description">' + esc(description) + '</p>' : "";
     const favClass = isFavorite(l.id) ? 'active' : '';
@@ -3329,6 +3349,58 @@ window.onunhandledrejection = function() {
         : [];
     }
     if (rows?.length) { renderIdeas(); renderIdeaFolderContent(); }
+  }
+
+  function parseListingImageObjectReference(imageUrl) {
+    try {
+      const url = new URL(imageUrl);
+      if (url.origin !== SUPABASE_URL) return null;
+      const match = url.pathname.match(/^\/storage\/v1\/object\/public\/(listings-images|listing-images)\/(.+)$/);
+      if (!match) return null;
+      const path = decodeURIComponent(match[2]);
+      if (!path || path.length > 512 || path.includes("\\") || path.split("/").some(part => !part || part === "." || part === "..")) return null;
+      if (match[1] === "listings-images" && !/^listing_[0-9a-f-]{36}_[0-9a-f-]{36}\.(?:jpg|png|webp)$/i.test(path)) return null;
+      return { bucket: match[1], path };
+    } catch {
+      return null;
+    }
+  }
+
+  async function hydrateListingImages(rows) {
+    const groups = new Map();
+    for (const listing of rows || []) {
+      if (!listing.image_url || listing.photo_status !== "approved") continue;
+      if (listing._listingImageSignedUrl && listing._listingImageSignedUntil > Date.now() + 60_000) continue;
+      const reference = parseListingImageObjectReference(listing.image_url);
+      if (!reference) continue;
+      const key = reference.bucket + "\n" + reference.path;
+      if (!groups.has(key)) groups.set(key, { ...reference, listings: [] });
+      groups.get(key).listings.push(listing);
+    }
+
+    const byBucket = new Map();
+    for (const reference of groups.values()) {
+      if (!byBucket.has(reference.bucket)) byBucket.set(reference.bucket, []);
+      byBucket.get(reference.bucket).push(reference);
+    }
+
+    await Promise.all([...byBucket].map(async ([bucket, references]) => {
+      const { data, error } = await sb.storage.from(bucket).createSignedUrls(
+        references.map(reference => reference.path),
+        3600,
+      );
+      for (const [index, reference] of references.entries()) {
+        const item = !error && Array.isArray(data) ? data[index] : null;
+        const signedUrl = typeof item?.signedUrl === "string"
+          && item.signedUrl.startsWith(SUPABASE_URL + "/storage/v1/object/sign/" + bucket + "/")
+          ? item.signedUrl
+          : null;
+        for (const listing of reference.listings) {
+          listing._listingImageSignedUrl = signedUrl;
+          listing._listingImageSignedUntil = signedUrl ? Date.now() + 55 * 60_000 : Date.now() + 60_000;
+        }
+      }
+    }));
   }
 
   function renderIdeaImages(idea) {
@@ -4852,6 +4924,10 @@ window.onunhandledrejection = function() {
   $("switchAuthBtn").onclick = () => {
     const isRegistration = $("authTitle").textContent !== "Регистрация";
     $("authTitle").textContent = isRegistration ? "Регистрация" : "Вход";
+    const passwordField = $("authPassword");
+    passwordField.autocomplete = isRegistration ? "new-password" : "current-password";
+    if (isRegistration) passwordField.setAttribute("minlength", "8");
+    else passwordField.removeAttribute("minlength");
     $("schoolGroup").classList.toggle("hidden", !isRegistration);
     const identityFields = $("registerIdentityFields");
     identityFields?.classList.toggle("hidden", !isRegistration);
