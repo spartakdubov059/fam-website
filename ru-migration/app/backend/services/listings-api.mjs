@@ -11,7 +11,7 @@ import { hasFreshConfirmation } from '../auth/fresh-confirmation.mjs';
 import { createRoleEmailVerification } from './role-email-verification.mjs';
 
 export function createListingsApi({ authenticate, resolveActor, repository, review, safetyKey, schools = SCHOOL_CATALOG,
-  pendingImages = null, now = Date.now, verificationKey, sendRoleVerificationEmail, emailVerification = null }) {
+  pendingImages = null, now = Date.now, verificationKey, sendRoleVerificationEmail, getPostboxAccessToken = null, emailVerification = null }) {
   const schoolPulseApi = createSchoolPulseApi({ authenticate, resolveActor, repository, now });
   const accountDeletionApi = createAccountDeletionApi({ authenticate, resolveActor, repository, pendingImages, now });
   const siteErrorTelemetry = createSiteErrorTelemetry({ repository, now: () => new Date(now()) });
@@ -289,7 +289,11 @@ export function createListingsApi({ authenticate, resolveActor, repository, revi
       if (suspensionBlock) return suspensionBlock;
       if (input?.action === 'send') {
         try {
-          const result = await roleEmailVerification.start(identity, actor, functionContext?.token?.access_token);
+          let accessToken = functionContext?.token?.access_token;
+          if (!accessToken && typeof getPostboxAccessToken === 'function') {
+            try { accessToken = await getPostboxAccessToken(); } catch { accessToken = null; }
+          }
+          const result = await roleEmailVerification.start(identity, actor, accessToken);
           if (result?.ok) return { status: result.already_verified ? 200 : 202, body: { ok: true, sent: result.sent === true, already_verified: result.already_verified === true } };
           const status = ['email_send_cooldown', 'email_send_rate_limited'].includes(result?.code) ? 429
             : ['student_profile_required', 'verified_email_required'].includes(result?.code) ? 403 : 503;

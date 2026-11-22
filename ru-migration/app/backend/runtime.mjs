@@ -23,6 +23,7 @@ import { createScheduledSafeAgentRunner, createScheduledCoderTaskProducer } from
 import { checkSystemdTimerHealth } from './services/systemd-timer-health.mjs';
 import { createYdbSchemaHealthCheck } from './services/ydb-schema-health.mjs';
 import { createYandexPostboxSender } from './services/yandex-postbox.mjs';
+import { createYandexIamMetadataTokenProvider } from './services/yandex-iam-metadata.mjs';
 import { SCHOOL_CATALOG } from './policies/school-catalog.mjs';
 
 export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, databaseReady, mediaConfigured }) {
@@ -102,6 +103,7 @@ export async function createRuntime(env = process.env) {
   const resolveActor = createDatabaseActorResolver(sql);
   const repository = createYdbListingsRepository(sql);
   const sendRoleVerificationEmail = createYandexPostboxSender({ fromEmail: env.FAM_RU_POSTBOX_FROM_EMAIL });
+  const getPostboxAccessToken = sendRoleVerificationEmail ? createYandexIamMetadataTokenProvider() : null;
   const agentTaskQueue = createYdbAgentTaskQueue(sql);
   const coderTaskBridge = createCoderTaskBridge({ queue: agentTaskQueue, token: env.FAM_RU_CODER_WORKER_TOKEN });
   const systemHealthTask = createSystemHealthTaskHandler({
@@ -139,7 +141,7 @@ export async function createRuntime(env = process.env) {
   } });
   const guardSuspendedWrites = createSuspensionWriteGuard({ authenticate, resolveActor, repository });
   const listingsApi = guardSuspendedWrites(createListingsApi({ authenticate, resolveActor, repository, pendingImages, safetyKey,
-    verificationKey: env.FAM_RU_SESSION_SECRET, sendRoleVerificationEmail }));
+    verificationKey: env.FAM_RU_SESSION_SECRET, sendRoleVerificationEmail, getPostboxAccessToken }));
   const mediaApi = guardSuspendedWrites(createMediaApi({ authenticate, resolveActor, pendingImages, repository }));
   return {
     listingsApi,

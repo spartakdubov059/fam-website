@@ -290,6 +290,28 @@ test('school role requests require Yandex email verification and only the verifi
   assert.equal(roleRequests, 1);
 });
 
+test('VM role email verification obtains a server IAM token without Cloud Functions context', async () => {
+  const identity = { issuer: 'https://login.yandex.ru', subject: 'vm-synthetic-student', email: 'student@example.test' };
+  const actor = { id: 'student-id', school_id: 'school-a', role: 'student' };
+  let sent;
+  const repository = {
+    getActiveAccountSuspension: async () => null,
+    startRoleEmailVerification: async () => ({ ok: true }),
+    clearRoleEmailChallenge: async () => true,
+    verifyRoleEmailVerification: async () => ({ ok: true, verified: true }),
+    isRoleEmailVerified: async () => false,
+  };
+  const handler = createListingsApi({ authenticate: async () => identity, resolveActor: async () => actor, repository,
+    verificationKey: 'test verification secret has at least thirty two bytes',
+    sendRoleVerificationEmail: async value => { sent = value; },
+    getPostboxAccessToken: async () => 'synthetic-vm-iam-token-0123456789',
+    now: () => 1_800_000_000_000, createCode: () => '246810' });
+  const request = req({ action: 'send' }); request.url = '/api/v1/role-requests/email-verification';
+  assert.deepEqual(await handler(request), { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.equal(sent.accessToken, 'synthetic-vm-iam-token-0123456789');
+  assert.equal(sent.to, identity.email);
+});
+
 test('role request submission and review fail closed for unprovisioned or non-admin profiles', async () => {
   let writes = 0;
   const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://issuer.example', subject: 'user' }),
