@@ -117,9 +117,12 @@ export async function verifyDomains({
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
 
-  const mismatches = latest.filter(result => !result.matches).map(result =>
-    `${result.domain} ${result.path}: ${result.status}${result.error ? ` (${result.error})` : ""}`
-  );
+  const mismatches = latest.filter(result => !result.matches).map(result => {
+    const expectedDigest = expected.get(result.path);
+    const actual = result.digest ? result.digest.slice(0, 12) : "unavailable";
+    const expectedPrefix = expectedDigest ? expectedDigest.slice(0, 12) : "unavailable";
+    return `${result.domain} ${result.path}: status=${result.status}, sha256=${actual}, expected=${expectedPrefix}${result.error ? ` (${result.error})` : ""}`;
+  });
   throw new Error(`Domains did not serve the same source files before timeout. ${mismatches.join("; ")}`);
 }
 
