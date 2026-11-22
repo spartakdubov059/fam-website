@@ -115,7 +115,11 @@ export function createYandexFunctionHandler({ requestHandler = createRequestHand
       await requestHandler(req, res);
       if (!ended) return toFunctionResponse(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
         JSON.stringify({ ok: false, error: 'empty_backend_response' }));
-      return toFunctionResponse(statusCode, headers, responseBody);
+      const response = toFunctionResponse(statusCode, headers, responseBody);
+      // A Node HTTP server suppresses bodies for HEAD and no-content responses.
+      // Cloud Functions expects the function to return that behavior explicitly.
+      if (req.method === 'HEAD' || [204, 205, 304].includes(statusCode)) response.body = '';
+      return response;
     } catch {
       return toFunctionResponse(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
         JSON.stringify({ ok: false, error: 'backend_request_failed' }));
