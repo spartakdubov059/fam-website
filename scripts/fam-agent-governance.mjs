@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
+import { fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -127,7 +128,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -154,6 +155,22 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
       "; случаев: " + w.count +
       (w.prs?.length ? "; PR: " + w.prs.map((n) => "#" + n).join(", ") : ""));
   }
+  lines.push("", "## SUPABASE — единая техническая очередь");
+  if (queueHealth && queueLink === "connected") {
+    lines.push(
+      "Связь подтверждена: ожидают " + queueHealth.queued +
+      "; захвачены " + queueHealth.claimed +
+      "; выполняются " + queueHealth.in_progress +
+      "; с ошибками за сутки " + queueHealth.failed_last_24h +
+      "; просроченные аренды " + queueHealth.expired_leases +
+      "; возраст старейшей ожидающей, минут " + queueHealth.oldest_queued_minutes + "."
+    );
+  } else if (queueLink === "not_configured") {
+    lines.push("Связь Supabase → GitHub не настроена: проверка очереди не выполнялась.");
+  } else {
+    lines.push("Связь Supabase → GitHub недоступна или ответ отклонён; здоровье очереди не подтверждено.");
+  }
+  lines.push("В штаб поступают только счётчики задач; тексты, ID и данные учеников не передаются.");
   lines.push("", "## RECRUITER — предложения по найму");
   if (!proposals.length) lines.push("Нет достаточных оснований создавать новые роли.");
   for (const p of proposals) {
@@ -231,13 +248,42 @@ export async function main() {
   if (!Array.isArray(workflows.workflow_runs)) throw new Error("Не удалось получить запуски кодера.");
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
+  // The same protected server bridge supplies only predefined aggregate counts.
+  // Raw Supabase task payloads and student content never enter GitHub.
+  const bridgeUrl = process.env.FAM_AGENT_BRIDGE_URL || "";
+  const bridgeToken = process.env.FAM_AGENT_WORKER_TOKEN || "";
+  let queueHealth = null;
+  let queueLink = "not_configured";
+  if (bridgeUrl && bridgeToken) {
+    try {
+      queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
+      warnings.push(...inspectQueueHealth(queueHealth));
+      queueLink = "connected";
+    } catch {
+      queueLink = "unavailable";
+      warnings.push({
+        code: "supabase_bridge_unavailable",
+        severity: "medium",
+        count: 1,
+        message: "Не удалось получить защищённые агрегаты очереди Supabase",
+      });
+    }
+  } else if (bridgeUrl || bridgeToken) {
+    queueLink = "incomplete_configuration";
+    warnings.push({
+      code: "supabase_bridge_incomplete",
+      severity: "medium",
+      count: 1,
+      message: "Не полностью настроено подключение штаба к защищённой очереди Supabase",
+    });
+  }
   const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
   const integrationPlan = buildIntegrationPlan({
     pulls, disputes,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   const report = makeReport({
-    disputes, warnings, proposals, integrationPlan, count: selected.length,
+    disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   if (process.env.GITHUB_STEP_SUMMARY) {
