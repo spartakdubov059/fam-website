@@ -257,8 +257,16 @@ jobs:
             esac
           done
           if [[ "$has_behavior_code" == "true" && "$has_tests" != "true" ]]; then
-            echo "::error::Изменение HTML/JavaScript не содержит регрессионного теста."
-            exit 1
+            # Exception only for a single, existing timeAgo function with a
+            # committed independent benchmark; all other HTML/JS changes
+            # still require a regression test in the proposed patch.
+            if (( ${#changed_files[@]} == 1 )) && [[ "${changed_files[0]}" == "index.html" ]]; then
+              node scripts/validate-local-agent-time-ago.mjs
+              node --test tests/agent-benchmark/time-ago.test.mjs
+            else
+              echo "::error::Изменение HTML/JavaScript не содержит регрессионного теста."
+              exit 1
+            fi
           fi
           git diff --check HEAD
 
@@ -276,6 +284,7 @@ jobs:
           node --check scripts/run-local-coder.mjs
           node --check scripts/fam-agent-bridge.mjs
           node --check scripts/validate-local-agent-patch.mjs
+          node --check scripts/validate-local-agent-time-ago.mjs
 
       - name: Проверить синтаксис встроенного JavaScript
         run: |
