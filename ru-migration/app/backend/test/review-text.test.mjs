@@ -24,6 +24,17 @@ test('serious local flags remain available to the Russian incident writer after 
   assert.equal(result.action, 'pending');
   assert.equal(result.local_flag, 'serious_hate_or_threat');
 });
+test('sensitive safety requests stay pending even if a reviewer would approve them', async () => {
+  for (const [text, code] of [
+    ['Скинь мне код из СМС для входа в аккаунт.', 'sensitive_data_safety_review'],
+    ['Пришлите номер паспорта для оформления.', 'sensitive_data_safety_review'],
+  ]) {
+    let called = false;
+    const result = await reviewText(text, { review: async () => { called = true; return { action: 'ok' }; } });
+    assert.equal(called, false);
+    assert.deepEqual(result, { action: 'pending', reason_code: code, local_flag: code });
+  }
+});
 test('empty and oversized input is rejected', async () => {
   assert.equal((await reviewText('   ')).reason_code, 'invalid_text');
   assert.equal((await reviewText('a'.repeat(10001))).reason_code, 'invalid_text');

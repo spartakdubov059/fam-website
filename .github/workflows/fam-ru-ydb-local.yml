@@ -1,7 +1,7 @@
 name: FAM RU local YDB integration
 on:
   push:
-    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next"]
+    branches: ["migration/yandex-cloud", "codex/fam-ru-offline-safety-review", "codex/fam-ru-port-next", "codex/fam-ru-photo-access-guard"]
     paths:
       - "ru-migration/app/backend/**"
       - "ru-migration/compat/**"

@@ -10,6 +10,9 @@ const CODER_EVENT_CODES = Object.freeze({
   js_runtime: 'audit_frontend_runtime',
   unhandled_rejection: 'audit_frontend_runtime',
   listings_load_failed: 'audit_client_resilience',
+  notifications_load_failed: 'audit_client_resilience',
+  database_request_failed: 'audit_client_resilience',
+  auth_backend_failed: 'audit_client_resilience',
 });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = 'fam-ru-safe-worker-v1';
@@ -74,7 +77,8 @@ export function createYdbAgentTaskQueue(sql) {
         const rows = await tx`SELECT event_code, page_area, SUM(event_count) AS occurrences
           FROM fam_site_error_counts
           WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
-            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed')
+            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed',
+              'notifications_load_failed', 'database_request_failed', 'auth_backend_failed')
           GROUP BY event_code, page_area HAVING SUM(event_count) >= 3
           ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
         const event = rows?.[0]?.[0];
@@ -229,6 +233,48 @@ export function createYdbAgentTaskQueue(sql) {
           VALUES (${randomUUID()}, ${id}, ${status}, ${WORKER_ID}, ${summary}, CurrentUtcTimestamp());`;
         return true;
       });
+    },
+
+    async getAgentTaskQueueHealth() {
+      const [statuses, failed, expired, oldest] = await Promise.all([
+        sql`SELECT status, COUNT(*) AS count FROM fam_agent_tasks GROUP BY status;`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status = 'failed'
+          AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status IN ('claimed', 'in_progress')
+          AND lease_expires_at <= CurrentUtcTimestamp();`,
+        sql`SELECT MIN(created_at) AS oldest_queued_at FROM fam_agent_tasks WHERE status = 'queued';`,
+      ]);
+      const counts = { queued: 0, claimed: 0, in_progress: 0 };
+      for (const row of statuses?.[0] ?? []) {
+        if (!Object.hasOwn(counts, row.status) && !['failed', 'blocked', 'completed', 'cancelled'].includes(row.status)) {
+          throw new TypeError('invalid agent task status');
+        }
+        if (Object.hasOwn(counts, row.status)) {
+          const value = Number(row.count);
+          if (!Number.isSafeInteger(value) || value < 0 || value > 10_000_000) throw new TypeError('invalid agent task count');
+          counts[row.status] = value;
+        }
+      }
+      const failedLast24 = Number(failed?.[0]?.[0]?.count ?? 0);
+      const expiredLeases = Number(expired?.[0]?.[0]?.count ?? 0);
+      if (![failedLast24, expiredLeases].every(value => Number.isSafeInteger(value) && value >= 0 && value <= 10_000_000)) {
+        throw new TypeError('invalid agent task health count');
+      }
+      const oldestValue = oldest?.[0]?.[0]?.oldest_queued_at;
+      const oldestMs = oldestValue instanceof Date ? oldestValue.getTime()
+        : typeof oldestValue === 'string' ? Date.parse(oldestValue) : NaN;
+      const health = {
+        queued: counts.queued,
+        claimed: counts.claimed,
+        in_progress: counts.in_progress,
+        failed_last_24h: failedLast24,
+        expired_leases: expiredLeases,
+        oldest_queued_minutes: Number.isFinite(oldestMs) ? Math.max(0, Math.floor((Date.now() - oldestMs) / 60_000)) : 0,
+      };
+      if (Object.values(health).some(value => !Number.isSafeInteger(value) || value < 0 || value > 10_000_000)) {
+        throw new TypeError('invalid agent task health age');
+      }
+      return health;
     },
 
     async getSafeTaskQueueHealth() {

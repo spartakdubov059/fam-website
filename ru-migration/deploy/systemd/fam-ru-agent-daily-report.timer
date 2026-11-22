@@ -1,10 +1,7 @@
 [Unit]
-Description=Run FAM RU aggregate daily report at 06:00 UTC
+Description=Historical FAM RU global report timer; do not install or enable
 
 [Timer]
 OnCalendar=*-*-* 06:00:00 UTC
-Persistent=true
+Persistent=false
 Unit=fam-ru-agent-daily-report.service
-
-[Install]
-WantedBy=timers.target

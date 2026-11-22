@@ -8,6 +8,14 @@ const webRoot = path.resolve(here, '../web');
 const host = process.env.FAM_RU_HOST || '127.0.0.1';
 const port = Number.parseInt(process.env.FAM_RU_PORT || '4178', 10);
 const maxBodyBytes = 256 * 1024;
+export const SECURITY_HEADERS = Object.freeze({
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'no-referrer',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'strict-transport-security': 'max-age=31536000',
+});
+const CONTENT_SECURITY_POLICY = "default-src 'self' data: blob:; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'], ['.json', 'application/json; charset=utf-8'],
@@ -35,7 +43,7 @@ function sendJson(res, status, value) {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(body),
     'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff',
+    ...SECURITY_HEADERS,
   });
   res.end(body);
 }
@@ -43,7 +51,7 @@ function sendJson(res, status, value) {
 function sendMediaResult(res, result) {
   if (Buffer.isBuffer(result.body) || result.body instanceof Uint8Array) {
     const body = Buffer.from(result.body);
-    res.writeHead(result.status, { ...result.headers, 'content-length': body.length, 'x-content-type-options': 'nosniff' });
+    res.writeHead(result.status, { ...result.headers, ...SECURITY_HEADERS, 'content-length': body.length });
     return res.end(body);
   }
   return sendJson(res, result.status, result.body);
@@ -57,7 +65,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
     try {
       const result = await authApi(req);
       if (result.body === null) {
-        res.writeHead(result.status, result.headers || {});
+        res.writeHead(result.status, { ...(result.headers || {}), ...SECURITY_HEADERS });
         return res.end();
       }
       return sendJson(res, result.status, result.body);
@@ -125,6 +133,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       || (req.method === 'GET' && url.pathname === '/api/v1/event-registrations/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/schools')
       || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests')
+      || (req.method === 'POST' && url.pathname === '/api/v1/profile-requests/email-verification')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests')
       || (req.method === 'GET' && url.pathname === '/api/v1/profile-requests/review')
       || (req.method === 'GET' && url.pathname === '/api/v1/staff-verifications')
@@ -189,9 +198,8 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
       'content-type': mime.get(path.extname(target).toLowerCase()) || 'application/octet-stream',
       'content-length': body.length,
       'cache-control': path.extname(target) === '.html' ? 'no-store' : 'public, max-age=3600',
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'no-referrer',
-      'content-security-policy': "default-src 'self' data: blob:; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      ...SECURITY_HEADERS,
+      'content-security-policy': CONTENT_SECURITY_POLICY,
     });
     return res.end(req.method === 'HEAD' ? undefined : body);
   } catch {

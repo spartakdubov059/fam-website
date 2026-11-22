@@ -24,6 +24,10 @@ test('Yandex function adapter serves the existing static Russian frontend with s
   assert.equal(response.isBase64Encoded, false);
   assert.match(response.headers['content-type'], /text\/html/);
   assert.match(response.headers['content-security-policy'], /frame-ancestors 'none'/);
+  assert.equal(response.headers['x-content-type-options'], 'nosniff');
+  assert.equal(response.headers['x-frame-options'], 'DENY');
+  assert.equal(response.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
+  assert.equal(response.headers['strict-transport-security'], 'max-age=31536000');
   assert.match(response.body, /FAM/);
 });
 
@@ -98,7 +102,9 @@ test('Yandex function adapter rejects malformed base64 and hides backend excepti
   const invalid = createYandexFunctionHandler({ requestHandler: async () => { throw new Error('sensitive backend detail'); } });
   const badBody = await invalid({ httpMethod: 'POST', path: '/', headers: {}, body: '***', isBase64Encoded: true });
   assert.equal(badBody.statusCode, 400);
+  assert.equal(badBody.headers['x-frame-options'], 'DENY');
   const failure = await invalid({ httpMethod: 'GET', path: '/', headers: {}, body: '' });
   assert.equal(failure.statusCode, 500);
+  assert.equal(failure.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
   assert.doesNotMatch(failure.body, /sensitive/);
 });

@@ -312,7 +312,7 @@ test('authenticated unprovisioned Yandex users can request a staff profile witho
   await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: false, status: 403, json: async () => ({ ok: false, error: 'profile_unavailable' }) };
-    if (url === '/api/v1/profile-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, request: null }) };
+    if (url === '/api/v1/profile-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, request: null, email_verified: true, email_verification_available: true }) };
     if (url === '/api/v1/schools') return { ok: true, json: async () => ({ ok: true, schools: [
       { id: 'lyceum_3', name: 'Лицей № 3' }, { id: 'gymnasium_4', name: 'Гимназия № 4' },
     ] }) };
@@ -335,6 +335,35 @@ test('authenticated unprovisioned Yandex users can request a staff profile witho
   const request = calls.find(call => call.url === '/api/v1/profile-requests' && call.init.method === 'POST');
   assert.deepEqual(JSON.parse(request.init.body), { school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', person_type: 'school_staff', class_name: '', staff_position: 'Учитель математики' });
   assert.equal(request.init.credentials, 'same-origin');
+  assert.match(f.status.textContent, /после одобрения/);
+});
+
+test('unprovisioned profile request verifies the Yandex email before submission', async () => {
+  const f = fixture(null); const calls = [];
+  await initializeListingSubmission({ ...f, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/me') return { ok: false, status: 403, json: async () => ({ ok: false, error: 'profile_unavailable' }) };
+    if (url === '/api/v1/profile-requests' && init.method === 'GET') return { ok: true, json: async () => ({ ok: true, request: null, email_verified: false, email_verification_available: true }) };
+    if (url === '/api/v1/schools') return { ok: true, json: async () => ({ ok: true, schools: [{ id: 'lyceum_3', name: 'Лицей № 3' }] }) };
+    if (url === '/api/v1/profile-requests/email-verification' && JSON.parse(init.body).action === 'send') return { ok: true, status: 202, json: async () => ({ ok: true, sent: true }) };
+    if (url === '/api/v1/profile-requests/email-verification' && JSON.parse(init.body).action === 'verify') return { ok: true, status: 200, json: async () => ({ ok: true, email_verified: true }) };
+    if (url === '/api/v1/profile-requests' && init.method === 'POST') return { ok: true, status: 202, json: async () => ({ ok: true, status: 'pending' }) };
+    throw new Error(`unexpected route ${url}`);
+  } });
+  const form = f.shellChildren[0].children[2];
+  form.elements = { school_id: { value: 'lyceum_3' }, first_name: { value: 'Аня' }, last_name: { value: 'Иванова' },
+    person_type: { value: 'student' }, class_name: { value: '8А' }, staff_position: { value: '' } };
+  form.children.find(item => item.textContent === 'Код подтверждения из письма').children[0].value = '135790';
+  await form.listeners.submit({ preventDefault() {} });
+  assert.deepEqual(calls.filter(call => call.url === '/api/v1/profile-requests').map(call => call.init.method), ['GET']);
+  const verificationLabel = form.children.find(item => item.textContent === 'Код подтверждения из письма');
+  assert.equal(verificationLabel.hidden, false);
+  assert.match(form.children.find(item => item.role === 'status').textContent, /Код отправлен/);
+  await form.listeners.submit({ preventDefault() {} });
+  const verification = calls.find(call => call.url === '/api/v1/profile-requests/email-verification' && JSON.parse(call.init.body).action === 'verify');
+  assert.equal(JSON.parse(verification.init.body).code, '135790');
+  const request = calls.find(call => call.url === '/api/v1/profile-requests' && call.init.method === 'POST');
+  assert.ok(request, 'the school request is sent only after the verification endpoint succeeds');
   assert.match(f.status.textContent, /после одобрения/);
 });
 

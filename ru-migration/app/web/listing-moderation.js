@@ -242,7 +242,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (targets.length) {
           const panel = node(document, 'section', 'ru-moderation-card');
           panel.append(node(document, 'h3', '', 'Временное ограничение действий аккаунта'));
-          const note = node(document, 'p', '', 'Доступно администраторам этой школы после явного подтверждения через Яндекс ID. Выберите срок и укажите фактическую причину без личных данных.');
+          const note = node(document, 'p', '', 'Управление требует проверяемого подтверждения недавнего входа. Текущая авторизация через Яндекс ID не сообщает серверу время повторной аутентификации, поэтому выдача и снятие ограничений временно недоступны.');
           const form = document.createElement('form'); form.className = 'ru-suspension-form';
           const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', 'Аккаунт');
           const prompt = node(document, 'option', '', 'Выберите аккаунт'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);

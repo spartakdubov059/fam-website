@@ -374,10 +374,16 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
   const shell = listingForm?.parentElement;
   if (!shell || typeof document.createElement !== 'function') return;
   let previousRequest = null;
+  let emailVerified = false;
+  let emailVerificationAvailable = false;
   try {
     const response = await fetchImpl('/api/v1/profile-requests', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
     const result = await readJson(response);
-    if (response.ok && result?.ok) previousRequest = result.request || null;
+    if (response.ok && result?.ok) {
+      previousRequest = result.request || null;
+      emailVerified = result.email_verified === true;
+      emailVerificationAvailable = result.email_verification_available === true;
+    }
   } catch { /* Request status is private and can be retried after the form mounts. */ }
   if (previousRequest && ['pending', 'reviewing', 'approved'].includes(previousRequest.status)) {
     const section = document.createElement('section'); section.className = 'ru-moderation';
@@ -427,7 +433,9 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
   const section = document.createElement('section'); section.className = 'ru-moderation'; section.setAttribute('aria-label', 'Заявка на школьный профиль');
   const heading = document.createElement('h2'); heading.textContent = 'Запросить школьный профиль';
   const note = document.createElement('p'); note.className = 'ru-note';
-  note.textContent = 'Школа проверит заявку. До одобрения будут доступны только открытая доска и вход.';
+  note.textContent = emailVerificationAvailable
+    ? 'Сначала подтвердите адрес кодом из письма. Затем школа проверит заявку. До одобрения будут доступны только открытая доска и вход.'
+    : 'Подтверждение почты пока не настроено. Отправить заявку можно будет после настройки безопасной почтовой отправки.';
   const form = document.createElement('form'); form.id = 'ruProfileRequestForm'; form.className = 'ru-listing-form';
   const schoolLabel = document.createElement('label'); schoolLabel.textContent = 'Школа';
   const school = document.createElement('select'); school.name = 'school_id'; school.required = true;
@@ -457,12 +465,45 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
   };
   personType.addEventListener('change', updateParticipantFields); updateParticipantFields();
   const result = document.createElement('p'); result.className = 'ru-note'; result.setAttribute('role', 'status'); result.setAttribute('aria-live', 'polite');
-  const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit'; submit.textContent = 'Отправить заявку';
-  form.append(schoolLabel, ...fields, personTypeLabel, classLabel, staffLabel, result, submit);
+  const verificationLabel = document.createElement('label'); verificationLabel.textContent = 'Код подтверждения из письма'; verificationLabel.hidden = true;
+  const verificationCode = document.createElement('input'); verificationCode.name = 'email_verification_code'; verificationCode.inputMode = 'numeric';
+  verificationCode.autocomplete = 'one-time-code'; verificationCode.pattern = '[0-9]{6}'; verificationCode.maxLength = 6;
+  verificationLabel.append(verificationCode);
+  const submit = document.createElement('button'); submit.className = 'ru-button'; submit.type = 'submit';
+  submit.textContent = emailVerified ? 'Отправить заявку' : 'Получить код подтверждения';
+  submit.disabled = !emailVerificationAvailable;
+  form.append(schoolLabel, ...fields, personTypeLabel, classLabel, staffLabel, verificationLabel, result, submit);
   section.append(heading, note, form); shell.append(section);
   form.addEventListener('submit', async event => {
     event.preventDefault(); submit.disabled = true; result.textContent = 'Отправляем заявку…';
     try {
+      if (!emailVerified) {
+        if (!emailVerificationAvailable) throw new Error('email_verification_unavailable');
+        if (!verificationLabel.hidden) {
+          const confirmation = await fetchImpl('/api/v1/profile-requests/email-verification', {
+            method: 'POST', credentials: 'same-origin', cache: 'no-store',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ action: 'verify', code: verificationCode.value }),
+          });
+          const confirmed = await readJson(confirmation);
+          if (!confirmation.ok || confirmed?.email_verified !== true) throw new Error(confirmed?.error || 'invalid_verification_code');
+          emailVerified = true;
+        } else {
+          const response = await fetchImpl('/api/v1/profile-requests/email-verification', {
+            method: 'POST', credentials: 'same-origin', cache: 'no-store',
+            headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ action: 'send' }),
+          });
+          const sent = await readJson(response);
+          if (!response.ok || !sent?.ok) throw new Error(sent?.error || 'email_verification_unavailable');
+          if (sent.already_verified) emailVerified = true;
+          else {
+            verificationLabel.hidden = false; verificationCode.required = true;
+            submit.textContent = 'Подтвердить код и отправить заявку';
+            result.textContent = 'Код отправлен на адрес, указанный в Яндекс ID. Введите его сюда.';
+            return;
+          }
+        }
+      }
       const response = await fetchImpl('/api/v1/profile-requests', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -475,8 +516,14 @@ async function createProfileRequestForm(document, status, fetchImpl, location = 
       if (!response.ok || !reply?.ok) throw new Error(reply?.error || 'request_failed');
       form.hidden = true;
       status.textContent = 'Заявка отправлена администратору школы. Доступ откроется после одобрения; затем обновите страницу.';
-    } catch { result.textContent = 'Не удалось отправить заявку. Проверьте данные и попробуйте снова.'; }
-    finally { submit.disabled = false; }
+    } catch (error) {
+      result.textContent = error?.message === 'email_verification_unavailable'
+        ? 'Не удалось отправить код. Подтверждение почты временно недоступно.'
+        : error?.message === 'invalid_verification_code' || error?.message === 'verification_code_expired' || error?.message === 'verification_code_locked'
+          ? 'Код не подошёл или истёк. Проверьте письмо и попробуйте ещё раз.'
+          : 'Не удалось отправить заявку. Проверьте данные и попробуйте снова.';
+    }
+    finally { submit.disabled = !emailVerificationAvailable; }
   });
 }
 

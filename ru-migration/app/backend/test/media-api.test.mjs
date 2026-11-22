@@ -237,6 +237,27 @@ test('listing author can read their approved photo before the listing is public'
   assert.equal(imageReads, 1, 'only the owner can read a private listing photo');
 });
 
+test('approved photos of unpublished listings remain private to their owners', async () => {
+  const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const ownerId = '11111111-1111-4111-8111-111111111111';
+  const listing = { user_id: ownerId, school_id: 'school-a', status: 'pending', image_key: 'pending/key.webp', photo_status: 'approved' };
+  let imageReads = 0;
+  const createApi = actor => createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: { getListingPhoto: async () => listing },
+    pendingImages: { get: async () => { imageReads++; return Buffer.from('webp'); } } });
+  const path = `/api/v1/listings/${id}/photo`;
+  const owner = await createApi({ id: ownerId, school_id: 'school-a', role: 'student' })(request({ method: 'GET', path }));
+  assert.equal(owner.status, 200);
+  for (const role of ['school_admin', 'council_member', 'student']) {
+    const nonOwner = await createApi({ id: '22222222-2222-4222-8222-222222222222', school_id: 'school-a', role })(request({ method: 'GET', path }));
+    assert.equal(nonOwner.status, 404, `${role} cannot read a photo before its listing is active`);
+  }
+  listing.status = 'active';
+  const schoolMember = await createApi({ id: '33333333-3333-4333-8333-333333333333', school_id: 'school-a', role: 'student' })(request({ method: 'GET', path }));
+  assert.equal(schoolMember.status, 200, 'same-school members can read the photo after publication');
+  assert.equal(imageReads, 2, 'only owner and active same-school request reach private storage');
+});
+
 test('photo approval requires a moderator from the owning school', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   let updates = 0;
