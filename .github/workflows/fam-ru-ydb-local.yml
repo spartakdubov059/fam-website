@@ -23,6 +23,8 @@ jobs:
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Start disposable local database
         run: docker run -d --name fam-ru-test-ydb --hostname localhost -p 127.0.0.1:2136:2136 -e GRPC_PORT=2136 -e YDB_GRPC_ENABLE_TLS=false -e YDB_USE_IN_MEMORY_PDISKS=true ydbplatform/local-ydb@sha256:9e46fd45875551a75bcf34d0bb9ca0baa1d8763a4ccf2070af45f4467c4b7402
+      - name: Expose locked SDK dependencies to backend modules
+        run: ln -s ../../compat/node_modules ru-migration/app/backend/node_modules
       - name: Wait for database and apply isolated schema
         shell: bash
         run: |
