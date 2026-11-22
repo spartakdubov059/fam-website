@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { Uint64 } from '@ydbjs/value/primitive';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -151,8 +152,8 @@ export function createYdbListingsRepository(sql) {
         await tx`UPSERT INTO fam_role_email_verifications
           (issuer, subject, user_id, email_digest, code_digest, issued_seconds, expires_seconds,
            attempt_count, window_started_seconds, send_count, sent_seconds, verified_seconds)
-          VALUES (${issuer}, ${subject}, ${userId}, ${emailDigest}, ${codeDigest}, ${currentSeconds}, ${expiresSeconds},
-            0, ${nextWindowStart}, ${nextSendCount}, ${currentSeconds}, 0);`;
+          VALUES (${issuer}, ${subject}, ${userId}, ${emailDigest}, ${codeDigest}, ${new Uint64(BigInt(currentSeconds))}, ${new Uint64(BigInt(expiresSeconds))},
+            0, ${new Uint64(BigInt(nextWindowStart))}, ${nextSendCount}, ${new Uint64(BigInt(currentSeconds))}, 0);`;
         return { ok: true, already_verified: false };
       });
     },
@@ -184,7 +185,7 @@ export function createYdbListingsRepository(sql) {
               AND email_digest = ${emailDigest} AND verified_seconds = 0;`;
           return { ok: false, code: attempts + 1 >= 5 ? 'verification_code_locked' : 'invalid_verification_code' };
         }
-        await tx`UPDATE fam_role_email_verifications SET verified_seconds = ${currentSeconds}
+        await tx`UPDATE fam_role_email_verifications SET verified_seconds = ${new Uint64(BigInt(currentSeconds))}
           WHERE issuer = ${issuer} AND subject = ${subject} AND user_id = ${userId}
             AND email_digest = ${emailDigest} AND code_digest = ${codeDigest} AND verified_seconds = 0;`;
         const confirmed = await tx`SELECT verified_seconds FROM fam_role_email_verifications
