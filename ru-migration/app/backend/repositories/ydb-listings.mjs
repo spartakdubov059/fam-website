@@ -130,6 +130,94 @@ export function createYdbListingsRepository(sql) {
       return row?.email_digest === emailDigest && Number(row.verified_seconds) > 0;
     },
 
+    async startStepUpEmailChallenge({ issuer, subject, emailDigest, codeDigest, currentSeconds, expiresSeconds }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(emailDigest || '')
+          || !/^[a-f0-9]{64}$/i.test(codeDigest || '') || !Number.isSafeInteger(currentSeconds)
+          || !Number.isSafeInteger(expiresSeconds) || expiresSeconds <= currentSeconds) throw new TypeError('invalid step-up email challenge');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT window_started_seconds, send_count, sent_seconds, expires_seconds, code_digest, confirmed_seconds
+          FROM fam_step_up_email_challenges WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        const windowStart = Number(current?.window_started_seconds ?? 0);
+        const sendCount = Number(current?.send_count ?? 0);
+        const sentSeconds = Number(current?.sent_seconds ?? 0);
+        const expiresSecondsCurrent = Number(current?.expires_seconds ?? 0);
+        const sameWindow = windowStart > 0 && currentSeconds >= windowStart && currentSeconds - windowStart < 3600;
+        // `confirmed_seconds` records that the one-time code was consumed; it
+        // must remain set. A new challenge resets it only when the old code
+        // expires, below.
+        if (current?.code_digest && expiresSecondsCurrent > currentSeconds) {
+          return { ok: false, code: 'verification_code_already_sent' };
+        }
+        if (sameWindow && sentSeconds > 0 && currentSeconds - sentSeconds < 60) {
+          return { ok: false, code: 'email_send_cooldown', retry_after_seconds: 60 - (currentSeconds - sentSeconds) };
+        }
+        if (sameWindow && sendCount >= 3) return { ok: false, code: 'email_send_rate_limited' };
+        const nextWindowStart = sameWindow ? windowStart : currentSeconds;
+        const nextSendCount = sameWindow ? sendCount + 1 : 1;
+        await tx`UPSERT INTO fam_step_up_email_challenges
+          (issuer, subject, email_digest, code_digest, issued_seconds, expires_seconds, attempt_count,
+           window_started_seconds, send_count, sent_seconds, confirmed_seconds)
+          VALUES (${issuer}, ${subject}, ${emailDigest}, ${codeDigest}, ${new Uint64(BigInt(currentSeconds))},
+            ${new Uint64(BigInt(expiresSeconds))}, ${new Uint32(0)}, ${new Uint64(BigInt(nextWindowStart))},
+            ${new Uint32(nextSendCount)}, ${new Uint64(BigInt(currentSeconds))}, ${new Uint64(0n)});`;
+        return { ok: true };
+      });
+    },
+
+    async clearStepUpEmailChallenge({ issuer, subject, codeDigest }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(codeDigest || '')) throw new TypeError('invalid step-up email cleanup');
+      await sql`UPDATE fam_step_up_email_challenges SET code_digest = '', expires_seconds = 0, attempt_count = 0
+        WHERE issuer = ${issuer} AND subject = ${subject} AND code_digest = ${codeDigest} AND confirmed_seconds = 0;`;
+      return true;
+    },
+
+    async verifyStepUpEmailChallenge({ issuer, subject, emailDigest, codeDigest, currentSeconds }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(emailDigest || '')
+          || !/^[a-f0-9]{64}$/i.test(codeDigest || '') || !Number.isSafeInteger(currentSeconds)) throw new TypeError('invalid step-up email verification');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT email_digest, code_digest, expires_seconds, attempt_count, confirmed_seconds, issued_seconds
+          FROM fam_step_up_email_challenges WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (!current || current.email_digest !== emailDigest || !current.code_digest) return { ok: false, code: 'invalid_verification_code' };
+        if (Number(current.issued_seconds) > currentSeconds) return { ok: false, code: 'invalid_verification_code' };
+        if (Number(current.confirmed_seconds) > 0) return { ok: false, code: 'verification_code_used' };
+        if (Number(current.expires_seconds) <= currentSeconds) {
+          await tx`UPDATE fam_step_up_email_challenges SET code_digest = '', attempt_count = 0
+            WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+              AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          return { ok: false, code: 'verification_code_expired' };
+        }
+        const attempts = Number(current.attempt_count ?? 0);
+        if (attempts >= 5) return { ok: false, code: 'verification_code_locked' };
+        const expected = Buffer.from(String(current.code_digest), 'hex');
+        const provided = Buffer.from(codeDigest, 'hex');
+        if (expected.length !== 32 || !timingSafeEqual(expected, provided)) {
+          const nextAttempts = attempts + 1;
+          if (nextAttempts >= 5) {
+            await tx`UPDATE fam_step_up_email_challenges SET attempt_count = ${new Uint32(nextAttempts)}, code_digest = ''
+              WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+                AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          } else {
+            await tx`UPDATE fam_step_up_email_challenges SET attempt_count = ${new Uint32(nextAttempts)}
+              WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+                AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          }
+          return { ok: false, code: nextAttempts >= 5 ? 'verification_code_locked' : 'invalid_verification_code' };
+        }
+        await tx`UPDATE fam_step_up_email_challenges SET code_digest = '', confirmed_seconds = ${new Uint64(BigInt(currentSeconds))}
+          WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+            AND code_digest = ${current.code_digest} AND issued_seconds = ${new Uint64(BigInt(Number(current.issued_seconds)))}
+            AND expires_seconds > ${new Uint64(BigInt(currentSeconds))}
+            AND confirmed_seconds = 0;`;
+        const confirmed = await tx`SELECT confirmed_seconds FROM fam_step_up_email_challenges
+          WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest} LIMIT 1;`;
+        const confirmedAt = Number(confirmed?.[0]?.[0]?.confirmed_seconds ?? 0);
+        return confirmedAt === currentSeconds ? { ok: true, confirmed_at: confirmedAt, issued_seconds: Number(current.issued_seconds) }
+          : { ok: false, code: 'invalid_verification_code' };
+      });
+    },
+
     async startRoleEmailVerification({ issuer, subject, userId, emailDigest, codeDigest, currentSeconds, expiresSeconds }) {
       if (!issuer || !subject || !userId || !/^[a-f0-9]{64}$/i.test(emailDigest || '')
           || !/^[a-f0-9]{64}$/i.test(codeDigest || '') || !Number.isSafeInteger(currentSeconds)
@@ -1128,1372 +1216,291 @@ export function createYdbListingsRepository(sql) {
       if (!imageKey) throw new TypeError('invalid photo key');
       const statement = sql`SELECT id FROM fam_listings WHERE image_key = ${imageKey} LIMIT 1;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return Boolean((await statement)?.[0]?.[0]?.id);
-    },
-
-    async moderateListingPhoto(listingId, schoolId, reviewerId, decision) {
-      if (!listingId || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid photo decision');
-      return sql.begin(async tx => {
-        const reviewerRows = await tx`SELECT role, school_id, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewerRows?.[0]?.[0];
-        if (!reviewer || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role) || reviewer.school_id !== schoolId) return false;
-        const suspensionRows = await tx`SELECT suspension_id FROM fam_account_suspensions
-          WHERE school_id = ${schoolId} AND target_id = ${reviewerId} AND status = 'active'
-            AND expires_at > CurrentUtcTimestamp() LIMIT 1;`;
-        if (suspensionRows?.[0]?.length) return false;
-        const current = await tx`SELECT school_id, status, image_key, photo_status FROM fam_listings WHERE id = ${listingId};`;
-        const row = current?.[0]?.[0];
-        if (!row || row.school_id !== schoolId || row.status !== 'pending' || !row.image_key || row.photo_status !== 'pending') return false;
-        await tx`UPDATE fam_listings SET photo_status = ${decision} WHERE id = ${listingId};`;
-        return true;
-      });
-    },
-
-    async createAvatarReview({ userId, schoolId, imageKey }) {
-      if (!userId || !schoolId || !imageKey) throw new TypeError('invalid avatar review request');
-      const id = randomUUID();
-      return sql.begin(async tx => {
-        const pending = await tx`SELECT user_id, status FROM fam_pending_media
-          WHERE object_key = ${imageKey} LIMIT 1;`;
-        const upload = pending?.[0]?.[0];
-        if (!upload || upload.user_id !== userId || upload.status !== 'pending') return null;
-        const existing = await tx`SELECT id FROM fam_avatar_reviews WHERE user_id = ${userId}
-          AND status = 'pending' LIMIT 1;`;
-        if (existing?.[0]?.length) return null;
-        // Source FAM shares the five-per-hour listing quota with avatar submissions.
-        if (!await consumeSubmissionQuota(tx, userId, 'listing', 5)) {
-          return { ok: false, code: 'rate_limited' };
-        }
-        await tx`INSERT INTO fam_avatar_reviews
-          (id, user_id, school_id, image_key, status, created_at, reviewed_by, reviewed_at)
-          VALUES (${id}, ${userId}, ${schoolId}, ${imageKey}, 'pending', CurrentUtcTimestamp(), '', NULL);`;
-        await tx`UPDATE fam_pending_media SET status = 'linked' WHERE object_key = ${imageKey}
-          AND user_id = ${userId} AND status = 'pending';`;
-        return { id, status: 'pending' };
-      });
-    },
-
-    async listPendingAvatarReviews(schoolId) {
-      if (!schoolId) throw new TypeError('invalid avatar review school');
-      const statement = sql`SELECT id, user_id, image_key, created_at FROM fam_avatar_reviews
-        WHERE school_id = ${schoolId} AND status = 'pending'
-        ORDER BY created_at ASC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return ((await statement)?.[0] ?? []).map(row => ({
-        id: row.id, user_id: row.user_id, created_at: row.created_at,
-        photo_url: `/api/v1/avatars/${row.id}/photo`,
-      }));
-    },
-
-    async getAvatarReview(reviewId) {
-      if (!reviewId) throw new TypeError('invalid avatar review id');
-      const statement = sql`SELECT id, user_id, school_id, image_key, status FROM fam_avatar_reviews
-        WHERE id = ${reviewId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0] ?? null;
-    },
-
-    async isCurrentAvatar(reviewId) {
-      if (!reviewId) throw new TypeError('invalid avatar review id');
-      const avatarUrl = `/api/v1/avatars/${reviewId}/photo`;
-      const statement = sql`SELECT user_id FROM fam_avatar_reviews WHERE id = ${reviewId}
-        AND status = 'approved' LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const userId = (await statement)?.[0]?.[0]?.user_id;
-      if (!userId) return false;
-      const profile = sql`SELECT user_id FROM fam_user_profiles WHERE user_id = ${userId}
-        AND active = true AND avatar_url = ${avatarUrl} LIMIT 1;`;
-      if (typeof profile?.on === 'function') profile.on('error', () => {});
-      return Boolean((await profile)?.[0]?.[0]?.user_id);
-    },
-
-    async moderateAvatarReview(reviewId, schoolId, reviewerId, decision) {
-      if (!reviewId || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid avatar review decision');
-      return sql.begin(async tx => {
-        const reviewerRows = await tx`SELECT role, school_id, active FROM fam_user_profiles
-          WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewerRows?.[0]?.[0];
-        if (!reviewer || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)
-            || reviewer.school_id !== schoolId) return false;
-        const reviewRows = await tx`SELECT user_id, image_key, status FROM fam_avatar_reviews
-          WHERE id = ${reviewId} AND school_id = ${schoolId} LIMIT 1;`;
-        const review = reviewRows?.[0]?.[0];
-        if (!review || review.status !== 'pending' || review.user_id === reviewerId) return false;
-        const profileRows = await tx`SELECT issuer, subject FROM fam_user_profiles
-          WHERE user_id = ${review.user_id} AND school_id = ${schoolId} AND active = true LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile) return false;
-        if (decision === 'approved') {
-          const avatarUrl = `/api/v1/avatars/${reviewId}/photo`;
-          await tx`UPDATE fam_user_profiles SET avatar_url = ${avatarUrl}
-            WHERE issuer = ${profile.issuer} AND subject = ${profile.subject}
-              AND user_id = ${review.user_id} AND school_id = ${schoolId} AND active = true;`;
-        } else {
-          // Return rejected media to the existing bounded orphan-cleanup queue.
-          await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
-            WHERE object_key = ${review.image_key} AND user_id = ${review.user_id} AND status = 'linked';`;
-        }
-        await tx`UPDATE fam_avatar_reviews SET status = ${decision}, reviewed_by = ${reviewerId},
-          reviewed_at = CurrentUtcTimestamp() WHERE id = ${reviewId} AND school_id = ${schoolId} AND status = 'pending';`;
-        const confirmed = await tx`SELECT status FROM fam_avatar_reviews WHERE id = ${reviewId} LIMIT 1;`;
-        return confirmed?.[0]?.[0]?.status === decision;
-      });
-    },
-
-    async createIdea(record) {
-      const imageKeys = Array.isArray(record?.image_keys) ? record.image_keys : [];
-      const imageStatus = imageKeys.length ? 'pending' : 'none';
-      if (!record || !record.user_id || !record.school_id || typeof record.text !== 'string'
-          || imageKeys.length > 3 || imageKeys.some(key => typeof key !== 'string')
-          || new Set(imageKeys).size !== imageKeys.length || (record.image_status && record.image_status !== imageStatus)
-          || !['pending', 'approved'].includes(record.ai_status) || record.admin_status !== 'new') {
-        throw new TypeError('invalid idea submission');
+      return Boolean((await sta…49777 tokens truncated…{ status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      try { return { status: 200, body: { ok: true, messages: await repository.listMessages(actor.id, actor.school_id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if ((req.method === 'GET' && pathname === '/api/v1/messages/moderation') || (req.method === 'PATCH' && pendingMessageReviewMatch)) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (req.method === 'GET') {
+        if (typeof repository?.listPendingMessages !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+        try { return { status: 200, body: { ok: true, messages: await repository.listPendingMessages(actor.school_id) } }; }
+        catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       }
-      const id = randomUUID();
-      return sql.begin(async tx => {
-        if (!await consumeSubmissionQuota(tx, record.user_id, 'idea', 5)) return { ok: false, code: 'rate_limited' };
-        for (const key of imageKeys) {
-          const owned = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${key} AND user_id = ${record.user_id} LIMIT 1;`;
-          if (owned?.[0]?.[0]?.status !== 'pending') throw new TypeError('idea image unavailable');
-        }
-        await tx`INSERT INTO fam_ideas
-          (id, user_id, school_id, text, image_status, ai_status, ai_summary, ai_reason, admin_status, created_at)
-          VALUES (${id}, ${record.user_id}, ${record.school_id}, ${record.text}, ${imageStatus}, ${record.ai_status},
-            ${record.ai_summary ?? ''}, ${record.ai_reason ?? ''}, ${record.admin_status}, CurrentUtcTimestamp());`;
-        for (const [imageIndex, key] of imageKeys.entries()) {
-          await tx`INSERT INTO fam_idea_images
-            (idea_id, image_index, object_key, user_id, school_id, created_at)
-            VALUES (${id}, Unwrap(CAST(${imageIndex} AS Uint32)), ${key}, ${record.user_id}, ${record.school_id}, CurrentUtcTimestamp());`;
-          await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '', claim_until = CurrentUtcTimestamp()
-            WHERE object_key = ${key} AND user_id = ${record.user_id} AND status = 'pending';`;
-        }
-        return { id };
-      });
-    },
-
-    async listPendingSchoolIdeas(schoolId, reviewerId, reviewerRole) {
-      if (!schoolId || !UUID.test(reviewerId || '') || !['school_admin', 'council_member'].includes(reviewerRole)) throw new TypeError('invalid idea review school');
-      const statement = reviewerRole === 'school_admin'
-        ? sql`SELECT id, school_id, user_id, text, image_status, ai_status, created_at
-          FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status != 'rejected'
-          ORDER BY created_at DESC LIMIT 50;`
-        : sql`SELECT id, school_id, user_id, text, image_status, ai_status, created_at
-          FROM fam_ideas WHERE school_id = ${schoolId} AND user_id != ${reviewerId} AND admin_status = 'new' AND ai_status = 'approved'
-          ORDER BY created_at DESC LIMIT 50;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const ideas = (await statement)?.[0] ?? [];
-      return Promise.all(ideas.map(async idea => {
-        const images = await sql`SELECT object_key FROM fam_idea_images WHERE idea_id = ${idea.id}
-          AND user_id = ${idea.user_id} AND school_id = ${idea.school_id}
-          ORDER BY image_index ASC LIMIT 3;`;
-        const { user_id: _userId, ...safeIdea } = idea;
-        return { ...safeIdea, image_keys: (images?.[0] ?? []).map(image => image.object_key) };
-      }));
-    },
-
-    async listSchoolIdeaWorkflow(schoolId, reviewerId) {
-      if (typeof schoolId !== 'string' || !schoolId || !UUID.test(reviewerId || '')) throw new TypeError('invalid idea workflow school');
-      const statement = sql`SELECT id, text, admin_status, created_at, user_id = ${reviewerId} AS is_own
-        FROM fam_ideas WHERE school_id = ${schoolId} AND ai_status = 'approved'
-        ORDER BY created_at DESC LIMIT 200;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async updateSchoolIdeaWorkflow({ ideaId, schoolId, reviewerId, status }) {
-      if (!UUID.test(ideaId || '') || typeof schoolId !== 'string' || !schoolId || !UUID.test(reviewerId || '')
-          || !['in_progress', 'done', 'rejected'].includes(status)) throw new TypeError('invalid idea workflow update');
-      return sql.begin(async tx => {
-        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewers?.[0]?.[0];
-        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
-        const rows = await tx`SELECT admin_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'approved' LIMIT 1;`;
-        const idea = rows?.[0]?.[0];
-        const allowed = idea?.admin_status === 'new' ? ['in_progress', 'rejected']
-          : idea?.admin_status === 'in_progress' ? ['done', 'rejected'] : [];
-        if (!idea || !allowed.includes(status)) return false;
-        await tx`UPDATE fam_ideas SET admin_status = ${status}
-          WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'approved' AND admin_status = ${idea.admin_status};`;
-        await tx`INSERT INTO fam_school_content_audit
-          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${ideaId}, 'idea', ${`idea_workflow_${status}`}, '{}', CurrentUtcTimestamp());`;
-        return true;
-      });
-    },
-
-    async listOwnIdeas(userId, schoolId) {
-      if (!UUID.test(userId || '') || typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid own idea lookup');
-      const statement = sql`SELECT id, text, image_status, ai_status, admin_status, created_at
-        FROM fam_ideas WHERE user_id = ${userId} AND school_id = ${schoolId}
-        ORDER BY created_at DESC LIMIT 50;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const ideas = (await statement)?.[0] ?? [];
-      return Promise.all(ideas.map(async idea => {
-        const images = await sql`SELECT image_index FROM fam_idea_images
-          WHERE idea_id = ${idea.id} AND user_id = ${userId} AND school_id = ${schoolId}
-          ORDER BY image_index ASC LIMIT 3;`;
-        return { ...idea, image_count: (images?.[0] ?? []).length };
-      }));
-    },
-
-    async getSchoolIdeaDeletionContext({ ideaId, schoolId }) {
-      if (!UUID.test(ideaId || '') || typeof schoolId !== 'string' || !schoolId) throw new TypeError('invalid school idea deletion lookup');
-      const statement = sql`SELECT user_id, school_id FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0] ?? null;
-    },
-
-    async deleteSchoolIdea({ ideaId, actorId, schoolId }) {
-      if (!UUID.test(ideaId || '') || !UUID.test(actorId || '') || typeof schoolId !== 'string' || !schoolId) {
-        throw new TypeError('invalid school idea deletion');
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 4096) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (!['approve', 'reject'].includes(input?.decision)) return { status: 400, body: { ok: false, error: 'invalid_decision' } };
+      if (typeof repository?.decidePendingMessage !== 'function') return { status: 503, body: { ok: false, error: 'message_review_unavailable' } };
+      try {
+        const updated = await repository.decidePendingMessage({ messageId: pendingMessageReviewMatch[1], schoolId: actor.school_id, reviewerId: actor.id, decision: input.decision });
+        return updated ? { status: 200, body: { ok: true } } : { status: 404, body: { ok: false, error: 'pending_message_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'POST' && listingContactMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 8 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (typeof repository?.getListingContactRecipient !== 'function') return { status: 503, body: { ok: false, error: 'contact_unavailable' } };
+      try {
+        const receiver_id = await repository.getListingContactRecipient(listingContactMatch[1], actor.id, actor.school_id);
+        if (!receiver_id) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        const result = await submitMessage({ actor, input: { body: input?.body, receiver_id, listing_id: listingContactMatch[1] }, repository, review, safetyKey });
+        const status = result.ok ? 201 : result.code === 'database_unavailable' || result.status === 'pending' ? 503
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
+        return { status, body: result };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/listings') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.listOwnActiveListingIds !== 'function') return { status: 503, body: { ok: false, error: 'own_listings_unavailable' } };
+      try {
+        const listing_ids = await repository.listOwnActiveListingIds(actor.id);
+        const listings = typeof repository.listOwnListingSummaries === 'function'
+          ? await repository.listOwnListingSummaries(actor.id) : [];
+        return { status: 200, body: { ok: true, listing_ids, listings } };
       }
-      return sql.begin(async tx => {
-        const actors = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
-        const actor = actors?.[0]?.[0];
-        if (!actor || actor.active !== true || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
-        const ideas = await tx`SELECT id, user_id, school_id FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
-        const idea = ideas?.[0]?.[0];
-        if (!idea) return { ok: false, code: 'idea_unavailable' };
-        const own = idea.user_id === actorId;
-        if (!own && actor.role !== 'school_admin') return { ok: false, code: 'forbidden' };
-
-        const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images
-          WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId}
-          ORDER BY image_index ASC LIMIT 3;`;
-        const mediaCleanup = [];
-        for (const image of imageRows?.[0] ?? []) {
-          if (typeof image.object_key !== 'string'
-              || image.object_key !== `pending/${idea.user_id}/${image.object_key.split('/').at(-1)}`
-              || !/^pending\/[0-9a-f-]{36}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(image.object_key)) {
-            return { ok: false, code: 'idea_media_unavailable' };
-          }
-          const mediaRows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${image.object_key}
-            AND user_id = ${idea.user_id} LIMIT 1;`;
-          if (mediaRows?.[0]?.[0]?.status !== 'linked') return { ok: false, code: 'idea_media_unavailable' };
-          const claimToken = randomUUID();
-          await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
-            claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
-            WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
-          mediaCleanup.push({ object_key: image.object_key, claim_token: claimToken });
-        }
-        await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
-        await tx`DELETE FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId};`;
-        if (!own) {
-          await tx`INSERT INTO fam_school_content_audit
-            (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
-            VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${ideaId}, 'idea', 'idea_deleted', '{}', CurrentUtcTimestamp());`;
-        }
-        return { ok: true, own, media_cleanup: mediaCleanup };
-      });
-    },
-
-    async getSchoolIdeaImage(ideaId, imageIndex) {
-      if (!UUID.test(ideaId || '') || !Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > 2) throw new TypeError('invalid idea image lookup');
-      const statement = sql`SELECT user_id, school_id, image_status, ai_status FROM fam_ideas WHERE id = ${ideaId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const row = (await statement)?.[0]?.[0];
-      if (!row || !['pending', 'approved'].includes(row.image_status)) return null;
-      const imageStatement = sql`SELECT object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
-        AND user_id = ${row.user_id} AND school_id = ${row.school_id}
-        AND image_index = Unwrap(CAST(${imageIndex} AS Uint32)) LIMIT 1;`;
-      if (typeof imageStatement?.on === 'function') imageStatement.on('error', () => {});
-      const image = (await imageStatement)?.[0]?.[0];
-      if (!image?.object_key) return null;
-      return { user_id: row.user_id, school_id: row.school_id, image_key: image.object_key, image_status: row.image_status, ai_status: row.ai_status };
-    },
-
-    async reviewSchoolIdeaImages({ ideaId, schoolId, reviewerId, decision }) {
-      if (!UUID.test(ideaId || '') || !schoolId || !UUID.test(reviewerId || '') || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid idea image review');
-      return sql.begin(async tx => {
-        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewers?.[0]?.[0];
-        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || !['school_admin', 'council_member'].includes(reviewer.role)) return false;
-        const rows = await tx`SELECT user_id, image_status, ai_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
-        const idea = rows?.[0]?.[0];
-        if (!idea || idea.user_id === reviewerId || idea.image_status !== 'pending') return false;
-        if (reviewer.role === 'council_member' && idea.ai_status !== 'approved') return false;
-        const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
-          AND user_id = ${idea.user_id} AND school_id = ${schoolId}
-          ORDER BY image_index ASC LIMIT 3;`;
-        const images = imageRows?.[0] ?? [];
-        if (!images.length) return false;
-        if (decision === 'approve') {
-          await tx`UPDATE fam_ideas SET image_status = 'approved' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
-        } else {
-          for (const image of images) {
-            await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
-              WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
-            await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId}
-              AND image_index = ${image.image_index} AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
-          }
-          await tx`UPDATE fam_ideas SET image_status = 'rejected' WHERE id = ${ideaId} AND school_id = ${schoolId} AND image_status = 'pending';`;
-        }
-        return true;
-      });
-    },
-
-    async reviewSchoolIdeaText({ ideaId, schoolId, reviewerId, decision }) {
-      if (!UUID.test(ideaId || '') || !schoolId || !UUID.test(reviewerId || '') || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid idea text review');
-      return sql.begin(async tx => {
-        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewers?.[0]?.[0];
-        if (!reviewer || reviewer.school_id !== schoolId || reviewer.active !== true || reviewer.role !== 'school_admin') return false;
-        const rows = await tx`SELECT user_id, ai_status, image_status FROM fam_ideas WHERE id = ${ideaId} AND school_id = ${schoolId} LIMIT 1;`;
-        const idea = rows?.[0]?.[0];
-        if (!idea || idea.user_id === reviewerId || idea.ai_status !== 'pending') return false;
-        const nextStatus = decision === 'approve' ? 'approved' : 'rejected';
-        if (decision === 'reject' && ['pending', 'approved'].includes(idea.image_status)) {
-          const imageRows = await tx`SELECT image_index, object_key FROM fam_idea_images WHERE idea_id = ${ideaId}
-            AND user_id = ${idea.user_id} AND school_id = ${schoolId} ORDER BY image_index ASC LIMIT 3;`;
-          for (const image of imageRows?.[0] ?? []) {
-            await tx`UPDATE fam_pending_media SET status = 'pending', claim_token = '', claim_until = CurrentUtcTimestamp()
-              WHERE object_key = ${image.object_key} AND user_id = ${idea.user_id} AND status = 'linked';`;
-            await tx`DELETE FROM fam_idea_images WHERE idea_id = ${ideaId} AND image_index = ${image.image_index}
-              AND user_id = ${idea.user_id} AND school_id = ${schoolId};`;
-          }
-          await tx`UPDATE fam_ideas SET ai_status = ${nextStatus}, image_status = 'rejected' WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'pending';`;
-        } else {
-          await tx`UPDATE fam_ideas SET ai_status = ${nextStatus} WHERE id = ${ideaId} AND school_id = ${schoolId} AND ai_status = 'pending';`;
-        }
-        await tx`INSERT INTO fam_school_content_audit
-          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${ideaId}, 'idea', ${decision === 'approve' ? 'idea_text_approved' : 'idea_text_rejected'}, '{}', CurrentUtcTimestamp());`;
-        return true;
-      });
-    },
-
-    async createMessage(record) {
-      if (!record || !record.sender_id || !record.receiver_id || !record.school_id
-          || typeof record.body !== 'string' || !record.body.trim() || record.body.length > 1000
-          || record.sender_id === record.receiver_id) throw new TypeError('invalid message');
-      const id = randomUUID();
-      return sql.begin(async tx => {
-        const recipients = await tx`SELECT user_id AS user_id FROM fam_user_profiles
-          WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
-        if (!(recipients?.[0] ?? []).length) return { ok: false, code: 'recipient_unavailable' };
-        if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
-          return { ok: false, code: 'rate_limited' };
-        }
-        await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
-          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, false, CurrentUtcTimestamp());`;
-        return { id };
-      });
-    },
-
-    async createPendingMessage(record) {
-      if (!record || !record.sender_id || !record.receiver_id || !record.school_id
-          || typeof record.body !== 'string' || !record.body.trim() || record.body.length > 1000
-          || record.sender_id === record.receiver_id) throw new TypeError('invalid pending message');
-      const id = randomUUID();
-      return sql.begin(async tx => {
-        const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
-          WHERE (user_id = ${record.sender_id} OR user_id = ${record.receiver_id}) AND school_id = ${record.school_id};`;
-        const byId = new Map((participants?.[0] ?? []).map(row => [row.user_id, row]));
-        if (byId.get(record.sender_id)?.active !== true) throw new Error('sender unavailable');
-        if (byId.get(record.receiver_id)?.active !== true) {
-          const error = new Error('recipient unavailable'); error.code = 'recipient_unavailable'; throw error;
-        }
-        if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
-          const error = new Error('message rate limit'); error.code = 'rate_limited'; throw error;
-        }
-        await tx`INSERT INTO fam_pending_messages (id, sender_id, receiver_id, school_id, listing_id, body, created_at)
-          VALUES (${id}, ${record.sender_id}, ${record.receiver_id}, ${record.school_id}, ${record.listing_id ?? ''}, ${record.body}, CurrentUtcTimestamp());`;
-        return { id };
-      });
-    },
-
-    async listPendingMessages(schoolId) {
-      if (!schoolId) throw new TypeError('invalid pending message school');
-      const cleanup = sql`DELETE FROM fam_pending_messages WHERE school_id = ${schoolId}
-        AND created_at < CurrentUtcTimestamp() - Interval('P30D');`;
-      if (typeof cleanup?.on === 'function') cleanup.on('error', () => {});
-      await cleanup;
-      const statement = sql`SELECT id, sender_id, body, created_at FROM fam_pending_messages
-        WHERE school_id = ${schoolId} ORDER BY created_at ASC LIMIT 50;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async decidePendingMessage({ messageId, schoolId, reviewerId, decision }) {
-      if (!messageId || !schoolId || !reviewerId || !['approve', 'reject'].includes(decision)) throw new TypeError('invalid pending message decision');
-      return sql.begin(async tx => {
-        const reviewers = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const reviewer = reviewers?.[0]?.[0];
-        if (!reviewer || reviewer.active !== true || reviewer.role !== 'school_admin' || reviewer.school_id !== schoolId) return false;
-        const rows = await tx`SELECT id, sender_id, receiver_id, school_id, listing_id, body FROM fam_pending_messages
-          WHERE id = ${messageId} AND school_id = ${schoolId} LIMIT 1;`;
-        const pending = rows?.[0]?.[0];
-        if (!pending) return false;
-        if (decision === 'approve') {
-          const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
-            WHERE (user_id = ${pending.sender_id} OR user_id = ${pending.receiver_id}) AND school_id = ${schoolId};`;
-          const activeIds = new Set((participants?.[0] ?? []).filter(row => row.school_id === schoolId && row.active === true).map(row => row.user_id));
-          if (!activeIds.has(pending.sender_id) || !activeIds.has(pending.receiver_id)) return false;
-          await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
-            VALUES (${pending.id}, ${pending.sender_id}, ${pending.receiver_id}, ${schoolId}, ${pending.listing_id ?? ''}, ${pending.body}, false, CurrentUtcTimestamp());`;
-        }
-        await tx`DELETE FROM fam_pending_messages WHERE id = ${messageId} AND school_id = ${schoolId};`;
-        await tx`INSERT INTO fam_school_admin_audit (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${reviewerId}, ${pending.sender_id}, ${decision === 'approve' ? 'message_approved' : 'message_rejected'}, '', CurrentUtcTimestamp());`;
-        return true;
-      });
-    },
-
-    async getListingContactRecipient(listingId, senderId, schoolId) {
-      if (!listingId || !senderId || !schoolId) throw new TypeError('invalid listing contact');
-      const statement = sql`SELECT user_id AS user_id FROM fam_listings
-        WHERE id = ${listingId} AND school_id = ${schoolId} AND status = 'active'
-          AND user_id != ${senderId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0]?.[0]?.user_id ?? null;
-    },
-
-    async listMessages(userId, schoolId) {
-      if (!userId || !schoolId) throw new TypeError('invalid message owner');
-      const statement = sql`SELECT id, sender_id, receiver_id, listing_id, body, is_read, created_at FROM fam_messages
-        WHERE school_id = ${schoolId} AND (sender_id = ${userId} OR receiver_id = ${userId})
-        ORDER BY created_at DESC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const sets = await statement;
-      return sets?.[0] ?? [];
-    },
-
-    async markMessageRead(userId, schoolId, messageId) {
-      if (!userId || !schoolId || !messageId) throw new TypeError('invalid message owner');
-      const update = sql`UPDATE fam_messages SET is_read = true WHERE id = ${messageId}
-        AND receiver_id = ${userId} AND school_id = ${schoolId};`;
-      if (typeof update?.on === 'function') update.on('error', () => {});
-      await update;
-      const confirmed = sql`SELECT id FROM fam_messages WHERE id = ${messageId}
-        AND receiver_id = ${userId} AND school_id = ${schoolId} LIMIT 1;`;
-      if (typeof confirmed?.on === 'function') confirmed.on('error', () => {});
-      return Boolean((await confirmed)?.[0]?.length);
-    },
-
-    async markMessagesRead(userId, schoolId, messageIds) {
-      if (!userId || !schoolId || !Array.isArray(messageIds) || messageIds.length > 100
-          || messageIds.some(id => !UUID.test(id || ''))) throw new TypeError('invalid message read batch');
-      const ids = [...new Set(messageIds)];
-      return sql.begin(async tx => {
-        let updated = 0;
-        for (const id of ids) {
-          const owned = await tx`SELECT receiver_id, school_id FROM fam_messages WHERE id = ${id} LIMIT 1;`;
-          const message = owned?.[0]?.[0];
-          if (message?.receiver_id !== userId || message?.school_id !== schoolId) continue;
-          await tx`UPDATE fam_messages SET is_read = true WHERE id = ${id} AND receiver_id = ${userId} AND school_id = ${schoolId};`;
-          updated += 1;
-        }
-        return updated;
-      });
-    },
-
-    async listFavoriteIds(userId) {
-      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid user id');
-      const statement = sql`SELECT f.listing_id AS listing_id FROM fam_favorites AS f
-        INNER JOIN fam_listings AS l ON f.listing_id = l.id
-        WHERE f.user_id = ${userId} AND l.status = 'active';`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const resultSets = await statement;
-      return (resultSets?.[0] ?? []).map(row => row.listing_id);
-    },
-
-    async setFavorite(userId, listingId, favorite) {
-      if (typeof userId !== 'string' || !userId || typeof listingId !== 'string' || !listingId || typeof favorite !== 'boolean') {
-        throw new TypeError('invalid favorite request');
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolListingDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (actor?.role !== 'school_admin' || !actor.school_id || !actor.id) return { status: 403, body: { ok: false, error: 'forbidden' } };
+      const suspensionBlock = await schoolRoleSuspensionGate(actor);
+      if (suspensionBlock) return suspensionBlock;
+      if (typeof repository?.getSchoolListingDeletionContext !== 'function' || typeof repository?.deleteSchoolListing !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
       }
-      if (favorite) {
-        const active = sql`SELECT id FROM fam_listings WHERE id = ${listingId} AND status = 'active' LIMIT 1;`;
-        if (typeof active?.on === 'function') active.on('error', () => {});
-        const rows = await active;
-        if (!(rows?.[0] ?? []).length) return false;
-        const insert = sql`UPSERT INTO fam_favorites (user_id, listing_id, created_at)
-          VALUES (${userId}, ${listingId}, CurrentUtcTimestamp());`;
-        if (typeof insert?.on === 'function') insert.on('error', () => {});
-        await insert;
-        return true;
+      let context;
+      try { context = await repository.getSchoolListingDeletionContext({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+      if (context.user_id !== actor.id) {
+        if (!hasFreshConfirmation(identity, now())) {
+          return { status: 403, body: { ok: false, error: 'fresh_authentication_required' } };
+        }
       }
-      const remove = sql`DELETE FROM fam_favorites WHERE user_id = ${userId} AND listing_id = ${listingId};`;
-      if (typeof remove?.on === 'function') remove.on('error', () => {});
-      await remove;
-      return true;
-    },
-
-    async listOwnActiveListingIds(userId) {
-      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid listing owner');
-      const statement = sql`SELECT id FROM fam_listings WHERE user_id = ${userId} AND status = 'active'
-        ORDER BY created_at DESC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return ((await statement)?.[0] ?? []).map(row => row.id);
-    },
-
-    async listOwnListingSummaries(userId) {
-      if (typeof userId !== 'string' || !userId) throw new TypeError('invalid listing owner');
-      const statement = sql`SELECT id, title, description, category, price_text, is_event,
-        event_date, event_time, event_type, max_seats, status, photo_status, created_at
-        FROM fam_listings WHERE user_id = ${userId}
-        ORDER BY created_at DESC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return ((await statement)?.[0] ?? []).map(row => ({
-        id: row.id, title: row.title, description: row.description, category: row.category,
-        price_text: row.price_text, is_event: Boolean(row.is_event), event_date: row.event_date || null,
-        event_time: row.event_time || null, event_type: row.event_type || null,
-        max_seats: Number(row.max_seats || 0), status: row.status,
-        photo_status: row.photo_status || 'none', created_at: row.created_at,
-      }));
-    },
-
-    async deleteOwnListing(userId, listingId) {
-      if (typeof userId !== 'string' || !userId || typeof listingId !== 'string' || !UUID.test(listingId)) {
-        throw new TypeError('invalid own listing deletion');
+      let input;
+      try {
+        const chunks = []; let bytes = 0;
+        for await (const chunk of req) { bytes += chunk.length; if (bytes > 2 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); }
+        input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      if (input?.confirmation !== 'УДАЛИТЬ ОБЪЯВЛЕНИЕ ШКОЛЫ') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
+      try {
+        const deleted = await repository.deleteSchoolListing({ schoolId: actor.school_id, actorId: actor.id, listingId: schoolListingDeleteMatch[1] });
+        if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function' && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && ownListingMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || actor.role !== 'student') return { status: 403, body: { ok: false, error: 'student_profile_required' } };
+      if (typeof repository?.deleteOwnListing !== 'function') return { status: 503, body: { ok: false, error: 'listing_delete_unavailable' } };
+      try {
+        const deleted = await repository.deleteOwnListing(actor.id, ownListingMatch[1]);
+        if (!deleted) return { status: 404, body: { ok: false, error: 'listing_unavailable' } };
+        let imageCleanup = deleted.media_cleanup ? 'queued' : 'not_needed';
+        if (deleted.media_cleanup && typeof pendingImages?.delete === 'function'
+            && typeof repository.finishPendingImageCleanup === 'function') {
+          try {
+            await pendingImages.delete(deleted.media_cleanup.object_key);
+            if (await repository.finishPendingImageCleanup(deleted.media_cleanup.object_key, deleted.media_cleanup.claim_token, true)) imageCleanup = 'complete';
+          } catch { /* The five-minute lease lets the pending-media janitor retry. */ }
+        }
+        return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'DELETE' && schoolIdeaDeleteMatch) {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.id || !actor.school_id) return { status: 403, body: { ok: false, error: 'school_profile_required' } };
+      if (typeof repository?.getSchoolIdeaDeletionContext !== 'function' || typeof repository?.deleteSchoolIdea !== 'function') {
+        return { status: 503, body: { ok: false, error: 'idea_delete_unavailable' } };
       }
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT user_id, is_event, image_key FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
-        const listing = rows?.[0]?.[0];
-        if (!listing || listing.user_id !== userId) return null;
-
-        if (listing.is_event) {
-          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
-          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
-        }
-        await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
-
-        let mediaCleanup = null;
-        if (listing.image_key) {
-          const mediaRows = await tx`SELECT status FROM fam_pending_media WHERE object_key = ${listing.image_key} LIMIT 1;`;
-          if (mediaRows?.[0]?.[0]) {
-            const claimToken = randomUUID();
-            await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
-                claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M'))
-              WHERE object_key = ${listing.image_key};`;
-            mediaCleanup = { object_key: listing.image_key, claim_token: claimToken };
-          }
-        }
-
-        await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND user_id = ${userId};`;
-        return { id: listingId, media_cleanup: mediaCleanup };
-      });
-    },
-
-    async getSchoolListingDeletionContext({ schoolId, actorId, listingId }) {
-      if (!schoolId || !actorId || !UUID.test(listingId || '')) throw new TypeError('invalid school listing deletion lookup');
-      const statement = sql`SELECT user_id, school_id, category FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const listing = (await statement)?.[0]?.[0];
-      if (!listing || listing.school_id !== schoolId) return null;
-      return { user_id: listing.user_id, school_id: listing.school_id, category: listing.category };
-    },
-
-    async deleteSchoolListing({ schoolId, actorId, listingId }) {
-      if (!schoolId || !actorId || !UUID.test(listingId || '')) throw new TypeError('invalid school listing deletion');
-      return sql.begin(async tx => {
-        const actorRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${actorId} LIMIT 1;`;
-        const actor = actorRows?.[0]?.[0];
-        if (!actor || actor.active !== true || actor.role !== 'school_admin' || actor.school_id !== schoolId) return { ok: false, code: 'forbidden' };
-        const listingRows = await tx`SELECT id, user_id, school_id, category, is_event, image_key FROM fam_listings WHERE id = ${listingId} LIMIT 1;`;
-        const listing = listingRows?.[0]?.[0];
-        if (!listing || listing.school_id !== schoolId) return { ok: false, code: 'listing_unavailable' };
-
-        if (listing.is_event === true) {
-          await tx`DELETE FROM fam_event_registrations WHERE event_id = ${listingId};`;
-          await tx`DELETE FROM fam_event_occupancy WHERE event_id = ${listingId};`;
-        }
-        await tx`DELETE FROM fam_favorites WHERE listing_id = ${listingId};`;
-
-        let mediaCleanup = null;
-        if (typeof listing.image_key === 'string' && UUID.test(listing.user_id || '')) {
-          const keyParts = listing.image_key.split('/');
-          const validOwnedKey = keyParts.length === 3 && keyParts[0] === 'pending'
-            && keyParts[1].toLowerCase() === listing.user_id.toLowerCase()
-            && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(keyParts[2]);
-          if (validOwnedKey) {
-            const mediaRows = await tx`SELECT user_id FROM fam_pending_media WHERE object_key = ${listing.image_key} LIMIT 1;`;
-            if (mediaRows?.[0]?.[0]?.user_id === listing.user_id) {
-              const claimToken = randomUUID();
-              await tx`UPDATE fam_pending_media SET status = 'deleting', claim_token = ${claimToken},
-                claim_until = Unwrap(CurrentUtcTimestamp() + Interval('PT5M')) WHERE object_key = ${listing.image_key};`;
-              const claim = await tx`SELECT object_key, claim_token FROM fam_pending_media
-                WHERE object_key = ${listing.image_key} AND status = 'deleting' AND claim_token = ${claimToken} LIMIT 1;`;
-              if (claim?.[0]?.[0]) mediaCleanup = claim[0][0];
-            }
-          }
-        }
-
-        await tx`DELETE FROM fam_listings WHERE id = ${listingId} AND school_id = ${schoolId};`;
-        await tx`INSERT INTO fam_school_content_audit
-          (event_id, school_id, actor_id, entity_id, entity_type, action, details, created_at)
-          VALUES (${randomUUID()}, ${schoolId}, ${actorId}, ${listingId}, 'listing', 'listing_deleted',
-            ${JSON.stringify({ category: String(listing.category ?? '').slice(0, 40), image_cleanup: mediaCleanup ? 'queued' : 'not_needed' })}, CurrentUtcTimestamp());`;
-        return { ok: true, id: listingId, media_cleanup: mediaCleanup };
-      });
-    },
-
-    async listActiveListings(schoolId) {
-      if (typeof schoolId !== 'string' || !schoolId.trim()) throw new TypeError('school scope is required');
-      const statement = sql`SELECT id, title, description, category, price_text, is_event,
-        event_date, event_time, event_type, max_seats, created_at, image_key, photo_status
-        FROM fam_listings
-        WHERE school_id = ${schoolId} AND status = 'active'
-        ORDER BY created_at DESC
-        LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const resultSets = await statement;
-      return (resultSets?.[0] ?? []).map(row => ({
-        id: row.id,
-        title: row.title,
-        description: row.description,
-        category: row.category,
-        price_text: row.price_text,
-        is_event: row.is_event,
-        event_date: row.event_date || null,
-        event_time: row.event_time || null,
-        event_type: row.event_type || null,
-        max_seats: row.max_seats,
-        created_at: row.created_at,
-        photo_url: row.image_key && row.photo_status === 'approved' ? `/api/v1/listings/${row.id}/photo` : null,
-      }));
-    },
-
-    async listRecentSchoolNotificationListings(schoolId, userId) {
-      if (typeof schoolId !== 'string' || !schoolId.trim() || typeof userId !== 'string' || !UUID.test(userId)) {
-        throw new TypeError('school notification scope is required');
+      let context;
+      try { context = await repository.getSchoolIdeaDeletionContext({ ideaId: schoolIdeaDeleteMatch[1], schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!context) return { status: 404, body: { ok: false, error: 'idea_unavailable' } };
+      if (context.user_id !== actor.id) {
+        if (actor.role !== 'school_admin') return { status: 403, body: { ok: false, error: 'forbidden' } };
+        let input;
+        try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+        catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+        if (input?.confirmation !== 'УДАЛИТЬ ИДЕЮ ШКОЛЫ') return { status: 400, body: { ok: false, error: 'confirmation_required' } };
       }
-      const statement = sql`SELECT id, title, is_event, created_at
-        FROM fam_listings
-        WHERE school_id = ${schoolId} AND user_id != ${userId} AND status = 'active'
-          AND created_at >= CurrentUtcTimestamp() - Interval('P14D')
-        ORDER BY created_at DESC
-        LIMIT 8;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const resultSets = await statement;
-      return (resultSets?.[0] ?? []).map(row => ({
-        id: row.id,
-        title: row.title,
-        is_event: row.is_event === true,
-        created_at: row.created_at,
-      }));
-    },
-
-    async listPendingListings(schoolId) {
-      if (!schoolId) throw new TypeError('invalid school id');
-      const statement = sql`SELECT id, title, description, category, price_text, is_event,
-        event_date, event_time, event_type, max_seats, created_at, image_key, photo_status
-        FROM fam_listings
-        WHERE school_id = ${schoolId} AND status = 'pending'
-        ORDER BY created_at ASC
-        LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const resultSets = await statement;
-      return (resultSets?.[0] ?? []).map(row => ({
-        id: row.id,
-        title: row.title,
-        description: row.description,
-        category: row.category,
-        price_text: row.price_text,
-        is_event: row.is_event,
-        event_date: row.event_date || null,
-        event_time: row.event_time || null,
-        event_type: row.event_type || null,
-        max_seats: row.max_seats,
-        created_at: row.created_at,
-        photo_status: row.photo_status || 'none',
-        photo_url: row.image_key ? `/api/v1/listings/${row.id}/photo` : null,
-      }));
-    },
-
-    async getEventOccupancy(eventId) {
-      if (!eventId) throw new TypeError('invalid event id');
-      const statement = sql`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const rows = await statement;
-      return Number(rows?.[0]?.[0]?.taken ?? 0);
-    },
-
-
-    async getPublicEventOccupancy(eventId, schoolId) {
-      if (!eventId || typeof schoolId !== 'string' || !schoolId.trim()) throw new TypeError('event and school scope are required');
-      const statement = sql`SELECT o.taken FROM fam_event_occupancy AS o
-        INNER JOIN fam_listings AS l ON l.id = o.event_id
-        WHERE o.event_id = ${eventId} AND l.school_id = ${schoolId} AND l.is_event = true AND l.status = 'active' LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const rows = await statement;
-      const row = rows?.[0]?.[0];
-      return row ? Number(row.taken ?? 0) : null;
-    },
-    async listEventRegistrations(userId) {
-      if (!userId) throw new TypeError('invalid event registrant');
-      const statement = sql`SELECT r.event_id AS event_id, r.user_id AS user_id, r.status AS status,
-          r.created_at AS created_at, l.title AS event_title, l.event_date AS event_date,
-          l.event_time AS event_time, l.event_type AS event_type
-        FROM fam_event_registrations AS r
-        INNER JOIN fam_listings AS l ON l.id = r.event_id
-        WHERE r.user_id = ${userId}
-        ORDER BY r.created_at DESC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async listEventApplicants(eventId, schoolId, viewerId) {
-      if (!eventId || !schoolId || !viewerId) throw new TypeError('invalid event applicant scope');
-      const statement = sql`SELECT r.user_id AS user_id, r.status AS status,
-          r.created_at AS created_at, p.first_name AS first_name,
-          p.last_name AS last_name, p.class_name AS class_name,
-          p.person_type AS person_type, p.staff_position AS staff_position
-        FROM fam_event_registrations AS r
-        INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
-        INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
-        WHERE r.event_id = ${eventId} AND r.school_id = ${schoolId}
-          AND (l.user_id = ${viewerId} OR EXISTS (
-            SELECT 1 FROM fam_user_profiles AS viewer
-            WHERE viewer.user_id = ${viewerId} AND viewer.school_id = ${schoolId}
-              AND viewer.active = true AND viewer.role IN ('school_admin', 'council_member')
-          ))
-          AND l.is_event = true AND l.status = 'active'
-        ORDER BY r.created_at ASC LIMIT 100;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async listPendingEventReviews(schoolId) {
-      if (!schoolId) throw new TypeError('invalid event review school');
-      const statement = sql`SELECT r.event_id AS event_id, l.title AS event_title,
-          r.user_id AS user_id, r.status AS status, r.created_at AS created_at,
-          p.first_name AS first_name, p.last_name AS last_name, p.class_name AS class_name,
-          p.person_type AS person_type, p.staff_position AS staff_position
-        FROM fam_event_registrations AS r
-        INNER JOIN fam_listings AS l ON l.id = r.event_id AND l.school_id = r.school_id
-        INNER JOIN fam_user_profiles AS p ON p.user_id = r.user_id AND p.school_id = r.school_id
-        WHERE r.school_id = ${schoolId} AND l.is_event = true AND l.status = 'active' AND r.status = 'pending'
-        ORDER BY r.created_at ASC LIMIT 200;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      return (await statement)?.[0] ?? [];
-    },
-
-    async registerForEvent(eventId, userId, schoolId) {
-      if (!eventId || !userId || !schoolId) throw new TypeError('invalid event registration');
-      const outcome = await sql.begin({ idempotent: true }, async tx => {
-        const listingResult = await tx`SELECT user_id, school_id, is_event, status, event_type, max_seats
-          FROM fam_listings WHERE id = ${eventId} LIMIT 1;`;
-        const event = listingResult?.[0]?.[0];
-        if (!event || event.is_event !== true || event.status !== 'active'
-            || !['open', 'request', 'limited'].includes(event.event_type)) {
-          return { failure: 'event_unavailable' };
+      let deleted;
+      try { deleted = await repository.deleteSchoolIdea({ ideaId: schoolIdeaDeleteMatch[1], actorId: actor.id, schoolId: actor.school_id }); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+      if (!deleted?.ok) return { status: deleted?.code === 'forbidden' ? 403 : 404, body: { ok: false, error: deleted?.code || 'idea_unavailable' } };
+      let imageCleanup = deleted.media_cleanup?.length ? 'queued' : 'not_needed';
+      if (deleted.media_cleanup?.length && typeof pendingImages?.delete === 'function'
+          && typeof repository.finishPendingImageCleanup === 'function') {
+        let complete = true;
+        for (const media of deleted.media_cleanup) {
+          try {
+            await pendingImages.delete(media.object_key);
+            if (!await repository.finishPendingImageCleanup(media.object_key, media.claim_token, true)) complete = false;
+          } catch { complete = false; }
         }
-        if (event.school_id !== schoolId) {
-          return { failure: 'school_mismatch' };
-        }
-        if (event.user_id === userId) {
-          return { failure: 'organizer_registration' };
-        }
-
-        const currentResult = await tx`SELECT status FROM fam_event_registrations
-          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
-        const current = currentResult?.[0]?.[0];
-        if (current && ['pending', 'confirmed'].includes(current.status)) {
-          return { failure: 'already_registered' };
-        }
-
-        const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
-        const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
-        const limit = event.event_type === 'limited' ? Number(event.max_seats ?? 0) : 0;
-        if (limit > 0 && taken >= limit) {
-          return { failure: 'no_seats_available' };
-        }
-
-        const status = event.event_type === 'request' ? 'pending' : 'confirmed';
-        if (!current || !['pending', 'confirmed'].includes(current.status)) {
-          await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
-            VALUES (${eventId}, Unwrap(CAST(${taken + 1} AS Uint32)));`;
-        }
-        await tx`UPSERT INTO fam_event_registrations (event_id, user_id, school_id, status, created_at)
-          VALUES (${eventId}, ${userId}, ${event.school_id}, ${status}, CurrentUtcTimestamp());`;
-        return { registration: { event_id: eventId, user_id: userId, status } };
-      });
-      if (outcome?.failure) {
-        const messages = {
-          event_unavailable: 'event unavailable',
-          school_mismatch: 'event unavailable',
-          organizer_registration: 'organizer cannot register',
-          already_registered: 'already registered',
-          no_seats_available: 'no seats available',
-        };
-        const error = new Error(messages[outcome.failure] || 'event registration rejected');
-        error.code = outcome.failure;
-        throw error;
+        imageCleanup = complete ? 'complete' : 'queued';
       }
-      return outcome.registration;
-    },
-
-    async cancelEventRegistration(eventId, userId) {
-      if (!eventId || !userId) throw new TypeError('invalid event registration');
-      return sql.begin({ idempotent: true }, async tx => {
-        const currentResult = await tx`SELECT status FROM fam_event_registrations
-          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
-        const current = currentResult?.[0]?.[0];
-        if (!current || !['pending', 'confirmed'].includes(current.status)) return false;
-        await tx`UPDATE fam_event_registrations SET status = 'cancelled'
-          WHERE event_id = ${eventId} AND user_id = ${userId};`;
-        const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
-        const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
-        await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
-          VALUES (${eventId}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
-        return true;
-      });
-    },
-
-    async listSchoolPulse(schoolId, userId) {
-      if (!schoolId || !userId) throw new TypeError('invalid school pulse read');
-      const announcementQuery = sql`SELECT announcement_id AS id, title, body, kind, published_at, event_starts_at
-        FROM fam_school_announcements WHERE school_id = ${schoolId} AND published_at <= CurrentUtcTimestamp()
-          AND expires_at > CurrentUtcTimestamp() ORDER BY published_at DESC LIMIT 6;`;
-      const openEventQuery = sql`SELECT id, title, Unicode::Substring(description, 0, 450) AS body,
-          created_at AS published_at, event_date, event_time
-        FROM fam_listings WHERE school_id = ${schoolId} AND status = 'active' AND is_event = true
-          AND max_seats = 0 AND (event_date = '' OR CAST(event_date AS Date) >= CurrentUtcDate())
-        ORDER BY created_at DESC LIMIT 6;`;
-      const pollQuery = sql`SELECT poll_id AS id, question, options_json, closes_at
-        FROM fam_school_polls WHERE school_id = ${schoolId}
-          AND closes_at > CurrentUtcTimestamp() - Interval('P7D') ORDER BY created_at DESC LIMIT 3;`;
-      for (const statement of [announcementQuery, openEventQuery, pollQuery]) if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const [announcementResult, openEventResult, pollResult] = await Promise.all([announcementQuery, openEventQuery, pollQuery]);
-      const announcements = (announcementResult?.[0] ?? []).map(row => ({
-        id: row.id, title: row.title, body: row.body, kind: row.kind, published_at: row.published_at,
-        event_starts_at: row.event_starts_at ?? null,
-      }));
-      const openEvents = (openEventResult?.[0] ?? []).map(row => ({
-        id: row.id, title: row.title, body: row.body, kind: 'open_event',
-        published_at: row.published_at, event_starts_at: null,
-        event_date: row.event_date || null, event_time: row.event_time || null,
-      }));
-      const timestamp = value => value instanceof Date ? value.getTime() : Date.parse(value ?? '');
-      const feed = [...openEvents, ...announcements].sort((left, right) => {
-        const kindOrder = Number(right.kind === 'open_event') - Number(left.kind === 'open_event');
-        if (kindOrder) return kindOrder;
-        return (timestamp(right.published_at) || 0) - (timestamp(left.published_at) || 0);
-      }).slice(0, 6);
-      const polls = [];
-      for (const poll of pollResult?.[0] ?? []) {
-        let options;
-        try { options = JSON.parse(poll.options_json); } catch { continue; }
-        if (!Array.isArray(options) || options.length < 2 || options.length > 8) continue;
-        const voteQuery = sql`SELECT choice_index, COUNT(*) AS votes FROM fam_school_poll_votes
-          WHERE poll_id = ${poll.id} AND school_id = ${schoolId} GROUP BY choice_index;`;
-        const myVoteQuery = sql`SELECT choice_index FROM fam_school_poll_votes
-          WHERE poll_id = ${poll.id} AND voter_id = ${userId} AND school_id = ${schoolId} LIMIT 1;`;
-        if (typeof voteQuery?.on === 'function') voteQuery.on('error', () => {});
-        if (typeof myVoteQuery?.on === 'function') myVoteQuery.on('error', () => {});
-        const [voteResult, myVoteResult] = await Promise.all([voteQuery, myVoteQuery]);
-        const rows = voteResult?.[0] ?? [];
-        const totalVotes = rows.reduce((sum, row) => sum + Number(row.votes ?? 0), 0);
-        const counts = totalVotes >= 5 ? options.map((_, index) => {
-          const row = rows.find(item => Number(item.choice_index) === index);
-          return Number(row?.votes ?? 0);
-        }) : null;
-        const myVote = myVoteResult?.[0]?.[0]?.choice_index;
-        polls.push({ ...poll, options, options_json: undefined, total_votes: totalVotes,
-          my_vote: myVote === undefined ? null : Number(myVote), counts });
+      return { status: 200, body: { ok: true, deleted: true, image_cleanup: imageCleanup } };
+    }
+    const favoriteMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/favorite$/i);
+    if (req.method === 'GET' && pathname === '/api/v1/favorites') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.listFavoriteIds !== 'function') return { status: 503, body: { ok: false, error: 'favorite_read_unavailable' } };
+      try { return { status: 200, body: { ok: true, favorite_ids: await repository.listFavoriteIds(actor.id) } }; }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (favoriteMatch && ['PUT', 'DELETE'].includes(req.method)) {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository.setFavorite !== 'function') return { status: 503, body: { ok: false, error: 'favorite_write_unavailable' } };
+      try {
+        const favorited = await repository.setFavorite(actor.id, favoriteMatch[1], req.method === 'PUT');
+        if (!favorited) return { status: 404, body: { ok: false, error: 'listing_not_found' } };
+        return { status: 200, body: { ok: true, listing_id: favoriteMatch[1], favorited: req.method === 'PUT' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'PATCH' && pathname === '/api/v1/me') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let input;
+      try { const chunks = []; let bytes = 0; for await (const chunk of req) { bytes += chunk.length; if (bytes > 4 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } }; chunks.push(chunk); } input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+      const first_name = typeof input?.first_name === 'string' ? input.first_name.trim() : '';
+      const last_name = typeof input?.last_name === 'string' ? input.last_name.trim() : '';
+      let currentProfile;
+      if (input?.person_type == null || input?.staff_position == null || input?.class_name == null) {
+        try { currentProfile = await resolveActor(identity); } catch { currentProfile = null; }
       }
-      return { announcements: feed, polls };
-    },
-
-    async voteSchoolPoll({ pollId, schoolId, userId, choiceIndex }) {
-      if (!pollId || !schoolId || !userId || !Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex > 7) {
-        throw new TypeError('invalid school poll vote');
+      const person_type = input?.person_type ?? currentProfile?.person_type ?? 'student';
+      const staff_position = typeof input?.staff_position === 'string' ? input.staff_position.trim() : (currentProfile?.staff_position ?? '');
+      const class_name = typeof input?.class_name === 'string' ? input.class_name.trim().toUpperCase().replace(/\s+/gu, '')
+        : (currentProfile?.class_name ?? '');
+      const validName = value => value.length >= 1 && value.length <= 60 && !/[<>\u0000-\u001f]/u.test(value);
+      if (!validName(first_name) || !validName(last_name) || !['student', 'school_staff', 'parent'].includes(person_type)
+          || (person_type === 'student' && !isSchoolClassName(class_name))
+          || (person_type !== 'student' && class_name !== '')
+          || (person_type === 'school_staff' && (staff_position.length < 1 || staff_position.length > 100 || /[<>\u0000-\u001f]/u.test(staff_position)))
+          || (person_type !== 'school_staff' && staff_position !== '')) {
+        return { status: 400, body: { ok: false, error: 'invalid_profile_identity' } };
       }
-      return sql.begin(async tx => {
-        const profileRows = await tx`SELECT school_id, active FROM fam_user_profiles WHERE user_id = ${userId} LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile?.active || profile.school_id !== schoolId) return { ok: false, code: 'school_profile_required' };
-        const pollRows = await tx`SELECT school_id, options_json, closes_at FROM fam_school_polls WHERE poll_id = ${pollId} LIMIT 1;`;
-        const poll = pollRows?.[0]?.[0];
-        if (!poll || poll.school_id !== schoolId) return { ok: false, code: 'poll_unavailable' };
-        let options;
-        try { options = JSON.parse(poll.options_json); } catch { return { ok: false, code: 'poll_unavailable' }; }
-        if (!Array.isArray(options) || choiceIndex >= options.length) return { ok: false, code: 'invalid_choice' };
-        if (new Date(poll.closes_at).getTime() <= Date.now()) return { ok: false, code: 'poll_closed' };
-        const priorRows = await tx`SELECT choice_index FROM fam_school_poll_votes WHERE poll_id = ${pollId} AND voter_id = ${userId} LIMIT 1;`;
-        if (priorRows?.[0]?.length) return { ok: false, code: 'already_voted' };
-        await tx`INSERT INTO fam_school_poll_votes (poll_id, voter_id, school_id, choice_index, created_at)
-          VALUES (${pollId}, ${userId}, ${schoolId}, Unwrap(CAST(${choiceIndex} AS Uint32)), CurrentUtcTimestamp());`;
-        return { ok: true };
-      });
-    },
-
-    async publishSchoolAnnouncement({ schoolId, authorId, title, body, kind, eventStartsAt }) {
-      if (!schoolId || !authorId || !title || !body || !['news', 'important', 'open_event'].includes(kind)) throw new TypeError('invalid school announcement');
-      const announcementId = randomUUID();
-      return sql.begin(async tx => {
-        const profileRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${authorId} LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile?.active || profile.school_id !== schoolId || !['school_admin', 'council_member'].includes(profile.role)) return { ok: false, code: 'trusted_school_role_required' };
-        const countRows = await tx`SELECT COUNT(*) AS count FROM fam_school_announcements
-          WHERE school_id = ${schoolId} AND published_at >= CurrentUtcTimestamp() - Interval('PT24H');`;
-        if (Number(countRows?.[0]?.[0]?.count ?? 0) >= 4) return { ok: false, code: 'daily_announcement_limit' };
-        if (kind === 'open_event') {
-          await tx`INSERT INTO fam_school_announcements
-            (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
-            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, Unwrap(CAST(${eventStartsAt} AS Timestamp)), CurrentUtcTimestamp(), Unwrap(CAST(${eventStartsAt} AS Timestamp) + Interval('PT12H')));`;
-        } else {
-          await tx`INSERT INTO fam_school_announcements
-            (announcement_id, school_id, author_id, title, body, kind, event_starts_at, published_at, expires_at)
-            VALUES (${announcementId}, ${schoolId}, ${authorId}, ${title}, ${body}, ${kind}, CAST(NULL AS Timestamp?), CurrentUtcTimestamp(), Unwrap(CurrentUtcTimestamp() + Interval('P14D')));`;
-        }
-        return { ok: true, id: announcementId };
-      });
-    },
-
-    async publishSchoolPoll({ schoolId, authorId, question, options, closesAt }) {
-      if (!schoolId || !authorId || !question || !Array.isArray(options) || !closesAt) throw new TypeError('invalid school poll');
-      const pollId = randomUUID();
-      const optionsJson = JSON.stringify(options);
-      return sql.begin(async tx => {
-        const profileRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${authorId} LIMIT 1;`;
-        const profile = profileRows?.[0]?.[0];
-        if (!profile?.active || profile.school_id !== schoolId || !['school_admin', 'council_member'].includes(profile.role)) return { ok: false, code: 'trusted_school_role_required' };
-        const countRows = await tx`SELECT COUNT(*) AS count FROM fam_school_polls
-          WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`;
-        if (Number(countRows?.[0]?.[0]?.count ?? 0) >= 2) return { ok: false, code: 'daily_poll_limit' };
-        await tx`INSERT INTO fam_school_polls (poll_id, school_id, author_id, question, options_json, closes_at, created_at)
-          VALUES (${pollId}, ${schoolId}, ${authorId}, ${question}, ${optionsJson}, Unwrap(CAST(${closesAt} AS Timestamp)), CurrentUtcTimestamp());`;
-        return { ok: true, id: pollId };
-      });
-    },
-
-    async moderateEventRegistration(eventId, userId, moderatorId, schoolId, decision) {
-      if (!eventId || !userId || !moderatorId || !schoolId || !['confirmed', 'rejected'].includes(decision)) {
-        throw new TypeError('invalid event review');
+      if (typeof repository?.updateOwnProfileIdentity !== 'function') return { status: 503, body: { ok: false, error: 'profile_update_unavailable' } };
+      try {
+        const profile = await repository.updateOwnProfileIdentity(identity.issuer, identity.subject,
+          { first_name, last_name, class_name, person_type, staff_position });
+        return profile ? { status: 200, body: { ok: true, profile } } : { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me') {
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      return { status: 200, body: { ok: true, profile: actor } };
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/listings') {
+      // Match the source FAM board policy: active listings are visible only
+      // to signed-in profiles from the same school. Guests receive an empty
+      // feed so the UI can show its login prompt without leaking school data.
+      let identity;
+      try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 200, body: { ok: true, listings: [] } };
+      let actor;
+      try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor?.school_id) return { status: 200, body: { ok: true, listings: [] } };
+      if (typeof repository.listActiveListings !== 'function') {
+        return { status: 503, body: { ok: false, error: 'listing_read_unavailable' } };
       }
-      return sql.begin({ idempotent: true }, async tx => {
-        const profileResult = await tx`SELECT school_id, role, active FROM fam_user_profiles
-          WHERE user_id = ${moderatorId} LIMIT 1;`;
-        const profile = profileResult?.[0]?.[0];
-        if (!profile || profile.active !== true || profile.school_id !== schoolId) return false;
-        const isSchoolReviewer = ['school_admin', 'council_member'].includes(profile.role);
-        const eventResult = await tx`SELECT user_id, school_id, is_event FROM fam_listings
-          WHERE id = ${eventId} LIMIT 1;`;
-        const event = eventResult?.[0]?.[0];
-        if (!event || event.is_event !== true || event.school_id !== schoolId
-            || (event.user_id !== moderatorId && !isSchoolReviewer)) return false;
-        const registrationResult = await tx`SELECT status FROM fam_event_registrations
-          WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
-        const registration = registrationResult?.[0]?.[0];
-        if (!registration || registration.status !== 'pending') return false;
-        await tx`UPDATE fam_event_registrations SET status = ${decision}
-          WHERE event_id = ${eventId} AND user_id = ${userId};`;
-        if (decision === 'rejected') {
-          const occupancyResult = await tx`SELECT taken FROM fam_event_occupancy WHERE event_id = ${eventId} LIMIT 1;`;
-          const taken = Number(occupancyResult?.[0]?.[0]?.taken ?? 0);
-          await tx`UPSERT INTO fam_event_occupancy (event_id, taken)
-            VALUES (${eventId}, Unwrap(CAST(${Math.max(0, taken - 1)} AS Uint32)));`;
-        }
-        return true;
-      });
-    },
-
-    async getSchoolAgentMetrics(schoolId) {
-      if (!schoolId) throw new TypeError('invalid agent report school');
-      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
-      const [active, fresh, safety, highSafety, deletion, suspensions, ideas] = await Promise.all([
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND status = 'active';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE school_id = ${schoolId} AND created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL;`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE school_id = ${schoolId} AND reviewed_at IS NULL AND severity = 'high';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_account_deletion_requests WHERE school_id = ${schoolId} AND status IN ('pending', 'processing');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_account_suspensions WHERE school_id = ${schoolId} AND status = 'active' AND expires_at > CurrentUtcTimestamp();`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_ideas WHERE school_id = ${schoolId} AND admin_status = 'new';`),
-      ]);
-      return { listings: { active, new_24h: fresh }, safety: { unreviewed: safety, high_unreviewed: highSafety },
-        account_requests: { deletion_pending: deletion, active_suspensions: suspensions }, ideas: { awaiting_council: ideas } };
-    },
-
-    async countPendingSchoolAgentIdeas(schoolId) {
-      if (!schoolId) throw new TypeError('invalid agent report school');
-      const rows = await sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE school_id = ${schoolId} AND status = 'pending';`;
-      const count = Number(rows?.[0]?.[0]?.count ?? 0);
-      if (!Number.isSafeInteger(count) || count < 0) throw new TypeError('invalid pending school proposals count');
-      return count;
-    },
-
-    async saveSchoolAgentReport({ schoolId, date, summary, metrics }) {
-      if (!schoolId || !/^\d{4}-\d{2}-\d{2}$/.test(date || '') || typeof summary !== 'string' || !metrics) throw new TypeError('invalid school agent report');
-      await sql`UPSERT INTO fam_agent_school_daily_reports (school_id, report_date, generated_at, summary, metrics_json)
-        VALUES (${schoolId}, ${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
-    },
-
-    async createSchoolAgentIdea({ id, schoolId, date, rule, count }) {
-      if (!id || !schoolId || !date || !rule || !Number.isInteger(count) || count <= 0) throw new TypeError('invalid school agent idea');
-      return sql.begin(async tx => {
-        const prior = await tx`SELECT id FROM fam_agent_ideas WHERE school_id = ${schoolId} AND report_date = ${date} AND agent_rule_key = ${rule.key} LIMIT 1;`;
-        if (prior?.[0]?.length) return false;
-        await tx`INSERT INTO fam_agent_ideas
-          (id, school_id, report_date, agent_rule_key, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by, status, reviewed_by, reviewed_at, decision_note, created_at)
-          VALUES (${id}, ${schoolId}, ${date}, ${rule.key}, ${rule.title}, ${rule.summary(count)}, ${rule.benefit}, ${rule.complexity || 'small'}, 'low', 'observed', ${rule.evidence(count)}, ${rule.proposedBy}, 'pending', NULL, NULL, NULL, CurrentUtcTimestamp());`;
-        return true;
-      });
-    },
-
-    async getGlobalAgentDailyMetrics() {
-      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
-      const [activeListings, newListings, unreviewedSafety, deletionRequests, activeSuspensions,
-        pendingIdeas, approvedIdeas, rejectedIdeas] = await Promise.all([
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE status = 'active';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_safety_incidents WHERE reviewed_at IS NULL;`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_account_deletion_requests WHERE status IN ('pending', 'processing');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_account_suspensions WHERE status = 'active' AND expires_at > CurrentUtcTimestamp();`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'pending';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'approved';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'rejected';`),
-      ]);
-      return {
-        listings: { active: activeListings, new_24h: newListings },
-        safety: { unreviewed: unreviewedSafety },
-        account_requests: { deletion_pending: deletionRequests, active_suspensions: activeSuspensions },
-        ideas: { pending: pendingIdeas, approved: approvedIdeas, rejected: rejectedIdeas },
-      };
-    },
-
-    async saveGlobalAgentDailyReport({ date, summary, metrics }) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || typeof summary !== 'string' || !metrics) {
-        throw new TypeError('invalid global agent report');
+      try {
+        const listings = await repository.listActiveListings(actor.school_id);
+        return { status: 200, body: { ok: true, listings } };
+      } catch {
+        return { status: 503, body: { ok: false, error: 'database_unavailable' } };
       }
-      await sql`UPSERT INTO fam_agent_daily_reports (report_date, generated_at, summary, metrics_json)
-        VALUES (${date}, CurrentUtcTimestamp(), ${summary}, ${JSON.stringify(metrics)});`;
-    },
+    }
+    if (req.method === 'GET' && pathname === '/api/v1/me/ideas') {
+      let identity; try { identity = await authenticate(req); } catch { identity = null; }
+      if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+      let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
+      if (!actor || typeof actor.id !== 'string' || !actor.school_id) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+      if (typeof repository?.listOwnIdeas !== 'function') return { status: 503, body: { ok: false, error: 'ideas_unavailable' } };
+      try {
+        const ideas = await repository.listOwnIdeas(actor.id, actor.school_id);
+        return { status: 200, body: { ok: true, ideas: Array.isArray(ideas) ? ideas.slice(0, 50) : [] } };
+      } catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
+    }
+    if (req.method !== 'POST') return { status: 405, body: { ok: false, error: 'method_not_allowed' } };
+    if (!['/api/v1/listings', '/api/v1/ideas', '/api/v1/messages'].includes(pathname)) return { status: 404, body: { ok: false, error: 'not_found' } };
 
-    async enqueueAgentDailyDigestTask(reportDate) {
-      if (!isIsoDate(reportDate)) {
-        throw new TypeError('invalid agent digest date');
+    let identity;
+    try { identity = await authenticate(req); } catch { identity = null; }
+    if (!identity) return { status: 401, body: { ok: false, error: 'unauthorized' } };
+    let actor;
+    try { actor = await resolveActor(identity); } catch { actor = null; }
+    if (!actor) return { status: 403, body: { ok: false, error: 'profile_unavailable' } };
+    let input;
+    try {
+      const chunks = []; let bytes = 0;
+      for await (const chunk of req) {
+        bytes += chunk.length;
+        if (bytes > 64 * 1024) return { status: 413, body: { ok: false, error: 'request_too_large' } };
+        chunks.push(chunk);
       }
-      return sql.begin(async tx => {
-        const prior = await tx`SELECT status, attempt_count FROM fam_agent_daily_digest_tasks
-          WHERE report_date = ${reportDate} LIMIT 1;`;
-        if (prior?.[0]?.length) return { created: false, status: prior[0][0].status };
-        await tx`INSERT INTO fam_agent_daily_digest_tasks
-          (report_date, status, attempt_count, max_attempts, available_at, claimed_by, claim_token,
-            lease_expires_at, generated_at, metrics_json, summary, last_error_code, created_at, updated_at)
-          VALUES (${reportDate}, 'queued', Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(3 AS Uint32)),
-            CurrentUtcTimestamp(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
-        return { created: true, status: 'queued' };
-      });
-    },
-
-    async claimAgentDailyDigestTask(workerId, reportDate) {
-      if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 80 || !isIsoDate(reportDate)) {
-        throw new TypeError('invalid agent digest claim');
-      }
-      return sql.begin(async tx => {
-        const candidates = await tx`SELECT report_date, status, attempt_count, max_attempts,
-            CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
-            CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
-          FROM fam_agent_daily_digest_tasks
-          WHERE report_date = ${reportDate} AND attempt_count < max_attempts
-            AND ((status IN ('queued', 'failed') AND available_at <= CurrentUtcTimestamp())
-              OR (status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp()))
-          ORDER BY report_date ASC LIMIT 1;`;
-        const task = candidates?.[0]?.[0];
-        if (!task) return null;
-        const due = task.available === true && ['queued', 'failed'].includes(task.status)
-          || task.status === 'claimed' && task.lease_expired === true;
-        if (!due) return null;
-        const claimToken = randomUUID();
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
-            attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
-            claimed_by = ${workerId}, claim_token = ${claimToken},
-            lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'),
-            last_error_code = CAST(NULL AS Utf8?), updated_at = CurrentUtcTimestamp()
-          WHERE report_date = ${task.report_date};`;
-        return { report_date: task.report_date, claim_token: claimToken };
-      });
-    },
-
-    async getAgentDailyDigestMetrics() {
-      const count = async statement => Number((await statement)?.[0]?.[0]?.count ?? 0);
-      const [activeListings, newListings, pendingIdeas, queuedTasks, completedTasks, blockedTasks, failedTasks] = await Promise.all([
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE status = 'active';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_listings WHERE created_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_ideas WHERE status = 'pending';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'queued';`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'completed' AND generated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'blocked' AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-        count(sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'failed' AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`),
-      ]);
-      return { active_listings: activeListings, new_listings_24h: newListings, pending_ideas: pendingIdeas,
-        queued_tasks: queuedTasks, completed_tasks_24h: completedTasks, blocked_tasks_24h: blockedTasks, failed_tasks_24h: failedTasks };
-    },
-
-    async getRuBackgroundQueueHealth(now = Date.now) {
-      if (typeof now !== 'function') throw new TypeError('invalid background queue clock');
-      const count = async statement => {
-        const value = Number((await statement)?.[0]?.[0]?.count ?? 0);
-        if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('invalid background queue count');
-        return value;
-      };
-      const readQueue = async (statusesQuery, expiredQuery, failuresQuery, oldestQuery) => {
-        const [statusRows, expiredLeases, recentFailures, oldestQueued] = await Promise.all([
-          statusesQuery, count(expiredQuery), count(failuresQuery), oldestQuery,
-        ]);
-        const statuses = { queued: 0, claimed: 0, completed: 0, blocked: 0, failed: 0 };
-        for (const row of statusRows?.[0] ?? []) {
-          if (!Object.hasOwn(statuses, row.status)) throw new TypeError('invalid background queue status');
-          const value = Number(row.count);
-          if (!Number.isSafeInteger(value) || value < 0) throw new TypeError('invalid background queue status count');
-          statuses[row.status] = value;
-        }
-        const oldest = oldestQueued?.[0]?.[0]?.oldest_queued_at;
-        const oldestMs = oldest instanceof Date ? oldest.getTime() : typeof oldest === 'string' ? Date.parse(oldest) : NaN;
-        const currentTime = Number(now());
-        if (!Number.isFinite(currentTime)) throw new TypeError('invalid background queue health clock value');
-        const oldestAgeMinutes = Number.isFinite(oldestMs) ? Math.max(0, Math.floor((currentTime - oldestMs) / 60_000)) : 0;
-        return { statuses, expired_leases: expiredLeases, failed_or_blocked_24h: recentFailures,
-          oldest_queued_age_minutes: oldestAgeMinutes };
-      };
-      const [dailyReports, siteErrorDigests] = await Promise.all([
-        readQueue(sql`SELECT status, COUNT(*) AS count FROM fam_agent_daily_digest_tasks GROUP BY status;`,
-          sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp();`,
-          sql`SELECT COUNT(*) AS count FROM fam_agent_daily_digest_tasks WHERE status IN ('failed', 'blocked') AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`,
-          sql`SELECT MIN(available_at) AS oldest_queued_at FROM fam_agent_daily_digest_tasks WHERE status = 'queued';`),
-        readQueue(sql`SELECT status, COUNT(*) AS count FROM fam_site_error_digest_tasks GROUP BY status;`,
-          sql`SELECT COUNT(*) AS count FROM fam_site_error_digest_tasks WHERE status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp();`,
-          sql`SELECT COUNT(*) AS count FROM fam_site_error_digest_tasks WHERE status IN ('failed', 'blocked') AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`,
-          sql`SELECT MIN(available_at) AS oldest_queued_at FROM fam_site_error_digest_tasks WHERE status = 'queued';`),
-      ]);
-      return { checked_at: new Date(Number(now())).toISOString(), queues: { daily_reports: dailyReports,
-        site_error_digests: siteErrorDigests }, content_read: false };
-    },
-
-    async completeAgentDailyDigestTask({ reportDate, claimToken, metrics, summary }) {
-      const keys = ['active_listings', 'new_listings_24h', 'pending_ideas', 'queued_tasks', 'completed_tasks_24h', 'blocked_tasks_24h', 'failed_tasks_24h'];
-      if (!isIsoDate(reportDate) || !UUID.test(claimToken || '')
-          || !metrics || keys.some(key => !Number.isSafeInteger(metrics[key]) || metrics[key] < 0)
-          || typeof summary !== 'string' || summary.length > 1000) throw new TypeError('invalid agent digest result');
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT status, claim_token,
-            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
-          FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
-        const current = rows?.[0]?.[0];
-        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('completed' AS Utf8)), generated_at = CurrentUtcTimestamp(),
-            metrics_json = ${JSON.stringify(metrics)}, summary = ${summary}, claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
-            lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
-          WHERE report_date = ${reportDate};`;
-        return true;
-      });
-    },
-
-    async retryAgentDailyDigestTask({ reportDate, claimToken, errorCode = 'digest_failed' }) {
-      if (!isIsoDate(reportDate) || !UUID.test(claimToken || '')
-          || !['digest_failed', 'database_unavailable', 'invalid_metrics'].includes(errorCode)) throw new TypeError('invalid agent digest retry');
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT status, claim_token,
-            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
-          FROM fam_agent_daily_digest_tasks WHERE report_date = ${reportDate} LIMIT 1;`;
-        const current = rows?.[0]?.[0];
-        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_agent_daily_digest_tasks SET status = Unwrap(CAST('failed' AS Utf8)), available_at = CurrentUtcTimestamp() + Interval('PT5M'),
-            last_error_code = ${errorCode}, claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
-            lease_expires_at = CAST(NULL AS Timestamp?),
-            updated_at = CurrentUtcTimestamp()
-          WHERE report_date = ${reportDate};`;
-        return true;
-      });
-    },
-
-    async enqueueSiteErrorDigestTask(digestSlot) {
-      if (!isQuarterHourSlot(digestSlot)) throw new TypeError('invalid site error digest slot');
-      return sql.begin(async tx => {
-        const prior = await tx`SELECT status, attempt_count FROM fam_site_error_digest_tasks
-          WHERE digest_slot = ${digestSlot} LIMIT 1;`;
-        if (prior?.[0]?.length) return { created: false, status: prior[0][0].status };
-        await tx`INSERT INTO fam_site_error_digest_tasks
-          (digest_slot, status, attempt_count, max_attempts, available_at, claimed_by, claim_token, lease_expires_at,
-            generated_at, metrics_json, summary, last_error_code, created_at, updated_at)
-          VALUES (${digestSlot}, 'queued', Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(),
-            NULL, NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
-        return { created: true, status: 'queued' };
-      });
-    },
-
-    async claimSiteErrorDigestTask(workerId) {
-      if (typeof workerId !== 'string' || !workerId.trim() || workerId.length > 80) {
-        throw new TypeError('invalid site error digest claim');
-      }
-      return sql.begin(async tx => {
-        const candidates = await tx`SELECT digest_slot, status, attempt_count, max_attempts,
-            CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
-            CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
-          FROM fam_site_error_digest_tasks WHERE attempt_count < max_attempts
-            AND ((status IN ('queued', 'failed') AND available_at <= CurrentUtcTimestamp())
-              OR (status = 'claimed' AND lease_expires_at <= CurrentUtcTimestamp()))
-          ORDER BY digest_slot ASC LIMIT 1;`;
-        const task = candidates?.[0]?.[0];
-        if (!task) return null;
-        if (!isQuarterHourSlot(task.digest_slot)) throw new Error('invalid stored site error digest slot');
-        const due = task.available === true && ['queued', 'failed'].includes(task.status)
-          || task.status === 'claimed' && task.lease_expired === true;
-        if (!due) return null;
-        const claimToken = randomUUID();
-        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
-            attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
-            claimed_by = ${workerId}, claim_token = ${claimToken}, lease_expires_at = CurrentUtcTimestamp() + Interval('PT2M'),
-            last_error_code = CAST(NULL AS Utf8?), updated_at = CurrentUtcTimestamp()
-          WHERE digest_slot = ${task.digest_slot};`;
-        return { digest_slot: task.digest_slot, claim_token: claimToken };
-      });
-    },
-
-    async getSiteErrorDigestMetrics() {
-      const statement = sql`SELECT event_code, page_area, event_count,
-          CASE WHEN hour_bucket >= CurrentUtcTimestamp() - Interval('PT1H') THEN true ELSE false END AS last_hour
-        FROM fam_site_error_counts WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
-        ORDER BY hour_bucket DESC LIMIT 1000;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const rows = (await statement)?.[0] ?? [];
-      let total = 0; let lastHour = 0;
-      const grouped = new Map();
-      for (const row of rows) {
-        const occurrences = Number(row.event_count);
-        if (!Number.isSafeInteger(occurrences) || occurrences < 0) throw new Error('invalid site error counter');
-        total += occurrences;
-        if (row.last_hour === true) lastHour += occurrences;
-        const key = `${row.event_code}/${row.page_area}`;
-        const prior = grouped.get(key);
-        grouped.set(key, { event_code: row.event_code, page_area: row.page_area, occurrences: (prior?.occurrences ?? 0) + occurrences });
-      }
-      const events = [...grouped.values()].sort((a, b) => b.occurrences - a.occurrences
-        || a.event_code.localeCompare(b.event_code) || a.page_area.localeCompare(b.page_area)).slice(0, 6);
-      return { total_events_24h: total, events_last_hour: lastHour, events };
-    },
-
-    async getLatestSiteErrorDigest() {
-      const statement = sql`SELECT digest_slot, generated_at, metrics_json, summary FROM fam_site_error_digest_tasks
-        WHERE status = 'completed' ORDER BY digest_slot DESC LIMIT 1;`;
-      if (typeof statement?.on === 'function') statement.on('error', () => {});
-      const row = (await statement)?.[0]?.[0];
-      if (!row || !isQuarterHourSlot(row.digest_slot) || typeof row.summary !== 'string' || row.summary.length > 1000) return null;
-      let metrics;
-      try { metrics = JSON.parse(row.metrics_json); } catch { return null; }
-      if (!Number.isSafeInteger(metrics?.total_events_24h) || metrics.total_events_24h < 0
-          || !Number.isSafeInteger(metrics?.events_last_hour) || metrics.events_last_hour < 0
-          || !Array.isArray(metrics.events) || metrics.events.length > 6
-          || metrics.events.some(event => typeof event.event_code !== 'string' || typeof event.page_area !== 'string'
-            || !Number.isSafeInteger(event.occurrences) || event.occurrences < 0)) return null;
-      return { digest_slot: row.digest_slot, generated_at: row.generated_at, summary: row.summary, metrics };
-    },
-
-    async completeSiteErrorDigestTask({ digestSlot, claimToken, metrics, summary }) {
-      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '') || !metrics
-          || !Number.isSafeInteger(metrics.total_events_24h) || metrics.total_events_24h < 0
-          || !Number.isSafeInteger(metrics.events_last_hour) || metrics.events_last_hour < 0
-          || !Array.isArray(metrics.events) || metrics.events.length > 6
-          || typeof summary !== 'string' || summary.length > 1000) throw new TypeError('invalid site error digest result');
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT status, claim_token, lease_expires_at > CurrentUtcTimestamp() AS lease_valid
-          FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlot} LIMIT 1;`;
-        const current = rows?.[0]?.[0];
-        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('completed' AS Utf8)), generated_at = CurrentUtcTimestamp(),
-            metrics_json = ${JSON.stringify(metrics)}, summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
-            claim_token = CAST(NULL AS Utf8?), lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
-          WHERE digest_slot = ${digestSlot};`;
-        return true;
-      });
-    },
-
-    async retrySiteErrorDigestTask({ digestSlot, claimToken, errorCode = 'digest_failed' }) {
-      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '')
-          || !['digest_failed', 'invalid_metrics'].includes(errorCode)) throw new TypeError('invalid site error digest retry');
-      return sql.begin(async tx => {
-        const rows = await tx`SELECT status, claim_token, lease_expires_at > CurrentUtcTimestamp() AS lease_valid
-          FROM fam_site_error_digest_tasks WHERE digest_slot = ${digestSlot} LIMIT 1;`;
-        const current = rows?.[0]?.[0];
-        if (current?.status !== 'claimed' || current.claim_token !== claimToken || current.lease_valid !== true) return false;
-        await tx`UPDATE fam_site_error_digest_tasks SET status = Unwrap(CAST('failed' AS Utf8)),
-            available_at = CurrentUtcTimestamp() + Interval('PT5M'), last_error_code = ${errorCode},
-            claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
-            lease_expires_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
-          WHERE digest_slot = ${digestSlot};`;
-        return true;
-      });
-    },
-
-    async recordSiteError({ eventCode, pageArea, occurredAt = new Date() }) {
-      const bucket = new Date(occurredAt);
-      if (!Number.isFinite(bucket.getTime())) throw new TypeError('invalid site error timestamp');
-      bucket.setUTCMinutes(0, 0, 0);
-      const hourBucket = bucket.toISOString();
-      return sql.begin(async tx => {
-        const priorRows = await tx`SELECT event_count FROM fam_site_error_counts
-          WHERE hour_bucket = Unwrap(CAST(${hourBucket} AS Timestamp)) AND event_code = ${eventCode} AND page_area = ${pageArea} LIMIT 1;`;
-        const count = Math.min(1000, Number(priorRows?.[0]?.[0]?.event_count ?? 0) + 1);
-        await tx`UPSERT INTO fam_site_error_counts (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
-          VALUES (Unwrap(CAST(${hourBucket} AS Timestamp)), ${eventCode}, ${pageArea}, Unwrap(CAST(${count} AS Uint32)),
-            CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
-        return count;
-      });
-    },
-
-    async listSiteErrorAlerts() {
-      const result = await sql`SELECT hour_bucket, event_code, page_area, event_count
-        FROM fam_site_error_counts
-        WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
-          AND ((event_code = 'database_request_failed' AND event_count >= 3)
-            OR (event_code = 'auth_backend_failed' AND event_count >= 5)
-            OR (event_code IN ('js_runtime', 'unhandled_rejection') AND event_count >= 10)
-            OR (event_code IN ('listings_load_failed', 'notifications_load_failed') AND event_count >= 8))
-        ORDER BY hour_bucket DESC, event_count DESC LIMIT 20;`;
-      return (result?.[0] ?? []).map(row => ({ ...row,
-        severity: ['database_request_failed', 'auth_backend_failed'].includes(row.event_code) ? 'critical' : 'warning',
-      }));
-    },
-
-    async getSchoolAgentDashboard(schoolId) {
-      if (!schoolId) throw new TypeError('invalid school agent dashboard school');
-      const [reports, ideas] = await Promise.all([
-        sql`SELECT report_date, generated_at, summary, metrics_json FROM fam_agent_school_daily_reports WHERE school_id = ${schoolId} ORDER BY report_date DESC LIMIT 1;`,
-        sql`SELECT id, report_date, title, summary, benefit, complexity, risk, evidence_kind, evidence_summary, proposed_by, status
-          FROM fam_agent_ideas WHERE school_id = ${schoolId} AND status = 'pending' ORDER BY created_at ASC LIMIT 20;`,
-      ]);
-      const report = reports?.[0]?.[0] ?? null;
-      let metrics = null;
-      try { metrics = report?.metrics_json ? JSON.parse(report.metrics_json) : null; } catch { metrics = null; }
-      return { report: report ? { report_date: report.report_date, generated_at: report.generated_at, summary: report.summary, metrics } : null,
-        ideas: ideas?.[0] ?? [] };
-    },
-
-    async reviewSchoolAgentIdea({ id, schoolId, reviewerId, decision }) {
-      if (!id || !schoolId || !reviewerId || !['approved', 'rejected'].includes(decision)) throw new TypeError('invalid school agent idea decision');
-      return sql.begin(async tx => {
-        const actorRows = await tx`SELECT school_id, role, active FROM fam_user_profiles WHERE user_id = ${reviewerId} LIMIT 1;`;
-        const actor = actorRows?.[0]?.[0];
-        if (!actor || actor.active !== true || actor.role !== 'school_admin' || actor.school_id !== schoolId) return false;
-        const rows = await tx`SELECT status FROM fam_agent_ideas WHERE id = ${id} AND school_id = ${schoolId} LIMIT 1;`;
-        if (rows?.[0]?.[0]?.status !== 'pending') return false;
-        await tx`UPDATE fam_agent_ideas SET status = ${decision}, reviewed_by = ${reviewerId}, reviewed_at = CurrentUtcTimestamp()
-          WHERE id = ${id} AND school_id = ${schoolId} AND status = 'pending';`;
-        return true;
-      });
-    },
-
-    async listNotificationReadStates(userId) {
-      if (!userId) throw new TypeError('invalid notification state owner');
-      const result = await sql`SELECT notification_key, read_at FROM fam_notification_reads
-        WHERE user_id = ${userId} ORDER BY notification_key LIMIT 10001;`;
-      return result?.[0] ?? [];
-    },
-
-    async saveNotificationReadStates(userId, notificationKeys) {
-      if (!userId || !Array.isArray(notificationKeys) || notificationKeys.length > 100
-          || notificationKeys.some(key => typeof key !== 'string' || key.length < 1 || key.length > 220 || /[\u0000-\u001f\u007f]/u.test(key))) {
-        throw new TypeError('invalid notification read states');
-      }
-      const keys = [...new Set(notificationKeys)];
-      return sql.begin(async tx => {
-        for (const key of keys) {
-          await tx`UPSERT INTO fam_notification_reads (user_id, notification_key, read_at)
-            VALUES (${userId}, ${key}, CurrentUtcTimestamp());`;
-        }
-        return true;
-      });
-    },
+      input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch { return { status: 400, body: { ok: false, error: 'invalid_json' } }; }
+    const result = pathname === '/api/v1/ideas'
+      ? await submitIdea({ actor, input, repository, review, safetyKey })
+      : pathname === '/api/v1/messages'
+        ? await submitMessage({ actor, input, repository, review, safetyKey })
+        : await submitListing({ actor, input, repository, review, safetyKey });
+    const status = result.ok ? 201
+      : result.code === 'database_unavailable' || result.status === 'pending' ? 503
+        : result.code === 'forbidden' ? 403
+          : result.code === 'recipient_unavailable' ? 404 : result.code === 'rate_limited' ? 429 : 400;
+    return { status, body: result };
   };
 }

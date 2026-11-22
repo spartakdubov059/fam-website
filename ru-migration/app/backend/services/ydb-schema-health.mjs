@@ -9,7 +9,7 @@ export const REQUIRED_RU_TABLES = Object.freeze([
   'fam_school_admin_audit', 'fam_school_content_audit', 'fam_school_announcements',
   'fam_school_poll_votes', 'fam_school_polls', 'fam_school_role_request_audit',
   'fam_school_role_requests', 'fam_role_email_verifications', 'fam_site_error_counts', 'fam_site_error_digest_tasks',
-  'fam_submission_quotas', 'fam_user_profiles',
+  'fam_step_up_email_challenges', 'fam_submission_quotas', 'fam_user_profiles',
 ]);
 
 export function createYdbSchemaHealthCheck(sql, { tables = REQUIRED_RU_TABLES, identifier, fragment, join } = {}) {
