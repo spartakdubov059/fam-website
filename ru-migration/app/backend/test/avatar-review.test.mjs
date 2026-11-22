@@ -53,19 +53,30 @@ test('avatar moderation list and decisions require same-school school staff', as
   assert.equal((await studentHandler(request('GET', '/api/v1/avatars/moderation'))).status, 403);
 });
 
-test('avatar bytes stay private while pending and are public only while the approved profile still uses them', async () => {
+test('avatar bytes stay private and approved photos are readable only by their active profile owner', async () => {
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const review = { id, user_id: student.id, school_id: 'school-a', image_key: key, status: 'pending' };
-  let reads = 0; let current = true;
-  const handler = createMediaApi({ authenticate: async () => ({ subject: 'moderator' }), resolveActor: async () => moderator,
+  let reads = 0; let current = true; let signedInAs = 'moderator';
+  const handler = createMediaApi({ authenticate: async () => signedInAs === 'guest' ? null : ({ subject: signedInAs }),
+    resolveActor: async identity => identity.subject === 'owner' ? student
+      : identity.subject === 'same-school' ? moderator
+        : identity.subject === 'other-school' ? { ...moderator, school_id: 'school-b' } : moderator,
     repository: { getActiveAccountSuspension: async () => null, getAvatarReview: async () => review, isCurrentAvatar: async () => current },
     pendingImages: { get: async imageKey => { reads++; assert.equal(imageKey, key); return Buffer.from('image'); } } });
   const path = `/api/v1/avatars/${id}/photo`;
   assert.equal((await handler(request('GET', path))).status, 200);
   assert.equal(reads, 1);
   review.status = 'approved';
-  const publicImage = await handler(request('GET', path));
-  assert.equal(publicImage.status, 200); assert.match(publicImage.headers['cache-control'], /public/);
+  assert.equal((await handler(request('GET', path))).status, 404, 'another school member cannot read the profile photo');
+  signedInAs = 'other-school';
+  assert.equal((await handler(request('GET', path))).status, 404, 'a different school cannot read the profile photo');
+  signedInAs = 'guest';
+  assert.equal((await handler(request('GET', path))).status, 404, 'guests cannot read an approved profile photo');
+  signedInAs = 'owner';
+  const ownerImage = await handler(request('GET', path));
+  assert.equal(ownerImage.status, 200);
+  assert.equal(ownerImage.headers['cache-control'], 'private, no-store');
+  assert.equal(reads, 2, 'only the pending moderator and owner reads reach private storage');
   current = false;
   assert.equal((await handler(request('GET', path))).status, 404);
 });
