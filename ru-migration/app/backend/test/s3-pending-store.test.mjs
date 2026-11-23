@@ -34,6 +34,16 @@ test('S3 photo reads validate scoped keys and byte content before returning byte
   await store.close();
 });
 
+test('S3 photo reads reject objects that could exceed the Yandex API Gateway response limit', async () => {
+  let bodyRead = false;
+  const store = createS3PendingImageStore(env, { get: async () => ({ ContentType: 'image/webp', ContentLength: 2 * 1024 * 1024 + 1,
+    Body: { transformToByteArray: async () => { bodyRead = true; return new Uint8Array(); } } }) });
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  await assert.rejects(store.get(key), /invalid private image object/);
+  assert.equal(bodyRead, false, 'declared oversized object is rejected before buffering');
+  await store.close();
+});
+
 test('S3 pending image deletion accepts only scoped image keys', async () => {
   let request;
   const store = createS3PendingImageStore(env, { remove: async input => { request = input; } });

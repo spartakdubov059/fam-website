@@ -2,6 +2,8 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, List
 import sharp from 'sharp';
 import { createPendingImageStore } from './pending-images.mjs';
 
+const MAX_IMAGE_OBJECT_BYTES = 2 * 1024 * 1024;
+
 export function createS3PendingImageStore(env = process.env, { send, get, remove, list } = {}) {
   const endpoint = env.FAM_RU_S3_ENDPOINT;
   const bucket = env.FAM_RU_S3_BUCKET;
@@ -24,9 +26,9 @@ export function createS3PendingImageStore(env = process.env, { send, get, remove
       const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
       if (typeof key !== 'string' || !new RegExp(`^pending/${uuid}/${uuid}\\.webp$`, 'i').test(key)) throw new TypeError('invalid private image key');
       const result = await getObject({ Bucket: bucket, Key: key });
-      if (result.ContentType !== 'image/webp' || !Number.isSafeInteger(Number(result.ContentLength)) || Number(result.ContentLength) < 1 || Number(result.ContentLength) > 5 * 1024 * 1024) throw new Error('invalid private image object');
+      if (result.ContentType !== 'image/webp' || !Number.isSafeInteger(Number(result.ContentLength)) || Number(result.ContentLength) < 1 || Number(result.ContentLength) > MAX_IMAGE_OBJECT_BYTES) throw new Error('invalid private image object');
       const bytes = Buffer.from(await result.Body.transformToByteArray());
-      if (!bytes.length || bytes.length > 5 * 1024 * 1024) throw new Error('invalid private image object');
+      if (!bytes.length || bytes.length > MAX_IMAGE_OBJECT_BYTES) throw new Error('invalid private image object');
       return bytes;
     },
     async delete(key) {
