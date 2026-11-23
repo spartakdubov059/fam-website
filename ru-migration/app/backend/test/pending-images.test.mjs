@@ -18,6 +18,15 @@ test('private image store enforces per-upload limits on both source and converte
   assert.equal(writes, 0, 'oversized source and converted files never reach object storage');
 });
 
+test('private image store rejects a declared MIME type that does not match the decoded format', async () => {
+  let writes = 0;
+  const sharp = () => ({ metadata: async () => ({ format: 'png' }) });
+  const store = createPendingImageStore({ sharp, putObject: async () => { writes++; }, bucket: 'private-test' });
+  await assert.rejects(store.put({ userId: '11111111-1111-4111-8111-111111111111',
+    contentType: 'image/jpeg', bytes: Buffer.from([1, 2, 3]) }), error => error.code === 'invalid_image');
+  assert.equal(writes, 0);
+});
+
 test('private image store retries WebP conversion until the gateway response size limit is met', async () => {
   const qualities = [];
   const stored = [];

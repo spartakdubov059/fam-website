@@ -29,7 +29,10 @@ export function createPendingImageStore({ sharp, putObject, bucket, maxBytes = 5
       let webp;
       try {
         const metadata = await sharp(bytes, { limitInputPixels: maxPixels, failOn: 'error' }).metadata();
-        if (!MIME_TO_FORMAT.has(`image/${metadata.format === 'jpg' ? 'jpeg' : metadata.format}`)) throw new Error('unsupported image format');
+        const actualContentType = `image/${metadata.format === 'jpg' ? 'jpeg' : metadata.format}`;
+        if (!MIME_TO_FORMAT.has(actualContentType) || actualContentType !== String(contentType).split(';', 1)[0].trim().toLowerCase()) {
+          throw new Error('image content type does not match its format');
+        }
         for (const { dimensions, quality } of [
           { dimensions: 1600, quality: 78 }, { dimensions: 1600, quality: 68 },
           { dimensions: 1400, quality: 58 }, { dimensions: 1200, quality: 48 }, { dimensions: 1000, quality: 42 },
