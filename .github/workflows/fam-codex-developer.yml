@@ -178,6 +178,7 @@ jobs:
           fi
           sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
           sudo install -o fam-inference -g fam-inference -m 500 "$SERVER" "$INFERENCE_SERVER"
+          sudo chmod 644 "$MODEL"
           sudo ln "$MODEL" "$INFERENCE_MODEL"
           umask 077
           sudo -u fam-inference env -i \

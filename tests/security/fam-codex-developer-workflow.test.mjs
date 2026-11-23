@@ -84,10 +84,11 @@ test("inference runs under an isolated uid and receives no bridge credentials", 
   assert.match(inferenceStep, /sudo -u fam-inference env -i/);
   assert.match(inferenceStep, /sudo install -d -o fam-inference -g fam-inference -m 700 "\$INFERENCE_HOME"/);
   assert.match(inferenceStep, /sudo install -o fam-inference -g fam-inference -m 500 "\$SERVER" "\$INFERENCE_SERVER"/);
+  assert.match(inferenceStep, /sudo chmod 644 "\$MODEL"/);
   assert.match(inferenceStep, /sudo ln "\$MODEL" "\$INFERENCE_MODEL"/);
   assert.match(inferenceStep, /PATH="\/usr\/bin:\/bin" HOME="\$INFERENCE_HOME" TMPDIR="\$INFERENCE_HOME"/);
   assert.match(inferenceStep, /"\$INFERENCE_SERVER" -m "\$INFERENCE_MODEL"/);
-  assert.doesNotMatch(inferenceStep, /chown[^\n]*\$MODEL|chmod[^\n]*\$MODEL/);
+  assert.doesNotMatch(inferenceStep, /chown[^\n]*\$MODEL|chmod (?!644 )[^\n]*\$MODEL/);
   assert.doesNotMatch(inferenceStep, /pushd "\$INFERENCE_HOME"|popd/);
   assert.match(inferenceStep, /env -i[\s\S]*?GITHUB_WORKSPACE="\$GITHUB_WORKSPACE"[\s\S]*?FAM_MODEL_ID=/);
   const controllerLaunch = inferenceStep.match(/env -i[\s\S]*?node scripts\/run-local-coder\.mjs/)?.[0] ?? "";
