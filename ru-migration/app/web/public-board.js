@@ -430,7 +430,6 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
     const result = await response.json();
     if (!result?.ok || !Array.isArray(result.listings) || result.listings.length > MAX_PUBLIC_LISTINGS) throw new Error('invalid_listing_response');
     const events = result.listings.some(listing => listing?.is_event === true);
-    const session = events ? await loadMyEventRegistrations(fetchImpl) : { state: 'guest', registrations: new Map() };
     if (result.listings.length === 0) {
       const favorites = await loadMyFavorites(fetchImpl);
       const status = element(document, 'p', 'ru-board-status', favorites.state === 'guest'
@@ -443,8 +442,11 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       } else root.replaceChildren(status);
       return;
     }
-    const favorites = await loadMyFavorites(fetchImpl);
-    const ownListingIds = await loadMyActiveListingIds(fetchImpl);
+    const [favorites, ownListingIds, session] = await Promise.all([
+      loadMyFavorites(fetchImpl),
+      loadMyActiveListingIds(fetchImpl),
+      events ? loadMyEventRegistrations(fetchImpl) : Promise.resolve({ state: 'guest', registrations: new Map() }),
+    ]);
     const cards = [];
     const details = createListingDetailsDialog({ document });
     let updateResults = () => {};
