@@ -1,6 +1,6 @@
 # PostgreSQL RPC inventory → FAM RU
 
-Срез исходника: `main` `cc8b59bd2517ddfe2b6488b16cff468e99c05980`; RU код `5462b22e1da48da2051fb64f6bf4f73c7208574a`. Из 81 файла SQL миграций извлечены 79 текстовых объявлений `CREATE OR REPLACE FUNCTION` и 52 уникальных имени; каталог ниже содержит последний найденный вариант каждой функции. Для каждой указаны последний найденный файл, объявленные режим безопасности и `search_path`, и RU аналог по исходникам. Это статический lexical каталог, не результат применения миграций к PostgreSQL и не доказательство состояния живой БД.
+Срез исходника: `main` `bdb8325843f4d02590723d396d5b3f803d04618a`; RU код `a32751087ae460ada7da175e32171486bc843d47`. Из 83 SQL-файлов миграций извлечено 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени; каталог ниже содержит последнее найденное определение каждой функции. Для каждой указаны последний найденный файл, объявленные режим безопасности и `search_path`, и RU аналог по исходникам. Это статический lexical каталог, не результат применения миграций к PostgreSQL и не доказательство состояния живой БД.
 
 ## Все последние определения
 
@@ -43,6 +43,7 @@
 | `public.get_fam_admin_technical_alerts()` | `DEFINER`; `''`; `20261110174043_fam_admin_technical_alerts.sql`; subsequent `20261110220017_revoke_school_admin_technical_alert_rpc.sql` revokes all grants | No separate RU endpoint; allowlisted counters are available only to aggregate digest/health internals | Upstream RPC отозвана у всех ролей; наружная техническая лента не является текущей поддерживаемой возможностью |
 | `public.get_fam_agent_admin_dashboard(p_school_id text)` | `INVOKER`; `''`; `20261109152842_school_scoped_agent_reports_and_free_analysts.sql` | listings-api.mjs + ydb-listings.mjs school admin/agent dashboard projections | Частичный same-school aggregate dashboard; поля и роли отличаются |
 | `public.get_fam_agent_queue_health()` | `INVOKER`; `''`; `20261110163415_add_fam_agent_queue_health_rpc.sql` | ydb-agent-task-queue.mjs `getSafeTaskQueueHealth` | Частичный bounded queue health; no direct browser RPC |
+| `public.get_fam_agent_task_metrics()` | `INVOKER`; `''`; `20261123013500_fam_agent_task_metrics.sql`; EXECUTE только `service_role` | ydb-agent-task-queue.mjs `getAgentTaskMetrics` через защищённое `metrics` действие `coder-task-bridge.mjs` | Read-only агрегаты `agent_key/status/count`; RU дополнительно ограничивает значения и число строк, не выбирает ID или payload |
 | `public.get_fam_agent_task_daily_digest(p_task_id uuid, p_worker_id text)` | `default`; `''`; `20261110170718_fix_daily_digest_report_date_validation.sql` | orchestrator-daily-digest.mjs + queue lease/complete repository | Частичный агрегированный обработчик, lease contract изменён |
 | `public.get_fam_agent_task_site_error_digest(p_task_id uuid,p_worker_id text)` | `default`; `''`; `20261110173255_fam_site_error_monitoring.sql` | site-error-digest.mjs + queue lease/complete repository | Частичный digest только фиксированных counters |
 | `public.get_fam_agent_task_system_health(p_task_id uuid,p_worker_id text)` | `default`; `''`; `20261110173255_fam_site_error_monitoring.sql` | system-health-task.mjs + ydb-schema-health.mjs | Частичный read-only health; нет DB grants/IAM parity |
@@ -61,10 +62,16 @@
 
 ## Ключевые выводы проверки безопасности
 
+### Актуализация подсчёта и claim-порядка — 23 ноября 2026
+
+- Точный source `main` `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL migration path. Повторный лексический подсчёт обнаружил 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени; строка `get_fam_agent_task_metrics()` теперь присутствует в каталоге выше.
+- На RU-коммите [`a327510`](https://github.com/spartakdubov059/fam-website/commit/a32751087ae460ada7da175e32171486bc843d47) порядок coder claim приведён к source `urgent → high → normal → остальное`. Два одновременных claim-запроса к одной synthetic задаче проверены в успешной [disposable YDB integration #45175534283](https://github.com/spartakdubov059/fam-website/actions/runs/45175534283); [SDK/Sharp CI #45175534306](https://github.com/spartakdubov059/fam-website/actions/runs/45175534306) также завершился успешно. YDB контейнер был удалён после интеграции.
+- Проверки относятся к текстовому каталогу и disposable YDB с synthetic data. Они не подтверждают live PostgreSQL catalog, cloud IAM/RLS или исполнение Qwen.
+
 - Имена `SECURITY DEFINER` и `search_path` — только те, что извлечены рядом с последним текстовым определением. Для некоторых старых и динамически объявленных определений атрибут может быть пропущен парсером; перед применением миграций это нужно подтвердить PostgreSQL parser/catalog.
 - RU закрывает доступ тем, что браузер обращается только к backend; конечная защита зависит от корректных Yandex token validation, API role/school gates и минимальных cloud IAM полномочий. В YDB отсутствует прямая замена PostgreSQL `SECURITY DEFINER`, schema grants и RLS.
 - Наиболее заметные неэквивалентные SQL flows: auth/profile triggers, coder/Qwen task execution, AI image moderation и полная внешняя AI text moderation. `claim_admin_role` и `get_fam_admin_technical_alerts` не требуют публичных RU route: upstream миграции отзывают их execute grants.
-- Отдельно нужно провести catalog-level diff итоговых PostgreSQL policies/grants/RPC после применения всех 81 миграции и сопоставить endpoint request/response schema. Этот документ даёт исходный function-level checklist, но не завершает security sign-off.
+- Отдельно нужно провести catalog-level diff итоговых PostgreSQL policies/grants/RPC после применения всех 83 миграций и сопоставить endpoint request/response schema. Этот документ даёт исходный function-level checklist, но не завершает security sign-off.
 
 ## Политики RLS и таблиц
 
