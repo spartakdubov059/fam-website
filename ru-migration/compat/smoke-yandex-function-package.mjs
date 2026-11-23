@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
