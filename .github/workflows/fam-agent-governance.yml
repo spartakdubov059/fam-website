@@ -36,7 +36,7 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs
+      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs tests/security/fam-agent-metrics.test.mjs
 
   governance:
     name: Арбитр, инспектор и рекрутер
