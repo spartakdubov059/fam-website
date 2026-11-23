@@ -37,17 +37,17 @@ try {
   const stepClock = Math.floor(Date.now() / 1000) - 10;
   const stepVerifyClock = stepClock + 1;
   const stepIdentity = { issuer: 'https://issuer.synthetic', subject: 'step-up-subject', email: 'step-up@example.test' };
-  const stepCookie = createStepUpCookie({ secret: 'synthetic-step-up-secret-that-is-long-enough', secure: false,
-    now: () => stepClock * 1000 });
   const stepEmail = createStepUpEmailVerification({ repository: repo,
     verificationKey: 'synthetic-step-up-verification-secret-long-enough', now: () => stepVerifyClock * 1000,
     createCode: () => '654321', sendEmail: async email => { assert.equal(email.to, stepIdentity.email); assert.equal(email.purpose, 'step_up'); } });
   assert.deepEqual(await stepEmail.start(stepIdentity, 'synthetic-function-access-token-long-enough'), { ok: true, sent: true });
   const stepVerified = await stepEmail.verify(stepIdentity, '654321');
   assert.equal(stepVerified.ok, true);
-  const issuedStepCookie = stepCookie.issue(stepIdentity);
+  const verifiedStepCookie = createStepUpCookie({ secret: 'synthetic-step-up-secret-that-is-long-enough', secure: false,
+    now: () => stepVerifyClock * 1000 });
+  const issuedStepCookie = verifiedStepCookie.issue(stepIdentity);
   assert.equal(issuedStepCookie.confirmedAt, stepClock + 1);
-  assert.equal(stepCookie.read({ headers: { cookie: issuedStepCookie.setCookie.split(';')[0] } }, stepIdentity), stepClock + 1);
+  assert.equal(verifiedStepCookie.read({ headers: { cookie: issuedStepCookie.setCookie.split(';')[0] } }, stepIdentity), stepClock + 1);
   assert.equal((await stepEmail.verify(stepIdentity, '654321')).ok, false, 'the code cannot be reused');
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {
