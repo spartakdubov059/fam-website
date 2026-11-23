@@ -5,10 +5,10 @@ Total output lines: 133
 
 ## Актуальное состояние — 23 ноября 2026
 
-- GitHub branch `migration/yandex-cloud` сейчас на [`88a4c61`](https://github.com/spartakdubov059/fam-website/commit/88a4c6180b8c7400d96bece0f8687344890cfe48); `main` остаётся на `9d0685304b0a58c70c47f52818a7b795729d31a6`. `main`, production и облачные ресурсы не менялись.
-- На текущем RU backend локально прошли 525/525 тестов на Node 22.15.0; `compat/verify.mjs` сообщил `SDK_COMPAT_PASS`; структура 7 systemd timer-файлов и ссылки на службы проверены. GitHub Actions для `88a4c61` пока не обнаружены; предыдущий точный кодовый tip `d8f5f36` имел успешные YDB/SDK CI.
+- GitHub branch `migration/yandex-cloud` сейчас на [`befe55f`](https://github.com/spartakdubov059/fam-website/commit/befe55f263cb04b08d8a76818c0a264f156a5667); `main` остаётся на `9d0685304b0a58c70c47f52818a7b795729d31a6`. `main`, production и облачные ресурсы не менялись.
+- На RU backend code tip `88a4c61` локально прошли 525/525 тестов на Node 22.15.0; `compat/verify.mjs` сообщил `SDK_COMPAT_PASS`; структура 7 systemd timer-файлов и ссылки на службы проверены. Последний коммит `befe55f` синхронизирует source snapshot и документацию; GitHub Actions для него пока не обнаружены. Предыдущий точный кодовый tip `d8f5f36` имел успешные YDB/SDK CI.
 - Расписание site-error digest сверено с полным порядком исходных migrations: итог — ежечасно в `:30` UTC. Добавлены точечные regression assertions и протокол в `VALIDATION_2026-11-23_SCHEDULE_PARITY.md`.
-- Три исходных Supabase function snapshot синхронизированы с текущим `main`; SHA и три подтверждённых функциональных различия записаны в `SOURCE_FUNCTION_SYNC_2026-11-23.md`. Остаются неполные parity для Qwen execution и автоматической image moderation; RU применяет ручную проверку. Avatar quota RU строже текущего исходника.
+- Все 7 исходных Supabase function files и 83 SQL migration snapshots сверены с текущим `main`; миграции совпали побайтно, три устаревших function snapshot обновлены. SHA и функциональные различия записаны в `SOURCE_FUNCTION_SYNC_2026-11-23.md`. Остаются неполные parity для Qwen execution и автоматической image moderation; RU применяет ручную проверку. Avatar quota RU строже текущего исходника.
 - Целевая инфраструктура — Yandex Cloud; личный сервер исключён. Публичный staging, IAM, YDB, бакет, API Gateway и Timer triggers не активированы: free-tier квоты ограничены, а бюджет не прекращает расход, поэтому гарантировать строгие `0 ₽` нельзя. Реальные ученические данные не использовались.
 - В рабочей папке остаются 8 незакоммиченных файлов с суффиксом ` 2`; их содержимое намеренно не включено в ветку и не изменено.
 
