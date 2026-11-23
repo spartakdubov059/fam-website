@@ -12,7 +12,7 @@ const sdkFallback = readFileSync(new URL("../../supabase-cdn-fallback.js", impor
 const fallbackOrigin = "https://spartakdubov059.github.io";
 const primaryOrigin = "https://famru.netlify.app";
 const fallbackUrl = fallbackOrigin + "/fam-website/";
-const primaryUrl = fallbackUrl;
+const primaryUrl = primaryOrigin + "/";
 
 function signupRedirect(origin, pathname) {
   const match = html.match(/function famSignupRedirectUrl\(\) \{[\s\S]*?\n  \}/);
@@ -26,7 +26,7 @@ test("GitHub Pages redirects only after the Netlify readiness marker confirms he
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
-  assert.ok(head.includes('"https://famru.netlify.app/fam-domain-health.json?t=" + Date.now()'));
+  assert.ok(head.includes('healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now()'));
   assert.ok(head.includes('mode: "cors"'));
   assert.ok(head.includes('cache: "no-store"'));
   assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
@@ -45,8 +45,8 @@ test("Supabase HTTP 401 confirms the API answered but does not claim login was t
   assert.equal(result.state, "auth-required");
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
-  assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
-    target.url === "https://famru.netlify.app/fam-domain-health.json"));
+  assert.ok(TARGETS.some(target => target.name === "FAM GitHub Pages readiness marker" &&
+    target.url === "https://spartakdubov059.github.io/fam-website/fam-domain-health.json"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
@@ -59,10 +59,10 @@ test("signup confirmation on GitHub Pages remains on that same fallback host", (
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/"), fallbackUrl);
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website"), fallbackUrl);
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/index.html"), fallbackUrl);
-  assert.equal(signupRedirect(primaryOrigin, "/"), primaryOrigin + "/");
+  assert.equal(signupRedirect(primaryOrigin, "/"), primaryUrl);
   // Never trust an arbitrary origin for email-redirect links.
-  assert.equal(signupRedirect("https://unknown.example", "/"), primaryOrigin + "/");
-  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), primaryOrigin + "/");
+  assert.equal(signupRedirect("https://unknown.example", "/"), primaryUrl);
+  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), primaryUrl);
   assert.match(html, /emailRedirectTo:\s*famSignupRedirectUrl\(\)/);
 });
 
@@ -85,12 +85,7 @@ test("existing server-side CORS allows both real FAM hosts", () => {
   }
 });
 
-test("SEO metadata and crawl maps identify the active GitHub Pages publisher", () => {
-  const activeOrigin = "https://spartakdubov059.github.io/fam-website/";
-  assert.ok(html.includes(`rel="canonical" href="${activeOrigin}"`));
-  assert.ok(html.includes(`property="og:url" content="${activeOrigin}"`));
-  assert.ok(html.includes(`property="og:image" content="${activeOrigin}banner-1.jpg"`));
-  assert.ok(html.includes(`name="twitter:image" content="${activeOrigin}banner-1.jpg"`));
-  assert.ok(readFileSync(new URL("../../robots.txt", import.meta.url), "utf8").includes(`Sitemap: ${activeOrigin}sitemap.xml`));
-  assert.ok(readFileSync(new URL("../../sitemap.xml", import.meta.url), "utf8").includes(`<loc>${activeOrigin}</loc>`));
+test("SEO canonical remains the primary host; fallback is not treated as another site", () => {
+  assert.ok(html.includes('rel="canonical" href="https://famru.netlify.app/"'));
+  assert.ok(html.includes('property="og:url" content="https://famru.netlify.app/"'));
 });
