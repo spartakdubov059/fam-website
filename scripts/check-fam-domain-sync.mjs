@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { appendFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -96,6 +97,7 @@ export async function verifyDomains({
   timeoutMs = 10 * 60_000,
   intervalMs = 15_000,
   maxAttempts = Number.POSITIVE_INFINITY,
+  allowMismatch = false,
   onAttempt = () => {},
 }) {
   const selected = selectPublicPaths(paths, root);
@@ -113,7 +115,7 @@ export async function verifyDomains({
       selected.map(path => comparePath(fetchImpl, domain, path, expected.get(path), cacheKey))
     )));
     onAttempt({ attempt, results: latest });
-    if (latest.every(result => result.matches)) return { attempts: attempt, paths: selected, results: latest };
+    if (latest.every(result => result.matches)) return { attempts: attempt, paths: selected, results: latest, matches: true };
     if (Date.now() + intervalMs > deadline) break;
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
@@ -124,7 +126,9 @@ export async function verifyDomains({
     const expectedPrefix = expectedDigest ? expectedDigest.slice(0, 12) : "unavailable";
     return `${result.domain} ${result.path}: status=${result.status}, sha256=${actual}, expected=${expectedPrefix}${result.error ? ` (${result.error})` : ""}`;
   });
-  throw new Error(`Domains did not serve the same source files before timeout. ${mismatches.join("; ")}`);
+  const message = `Domains did not serve the same source files before timeout. ${mismatches.join("; ")}`;
+  if (allowMismatch) return { attempts: attempt, paths: selected, results: latest, matches: false, message };
+  throw new Error(message);
 }
 
 // GitHub Pages is the canonical free publisher. Wait for its deployment to
@@ -150,12 +154,19 @@ export async function verifyProductionDomains({
     paths, root, fetchImpl, cacheKey, domains: [secondary],
     timeoutMs: netlifyPublishEnabled ? timeoutMs : 0, intervalMs,
     maxAttempts: netlifyPublishEnabled ? Number.POSITIVE_INFINITY : 1,
+    allowMismatch: !netlifyPublishEnabled,
     onAttempt: event => onAttempt({ ...event, phase: "secondary" }),
   });
+  const netlifyState = secondaryResult.matches
+    ? "synced"
+    : secondaryResult.results.some(result => result.status === "network-error" || Number(result.status) >= 500)
+      ? "paused-unavailable"
+      : "paused-stale";
   return {
     attempts: primaryResult.attempts + secondaryResult.attempts,
     paths: primaryResult.paths,
     results: [...primaryResult.results, ...secondaryResult.results],
+    netlifyState,
   };
 }
 
@@ -173,6 +184,20 @@ async function main() {
       }
     },
   });
+  if (result.netlifyState !== "synced") {
+    const secondary = result.results.filter(item => item.domain === "Netlify" && !item.matches);
+    const details = secondary.map(item => {
+      const actual = item.digest ? item.digest.slice(0, 12) : "unavailable";
+      return `${item.path}: HTTP ${item.status}, sha256=${actual}`;
+    });
+    const state = result.netlifyState === "paused-unavailable" ? "unavailable" : "serving stale files";
+    const warning = `Netlify publishing is paused; expected state: ${state}. GitHub Pages is current. ${details.join("; ")}`;
+    console.warn(`::warning::${warning}`);
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(process.env.GITHUB_STEP_SUMMARY,
+        `\n## Netlify publication paused\n\nExpected state: **${state}**. GitHub Pages serves the current source.\n\n${details.map(item => `- ${item}`).join("\n")}\n`);
+    }
+  }
   console.log(`Domain sync verified after ${result.attempts} attempt(s): ${result.paths.join(", ")}`);
 }
 
