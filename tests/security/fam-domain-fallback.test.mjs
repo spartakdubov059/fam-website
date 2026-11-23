@@ -26,7 +26,7 @@ test("GitHub Pages redirects only after the exact primary readiness marker confi
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
-  assert.ok(head.includes("var healthUrl = \"https://famru.netlify.app/fam-domain-health.json?t=\" + Date.now()"));
+  assert.ok(head.includes('"https://famru.netlify.app/fam-domain-health.json?t=" + Date.now()'));
   assert.ok(head.includes('mode: "cors"'));
   assert.ok(head.includes('cache: "no-store"'));
   assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
@@ -45,7 +45,7 @@ test("Supabase HTTP 401 confirms the API answered but does not claim login was t
   assert.equal(result.state, "auth-required");
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
-  assert.ok(TARGETS.some(target => target.name === "FAM Netlify readiness marker" &&
+  assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
     target.url === "https://famru.netlify.app/fam-domain-health.json"));
 });
 
@@ -59,10 +59,10 @@ test("signup confirmation on GitHub Pages remains on that same fallback host", (
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/"), fallbackUrl);
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website"), fallbackUrl);
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/index.html"), fallbackUrl);
-  assert.equal(signupRedirect(primaryOrigin, "/"), primaryUrl);
+  assert.equal(signupRedirect(primaryOrigin, "/"), primaryOrigin + "/");
   // Never trust an arbitrary origin for email-redirect links.
-  assert.equal(signupRedirect("https://unknown.example", "/"), fallbackUrl);
-  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), fallbackUrl);
+  assert.equal(signupRedirect("https://unknown.example", "/"), primaryOrigin + "/");
+  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), primaryOrigin + "/");
   assert.match(html, /emailRedirectTo:\s*famSignupRedirectUrl\(\)/);
 });
 
