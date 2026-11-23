@@ -3,7 +3,16 @@ Total output lines: 133
 
 # FAM RU — изолированная миграция на российскую инфраструктуру
 
-## Текущее состояние — 23 ноября 2026
+## Актуальное состояние — 23 ноября 2026
+
+- GitHub branch `migration/yandex-cloud` сейчас на [`88a4c61`](https://github.com/spartakdubov059/fam-website/commit/88a4c6180b8c7400d96bece0f8687344890cfe48); `main` остаётся на `9d0685304b0a58c70c47f52818a7b795729d31a6`. `main`, production и облачные ресурсы не менялись.
+- На текущем RU backend локально прошли 525/525 тестов на Node 22.15.0; `compat/verify.mjs` сообщил `SDK_COMPAT_PASS`; структура 7 systemd timer-файлов и ссылки на службы проверены. GitHub Actions для `88a4c61` пока не обнаружены; предыдущий точный кодовый tip `d8f5f36` имел успешные YDB/SDK CI.
+- Расписание site-error digest сверено с полным порядком исходных migrations: итог — ежечасно в `:30` UTC. Добавлены точечные regression assertions и протокол в `VALIDATION_2026-11-23_SCHEDULE_PARITY.md`.
+- Три исходных Supabase function snapshot синхронизированы с текущим `main`; SHA и три подтверждённых функциональных различия записаны в `SOURCE_FUNCTION_SYNC_2026-11-23.md`. Остаются неполные parity для Qwen execution и автоматической image moderation; RU применяет ручную проверку. Avatar quota RU строже текущего исходника.
+- Целевая инфраструктура — Yandex Cloud; личный сервер исключён. Публичный staging, IAM, YDB, бакет, API Gateway и Timer triggers не активированы: free-tier квоты ограничены, а бюджет не прекращает расход, поэтому гарантировать строгие `0 ₽` нельзя. Реальные ученические данные не использовались.
+- В рабочей папке остаются 8 незакоммиченных файлов с суффиксом ` 2`; их содержимое намеренно не включено в ветку и не изменено.
+
+## История прогресса — прежние записи
 
 - Текущий кодовый tip [`9819ae2`](https://github.com/spartakdubov059/fam-website/commit/9819ae2f15a20b581519a6772ebfe471da2424a7) добавил тест сверки общих локальных правил защиты текста с source moderation. Полный backend-набор прошёл **522/522** локально; точные [SDK/Sharp/backend CI #45237047721](https://github.com/spartakdubov059/fam-website/actions/runs/45237047721) и [synthetic YDB CI #45237047649](https://github.com/spartakdubov059/fam-website/actions/runs/45237047649) успешны, disposable DB удалена. Это проверка базовых локальных правил; она не заменяет AI/vision moderation parity.
 - На кодовом коммите [`ebac253`](https://github.com/spartakdubov059/fam-website/commit/ebac25367c99c92fe9dcc4050c1e0ae1ab6ed89d) заново прошли [SDK/Sharp и Cloud Functions package CI #45235353513](https://github.com/spartakdubov059/fam-website/actions/runs/45235353513) и [synthetic YDB integration #45235353704](https://github.com/spartakdubov059/fam-website/actions/runs/45235353704). Пакет включает HTTP + Timer entrypoints; все backend/UI-тесты, locked SDK/Sharp и образные тесты прошли. Временная YDB из CI удалена. См. [протокол](VALIDATION_2026-11-23_YCF_PACKAGE_AND_CI.md). Это не развёртывание в Yandex Cloud.

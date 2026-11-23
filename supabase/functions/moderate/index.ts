@@ -144,7 +144,10 @@ async function recordCachedSignal(context: SafetyContext | null, cached: Record<
     second_reviewer_unavailable: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_empty_response: { category: "unclear_safety_signal", severity: "medium" },
-    // Provider failures describe infrastructure, not user conduct; never create a safety incident for them.
+    image_review_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_quota_exceeded: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_unavailable: { category: "unclear_safety_signal", severity: "medium" },
+    image_review_no_decision: { category: "unclear_safety_signal", severity: "medium" },
     personal_information: { category: "personal_data_in_image", severity: "medium" },
     private_document: { category: "personal_data_in_image", severity: "medium" },
     unsafe_content: { category: "unsafe_image", severity: "high" },
