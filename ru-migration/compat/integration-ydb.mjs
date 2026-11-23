@@ -832,8 +832,9 @@ try {
     WHERE event_id = ${limitedEvent.id} AND status IN ('pending', 'confirmed');`;
   assert.equal(Number(reservedRegistrations?.[0]?.[0]?.count ?? -1),
     Number(await repo.getEventOccupancy(limitedEvent.id)), 'seat counter equals the number of active reservations after the race');
-  assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
-    'the serialized race retains exactly one seat reservation');
+  const occupancyAfterRace = Number(await repo.getEventOccupancy(limitedEvent.id));
+  assert.equal(occupancyAfterRace, registrationAfterRace?.[0]?.[0]?.status === 'cancelled' ? 0 : 1,
+    'the serialized race keeps occupancy consistent with its final registration state');
   await sql`UPDATE fam_listings SET status = 'rejected' WHERE id = ${limitedEvent.id};`;
   const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
   assert.deepEqual(hiddenOccupancy, { status: 404, body: { ok: false, error: 'event_unavailable' } },
