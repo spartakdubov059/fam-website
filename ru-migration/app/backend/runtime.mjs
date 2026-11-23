@@ -47,6 +47,20 @@ export function getRuntimeReadiness({ yandexConfigured, oidcConfigured, database
   };
 }
 
+export function getAuthConfiguration(env = {}) {
+  const yandexValues = [env.FAM_RU_YANDEX_CLIENT_ID, env.FAM_RU_YANDEX_REDIRECT_URI, env.FAM_RU_SESSION_SECRET];
+  const oidcValues = [env.FAM_RU_AUTH_ISSUER, env.FAM_RU_AUTH_AUDIENCE, env.FAM_RU_AUTH_JWKS_URL];
+  const yandexPresent = yandexValues.some(Boolean);
+  const oidcPresent = oidcValues.some(Boolean);
+  const yandexConfigured = yandexValues.every(Boolean);
+  const oidcConfigured = oidcValues.every(Boolean);
+  if (yandexPresent && oidcPresent) return { valid: false, reason: 'conflicting_auth_modes' };
+  if ((yandexPresent && !yandexConfigured) || (oidcPresent && !oidcConfigured)) {
+    return { valid: false, reason: 'incomplete_auth_configuration' };
+  }
+  return { valid: true, yandexConfigured, oidcConfigured };
+}
+
 export async function checkYdbReadiness(sql) {
   if (typeof sql !== 'function') return false;
   try {
@@ -81,9 +95,11 @@ export async function createRuntime(env = process.env, { allowBackgroundJobsOnly
   const issuer = env.FAM_RU_AUTH_ISSUER;
   const audience = env.FAM_RU_AUTH_AUDIENCE;
   const jwksUri = env.FAM_RU_AUTH_JWKS_URL;
-  const yandexConfigured = Boolean(env.FAM_RU_YANDEX_CLIENT_ID && env.FAM_RU_YANDEX_REDIRECT_URI && env.FAM_RU_SESSION_SECRET);
+  const authConfig = getAuthConfiguration(env);
+  if (!authConfig.valid && allowBackgroundJobsOnly !== true) return null;
+  const yandexConfigured = authConfig.valid && authConfig.yandexConfigured;
   const safetyKey = env.FAM_RU_SAFETY_HMAC_KEY || (yandexConfigured ? env.FAM_RU_SESSION_SECRET : null);
-  const oidcConfigured = Boolean(issuer && audience && jwksUri);
+  const oidcConfigured = authConfig.valid && authConfig.oidcConfigured;
   if (!databaseUrl || (!yandexConfigured && !oidcConfigured && allowBackgroundJobsOnly !== true)) return null;
   const yandexAuth = yandexConfigured ? createYandexIdAuth({
     clientId: env.FAM_RU_YANDEX_CLIENT_ID,

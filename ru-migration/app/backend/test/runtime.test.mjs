@@ -1,6 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkYdbReadiness, createYdbReadinessProbe, getRuntimeReadiness } from '../runtime.mjs';
+import { checkYdbReadiness, createYdbReadinessProbe, getAuthConfiguration, getRuntimeReadiness } from '../runtime.mjs';
+
+test('auth configuration accepts exactly one complete supported mode', () => {
+  assert.deepEqual(getAuthConfiguration({
+    FAM_RU_YANDEX_CLIENT_ID: 'client', FAM_RU_YANDEX_REDIRECT_URI: 'https://fam.example/auth',
+    FAM_RU_SESSION_SECRET: 'secret',
+  }), { valid: true, yandexConfigured: true, oidcConfigured: false });
+  assert.deepEqual(getAuthConfiguration({
+    FAM_RU_AUTH_ISSUER: 'https://issuer.example', FAM_RU_AUTH_AUDIENCE: 'fam',
+    FAM_RU_AUTH_JWKS_URL: 'https://issuer.example/keys',
+  }), { valid: true, yandexConfigured: false, oidcConfigured: true });
+});
+
+test('auth configuration rejects mixed and partially configured modes', () => {
+  assert.deepEqual(getAuthConfiguration({
+    FAM_RU_YANDEX_CLIENT_ID: 'client', FAM_RU_YANDEX_REDIRECT_URI: 'https://fam.example/auth',
+    FAM_RU_SESSION_SECRET: 'secret', FAM_RU_AUTH_ISSUER: 'https://issuer.example',
+  }), { valid: false, reason: 'conflicting_auth_modes' });
+  assert.deepEqual(getAuthConfiguration({ FAM_RU_AUTH_ISSUER: 'https://issuer.example' }), {
+    valid: false, reason: 'incomplete_auth_configuration',
+  });
+  assert.deepEqual(getAuthConfiguration({ FAM_RU_YANDEX_CLIENT_ID: 'client' }), {
+    valid: false, reason: 'incomplete_auth_configuration',
+  });
+});
 
 test('runtime readiness requires auth, YDB and object storage for the complete Russian copy', () => {
   assert.deepEqual(getRuntimeReadiness({
@@ -40,8 +64,7 @@ test('runtime readiness is false when YDB is unavailable', () => {
   const readiness = getRuntimeReadiness({ yandexConfigured: true, oidcConfigured: false,
     databaseReady: false, mediaConfigured: true });
   assert.equal(readiness.ready, false);
-  assert.equal(readiness.services.database, false);
-  assert.equal(readiness.services.auth, true);
+  assert.deepEqual(readiness.services, { auth: true, database: false, objectStorage: true });
   assert.equal(readiness.message, 'Russian backend database is not ready.');
 });
 
