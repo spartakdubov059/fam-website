@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
+import { fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
