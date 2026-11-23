@@ -114,7 +114,7 @@ test("edge function requires server token and exposes only fixed aggregate RPC o
   assert.match(edge, /origin_not_allowed/);
   assert.match(edge, /body\.action === "health" && Object\.keys\(body\)\.length === 1/);
   assert.match(edge, /rpc\("get_fam_agent_queue_health", \{\}\)/);
-  assert.match(edge, /return json\(\{ ok: true, queue: safe \}\)/);
+  assert.match(edge, /return json\(\{ ok: true, queue: safe, diagnostic_id: diagnosticId \}, 200, diagnosticId\)/);
   assert.doesNotMatch(edge, /rpc\(body\./);
   assert.match(workflow, /FAM_AGENT_BRIDGE_URL: \$\{\{ secrets\.FAM_AGENT_BRIDGE_URL \}\}/);
   assert.match(workflow, /FAM_AGENT_WORKER_TOKEN: \$\{\{ secrets\.FAM_AGENT_WORKER_TOKEN \}\}/);

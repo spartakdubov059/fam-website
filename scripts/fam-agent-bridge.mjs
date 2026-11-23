@@ -87,16 +87,43 @@ export function chooseResultCode(summary, executionSucceeded = true) {
 
 export async function bridgeRequest({ url, token, body, fetchImpl = fetch }) {
   if (!url || !token) throw new Error("Bridge credentials are not configured.");
+  const requestBody = JSON.stringify(body);
   const response = await fetchImpl(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-fam-agent-token": token,
     },
-    body: JSON.stringify(body),
+    body: requestBody,
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new Error("Bridge request failed with HTTP " + response.status);
+  if (!response.ok) {
+    let diagnostic = {};
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload === "object") diagnostic = payload;
+    } catch {
+      // Non-JSON gateway errors are reported without logging response content.
+    }
+    const errorCode = typeof diagnostic.error_code === "string" && /^[a-z0-9_]{1,48}$/.test(diagnostic.error_code)
+      ? diagnostic.error_code : "unstructured_error";
+    const stage = typeof diagnostic.stage === "string" && /^[a-z0-9_]{1,48}$/.test(diagnostic.stage)
+      ? diagnostic.stage : "unknown";
+    const diagnosticId = typeof diagnostic.diagnostic_id === "string" && /^[0-9a-f-]{36}$/i.test(diagnostic.diagnostic_id)
+      ? diagnostic.diagnostic_id : response.headers?.get?.("x-fam-diagnostic-id") || "unavailable";
+    const metadata = {
+      http_status: response.status,
+      error_code: errorCode,
+      stage,
+      diagnostic_id: diagnosticId,
+      action: typeof body.action === "string" ? body.action : "unknown",
+      request_bytes: new TextEncoder().encode(requestBody).byteLength,
+      task_id_valid: typeof body.task_id === "string" && UUID_RE.test(body.task_id),
+      result_code: ["model_no_patch", "model_failed", "model_blocked"].includes(body.result_code) ? body.result_code : undefined,
+    };
+    console.error("fam_agent_bridge_request_failed", JSON.stringify(metadata));
+    throw new Error("Bridge request failed: HTTP " + response.status + " " + errorCode + " at " + stage + " (diagnostic " + diagnosticId + ")");
+  }
   return response.json();
 }
 

@@ -28,12 +28,13 @@ const EVENT_CODES = new Set([
 ]);
 const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
 
-function json(body: Record<string, unknown>, status = 200): Response {
+function json(body: Record<string, unknown>, status = 200, diagnosticId = crypto.randomUUID()): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
+      "X-FAM-Diagnostic-Id": diagnosticId,
     },
   });
 }
@@ -73,40 +74,42 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<any> {
     try { data = JSON.parse(raw); } catch { data = null; }
   }
   if (!response.ok) {
-    console.error("fam_agent_coder_bridge_rpc_failed", JSON.stringify({ rpc: name, status: response.status }));
-    throw new Error("rpc_failed");
+    const error = new Error("rpc_failed");
+    Object.assign(error, { code: "rpc_http_error", httpStatus: response.status, rpc: name });
+    throw error;
   }
   return data;
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
-  if (req.headers.get("origin")) return json({ ok: false, error: "origin_not_allowed" }, 403);
+  const diagnosticId = crypto.randomUUID();
+  if (req.method !== "POST") return json({ ok: false, error_code: "method_not_allowed", stage: "request" , diagnostic_id: diagnosticId }, 405, diagnosticId);
+  if (req.headers.get("origin")) return json({ ok: false, error_code: "origin_not_allowed", stage: "request", diagnostic_id: diagnosticId }, 403, diagnosticId);
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !WORKER_TOKEN) {
-    return json({ ok: false, error: "bridge_not_configured" }, 503);
+    return json({ ok: false, error_code: "bridge_not_configured", stage: "configuration", diagnostic_id: diagnosticId }, 503, diagnosticId);
   }
   if (!await sameSecret(req.headers.get("x-fam-agent-token") ?? "", WORKER_TOKEN)) {
-    return json({ ok: false, error: "unauthorized" }, 401);
+    return json({ ok: false, error_code: "unauthorized", stage: "authentication", diagnostic_id: diagnosticId }, 401, diagnosticId);
   }
 
   const declaredLength = Number(req.headers.get("content-length") ?? "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return json({ ok: false, error: "request_too_large" }, 413);
+    return json({ ok: false, error_code: "request_too_large", stage: "request_validation", diagnostic_id: diagnosticId }, 413, diagnosticId);
   }
 
   let body: any;
   try {
     const raw = await req.text();
     if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
-      return json({ ok: false, error: "request_too_large" }, 413);
+      return json({ ok: false, error_code: "request_too_large", stage: "request_validation", diagnostic_id: diagnosticId }, 413, diagnosticId);
     }
     body = raw ? JSON.parse(raw) : {};
   } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
+    return json({ ok: false, error_code: "invalid_json", stage: "request_parse", diagnostic_id: diagnosticId }, 400, diagnosticId);
   }
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return json({ ok: false, error: "invalid_body" }, 400);
+    return json({ ok: false, error_code: "invalid_body", stage: "request_validation", diagnostic_id: diagnosticId }, 400, diagnosticId);
   }
 
   try {
@@ -128,7 +131,7 @@ Deno.serve(async (req: Request) => {
         }
         safe[key] = value;
       }
-      return json({ ok: true, queue: safe });
+      return json({ ok: true, queue: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
     if (body.action === "metrics" && Object.keys(body).length === 1) {
@@ -140,7 +143,7 @@ Deno.serve(async (req: Request) => {
         !Number.isSafeInteger(Number(row.count)) || Number(row.count) < 0 || Number(row.count) > 10_000_000
       )) return json({ ok: false, error: "invalid_task_metrics" }, 502);
       const safe = metrics.map((row) => ({ agent_key: row.agent_key, status: row.status, count: Number(row.count) }));
-      return json({ ok: true, metrics: safe });
+      return json({ ok: true, metrics: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
     if (body.action === "claim" && Object.keys(body).length === 1) {
@@ -152,7 +155,7 @@ Deno.serve(async (req: Request) => {
       if (!Array.isArray(tasks) || tasks.length > 1) {
         return json({ ok: false, error: "invalid_queue_response" }, 502);
       }
-      if (tasks.length === 0) return json({ ok: true, task: null });
+      if (tasks.length === 0) return json({ ok: true, task: null, diagnostic_id: diagnosticId }, 200, diagnosticId);
       const task = tasks[0];
       if (
         typeof task?.id !== "string" ||
@@ -168,6 +171,7 @@ Deno.serve(async (req: Request) => {
       }
       return json({
         ok: true,
+        diagnostic_id: diagnosticId,
         task: {
           id: task.id,
           task_key: task.task_key,
@@ -189,7 +193,7 @@ Deno.serve(async (req: Request) => {
         p_worker_id: WORKER_ID,
         p_lease_seconds: 1800,
       });
-      return json({ ok: true, started: started === true });
+      return json({ ok: true, started: started === true, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
     if (
@@ -203,7 +207,7 @@ Deno.serve(async (req: Request) => {
         p_worker_id: WORKER_ID,
         p_lease_seconds: 1800,
       });
-      return json({ ok: true, renewed: renewed === true });
+      return json({ ok: true, renewed: renewed === true, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
     if (
@@ -221,7 +225,7 @@ Deno.serve(async (req: Request) => {
         p_stage: body.stage,
         p_pr_number: body.pr_number ?? null,
       });
-      return json({ ok: true, advanced: advanced === true });
+      return json({ ok: true, advanced: advanced === true, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
     if (
@@ -236,11 +240,16 @@ Deno.serve(async (req: Request) => {
         p_worker_id: WORKER_ID,
         p_result_code: body.result_code,
       });
-      return json({ ok: true, saved: saved === true });
+      return json({ ok: true, saved: saved === true, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
-    return json({ ok: false, error: "invalid_action" }, 400);
-  } catch {
-    return json({ ok: false, error: "bridge_execution_failed" }, 500);
+    console.warn("fam_agent_coder_bridge_rejected", JSON.stringify({ diagnostic_id: diagnosticId, stage: "action_validation", error_code: "invalid_action", action: typeof body.action === "string" ? body.action : "invalid", field_count: Object.keys(body).length }));
+    return json({ ok: false, error_code: "invalid_action", stage: "action_validation", diagnostic_id: diagnosticId }, 400, diagnosticId);
+  } catch (error) {
+    const safeError = error as { code?: string; httpStatus?: number; rpc?: string };
+    const errorCode = safeError?.code === "rpc_http_error" ? "rpc_http_error" : "bridge_execution_failed";
+    const stage = safeError?.rpc === "finish_fam_agent_coder_task" ? "finish_rpc" : "rpc_or_action";
+    console.error("fam_agent_coder_bridge_failed", JSON.stringify({ diagnostic_id: diagnosticId, stage, error_code: errorCode, http_status: Number.isInteger(safeError?.httpStatus) ? safeError.httpStatus : null, rpc: typeof safeError?.rpc === "string" ? safeError.rpc : null }));
+    return json({ ok: false, error_code: errorCode, stage, diagnostic_id: diagnosticId }, 500, diagnosticId);
   }
 });

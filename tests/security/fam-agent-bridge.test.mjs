@@ -112,6 +112,34 @@ test("bridge request never logs or returns the supplied token", async () => {
   assert.equal(JSON.stringify(data).includes("secret-test-token"), false);
 });
 
+test("finish request logs only fixed diagnostics when the edge rejects it", async () => {
+  const messages = [];
+  const originalError = console.error;
+  console.error = (...args) => messages.push(args.join(" "));
+  try {
+    await assert.rejects(bridgeRequest({
+      url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+      token: "secret-test-token",
+      body: { action: "finish", task_id: "e6044c1e-0234-43d1-bb61-f27602b7f951", result_code: "model_no_patch" },
+      fetchImpl: async (_url, options) => {
+        assert.equal(options.body.length, 99);
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers({ "X-FAM-Diagnostic-Id": "123e4567-e89b-42d3-a456-426614174000" }),
+          json: async () => ({ error_code: "invalid_action", stage: "action_validation", diagnostic_id: "123e4567-e89b-42d3-a456-426614174000" }),
+        };
+      },
+    }), /HTTP 400 invalid_action at action_validation/);
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /"request_bytes":99/);
+  assert.match(messages[0], /"result_code":"model_no_patch"/);
+  assert.doesNotMatch(messages[0], /secret-test-token|e6044c1e-0234-43d1-bb61-f27602b7f951/);
+});
+
 import { readFileSync } from "node:fs";
 
 const migration = readFileSync(
