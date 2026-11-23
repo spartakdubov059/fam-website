@@ -47,4 +47,5 @@ jobs:
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
           GITHUB_SHA: ${{ github.sha }}
+          FAM_NETLIFY_PUBLISH_ENABLED: ${{ vars.FAM_NETLIFY_PUBLISH_ENABLED }}
         run: node scripts/check-fam-domain-sync.mjs

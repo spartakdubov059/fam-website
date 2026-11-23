@@ -95,6 +95,7 @@ export async function verifyDomains({
   cacheKey = process.env.GITHUB_SHA || "sync-check",
   timeoutMs = 10 * 60_000,
   intervalMs = 15_000,
+  maxAttempts = Number.POSITIVE_INFINITY,
   onAttempt = () => {},
 }) {
   const selected = selectPublicPaths(paths, root);
@@ -106,7 +107,7 @@ export async function verifyDomains({
   let attempt = 0;
   let latest = [];
 
-  while (Date.now() <= deadline) {
+  while (Date.now() <= deadline && attempt < maxAttempts) {
     attempt += 1;
     latest = (await Promise.all(domains.flatMap(domain =>
       selected.map(path => comparePath(fetchImpl, domain, path, expected.get(path), cacheKey))
@@ -117,23 +118,58 @@ export async function verifyDomains({
     await new Promise(resolve => setTimeout(resolve, intervalMs));
   }
 
-  const mismatches = latest.filter(result => !result.matches).map(result =>
-    `${result.domain} ${result.path}: ${result.status}${result.error ? ` (${result.error})` : ""}`
-  );
+  const mismatches = latest.filter(result => !result.matches).map(result => {
+    const expectedDigest = expected.get(result.path);
+    const actual = result.digest ? result.digest.slice(0, 12) : "unavailable";
+    const expectedPrefix = expectedDigest ? expectedDigest.slice(0, 12) : "unavailable";
+    return `${result.domain} ${result.path}: status=${result.status}, sha256=${actual}, expected=${expectedPrefix}${result.error ? ` (${result.error})` : ""}`;
+  });
   throw new Error(`Domains did not serve the same source files before timeout. ${mismatches.join("; ")}`);
+}
+
+// GitHub Pages is the canonical free publisher. Wait for its deployment to
+// reach the current commit first. When Netlify publishing is paused, inspect
+// that secondary host once and report stale files without spending ten minutes
+// polling an inactive paid-credit deployment.
+export async function verifyProductionDomains({
+  paths,
+  root = process.cwd(),
+  fetchImpl = fetch,
+  cacheKey = process.env.GITHUB_SHA || "sync-check",
+  netlifyPublishEnabled = process.env.FAM_NETLIFY_PUBLISH_ENABLED === "true",
+  timeoutMs = 10 * 60_000,
+  intervalMs = 15_000,
+  onAttempt = () => {},
+}) {
+  const [primary, secondary] = DOMAINS;
+  const primaryResult = await verifyDomains({
+    paths, root, fetchImpl, cacheKey, domains: [primary], timeoutMs, intervalMs,
+    onAttempt: event => onAttempt({ ...event, phase: "primary" }),
+  });
+  const secondaryResult = await verifyDomains({
+    paths, root, fetchImpl, cacheKey, domains: [secondary],
+    timeoutMs: netlifyPublishEnabled ? timeoutMs : 0, intervalMs,
+    maxAttempts: netlifyPublishEnabled ? Number.POSITIVE_INFINITY : 1,
+    onAttempt: event => onAttempt({ ...event, phase: "secondary" }),
+  });
+  return {
+    attempts: primaryResult.attempts + secondaryResult.attempts,
+    paths: primaryResult.paths,
+    results: [...primaryResult.results, ...secondaryResult.results],
+  };
 }
 
 async function main() {
   const paths = changedPaths();
   console.log(`Checking ${paths.length} changed repository paths and core FAM assets on both production domains.`);
-  const result = await verifyDomains({
+  const result = await verifyProductionDomains({
     paths,
-    onAttempt: ({ attempt, results }) => {
+    onAttempt: ({ phase, attempt, results }) => {
       const waiting = results.filter(item => !item.matches);
       if (waiting.length) {
-        console.log(`Attempt ${attempt}: waiting for ${waiting.length} file/domain checks to match.`);
+        console.log(`${phase} attempt ${attempt}: waiting for ${waiting.length} file/domain checks to match.`);
       } else {
-        console.log(`Attempt ${attempt}: all checked files match on both domains.`);
+        console.log(`${phase} attempt ${attempt}: all checked files match on this host.`);
       }
     },
   });
