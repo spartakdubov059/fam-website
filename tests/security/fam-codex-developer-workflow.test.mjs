@@ -45,7 +45,7 @@ const noPatchValidator = readFileSync(
   "utf8",
 );
 
-test("local FAM coding agent has scheduled and owner-only manual triggers", () => {
+test("local FAM coding agent permits the owner and trusted inspector dispatch", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /push:/);
   assert.ok(workflow.includes("branches: [main]"));
@@ -53,6 +53,7 @@ test("local FAM coding agent has scheduled and owner-only manual triggers", () =
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /cron: ["']15 3 \* \* \*["']/);
   assert.match(workflow, /github\.actor == 'spartakdubov059'/);
+  assert.match(workflow, /github\.actor == 'github-actions\[bot\]'/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
 });
 
@@ -82,7 +83,8 @@ test("inference runs under an isolated uid and receives no bridge credentials", 
   assert.match(inferenceStep, /useradd --system[^\n]*fam-inference/);
   assert.match(inferenceStep, /sudo -u fam-inference env -i/);
   assert.match(inferenceStep, /PATH="\$PATH" HOME="\$INFERENCE_HOME" TMPDIR="\$INFERENCE_HOME"/);
-  assert.match(inferenceStep, /pushd "\$INFERENCE_HOME"[\s\S]*?popd/);
+  assert.match(inferenceStep, /sudo install -d -o fam-inference -g fam-inference -m 700 "\$INFERENCE_HOME"/);
+  assert.doesNotMatch(inferenceStep, /pushd "\$INFERENCE_HOME"|popd/);
   assert.match(inferenceStep, /env -i[\s\S]*?GITHUB_WORKSPACE="\$GITHUB_WORKSPACE"[\s\S]*?FAM_MODEL_ID=/);
   const controllerLaunch = inferenceStep.match(/env -i[\s\S]*?node scripts\/run-local-coder\.mjs/)?.[0] ?? "";
   assert.ok(controllerLaunch, "model controller must launch through an environment allowlist");
