@@ -4,7 +4,7 @@
 
 ## Объём и метод
 
-- В source `main` `bdb8325`: 83 файла `supabase/migrations/*.sql`, 7 Edge Function entrypoints; локальная source checkout содержит 80 файлов, поэтому inventory по отсутствующим source revisions дополнен проверкой remote GitHub ниже и не означает локальное наличие SQL.
+- В source `main` `bdb8325`: 83 файла `supabase/migrations/*.sql`, 7 Edge Function entrypoints. Root source checkout содержит 80 SQL файлов; ещё 3 точных upstream-файла сохранены в [`source-reference/supabase-migrations`](source-reference/supabase-migrations/) с проверенными Git blob SHA. Это только read-only evidence: их нельзя запускать на YDB или Supabase. Семантическая замена остаётся отдельной от наличия исходных SQL-файлов.
 - Лексический поиск SQL-файлов нашёл 19 уникальных имен таблиц в `CREATE TABLE`, 52 имени функции в `CREATE OR REPLACE FUNCTION` и 5 имен триггеров в `CREATE TRIGGER`. Четыре функции сверх прежнего снимка добавлены миграцией `20261123001553_fam_qwen_lease_and_lifecycle.sql`. Это подсчёт по тексту, а не анализ итогового живого PostgreSQL-каталога: он не учитывает полностью динамический SQL и жизненный цикл `ALTER`/`DROP`.
 - RU содержит 37 YQL-файлов и 39 объявлений `CREATE TABLE`. Схема и репозиторий проверены чтением кода, существующие интеграционные проверки указаны в других документах. Это не аудит реальных YDB grants/IAM и не эквивалент PostgreSQL RLS.
 
