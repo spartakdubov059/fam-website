@@ -38,12 +38,13 @@ test("social previews and crawler metadata are complete for the public homepage"
   assert.ok(frontend.includes('property="og:image:type" content="image/jpeg"'));
   assert.ok(frontend.includes('property="og:image:width" content="1200"'));
   assert.ok(frontend.includes('property="og:image:height" content="675"'));
-  assert.ok(frontend.includes("https://spartakdubov059.github.io/fam-website/banner-1.jpg"));
-  assert.ok(frontend.includes('rel="canonical" href="https://spartakdubov059.github.io/fam-website/"'));
-  assert.ok(frontend.includes('property="og:url" content="https://spartakdubov059.github.io/fam-website/"'));
+  const activeOrigin = "https://spartakdubov059.github.io/fam-website/";
+  assert.ok(frontend.includes(`${activeOrigin}banner-1.jpg`));
+  assert.ok(frontend.includes(`rel="canonical" href="${activeOrigin}"`));
+  assert.ok(frontend.includes(`property="og:url" content="${activeOrigin}"`));
   assert.ok(frontend.includes("emailRedirectTo: famSignupRedirectUrl()"));
-  assert.ok(robots.includes("Sitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml"));
-  assert.ok(sitemap.includes("<loc>https://spartakdubov059.github.io/fam-website/</loc>"));
+  assert.ok(robots.includes(`Sitemap: ${activeOrigin}sitemap.xml`));
+  assert.ok(sitemap.includes(`<loc>${activeOrigin}</loc>`));
 });
 
 test("the photo form does not claim moderation is disabled", () => {
