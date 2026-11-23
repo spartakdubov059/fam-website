@@ -167,10 +167,23 @@ jobs:
           set -euo pipefail
           MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
           SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
-          "$SERVER" -m "$MODEL" \
+          INFERENCE_HOME="$RUNNER_TEMP/fam-inference-home"
+          if ! getent group fam-inference >/dev/null 2>&1; then
+            sudo groupadd --system fam-inference
+          fi
+          if ! id fam-inference >/dev/null 2>&1; then
+            sudo useradd --system --gid fam-inference --no-create-home --shell /usr/sbin/nologin fam-inference
+          fi
+          sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
+          umask 077
+          pushd "$INFERENCE_HOME" >/dev/null
+          sudo -u fam-inference env -i \
+            PATH="$PATH" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" \
+            "$SERVER" -m "$MODEL" \
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           SERVER_PID=$!
+          popd >/dev/null
           HEARTBEAT_PID=""
           if [[ "${{ steps.coder-queue.outputs.claimed }}" == "true" ]]; then
             node scripts/fam-agent-bridge.mjs heartbeat
@@ -210,7 +223,17 @@ jobs:
           fi
           mkdir -p "$RUNNER_TEMP/fam-agent"
           git rev-parse HEAD > "$RUNNER_TEMP/fam-agent-base.sha"
-          node scripts/run-local-coder.mjs
+          # The model controller needs repository paths and output locations only.
+          # Keep bridge credentials out of its environment even though this step
+          # also runs a separate heartbeat process that requires them.
+          env -i \
+            PATH="$PATH" \
+            GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+            RUNNER_TEMP="$RUNNER_TEMP" \
+            GITHUB_OUTPUT="$GITHUB_OUTPUT" \
+            FAM_MODEL_ID="Qwen3.8-27B-IQ2_XS" \
+            FAM_TASK="${FAM_TASK:-}" \
+            node scripts/run-local-coder.mjs
           if [[ -n "$HEARTBEAT_PID" ]] && ! kill -0 "$HEARTBEAT_PID" 2>/dev/null; then
             echo "::error::Heartbeat process stopped before model work finished."
             exit 1
