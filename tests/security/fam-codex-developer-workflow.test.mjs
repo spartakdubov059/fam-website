@@ -81,7 +81,8 @@ test("inference runs under an isolated uid and receives no bridge credentials", 
   assert.ok(inferenceStep, "model execution step must be present");
   assert.match(inferenceStep, /useradd --system[^\n]*fam-inference/);
   assert.match(inferenceStep, /sudo -u fam-inference env -i/);
-  assert.match(inferenceStep, /PATH="\$PATH" HOME="\$INFERENCE_HOME" TMPDIR="\$RUNNER_TEMP"/);
+  assert.match(inferenceStep, /PATH="\$PATH" HOME="\$INFERENCE_HOME" TMPDIR="\$INFERENCE_HOME"/);
+  assert.match(inferenceStep, /pushd "\$INFERENCE_HOME"[\s\S]*?popd/);
   assert.match(inferenceStep, /env -i[\s\S]*?GITHUB_WORKSPACE="\$GITHUB_WORKSPACE"[\s\S]*?FAM_MODEL_ID=/);
   const controllerLaunch = inferenceStep.match(/env -i[\s\S]*?node scripts\/run-local-coder\.mjs/)?.[0] ?? "";
   assert.ok(controllerLaunch, "model controller must launch through an environment allowlist");
