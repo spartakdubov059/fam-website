@@ -167,7 +167,7 @@ jobs:
           set -euo pipefail
           MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
           SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
-          INFERENCE_HOME="$RUNNER_TEMP/fam-inference-home"
+          INFERENCE_HOME="/tmp/fam-inference-home"
           INFERENCE_SERVER="$INFERENCE_HOME/llama-server"
           INFERENCE_MODEL="$INFERENCE_HOME/model.gguf"
           if ! getent group fam-inference >/dev/null 2>&1; then

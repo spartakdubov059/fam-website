@@ -82,6 +82,8 @@ test("inference runs under an isolated uid and receives no bridge credentials", 
   assert.ok(inferenceStep, "model execution step must be present");
   assert.match(inferenceStep, /useradd --system[^\n]*fam-inference/);
   assert.match(inferenceStep, /sudo -u fam-inference env -i/);
+  assert.match(inferenceStep, /INFERENCE_HOME="\/tmp\/fam-inference-home"/);
+  assert.doesNotMatch(inferenceStep, /INFERENCE_HOME="\$RUNNER_TEMP\//);
   assert.match(inferenceStep, /sudo install -d -o fam-inference -g fam-inference -m 700 "\$INFERENCE_HOME"/);
   assert.match(inferenceStep, /sudo install -o fam-inference -g fam-inference -m 500 "\$SERVER" "\$INFERENCE_SERVER"/);
   assert.match(inferenceStep, /sudo chmod 644 "\$MODEL"/);
