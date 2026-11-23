@@ -86,6 +86,9 @@ test("inference runs under an isolated uid and receives no bridge credentials", 
   assert.doesNotMatch(inferenceStep, /INFERENCE_HOME="\$RUNNER_TEMP\//);
   assert.match(inferenceStep, /sudo install -d -o fam-inference -g fam-inference -m 700 "\$INFERENCE_HOME"/);
   assert.match(inferenceStep, /sudo install -o fam-inference -g fam-inference -m 500 "\$SERVER" "\$INFERENCE_SERVER"/);
+  assert.match(inferenceStep, /ldd "\$SERVER" \| awk/);
+  assert.match(inferenceStep, /sudo install -o fam-inference -g fam-inference -m 400 "\$library" "\$INFERENCE_HOME\/\$\(basename "\$library"\)"/);
+  assert.match(inferenceStep, /LD_LIBRARY_PATH="\$INFERENCE_HOME"/);
   assert.match(inferenceStep, /sudo chmod 644 "\$MODEL"/);
   assert.match(inferenceStep, /sudo ln "\$MODEL" "\$INFERENCE_MODEL"/);
   assert.match(inferenceStep, /PATH="\/usr\/bin:\/bin" HOME="\$INFERENCE_HOME" TMPDIR="\$INFERENCE_HOME"/);

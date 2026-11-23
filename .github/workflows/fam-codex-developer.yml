@@ -178,11 +178,18 @@ jobs:
           fi
           sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
           sudo install -o fam-inference -g fam-inference -m 500 "$SERVER" "$INFERENCE_SERVER"
+          while IFS= read -r library; do
+            case "$library" in
+              "$RUNNER_TEMP/llama.cpp/"*)
+                sudo install -o fam-inference -g fam-inference -m 400 "$library" "$INFERENCE_HOME/$(basename "$library")"
+                ;;
+            esac
+          done < <(ldd "$SERVER" | awk '$2 == "=>" && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}')
           sudo chmod 644 "$MODEL"
           sudo ln "$MODEL" "$INFERENCE_MODEL"
           umask 077
           sudo -u fam-inference env -i \
-            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" \
+            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" LD_LIBRARY_PATH="$INFERENCE_HOME" \
             "$INFERENCE_SERVER" -m "$INFERENCE_MODEL" \
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
