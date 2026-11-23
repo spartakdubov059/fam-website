@@ -98,10 +98,9 @@ try {
   const adminRaceSuccesses = adminRaceResults.filter(result => result.status === 'fulfilled' && result.value?.ok);
   assert.equal(adminRaceSuccesses.length, 1,
     'serializable concurrent role revocations must allow at most one admin to lose the role');
-  const rejectedAdminRace = adminRaceResults.find(result => result.status === 'rejected'
-    || result.value?.code === 'last_school_admin');
-  assert.ok(rejectedAdminRace,
-    'the competing demotion must either observe the last-admin guard or lose the serializable transaction conflict');
+  const losingAdminRace = adminRaceResults.filter(result => result.status === 'rejected' || !result.value?.ok);
+  assert.equal(losingAdminRace.length, 1,
+    'the competing demotion must stop after the other transaction changes its actor or target role');
   const remainingRaceAdmins = await sql`SELECT user_id FROM fam_user_profiles
     WHERE school_id = 'synthetic-admin-race-school' AND role = 'school_admin' AND active = true;`;
   assert.equal(remainingRaceAdmins?.[0]?.length, 1,
@@ -118,10 +117,9 @@ try {
   const accountRaceSuccesses = accountRaceResults.filter(result => result.status === 'fulfilled' && result.value?.ok);
   assert.equal(accountRaceSuccesses.length, 1,
     'serializable concurrent self-deletions must allow at most one administrator to deactivate');
-  const rejectedAccountRace = accountRaceResults.find(result => result.status === 'rejected'
-    || result.value?.code === 'last_school_admin');
-  assert.ok(rejectedAccountRace,
-    'the competing self-deletion must either observe the last-admin guard or lose the serializable transaction conflict');
+  const losingAccountRace = accountRaceResults.filter(result => result.status === 'rejected' || !result.value?.ok);
+  assert.equal(losingAccountRace.length, 1,
+    'the competing self-deletion must stop after the other transaction deactivates its actor');
   const remainingAccountAdmins = await sql`SELECT user_id FROM fam_user_profiles
     WHERE school_id = 'synthetic-account-race-school' AND role = 'school_admin' AND active = true;`;
   assert.equal(remainingAccountAdmins?.[0]?.length, 1,
