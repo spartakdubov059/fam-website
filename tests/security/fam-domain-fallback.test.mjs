@@ -45,8 +45,8 @@ test("Supabase HTTP 401 confirms the API answered but does not claim login was t
   assert.equal(result.state, "auth-required");
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
-  assert.ok(TARGETS.some(target => target.name === "FAM GitHub Pages readiness marker" &&
-    target.url === "https://spartakdubov059.github.io/fam-website/fam-domain-health.json"));
+  assert.ok(TARGETS.some(target => target.name === "FAM Netlify readiness marker" &&
+    target.url === "https://famru.netlify.app/fam-domain-health.json"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
@@ -85,7 +85,12 @@ test("existing server-side CORS allows both real FAM hosts", () => {
   }
 });
 
-test("SEO canonical remains the primary host; fallback is not treated as another site", () => {
-  assert.ok(html.includes('rel="canonical" href="https://famru.netlify.app/"'));
-  assert.ok(html.includes('property="og:url" content="https://famru.netlify.app/"'));
+test("SEO metadata and crawl maps identify the active GitHub Pages publisher", () => {
+  const activeOrigin = "https://spartakdubov059.github.io/fam-website/";
+  assert.ok(html.includes(`rel="canonical" href="${activeOrigin}"`));
+  assert.ok(html.includes(`property="og:url" content="${activeOrigin}"`));
+  assert.ok(html.includes(`property="og:image" content="${activeOrigin}banner-1.jpg"`));
+  assert.ok(html.includes(`name="twitter:image" content="${activeOrigin}banner-1.jpg"`));
+  assert.ok(readFileSync(new URL("../../robots.txt", import.meta.url), "utf8").includes(`Sitemap: ${activeOrigin}sitemap.xml`));
+  assert.ok(readFileSync(new URL("../../sitemap.xml", import.meta.url), "utf8").includes(`<loc>${activeOrigin}</loc>`));
 });
