@@ -62,13 +62,18 @@ export function createS3PendingImageStore(env = process.env, { send, get, remove
       let continuationToken;
       for (let page = 0; page < 100; page++) {
         const result = await listObjects({ Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken, MaxKeys: 1000 });
+        if (!result || typeof result !== 'object' || typeof result.IsTruncated !== 'boolean'
+            || (result.Contents !== undefined && !Array.isArray(result.Contents))) {
+          throw new Error('incomplete account image inventory');
+        }
         for (const item of result.Contents || []) {
           if (typeof item.Key !== 'string' || !keyPattern.test(item.Key)) throw new Error('unexpected account image object');
           keys.push(item.Key);
           if (keys.length > 100_000) throw new Error('account image inventory exceeds safe deletion limit');
         }
-        if (!result.IsTruncated) return keys;
-        if (typeof result.NextContinuationToken !== 'string' || !result.NextContinuationToken) throw new Error('incomplete account image inventory');
+        if (result.IsTruncated === false) return keys;
+        if (typeof result.NextContinuationToken !== 'string' || !result.NextContinuationToken
+            || result.NextContinuationToken === continuationToken) throw new Error('incomplete account image inventory');
         continuationToken = result.NextContinuationToken;
       }
       throw new Error('account image inventory exceeds safe pagination limit');

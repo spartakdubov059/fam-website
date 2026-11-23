@@ -37,3 +37,18 @@ test('manual recovery leaves the durable job for retry when inventory contains a
   assert.equal(deleted, false);
   assert.equal(finished, false);
 });
+
+test('manual recovery keeps the durable deletion job when object inventory is incomplete', async () => {
+  let deleted = false; let finished = false;
+  const result = await recoverIncompleteAccountDeletions({ repository: {
+    listAccountMediaKeys: async () => [key],
+    claimIncompleteAccountDeletions: async () => [job],
+    finishAccountDeletion: async () => { finished = true; return { ok: true }; },
+  }, pendingImages: {
+    listAccountObjects: async () => { throw new Error('incomplete account image inventory'); },
+    delete: async () => { deleted = true; },
+  } });
+  assert.deepEqual(result, { claimed: 1, completed: 0, failed: 1 });
+  assert.equal(deleted, false);
+  assert.equal(finished, false, 'the durable job remains available for a later complete inventory retry');
+});

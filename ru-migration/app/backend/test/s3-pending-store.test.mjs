@@ -104,3 +104,17 @@ test('S3 account inventory paginates only validated objects below the account pr
   await assert.rejects(store.listUserObjects('../../other'), /invalid image owner/);
   await store.close();
 });
+
+test('S3 account inventory rejects incomplete or malformed pagination metadata', async () => {
+  const userId = '11111111-1111-4111-8111-111111111111';
+  for (const response of [
+    { Contents: [] },
+    { Contents: [], IsTruncated: 'false' },
+    { Contents: {}, IsTruncated: false },
+    { Contents: [], IsTruncated: true },
+  ]) {
+    const store = createS3PendingImageStore(env, { list: async () => response });
+    await assert.rejects(store.listUserObjects(userId), /incomplete account image inventory/);
+    await store.close();
+  }
+});
