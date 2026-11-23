@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import sharp from 'sharp';
 import { createS3PendingImageStore } from '../media/s3-pending-store.mjs';
 const env = { FAM_RU_S3_ENDPOINT: 'https://storage.example.invalid', FAM_RU_S3_BUCKET: 'private-test', FAM_RU_S3_ACCESS_KEY_ID: 'synthetic', FAM_RU_S3_SECRET_ACCESS_KEY: 'synthetic' };
@@ -24,7 +25,7 @@ test('S3 photo reads validate scoped keys and byte content before returning byte
   let request;
   const store = createS3PendingImageStore(env, { get: async input => {
     request = input;
-    return { ContentType: 'image/webp', ContentLength: 4, Body: { transformToByteArray: async () => Uint8Array.from([1, 2, 3, 4]) } };
+    return { ContentType: 'image/webp', ContentLength: 4, Body: Readable.from([Uint8Array.from([1, 2]), Uint8Array.from([3, 4])]) };
   } });
   const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
   assert.deepEqual([...await store.get(key)], [1, 2, 3, 4]);
@@ -41,6 +42,30 @@ test('S3 photo reads reject objects that could exceed the Yandex API Gateway res
   const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
   await assert.rejects(store.get(key), /invalid private image object/);
   assert.equal(bodyRead, false, 'declared oversized object is rejected before buffering');
+  await store.close();
+});
+
+test('S3 photo reads stop a streamed object when actual bytes exceed its declared length and size limit', async () => {
+  let secondChunkRead = false;
+  let streamClosed = false;
+  const body = {
+    async *[Symbol.asyncIterator]() {
+      try {
+        yield Buffer.alloc(2 * 1024 * 1024 + 1);
+        secondChunkRead = true;
+        yield Buffer.from([1]);
+      } finally {
+        streamClosed = true;
+      }
+    },
+  };
+  const store = createS3PendingImageStore(env, { get: async () => ({
+    ContentType: 'image/webp', ContentLength: 1, Body: body,
+  }) });
+  const key = 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp';
+  await assert.rejects(store.get(key), /invalid private image object/);
+  assert.equal(secondChunkRead, false, 'stream is not consumed after crossing the byte limit');
+  assert.equal(streamClosed, true, 'overflow closes the stream iterator');
   await store.close();
 });
 
