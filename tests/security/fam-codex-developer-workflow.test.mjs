@@ -76,6 +76,20 @@ test("llama.cpp server builds without unnecessary web UI assets", () => {
   assert.match(workflow, /cmake --build "\$RUNNER_TEMP\/llama\.cpp\/build" --config Release --target llama-server/);
 });
 
+test("inference runs under an isolated uid and receives no bridge credentials", () => {
+  const inferenceStep = workflow.match(/- name: Запустить локальную модель и подготовить patch[\s\S]*?(?=\n      - name:)/)?.[0] ?? "";
+  assert.ok(inferenceStep, "model execution step must be present");
+  assert.match(inferenceStep, /useradd --system[^\n]*fam-inference/);
+  assert.match(inferenceStep, /sudo -u fam-inference env -i/);
+  assert.match(inferenceStep, /PATH="\$PATH" HOME="\$INFERENCE_HOME" TMPDIR="\$RUNNER_TEMP"/);
+  assert.match(inferenceStep, /env -i[\s\S]*?GITHUB_WORKSPACE="\$GITHUB_WORKSPACE"[\s\S]*?FAM_MODEL_ID=/);
+  const controllerLaunch = inferenceStep.match(/env -i[\s\S]*?node scripts\/run-local-coder\.mjs/)?.[0] ?? "";
+  assert.ok(controllerLaunch, "model controller must launch through an environment allowlist");
+  assert.doesNotMatch(controllerLaunch, /FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|FAM_CODER_TASK_ID/);
+  assert.match(inferenceStep, /node scripts\/fam-agent-bridge\.mjs heartbeat/);
+  assert.match(inferenceStep, /kill "\$SERVER_PID"/);
+});
+
 test("model receives read-only repository access and can only propose allowlisted paths", () => {
   assert.match(workflow, /generate:[\s\S]*?permissions:\n\s+contents: read/);
   assert.match(workflow, /index\.html\|css\/\*\|js\/\*\|assets\/\*\|docs\/\*\|tests\/\*/);
