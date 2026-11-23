@@ -5,6 +5,8 @@ import {
   validateQueueHealthResponse,
   fetchQueueHealth,
   inspectQueueHealth,
+  validateAgentMetricsResponse,
+  fetchAgentMetrics,
 } from "../../scripts/fam-governance-bridge.mjs";
 import { makeReport, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
 
@@ -70,6 +72,21 @@ test("bridge failures are explicit and never reveal credentials", async () => {
     url: "https://example.invalid", token: "test-governance-token",
     fetchImpl: async () => ({ ok: false, status: 401 }),
   }), /health request failed/);
+});
+
+test("agent metrics client sends a fixed authenticated read-only action", async () => {
+  let request;
+  const result = await fetchAgentMetrics({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token",
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return { ok: true, json: async () => ({ ok: true, metrics: [{ agent_key: "technical", status: "completed", count: 2 }] }) };
+    },
+  });
+  assert.deepEqual(result, [{ agent_key: "technical", status: "completed", count: 2 }]);
+  assert.deepEqual(JSON.parse(request.options.body), { action: "metrics" });
+  assert.throws(() => validateAgentMetricsResponse({ ok: true, metrics: [{ agent_key: "technical", status: "completed", count: 1, user_id: "x" }] }));
 });
 
 test("INSPECTOR differentiates healthy, failed and stalled aggregate queue", () => {

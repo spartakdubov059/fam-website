@@ -69,3 +69,10 @@ test("smoke run cannot imply model output is already an approved production fix"
   assert.match(workflow, /Production этим workflow не изменяется/);
   assert.match(workflow, /требуется отдельное явное разрешение владельца/);
 });
+
+test("production Qwen model job stops if its lease heartbeat fails", () => {
+  assert.match(workflow, /timeout-minutes: 165/);
+  assert.match(workflow, /while sleep 300; do/);
+  assert.match(workflow, /kill "\$SERVER_PID"/);
+  assert.match(workflow, /Heartbeat process stopped before model work finished/);
+});

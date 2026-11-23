@@ -72,3 +72,33 @@ export function inspectQueueHealth(queue) {
   }
   return warnings;
 }
+
+const METRIC_AGENTS = new Set(["orchestrator", "technical", "database", "moderation", "safety", "quality", "growth"]);
+const METRIC_STATES = new Set(["queued", "claimed", "in_progress", "blocked", "completed", "failed", "cancelled"]);
+
+export function validateAgentMetricsResponse(body) {
+  if (!body || typeof body !== "object" || body.ok !== true || !Array.isArray(body.metrics) || body.metrics.length > 49) {
+    throw new Error("Invalid aggregate agent metrics response");
+  }
+  return Object.freeze(body.metrics.map((row) => {
+    if (!row || Object.keys(row).length !== 3 || !METRIC_AGENTS.has(row.agent_key) || !METRIC_STATES.has(row.status) ||
+        !Number.isSafeInteger(row.count) || row.count < 0 || row.count > 10_000_000) {
+      throw new Error("Invalid aggregate agent metrics row");
+    }
+    return Object.freeze({ agent_key: row.agent_key, status: row.status, count: row.count });
+  }));
+}
+
+export async function fetchAgentMetrics({ url, token, fetchImpl = fetch }) {
+  if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
+    throw new Error("FAM governance bridge credentials unavailable");
+  }
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-fam-agent-token": token },
+    body: JSON.stringify({ action: "metrics" }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response?.ok) throw new Error("FAM aggregate metrics request failed");
+  return validateAgentMetricsResponse(await response.json());
+}

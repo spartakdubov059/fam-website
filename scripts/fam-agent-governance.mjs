@@ -1,12 +1,80 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
+import { fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
 const MAX_PRS = 25;
 const CORE_WORKFLOW = "fam-codex-developer.yml";
+const CODER_JOB = "Локальная модель готовит исправление";
+
+export function summarizeQwenRuns(runs = []) {
+  const rows = [];
+  for (const run of runs) {
+    const job = (run.jobs || []).find((item) => item.name === CODER_JOB);
+    if (!job) continue;
+    const duration = Math.max(0, dateMs(job.completed_at || run.updated_at) - dateMs(job.started_at || run.created_at));
+    const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
+    const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
+    const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
+    const noTask = preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped";
+    const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
+    rows.push({
+      status: job.conclusion || job.status || run.conclusion || run.status || "unknown",
+      duration_ms: duration,
+      no_task: noTask,
+      model_outcome: modelOutcome || "not_run",
+      generated: modelOutcome === "success" && verifyJob?.conclusion !== "skipped" && Boolean(verifyJob),
+      qa_passed: verifyJob?.conclusion === "success",
+      pr_created: (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" && item.conclusion === "success"),
+      estimated_runner_minutes: (run.jobs || []).reduce((sum, item) => {
+        const milliseconds = Math.max(0, dateMs(item.completed_at || run.updated_at) - dateMs(item.started_at || run.created_at));
+        return sum + Math.ceil(milliseconds / 60_000);
+      }, 0),
+    });
+  }
+  const count = (predicate) => rows.filter(predicate).length;
+  const sorted = rows.map((row) => row.duration_ms).sort((a, b) => a - b);
+  return Object.freeze({
+    runs: rows.length,
+    successful: count((row) => row.status === "success"),
+    failed: count((row) => row.status === "failure"),
+    no_task: count((row) => row.no_task),
+    model_generated: count((row) => row.generated),
+    model_no_patch: count((row) => row.model_outcome === "success" && !row.generated && !row.no_task),
+    qa_passed: count((row) => row.qa_passed),
+    pr_created: count((row) => row.pr_created),
+    estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
+    p95_duration_minutes: sorted.length ? Math.ceil(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] / 60_000) : 0,
+  });
+}
+
+export function summarizeAgentQueue(rows = []) {
+  const map = new Map();
+  for (const row of rows) {
+    if (!row || typeof row.agent_key !== "string" ||
+        !["completed", "failed", "queued", "claimed", "in_progress", "blocked", "cancelled"].includes(row.status)) continue;
+    const item = map.get(row.agent_key) || { agent: row.agent_key, total: 0, completed: 0, failed: 0, active: 0 };
+    const count = Number(row.count);
+    if (!Number.isSafeInteger(count) || count < 0 || count > 10_000_000) continue;
+    item.total += count;
+    if (row.status === "completed") item.completed += count;
+    if (row.status === "failed") item.failed += count;
+    if (["queued", "claimed", "in_progress"].includes(row.status)) item.active += count;
+    map.set(row.agent_key, item);
+  }
+  return Object.freeze([...map.values()].map((item) => Object.freeze(item)));
+}
+
+export function inspectPostMerge({ runs = [], deployments = [], now = Date.now() } = {}) {
+  const warnings = [];
+  const failed = runs.filter((run) => run.conclusion === "failure" && run.event === "push" && now - dateMs(run.created_at) <= 7 * DAY);
+  if (failed.length) warnings.push({ code: "postmerge_workflow_failure", severity: "high", count: failed.length, message: "Проверки после объединения PR завершились ошибкой" });
+  const badDeployments = deployments.filter((item) => ["error", "failure", "inactive", "in_progress"].includes(item.state));
+  if (badDeployments.length) warnings.push({ code: "postmerge_deployment", severity: "high", count: badDeployments.length, message: "Развёртывание после объединения PR требует внимания" });
+  return warnings;
+}
 
 function dateMs(value) {
   const result = Date.parse(value || "");
@@ -128,7 +196,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -171,6 +239,13 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     lines.push("Связь Supabase → GitHub недоступна или ответ отклонён; здоровье очереди не подтверждено.");
   }
   lines.push("В штаб поступают только счётчики задач; тексты, ID и данные учеников не передаются.");
+  lines.push("", "## Метрики работы агентов");
+  if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
+  for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
+  if (qwenMetrics) {
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+    lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
+  } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");
   if (!proposals.length) lines.push("Нет достаточных оснований создавать новые роли.");
   for (const p of proposals) {
@@ -246,17 +321,41 @@ export async function main() {
   }));
   const workflows = await api("/actions/workflows/" + CORE_WORKFLOW + "/runs?branch=main&per_page=100", token);
   if (!Array.isArray(workflows.workflow_runs)) throw new Error("Не удалось получить запуски кодера.");
+  const runDetails = await Promise.all(workflows.workflow_runs.slice(0, 20).map(async (run) => {
+    try {
+      const jobs = await api("/actions/runs/" + run.id + "/jobs?per_page=100", token);
+      return { ...run, jobs: jobs.jobs || [] };
+    } catch {
+      return { ...run, jobs: [] };
+    }
+  }));
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
+  const deploymentAuditResults = await Promise.allSettled([
+    api("/actions/workflows/fam-domain-sync.yml/runs?branch=main&per_page=20", token),
+    api("/actions/workflows/fam-netlify-production.yml/runs?branch=main&per_page=20", token),
+  ]);
+  const deploymentAuditAvailable = deploymentAuditResults.every((item) => item.status === "fulfilled" && Array.isArray(item.value.workflow_runs));
+  const deploymentRuns = deploymentAuditResults.flatMap((item) =>
+    item.status === "fulfilled" && Array.isArray(item.value.workflow_runs) ? item.value.workflow_runs : []
+  );
+  warnings.push(...inspectPostMerge({ runs: deploymentRuns }));
+  if (!deploymentAuditAvailable) warnings.push({
+    code: "postmerge_audit_unavailable", severity: "medium", count: 1,
+    message: "Не удалось проверить состояние CI и развёртывания после объединения PR",
+  });
   // The same protected server bridge supplies only predefined aggregate counts.
   // Raw Supabase task payloads and student content never enter GitHub.
   const bridgeUrl = process.env.FAM_AGENT_BRIDGE_URL || "";
   const bridgeToken = process.env.FAM_AGENT_WORKER_TOKEN || "";
   let queueHealth = null;
   let queueLink = "not_configured";
+  let agentMetrics = [];
   if (bridgeUrl && bridgeToken) {
     try {
       queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
+      const metrics = await fetchAgentMetrics({ url: bridgeUrl, token: bridgeToken });
+      agentMetrics = summarizeAgentQueue(metrics);
       warnings.push(...inspectQueueHealth(queueHealth));
       queueLink = "connected";
     } catch {
@@ -283,7 +382,8 @@ export async function main() {
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   const report = makeReport({
-    disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, count: selected.length,
+    disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
+    qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   if (process.env.GITHUB_STEP_SUMMARY) {

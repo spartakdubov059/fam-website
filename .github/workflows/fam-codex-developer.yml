@@ -157,6 +157,7 @@ jobs:
       - name: Запустить локальную модель и подготовить patch
         if: steps.preflight.outputs.schedule_enabled == 'true'
         id: agent
+        timeout-minutes: 165
         env:
           FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
@@ -173,7 +174,15 @@ jobs:
           HEARTBEAT_PID=""
           if [[ "${{ steps.coder-queue.outputs.claimed }}" == "true" ]]; then
             node scripts/fam-agent-bridge.mjs heartbeat
-            (while sleep 900; do node scripts/fam-agent-bridge.mjs heartbeat || exit 1; done) &
+            (
+              while sleep 300; do
+                if ! node scripts/fam-agent-bridge.mjs heartbeat; then
+                  echo "::error::Qwen lease heartbeat failed; stopping model work."
+                  kill "$SERVER_PID" 2>/dev/null || true
+                  exit 1
+                fi
+              done
+            ) &
             HEARTBEAT_PID=$!
           fi
           cleanup() {
@@ -202,6 +211,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/fam-agent"
           git rev-parse HEAD > "$RUNNER_TEMP/fam-agent-base.sha"
           node scripts/run-local-coder.mjs
+          if [[ -n "$HEARTBEAT_PID" ]] && ! kill -0 "$HEARTBEAT_PID" 2>/dev/null; then
+            echo "::error::Heartbeat process stopped before model work finished."
+            exit 1
+          fi
           cp "$RUNNER_TEMP/fam-agent-base.sha" "$RUNNER_TEMP/fam-agent/base.sha"
           if [[ "$(node -e "const s=require(process.argv[1]); process.stdout.write(String(s.patch_available))" "$RUNNER_TEMP/fam-agent/summary.json")" == "true" ]]; then
             git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"

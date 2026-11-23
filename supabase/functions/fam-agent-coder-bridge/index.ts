@@ -131,6 +131,18 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, queue: safe });
     }
 
+    if (body.action === "metrics" && Object.keys(body).length === 1) {
+      const metrics = await rpc("get_fam_agent_task_metrics", {});
+      const allowedAgents = new Set(["orchestrator", "technical", "database", "moderation", "safety", "quality", "growth"]);
+      const allowedStatuses = new Set(["queued", "claimed", "in_progress", "blocked", "completed", "failed", "cancelled"]);
+      if (!Array.isArray(metrics) || metrics.length > 49 || metrics.some((row) =>
+        !row || !allowedAgents.has(row.agent_key) || !allowedStatuses.has(row.status) ||
+        !Number.isSafeInteger(Number(row.count)) || Number(row.count) < 0 || Number(row.count) > 10_000_000
+      )) return json({ ok: false, error: "invalid_task_metrics" }, 502);
+      const safe = metrics.map((row) => ({ agent_key: row.agent_key, status: row.status, count: Number(row.count) }));
+      return json({ ok: true, metrics: safe });
+    }
+
     if (body.action === "claim" && Object.keys(body).length === 1) {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,
