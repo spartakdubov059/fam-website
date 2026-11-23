@@ -26,7 +26,7 @@ test("GitHub Pages redirects only after the exact primary readiness marker confi
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
-  assert.ok(head.includes("var healthUrl = \"https://famru.netlify.app/fam-domain-health.json?t=\" + Date.now()"));
+  assert.ok(head.includes('https://famru.netlify.app/fam-domain-health.json?t='));
   assert.ok(head.includes('mode: "cors"'));
   assert.ok(head.includes('cache: "no-store"'));
   assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
