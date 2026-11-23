@@ -23,7 +23,13 @@ export function isAllowedAgentPath(path) {
   return path.startsWith("css/") ||
     path.startsWith("js/") ||
     path.startsWith("docs/") ||
-    path.startsWith("tests/");
+    path.startsWith("tests/") ||
+    [
+      "scripts/fam-agent-governance.mjs",
+      "scripts/fam-agent-bridge.mjs",
+      ".github/workflows/fam-agent-governance.yml",
+      ".github/workflows/fam-codex-developer.yml",
+    ].includes(path);
 }
 
 const CRITICAL_CHANGE_PATTERNS = [
@@ -85,7 +91,9 @@ export function requiresManualApproval(summary, patch) {
   if (paths.some((path) =>
     path === "index.html" ||
     path.startsWith("js/") ||
-    path.startsWith("tests/")
+    path.startsWith("tests/") ||
+    path.startsWith("scripts/") ||
+    path.startsWith(".github/workflows/")
   )) return true;
 
   const changedText = changedLinesOnly(patch);

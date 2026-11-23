@@ -6,6 +6,7 @@ on:
       - ".github/workflows/fam-agent-governance.yml"
       - "scripts/fam-agent-governance.mjs"
       - "scripts/fam-governance-bridge.mjs"
+      - "supabase/migrations/*fam_inspector_bounded_coder_enqueue.sql"
       - "supabase/functions/fam-agent-coder-bridge/**"
       - "supabase/migrations/*fam_agent_task_metrics.sql"
       - "supabase/migrations/*fam_qwen_retry_recovery.sql"
@@ -14,6 +15,13 @@ on:
       - "tests/security/fam-agent-metrics.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
   workflow_dispatch:
+    inputs:
+      synthetic_signal:
+        description: "Только безопасное синтетическое испытание очереди INSPECTOR → Qwen"
+        required: false
+        type: choice
+        options: [none, synthetic_ci_workflow_failure]
+        default: none
   schedule:
     - cron: "45 4 * * *"
 
@@ -45,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      actions: read
+      actions: write
       contents: read
       pull-requests: read
       issues: write
@@ -61,4 +69,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_INSPECTOR_SYNTHETIC_SIGNAL: ${{ inputs.synthetic_signal || 'none' }}
         run: node scripts/fam-agent-governance.mjs

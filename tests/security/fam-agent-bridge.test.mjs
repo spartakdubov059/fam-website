@@ -30,12 +30,28 @@ test("accepts a single allowlisted aggregate task", () => {
   assert.match(task.prompt, /index\.html/);
   assert.match(task.prompt, /window\.onerror/);
   assert.match(task.prompt, /window\.onunhandledrejection/);
-  assert.equal(Object.keys(TASK_PROMPTS).length, 3);
+  assert.equal(Object.keys(TASK_PROMPTS).length, 4);
   assert.equal(task.contract, TASK_CONTRACT);
   assert.match(task.prompt, /Карточка задачи:/);
   assert.match(task.prompt, /required_checks/);
   assert.ok(task.contract.acceptance.includes("При отсутствии подтверждённого дефекта вернуть no_patch."));
   assert.ok(task.contract.limits.some((item) => item.includes("Нет секретов")));
+});
+
+test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mismatch", () => {
+  const task = validateClaimResponse({
+    ok: true,
+    task: { id, task_key: "audit_agent_infrastructure", event_code: "synthetic_ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
+  });
+  assert.match(task.prompt, /без чтения журналов GitHub/);
+  assert.throws(() => validateClaimResponse({
+    ok: true,
+    task: { id, task_key: "audit_agent_infrastructure", event_code: "js_runtime", page_area: "agent_infrastructure", occurrences: 1 },
+  }));
+  assert.throws(() => validateClaimResponse({
+    ok: true,
+    task: { id, task_key: "audit_frontend_runtime", event_code: "ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
+  }));
 });
 
 test("accepts an empty queue", () => {
