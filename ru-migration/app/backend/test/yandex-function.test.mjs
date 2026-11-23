@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequestHandler } from '../server.mjs';
 import { createYandexFunctionHandler } from '../yandex-function.mjs';
 import cloudFunction from '../cloud-function.cjs';
+import { createListingsApi } from '../services/listings-api.mjs';
 
 test('Yandex Cloud Functions CommonJS entrypoint loads the ES module handler', async () => {
   const response = await cloudFunction.handler({ httpMethod: 'GET', path: '/', headers: {}, body: '' }, {});
@@ -24,6 +25,10 @@ test('Yandex function adapter serves the existing static Russian frontend with s
   assert.equal(response.isBase64Encoded, false);
   assert.match(response.headers['content-type'], /text\/html/);
   assert.match(response.headers['content-security-policy'], /frame-ancestors 'none'/);
+  assert.equal(response.headers['x-content-type-options'], 'nosniff');
+  assert.equal(response.headers['x-frame-options'], 'DENY');
+  assert.equal(response.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
+  assert.equal(response.headers['strict-transport-security'], 'max-age=31536000');
   assert.match(response.body, /FAM/);
 });
 
@@ -47,6 +52,36 @@ test('Yandex function adapter forwards invocation context only to the backend ha
   } });
   await handler({ httpMethod: 'GET', path: '/', headers: {}, body: '' }, context);
   assert.equal(received, context);
+});
+
+test('Yandex function context IAM token reaches the email sender without returning to the browser', async () => {
+  const iamToken = 'synthetic-function-iam-token-0123456789';
+  let sent;
+  let savedChallenge;
+  const repository = {
+    getActiveAccountSuspension: async () => null,
+    startRoleEmailVerification: async challenge => { savedChallenge = challenge; return { ok: true }; },
+    verifyRoleEmailVerification: async () => ({ ok: false }),
+    isRoleEmailVerified: async () => false,
+  };
+  const listingsApi = createListingsApi({
+    authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'synthetic-student', email: 'student@example.test' }),
+    resolveActor: async () => ({ id: 'synthetic-student-id', school_id: 'synthetic-school', role: 'student' }),
+    repository,
+    verificationKey: 'synthetic verification key longer than thirty-two bytes',
+    sendRoleVerificationEmail: async value => { sent = value; },
+  });
+  const handler = createYandexFunctionHandler({ requestHandler: createRequestHandler({ listingsApi }) });
+  const response = await handler({ httpMethod: 'POST', path: '/api/v1/role-requests/email-verification',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'send' }) },
+  { token: { access_token: iamToken, token_type: 'Bearer' } });
+
+  assert.equal(response.statusCode, 202);
+  assert.deepEqual(JSON.parse(response.body), { ok: true, sent: true, already_verified: false });
+  assert.equal(sent.accessToken, iamToken);
+  assert.equal(sent.to, 'student@example.test');
+  assert.equal(JSON.stringify(savedChallenge).includes(iamToken), false);
+  assert.equal(JSON.stringify(response).includes(iamToken), false, 'the function IAM token is never returned to the browser');
 });
 
 test('Yandex function adapter preserves repeated Set-Cookie headers', async () => {
@@ -98,7 +133,9 @@ test('Yandex function adapter rejects malformed base64 and hides backend excepti
   const invalid = createYandexFunctionHandler({ requestHandler: async () => { throw new Error('sensitive backend detail'); } });
   const badBody = await invalid({ httpMethod: 'POST', path: '/', headers: {}, body: '***', isBase64Encoded: true });
   assert.equal(badBody.statusCode, 400);
+  assert.equal(badBody.headers['x-frame-options'], 'DENY');
   const failure = await invalid({ httpMethod: 'GET', path: '/', headers: {}, body: '' });
   assert.equal(failure.statusCode, 500);
+  assert.equal(failure.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()');
   assert.doesNotMatch(failure.body, /sensitive/);
 });

@@ -6,9 +6,9 @@ const key = 'synthetic-test-secret-key-at-least-32-bytes';
 const actor = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', school_id: 'school-a' };
 const targetId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
-test('serious safety markers produce a keyed school-scoped pair digest without preserving content', () => {
+test('serious safety markers produce a keyed digest and retain only a redacted short evidence excerpt', () => {
   const input = { actor, targetId, sourceKind: 'message', sourceOrigin: 'messages', localFlag: 'serious_hate_or_threat',
-    text: 'Поступали угрозы в адрес ученика. Его телефон +7 999 123-45-67', safetyKey: key };
+    text: 'Поступали угрозы. Почта test@example.ru, адрес https://example.test/path?phone=12345678, телефон +7 999 123-45-67', safetyKey: key };
   const signal = buildLocalSafetySignal(input);
   assert.equal(signal.category, 'threat_or_intimidation');
   assert.equal(signal.severity, 'high');
@@ -16,7 +16,10 @@ test('serious safety markers produce a keyed school-scoped pair digest without p
   assert.equal(signal.actorId, actor.id);
   assert.equal(signal.targetId, targetId);
   assert.equal(Object.hasOwn(signal, 'text'), false);
-  assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+  assert.equal(signal.evidenceExcerpt, 'Поступали угрозы. Почта [почта скрыта], адрес [ссылка скрыта] телефон [номер скрыт]');
+  assert.equal(signal.evidenceExcerpt.includes('test@example.ru'), false);
+  assert.equal(signal.evidenceExcerpt.includes('example.test'), false);
+  assert.equal(signal.evidenceExcerpt.includes('+7 999'), false);
   assert.equal(buildLocalSafetySignal(input).fingerprint, signal.fingerprint);
   assert.notEqual(buildLocalSafetySignal({ ...input, safetyKey: 'a-different-synthetic-secret-key-32b' }).fingerprint, signal.fingerprint);
   assert.notEqual(buildLocalSafetySignal({ ...input, actor: { ...actor, school_id: 'school-b' } }).fingerprint, signal.fingerprint);
@@ -37,14 +40,14 @@ test('non-safety local moderation flags do not create incident reports', () => {
     localFlag: 'controlled_substances', text: 'тест', safetyKey: key }), null);
 });
 
-test('sensitive-topic review stores only a medium school safety marker without text', () => {
+test('sensitive-topic review stores a medium marker and only its bounded redacted excerpt', () => {
   for (const localFlag of ['self_harm_safety_review', 'sexual_safety_review', 'violence_safety_review']) {
     const signal = buildLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
       localFlag, text: 'Синтетический чувствительный материал.', safetyKey: key });
     assert.equal(signal.category, 'unclear_safety_signal', localFlag);
     assert.equal(signal.severity, 'medium', localFlag);
     assert.equal(Object.hasOwn(signal, 'text'), false);
-    assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+    assert.equal(signal.evidenceExcerpt, 'Синтетический чувствительный материал.');
   }
 });
 
@@ -56,8 +59,15 @@ test('harassment and negative personal calls create medium redacted school incid
     assert.equal(signal.category, category);
     assert.equal(signal.severity, 'medium');
     assert.equal(Object.hasOwn(signal, 'text'), false);
-    assert.equal(Object.hasOwn(signal, 'evidenceExcerpt'), false);
+    assert.equal(signal.evidenceExcerpt, 'Синтетический текст с контактом [почта скрыта]');
   }
+});
+
+test('safety evidence excerpt is capped at 260 characters after contact redaction', () => {
+  const signal = buildLocalSafetySignal({ actor, sourceKind: 'idea', sourceOrigin: 'ideas',
+    localFlag: 'serious_hate_or_threat', text: 'угрозы ' + 'т'.repeat(500), safetyKey: key });
+  assert.equal(signal.evidenceExcerpt.length, 260);
+  assert.equal(signal.evidenceExcerpt.includes('угрозы'), true);
 });
 
 test('safety incident recording requires a long key and valid same-school identities', () => {

@@ -1,4 +1,5 @@
 import './profile-settings.js';
+import { requestWithEmailStepUp } from './step-up-email.js';
 
 const CONFIRMATION = 'УДАЛИТЬ МОЙ АККАУНТ';
 
@@ -30,7 +31,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
   section.hidden = false;
   section.append(node(document, 'h2', '', 'Удаление аккаунта'));
   section.append(node(document, 'p', 'ru-note', 'Удалятся профиль, ваши объявления, идеи, избранное, сообщения, записи на события и принадлежащие аккаунту фотографии. Действие необратимо. Последнего администратора школы удалить нельзя.'));
-  const status = node(document, 'p', 'ru-note', 'Для удаления потребуется подтверждённый Яндекс ID повторный вход и точное подтверждение. Сейчас провайдер не передаёт приложению надёжное время повторной аутентификации, поэтому удаление останется недоступным, пока это ограничение не устранено.');
+  const status = node(document, 'p', 'ru-note', 'Для удаления потребуется подтвердить доступ к почте Яндекс ID одноразовым кодом и ввести точную фразу подтверждения. Код не заменяет парольную аутентификацию Яндекс ID.');
   status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   section.append(status);
   try {
@@ -42,7 +43,7 @@ export async function initializeAccountWorkflow({ document = globalThis.document
       const expiry = typeof result.suspension.expires_at === 'string' ? Date.parse(result.suspension.expires_at) : NaN;
       const date = Number.isFinite(expiry) ? new Date(expiry).toLocaleString('ru-RU') : 'неизвестное время';
       const reason = typeof result.suspension.reason === 'string' ? result.suspension.reason.slice(0, 240) : '';
-      const notice = node(document, 'p', 'ru-note', `Для аккаунта действует временное ограничение до ${date}.${reason ? ` Причина: ${reason}` : ''} Просмотр статуса доступен. Удаление аккаунта пока недоступно, поскольку Яндекс ID не передаёт приложению проверяемое время повторной аутентификации.`);
+      const notice = node(document, 'p', 'ru-note', `Для аккаунта действует временное ограничение до ${date}.${reason ? ` Причина: ${reason}` : ''} Статус доступен для просмотра. Для удаления потребуется одноразовый код на почту Яндекс ID.`);
       notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
       section.insertBefore ? section.insertBefore(notice, status) : section.append(notice);
     }
@@ -65,15 +66,16 @@ export async function initializeAccountWorkflow({ document = globalThis.document
     button.disabled = true;
     status.textContent = 'Проверяем возможность безопасного удаления данных аккаунта…';
     try {
-      const response = await fetchImpl('/api/v1/me/account', {
+      const { response, result, stepUpError } = await requestWithEmailStepUp({ fetchImpl, promptImpl: promptAction,
+        url: '/api/v1/me/account', init: {
         method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ confirmation: CONFIRMATION }),
-      });
-      const result = await json(response);
+      } });
       if (!response.ok || !result?.ok || !result.deleted) {
         if (result?.error === 'fresh_authentication_required') {
-          status.textContent = 'Яндекс ID не сообщает приложению подтверждённое время повторной аутентификации. Удаление временно недоступно; аккаунт не изменён.';
+          status.textContent = stepUpError === 'code_entry_cancelled' ? 'Подтверждение отменено. Аккаунт не изменён.'
+            : 'Не удалось подтвердить действие по почте. Аккаунт не изменён.';
           return;
         }
         if (result?.error === 'last_school_admin') {

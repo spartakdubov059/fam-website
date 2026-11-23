@@ -17,6 +17,11 @@ test('isolated server serves the local FAM RU shell and its price formatter with
   await withServer({}, async origin => {
     const page = await fetch(origin);
     assert.equal(page.status, 200);
+    assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(page.headers.get('x-frame-options'), 'DENY');
+    assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(page.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+    assert.equal(page.headers.get('strict-transport-security'), 'max-age=31536000');
     const html = await page.text();
     assert.match(page.headers.get('content-security-policy'), /script-src 'self'(?:;|$)/);
     assert.doesNotMatch(page.headers.get('content-security-policy'), /script-src[^;]*unsafe-inline/);
@@ -83,14 +88,14 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const moderationSource = await moderation.text();
     assert.match(moderationSource, /api\/v1\/listings\/moderation/);
     assert.doesNotMatch(moderationSource, /link\.href = '\/auth\/yandex\/start\?reauth=1'/);
-    assert.match(moderationSource, /не сообщает приложению подтверждённое время повторной аутентификации/);
+    assert.match(moderationSource, /step-up-email\.js/);
     assert.match(moderationSource, /api\/v1\/school\/admin\/overview/);
     assert.match(moderationSource, /api\/v1\/school\/admin\/safety-reports/);
     assert.match(moderationSource, /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
 
     const account = await fetch(new URL('/account-workflow.js', origin));
     assert.equal(account.status, 200);
-    assert.match(await account.text(), /fetchImpl\('\/api\/v1\/me\/account'/);
+    assert.match(await account.text(), /url: '\/api\/v1\/me\/account'/);
 
     const boardStyles = await fetch(new URL('/public-board.css', origin));
     assert.equal(boardStyles.status, 200);
@@ -119,6 +124,19 @@ test('unconfigured isolated server fails closed for health and user API routes',
     const safety = await fetch(new URL('/api/v1/school/admin/safety-reports', origin));
     assert.equal(safety.status, 503);
     assert.equal((await safety.json()).error, 'backend_not_configured');
+  });
+});
+
+test('step-up route is routed through the backend and preserves the HttpOnly Set-Cookie header', async () => {
+  await withServer({ listingsApi: async req => {
+    assert.equal(new URL(req.url, 'http://localhost').pathname, '/api/v1/me/step-up/email');
+    return { status: 200, body: { ok: true }, headers: { 'set-cookie': 'fam_ru_step_up=synthetic; Path=/; HttpOnly' } };
+  } }, async origin => {
+    const response = await fetch(new URL('/api/v1/me/step-up/email', origin), { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'verify', code: '123456' }) });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
   });
 });
 
@@ -174,6 +192,11 @@ test('configured server reports full readiness only when object storage is confi
     for (const path of ['/api/health', '/api/v1/status']) {
       const response = await fetch(new URL(path, origin));
       assert.equal(response.status, 200);
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(response.headers.get('x-frame-options'), 'DENY');
+      assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+      assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
+      assert.equal(response.headers.get('strict-transport-security'), 'max-age=31536000');
       assert.deepEqual(await response.json(), state);
     }
   });
@@ -290,6 +313,8 @@ test('isolated server returns Yandex OAuth redirects without proxying credential
     assert.equal(response.status, 302);
     assert.match(response.headers.get('location'), /^https:\/\/oauth\.yandex\.ru\/authorize/);
     assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
   });
   await withServer({}, async origin => {
     const response = await fetch(new URL('/auth/yandex/start', origin));
@@ -378,6 +403,8 @@ test('isolated server sends photo bytes with verified image headers instead of J
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'image/webp');
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
     assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0x52, 0x49, 0x46, 0x46]);
   });
 });
@@ -473,6 +500,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
       ['GET', '/api/v1/schools'],
       ['PATCH', '/api/v1/me'],
       ['POST', '/api/v1/profile-requests'],
+      ['POST', '/api/v1/profile-requests/email-verification'],
       ['GET', '/api/v1/profile-requests/review'],
       ['GET', '/api/v1/staff-verifications'],
       ['PATCH', `/api/v1/staff-verifications/${id}`],
@@ -497,7 +525,7 @@ test('isolated server routes school catalog and access-request lifecycle to the 
     }
   });
   assert.deepEqual(routed, [
-    'GET /api/v1/schools', 'PATCH /api/v1/me', 'POST /api/v1/profile-requests', 'GET /api/v1/profile-requests/review', 'GET /api/v1/staff-verifications', `PATCH /api/v1/staff-verifications/${id}`, `PATCH /api/v1/profile-requests/${id}`,
+    'GET /api/v1/schools', 'PATCH /api/v1/me', 'POST /api/v1/profile-requests', 'POST /api/v1/profile-requests/email-verification', 'GET /api/v1/profile-requests/review', 'GET /api/v1/staff-verifications', `PATCH /api/v1/staff-verifications/${id}`, `PATCH /api/v1/profile-requests/${id}`,
     'POST /api/v1/role-requests', 'POST /api/v1/role-requests/email-verification', 'GET /api/v1/role-requests', 'GET /api/v1/role-requests/review', `PATCH /api/v1/role-requests/${id}`,
     'GET /api/v1/messages/moderation', `PATCH /api/v1/messages/moderation/${id}`,
     'GET /api/v1/deletion-requests/targets', 'GET /api/v1/deletion-requests', 'GET /api/v1/deletion-requests/review', 'POST /api/v1/deletion-requests', `PATCH /api/v1/deletion-requests/${id}`, `DELETE /api/v1/school/accounts/${id}`,

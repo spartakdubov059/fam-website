@@ -258,18 +258,27 @@ test('safety report groups are bounded, sanitized, school-scoped and acknowledge
   await assert.rejects(repo.acknowledgeSchoolSafetyReport({ schoolId: 'school-a', reviewerId: 'admin-a', fingerprint: 'bad', category: 'targeted_harassment', sourceKind: 'message' }), TypeError);
 });
 
-test('safety signal writer stores only keyed metadata and never an evidence excerpt', async () => {
+test('safety signal writer sanitizes evidence excerpt before binding it to YDB', async () => {
   let query;
   const repo = createYdbListingsRepository((strings, ...values) => { query = { text: strings.join('?'), values }; return Promise.resolve([[]]); });
   assert.equal(await repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'a'.repeat(64), sourceKind: 'message',
     category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111',
-    targetId: '22222222-2222-4222-8222-222222222222', sourceOrigin: 'messages' }), true);
+    targetId: '22222222-2222-4222-8222-222222222222', sourceOrigin: 'messages',
+    evidenceExcerpt: 'текст угрозы test@example.ru https://example.test +7 999 123-45-67' }), true);
   assert.match(query.text, /INSERT INTO fam_safety_incidents/);
   assert.match(query.text, /evidence_excerpt\)\s+VALUES/);
   assert.ok(query.values.includes('school-a') && query.values.includes('a'.repeat(64)));
-  assert.equal(query.values.includes('текст угрозы'), false);
-  assert.equal(query.text.includes('текст угрозы'), false);
-  assert.ok(query.text.includes('NULL'), 'review fields and excerpt are null');
+  assert.ok(query.values.includes('текст угрозы [почта скрыта] [ссылка скрыта] [номер скрыт]'));
+  assert.equal(query.values.includes('test@example.ru'), false);
+  assert.equal(query.values.includes('https://example.test'), false);
+  assert.equal(query.values.includes('+7 999 123-45-67'), false);
+  assert.equal(query.text.includes('текст угрозы'), false, 'excerpt is bound as data, not embedded into SQL');
+  assert.ok(query.text.includes('NULL'), 'review fields remain null');
+  await repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'b'.repeat(64), sourceKind: 'image',
+    category: 'unsafe_image', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111',
+    sourceOrigin: 'images', evidenceExcerpt: 'image source must never retain accompanying text' });
+  assert.ok(query.values.includes(null), 'image incident evidence is always null');
+  assert.equal(query.values.includes('image source must never retain accompanying text'), false);
   await assert.rejects(repo.recordSafetySignal({ schoolId: 'school-a', fingerprint: 'bad', sourceKind: 'message',
     category: 'threat_or_intimidation', severity: 'high', actorId: '11111111-1111-4111-8111-111111111111', sourceOrigin: 'messages' }), TypeError);
 });
@@ -726,13 +735,19 @@ test('profile identity update changes only first name, last name, and class for 
   };
   const sql = Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) });
   const repo = createYdbListingsRepository(sql);
-  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', { first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
+  const result = await repo.updateOwnProfileIdentity('https://issuer.test', 'student-sub', {
+    first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '',
+    role: 'school_admin', school_id: 'foreign-school',
+  });
   assert.equal(result.first_name, 'Аня');
   const update = calls.find(call => call.text.includes('UPDATE fam_user_profiles'));
   assert.ok(update.values.includes('Аня')); assert.ok(update.values.includes('Иванова')); assert.ok(update.values.includes('8А'));
   assert.ok(update.values.includes('https://issuer.test')); assert.ok(update.values.includes('student-sub'));
   assert.ok(update.values.includes('student'));
   assert.match(update.text, /user_id = \? AND active = true/);
+  assert.doesNotMatch(update.text, /school_id\s*=|role\s*=/i,
+    'self-service profile updates never write school or application role');
+  assert.ok(!update.values.includes('foreign-school'));
   await assert.rejects(repo.updateOwnProfileIdentity('issuer', 'subject', { first_name: 'x', last_name: 'y' }), TypeError);
 });
 test('school role request submission is bound to the database student profile and prevents duplicates', async () => {
@@ -862,6 +877,8 @@ test('pending-media repository validates ownership keys and claims only expired 
     const text = strings.join('?'); calls.push({ text, values });
     if (text.includes('SELECT object_key FROM fam_pending_media')) return [[{ object_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' }]];
     if (text.includes('SELECT id FROM fam_listings WHERE image_key')) return [[]];
+    if (text.includes('SELECT idea_id FROM fam_idea_images')) return [[]];
+    if (text.includes('SELECT id FROM fam_avatar_reviews WHERE image_key')) return [[]];
     if (text.includes('SELECT object_key, claim_token FROM fam_pending_media')) return [[{ object_key: values[0], claim_token: values[1] }]];
     if (text.includes('SELECT status FROM fam_pending_media')) return [[{ status: 'deleting' }]];
     return [[]];
@@ -875,10 +892,30 @@ test('pending-media repository validates ownership keys and claims only expired 
   assert.equal(claims.length, 1);
   assert.equal(claims[0].object_key, key);
   assert.match(calls.find(call => call.text.includes("status = 'pending' AND created_at" )).text, /Interval\('P7D'\)/);
+  assert.ok(calls.some(call => call.text.includes('FROM fam_idea_images WHERE object_key')));
+  assert.ok(calls.some(call => call.text.includes('FROM fam_avatar_reviews WHERE image_key')));
   assert.equal(await repo.finishPendingImageCleanup(key, claims[0].claim_token, false), true);
   assert.ok(calls.some(call => call.text.includes("SET status = 'pending', claim_token = ''")));
   assert.equal(await repo.finishPendingImageCleanup(key, claims[0].claim_token, true), true);
   await assert.rejects(repo.claimExpiredPendingImages(101), TypeError);
+});
+
+test('pending-media cleanup protects expired uploads still referenced by an idea or avatar review', async () => {
+  for (const linkedTable of ['fam_idea_images', 'fam_avatar_reviews']) {
+    const calls = [];
+    const tx = async (strings) => {
+      const text = strings.join('?'); calls.push(text);
+      if (text.includes('SELECT object_key FROM fam_pending_media')) return [[{ object_key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' }]];
+      if (text.includes('SELECT id FROM fam_listings WHERE image_key')) return [[]];
+      if (text.includes('SELECT idea_id FROM fam_idea_images')) return linkedTable === 'fam_idea_images' ? [[{ idea_id: 'idea-1' }]] : [[]];
+      if (text.includes('SELECT id FROM fam_avatar_reviews WHERE image_key')) return linkedTable === 'fam_avatar_reviews' ? [[{ id: 'avatar-1' }]] : [[]];
+      return [[]];
+    };
+    const repo = createYdbListingsRepository(Object.assign(() => Promise.resolve([[]]), { begin: callback => callback(tx) }));
+    assert.deepEqual(await repo.claimExpiredPendingImages(5), []);
+    assert.ok(calls.some(text => text.includes("SET status = 'linked', claim_token = ''")));
+    assert.equal(calls.some(text => text.includes("SET status = 'deleting'")), false);
+  }
 });
 
 test('avatar upload is atomically queued as linked private media and only same-school decisions publish it', async () => {
@@ -1250,7 +1287,7 @@ test('event registration reserves a seat and stores only the database actor iden
   } });
   const repo = createYdbListingsRepository(sql);
   assert.deepEqual(await repo.registerForEvent('event-id', 'verified-user', 'school-a'), { event_id: 'event-id', user_id: 'verified-user', status: 'confirmed' });
-  assert.deepEqual(beginOptions, [{ idempotent: true }], 'capacity transactions retry serializable conflicts from a fresh snapshot');
+  assert.deepEqual(beginOptions, [], 'capacity transactions must surface serialization conflicts instead of retrying');
   assert.ok(operations.some(operation => operation.text.includes('UPSERT INTO fam_event_occupancy')));
   const registration = operations.find(operation => operation.text.includes('UPSERT INTO fam_event_registrations'));
   assert.ok(registration.values.includes('verified-user'));
@@ -1277,10 +1314,10 @@ test('event capacity and organizer rejection are returned after the YDB transact
   await assert.rejects(makeRepo({ owner: 'student', taken: 0 }).registerForEvent('event-id', 'student', 'school-a'), error => error.code === 'organizer_registration');
   await assert.rejects(makeRepo({ taken: 0, existing: [{ status: 'confirmed' }] }).registerForEvent('event-id', 'student', 'school-a'), error => error.code === 'already_registered');
   await assert.rejects(makeRepo({ taken: 0 }).registerForEvent('event-id', 'student', 'school-b'), error => error.code === 'school_mismatch');
-  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }, { idempotent: true }, { idempotent: true }]);
+  assert.deepEqual(options, [], 'rejected capacity transactions must not be retried');
 });
 
-test('event cancellation and organizer review retry after YDB serialization conflicts', async () => {
+test('event cancellation and organizer review surface YDB serialization conflicts without retrying', async () => {
   const options = [];
   const makeRepo = status => {
     const tx = async strings => {
@@ -1292,6 +1329,7 @@ test('event cancellation and organizer review retry after YDB serialization conf
       return [[]];
     };
     const sql = Object.assign(async () => [[]], { begin: async (settings, work) => {
+      if (typeof settings === 'function') return settings(tx);
       options.push(settings);
       return work(tx);
     } });
@@ -1300,7 +1338,7 @@ test('event cancellation and organizer review retry after YDB serialization conf
   assert.equal(await makeRepo('confirmed').cancelEventRegistration('event-id', 'student-id'), true);
   assert.equal(await makeRepo('pending').moderateEventRegistration(
     'event-id', 'student-id', 'organizer', 'school-a', 'rejected'), true);
-  assert.deepEqual(options, [{ idempotent: true }, { idempotent: true }]);
+  assert.deepEqual(options, []);
 });
 
 test('event review allows its owner or an active same-school reviewer only', async () => {
@@ -1314,7 +1352,8 @@ test('event review allows its owner or an active same-school reviewer only', asy
       if (text.includes('FROM fam_event_occupancy')) return [[{ taken: 1 }]];
       return [[]];
     };
-    const sql = Object.assign(async () => [[]], { begin: async (settings, work) => work(tx) });
+    const sql = Object.assign(async () => [[]], { begin: async (settings, work) =>
+      (typeof settings === 'function' ? settings : work)(tx) });
     return { repo: createYdbListingsRepository(sql), calls };
   };
   const owner = makeRepo({ moderatorId: 'organizer' });

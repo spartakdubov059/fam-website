@@ -37,7 +37,7 @@ test('school moderators review same-school pending photos and publish only after
   const f = fixture();
   const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const calls = [];
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+  await initializeListingModeration({ ...f, promptImpl: () => '123456', fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { role: 'council_member' } }) };
     if (url === '/api/v1/event-registrations/review') return { ok: true, json: async () => ({ ok: true, applications: [] }) };
@@ -274,7 +274,7 @@ test('school admins do not request or see global technical alerts', async () => 
   assert.equal(overview.textContent.includes('<unsafe>'), false);
 });
 
-test('school account deletion stays blocked when Yandex cannot attest fresh authentication', async () => {
+test('school account deletion fails safely when email step-up is unavailable', async () => {
   const f = fixture(); const calls = []; const confirmations = []; const prompts = [];
   const adminId = '11111111-1111-4111-8111-111111111111';
   const studentId = '22222222-2222-4222-8222-222222222222';
@@ -305,6 +305,7 @@ test('school account deletion stays blocked when Yandex cannot attest fresh auth
         deletionRequests++;
         return { ok: false, status: 403, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
       }
+    if (url === '/api/v1/me/step-up/email') return { ok: false, json: async () => ({ ok: false, error: 'step_up_unavailable' }) };
       return { ok: true, json: async () => ({ ok: true, requests: [], targets: [], suspensions: [], reports: [], messages: [], alerts: [] }) };
     },
   });
@@ -317,7 +318,7 @@ test('school account deletion stays blocked when Yandex cannot attest fresh auth
   assert.equal(deleteButtons.length, 2);
   assert.deepEqual(deleteButtons.map(button => button.textContent), ['Удалить аккаунт', 'Удалить аккаунт']);
   await deleteButtons[0].listeners.click();
-  assert.match(f.status.textContent, /не сообщает приложению подтверждённое время/);
+  assert.match(f.status.textContent, /Не удалось подтвердить действие по почте/);
   assert.equal(f.status.children.some(child => child.href), false, 'the UI does not imply an OAuth consent prompt proves reauthentication');
 
   const deletion = calls.find(call => call.url === `/api/v1/school/accounts/${studentId}` && call.init.method === 'DELETE');
@@ -332,10 +333,10 @@ test('school account deletion stays blocked when Yandex cannot attest fresh auth
   assert.match(prompts[0], /УДАЛИТЬ АККАУНТ УЧАСТНИКА/);
 });
 
-test('school admins can issue and lift short account restrictions with safe text and fresh Yandex confirmation', async () => {
+test('school suspension UI explains the email step-up flow and fails safely when it is unavailable', async () => {
   const f = fixture(); const calls = [];
   const target = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  await initializeListingModeration({ ...f, fetchImpl: async (url, init = {}) => {
+  await initializeListingModeration({ ...f, promptImpl: () => '123456', fetchImpl: async (url, init = {}) => {
     calls.push({ url, init });
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'admin-a', role: 'school_admin' } }) };
     if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [{ target_id: target, target_role: 'student', reason: 'Repeated disruption', expires_at: '2099-01-01T00:00:00Z' }] }) };
@@ -347,24 +348,75 @@ test('school admins can issue and lift short account restrictions with safe text
       if (body.action === 'issue') return { ok: false, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
       if (body.action === 'lift') return { ok: true, json: async () => ({ ok: true, status: 'lifted' }) };
     }
+    if (url === '/api/v1/me/step-up/email') return { ok: false, json: async () => ({ ok: false, error: 'step_up_unavailable' }) };
     throw new Error(`unexpected route ${url}`);
   } });
   const panel = f.queue.children[0];
   const form = panel.children[2];
   const [targetSelect, duration, reason, submit] = form.children;
+  assert.match(panel.children[1].textContent, /одноразовый код на почту аккаунта Яндекс ID/);
   assert.equal(targetSelect.children[1].textContent, '<script> Имя · ученик', 'names are rendered as text');
   targetSelect.value = target; duration.value = '72'; reason.value = 'Repeatedly disrupted the shared school board.';
   await form.listeners.submit({ preventDefault() {} });
   const issue = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'issue');
   assert.equal(issue.url, `/api/v1/suspensions/${target}`);
   assert.deepEqual(JSON.parse(issue.init.body), { action: 'issue', duration_hours: 72, reason: reason.value });
-  assert.match(f.status.textContent, /не подтверждает повторную аутентификацию/);
+  assert.match(f.status.textContent, /Не удалось подтвердить административное действие по почте/);
   assert.equal(f.status.children.some(child => child.href), false);
   const activeCard = f.queue.children.find(card => card.children.some(child => child.textContent?.startsWith('Причина:')));
   const lift = activeCard.children.at(-1);
   await lift.listeners.click();
   const liftCall = calls.find(call => call.init.method === 'PATCH' && JSON.parse(call.init.body).action === 'lift');
   assert.equal(liftCall.url, `/api/v1/suspensions/${target}`);
+});
+
+test('suspension issue and role revocation retry only after email step-up succeeds', async () => {
+  const f = fixture(); const calls = [];
+  const suspensionTarget = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const roleTarget = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  let verified = false;
+  f.document.defaultView = { confirm: () => true };
+  await initializeListingModeration({ ...f, promptImpl: () => '123456', confirmImpl: () => true, fetchImpl: async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url === '/api/v1/listings/moderation') return { ok: true, json: async () => ({ ok: true, listings: [{ id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', title: 'Объявление', description: 'Текст', category: 'Учёба', price_text: 'Бесплатно' }] }) };
+    if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', role: 'school_admin' } }) };
+    if (url === '/api/v1/suspensions') return { ok: true, json: async () => ({ ok: true, suspensions: [] }) };
+    if (url === '/api/v1/suspensions/targets') return { ok: true, json: async () => ({ ok: true, targets: [{ id: suspensionTarget, role: 'student', first_name: 'Ученик' }] }) };
+    if (url === '/api/v1/role-management/targets') return { ok: true, json: async () => ({ ok: true, targets: [{ id: roleTarget, role: 'council_member', first_name: 'Член', last_name: 'Совета' }] }) };
+    if (url === '/api/v1/school/ideas') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
+    if (url === '/api/v1/school/ideas/workflow') return { ok: true, json: async () => ({ ok: true, ideas: [] }) };
+    if (url === '/api/v1/event-registrations/review' || url === '/api/v1/profile-requests/review'
+      || url === '/api/v1/role-requests/review') return { ok: true, json: async () => ({ ok: true, applications: [], requests: [] }) };
+    if (url === '/api/v1/me/step-up/email') {
+      if (JSON.parse(init.body).action === 'send') return { ok: true, json: async () => ({ ok: true }) };
+      verified = true; return { ok: true, json: async () => ({ ok: true }) };
+    }
+    if ((url === `/api/v1/suspensions/${suspensionTarget}` || url === `/api/v1/role-management/${roleTarget}`) && init.method === 'PATCH') {
+      if (!verified) return { ok: false, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
+      return { ok: true, json: async () => ({ ok: true }) };
+    }
+    throw new Error(`unexpected route ${url}`);
+  } });
+
+  const suspensionPanel = f.queue.children.find(card => card.children[0]?.textContent === 'Временное ограничение действий аккаунта');
+  const suspensionForm = suspensionPanel.children.find(child => child.tagName === 'form');
+  suspensionForm.children[0].value = suspensionTarget;
+  suspensionForm.children[1].value = '72';
+  suspensionForm.children[2].value = 'Повторные нарушения правил школы.';
+  await suspensionForm.listeners.submit({ preventDefault() {} });
+  assert.equal(calls.filter(call => call.url === `/api/v1/suspensions/${suspensionTarget}` && call.init.method === 'PATCH').length, 2);
+  assert.equal(calls.filter(call => call.url === '/api/v1/me/step-up/email').length, 2);
+
+  const roleSection = f.queue.children.find(card => card.children[0]?.textContent === 'Управление полномочиями школы');
+  assert.ok(roleSection, 'the role management section should render');
+  const roleRow = roleSection.children.find(child => child.tagName === 'div');
+  const revoke = roleRow?.children.find(child => child.tagName === 'button');
+  assert.ok(revoke, 'the school role revoke action should be visible');
+  await revoke.listeners.click();
+  assert.ok(calls.some(call => call.url === '/api/v1/me/step-up/email'), 'sensitive role changes must request the one-time confirmation');
+  const roleChangeCalls = calls.filter(call => call.url.startsWith('/api/v1/role-management/') && call.init.method === 'PATCH');
+  assert.equal(roleChangeCalls.length, 1, 'a denied role change is retried only once after confirmation');
+  assert.match(roleChangeCalls[0].url, /^\/api\/v1\/role-management\/[0-9a-f-]{36}$/i);
 });
 
 test('school admins are told when suspension status could not be loaded instead of seeing a false empty result', async () => {

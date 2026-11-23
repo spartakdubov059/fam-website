@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { Uint32, Uint64 } from '@ydbjs/value/primitive';
+import { sanitizeSafetyEvidenceExcerpt } from '../policies/safety-signal.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -128,6 +129,94 @@ export function createYdbListingsRepository(sql) {
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const row = (await statement)?.[0]?.[0];
       return row?.email_digest === emailDigest && Number(row.verified_seconds) > 0;
+    },
+
+    async startStepUpEmailChallenge({ issuer, subject, emailDigest, codeDigest, currentSeconds, expiresSeconds }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(emailDigest || '')
+          || !/^[a-f0-9]{64}$/i.test(codeDigest || '') || !Number.isSafeInteger(currentSeconds)
+          || !Number.isSafeInteger(expiresSeconds) || expiresSeconds <= currentSeconds) throw new TypeError('invalid step-up email challenge');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT window_started_seconds, send_count, sent_seconds, expires_seconds, code_digest, confirmed_seconds
+          FROM fam_step_up_email_challenges WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        const windowStart = Number(current?.window_started_seconds ?? 0);
+        const sendCount = Number(current?.send_count ?? 0);
+        const sentSeconds = Number(current?.sent_seconds ?? 0);
+        const expiresSecondsCurrent = Number(current?.expires_seconds ?? 0);
+        const sameWindow = windowStart > 0 && currentSeconds >= windowStart && currentSeconds - windowStart < 3600;
+        // `confirmed_seconds` records that the one-time code was consumed; it
+        // must remain set. A new challenge resets it only when the old code
+        // expires, below.
+        if (current?.code_digest && expiresSecondsCurrent > currentSeconds) {
+          return { ok: false, code: 'verification_code_already_sent' };
+        }
+        if (sameWindow && sentSeconds > 0 && currentSeconds - sentSeconds < 60) {
+          return { ok: false, code: 'email_send_cooldown', retry_after_seconds: 60 - (currentSeconds - sentSeconds) };
+        }
+        if (sameWindow && sendCount >= 3) return { ok: false, code: 'email_send_rate_limited' };
+        const nextWindowStart = sameWindow ? windowStart : currentSeconds;
+        const nextSendCount = sameWindow ? sendCount + 1 : 1;
+        await tx`UPSERT INTO fam_step_up_email_challenges
+          (issuer, subject, email_digest, code_digest, issued_seconds, expires_seconds, attempt_count,
+           window_started_seconds, send_count, sent_seconds, confirmed_seconds)
+          VALUES (${issuer}, ${subject}, ${emailDigest}, ${codeDigest}, ${new Uint64(BigInt(currentSeconds))},
+            ${new Uint64(BigInt(expiresSeconds))}, ${new Uint32(0)}, ${new Uint64(BigInt(nextWindowStart))},
+            ${new Uint32(nextSendCount)}, ${new Uint64(BigInt(currentSeconds))}, ${new Uint64(0n)});`;
+        return { ok: true };
+      });
+    },
+
+    async clearStepUpEmailChallenge({ issuer, subject, codeDigest }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(codeDigest || '')) throw new TypeError('invalid step-up email cleanup');
+      await sql`UPDATE fam_step_up_email_challenges SET code_digest = '', expires_seconds = 0, attempt_count = 0
+        WHERE issuer = ${issuer} AND subject = ${subject} AND code_digest = ${codeDigest} AND confirmed_seconds = 0;`;
+      return true;
+    },
+
+    async verifyStepUpEmailChallenge({ issuer, subject, emailDigest, codeDigest, currentSeconds }) {
+      if (!issuer || !subject || !/^[a-f0-9]{64}$/i.test(emailDigest || '')
+          || !/^[a-f0-9]{64}$/i.test(codeDigest || '') || !Number.isSafeInteger(currentSeconds)) throw new TypeError('invalid step-up email verification');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT email_digest, code_digest, expires_seconds, attempt_count, confirmed_seconds, issued_seconds
+          FROM fam_step_up_email_challenges WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`;
+        const current = rows?.[0]?.[0];
+        if (!current || current.email_digest !== emailDigest || !current.code_digest) return { ok: false, code: 'invalid_verification_code' };
+        if (Number(current.issued_seconds) > currentSeconds) return { ok: false, code: 'invalid_verification_code' };
+        if (Number(current.confirmed_seconds) > 0) return { ok: false, code: 'verification_code_used' };
+        if (Number(current.expires_seconds) <= currentSeconds) {
+          await tx`UPDATE fam_step_up_email_challenges SET code_digest = '', attempt_count = 0
+            WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+              AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          return { ok: false, code: 'verification_code_expired' };
+        }
+        const attempts = Number(current.attempt_count ?? 0);
+        if (attempts >= 5) return { ok: false, code: 'verification_code_locked' };
+        const expected = Buffer.from(String(current.code_digest), 'hex');
+        const provided = Buffer.from(codeDigest, 'hex');
+        if (expected.length !== 32 || !timingSafeEqual(expected, provided)) {
+          const nextAttempts = attempts + 1;
+          if (nextAttempts >= 5) {
+            await tx`UPDATE fam_step_up_email_challenges SET attempt_count = ${new Uint32(nextAttempts)}, code_digest = ''
+              WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+                AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          } else {
+            await tx`UPDATE fam_step_up_email_challenges SET attempt_count = ${new Uint32(nextAttempts)}
+              WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+                AND code_digest = ${current.code_digest} AND confirmed_seconds = 0;`;
+          }
+          return { ok: false, code: nextAttempts >= 5 ? 'verification_code_locked' : 'invalid_verification_code' };
+        }
+        await tx`UPDATE fam_step_up_email_challenges SET code_digest = '', confirmed_seconds = ${new Uint64(BigInt(currentSeconds))}
+          WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest}
+            AND code_digest = ${current.code_digest} AND issued_seconds = ${new Uint64(BigInt(Number(current.issued_seconds)))}
+            AND expires_seconds > ${new Uint64(BigInt(currentSeconds))}
+            AND confirmed_seconds = 0;`;
+        const confirmed = await tx`SELECT confirmed_seconds FROM fam_step_up_email_challenges
+          WHERE issuer = ${issuer} AND subject = ${subject} AND email_digest = ${emailDigest} LIMIT 1;`;
+        const confirmedAt = Number(confirmed?.[0]?.[0]?.confirmed_seconds ?? 0);
+        return confirmedAt === currentSeconds ? { ok: true, confirmed_at: confirmedAt, issued_seconds: Number(current.issued_seconds) }
+          : { ok: false, code: 'invalid_verification_code' };
+      });
     },
 
     async startRoleEmailVerification({ issuer, subject, userId, emailDigest, codeDigest, currentSeconds, expiresSeconds }) {
@@ -477,7 +566,7 @@ export function createYdbListingsRepository(sql) {
       })), period_days: 30 };
     },
 
-    async recordSafetySignal({ schoolId, fingerprint, sourceKind, category, severity, actorId, targetId = null, sourceOrigin }) {
+    async recordSafetySignal({ schoolId, fingerprint, sourceKind, category, severity, actorId, targetId = null, sourceOrigin, evidenceExcerpt = null }) {
       const sources = new Set(['message', 'idea', 'listing', 'image']);
       const categories = new Set(['targeted_harassment', 'hate_or_discrimination', 'threat_or_intimidation',
         'negative_personal_call', 'spam_or_repeated_abuse', 'unsafe_image', 'personal_data_in_image', 'unclear_safety_signal']);
@@ -486,12 +575,13 @@ export function createYdbListingsRepository(sql) {
           || (targetId !== null && !UUID.test(targetId || '')) || !/^[a-z0-9.-]{1,120}$/.test(sourceOrigin || '')) {
         throw new TypeError('invalid safety signal');
       }
+      const safeEvidenceExcerpt = sourceKind === 'image' ? null : sanitizeSafetyEvidenceExcerpt(evidenceExcerpt);
       const incidentId = randomUUID();
       const statement = sql`INSERT INTO fam_safety_incidents
         (school_id, pair_fingerprint, source_kind, category, incident_id, severity, created_at, reviewed_at,
           reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
         VALUES (${schoolId}, ${fingerprint}, ${sourceKind}, ${category}, ${incidentId}, ${severity}, CurrentUtcTimestamp(),
-          NULL, NULL, ${actorId}, CAST(${targetId} AS Utf8?), ${sourceOrigin}, NULL);`;
+          NULL, NULL, ${actorId}, CAST(${targetId} AS Utf8?), ${sourceOrigin}, ${safeEvidenceExcerpt});`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       await statement;
       return true;
@@ -1067,6 +1157,16 @@ export function createYdbListingsRepository(sql) {
           const objectKey = row.object_key;
           const stillLinked = await tx`SELECT id FROM fam_listings WHERE image_key = ${objectKey} LIMIT 1;`;
           if (stillLinked?.[0]?.length) {
+            await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '' WHERE object_key = ${objectKey};`;
+            continue;
+          }
+          const linkedIdea = await tx`SELECT idea_id FROM fam_idea_images WHERE object_key = ${objectKey} LIMIT 1;`;
+          if (linkedIdea?.[0]?.length) {
+            await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '' WHERE object_key = ${objectKey};`;
+            continue;
+          }
+          const linkedAvatar = await tx`SELECT id FROM fam_avatar_reviews WHERE image_key = ${objectKey} LIMIT 1;`;
+          if (linkedAvatar?.[0]?.length) {
             await tx`UPDATE fam_pending_media SET status = 'linked', claim_token = '' WHERE object_key = ${objectKey};`;
             continue;
           }
@@ -1870,7 +1970,7 @@ export function createYdbListingsRepository(sql) {
 
     async registerForEvent(eventId, userId, schoolId) {
       if (!eventId || !userId || !schoolId) throw new TypeError('invalid event registration');
-      const outcome = await sql.begin({ idempotent: true }, async tx => {
+      const outcome = await sql.begin(async tx => {
         const listingResult = await tx`SELECT user_id, school_id, is_event, status, event_type, max_seats
           FROM fam_listings WHERE id = ${eventId} LIMIT 1;`;
         const event = listingResult?.[0]?.[0];
@@ -1925,7 +2025,7 @@ export function createYdbListingsRepository(sql) {
 
     async cancelEventRegistration(eventId, userId) {
       if (!eventId || !userId) throw new TypeError('invalid event registration');
-      return sql.begin({ idempotent: true }, async tx => {
+      return sql.begin(async tx => {
         const currentResult = await tx`SELECT status FROM fam_event_registrations
           WHERE event_id = ${eventId} AND user_id = ${userId} LIMIT 1;`;
         const current = currentResult?.[0]?.[0];
@@ -2062,7 +2162,7 @@ export function createYdbListingsRepository(sql) {
       if (!eventId || !userId || !moderatorId || !schoolId || !['confirmed', 'rejected'].includes(decision)) {
         throw new TypeError('invalid event review');
       }
-      return sql.begin({ idempotent: true }, async tx => {
+      return sql.begin(async tx => {
         const profileResult = await tx`SELECT school_id, role, active FROM fam_user_profiles
           WHERE user_id = ${moderatorId} LIMIT 1;`;
         const profile = profileResult?.[0]?.[0];

@@ -48,6 +48,12 @@ export async function initializeProfileSettings({ document = globalThis.document
   section.setAttribute('aria-label', 'Настройки профиля');
   section.append(node(document, 'h2', '', 'Мой профиль'));
   section.append(node(document, 'p', 'ru-note', 'Укажите имя и сведения о себе. Изменения относятся только к вашему аккаунту.'));
+  section.append(node(document, 'p', 'ru-note', 'Почта аккаунта управляется в Яндекс ID. FAM использует адрес из Яндекс ID для кодов подтверждения, но не сохраняет его в школьном профиле.'));
+  const identitySettings = node(document, 'a', 'ru-auth-link', 'Управлять аккаунтом Яндекс ID');
+  identitySettings.href = 'https://id.yandex.ru/';
+  identitySettings.target = '_blank';
+  identitySettings.rel = 'noopener noreferrer';
+  section.append(identitySettings);
   const form = node(document, 'form', 'ru-listing-form');
   form.id = 'ruProfileSettingsForm';
   const field = (name, title, type = 'text') => {

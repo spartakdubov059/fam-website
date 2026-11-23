@@ -10,9 +10,27 @@ const CODER_EVENT_CODES = Object.freeze({
   js_runtime: 'audit_frontend_runtime',
   unhandled_rejection: 'audit_frontend_runtime',
   listings_load_failed: 'audit_client_resilience',
+  notifications_load_failed: 'audit_client_resilience',
+  database_request_failed: 'audit_client_resilience',
+  auth_backend_failed: 'audit_client_resilience',
 });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = 'fam-ru-safe-worker-v1';
+const CODER_WORKER_ID = 'fam-agent-qwen-coder-v1';
+const CODER_SUMMARY = Object.freeze({
+  claimed: 'Задание принято локальным анализатором; независимая QA ещё не подтверждена.',
+  model_generated: 'Модель подготовила предложение; независимая QA ещё не подтверждена.',
+  qa_passed: 'Независимая QA прошла; PR ещё не создан.',
+});
+const CODER_STAGES = Object.freeze({
+  model_generated: { expected: CODER_SUMMARY.claimed, summary: CODER_SUMMARY.model_generated, renew: true },
+  qa_passed: { expected: CODER_SUMMARY.model_generated, summary: CODER_SUMMARY.qa_passed, renew: true },
+  pr_created: { expected: CODER_SUMMARY.qa_passed, summary: 'PR создан после независимой QA; ожидает решения владельца.', release: true },
+  qa_failed: { expected: CODER_SUMMARY.qa_passed, summary: 'Независимая QA не прошла; изменение не считается выполненным.', status: 'blocked' },
+  model_no_patch: { expected: CODER_SUMMARY.claimed, summary: 'Локальная модель не предложила подтверждённое исправление.', status: 'completed' },
+  model_failed: { expected: CODER_SUMMARY.claimed, summary: 'Локальный анализатор завершился с ошибкой.', status: 'failed' },
+  model_blocked: { expected: CODER_SUMMARY.claimed, summary: 'Задание остановлено защитными ограничениями.', status: 'blocked' },
+});
 
 function deterministicId(taskType, slot) {
   const bytes = createHash('sha256').update(`fam-ru:${taskType}:${slot}`).digest().subarray(0, 16);
@@ -34,7 +52,7 @@ function isUtcTaskSlot(taskType, value) {
   const hour = date.getUTCHours(); const minute = date.getUTCMinutes();
   if (taskType === 'system_health_check') return hour === 3 && minute === 40;
   if (taskType === 'daily_report_digest') return hour === 4 && minute === 0;
-  if (taskType === 'site_error_digest') return minute === 30;
+  if (taskType === 'site_error_digest') return [0, 15, 30, 45].includes(minute);
   return taskType === 'queue_health_check' && [0, 15, 30, 45].includes(minute);
 }
 
@@ -74,7 +92,8 @@ export function createYdbAgentTaskQueue(sql) {
         const rows = await tx`SELECT event_code, page_area, SUM(event_count) AS occurrences
           FROM fam_site_error_counts
           WHERE hour_bucket >= CurrentUtcTimestamp() - Interval('PT24H')
-            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed')
+            AND event_code IN ('js_runtime', 'unhandled_rejection', 'listings_load_failed',
+              'notifications_load_failed', 'database_request_failed', 'auth_backend_failed')
           GROUP BY event_code, page_area HAVING SUM(event_count) >= 3
           ORDER BY occurrences DESC, event_code, page_area LIMIT 1;`;
         const event = rows?.[0]?.[0];
@@ -152,12 +171,124 @@ export function createYdbAgentTaskQueue(sql) {
       });
     },
 
+    async startSafeCoderTask({ id, workerId, claimToken, leaseSeconds = 1800 } = {}) {
+      if (!UUID.test(id || '') || workerId !== CODER_WORKER_ID || !UUID.test(claimToken || '')
+          || leaseSeconds !== 1800) {
+        throw new TypeError('invalid coder task start');
+      }
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, claimed_by, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_tasks WHERE id = ${id} AND agent_key = 'technical'
+            AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') LIMIT 1;`;
+        const task = rows?.[0]?.[0];
+        if (task?.status !== 'claimed' || task.claimed_by !== workerId || task.claim_token !== claimToken
+            || task.lease_valid !== true) return false;
+        await tx`UPDATE fam_agent_tasks SET status = 'in_progress',
+            started_at = CASE WHEN started_at IS NULL THEN CurrentUtcTimestamp() ELSE started_at END,
+            lease_expires_at = CurrentUtcTimestamp() + Interval('PT30M'),
+            result_summary = ${CODER_SUMMARY.claimed}, updated_at = CurrentUtcTimestamp()
+          WHERE id = ${id} AND claimed_by = ${workerId} AND claim_token = ${claimToken}
+            AND agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND status = 'claimed'
+            AND lease_expires_at > CurrentUtcTimestamp();`;
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${id}, 'started', ${workerId},
+            'Локальный анализ начат с ограниченной арендой.', CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
+    async heartbeatSafeCoderTask({ id, workerId, claimToken, leaseSeconds = 1800 } = {}) {
+      if (!UUID.test(id || '') || workerId !== CODER_WORKER_ID || !UUID.test(claimToken || '')
+          || leaseSeconds !== 1800) {
+        throw new TypeError('invalid coder task heartbeat');
+      }
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, result_summary, claimed_by, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_tasks WHERE id = ${id} AND agent_key = 'technical'
+            AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') LIMIT 1;`;
+        const task = rows?.[0]?.[0];
+        if (task?.status !== 'in_progress' || !Object.values(CODER_SUMMARY).includes(task.result_summary)
+            || task.claimed_by !== workerId || task.claim_token !== claimToken || task.lease_valid !== true) return false;
+        await tx`UPDATE fam_agent_tasks SET lease_expires_at = CurrentUtcTimestamp() + Interval('PT30M'),
+            updated_at = CurrentUtcTimestamp()
+          WHERE id = ${id} AND claimed_by = ${workerId} AND claim_token = ${claimToken}
+            AND agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND status = 'in_progress'
+            AND lease_expires_at > CurrentUtcTimestamp();`;
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${id}, 'progress', ${workerId},
+            'Активный анализ подтвердил продление ограниченной аренды.', CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
+    async advanceSafeCoderTask({ id, workerId, claimToken, stage, prNumber } = {}) {
+      const transition = Object.hasOwn(CODER_STAGES, stage) ? CODER_STAGES[stage] : null;
+      if (!UUID.test(id || '') || workerId !== CODER_WORKER_ID || !UUID.test(claimToken || '') || !transition
+          || (stage === 'pr_created' && (!Number.isSafeInteger(prNumber) || prNumber < 1 || prNumber > 99_999_999))
+          || (stage !== 'pr_created' && prNumber !== undefined)) throw new TypeError('invalid coder task stage');
+      return sql.begin(async tx => {
+        const rows = await tx`SELECT status, result_summary, claimed_by, claim_token,
+            lease_expires_at > CurrentUtcTimestamp() AS lease_valid
+          FROM fam_agent_tasks WHERE id = ${id} AND agent_key = 'technical'
+            AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') LIMIT 1;`;
+        const task = rows?.[0]?.[0];
+        if (task?.status !== 'in_progress' || task.result_summary !== transition.expected
+            || task.claimed_by !== workerId || task.claim_token !== claimToken || task.lease_valid !== true) return false;
+        const status = transition.status || 'in_progress';
+        const release = Boolean(transition.status || transition.release);
+        const finished = status === 'completed';
+        const eventType = status === 'in_progress' ? 'progress' : status;
+        const summary = stage === 'pr_created' ? `${transition.summary} №${prNumber}.` : transition.summary;
+        if (release) {
+          if (finished) {
+            await tx`UPDATE fam_agent_tasks SET status = ${status}, result_summary = ${summary},
+                finished_at = CurrentUtcTimestamp(), lease_expires_at = CAST(NULL AS Timestamp?),
+                claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
+                claimed_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
+              WHERE id = ${id} AND claimed_by = ${workerId} AND claim_token = ${claimToken}
+                AND agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+                AND source IN ('system', 'scheduled_audit')
+                AND status = 'in_progress' AND result_summary = ${transition.expected}
+                AND lease_expires_at > CurrentUtcTimestamp();`;
+          } else {
+            await tx`UPDATE fam_agent_tasks SET status = ${status}, result_summary = ${summary},
+                finished_at = CAST(NULL AS Timestamp?), lease_expires_at = CAST(NULL AS Timestamp?),
+                claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
+                claimed_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
+              WHERE id = ${id} AND claimed_by = ${workerId} AND claim_token = ${claimToken}
+                AND agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+                AND source IN ('system', 'scheduled_audit')
+                AND status = 'in_progress' AND result_summary = ${transition.expected}
+                AND lease_expires_at > CurrentUtcTimestamp();`;
+          }
+        } else {
+          await tx`UPDATE fam_agent_tasks SET status = ${status}, result_summary = ${summary},
+              finished_at = CAST(NULL AS Timestamp?), lease_expires_at = CurrentUtcTimestamp() + Interval('PT2H'),
+              updated_at = CurrentUtcTimestamp()
+            WHERE id = ${id} AND claimed_by = ${workerId} AND claim_token = ${claimToken}
+              AND agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+              AND source IN ('system', 'scheduled_audit')
+              AND status = 'in_progress' AND result_summary = ${transition.expected}
+              AND lease_expires_at > CurrentUtcTimestamp();`;
+        }
+        await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${id}, ${eventType}, ${workerId}, ${summary}, CurrentUtcTimestamp());`;
+        return true;
+      });
+    },
+
     async finishSafeCoderTask({ id, workerId, claimToken, resultCode } = {}) {
       const results = {
-        model_completed: ['completed', 'Локальный анализ завершён; любое изменение требует независимой проверки.'],
-        model_no_patch: ['completed', 'Подтверждённое исправление не предложено.'],
+        model_no_patch: ['completed', 'Локальная модель не предложила подтверждённое исправление.'],
         model_failed: ['failed', 'Локальный анализатор завершился с ошибкой.'],
-        model_blocked: ['blocked', 'Задача остановлена защитными ограничениями.'],
+        model_blocked: ['blocked', 'Задание остановлено защитными ограничениями.'],
       };
       if (!UUID.test(id || '') || workerId !== 'fam-agent-qwen-coder-v1' || !UUID.test(claimToken || '')
           || !Object.hasOwn(results, resultCode)) throw new TypeError('invalid coder task result');
@@ -165,15 +296,21 @@ export function createYdbAgentTaskQueue(sql) {
       return sql.begin(async tx => {
         const rows = await tx`SELECT status, claimed_by, claim_token,
             lease_expires_at > CurrentUtcTimestamp() AS lease_valid
-          FROM fam_agent_tasks WHERE id = ${id} AND task_type = 'coder_patch_request' LIMIT 1;`;
+          FROM fam_agent_tasks WHERE id = ${id} AND agent_key = 'technical'
+            AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') LIMIT 1;`;
         const current = rows?.[0]?.[0];
-        if (current?.status !== 'claimed' || current.claimed_by !== workerId
+        if (!['claimed', 'in_progress'].includes(current?.status) || current.claimed_by !== workerId
             || current.claim_token !== claimToken || current.lease_valid !== true) return false;
         await tx`UPDATE fam_agent_tasks SET status = ${status}, result_summary = ${summary},
             finished_at = CASE WHEN ${status} = 'blocked' THEN CAST(NULL AS Timestamp?) ELSE CurrentUtcTimestamp() END,
             claimed_by = CAST(NULL AS Utf8?),
             claim_token = CAST(NULL AS Utf8?), lease_expires_at = CAST(NULL AS Timestamp?),
-            updated_at = CurrentUtcTimestamp() WHERE id = ${id};`;
+            updated_at = CurrentUtcTimestamp() WHERE id = ${id} AND agent_key = 'technical'
+            AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND claimed_by = ${workerId}
+            AND claim_token = ${claimToken} AND status IN ('claimed', 'in_progress')
+            AND lease_expires_at > CurrentUtcTimestamp();`;
         await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
           VALUES (${randomUUID()}, ${id}, ${status}, ${workerId}, ${summary}, CurrentUtcTimestamp());`;
         return true;
@@ -229,6 +366,48 @@ export function createYdbAgentTaskQueue(sql) {
           VALUES (${randomUUID()}, ${id}, ${status}, ${WORKER_ID}, ${summary}, CurrentUtcTimestamp());`;
         return true;
       });
+    },
+
+    async getAgentTaskQueueHealth() {
+      const [statuses, failed, expired, oldest] = await Promise.all([
+        sql`SELECT status, COUNT(*) AS count FROM fam_agent_tasks GROUP BY status;`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status = 'failed'
+          AND updated_at >= CurrentUtcTimestamp() - Interval('PT24H');`,
+        sql`SELECT COUNT(*) AS count FROM fam_agent_tasks WHERE status IN ('claimed', 'in_progress')
+          AND lease_expires_at <= CurrentUtcTimestamp();`,
+        sql`SELECT MIN(created_at) AS oldest_queued_at FROM fam_agent_tasks WHERE status = 'queued';`,
+      ]);
+      const counts = { queued: 0, claimed: 0, in_progress: 0 };
+      for (const row of statuses?.[0] ?? []) {
+        if (!Object.hasOwn(counts, row.status) && !['failed', 'blocked', 'completed', 'cancelled'].includes(row.status)) {
+          throw new TypeError('invalid agent task status');
+        }
+        if (Object.hasOwn(counts, row.status)) {
+          const value = Number(row.count);
+          if (!Number.isSafeInteger(value) || value < 0 || value > 10_000_000) throw new TypeError('invalid agent task count');
+          counts[row.status] = value;
+        }
+      }
+      const failedLast24 = Number(failed?.[0]?.[0]?.count ?? 0);
+      const expiredLeases = Number(expired?.[0]?.[0]?.count ?? 0);
+      if (![failedLast24, expiredLeases].every(value => Number.isSafeInteger(value) && value >= 0 && value <= 10_000_000)) {
+        throw new TypeError('invalid agent task health count');
+      }
+      const oldestValue = oldest?.[0]?.[0]?.oldest_queued_at;
+      const oldestMs = oldestValue instanceof Date ? oldestValue.getTime()
+        : typeof oldestValue === 'string' ? Date.parse(oldestValue) : NaN;
+      const health = {
+        queued: counts.queued,
+        claimed: counts.claimed,
+        in_progress: counts.in_progress,
+        failed_last_24h: failedLast24,
+        expired_leases: expiredLeases,
+        oldest_queued_minutes: Number.isFinite(oldestMs) ? Math.max(0, Math.floor((Date.now() - oldestMs) / 60_000)) : 0,
+      };
+      if (Object.values(health).some(value => !Number.isSafeInteger(value) || value < 0 || value > 10_000_000)) {
+        throw new TypeError('invalid agent task health age');
+      }
+      return health;
     },
 
     async getSafeTaskQueueHealth() {

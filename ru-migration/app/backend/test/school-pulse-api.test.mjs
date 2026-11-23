@@ -1,9 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { createSchoolPulseApi } from '../services/school-pulse-api.mjs';
 
 const pollId = '11111111-1111-4111-8111-111111111111';
+
+test('school poll history is retained independently of the vote TTL', async () => {
+  const schema = await readFile(new URL('../schema/15_school_pulse.yql', import.meta.url), 'utf8');
+  const pollSchema = schema.match(/CREATE TABLE fam_school_polls \(([\s\S]*?)\n\);/i)?.[1];
+  assert.ok(pollSchema, 'school poll table schema is present');
+  assert.match(pollSchema, /closes_at Timestamp NOT NULL/);
+  assert.doesNotMatch(pollSchema, /TTL/i, 'closed polls remain available for historical results');
+  const voteSchema = schema.match(/CREATE TABLE fam_school_poll_votes \(([\s\S]*?)\n\) WITH \(TTL = Interval\("P180D"\) ON created_at\);/i)?.[1];
+  assert.ok(voteSchema, 'individual vote retention remains bounded to 180 days');
+});
 const student = { id: 'student-a', school_id: 'school-a', role: 'student' };
 function request(method, url, body, token = 'user') {
   const req = body === undefined ? Readable.from([]) : Readable.from([Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))]);

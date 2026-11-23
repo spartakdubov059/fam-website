@@ -22,7 +22,7 @@ CREATE TABLE fam_school_polls (
   closes_at Timestamp NOT NULL,
   created_at Timestamp NOT NULL,
   PRIMARY KEY (poll_id)
-) WITH (TTL = Interval("P7D") ON closes_at);
+);
 
 CREATE TABLE fam_school_poll_votes (
   poll_id Utf8 NOT NULL,

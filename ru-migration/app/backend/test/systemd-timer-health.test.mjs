@@ -74,3 +74,16 @@ test('runtime check uses fixed systemctl arguments and fails closed on command e
   assert.ok(calls.every(([command]) => command === 'systemctl'));
   assert.ok(calls.every(([, args]) => !args.some(value => value.includes(';') || value.includes('`'))));
 });
+
+test('site error digest timer is stale when a 15-minute schedule misses two intervals', () => {
+  const nowMs = Date.parse('2026-11-20T00:30:00Z');
+  const states = FAM_RU_TIMER_UNITS.map(unit => ({ unit, loadState: 'loaded', serviceUnit: unit.replace(/\.timer$/u, '.service'),
+    enabled: true, activeState: 'active', nextElapse: 'Sat 2026-11-21 03:30:00 UTC', lastRunResult: 'success',
+    lastRunCode: 'exited', lastRunStatus: '0', lastRunAt: '2026-11-20T00:00:00Z' }));
+  states.find(state => state.unit === 'fam-ru-site-error-digest.timer').lastRunAt = '2026-11-19T23:59:59Z';
+  states.find(state => state.unit === 'fam-ru-safe-agent-worker.timer').lastRunAt = '2026-11-20T00:25:00Z';
+  const report = analyzeSystemdTimerStates(states, undefined, nowMs);
+  const digest = report.timers.find(timer => timer.unit === 'fam-ru-site-error-digest.timer');
+  assert.equal(digest.lastRunFresh, false);
+  assert.equal(digest.ok, false);
+});

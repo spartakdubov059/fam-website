@@ -7,18 +7,17 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const timerDirectory = resolve(scriptDirectory, '../deploy/systemd');
 const validateCalendars = !process.argv.includes('--structure-only');
 const expectedCalendars = new Map([
-  // RU-only local jobs; neither is an active upstream pg_cron schedule.
-  ['fam-ru-agent-daily-report.timer', ['*-*-* 06:00:00 UTC']],
+  // The old global report timer is retained for traceability only, not deployment.
   ['fam-ru-orchestrator-daily-digest.timer', ['*-*-* 04:00:00 UTC']],
   ['fam-ru-coder-task-producer.timer', ['*-*-* 03:10:00 UTC']],
   ['fam-ru-pending-media-cleanup.timer', ['*-*-* 00,06,12,18:17:00 UTC']],
   ['fam-ru-runtime-health.timer', ['*-*-* 03:40:00 UTC']],
   ['fam-ru-safe-agent-worker.timer', ['*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00 UTC']],
   ['fam-ru-school-agent-report.timer', ['*-*-* 03:30:00 UTC']],
-  ['fam-ru-site-error-digest.timer', ['*-*-* *:30:00 UTC']],
+  ['fam-ru-site-error-digest.timer', ['*-*-* *:00,15,30,45:00 UTC']],
 ]);
 const timerNames = (await readdir(timerDirectory))
-  .filter((name) => name.endsWith('.timer'))
+  .filter((name) => name.endsWith('.timer') && name !== 'fam-ru-agent-daily-report.timer')
   .sort();
 
 if (timerNames.length === 0) {
@@ -28,6 +27,14 @@ const expectedTimerNames = [...expectedCalendars.keys()].sort();
 if (timerNames.length !== expectedTimerNames.length
     || timerNames.some((name, index) => name !== expectedTimerNames[index])) {
   throw new Error(`Timer inventory does not match the reviewed set: ${timerNames.join(', ')}`);
+}
+
+const historicalTimer = await readFile(join(timerDirectory, 'fam-ru-agent-daily-report.timer'), 'utf8');
+if (!/Historical FAM RU global report timer; do not install or enable/.test(historicalTimer)
+    || !/^Persistent=false$/m.test(historicalTimer)
+    || !/^Unit=fam-ru-agent-daily-report\.service$/m.test(historicalTimer)
+    || /^\[Install\]$/m.test(historicalTimer)) {
+  throw new Error('Historical global daily report timer must remain retained but explicitly non-deployable.');
 }
 
 let usedSystemdCalendarParser = false;

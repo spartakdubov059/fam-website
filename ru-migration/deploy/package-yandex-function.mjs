@@ -53,6 +53,7 @@ async function packageFunction(outputPath) {
     lock.packages[''].name = packageJson.name;
     await writeFile(path.join(stage, 'package-lock.json'), JSON.stringify(lock, null, 2) + '\n', { flag: 'wx' });
     await writeFile(path.join(stage, 'index.cjs'), "'use strict';\nexports.handler = async (event, context) => {\n  void context;\n  const mod = await import('./app/backend/yandex-function.mjs');\n  return mod.handler(event);\n};\n", { flag: 'wx' });
+    await writeFile(path.join(stage, 'timer.cjs'), "'use strict';\nexports.handler = async (event, context) => {\n  void context;\n  const mod = await import('./app/backend/yandex-function-timer.mjs');\n  return mod.handler(event);\n};\n", { flag: 'wx' });
 
     await mkdir(path.dirname(output), { recursive: true });
     await execFileAsync('zip', ['-q', '-r', output, '.'], { cwd: stage, maxBuffer: 1024 * 1024 });
@@ -66,7 +67,7 @@ async function packageFunction(outputPath) {
     if (bytes > MAX_DIRECT_UPLOAD_BYTES) {
       throw new Error(`archive is ${bytes} bytes; direct upload ceiling is ${MAX_DIRECT_UPLOAD_BYTES} bytes`);
     }
-    return { output, bytes, files: names.length, entrypoint: 'index.handler', runtime: 'nodejs22' };
+    return { output, bytes, files: names.length, entrypoints: ['index.handler', 'timer.handler'], runtime: 'nodejs22' };
   } finally {
     await rm(temp, { recursive: true, force: true });
   }

@@ -1,19 +1,19 @@
 # Адаптер FAM RU для Yandex Cloud Functions
 
-`app/backend/cloud-function.cjs` экспортирует обработчик `handler` для runtime `nodejs22`. Он загружает ES-модуль `yandex-function.mjs`, который преобразует событие HTTP API Gateway в Node.js request, вызывает существующий router и возвращает HTTP-ответ в формате Cloud Functions. Статический RU-интерфейс также обслуживается тем же router.
+`deploy/package-yandex-function.mjs` собирает два entrypoint для runtime `nodejs22`: `index.handler` преобразует событие HTTP API Gateway в Node.js request, вызывает существующий router и обслуживает RU-интерфейс; `timer.handler` обрабатывает закрытые Yandex Timer trigger события через allowlist фоновых заданий. Разворачивайте их как две отдельные функции и не подключайте timer-функцию к публичному API Gateway. Расписание, scope и переменные окружения см. в [YANDEX_CLOUD_TIMER_JOBS.md](YANDEX_CLOUD_TIMER_JOBS.md).
 
 Проверяемая совместимость runtime: [Node.js 22 поддерживается Cloud Functions](https://yandex.cloud/ru/docs/functions/concepts/runtime/). Формат запроса/ответа, `multiValueHeaders` и base64 для бинарных данных описан в [документации вызова функции](https://yandex.cloud/ru/docs/functions/concepts/function-invoke). Код содержит тесты маршрутизации, повторных `Set-Cookie`, бинарного медиа и загрузки CommonJS entrypoint.
 
 ## Результат локальной проверки
 
-- Backend: `356/356` тестов на Node 22.23.5.
+- На кодовом commit `b100428`: `493/493` backend/UI теста на Node 22.15.0.
 - SDK/Sharp: `SDK_COMPAT_PASS` на закреплённых версиях.
-- Расписание: portable parser проверил 8 systemd timer-файлов.
+- Расписание: portable parser проверил 7 устанавливаемых systemd timer-файлов; синтетические Yandex Timer event tests прошли.
 - Реальный вызов функции, API Gateway, Yandex ID, YDB и S3 не выполнялся; CI и этот адаптер не доказывают облачную интеграцию.
 
 ## Сборка пакета функции
 
-Сборщик `deploy/package-yandex-function.mjs` формирует ZIP с `index.handler`, Node.js backend, RU web assets, `package.json` и закреплённым lockfile. Он исключает `node_modules`, тесты, `.env` и ключевые файлы; отказывается перезаписывать существующий файл и останавливается при превышении лимита прямой загрузки. Порог `3.5 MB` указан в [официальной инструкции создания Cloud Function](https://yandex.cloud/ru/docs/functions/quickstart/create-function/node-function-quickstart); более крупный исходный архив инструкция предлагает загружать через Object Storage.
+Сборщик `deploy/package-yandex-function.mjs` формирует ZIP с `index.handler`, `timer.handler`, Node.js backend, RU web assets, `package.json` и закреплённым lockfile. Он исключает `node_modules`, тесты, `.env` и ключевые файлы; отказывается перезаписывать существующий файл и останавливается при превышении лимита прямой загрузки. Порог `3.5 MB` указан в [официальной инструкции создания Cloud Function](https://yandex.cloud/ru/docs/functions/quickstart/create-function/node-function-quickstart); более крупный исходный архив инструкция предлагает загружать через Object Storage.
 
 Команда:
 
@@ -21,7 +21,13 @@
 node ru-migration/deploy/package-yandex-function.mjs /tmp/fam-ru-yandex-function.zip
 ```
 
-Пакет проверен локально: `976900` байт, 121 файл, после чистого `npm ci` в распакованной папке `index.handler` вернул `GET /` с HTTP 200 и интерфейсом FAM RU. Это только проверка содержимого/entrypoint ZIP, не реальный вызов Cloud Functions.
+Повторная проверка на commit `89cef58` (23 ноября 2026): собран ZIP размером `1,021,629` байт (141 файл; SHA-256 `bd76e7e90e7d7f8013beed84999c58761861fbe6891cc949d1e9aa7aa196b83e`), runtime `nodejs22`, entrypoints `index.handler` и `timer.handler`. В свежую распакованную копию установлены 87 закреплённых пакетов через `npm ci`. С пустым окружением HTTP-вход вернул `GET /` с HTTP 200 и интерфейсом FAM RU. Timer-вход принял синтетическое событие с точным форматом Yandex Timer и без DB-конфигурации отказал закрыто (`FAM_RU_TIMER_JOB_FAILED:runtime_health`). Сборщик проверил архив на исключённые тесты/секреты и лимит прямой загрузки 3.5 MB. Это не проверка фактического запуска Cloud Functions, YDB, OAuth или S3 в облаке.
+
+Повторная проверка точного локального кода `ffa0511` на Node 22.15.0: backend/UI suite `494/494`, целевая группа `yandex-function.test.mjs` — `9/9`, SDK verifier `SDK_COMPAT_PASS`, portable calendar parser проверил 7 устанавливаемых таймеров. Сквозной синтетический тест подтверждает, что контекстный IAM-токен доходит до email sender через Yandex Function adapter, сервер и listings API, но не попадает в challenge или HTTP response. Это соответствует [форме invocation context](https://yandex.cloud/ru/docs/functions/lang/nodejs/context), где для функции с service account доступен `context.token.access_token`; Yandex Postbox принимает IAM token в `X-YaCloud-SubjectToken` ([документация аутентификации Postbox](https://yandex.cloud/ru/docs/postbox/api-ref/authentication)). Сценарий использует только синтетический токен и sender mock; реальное письмо не отправлялось.
+
+Свежий пакет [FAM_RU_Yandex_Function_ffa0511.zip](/Users/spartakdubov/Documents/Codex/2026-11-13/referenced-chatgpt-conversation-this-is-an-2/outputs/FAM_RU_Yandex_Function_ffa0511.zip) имеет размер 1,021,746 байт (141 файл), SHA-256 `114ee793ff15e01d0ec88ef395c3058d34bec05bde453cd595a2c2b4f30d1a08`. Из отдельной распаковки на Node 22.15.0 `npm ci --omit=dev` установил 87 пакетов и сообщил 0 vulnerabilities; packaged HTTP handler вернул 200, Timer handler на корректном синтетическом событии без YDB-конфигурации завершился ожидаемым закрытым отказом `FAM_RU_TIMER_JOB_FAILED:runtime_health`. Это локальная проверка ZIP/handler; точные GitHub CI, disposable YDB, реальный Postbox, IAM и облачный вызов не выполнялись.
+
+Повторная упаковка текущего RU code snapshot `5462b22` (локальный checkout `ab41b8c`, 23 ноября 2026): [fam-ru-yandex-function-ab41b8c.zip](/Users/spartakdubov/Documents/Codex/2026-11-13/referenced-chatgpt-conversation-this-is-an-2/outputs/fam-ru-yandex-function-ab41b8c.zip), 1,023,648 байт, 141 entry, SHA-256 `684dae01f0026bdfe9788ead391a7dda74317456dc5f344691ae0b75008fca87`. Сборщик подтвердил два entrypoint, runtime `nodejs22`, отсутствие включённых тестов, `node_modules` и секретных файлов, лимит 3.5 MB. В отдельную распаковку установлены 87 закреплённых пакетов командой `npm ci --omit=dev` при Node `v22.15.0`; упакованный HTTP handler вернул FAM RU HTML (`200`, 2,160 байт), а Timer handler на валидном синтетическом событии без DB credentials завершился ожидаемым fail-closed `FAM_RU_TIMER_JOB_FAILED:runtime_health`. На той же ревизии `compat/verify-systemd-timers.mjs` проверил все 7 deployable timer calendars через portable subset parser, `compat/verify.mjs` завершился `SDK_COMPAT_PASS` для pinned Sharp/WebP, YDB query-client и AWS SDK exports. Полный `systemd-analyze` остаётся задачей Linux CI. Cloud Function, Gateway, Timer, email или пользовательская БД не создавались и не вызывались; это упаковочная и локальная проверка, не Yandex Cloud integration/CI.
 
 ## Ограничения бесплатного размещения
 

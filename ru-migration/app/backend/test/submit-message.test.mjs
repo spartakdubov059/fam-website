@@ -24,7 +24,7 @@ test('message without a classifier is saved only to a pending school review queu
   assert.equal(delivered, false);
 });
 
-test('serious local message marker is recorded without content before pending delivery', async () => {
+test('serious local message marker is recorded with a redacted excerpt before pending delivery', async () => {
   const writes = [];
   const safetyKey = 'local-synthetic-safety-key-with-more-than-32-bytes';
   const result = await submitMessage({ actor, input: { receiver_id: input.receiver_id, body: 'Поступали угрозы в адрес ученика.' }, safetyKey,
@@ -36,7 +36,7 @@ test('serious local message marker is recorded without content before pending de
   assert.equal(writes[0].category, 'threat_or_intimidation');
   assert.equal(writes[0].severity, 'high');
   assert.equal(Object.hasOwn(writes[0], 'text'), false);
-  assert.equal(Object.hasOwn(writes[0], 'evidence_excerpt'), false);
+  assert.equal(writes[0].evidenceExcerpt, 'Поступали угрозы в адрес ученика.');
   assert.equal(writes[1].body, 'Поступали угрозы в адрес ученика.');
 });
 

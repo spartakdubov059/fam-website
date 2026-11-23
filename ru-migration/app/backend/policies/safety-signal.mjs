@@ -2,6 +2,19 @@ import { createHmac } from 'node:crypto';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export function sanitizeSafetyEvidenceExcerpt(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[почта скрыта]')
+    .replace(/(?:https?:\/\/|www\.)\S+/gi, '[ссылка скрыта]')
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, '[номер скрыт]')
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 260);
+  return cleaned || null;
+}
+
 export function buildLocalSafetySignal({ actor, targetId = null, sourceKind, sourceOrigin, localFlag, text, safetyKey }) {
   const reportableFlags = new Set(['serious_hate_or_threat', 'self_harm_safety_review', 'sexual_safety_review',
     'violence_safety_review', 'targeted_harassment', 'negative_personal_call']);
@@ -33,6 +46,7 @@ export function buildLocalSafetySignal({ actor, targetId = null, sourceKind, sou
     actorId: actor.id,
     targetId,
     sourceOrigin,
+    evidenceExcerpt: sanitizeSafetyEvidenceExcerpt(text),
   };
 }
 

@@ -1,3 +1,5 @@
+import { requestWithEmailStepUp } from './step-up-email.js';
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const STAFF_ROLES = new Set(['school_admin', 'council_member']);
 
@@ -45,14 +47,15 @@ export async function initializeListingModeration({ document = globalThis.docume
     }
     status.textContent = 'Проверяем возможность безопасного удаления аккаунта…';
     try {
-      const response = await fetchImpl(`/api/v1/school/accounts/${encodeURIComponent(account.id)}`, {
+      const { response, result, stepUpError } = await requestWithEmailStepUp({ fetchImpl, promptImpl,
+        url: `/api/v1/school/accounts/${encodeURIComponent(account.id)}`, init: {
         method: 'DELETE', credentials: 'same-origin', cache: 'no-store',
         headers: { 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ confirmation }),
-      });
-      const result = await json(response);
+      } });
       if (result?.error === 'fresh_authentication_required') {
-        status.textContent = 'Яндекс ID не сообщает приложению подтверждённое время повторной аутентификации. Удаление временно недоступно; аккаунт не изменён.';
+        status.textContent = stepUpError === 'code_entry_cancelled' ? 'Подтверждение отменено. Аккаунт не изменён.'
+          : 'Не удалось подтвердить действие по почте. Аккаунт не изменён.';
         return;
       }
       if (!response.ok || result?.ok !== true) throw new Error('account_deletion_failed');
@@ -242,7 +245,7 @@ export async function initializeListingModeration({ document = globalThis.docume
         if (targets.length) {
           const panel = node(document, 'section', 'ru-moderation-card');
           panel.append(node(document, 'h3', '', 'Временное ограничение действий аккаунта'));
-          const note = node(document, 'p', '', 'Доступно администраторам этой школы после явного подтверждения через Яндекс ID. Выберите срок и укажите фактическую причину без личных данных.');
+          const note = node(document, 'p', '', 'Для выдачи и снятия ограничений потребуется одноразовый код на почту аккаунта Яндекс ID. Код подтверждает доступ к почте, но не парольный повторный вход в Яндекс ID.');
           const form = document.createElement('form'); form.className = 'ru-suspension-form';
           const select = document.createElement('select'); select.required = true; select.setAttribute('aria-label', 'Аккаунт');
           const prompt = node(document, 'option', '', 'Выберите аккаунт'); prompt.value = ''; prompt.disabled = true; prompt.selected = true; select.append(prompt);
@@ -534,12 +537,19 @@ export async function initializeListingModeration({ document = globalThis.docume
   async function patch(path, body) {
     status.textContent = 'Сохраняем решение…';
     try {
-      const response = await fetchImpl(path, { method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
-      const result = await json(response);
+      const needsFreshConfirmation = path.startsWith('/api/v1/suspensions/')
+        || path.startsWith('/api/v1/role-management/');
+      const request = needsFreshConfirmation ? requestWithEmailStepUp : async options => {
+        const response = await options.fetchImpl(options.url, options.init);
+        return { response, result: await json(response), stepUpError: null };
+      };
+      const { response, result, stepUpError } = await request({ fetchImpl, promptImpl, url: path,
+        init: { method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
+          headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) } });
       if (!response.ok) {
         if (result?.error === 'fresh_authentication_required') {
-          status.textContent = 'Яндекс ID не подтверждает повторную аутентификацию. Это административное действие временно недоступно.';
+          status.textContent = stepUpError === 'code_entry_cancelled' ? 'Подтверждение отменено. Изменений нет.'
+            : 'Не удалось подтвердить административное действие по почте. Изменений нет.';
           return;
         }
         if (result?.error === 'already_suspended') { status.textContent = 'У этого аккаунта уже есть действующее ограничение.'; return; }
@@ -687,15 +697,16 @@ export async function initializeListingModeration({ document = globalThis.docume
           }
           requestStatus.textContent = 'Проверяем возможность безопасного удаления аккаунта…';
           try {
-            const decision = await fetchImpl(`/api/v1/deletion-requests/${item.request_id}`, {
+            const { response: decision, result: decided, stepUpError } = await requestWithEmailStepUp({ fetchImpl, promptImpl,
+              url: `/api/v1/deletion-requests/${item.request_id}`, init: {
               method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
               headers: { 'content-type': 'application/json', accept: 'application/json' },
               body: JSON.stringify({ decision: 'approve', confirmation: 'УДАЛИТЬ АККАУНТ УЧАСТНИКА' }),
-            });
-            const decided = await json(decision);
+            } });
             if (!decision.ok || !decided?.ok) {
               if (decided?.error === 'fresh_authentication_required') {
-                requestStatus.textContent = 'Яндекс ID не сообщает подтверждённое время повторной аутентификации. Удаление временно недоступно; обращение осталось открытым.';
+                requestStatus.textContent = stepUpError === 'code_entry_cancelled' ? 'Подтверждение отменено. Обращение осталось открытым.'
+                  : 'Не удалось подтвердить действие по почте. Обращение осталось открытым.';
                 return;
               }
               throw new Error('decision_failed');

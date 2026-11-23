@@ -17,7 +17,7 @@ const MAX_RUN_AGE_MS = Object.freeze({
   'fam-ru-runtime-health.timer': 26 * 60 * 60 * 1000,
   'fam-ru-safe-agent-worker.timer': 12 * 60 * 1000,
   'fam-ru-school-agent-report.timer': 26 * 60 * 60 * 1000,
-  'fam-ru-site-error-digest.timer': 2 * 60 * 60 * 1000,
+  'fam-ru-site-error-digest.timer': 30 * 60 * 1000,
 });
 
 function parseProperties(stdout) {

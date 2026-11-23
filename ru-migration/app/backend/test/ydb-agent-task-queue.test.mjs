@@ -36,14 +36,17 @@ test('safe scheduled tasks accept their source UTC schedule slots, including 03:
   for (const [taskType, slot] of [
     ['system_health_check', '2026-11-20T03:40'],
     ['daily_report_digest', '2026-11-20T04:00'],
+    ['site_error_digest', '2026-11-20T04:00'],
+    ['site_error_digest', '2026-11-20T04:15'],
     ['site_error_digest', '2026-11-20T04:30'],
+    ['site_error_digest', '2026-11-20T04:45'],
   ]) {
     assert.equal((await queue.enqueueSafeTask(taskType, slot)).created, true);
   }
-  assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 3);
+  assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 6);
   await assert.rejects(queue.enqueueSafeTask('system_health_check', '2026-11-20T03:45'), /safe agent task/);
   await assert.rejects(queue.enqueueSafeTask('daily_report_digest', '2026-11-20T04:15'), /safe agent task/);
-  await assert.rejects(queue.enqueueSafeTask('site_error_digest', '2026-11-20T04:15'), /safe agent task/);
+  await assert.rejects(queue.enqueueSafeTask('site_error_digest', '2026-11-20T04:17'), /safe agent task/);
 });
 
 test('coder producer creates only one bounded task from allowlisted aggregate events', async () => {
@@ -66,6 +69,69 @@ test('coder producer creates only one bounded task from allowlisted aggregate ev
   assert.match(insert.query, /payload_json/);
   assert.ok(insert.values.includes(JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 4 })));
   await assert.rejects(queue.enqueueSafeCoderTask('2026-11-20T03:11'), /coder slot/);
+});
+
+test('coder producer maps every upstream technical event to a fixed aggregate audit task', async () => {
+  const cases = [
+    ['js_runtime', 'audit_frontend_runtime'],
+    ['unhandled_rejection', 'audit_frontend_runtime'],
+    ['listings_load_failed', 'audit_client_resilience'],
+    ['notifications_load_failed', 'audit_client_resilience'],
+    ['database_request_failed', 'audit_client_resilience'],
+    ['auth_backend_failed', 'audit_client_resilience'],
+  ];
+  for (const [eventCode, expectedTaskKey] of cases) {
+    const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+      ? [[{ event_code: eventCode, page_area: 'other', occurrences: 3 }]] : [[]]);
+    const queue = createYdbAgentTaskQueue(sql);
+    const result = await queue.enqueueSafeCoderTask('2026-11-20T03:15');
+    const insert = calls.find(call => call.query.includes('INSERT INTO fam_agent_tasks'));
+    const payload = JSON.parse(insert.values.find(value => typeof value === 'string' && value.includes('"task_key"')));
+    assert.equal(result.created, true, eventCode);
+    assert.equal(payload.task_key, expectedTaskKey, eventCode);
+    assert.equal(payload.event_code, eventCode, eventCode);
+    assert.match(calls.find(call => call.query.includes('SUM(event_count)')).query, /notifications_load_failed.*database_request_failed.*auth_backend_failed/s);
+  }
+});
+
+test('coder producer refuses unknown aggregate event codes even if returned by the database', async () => {
+  const { sql, calls } = fakeSql(query => query.includes('SUM(event_count)')
+    ? [[{ event_code: 'unlisted_event', page_area: 'other', occurrences: 3 }]] : [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.deepEqual(await queue.enqueueSafeCoderTask('2026-11-20T03:15'),
+    { created: false, reason: 'no_threshold_event' });
+  assert.equal(calls.some(call => call.query.includes('INSERT INTO fam_agent_tasks')), false);
+});
+
+test('coder queue health returns only bounded aggregate status fields', async () => {
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('GROUP BY status')) return [[
+      { status: 'queued', count: '4' }, { status: 'claimed', count: 1 }, { status: 'in_progress', count: 2 },
+      { status: 'failed', count: 7 }, { status: 'completed', count: 10 },
+    ]];
+    if (query.includes("status = 'failed'")) return [[{ count: '3' }]];
+    if (query.includes("lease_expires_at <= CurrentUtcTimestamp()")) return [[{ count: 1 }]];
+    if (query.includes('MIN(created_at)')) return [[{ oldest_queued_at: new Date(Date.now() - 17 * 60_000) }]];
+    return [[]];
+  });
+  const health = await createYdbAgentTaskQueue(sql).getAgentTaskQueueHealth();
+  assert.deepEqual(Object.keys(health).sort(), [
+    'claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued',
+  ]);
+  assert.equal(health.queued, 4);
+  assert.equal(health.claimed, 1);
+  assert.equal(health.in_progress, 2);
+  assert.equal(health.failed_last_24h, 3);
+  assert.equal(health.expired_leases, 1);
+  assert.ok(health.oldest_queued_minutes >= 17 && health.oldest_queued_minutes <= 18);
+  assert.ok(calls.every(({ query }) => !/payload_json|result_summary|school_id|user_id/.test(query)));
+});
+
+test('coder queue health rejects invalid statuses and unbounded counts', async () => {
+  const invalidStatus = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'unknown', count: 1 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(invalidStatus).getAgentTaskQueueHealth(), /invalid agent task status/);
+  const excessiveCount = fakeSql(query => query.includes('GROUP BY status') ? [[{ status: 'queued', count: 10_000_001 }]] : [[]]).sql;
+  await assert.rejects(createYdbAgentTaskQueue(excessiveCount).getAgentTaskQueueHealth(), /invalid agent task count/);
 });
 
 test('coder producer caps 24-hour event aggregates to the bridge payload limit', async () => {
@@ -103,10 +169,50 @@ test('coder bridge claims only allowlisted aggregate payload and finishes the ma
   assert.ok(calls.some(query => query.includes("task_type = 'coder_patch_request'")));
   assert.match(task.claim_token, /^[0-9a-f-]{36}$/i);
   assert.equal(await queue.finishSafeCoderTask({ id, workerId: 'fam-agent-qwen-coder-v1',
-    claimToken: task.claim_token, resultCode: 'model_completed' }), true);
+    claimToken: task.claim_token, resultCode: 'model_no_patch' }), true);
   assert.equal(finished, true);
+  assert.ok(calls.some(query => query.includes('source IN (\'system\', \'scheduled_audit\')')
+    && query.includes('approval_required = false')), 'coder completion stays within the approved internal queue scope');
   await assert.rejects(queue.claimSafeCoderTask({ workerId: 'wrong-worker', leaseSeconds: 7200 }), /coder worker claim/);
-  await assert.rejects(queue.finishSafeCoderTask({ id, workerId: 'wrong-worker', claimToken, resultCode: 'model_completed' }), /coder task result/);
+  await assert.rejects(queue.finishSafeCoderTask({ id, workerId: 'wrong-worker', claimToken, resultCode: 'model_no_patch' }), /coder task result/);
+});
+
+test('coder task lifecycle enforces claim capability, bounded leases and ordered terminal transitions', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const claimToken = '22222222-2222-4222-8222-222222222222';
+  const workerId = 'fam-agent-qwen-coder-v1';
+  const state = { status: 'claimed', claimed_by: workerId, claim_token: claimToken, lease_valid: true, result_summary: null };
+  const calls = [];
+  const { sql } = fakeSql((query, values) => {
+    calls.push({ query, values });
+    if (query.includes('SELECT status, result_summary, claimed_by, claim_token')) return [[{ ...state }]];
+    if (query.includes('SELECT status, claimed_by, claim_token')) return [[{ ...state }]];
+    if (query.includes("SET status = 'in_progress'")) {
+      state.status = 'in_progress'; state.result_summary = values[0];
+    } else if (query.includes('SET status = ?')) {
+      state.status = values[0]; state.result_summary = values[1];
+      if (query.includes('claim_token = CAST(NULL AS Utf8?)')) { state.claimed_by = null; state.claim_token = null; }
+    }
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.equal(await queue.startSafeCoderTask({ id, workerId, claimToken }), true);
+  assert.equal(state.status, 'in_progress');
+  assert.equal(state.result_summary, 'Задание принято локальным анализатором; независимая QA ещё не подтверждена.');
+  assert.ok(calls[1].query.includes("Interval('PT30M')"));
+  assert.equal(await queue.heartbeatSafeCoderTask({ id, workerId, claimToken }), true);
+  assert.equal(await queue.advanceSafeCoderTask({ id, workerId, claimToken, stage: 'model_generated' }), true);
+  assert.equal(await queue.advanceSafeCoderTask({ id, workerId, claimToken, stage: 'qa_passed' }), true);
+  assert.equal(await queue.advanceSafeCoderTask({ id, workerId, claimToken, stage: 'pr_created', prNumber: 42 }), true);
+  assert.match(state.result_summary, /№42/);
+  assert.equal(state.status, 'in_progress', 'a created PR awaits the owner decision');
+  assert.equal(state.claimed_by, null, 'PR transition releases the worker lease');
+  assert.equal(await queue.advanceSafeCoderTask({ id, workerId, claimToken, stage: 'qa_passed' }), false);
+  assert.ok(calls.filter(call => call.query.includes('coder_patch_request')).every(call =>
+    call.query.includes('source IN (\'system\', \'scheduled_audit\')') && call.query.includes('approval_required = false')),
+  'all lifecycle reads and writes stay within the approved internal queue scope');
+  await assert.rejects(queue.advanceSafeCoderTask({ id, workerId, claimToken, stage: 'pr_created' }), /coder task stage/);
+  await assert.rejects(queue.startSafeCoderTask({ id, workerId: 'wrong-worker', claimToken }), /coder task start/);
 });
 
 test('coder claim closes only its own expired final system lease and records a terminal event', async () => {

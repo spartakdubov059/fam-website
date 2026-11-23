@@ -128,13 +128,14 @@ export async function initializeNotifications({ document = globalThis.document, 
       if (!me.response.ok || !UUID.test(profile?.id || '')) throw new Error('profile_unavailable');
       const daysAgo = now() - 14 * 24 * 60 * 60 * 1000;
       const role = profile.role;
-      const [inbox, listings, ideas, eventReviews, roleRequests, roleReview, deletionRequests] = await Promise.all([
+      const [inbox, listings, ideas, eventReviews, roleRequests, roleReview, deletionRequests, myDeletionRequests] = await Promise.all([
         request('/api/v1/messages'), optional('/api/v1/notifications/listings', 'listings'),
         ['school_admin', 'council_member'].includes(role) ? optional('/api/v1/school/ideas', 'ideas') : Promise.resolve(null),
         ['school_admin', 'council_member'].includes(role) ? optional('/api/v1/event-registrations/review', 'applications') : Promise.resolve(null),
         role === 'student' ? optional('/api/v1/role-requests', 'request') : Promise.resolve(null),
         role === 'school_admin' ? optional('/api/v1/role-requests/review', 'requests') : Promise.resolve(null),
         role === 'school_admin' ? optional('/api/v1/deletion-requests/review', 'requests') : Promise.resolve(null),
+        role === 'council_member' ? optional('/api/v1/deletion-requests', 'requests') : Promise.resolve(null),
       ]);
       if (refreshId !== sequence) return;
       if (!inbox.response.ok || !Array.isArray(inbox.result?.messages)) throw new Error('messages_unavailable');
@@ -172,6 +173,21 @@ export async function initializeNotifications({ document = globalThis.document, 
         id: `account-deletion-request:${row.request_id || row.id}`, kind: 'deletion-request', title: 'Запрос на проверку аккаунта',
         text: `Запрос ожидает решения · ${String(row.reason_code || 'прочая причина').slice(0, 80)}`,
         time: Date.parse(row.created_at || '') }));
+      if (Array.isArray(myDeletionRequests)) myDeletionRequests
+        .filter(row => row && typeof row.request_id === 'string' && UUID.test(row.request_id)
+          && ['approved', 'rejected'].includes(row.status)
+          && Number.isFinite(Date.parse(row.reviewed_at || row.created_at || ''))
+          && Date.parse(row.reviewed_at || row.created_at || '') >= daysAgo)
+        .slice(0, 10).forEach(row => {
+          const approved = row.status === 'approved';
+          add({ id: `account-deletion-result:${row.request_id}:${row.status}`, kind: 'deletion-result',
+            title: approved ? 'Запрос Совета одобрен' : 'Запрос Совета отклонён',
+            text: approved ? 'Администратор школы одобрил запрос на удаление аккаунта.'
+              : typeof row.review_note === 'string' && row.review_note.trim()
+                ? `Администратор отклонил запрос: ${row.review_note.trim().slice(0, 180)}`
+                : 'Администратор школы отклонил запрос на удаление аккаунта.',
+            time: Date.parse(row.reviewed_at || row.created_at || '') });
+        });
 
       const ordered = items.sort((a, b) => (Number.isFinite(b.time) ? b.time : 0) - (Number.isFinite(a.time) ? a.time : 0)).slice(0, 60);
       const states = await request('/api/v1/notification-reads');

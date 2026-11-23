@@ -53,7 +53,7 @@ test('ordinary Yandex sessions and OAuth consent refresh do not satisfy fresh au
   const ordinary = api({ authenticated: { ...identity, authenticated_at: null, session_issued_at: Math.floor(now / 1000) } });
   assert.equal((await ordinary(request())).body.error, 'fresh_authentication_required');
   const confirmed = api({ authenticated: { ...identity, authenticated_at: null, step_up_confirmed_at: Math.floor(now / 1000) } });
-  assert.equal((await confirmed(request())).body.error, 'fresh_authentication_required', 'a local consent timestamp is not provider-authenticated time');
+  assert.notEqual((await confirmed(request())).body.error, 'fresh_authentication_required', 'only the signed backend cookie may supply this timestamp');
 });
 
 test('account deletion deactivates first, removes every listed object, then clears YDB records', async () => {

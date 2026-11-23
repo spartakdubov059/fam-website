@@ -19,6 +19,8 @@ import { createS3PendingImageStore } from '../app/backend/media/s3-pending-store
 import { createAccountDeletionRecoveryOperation } from '../app/backend/services/recover-account-deletions.mjs';
 import { createYdbSchemaHealthCheck } from '../app/backend/services/ydb-schema-health.mjs';
 import { createRoleEmailVerification } from '../app/backend/services/role-email-verification.mjs';
+import { createStepUpEmailVerification } from '../app/backend/services/step-up-email-verification.mjs';
+import { createStepUpCookie } from '../app/backend/auth/step-up-cookie.mjs';
 
 // This script is intentionally hard-wired to the disposable local database.
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -31,7 +33,22 @@ try {
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
   const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 38, content_read: false, write_permissions_checked: false });
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 39, content_read: false, write_permissions_checked: false });
+  const stepClock = Math.floor(Date.now() / 1000) - 10;
+  const stepVerifyClock = stepClock + 1;
+  const stepIdentity = { issuer: 'https://issuer.synthetic', subject: 'step-up-subject', email: 'step-up@example.test' };
+  const stepCookie = createStepUpCookie({ secret: 'synthetic-step-up-secret-that-is-long-enough', secure: false,
+    now: () => stepClock * 1000 });
+  const stepEmail = createStepUpEmailVerification({ repository: repo,
+    verificationKey: 'synthetic-step-up-verification-secret-long-enough', now: () => stepVerifyClock * 1000,
+    createCode: () => '654321', sendEmail: async email => { assert.equal(email.to, stepIdentity.email); assert.equal(email.purpose, 'step_up'); } });
+  assert.deepEqual(await stepEmail.start(stepIdentity, 'synthetic-function-access-token-long-enough'), { ok: true, sent: true });
+  const stepVerified = await stepEmail.verify(stepIdentity, '654321');
+  assert.equal(stepVerified.ok, true);
+  const issuedStepCookie = stepCookie.issue(stepIdentity);
+  assert.equal(issuedStepCookie.confirmedAt, stepClock + 1);
+  assert.equal(stepCookie.read({ headers: { cookie: issuedStepCookie.setCookie.split(';')[0] } }, stepIdentity), stepClock + 1);
+  assert.equal((await stepEmail.verify(stepIdentity, '654321')).ok, false, 'the code cannot be reused');
   const beginAccountDeletion = repo.beginAccountDeletion.bind(repo);
   repo.beginAccountDeletion = async input => {
     try {
@@ -67,6 +84,48 @@ try {
     ('https://issuer.synthetic', 'subject-recovery', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaac', 'synthetic-school', 'student', true),
     ('https://issuer.synthetic', 'subject-lyceum-admin', '44444444-4444-4444-8444-444444444444', 'lyceum_3', 'school_admin', true),
     ('https://issuer.synthetic', 'subject-media', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'synthetic-school', 'student', true);`;
+  const adminRaceIds = [
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+  ];
+  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
+    ('https://issuer.synthetic', 'subject-admin-race-a', ${adminRaceIds[0]}, 'synthetic-admin-race-school', 'school_admin', true),
+    ('https://issuer.synthetic', 'subject-admin-race-b', ${adminRaceIds[1]}, 'synthetic-admin-race-school', 'school_admin', true);`;
+  const adminRaceResults = await Promise.allSettled([
+    repo.revokeSchoolRole({ schoolId: 'synthetic-admin-race-school', actorId: adminRaceIds[0], targetId: adminRaceIds[1] }),
+    repo.revokeSchoolRole({ schoolId: 'synthetic-admin-race-school', actorId: adminRaceIds[1], targetId: adminRaceIds[0] }),
+  ]);
+  const adminRaceSuccesses = adminRaceResults.filter(result => result.status === 'fulfilled' && result.value?.ok);
+  assert.equal(adminRaceSuccesses.length, 1,
+    'serializable concurrent role revocations must allow at most one admin to lose the role');
+  const rejectedAdminRace = adminRaceResults.find(result => result.status === 'rejected'
+    || result.value?.code === 'last_school_admin');
+  assert.ok(rejectedAdminRace,
+    'the competing demotion must either observe the last-admin guard or lose the serializable transaction conflict');
+  const remainingRaceAdmins = await sql`SELECT user_id FROM fam_user_profiles
+    WHERE school_id = 'synthetic-admin-race-school' AND role = 'school_admin' AND active = true;`;
+  assert.equal(remainingRaceAdmins?.[0]?.length, 1,
+    'concurrent demotions must preserve one active school administrator');
+  const accountRaceIds = [
+    'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  ];
+  await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active) VALUES
+    ('https://issuer.synthetic', 'subject-account-race-a', ${accountRaceIds[0]}, 'synthetic-account-race-school', 'school_admin', true),
+    ('https://issuer.synthetic', 'subject-account-race-b', ${accountRaceIds[1]}, 'synthetic-account-race-school', 'school_admin', true);`;
+  const accountRaceResults = await Promise.allSettled(accountRaceIds.map((userId, index) =>
+    repo.beginAccountDeletion({ issuer: 'https://issuer.synthetic', subject: `subject-account-race-${index ? 'b' : 'a'}`, userId })));
+  const accountRaceSuccesses = accountRaceResults.filter(result => result.status === 'fulfilled' && result.value?.ok);
+  assert.equal(accountRaceSuccesses.length, 1,
+    'serializable concurrent self-deletions must allow at most one administrator to deactivate');
+  const rejectedAccountRace = accountRaceResults.find(result => result.status === 'rejected'
+    || result.value?.code === 'last_school_admin');
+  assert.ok(rejectedAccountRace,
+    'the competing self-deletion must either observe the last-admin guard or lose the serializable transaction conflict');
+  const remainingAccountAdmins = await sql`SELECT user_id FROM fam_user_profiles
+    WHERE school_id = 'synthetic-account-race-school' AND role = 'school_admin' AND active = true;`;
+  assert.equal(remainingAccountAdmins?.[0]?.length, 1,
+    'concurrent self-deletions must preserve one active school administrator');
   await sql`INSERT INTO fam_user_profiles (issuer, subject, user_id, school_id, role, active, first_name, last_name, class_name)    VALUES ('https://issuer.synthetic', 'subject-safety-actor', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'synthetic-school', 'student', true, 'Тест', 'Нарушитель', '8Б');`;
   const resolveActor = createDatabaseActorResolver(sql);
   assert.deepEqual(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-1' }), { id: 'synthetic-user', school_id: 'synthetic-school', role: 'student', first_name: 'Тест', last_name: 'Ученик', class_name: '8А', city: 'Казань', avatar_url: null, person_type: 'student', staff_position: null, staff_verification_status: 'not_required' });
@@ -84,6 +143,8 @@ try {
           : req.headers.authorization === 'Bearer synthetic-safety-actor' ? 'subject-safety-actor' : 'subject-1';
     return { issuer: 'https://issuer.synthetic', subject,
       ...(subject === 'subject-role-student' ? { email: 'role-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new' ? { email: 'new-student@synthetic.example' } : {}),
+      ...(subject === 'subject-new-staff' ? { email: 'new-staff@synthetic.example' } : {}),
       authenticated_at: ['Bearer synthetic-admin', 'Bearer synthetic-recent-registrant'].includes(req.headers.authorization) ? Math.floor(Date.now() / 1000) : null };
   };
   const deletedMediaKeys = [];
@@ -421,6 +482,23 @@ try {
     target_id: '11111111-1111-4111-8111-111111111111', reason_code: 'spam', reason: 'Repeated unrelated posts in group.',
   }))).status, 403);
   console.log('YDB_ACCOUNT_DELETION_REQUEST_PASS: council submission/history, school-scoped admin queue/rejection, duplicate guard, and role enforcement');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
+  }))).status, 403, 'an unverified identity cannot create a school profile request');
+  const sendProfileEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendProfileEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-student@synthetic.example', code: '135790' });
+  const storedProfileChallenge = await sql`SELECT email_digest, code_digest FROM fam_role_email_verifications
+    WHERE issuer = 'https://issuer.synthetic' AND subject = 'subject-new' LIMIT 1;`;
+  assert.match(storedProfileChallenge[0][0].email_digest, /^[a-f0-9]{64}$/);
+  assert.match(storedProfileChallenge[0][0].code_digest, /^[a-f0-9]{64}$/);
+  assert.equal(storedProfileChallenge[0][0].email_digest.includes('new-student@synthetic.example'), false);
+  assert.equal(storedProfileChallenge[0][0].code_digest.includes('135790'), false);
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-student', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
+  console.log('YDB_PROFILE_EMAIL_VERIFICATION_PASS: unverified identity is blocked, synthetic code verifies, and YDB stores only HMAC digests');
   const profileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-student', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Профиль', class_name: '7Б', role: 'school_admin',
   }));
@@ -499,6 +577,16 @@ try {
   const auditRows = await sql`SELECT action, status FROM fam_school_role_request_audit WHERE request_id = ${roleRequest.request_id};`;
   assert.equal(auditRows?.[0]?.length, 3, 'submission, review claim, and decision are retained in the audit table');
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/profile-requests', 'synthetic-new-student'))).body.request.status, 'approved');
+  assert.equal((await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
+    school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
+  }))).status, 403, 'an unverified school employee identity cannot create a profile request');
+  const sendStaffEmail = await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'send' }),
+    { token: { access_token: 'synthetic-yandex-function-iam-token-0123456789' } });
+  assert.deepEqual(sendStaffEmail, { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.deepEqual({ to: syntheticVerificationEmail.to, code: syntheticVerificationEmail.code },
+    { to: 'new-staff@synthetic.example', code: '135790' });
+  assert.deepEqual(await listingsApi(apiRequest('POST', '/api/v1/profile-requests/email-verification', 'synthetic-new-staff', { action: 'verify', code: '135790' })),
+    { status: 200, body: { ok: true, email_verified: true } });
   const staffProfileSubmission = await listingsApi(apiRequest('POST', '/api/v1/profile-requests', 'synthetic-new-staff', {
     school_id: 'lyceum_3', first_name: 'Тест', last_name: 'Сотрудник', person_type: 'school_staff', staff_position: 'Учитель',
   }));
@@ -736,14 +824,18 @@ try {
     repo.cancelEventRegistration(limitedEvent.id, '11111111-1111-4111-8111-111111111111'),
     repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school'),
   ]);
-  assert.ok(cancelRegisterRace.some(result => result.status === 'fulfilled'), 'at least one serialized race operation completes');
+  assert.equal(cancelRegisterRace.filter(result => result.status === 'fulfilled').length, 1,
+    'one of the conflicting cancel/re-register transactions commits and the other surfaces its serialization conflict');
   const registrationAfterRace = await sql`SELECT status FROM fam_event_registrations
     WHERE event_id = ${limitedEvent.id} AND user_id = '11111111-1111-4111-8111-111111111111' LIMIT 1;`;
-  if (registrationAfterRace?.[0]?.[0]?.status === 'cancelled') {
-    await repo.registerForEvent(limitedEvent.id, '11111111-1111-4111-8111-111111111111', 'synthetic-school');
-  }
+  assert.ok(['cancelled', 'confirmed'].includes(registrationAfterRace?.[0]?.[0]?.status),
+    'race leaves one valid terminal registration state');
+  const reservedRegistrations = await sql`SELECT COUNT(*) AS count FROM fam_event_registrations
+    WHERE event_id = ${limitedEvent.id} AND status IN ('pending', 'confirmed');`;
+  assert.equal(Number(reservedRegistrations?.[0]?.[0]?.count ?? -1),
+    Number(await repo.getEventOccupancy(limitedEvent.id)), 'seat counter equals the number of active reservations after the race');
   assert.equal(await repo.getEventOccupancy(limitedEvent.id), 1,
-    'cancellation and re-registration remain consistent under a concurrent race');
+    'the serialized race retains exactly one seat reservation');
   await sql`UPDATE fam_listings SET status = 'rejected' WHERE id = ${limitedEvent.id};`;
   const hiddenOccupancy = await listingsApi(apiRequest('GET', `/api/v1/listings/${limitedEvent.id}/occupancy`, 'synthetic-registrant'));
   assert.deepEqual(hiddenOccupancy, { status: 404, body: { ok: false, error: 'event_unavailable' } },
@@ -1146,6 +1238,11 @@ try {
   const coderTask = await agentQueue.enqueueSafeCoderTask(coderSlot);
   assert.equal(coderTask.created, true, 'thresholded aggregate telemetry creates a synthetic manual-review task');
   assert.equal(coderTask.task_key, 'audit_frontend_runtime');
+  const initialCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(initialCoderQueueHealth.queued, 1);
+  assert.equal(initialCoderQueueHealth.claimed, 0);
+  assert.deepEqual(Object.keys(initialCoderQueueHealth).sort(),
+    ['claimed', 'expired_leases', 'failed_last_24h', 'in_progress', 'oldest_queued_minutes', 'queued']);
   assert.equal((await agentQueue.enqueueSafeCoderTask(coderSlot)).created, false, 'coder task enqueue is idempotent per quarter-hour slot');
   const claimedBeforeCoder = await agentQueue.claimSafeTasks(5);
   assert.equal(claimedBeforeCoder.some(task => task.task_type === 'coder_patch_request'), false,
@@ -1162,10 +1259,83 @@ try {
   const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
   assert.equal(coderClaim.id, coderTask.id);
   assert.equal(coderClaim.task_key, coderPayload.task_key);
+  const claimedCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();
+  assert.equal(claimedCoderQueueHealth.queued, 0);
+  assert.equal(claimedCoderQueueHealth.claimed, 1);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
+  await sql`DELETE FROM fam_site_error_counts
+    WHERE hour_bucket = Unwrap(CAST(${coderBucket.toISOString()} AS Timestamp))
+      AND event_code = 'js_runtime' AND page_area = 'auth';`;
+  for (const [index, [eventCode, pageArea, taskKey]] of [
+    ['notifications_load_failed', 'notifications', 'audit_client_resilience'],
+    ['database_request_failed', 'database', 'audit_client_resilience'],
+    ['auth_backend_failed', 'auth', 'audit_client_resilience'],
+  ].entries()) {
+    await sql`DELETE FROM fam_site_error_counts WHERE event_code IN
+      ('js_runtime', 'unhandled_rejection', 'listings_load_failed', 'notifications_load_failed',
+        'database_request_failed', 'auth_backend_failed');`;
+    const eventBucket = new Date();
+    eventBucket.setUTCMinutes(0, 0, 0);
+    await sql`UPSERT INTO fam_site_error_counts
+      (hour_bucket, event_code, page_area, event_count, created_at, updated_at)
+      VALUES (Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp)), ${eventCode}, ${pageArea},
+        Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+    const followupSlotDate = new Date(coderSlotDate.getTime() + (index + 1) * 15 * 60 * 1000);
+    const followupTask = await agentQueue.enqueueSafeCoderTask(followupSlotDate.toISOString().slice(0, 16));
+    assert.equal(followupTask.created, true, `${eventCode} aggregate creates a synthetic coder review task`);
+    assert.equal(followupTask.task_key, taskKey, `${eventCode} maps to its fixed task key`);
+    const followupPayloadRows = await sql`SELECT status, payload_json FROM fam_agent_tasks WHERE id = ${followupTask.id} LIMIT 1;`;
+    assert.equal(followupPayloadRows?.[0]?.[0]?.status, 'queued',
+      'new coder task remains outside the automated safe-worker allowlist');
+    const followupPayload = JSON.parse(followupPayloadRows?.[0]?.[0]?.payload_json ?? 'null');
+    assert.deepEqual(followupPayload, { task_key: taskKey, event_code: eventCode, page_area: pageArea, occurrences: 3 });
+    const followupClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+    assert.equal(followupClaim.id, followupTask.id);
+    assert.equal(followupClaim.event_code, eventCode);
+    assert.equal(await agentQueue.finishSafeCoderTask({ id: followupClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+      claimToken: followupClaim.claim_token, resultCode: 'model_no_patch' }), true);
+    await sql`DELETE FROM fam_site_error_counts
+      WHERE hour_bucket = Unwrap(CAST(${eventBucket.toISOString()} AS Timestamp))
+        AND event_code = ${eventCode} AND page_area = ${pageArea};`;
+  }
+  const lifecycleTaskId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const lifecyclePayload = JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 3 });
+  await sql`INSERT INTO fam_agent_tasks
+    (id, agent_key, task_type, title, description, priority, status, source, approval_required,
+      payload_json, result_summary, attempt_count, max_attempts, available_at, claim_token,
+      claimed_by, claimed_at, lease_expires_at, started_at, finished_at, created_at, updated_at)
+    VALUES (${lifecycleTaskId}, 'technical', 'coder_patch_request', 'Synthetic lifecycle verification',
+      'Synthetic data only.', 'normal', 'queued', 'scheduled_audit', false, ${lifecyclePayload}, NULL,
+      Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(1 AS Uint32)), CurrentUtcTimestamp(), NULL, NULL, NULL,
+      NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+  const lifecycleClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(lifecycleClaim.id, lifecycleTaskId);
+  assert.equal(await agentQueue.startSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token }), true);
+  assert.equal(await agentQueue.heartbeatSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token }), true);
+  assert.equal(await agentQueue.advanceSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token, stage: 'model_generated' }), true);
+  assert.equal(await agentQueue.heartbeatSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token }), true);
+  assert.equal(await agentQueue.advanceSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token, stage: 'qa_passed' }), true);
+  assert.equal(await agentQueue.advanceSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token, stage: 'pr_created', prNumber: 42 }), true);
+  const lifecycleResult = await sql`SELECT status, claimed_by, claim_token, lease_expires_at, result_summary
+    FROM fam_agent_tasks WHERE id = ${lifecycleTaskId} LIMIT 1;`;
+  assert.equal(lifecycleResult?.[0]?.[0]?.status, 'in_progress');
+  assert.equal(lifecycleResult?.[0]?.[0]?.claimed_by, null, 'PR handoff releases the worker');
+  assert.equal(lifecycleResult?.[0]?.[0]?.claim_token, null);
+  assert.equal(lifecycleResult?.[0]?.[0]?.lease_expires_at, null);
+  assert.match(lifecycleResult?.[0]?.[0]?.result_summary ?? '', /№42/);
+  assert.equal(await agentQueue.heartbeatSafeCoderTask({ id: lifecycleTaskId, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: lifecycleClaim.claim_token }), false, 'a released claim cannot heartbeat or replay');
+  await sql`DELETE FROM fam_agent_task_events WHERE task_id = ${lifecycleTaskId};`;
+  await sql`DELETE FROM fam_agent_tasks WHERE id = ${lifecycleTaskId};`;
   const safeTask = await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00');
   assert.equal(safeTask.created, true);
   assert.equal((await agentQueue.enqueueSafeTask('queue_health_check', '2026-11-20T03:00')).created, false,
@@ -1203,37 +1373,41 @@ try {
     },
     schemaCheck: async () => schemaHealth,
   });
+  let scheduledTime = new Date('2026-11-20T03:40:00.000Z');
   const scheduledWorker = createSafeAgentTaskWorker({ queue: agentQueue, handlers: {
     queue_health_check: async () => {
       const health = await agentQueue.getSafeTaskQueueHealth();
       return `Синтетическая проверка очередей: ожидают ${health.statuses.queued}; содержимое не читалось.`;
     },
     daily_report_digest: async () => {
-      const result = await createOrchestratorDailyDigest({ repository: repo, now: () => new Date('2026-11-20T04:00:00.000Z') })();
+      const result = await createOrchestratorDailyDigest({ repository: repo, now: () => scheduledTime })();
       return `Синтетическая сводка за ${result.date} обработана агрегированно.`;
     },
     system_health_check: syntheticSystemHealth,
     site_error_digest: async () => {
-      const result = await createSiteErrorDigest({ repository: repo, now: () => new Date('2026-11-20T04:30:00.000Z') })();
+      const result = await createSiteErrorDigest({ repository: repo, now: () => scheduledTime })();
       return `Синтетическая сводка ошибок за ${result.slot} обработана агрегированно.`;
     },
   } });
   const scheduledRuns = [];
-  for (const slot of ['2026-11-20T03:40:00.000Z', '2026-11-20T04:00:00.000Z', '2026-11-20T04:30:00.000Z']) {
+  for (const slot of ['2026-11-20T03:40:00.000Z', '2026-11-20T04:00:00.000Z', '2026-11-20T04:15:00.000Z', '2026-11-20T04:30:00.000Z', '2026-11-20T04:45:00.000Z']) {
+    scheduledTime = new Date(slot);
     scheduledRuns.push(await createScheduledSafeAgentRunner({ queue: agentQueue, worker: scheduledWorker,
       now: () => new Date(slot) })());
   }
   assert.deepEqual(scheduledRuns.map(result => ({ scheduled: result.scheduled, created: result.created,
     claimed: result.claimed, completed: result.completed, blocked: result.blocked, failed: result.failed })), [
     { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
+    { scheduled: 2, created: 2, claimed: 2, completed: 2, blocked: 0, failed: 0 },
     { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
     { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
-  ], 'all three source schedule slots enqueue and complete through the real YDB queue and safe worker');
+    { scheduled: 1, created: 1, claimed: 1, completed: 1, blocked: 0, failed: 0 },
+  ], 'all five source schedule slots enqueue and complete through the real YDB queue and safe worker');
   const scheduledRows = await sql`SELECT task_type, status FROM fam_agent_tasks WHERE source = 'scheduled_audit'
     AND task_type IN ('system_health_check', 'daily_report_digest', 'site_error_digest');`;
   assert.deepEqual(new Set((scheduledRows?.[0] ?? []).map(row => `${row.task_type}:${row.status}`)),
     new Set(['system_health_check:completed', 'daily_report_digest:completed', 'site_error_digest:completed']));
-  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted hourly error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40/04:00/hourly :30 UTC schedule-to-worker flows with synthetic health checks and real digest handlers, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
+  console.log('YDB_LOCAL_INTEGRATION_PASS: school profile/role/deletion requests, same-school account and listing deletion, school content/polls, own-profile identity, private media cleanup, manual school-scoped avatar review and approval, aggregate agent reports and school-bound idea review, allowlisted 15-minute error telemetry, idempotent concurrent enqueue and exclusive lease-based safe agent queue, 03:40/04:00 and quarter-hour UTC schedule-to-worker flows with synthetic health checks and real digest handlers, persistent hourly listing/idea/image-upload quotas, four secondary lookup indexes, listings, favorites, ideas, messages, events, all on disposable synthetic local database');
 } catch (error) {
   console.error(inspect(error, { depth: null }));
   process.exitCode = 1;

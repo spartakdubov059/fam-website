@@ -51,7 +51,7 @@ test('RU account deletion sends the exact confirmation, then logs out and refres
   assert.equal(f.elements.ruAccountWorkflow.children[0].textContent, 'Аккаунт удалён');
 });
 
-test('RU account deletion explains when the provider cannot attest fresh authentication', async () => {
+test('RU account deletion fails safely when the email step-up endpoint is unavailable', async () => {
   const f = fixture(); const calls = [];
   f.document.defaultView = { confirm: () => true, prompt: () => 'УДАЛИТЬ МОЙ АККАУНТ' };
   await initializeAccountWorkflow({ ...f, fetchImpl: async (url, init = {}) => {
@@ -59,22 +59,23 @@ test('RU account deletion explains when the provider cannot attest fresh authent
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111' } }) };
     if (url === '/api/v1/me/suspension') return { ok: true, json: async () => ({ ok: true, suspended: false, suspension: null }) };
     if (url === '/api/v1/me/account') return { ok: false, json: async () => ({ ok: false, error: 'fresh_authentication_required' }) };
+    if (url === '/api/v1/me/step-up/email') return { ok: false, json: async () => ({ ok: false, error: 'step_up_unavailable' }) };
     throw new Error(`unexpected route ${url}`);
   } });
   await f.elements.ruAccountWorkflow.children[3].listeners.click();
-  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /не сообщает приложению подтверждённое время/);
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /Не удалось подтвердить действие по почте/);
   assert.equal(calls.some(call => call.url === '/auth/yandex/logout'), false);
 });
 
-test('RU account deletion explains the current provider limitation before a user attempts deletion', async () => {
+test('RU account deletion explains the email step-up requirement before a user attempts deletion', async () => {
   const f = fixture();
   await initializeAccountWorkflow({ ...f, fetchImpl: async url => {
     if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: '11111111-1111-4111-8111-111111111111' } }) };
     if (url === '/api/v1/me/suspension') return { ok: true, json: async () => ({ ok: true, suspended: false, suspension: null }) };
     throw new Error(`unexpected route ${url}`);
   } });
-  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /провайдер не передаёт приложению надёжное время/);
-  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /удаление останется недоступным/);
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /подтвердить доступ к почте Яндекс ID одноразовым кодом/);
+  assert.match(f.elements.ruAccountWorkflow.children[2].textContent, /не заменяет парольную аутентификацию/);
 });
 
 test('RU account page shows a safe notice for the users active suspension', async () => {
@@ -89,7 +90,7 @@ test('RU account page shows a safe notice for the users active suspension', asyn
   const notice = f.elements.ruAccountWorkflow.children[2];
   assert.match(notice.textContent, /действует временное ограничение/);
   assert.match(notice.textContent, /Повторные нарушения школьных правил/);
-  assert.match(notice.textContent, /Удаление аккаунта пока недоступно/);
+  assert.match(notice.textContent, /Для удаления потребуется одноразовый код на почту Яндекс ID/);
   assert.equal(notice.role, 'status');
   assert.equal(f.elements.ruAccountWorkflow.children[4].textContent, 'Удалить мой аккаунт');
 });
