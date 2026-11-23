@@ -45,7 +45,7 @@ test("smoke task is a zero-occurrence aggregate-only audit, not a fabricated inc
   });
   assert.equal(valid.task_key, "audit_accessibility");
   assert.doesNotMatch(valid.prompt, /must-never-reach-Qwen/);
-  assert.deepEqual(Object.keys(valid), ["id", "task_key", "prompt"]);
+  assert.deepEqual(Object.keys(valid), ["id", "task_key", "contract", "prompt"]);
 });
 
 test("server bridge has fixed claim/finish contracts, no raw task instructions", () => {
@@ -53,6 +53,9 @@ test("server bridge has fixed claim/finish contracts, no raw task instructions",
   assert.match(bridge, /body\.action === "finish"/);
   assert.match(bridge, /p_limit: 1/);
   assert.match(bridge, /p_lease_seconds: 7200/);
+  assert.match(bridge, /p_lease_seconds: 1800/);
+  assert.match(bridge, /body\.action === "heartbeat"/);
+  assert.match(bridge, /body\.action === "advance"/);
   assert.match(bridge, /origin_not_allowed/);
   assert.match(bridge, /sameSecret/);
   assert.doesNotMatch(bridge, /rpc\(body\./);

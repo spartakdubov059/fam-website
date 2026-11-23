@@ -21,11 +21,6 @@ on:
       - "scripts/render-fam-agent-report.mjs"
       - "tests/security/fam-local-agent.test.mjs"
   workflow_dispatch:
-    inputs:
-      task:
-        description: "Задача для бесплатного локального ИИ-разработчика FAM (до 3000 символов)"
-        required: false
-        type: string
   schedule:
     - cron: "15 3 * * *"
 
@@ -46,6 +41,7 @@ jobs:
       contents: read
     outputs:
       has_patch: ${{ steps.agent.outputs.has_patch }}
+      fam_task_id: ${{ steps.coder-queue.outputs.task_id }}
     steps:
       - name: Получить исходники FAM без GitHub credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -53,19 +49,52 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Получить одно безопасное задание из очереди до долгих шагов
+        id: coder-queue
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+        run: node scripts/fam-agent-bridge.mjs claim
+
+      - name: Проверить настройки затрат до сборки модели
+        id: preflight
+        run: |
+          set -euo pipefail
+          echo "Runner: ${RUNNER_OS}; repository: ${GITHUB_REPOSITORY}; event: ${GITHUB_EVENT_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "::error::Проверка AI-runner разрешена только на main."
+            exit 1
+          fi
+          if [[ "${{ steps.coder-queue.outputs.claimed }}" == "false" ]]; then
+            echo "schedule_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Разрешённой задачи нет; загрузка модели и сборка пропущены."
+            exit 0
+          fi
+          echo "schedule_enabled=true" >> "$GITHUB_OUTPUT"
+
       - name: Установить Node.js
+        if: steps.preflight.outputs.schedule_enabled == 'true'
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-
       - name: Восстановить бесплатные веса модели из кэша
+        if: steps.preflight.outputs.schedule_enabled == 'true'
         id: model-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
         with:
           path: ${{ runner.temp }}/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf
           key: fam-qwen38-27b-iq2xs-v1
 
+      - name: Восстановить сборку llama.cpp из кэша
+        if: steps.preflight.outputs.schedule_enabled == 'true'
+        id: llama-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
+        with:
+          path: ${{ runner.temp }}/llama.cpp/build/bin/llama-server
+          key: fam-llama-cpu-${{ runner.os }}-${{ runner.arch }}-2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c-v1
+
       - name: Скачать бесплатную модель с лицензией Apache 2.0
+        if: steps.preflight.outputs.schedule_enabled == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/fam-model"
@@ -95,6 +124,7 @@ jobs:
           fi
 
       - name: Собрать llama.cpp без GPU и стороннего API
+        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.llama-cache.outputs.cache-hit != 'true'
         env:
           LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
         run: |
@@ -114,19 +144,24 @@ jobs:
             -DLLAMA_BUILD_UI=OFF \
             -DLLAMA_USE_PREBUILT_UI=OFF
           cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+          mkdir -p "$RUNNER_TEMP/llama.cpp/build/bin"
 
-      - name: Получить одно безопасное задание из очереди (необязательно)
-        id: coder-queue
+      - name: Начать аренду после дорогой подготовки модели
+        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.coder-queue.outputs.claimed == 'true'
         env:
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_MANUAL_TASK: ${{ inputs.task }}
-        run: node scripts/fam-agent-bridge.mjs claim
+          FAM_CODER_TASK_ID: ${{ steps.coder-queue.outputs.task_id }}
+        run: node scripts/fam-agent-bridge.mjs start
 
       - name: Запустить локальную модель и подготовить patch
+        if: steps.preflight.outputs.schedule_enabled == 'true'
         id: agent
         env:
           FAM_MODEL_ID: Qwen3.8-27B-IQ2_XS
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ steps.coder-queue.outputs.task_id }}
         run: |
           set -euo pipefail
           MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
@@ -135,7 +170,14 @@ jobs:
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           SERVER_PID=$!
+          HEARTBEAT_PID=""
+          if [[ "${{ steps.coder-queue.outputs.claimed }}" == "true" ]]; then
+            node scripts/fam-agent-bridge.mjs heartbeat
+            (while sleep 900; do node scripts/fam-agent-bridge.mjs heartbeat || exit 1; done) &
+            HEARTBEAT_PID=$!
+          fi
           cleanup() {
+            if [[ -n "$HEARTBEAT_PID" ]]; then kill "$HEARTBEAT_PID" 2>/dev/null || true; fi
             kill "$SERVER_PID" 2>/dev/null || true
           }
           trap cleanup EXIT
@@ -166,7 +208,7 @@ jobs:
           fi
 
       - name: Зафиксировать сбой генерации без публикации
-        if: always() && steps.agent.outcome == 'failure'
+        if: always() && steps.preflight.outputs.schedule_enabled == 'true' && steps.coder-queue.outputs.claimed == 'true' && steps.agent.outcome == 'failure'
         run: |
           echo "## FAM Qwen3.8 — генерация не прошла" >> "$GITHUB_STEP_SUMMARY"
           echo "Исправление не публикуется. Проверьте журнал модели; независимая проверка и PR не запускаются без валидного patch." >> "$GITHUB_STEP_SUMMARY"
@@ -176,17 +218,17 @@ jobs:
         env:
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ env.FAM_CODER_TASK_ID }}
+          FAM_CODER_TASK_ID: ${{ steps.coder-queue.outputs.task_id }}
           FAM_MODEL_STEP_OUTCOME: ${{ steps.agent.outcome }}
           FAM_SUMMARY_PATH: ${{ runner.temp }}/fam-agent/summary.json
         run: node scripts/fam-agent-bridge.mjs finish
 
       - name: Показать структурированный результат модели
-        if: always() && steps.agent.outcome == 'success'
+        if: always() && steps.preflight.outputs.schedule_enabled == 'true' && steps.agent.outcome == 'success'
         run: node scripts/render-fam-agent-report.mjs "$RUNNER_TEMP/fam-agent/summary.json" "$GITHUB_STEP_SUMMARY"
 
       - name: Сохранить patch и отчёт модели
-        if: always() && steps.agent.outcome == 'success'
+        if: always() && steps.preflight.outputs.schedule_enabled == 'true' && steps.agent.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # actions/upload-artifact v4
         with:
           name: fam-local-agent-result
@@ -276,6 +318,24 @@ jobs:
 
       - name: Выполнить полный набор регрессионных тестов
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
+
+      - name: Отметить независимую QA как пройденную
+        if: success() && needs.generate.outputs.has_patch == 'true'
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
+          FAM_RESULT_STAGE: qa_passed
+        run: node scripts/fam-agent-bridge.mjs advance
+
+      - name: Отметить независимую QA как проваленную
+        if: failure() && needs.generate.outputs.has_patch == 'true' && needs.generate.result == 'success'
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
+          FAM_RESULT_STAGE: qa_failed
+        run: node scripts/fam-agent-bridge.mjs advance
 
       - name: Проверить синтаксис скриптов локального агента
         run: |
@@ -375,6 +435,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
           # Step-local shell variables do not survive into this step.
@@ -383,6 +446,9 @@ jobs:
           gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
           TEST_RUN_ID=""
           for attempt in $(seq 1 60); do
+            if (( attempt % 12 == 0 )) && [[ -n "${FAM_CODER_TASK_ID:-}" ]]; then
+              node scripts/fam-agent-bridge.mjs heartbeat
+            fi
             TEST_RUN_ID="$(gh run list --workflow .github/workflows/moderation-regression.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,event --jq ".[] | select(.headSha == \"$BRANCH_SHA\" and .event == \"workflow_dispatch\") | .databaseId" | head -n 1)"
             [[ -n "$TEST_RUN_ID" ]] && break
             sleep 5
@@ -398,6 +464,14 @@ jobs:
             exit 1
           fi
           gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
+          if [[ -n "${FAM_CODER_TASK_ID:-}" ]]; then
+            export FAM_RESULT_STAGE="qa_passed"
+            node scripts/fam-agent-bridge.mjs advance
+            export FAM_RESULT_STAGE="pr_created"
+            export FAM_PR_NUMBER="$(gh pr view "$PR_URL" --json number --jq .number)"
+            node scripts/fam-agent-bridge.mjs advance
+          fi
+        if: success()
       - name: Сохранить отчёт о PR
         if: always()
         run: |
