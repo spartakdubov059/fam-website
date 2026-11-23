@@ -22,7 +22,7 @@ function signupRedirect(origin, pathname) {
   });
 }
 
-test("GitHub Pages redirects only after the exact primary readiness marker confirms health", () => {
+test("GitHub Pages redirects only after the Netlify readiness marker confirms health", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
   assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
