@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 21233)
-Total output lines: 1189
-
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
@@ -580,7 +577,70 @@ test('event review queue is school-scoped, staff-only, and does not query for st
     repository: { getActiveAccountSuspension: async () => null, listPendingEventReviews: async () => { reads++; return []; } } });
   const denied = req({}, 'GET'); denied.url = '/api/v1/event-registrations/review';
   assert.equal((await student(denied)).status, 403);
-  assert.equal…1233 tokens truncated…sync () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
+  assert.equal(reads, 0);
+});
+
+test('unprovisioned Yandex identities can request a participant profile but cannot choose an app role', async () => {
+  let saved;
+  const handler = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
+    resolveActor: async () => null,
+    emailVerification: { available: true, isVerified: async () => true },
+    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async record => { saved = record; return { ok: true, status: 'pending', request_id: 'synthetic-request' }; } } });
+  const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8а', role: 'school_admin', user_id: 'forged' });
+  request.url = '/api/v1/profile-requests';
+  const response = await handler(request);
+  assert.equal(response.status, 202);
+  assert.deepEqual(saved, { issuer: 'https://login.yandex.ru', subject: 'verified-subject', school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А', person_type: 'student', staff_position: '' });
+  assert.equal(Object.hasOwn(saved, 'role'), false);
+
+  let writes = 0;
+  const denied = createListingsApi({ authenticate: async () => ({ issuer: 'https://login.yandex.ru', subject: 'verified-subject' }),
+    emailVerification: { available: true, isVerified: async () => true },
+    repository: { getActiveAccountSuspension: async () => null, createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending' }; } } });
+  const invalid = req({ school_id: 'unlisted-school', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); invalid.url = '/api/v1/profile-requests';
+  assert.equal((await denied(invalid)).status, 400);
+  assert.equal(writes, 0);
+});
+
+test('school profile creation requires verified email and unprovisioned identity verification', async () => {
+  const identity = { issuer: 'https://login.yandex.ru', subject: 'new-subject', email: 'new@example.test' };
+  let isVerified = false; let writes = 0; let sent; let verified;
+  const repository = {
+    getActiveAccountSuspension: async () => null,
+    startRoleEmailVerification: async values => { sent = values; return { ok: true }; },
+    clearRoleEmailChallenge: async () => true,
+    verifyRoleEmailVerification: async values => { verified = values; isVerified = true; return { ok: true, verified: true }; },
+    isRoleEmailVerified: async () => isVerified,
+    createSchoolProfileRequest: async () => { writes++; return { ok: true, status: 'pending', request_id: 'request-a' }; },
+  };
+  const emailVerification = createRoleEmailVerification({ repository, verificationKey: 'test verification secret has at least thirty two bytes',
+    sendEmail: async value => { sent.email = value.to; }, now: () => 1_800_000_000_000, createCode: () => '135790' });
+  const handler = createListingsApi({ authenticate: async () => identity, resolveActor: async () => null, repository, emailVerification });
+  const submit = () => { const request = req({ school_id: 'lyceum_3', first_name: 'Аня', last_name: 'Иванова', class_name: '8А' }); request.url = '/api/v1/profile-requests'; return request; };
+  assert.deepEqual(await handler(submit()), { status: 403, body: { ok: false, error: 'email_verification_required' } });
+  assert.equal(writes, 0);
+  const send = req({ action: 'send' }); send.url = '/api/v1/profile-requests/email-verification';
+  assert.deepEqual(await handler(send, { token: { access_token: 'synthetic-function-iam-token-0123456789' } }),
+    { status: 202, body: { ok: true, sent: true, already_verified: false } });
+  assert.equal(sent.email, identity.email);
+  const verify = req({ action: 'verify', code: '135790' }); verify.url = '/api/v1/profile-requests/email-verification';
+  assert.deepEqual(await handler(verify), { status: 200, body: { ok: true, email_verified: true } });
+  assert.equal(verified.userId, identity.subject);
+  assert.equal((await handler(submit())).status, 202);
+  assert.equal(writes, 1);
+
+  const provisioned = createListingsApi({ authenticate: async () => identity, resolveActor: async () => ({ id: 'active-user', role: 'student', school_id: 'lyceum_3' }),
+    emailVerification, repository });
+  const blockedSend = req({ action: 'send' }); blockedSend.url = '/api/v1/profile-requests/email-verification';
+  assert.equal((await provisioned(blockedSend, { token: { access_token: 'synthetic-function-iam-token-0123456789' } })).status, 409);
+});
+
+test('only same-school administrators can read or decide profile access requests', async () => {
+  const requestId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  let schoolId; let decision;
+  const admin = createListingsApi({ authenticate: async () => ({ subject: 'admin' }),
+    resolveActor: async () => ({ id: 'admin', school_id: 'lyceum_3', role: 'school_admin' }),
+    repository: { getActiveAccountSuspension: async () => null, listPendingSchoolProfileRequests: async id => { schoolId = id; return [{ request_id: requestId, first_name: 'Аня', class_name: '8А' }]; },
       reviewSchoolProfileRequest: async (...args) => { [decision, schoolId] = [args[3], args[1]]; return true; } } });
   const list = req({}, 'GET'); list.url = '/api/v1/profile-requests/review';
   assert.equal((await admin(list)).status, 200);
