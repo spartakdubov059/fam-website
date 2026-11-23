@@ -4,7 +4,7 @@
 
 ## Объём и метод
 
-- В source `main` `bdb8325`: 83 файла `supabase/migrations/*.sql`, 7 Edge Function entrypoints. Root source checkout содержит 80 SQL файлов; ещё 3 точных upstream-файла сохранены в [`source-reference/supabase-migrations`](source-reference/supabase-migrations/) с проверенными Git blob SHA. Это только read-only evidence: их нельзя запускать на YDB или Supabase. Семантическая замена остаётся отдельной от наличия исходных SQL-файлов.
+- В source snapshot `bdb8325`: 83 файла `supabase/migrations/*.sql`, 7 Edge Function entrypoints. Root source checkout содержит 80 SQL файлов; ещё 3 точных upstream-файла сохранены в [`source-reference/supabase-migrations`](source-reference/supabase-migrations/) с проверенными Git blob SHA. Это только read-only evidence: их нельзя запускать на YDB или Supabase. Source `main` позже продвинулся до `e574e905`, где 84-я migration учтена ниже как ещё не перенесённая. Семантическая замена остаётся отдельной от наличия исходных SQL-файлов.
 - Лексический поиск SQL-файлов нашёл 19 уникальных имён таблиц в `CREATE TABLE`, 53 имени функции в `CREATE OR REPLACE FUNCTION` и 5 имён триггеров в `CREATE TRIGGER`. Четыре lifecycle-функции добавлены миграцией `20261123001553_fam_qwen_lease_and_lifecycle.sql`, а агрегатная метрика — `20261123013500_fam_agent_task_metrics.sql`. Это подсчёт по тексту, а не анализ итогового живого PostgreSQL-каталога: он не учитывает полностью динамический SQL и жизненный цикл `ALTER`/`DROP`.
 - RU содержит 37 YQL-файлов и 39 объявлений `CREATE TABLE`. Схема и репозиторий проверены чтением кода, существующие интеграционные проверки указаны в других документах. Это не аудит реальных YDB grants/IAM и не эквивалент PostgreSQL RLS.
 
@@ -17,7 +17,7 @@
 | `ENABLE ROW LEVEL SECURITY` | 14 | Табличный итог требует проверки PostgreSQL catalog и FORCE/RLS role semantics. |
 | `FORCE ROW LEVEL SECURITY` | 4 | Строки миграций, не подтверждение итогового состояния живой базы. |
 
-Эти количества относились к предыдущему source snapshot `cc8b59b`. Текущий source `main` `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL-файла; обновлённый lexical RPC count приведён в [RPC_SECURITY_CROSSWALK_2026-11-23.md](RPC_SECURITY_CROSSWALK_2026-11-23.md). Подсчёты нужны только для оценки охвата аудита; в RU нет эквивалентного набора RLS policy DDL, поэтому каждую доступную операцию следует свести к actor/school/owner проверкам и отдельно подтвердить минимальный Yandex IAM.
+Эти количества относились к предыдущему source snapshot `cc8b59b`. Source snapshot `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL-файла; source `main` `e574e905` содержит 84. Подсчёты нужны только для оценки охвата аудита; RPC crosswalk пока основан на старом snapshot. В RU нет эквивалентного набора RLS policy DDL, поэтому каждую доступную операцию следует свести к actor/school/owner проверкам и отдельно подтвердить минимальный Yandex IAM.
 
 ## Таблицы, создаваемые исходными миграциями
 
@@ -64,7 +64,7 @@ RU-специфические таблицы без прямой отдельн�
 
 ## Обновление source `main` и RU coder lifecycle — 23 ноября 2026
 
-- Предыдущий скриптовый подсчёт `cc8b59b` дал 81 SQL migration path, 7 Edge Function entrypoints; 19 уникальных `CREATE TABLE`, 52 уникальных `CREATE OR REPLACE FUNCTION`, 5 уникальных `CREATE TRIGGER`. Текущий source `bdb8325` содержит 83 SQL paths, 7 entrypoints, 53 уникальных RPC имени; точные migration filenames теперь сверены в inventory ниже.
+- Предыдущий скриптовый подсчёт `cc8b59b` дал 81 SQL migration path, 7 Edge Function entrypoints; 19 уникальных `CREATE TABLE`, 52 уникальных `CREATE OR REPLACE FUNCTION`, 5 уникальных `CREATE TRIGGER`. Source snapshot `bdb8325` содержит 83 SQL paths, 7 entrypoints, 53 уникальных RPC имени; точные имена проверены для того snapshot. На последнем `main` `e574e905` уже 84 SQL paths; новый RPC и итоговый lexical inventory в старый список пока не включены.
 - RU теперь поддерживает lease-bound `start`, `heartbeat`, и упорядоченные стадии `model_generated`, `qa_passed`, `pr_created`, `qa_failed`, `model_no_patch`, `model_failed`, `model_blocked`. На YDB task дополнительно требуется одноразовый claim token, а не только worker bearer; максимальные lifecycle lease ограничены 30 минутами, дальнейшее продление — двумя часами. Успешный `finish` допускает только `model_no_patch`; подтверждение `model_completed` отклоняется.
 - Добавлена synthetic YDB integration последовательность для start/heartbeat/model/QA/PR стадии и проверки освобождения аренды после PR handoff. Её синтаксис и локальная имитационная часть проходят; точная последовательность против YDB пока не проверена, потому что нет локального YDB/Docker и текущий diff не опубликован для disposable GitHub Actions.
 - Этот port реализует состояние очереди, но не исполняет Qwen, shell/tools или GitHub PR операции. Он не делает полную эквивалентность source workflow; независимый security review обязателен.
@@ -73,6 +73,12 @@ RU-специфические таблицы без прямой отдельн�
 
 - В `claimSafeCoderTask` RU раньше выбирал задачи по времени создания, а source RPC сначала сортирует по `priority` (`urgent`, `high`, `normal`, затем прочие). RU query и unit assertion обновлены на коммите [`a327510`](https://github.com/spartakdubov059/fam-website/commit/a32751087ae460ada7da175e32171486bc843d47).
 - Для одной синтетической coder-задачи запущены два параллельных claim. Условие «выдана ровно одна аренда» прошло в [disposable YDB integration #45175534283](https://github.com/spartakdubov059/fam-website/actions/runs/45175534283); SDK/Sharp workflow #45175534306 прошёл также. Это исправляет семантику выбора и проверяет конкурентный доступ на тестовой YDB, но не запускает Qwen и не проверяет cloud IAM.
+
+## Повторная сверка с обновившимся `main` — 23 ноября 2026
+
+- После branch tip `60b724f` исходный `main` обновился до `e574e905da574356eb847ec4a92b3ea64894adfa` (PR #157). Теперь там **84 SQL migration**, включая `20261123194000_fam_inspector_bounded_coder_enqueue.sql`; предыдущий RU inventory содержал 83 имени. Read-only сравнение найдено: ровно этот файл отсутствует в RU документах, иных пропусков и лишних имён нет.
+- Migration добавляет allowlisted `INSPECTOR → coder_patch_request` сигнал, дедупликацию/cooldown и claim только для технического worker. Она ограничивает типы событий/полей и не записывает workflow logs. Связанные текущие upstream правки в `fam-agent-coder-bridge` включают enqueue entrypoint. RU намеренно не исполняет Qwen, shell/tools или автоматическое создание PR; поэтому безопасное решение сейчас — документировать функциональный разрыв, а не включать этот поток без независимой проверки и разрешённых российских model/worker ресурсов.
+- RU branch и рабочий checkout остались `60b724fa7a851a6b64c8e9f2920b4913a0c0b8bb`; `main` только прочитана. Новая migration не применяется ни к RU YDB, ни к production. Потребуется обновить function/RPC инвентарь и рассмотреть перенос только после отдельного threat review orchestration.
 4. Получить бесплатное безопасное окружение с проверяемым hard stop стоимости; без него облачные ресурсы не включать. В доступных условиях гарантированного 0 ₽ cloud staging нет.
 5. После статического закрытия parity выполнить disposable YDB + private S3 integration на синтетических данных, затем проверить OAuth/Postbox, IAM, backup/restore и права без подключения реальных школьных записей.
 
