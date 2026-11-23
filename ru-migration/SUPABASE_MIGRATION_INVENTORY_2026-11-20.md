@@ -3,7 +3,7 @@ Total output lines: 162
 
 # Реестр переноса Supabase → FAM RU
 
-Историческая основа: `origin/main` на `af1f0086066d18b3d814dd535f06eda733ae58de` (2026-11-20). Текущий `origin/main` `cc8b59bd2517ddfe2b6488b16cff468e99c05980` повторно сверён 23 ноября: всего 81 SQL migration. Последняя Qwen queue lifecycle migration добавлена ниже; это инвентаризация исходных объектов и статуса локального RU аналога, не доказательство полного паритета или готовности к запуску. `не проверено` означает, что RU-аналог и тест должны быть подтверждены вручную/синтетически; похожее имя файла не считается доказательством. Политики и grants перечислены как отдельные требования безопасности.
+Историческая основа: `origin/main` на `af1f0086066d18b3d814dd535f06eda733ae58de` (2026-11-20). Текущий `origin/main` `bdb8325843f4d02590723d396d5b3f803d04618a` повторно проверен 23 ноября: всего 83 SQL migrations и 7 Edge Function entrypoints. Ветка RU хранит 80 source SQL в корне и ещё 3 точные read-only reference-копии. Это инвентаризация объектов и статуса аналога, не доказательство полного паритета или готовности к запуску. `не проверено` означает, что RU-аналог и тест должны быть подтверждены вручную/синтетически; похожее имя файла не считается доказательством. Политики и grants перечислены как отдельные требования безопасности.
 
 | SQL migration | Объекты/изменения | Статус |
 |---|---|---|
@@ -135,7 +135,35 @@ Reviewed source migrations `20261108194342_account_deletion_requests_and_cleanup
 - Source `pg_net`, cron-schema grants и PostgreSQL RPC не устанавливаются в RU. Фоновые задачи представлены подготовленными systemd units/timers, но они не установлены и не включены. Health-check не проверяет YDB write grants, service-account IAM, cron extensions или облачные schedule permissions.
 - На точном code commit [`ea7325e187887dddf47457b71acd97107dac3145`](https://github.com/spartakdubov059/fam-website/commit/ea7325e187887dddf47457b71acd97107dac3145) локальный Node 22 набор прошёл **432/432**. [SDK/Sharp CI #44948441225](https://github.com/spartakdubov059/fam-website/actions/runs/44948441225) и [disposable YDB CI #44948441262](https://github.com/spartakdubov059/fam-website/actions/runs/44948441262) завершились успешно. YDB job вывела `YDB_LOCAL_INTEGRATION_PASS` по synthetic schema/integration и удалила контейнер. Это не cloud IAM, cloud schedule или zero-cost staging proof.
 
-Этот review обновляет статусы только перечисленных migrations; другие `не проверено`, полный route/field audit и независимый security review остаются отдельной работой. В реестре перечислены 81 SQL migration из `main` `cc8b59bd2517ddfe2b6488b16cff468e99c05980` на 2026-11-23; наличие каждой строки не доказывает полную семантическую эквивалентность.
+Этот review обновляет статусы только перечисленных migrations; другие `не проверено`, полный route/field audit и независимый security review остаются отдельной работой. В реестре перечислены 83 SQL migration из `main` `bdb8325843f4d02590723d396d5b3f803d04618a` на 2026-11-23; наличие каждой строки не доказывает полную семантическую эквивалентность.
+
+### Повторная проверка coder claim priority и гонки (23 ноября 2026)
+
+- Source `claim_fam_agent_coder_tasks` сортирует кандидатов по `priority` (`urgent`, `high`, `normal`, затем прочие). RU `claimSafeCoderTask` теперь использует тот же порядок; unit test проверяет форму запроса.
+- Для одной synthetic задачи два параллельных RU claim-вызова выдали ровно одну аренду в [disposable YDB integration #45175534283](https://github.com/spartakdubov059/fam-website/actions/runs/45175534283). [SDK/Sharp CI #45175534306](https://github.com/spartakdubov059/fam-website/actions/runs/45175534306) завершился успешно. Это проверка очереди на disposable YDB, не live staging.
+
+### Filename coverage audit для полного source snapshot (23 ноября 2026)
+
+Сверка точных путей `origin/main` `bdb8325843f4d02590723d396d5b3f803d04618a` показала, что 14 исходных SQL-файлов не имели отдельного filename упоминания в предыдущих crosswalks. Объекты этих migration уже частично описаны выше по подсистемам; таблица ниже фиксирует все 14 имён и границы известного RU аналога. Это устраняет пропуск имён, но не означает полную SQL semantic parity.
+
+| Source migration | Обнаруженное изменение | RU статус и предел доказательства |
+|---|---|---|
+| `20261109144741_create_fam_agent_daily_reports.sql` | Глобальные ежедневные отчёты, private refresh helper и первоначальный cron. | Source schedule заменён последующей school-scoped migration `20261109152842`; RU ведёт ограниченные агрегированные global reports через `saveGlobalAgentDailyReport`, но report contract отличается. Worker и cloud schedule не включены. |
+| `20261109152842_school_scoped_agent_reports_and_free_analysts.sql` | School-scoped reports, deterministic/free analyst rows, dashboard/review RPC и замена старого global job. | Частичная RU реализация в `school-agent-reports.mjs`; каталог ограничен фиксированными школами, а отчёты не эквивалентны source analytics. См. раздел background queues выше. |
+| `20261110163213_enable_pg_net_for_fam_agent_worker.sql` | Включает PostgreSQL `pg_net` для dispatch worker HTTP-запросов. | `pg_net` отсутствует в RU; backend worker заменяет допустимые фиксированные типы очереди. Source HTTP dispatch и облачный worker не развёрнуты. |
+| `20261110163415_add_fam_agent_queue_health_rpc.sql` | Добавляет ограниченный `get_fam_agent_queue_health()` только для service role. | Частичный bounded аналог `getSafeTaskQueueHealth` в `ydb-agent-task-queue.mjs`; прямой browser RPC не предоставляется. Полный cloud worker/IAM status не проверен. |
+| `20261110165908_notification_read_states.sql` | Отдельные состояния прочтения уведомлений с own-user policy. | RU реализует actor-bound `/api/v1/notification-reads`, YDB `fam_notification_reads`, UI чтения/сохранения и удаление состояний при account cleanup. Проверяют `schema/26_notification_reads.yql`, `listings-api.test.mjs` и repository implementation. Это API/YDB замена, не PostgreSQL RLS/IAM parity. |
+| `20261110170529_route_daily_operational_report_to_orchestrator.sql` | Перенаправляет daily digest через orchestrator task queue и обновляет claim/refresh flows. | Частичная замена в `orchestrator-daily-digest.mjs` и RU durable queue; bounded payload и retry тестируются, автоматическая работа таймера не включена. |
+| `20261110170718_fix_daily_digest_report_date_validation.sql` | Добавляет проверку report date при формировании digest. | RU проверяет UTC слот и идемпотентность очереди; текст/contract source digest не переносится. Schedule остаётся выключенным. |
+| `20261110171353_add_read_only_fam_technical_health_agent.sql` | Read-only system health task type и scheduled enqueue. | Частичный RU аналог `system-health-task.mjs` и `ydb-schema-health.mjs`; только allowlisted aggregates/schema probes, без cloud IAM grants и активного расписания. |
+| `20261110171530_grant_worker_read_only_cron_schema_access.sql` | Разрешает worker читать `cron.job` и `cron.job_run_details`. | Замена архитектурой: RU health-check сверяет фиксированный allowlist локальных timer units, не читает PostgreSQL cron. Таймеры не установлены; облачные schedule permissions не проверены. |
+| `20261110173255_fam_site_error_monitoring.sql` | Aggregated site-error table, telemetry/digest RPC, worker task и 15-minute cron. | Частичная RU замена `site-error-telemetry.mjs` + `site-error-digest.mjs`; только allowlisted counters без сырого текста/PII. Disposable YDB проверяет очередь, не production IAM/schedules. |
+| `20261110174043_fam_admin_technical_alerts.sql` | Добавляет admin technical-alert read RPC; поздний source revoke ограничивает execute доступ. | Прямой RU admin-alert RPC не добавлялся; часть безопасных агрегатов видна school-admin через отдельный endpoint. Полный source contract/role parity остаётся непроверенным. |
+| `20261110181754_20261110180500_fam_agent_moscow_morning_schedule.sql` | Меняет несколько cron выражений с учётом MSK=UTC+3 и интервал site-error digest. | RU timer manifest отражает 15-minute site-error интервал; остальные timers подготовлены, но не установлены/включены. Фактическое облачное расписание отсутствует. |
+| `20261110210025_add_persistent_listing_image_review_queue.sql` | Persistent queue для image review, включая идеи, функции claim/finish и cron. | RU сохраняет изображения приватно и требует ручную модерацию; automated vision worker и его schedule намеренно не включены, а отдельная source image queue не перенесена. |
+| `20261110215715_harden_private_queue_and_index_user.sql` | Усиливает приватность site-error/image-review очередей и добавляет user lookup index. | HTTP API не предоставляет прямые private queue paths; media ownership и quota guards тестируются. PostgreSQL RLS/index semantics и cloud YDB IAM не эквивалентны и требуют отдельной проверки. |
+
+Filename audit явно выделяет automated image-review queue как открытое расхождение. Для image moderation RU проводит ручную проверку; automated vision classification преднамеренно выключена.
 
 
 ### Анонимная telemetry и чтение расписаний worker (22 ноября 2026)
