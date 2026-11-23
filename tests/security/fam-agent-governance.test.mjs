@@ -15,6 +15,15 @@ import {
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
+test("Qwen model failures are retried only within the configured attempt budget", () => {
+  const migration = readFileSync(new URL("../../supabase/migrations/20261123203000_fam_qwen_bounded_failure_retry.sql", import.meta.url), "utf8");
+  assert.match(migration, /status='failed'[\s\S]*?result_summary='Локальный анализатор завершился с ошибкой\.'/);
+  assert.match(migration, /attempt_count<t\.max_attempts/);
+  assert.match(migration, /status='queued'[\s\S]*?retry_scheduled/);
+  assert.match(migration, /active\.status in \('queued','claimed','in_progress'\)/);
+  assert.ok(migration.indexOf("if p_worker_id is distinct") < migration.indexOf("with retryable_failures"));
+});
+
 test("Qwen workflow accepts the trusted INSPECTOR dispatch actor", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url), "utf8");
   const generateJob = workflow.split("  generate:")[1]?.split("  verify:")[0] ?? "";
