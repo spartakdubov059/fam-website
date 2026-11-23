@@ -21,6 +21,9 @@ test("Qwen workflow accepts the trusted INSPECTOR dispatch actor", () => {
   assert.match(generateJob, /github\.actor == 'spartakdubov059'/);
   assert.match(generateJob, /github\.actor == 'github-actions\[bot\]'/);
   assert.doesNotMatch(generateJob, /github\.event_name == 'workflow_dispatch'/);
+  const inferenceSetup = generateJob.split("INFERENCE_HOME=")[1]?.split("HEARTBEAT_PID=")[0] ?? "";
+  assert.match(inferenceSetup, /sudo -u fam-inference env -i/);
+  assert.doesNotMatch(inferenceSetup, /pushd|popd/);
 });
 
 test("ARBITER detects only real code-file overlaps, not docs noise", () => {
