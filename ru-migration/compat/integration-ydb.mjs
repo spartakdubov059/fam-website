@@ -1005,7 +1005,8 @@ try {
   assert.match(emittedIncident?.[0]?.[0]?.pair_fingerprint || '', /^[0-9a-f]{64}$/);
   assert.equal(emittedIncident?.[0]?.[0]?.category, 'threat_or_intimidation');
   assert.equal(emittedIncident?.[0]?.[0]?.severity, 'high');
-  assert.equal(emittedIncident?.[0]?.[0]?.evidence_excerpt, null);
+  assert.equal(emittedIncident?.[0]?.[0]?.evidence_excerpt, 'Поступали угрозы в адрес ученика.',
+    'service-classified messages keep the same bounded excerpt contract for the same-school reviewer');
   const emittedQueue = await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-admin'));
   assert.ok(emittedQueue.body.reports.some(row => row.category === 'threat_or_intimidation'));
   assert.equal((await listingsApi(apiRequest('GET', '/api/v1/school/admin/safety-reports', 'synthetic-lyceum-admin'))).body.reports.length, 0,
