@@ -85,7 +85,13 @@ test("existing server-side CORS allows both real FAM hosts", () => {
   }
 });
 
-test("SEO canonical remains the primary host; fallback is not treated as another site", () => {
-  assert.ok(html.includes('rel="canonical" href="https://famru.netlify.app/"'));
-  assert.ok(html.includes('property="og:url" content="https://famru.netlify.app/"'));
+test("SEO metadata identifies the active GitHub Pages publisher without changing auth handoff", () => {
+  const activeUrl = "https://spartakdubov059.github.io/fam-website/";
+  assert.ok(html.includes(`rel="canonical" href="${activeUrl}"`));
+  assert.ok(html.includes(`property="og:url" content="${activeUrl}"`));
+  assert.ok(html.includes(`property="og:image" content="${activeUrl}banner-1.jpg"`));
+  assert.ok(html.includes(`name="twitter:image" content="${activeUrl}banner-1.jpg"`));
+  assert.ok(html.includes('https://famru.netlify.app/fam-domain-health.json?t='));
+  assert.equal(signupRedirect(fallbackOrigin, "/fam-website/"), fallbackUrl);
+  assert.equal(signupRedirect(primaryOrigin, "/"), primaryUrl);
 });

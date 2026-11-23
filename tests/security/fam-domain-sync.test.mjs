@@ -112,19 +112,54 @@ test("waits for canonical Pages first, then checks paused Netlify once", async (
       return new Response("stale release", { status: 200 });
     };
 
-    await assert.rejects(
-      verifyProductionDomains({
-        paths: ["index.html"], root, fetchImpl, cacheKey: "paused-test",
-        netlifyPublishEnabled: false, timeoutMs: 0, intervalMs: 1,
-      }),
-      error => {
-        assert.match(error.message, /Netlify index\.html: status=200/);
-        assert.match(error.message, /sha256=[a-f0-9]{12}, expected=[a-f0-9]{12}/);
-        return true;
-      },
-    );
+    const result = await verifyProductionDomains({
+      paths: ["index.html"], root, fetchImpl, cacheKey: "paused-test",
+      netlifyPublishEnabled: false, timeoutMs: 0, intervalMs: 1,
+    });
+    assert.equal(result.netlifyState, "paused-stale");
+    assert.equal(result.results.filter(item => item.domain === "GitHub Pages").every(item => item.matches), true);
+    const stale = result.results.filter(item => item.domain === "Netlify");
+    assert.equal(stale.every(item => !item.matches && item.status === 200), true);
     assert.equal(calls.pages, 3);
     assert.equal(calls.netlify, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a paused Netlify outage is reported separately from an active Pages failure", async () => {
+  const root = mkdtempSync(join(tmpdir(), "fam-domain-paused-outage-"));
+  try {
+    writeFileSync(join(root, "index.html"), "current release");
+    const fetchImpl = async url => url.startsWith(DOMAINS[0].origin)
+      ? new Response("current release", { status: 200 })
+      : new Response("not found", { status: 404 });
+    const result = await verifyProductionDomains({
+      paths: ["index.html"], root, fetchImpl, cacheKey: "paused-outage",
+      netlifyPublishEnabled: false, timeoutMs: 0, intervalMs: 1,
+    });
+    assert.equal(result.netlifyState, "paused-stale");
+    assert.equal(result.results.find(item => item.domain === "GitHub Pages").matches, true);
+    assert.equal(result.results.find(item => item.domain === "Netlify").status, 404);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an enabled Netlify publisher still fails when production files are stale", async () => {
+  const root = mkdtempSync(join(tmpdir(), "fam-domain-active-netlify-"));
+  try {
+    writeFileSync(join(root, "index.html"), "current release");
+    const fetchImpl = async url => url.startsWith(DOMAINS[0].origin)
+      ? new Response("current release", { status: 200 })
+      : new Response("stale release", { status: 200 });
+    await assert.rejects(
+      verifyProductionDomains({
+        paths: ["index.html"], root, fetchImpl, cacheKey: "active-netlify",
+        netlifyPublishEnabled: true, timeoutMs: 0, intervalMs: 1,
+      }),
+      /Netlify index\.html: status=200/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
