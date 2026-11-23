@@ -20,10 +20,10 @@ function element(document, tag, className, text) {
   return node;
 }
 
-async function loadMyEventRegistrations(fetchImpl) {
+async function loadMyEventRegistrations(fetchImpl, signal) {
   try {
     const response = await fetchImpl('/api/v1/event-registrations', {
-      method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' },
+      method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' }, signal,
     });
     if (response.status === 401) return { state: 'guest', registrations: new Map() };
     if (!response.ok) return { state: 'unavailable', registrations: new Map() };
@@ -37,9 +37,9 @@ async function loadMyEventRegistrations(fetchImpl) {
   }
 }
 
-async function loadMyFavorites(fetchImpl) {
+async function loadMyFavorites(fetchImpl, signal) {
   try {
-    const response = await fetchImpl('/api/v1/favorites', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    const response = await fetchImpl('/api/v1/favorites', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' }, signal });
     if (response.status === 401) return { state: 'guest', ids: new Set() };
     if (!response.ok) return { state: 'unavailable', ids: new Set() };
     const result = await response.json();
@@ -48,9 +48,9 @@ async function loadMyFavorites(fetchImpl) {
   } catch { return { state: 'unavailable', ids: new Set() }; }
 }
 
-async function loadMyActiveListingIds(fetchImpl) {
+async function loadMyActiveListingIds(fetchImpl, signal) {
   try {
-    const response = await fetchImpl('/api/v1/me/listings', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } });
+    const response = await fetchImpl('/api/v1/me/listings', { method: 'GET', credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' }, signal });
     if (!response.ok) return new Set();
     const result = await response.json();
     return result?.ok && Array.isArray(result.listing_ids)
@@ -398,7 +398,7 @@ function addEventRegistrationControls({ card, listing, document, fetchImpl, sess
   card.append(actions, status);
 }
 
-export async function loadPublicBoard({ root, document = globalThis.document, fetchImpl = globalThis.fetch, location = document?.defaultView?.location ?? globalThis.location, confirmImpl = globalThis.confirm?.bind(globalThis) }) {
+export async function loadPublicBoard({ root, document = globalThis.document, fetchImpl = globalThis.fetch, location = document?.defaultView?.location ?? globalThis.location, confirmImpl = globalThis.confirm?.bind(globalThis), personalDataTimeoutMs = 5000 }) {
   if (!root || !document || typeof fetchImpl !== 'function') throw new TypeError('public board dependencies are required');
   if (document.getElementById && !document.getElementById('ruOpenMessages')) {
     const open = element(document, 'button', 'ru-button', 'Личные сообщения');
@@ -442,11 +442,23 @@ export async function loadPublicBoard({ root, document = globalThis.document, fe
       } else root.replaceChildren(status);
       return;
     }
-    const [favorites, ownListingIds, session] = await Promise.all([
-      loadMyFavorites(fetchImpl),
-      loadMyActiveListingIds(fetchImpl),
-      events ? loadMyEventRegistrations(fetchImpl) : Promise.resolve({ state: 'guest', registrations: new Map() }),
+    const personalDataController = new AbortController();
+    let personalDataTimer;
+    const personalData = Promise.all([
+      loadMyFavorites(fetchImpl, personalDataController.signal),
+      loadMyActiveListingIds(fetchImpl, personalDataController.signal),
+      events ? loadMyEventRegistrations(fetchImpl, personalDataController.signal) : Promise.resolve({ state: 'guest', registrations: new Map() }),
     ]);
+    const timedOut = new Promise(resolve => {
+      personalDataTimer = setTimeout(() => resolve(null), personalDataTimeoutMs);
+    });
+    const personalState = await Promise.race([personalData, timedOut]);
+    clearTimeout(personalDataTimer);
+    if (personalState === null) personalDataController.abort();
+    const [favorites, ownListingIds, session] = personalState ?? [
+      { state: 'unavailable', ids: new Set() }, new Set(),
+      { state: 'unavailable', registrations: new Map() },
+    ];
     const cards = [];
     const details = createListingDetailsDialog({ document });
     let updateResults = () => {};

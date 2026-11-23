@@ -255,6 +255,23 @@ test('guest board offers retry when the Russian API is unavailable', async () =>
   assert.equal(calls, 2);
 });
 
+test('board renders safely when a personal-data request stalls past its deadline', async () => {
+  const root = new FakeNode('section');
+  let favoriteSignal;
+  await loadPublicBoard({ root, document: createFakeDocument(), personalDataTimeoutMs: 10, fetchImpl: async (url, options = {}) => {
+    if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, listings: [
+      { id: '11111111-1111-4111-8111-111111111111', title: 'Синтетическая книга', description: 'Проверка задержки', category: 'Учёба' },
+    ] }) };
+    if (url === '/api/v1/favorites') { favoriteSignal = options.signal; return new Promise(() => {}); }
+    if (url === '/api/v1/me/listings') return { ok: false, status: 401, json: async () => ({}) };
+    throw new Error(`unexpected request ${url}`);
+  } });
+  const card = boardCard(root);
+  const favorite = card.children.find(node => node.className === 'ru-favorite-actions').children[0];
+  assert.equal(favorite.disabled, true, 'uncertain favorite state cannot enable a write action');
+  assert.equal(favoriteSignal.aborted, true, 'stalled personal-data requests are cancelled after the deadline');
+});
+
 test('event card reads only the user own registrations and supports reservation and cancellation', async () => {
   const root = new FakeNode('section');
   const calls = [];
