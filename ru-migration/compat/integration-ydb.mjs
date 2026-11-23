@@ -1308,7 +1308,7 @@ try {
     .map(result => result.value);
   assert.equal(successfulCoderClaims.length, 1,
     `concurrent coder bridge calls must issue one live claim; outcomes: ${concurrentCoderClaims.map(result =>
-      result.status === 'fulfilled' ? (result.value ? 'claimed' : 'empty') : `rejected: ${result.reason?.message}`).join(' | ')}`);
+      result.status === 'fulfilled' ? (result.value ? 'claimed' : 'empty') : `rejected: ${inspect(result.reason, { depth: 5 })}`).join(' | ')}`);
   const coderClaim = successfulCoderClaims[0];
   assert.equal(coderClaim.id, coderTask.id);
   assert.equal(coderClaim.task_key, coderPayload.task_key);
