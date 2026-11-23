@@ -1317,9 +1317,28 @@ try {
   const claimedAgentMetrics = await agentQueue.getAgentTaskMetrics();
   assert.ok(claimedAgentMetrics.some(row => row.agent_key === 'technical' && row.status === 'claimed' && row.count === 1));
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
-    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), true);
+    claimToken: coderClaim.claim_token, resultCode: 'model_failed' }), true);
   assert.equal(await agentQueue.finishSafeCoderTask({ id: coderClaim.id, workerId: 'fam-agent-qwen-coder-v1',
-    claimToken: coderClaim.claim_token, resultCode: 'model_no_patch' }), false, 'finished coder leases cannot be replayed');
+    claimToken: coderClaim.claim_token, resultCode: 'model_failed' }), false, 'finished coder leases cannot be replayed');
+  const failedRetryClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(failedRetryClaim.id, coderTask.id, 'a retryable model failure is requeued and claimed once');
+  assert.notEqual(failedRetryClaim.claim_token, coderClaim.claim_token, 'a retry receives a fresh claim token');
+  const failedRetryRow = await sql`SELECT status, attempt_count, max_attempts, claim_token, result_summary
+    FROM fam_agent_tasks WHERE id = ${coderTask.id} LIMIT 1;`;
+  assert.equal(failedRetryRow?.[0]?.[0]?.status, 'claimed');
+  assert.equal(failedRetryRow?.[0]?.[0]?.attempt_count, 2);
+  assert.equal(failedRetryRow?.[0]?.[0]?.max_attempts, 2);
+  assert.equal(failedRetryRow?.[0]?.[0]?.claim_token, failedRetryClaim.claim_token);
+  assert.ok((await sql`SELECT event_type FROM fam_agent_task_events WHERE task_id = ${coderTask.id};`)
+    ?. [0]?.some(event => event.event_type === 'retry_scheduled'));
+  assert.equal(await agentQueue.finishSafeCoderTask({ id: failedRetryClaim.id, workerId: 'fam-agent-qwen-coder-v1',
+    claimToken: failedRetryClaim.claim_token, resultCode: 'model_failed' }), true);
+  assert.equal(await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }), null,
+    'a failed model execution is not retried after the attempt budget is exhausted');
+  const failedRetryFinal = await sql`SELECT status, attempt_count, max_attempts FROM fam_agent_tasks WHERE id = ${coderTask.id} LIMIT 1;`;
+  assert.equal(failedRetryFinal?.[0]?.[0]?.status, 'failed');
+  assert.equal(failedRetryFinal?.[0]?.[0]?.attempt_count, 2);
+  assert.equal(failedRetryFinal?.[0]?.[0]?.max_attempts, 2);
   const retryTaskId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   const retryPayload = JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 3 });
   await sql`INSERT INTO fam_agent_tasks

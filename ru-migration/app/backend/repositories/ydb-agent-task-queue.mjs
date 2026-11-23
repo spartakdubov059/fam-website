@@ -109,7 +109,7 @@ export function createYdbAgentTaskQueue(sql) {
             claimed_by, claimed_at, lease_expires_at, started_at, finished_at, created_at, updated_at)
           VALUES (${taskId}, 'technical', 'coder_patch_request', 'Безопасный анализ технического события FAM',
             'Автоматический анализ отключён. Требуется ручная проверка агрегированной категории.', 'normal', 'queued',
-            'scheduled_audit', false, ${payloadJson}, NULL, Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(1 AS Uint32)),
+            'scheduled_audit', false, ${payloadJson}, NULL, Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(2 AS Uint32)),
             CurrentUtcTimestamp(), NULL, NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
         await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
           VALUES (${randomUUID()}, ${taskId}, 'created', ${WORKER_ID},
@@ -121,6 +121,36 @@ export function createYdbAgentTaskQueue(sql) {
     async claimSafeCoderTask({ workerId, leaseSeconds = 7200 } = {}) {
       if (workerId !== 'fam-agent-qwen-coder-v1' || leaseSeconds !== 7200) throw new TypeError('invalid coder worker claim');
       return sql.begin(async tx => {
+        const retryableFailures = await tx`SELECT id FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND status = 'failed'
+            AND result_summary = 'Локальный анализатор завершился с ошибкой.'
+            AND attempt_count < max_attempts
+            AND NOT EXISTS (SELECT 1 FROM fam_agent_tasks active
+              WHERE active.id != fam_agent_tasks.id AND active.agent_key = 'technical'
+                AND active.task_type = 'coder_patch_request'
+                AND active.status IN ('queued', 'claimed', 'in_progress'))
+          ORDER BY updated_at ASC LIMIT 1;`;
+        for (const task of retryableFailures?.[0] ?? []) {
+          const summary = 'Повторная попытка поставлена в очередь после ограниченной ошибки запуска.';
+          await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('queued' AS Utf8)),
+              result_summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
+              claim_token = CAST(NULL AS Utf8?), claimed_at = CAST(NULL AS Timestamp?),
+              lease_expires_at = CAST(NULL AS Timestamp?), started_at = CAST(NULL AS Timestamp?),
+              finished_at = CAST(NULL AS Timestamp?), available_at = CurrentUtcTimestamp(),
+              updated_at = CurrentUtcTimestamp()
+            WHERE id = ${task.id} AND agent_key = 'technical' AND task_type = 'coder_patch_request'
+              AND approval_required = false AND source IN ('system', 'scheduled_audit')
+              AND status = 'failed' AND result_summary = 'Локальный анализатор завершился с ошибкой.'
+              AND attempt_count < max_attempts
+              AND NOT EXISTS (SELECT 1 FROM fam_agent_tasks active
+                WHERE active.id != ${task.id} AND active.agent_key = 'technical'
+                  AND active.task_type = 'coder_patch_request'
+                  AND active.status IN ('queued', 'claimed', 'in_progress'));`;
+          await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+            VALUES (${randomUUID()}, ${task.id}, 'retry_scheduled', ${workerId},
+              'Временный сбой запуска будет повторён в пределах разрешённого лимита.', CurrentUtcTimestamp());`;
+        }
         const exhausted = await tx`SELECT id, claim_token FROM fam_agent_tasks
           WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
             AND source IN ('system', 'scheduled_audit') AND claimed_by = ${workerId}

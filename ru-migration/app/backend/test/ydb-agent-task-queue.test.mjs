@@ -229,7 +229,8 @@ test('coder claim closes expired final leases and requeues expired retryable lea
   });
   const queue = createYdbAgentTaskQueue(sql);
   assert.equal(await queue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }), null);
-  const recovery = calls[0];
+  const recovery = calls.find(call => call.query.includes('SELECT id, claim_token FROM fam_agent_tasks'));
+  assert.ok(recovery);
   assert.match(recovery.query, /source IN \('system', 'scheduled_audit'\)/);
   assert.match(recovery.query, /claimed_by = \?/);
   assert.match(recovery.query, /attempt_count >= max_attempts/);
@@ -264,6 +265,43 @@ test('coder claim closes expired final leases and requeues expired retryable lea
   assert.ok(retryCalls.some(call => call.query.includes("'retry_scheduled'")));
   assert.match(retryCalls.find(call => call.query.includes('SELECT id, payload_json, status, attempt_count')).query,
     /status = 'queued'/);
+});
+
+test('coder claim retries only bounded model failures when no other coder task is active', async () => {
+  const id = '55555555-5555-4555-8555-555555555555';
+  const payload = { task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 3 };
+  const calls = [];
+  const { sql } = fakeSql((query, values) => {
+    calls.push({ query, values });
+    if (query.includes("status = 'failed'") && query.includes('Локальный анализатор завершился с ошибкой.')) {
+      return [[{ id }]];
+    }
+    if (query.includes('SELECT id, claim_token FROM fam_agent_tasks')) return [[]];
+    if (query.includes('SELECT id, payload_json, status, attempt_count')) return [[{
+      id, payload_json: JSON.stringify(payload), status: 'queued', attempt_count: 1,
+      max_attempts: 2, available: true, lease_expired: true,
+    }]];
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  const claim = await queue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(claim.id, id);
+  assert.deepEqual({ task_key: claim.task_key, event_code: claim.event_code, page_area: claim.page_area, occurrences: claim.occurrences }, payload);
+
+  const eligibility = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks'));
+  assert.ok(eligibility);
+  assert.match(eligibility.query, /attempt_count < max_attempts/);
+  assert.match(eligibility.query, /NOT EXISTS \(SELECT 1 FROM fam_agent_tasks active/);
+  assert.match(eligibility.query, /active\.status IN \('queued', 'claimed', 'in_progress'\)/);
+  assert.match(eligibility.query, /result_summary = 'Локальный анализатор завершился с ошибкой\.'/);
+  const reset = calls.find(call => call.query.includes("SET status = Unwrap(CAST('queued'"));
+  assert.ok(reset);
+  for (const field of ['claimed_by', 'claim_token', 'claimed_at', 'lease_expires_at', 'started_at', 'finished_at']) {
+    assert.ok(reset.query.includes(`${field} = CAST(NULL`), `retry clears ${field}`);
+  }
+  assert.ok(reset.query.includes('available_at = CurrentUtcTimestamp()'));
+  assert.ok(calls.some(call => call.query.includes("'retry_scheduled'")
+    && call.query.includes('Временный сбой запуска будет повторён в пределах разрешённого лимита.')));
 });
 
 test('agent task metrics expose only bounded aggregates for known agents and states', async () => {
