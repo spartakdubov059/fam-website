@@ -176,14 +176,12 @@ jobs:
           fi
           sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
           umask 077
-          pushd "$INFERENCE_HOME" >/dev/null
           sudo -u fam-inference env -i \
             PATH="$PATH" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" \
             "$SERVER" -m "$MODEL" \
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           SERVER_PID=$!
-          popd >/dev/null
           HEARTBEAT_PID=""
           if [[ "${{ steps.coder-queue.outputs.claimed }}" == "true" ]]; then
             node scripts/fam-agent-bridge.mjs heartbeat
