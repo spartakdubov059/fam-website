@@ -15,7 +15,9 @@ test("lease heartbeat is short, owner-bound, and cannot revive expired leases", 
   assert.match(migration, /least\(greatest\(coalesce\(p_lease_seconds,1800\),300\),1800\)/);
   assert.match(migration, /t\.claimed_by = p_worker_id/);
   assert.match(migration, /t\.lease_expires_at > pg_catalog\.now\(\)/);
-  assert.match(workflow, /while sleep 900; do node scripts\/fam-agent-bridge\.mjs heartbeat/);
+  assert.match(workflow, /while sleep 300; do/);
+  assert.match(workflow, /Qwen lease heartbeat failed; stopping model work/);
+  assert.match(workflow, /timeout-minutes: 165/);
 });
 
 test("model generation and QA do not mark an issue with a patch completed", () => {

@@ -6,8 +6,12 @@ on:
       - ".github/workflows/fam-agent-governance.yml"
       - "scripts/fam-agent-governance.mjs"
       - "scripts/fam-governance-bridge.mjs"
+      - "supabase/functions/fam-agent-coder-bridge/**"
+      - "supabase/migrations/*fam_agent_task_metrics.sql"
+      - "supabase/migrations/*fam_qwen_retry_recovery.sql"
       - "scripts/fam-integration-coordinator.mjs"
       - "tests/security/fam-agent-governance.test.mjs"
+      - "tests/security/fam-agent-metrics.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
   workflow_dispatch:
   schedule:
