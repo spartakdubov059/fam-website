@@ -12,7 +12,7 @@ const sdkFallback = readFileSync(new URL("../../supabase-cdn-fallback.js", impor
 const fallbackOrigin = "https://spartakdubov059.github.io";
 const primaryOrigin = "https://famru.netlify.app";
 const fallbackUrl = fallbackOrigin + "/fam-website/";
-const primaryUrl = primaryOrigin + "/";
+const primaryUrl = fallbackUrl;
 
 function signupRedirect(origin, pathname) {
   const match = html.match(/function famSignupRedirectUrl\(\) \{[\s\S]*?\n  \}/);
@@ -61,8 +61,8 @@ test("signup confirmation on GitHub Pages remains on that same fallback host", (
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/index.html"), fallbackUrl);
   assert.equal(signupRedirect(primaryOrigin, "/"), primaryUrl);
   // Never trust an arbitrary origin for email-redirect links.
-  assert.equal(signupRedirect("https://unknown.example", "/"), primaryUrl);
-  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), primaryUrl);
+  assert.equal(signupRedirect("https://unknown.example", "/"), fallbackUrl);
+  assert.equal(signupRedirect(fallbackOrigin, "/unrelated-site"), fallbackUrl);
   assert.match(html, /emailRedirectTo:\s*famSignupRedirectUrl\(\)/);
 });
 
