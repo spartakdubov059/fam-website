@@ -1202,7 +1202,7 @@ try {
     get: async input => {
       const object = privateObjects.get(input.Key);
       return object ? { ContentType: object.contentType, ContentLength: object.body.length,
-        Body: { transformToByteArray: async () => object.body } } : null;
+        Body: Readable.from([object.body]) } : null;
     },
     remove: async input => { privateObjects.delete(input.Key); },
   });
