@@ -6,7 +6,8 @@ const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'ot
 export function getSiteErrorDigestSlot(value = new Date()) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) throw new TypeError('invalid site error digest time');
-  date.setUTCMinutes(Math.floor(date.getUTCMinutes() / 15) * 15, 0, 0);
+  if (date.getUTCMinutes() < 30) date.setUTCHours(date.getUTCHours() - 1);
+  date.setUTCMinutes(30, 0, 0);
   return date.toISOString().slice(0, 16);
 }
 
@@ -29,7 +30,7 @@ export function createSiteErrorDigest({ repository, now = () => new Date() } = {
       const task = await repository.claimSiteErrorDigestTask(WORKER_ID);
       if (!task) break;
       const digestSlot = task.digest_slot;
-      if (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(digestSlot || '')
+      if (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):30$/.test(digestSlot || '')
           || typeof task.claim_token !== 'string') {
         await repository.retrySiteErrorDigestTask({ digestSlot, claimToken: task.claim_token, errorCode: 'digest_failed' });
         throw new Error('invalid site error digest claim');

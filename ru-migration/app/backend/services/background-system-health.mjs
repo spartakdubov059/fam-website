@@ -16,7 +16,7 @@ export function createBackgroundSystemHealthTask({ databaseCheck, schemaCheck, q
     const [databaseReady, schema, queues] = await Promise.all([
       databaseCheck(), schemaCheck(), queueHealthCheck(),
     ]);
-    const queueMaxAge = { daily_reports: 26 * 60, site_error_digests: 30, safe_agent_tasks: 120 };
+    const queueMaxAge = { daily_reports: 26 * 60, site_error_digests: 90, safe_agent_tasks: 120 };
     const queueNames = Object.keys(queueMaxAge);
     const queuesReady = queues?.content_read === false && queues?.queues
       && queueNames.every(name => {

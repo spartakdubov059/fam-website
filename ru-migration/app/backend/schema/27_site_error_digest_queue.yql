@@ -1,4 +1,4 @@
--- Durable queue for the source site's 15-minute aggregate error digest.
+-- Durable queue for the source site's hourly aggregate error digest at minute 30 UTC.
 -- Only allowlisted counters and a fixed summary are persisted; no request content or identity.
 CREATE TABLE fam_site_error_digest_tasks (
   digest_slot Utf8 NOT NULL,

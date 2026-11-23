@@ -14,7 +14,7 @@ const expectedCalendars = new Map([
   ['fam-ru-runtime-health.timer', ['*-*-* 03:40:00 UTC']],
   ['fam-ru-safe-agent-worker.timer', ['*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00 UTC']],
   ['fam-ru-school-agent-report.timer', ['*-*-* 03:30:00 UTC']],
-  ['fam-ru-site-error-digest.timer', ['*-*-* *:00,15,30,45:00 UTC']],
+  ['fam-ru-site-error-digest.timer', ['*-*-* *:30:00 UTC']],
 ]);
 const timerNames = (await readdir(timerDirectory))
   .filter((name) => name.endsWith('.timer') && name !== 'fam-ru-agent-daily-report.timer')
@@ -84,7 +84,7 @@ for (const timerName of timerNames) {
 
 const errorDigest = await readFile(join(timerDirectory, 'fam-ru-site-error-digest.timer'), 'utf8');
 if (!/^Persistent=false$/m.test(errorDigest)) {
-  throw new Error('Site error digest must not catch up missed 15-minute timer events after downtime.');
+  throw new Error('Site error digest must not catch up missed hourly timer events after downtime.');
 }
 
 const coderProducer = await readFile(join(timerDirectory, 'fam-ru-coder-task-producer.timer'), 'utf8');

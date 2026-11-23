@@ -52,7 +52,7 @@ function isUtcTaskSlot(taskType, value) {
   const hour = date.getUTCHours(); const minute = date.getUTCMinutes();
   if (taskType === 'system_health_check') return hour === 3 && minute === 40;
   if (taskType === 'daily_report_digest') return hour === 4 && minute === 0;
-  if (taskType === 'site_error_digest') return [0, 15, 30, 45].includes(minute);
+  if (taskType === 'site_error_digest') return minute === 30;
   return taskType === 'queue_health_check' && [0, 15, 30, 45].includes(minute);
 }
 

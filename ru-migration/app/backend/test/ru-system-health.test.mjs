@@ -35,7 +35,7 @@ test('system health fails for missing services, unhealthy timers, stale queues a
   const degraded = structuredClone(queueHealth);
   degraded.queues.daily_reports.expired_leases = 1;
   degraded.queues.site_error_digests.failed_or_blocked_24h = 1;
-  degraded.queues.site_error_digests.oldest_queued_age_minutes = 31;
+  degraded.queues.site_error_digests.oldest_queued_age_minutes = 91;
   degraded.queues.safe_agent_tasks.failed_or_blocked_24h = 1;
   const report = buildRuSystemHealthReport({
     readiness: { ready: false, services: { auth: true, database: false, objectStorage: true } },

@@ -46,9 +46,9 @@ test('background health rejects queues with missing or invalid aggregate fields'
   await assert.rejects(health(), /background_system_health_degraded/);
 });
 
-test('background health flags a site-error queue older than two 15-minute intervals', async () => {
+test('background health flags a site-error queue older than its hourly schedule plus grace', async () => {
   const staleQueues = queues();
-  staleQueues.queues.site_error_digests.oldest_queued_age_minutes = 31;
+  staleQueues.queues.site_error_digests.oldest_queued_age_minutes = 91;
   const health = createBackgroundSystemHealthTask({ databaseCheck: async () => true,
     schemaCheck: async () => schema, queueHealthCheck: async () => staleQueues });
   await assert.rejects(health(), /background_system_health_degraded/);

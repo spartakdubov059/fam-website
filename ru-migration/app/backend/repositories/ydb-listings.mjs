@@ -36,8 +36,8 @@ const isIsoDate = value => {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
-const isQuarterHourSlot = value => {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(value)) return false;
+const isHourlyHalfHourSlot = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):30$/.test(value)) return false;
   const date = new Date(`${value}:00.000Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 16) === value;
 };
@@ -2399,7 +2399,7 @@ export function createYdbListingsRepository(sql) {
     },
 
     async enqueueSiteErrorDigestTask(digestSlot) {
-      if (!isQuarterHourSlot(digestSlot)) throw new TypeError('invalid site error digest slot');
+      if (!isHourlyHalfHourSlot(digestSlot)) throw new TypeError('invalid site error digest slot');
       return sql.begin(async tx => {
         const prior = await tx`SELECT status, attempt_count FROM fam_site_error_digest_tasks
           WHERE digest_slot = ${digestSlot} LIMIT 1;`;
@@ -2427,7 +2427,7 @@ export function createYdbListingsRepository(sql) {
           ORDER BY digest_slot ASC LIMIT 1;`;
         const task = candidates?.[0]?.[0];
         if (!task) return null;
-        if (!isQuarterHourSlot(task.digest_slot)) throw new Error('invalid stored site error digest slot');
+        if (!isHourlyHalfHourSlot(task.digest_slot)) throw new Error('invalid stored site error digest slot');
         const due = task.available === true && ['queued', 'failed'].includes(task.status)
           || task.status === 'claimed' && task.lease_expired === true;
         if (!due) return null;
@@ -2469,7 +2469,7 @@ export function createYdbListingsRepository(sql) {
         WHERE status = 'completed' ORDER BY digest_slot DESC LIMIT 1;`;
       if (typeof statement?.on === 'function') statement.on('error', () => {});
       const row = (await statement)?.[0]?.[0];
-      if (!row || !isQuarterHourSlot(row.digest_slot) || typeof row.summary !== 'string' || row.summary.length > 1000) return null;
+      if (!row || !isHourlyHalfHourSlot(row.digest_slot) || typeof row.summary !== 'string' || row.summary.length > 1000) return null;
       let metrics;
       try { metrics = JSON.parse(row.metrics_json); } catch { return null; }
       if (!Number.isSafeInteger(metrics?.total_events_24h) || metrics.total_events_24h < 0
@@ -2481,7 +2481,7 @@ export function createYdbListingsRepository(sql) {
     },
 
     async completeSiteErrorDigestTask({ digestSlot, claimToken, metrics, summary }) {
-      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '') || !metrics
+      if (!isHourlyHalfHourSlot(digestSlot) || !UUID.test(claimToken || '') || !metrics
           || !Number.isSafeInteger(metrics.total_events_24h) || metrics.total_events_24h < 0
           || !Number.isSafeInteger(metrics.events_last_hour) || metrics.events_last_hour < 0
           || !Array.isArray(metrics.events) || metrics.events.length > 6
@@ -2500,7 +2500,7 @@ export function createYdbListingsRepository(sql) {
     },
 
     async retrySiteErrorDigestTask({ digestSlot, claimToken, errorCode = 'digest_failed' }) {
-      if (!isQuarterHourSlot(digestSlot) || !UUID.test(claimToken || '')
+      if (!isHourlyHalfHourSlot(digestSlot) || !UUID.test(claimToken || '')
           || !['digest_failed', 'invalid_metrics'].includes(errorCode)) throw new TypeError('invalid site error digest retry');
       return sql.begin(async tx => {
         const rows = await tx`SELECT status, claim_token, lease_expires_at > CurrentUtcTimestamp() AS lease_valid

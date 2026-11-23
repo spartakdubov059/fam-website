@@ -8,8 +8,8 @@ test('safe agent queue CLIs close the runtime after success and failure', async 
   let closes = 0;
   const runtimeFactory = async () => ({ agentTaskQueue: { enqueueSafeTask: async (...args) => ({ created: true, args }) },
     processSafeAgentTasks: async limit => ({ claimed: limit }), close: async () => { closes++; } });
-  assert.deepEqual(await enqueueSafeAgentTask({ runtimeFactory, taskType: 'site_error_digest', slot: '2026-11-20T03:15' }),
-    { created: true, args: ['site_error_digest', '2026-11-20T03:15'] });
+  assert.deepEqual(await enqueueSafeAgentTask({ runtimeFactory, taskType: 'site_error_digest', slot: '2026-11-20T03:30' }),
+    { created: true, args: ['site_error_digest', '2026-11-20T03:30'] });
   assert.deepEqual(await processSafeAgentTasks({ runtimeFactory, limit: 2 }), { claimed: 2 });
   assert.deepEqual(await runSafeAgentWorker({ runtimeFactory: async () => ({ runSafeAgentWorker: async () => ({ claimed: 0 }), close: async () => { closes++; } }) }), { claimed: 0 });
   assert.equal(closes, 3);

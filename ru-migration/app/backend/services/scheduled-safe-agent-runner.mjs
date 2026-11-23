@@ -8,7 +8,7 @@ export function getDueSafeAgentTasks(value = new Date()) {
   if (!Number.isFinite(now.getTime())) throw new TypeError('invalid safe agent schedule time');
   const tasks = SCHEDULE.filter(item => now.getUTCHours() === item.hour && now.getUTCMinutes() === item.minute)
     .map(item => item.taskType);
-  if ([0, 15, 30, 45].includes(now.getUTCMinutes())) tasks.push('site_error_digest');
+  if (now.getUTCMinutes() === 30) tasks.push('site_error_digest');
   return tasks;
 }
 

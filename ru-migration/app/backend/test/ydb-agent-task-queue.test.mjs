@@ -36,16 +36,16 @@ test('safe scheduled tasks accept their source UTC schedule slots, including 03:
   for (const [taskType, slot] of [
     ['system_health_check', '2026-11-20T03:40'],
     ['daily_report_digest', '2026-11-20T04:00'],
-    ['site_error_digest', '2026-11-20T04:00'],
-    ['site_error_digest', '2026-11-20T04:15'],
     ['site_error_digest', '2026-11-20T04:30'],
-    ['site_error_digest', '2026-11-20T04:45'],
   ]) {
     assert.equal((await queue.enqueueSafeTask(taskType, slot)).created, true);
   }
-  assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 6);
+  assert.equal(calls.filter(call => call.query.includes('INSERT INTO fam_agent_tasks')).length, 3);
   await assert.rejects(queue.enqueueSafeTask('system_health_check', '2026-11-20T03:45'), /safe agent task/);
   await assert.rejects(queue.enqueueSafeTask('daily_report_digest', '2026-11-20T04:15'), /safe agent task/);
+  for (const minute of ['00', '15', '45']) {
+    await assert.rejects(queue.enqueueSafeTask('site_error_digest', `2026-11-20T04:${minute}`), /safe agent task/);
+  }
   await assert.rejects(queue.enqueueSafeTask('site_error_digest', '2026-11-20T04:17'), /safe agent task/);
 });
 
