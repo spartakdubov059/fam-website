@@ -1290,7 +1290,7 @@ try {
       Unwrap(CAST(1 AS Uint32)), Unwrap(CAST(3 AS Uint32)), CurrentUtcTimestamp(), 'stale-token',
       'fam-agent-qwen-coder-v1', CurrentUtcTimestamp() - Interval('PT3H'),
       CurrentUtcTimestamp() - Interval('PT1H'), CurrentUtcTimestamp() - Interval('PT3H'),
-      CurrentUtcTimestamp(), CurrentUtcTimestamp() - Interval('PT3H'), CurrentUtcTimestamp() - Interval('PT1H'));`;
+      CurrentUtcTimestamp(), CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
   const retryClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
   assert.equal(retryClaim.id, retryTaskId, 'an expired attempt is requeued and claimed again');
   assert.notEqual(retryClaim.claim_token, 'stale-token');
