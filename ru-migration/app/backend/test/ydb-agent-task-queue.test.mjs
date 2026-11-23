@@ -215,7 +215,7 @@ test('coder task lifecycle enforces claim capability, bounded leases and ordered
   await assert.rejects(queue.startSafeCoderTask({ id, workerId: 'wrong-worker', claimToken }), /coder task start/);
 });
 
-test('coder claim closes only its own expired final system lease and records a terminal event', async () => {
+test('coder claim closes expired final leases and requeues expired retryable leases before claim', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const claimToken = '22222222-2222-4222-8222-222222222222';
   const calls = [];
@@ -238,6 +238,38 @@ test('coder claim closes only its own expired final system lease and records a t
   ]);
   assert.ok(calls.some(call => call.query.includes('INSERT INTO fam_agent_task_events')
     && call.query.includes('Задача закрыта после истечения аренды последней разрешённой попытки.')));
+  const retryId = '33333333-3333-4333-8333-333333333333';
+  const retryToken = '44444444-4444-4444-8444-444444444444';
+  const retryCalls = [];
+  const retrySql = fakeSql((query, values) => {
+    retryCalls.push({ query, values });
+    if (query.includes('SELECT id, claim_token FROM fam_agent_tasks')) return [[{ id: retryId, claim_token: retryToken }]];
+    if (query.includes("SELECT id, payload_json, status, attempt_count")) return [[{
+      id: retryId, payload_json: JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 3 }),
+      status: 'queued', attempt_count: 1, max_attempts: 3, available: true, lease_expired: true,
+    }]];
+    return [[]];
+  }).sql;
+  const retryQueue = createYdbAgentTaskQueue(retrySql);
+  const retried = await retryQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  assert.equal(retried.id, retryId);
+  const retryRecovery = retryCalls.find(call => call.query.includes("SET status = Unwrap(CAST('queued'"));
+  assert.ok(retryRecovery);
+  for (const field of ['claim_token', 'claimed_at', 'lease_expires_at', 'started_at', 'finished_at']) {
+    assert.ok(retryRecovery.query.includes(`${field} = CAST(NULL`), `recovery clears ${field}`);
+  }
+  assert.ok(retryCalls.some(call => call.query.includes("'retry_scheduled'")));
+  assert.match(retryCalls.find(call => call.query.includes('SELECT id, payload_json, status, attempt_count')).query,
+    /status = 'queued'/);
+});
+
+test('agent task metrics expose only bounded aggregates for known agents and states', async () => {
+  const { sql, calls } = fakeSql(query => query.includes('SELECT agent_key, status, COUNT(*) AS count')
+    ? [[{ agent_key: 'technical', status: 'completed', count: 7 }]] : [[]]);
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.deepEqual(await queue.getAgentTaskMetrics(), [{ agent_key: 'technical', status: 'completed', count: 7 }]);
+  assert.match(calls[0].query, /GROUP BY agent_key, status/);
+  assert.match(calls[0].query, /LIMIT 50/);
 });
 
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {

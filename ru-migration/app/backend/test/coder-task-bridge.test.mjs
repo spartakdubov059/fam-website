@@ -73,6 +73,27 @@ test('coder bridge exposes only bounded aggregate queue health to the authentica
   }
 });
 
+test('coder bridge returns only fixed aggregate agent task metrics', async () => {
+  const metrics = [{ agent_key: 'technical', status: 'completed', count: 12 }];
+  let reads = 0;
+  const queue = { ...lifecycleStub, getAgentTaskQueueHealth: async () => ({ queued: 0, claimed: 0, in_progress: 0,
+    failed_last_24h: 0, expired_leases: 0, oldest_queued_minutes: 0 }), getAgentTaskMetrics: async () => { reads++; return metrics; },
+    claimSafeCoderTask: async () => null, finishSafeCoderTask: async () => false };
+  const bridge = createCoderTaskBridge({ queue, token });
+  assert.deepEqual(await bridge(request({ action: 'metrics' })), { status: 200, body: { ok: true, metrics } });
+  assert.equal(reads, 1);
+  assert.equal((await bridge(request({ action: 'metrics', extra: true }))).status, 400);
+  for (const invalid of [
+    [{ agent_key: 'unknown', status: 'completed', count: 1 }],
+    [{ agent_key: 'technical', status: 'completed', count: 1, payload: 'private' }],
+    [{ agent_key: 'technical', status: 'completed', count: 10_000_001 }],
+  ]) {
+    const invalidQueue = { ...queue, getAgentTaskMetrics: async () => invalid };
+    const result = await createCoderTaskBridge({ queue: invalidQueue, token })(request({ action: 'metrics' }));
+    assert.equal(result.status, 502);
+  }
+});
+
 test('coder bridge returns every supported technical event and rejects unknown event codes', async () => {
   const cases = [
     ['js_runtime', 'audit_frontend_runtime'],

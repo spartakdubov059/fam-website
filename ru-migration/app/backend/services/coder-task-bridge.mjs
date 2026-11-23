@@ -7,6 +7,10 @@ const CODER_TASK_KEYS = new Set(['audit_frontend_runtime', 'audit_client_resilie
 const CODER_EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'listings_load_failed',
   'notifications_load_failed', 'database_request_failed', 'auth_backend_failed']);
 const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other']);
+const AGENT_KEYS = new Set(['orchestrator', 'technical', 'database', 'moderation', 'safety', 'quality', 'growth']);
+const TASK_STATUSES = new Set(['queued', 'claimed', 'in_progress', 'blocked', 'completed', 'failed', 'cancelled']);
+const MAX_METRIC_ROWS = AGENT_KEYS.size * TASK_STATUSES.size;
+const MAX_METRIC_COUNT = 10_000_000;
 
 function matchesSecret(provided, expected) {
   if (typeof provided !== 'string' || !provided || typeof expected !== 'string' || Buffer.byteLength(expected) < 32) return false;
@@ -53,6 +57,17 @@ export function createCoderTaskBridge({ queue, token } = {}) {
           return json(502, { ok: false, error: 'invalid_queue_health' });
         }
         return json(200, { ok: true, queue: Object.fromEntries(fields.map(field => [field, queueHealth[field]])) });
+      }
+      if (body.action === 'metrics' && Object.keys(body).length === 1) {
+        if (typeof queue.getAgentTaskMetrics !== 'function') return json(503, { ok: false, error: 'metrics_unavailable' });
+        const metrics = await queue.getAgentTaskMetrics();
+        if (!Array.isArray(metrics) || metrics.length > MAX_METRIC_ROWS || metrics.some(row =>
+          !row || typeof row !== 'object' || Array.isArray(row)
+          || Object.keys(row).sort().join(',') !== 'agent_key,count,status'
+          || !AGENT_KEYS.has(row.agent_key) || !TASK_STATUSES.has(row.status)
+          || !Number.isSafeInteger(row.count) || row.count < 0 || row.count > MAX_METRIC_COUNT
+        )) return json(502, { ok: false, error: 'invalid_task_metrics' });
+        return json(200, { ok: true, metrics: metrics.map(({ agent_key, status, count }) => ({ agent_key, status, count })) });
       }
       if (body.action === 'claim' && Object.keys(body).length === 1) {
         const task = await queue.claimSafeCoderTask({ workerId: WORKER_ID, leaseSeconds: 7200 });

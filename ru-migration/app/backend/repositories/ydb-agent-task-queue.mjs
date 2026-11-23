@@ -140,13 +140,31 @@ export function createYdbAgentTaskQueue(sql) {
             VALUES (${randomUUID()}, ${task.id}, 'failed', ${workerId},
               'Задача закрыта после истечения аренды последней разрешённой попытки.', CurrentUtcTimestamp());`;
         }
+        const recovered = await tx`SELECT id, claim_token FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
+            AND source IN ('system', 'scheduled_audit') AND claimed_by = ${workerId}
+            AND status IN ('claimed', 'in_progress') AND lease_expires_at <= CurrentUtcTimestamp()
+            AND attempt_count < max_attempts;`;
+        for (const task of recovered?.[0] ?? []) {
+          const summary = 'Повторная попытка поставлена в очередь после истечения аренды.';
+          await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('queued' AS Utf8)),
+              result_summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
+              claim_token = CAST(NULL AS Utf8?), claimed_at = CAST(NULL AS Timestamp?),
+              lease_expires_at = CAST(NULL AS Timestamp?), started_at = CAST(NULL AS Timestamp?),
+              finished_at = CAST(NULL AS Timestamp?), updated_at = CurrentUtcTimestamp()
+            WHERE id = ${task.id} AND claim_token = ${task.claim_token}
+              AND claimed_by = ${workerId} AND status IN ('claimed', 'in_progress')
+              AND lease_expires_at <= CurrentUtcTimestamp() AND attempt_count < max_attempts;`;
+          await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+            VALUES (${randomUUID()}, ${task.id}, 'retry_scheduled', ${workerId},
+              'Истёк lease; задача возвращена в очередь для ограниченного повтора.', CurrentUtcTimestamp());`;
+        }
         const rows = await tx`SELECT id, payload_json, status, attempt_count, max_attempts,
             CASE WHEN available_at <= CurrentUtcTimestamp() THEN true ELSE false END AS available,
             CASE WHEN lease_expires_at IS NULL OR lease_expires_at <= CurrentUtcTimestamp() THEN true ELSE false END AS lease_expired
           FROM fam_agent_tasks WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
             AND approval_required = false AND attempt_count < max_attempts
-            AND ((status = 'queued' AND available_at <= CurrentUtcTimestamp())
-              OR (status IN ('claimed', 'in_progress') AND lease_expires_at <= CurrentUtcTimestamp()))
+            AND status = 'queued' AND available_at <= CurrentUtcTimestamp()
           ORDER BY available_at ASC, created_at ASC LIMIT 1;`;
         const row = rows?.[0]?.[0];
         if (!row) return null;
@@ -408,6 +426,24 @@ export function createYdbAgentTaskQueue(sql) {
         throw new TypeError('invalid agent task health age');
       }
       return health;
+    },
+
+    async getAgentTaskMetrics() {
+      const agents = new Set(['orchestrator', 'technical', 'database', 'moderation', 'safety', 'quality', 'growth']);
+      const statuses = new Set(['queued', 'claimed', 'in_progress', 'blocked', 'completed', 'failed', 'cancelled']);
+      const rows = await sql`SELECT agent_key, status, COUNT(*) AS count FROM fam_agent_tasks
+        GROUP BY agent_key, status ORDER BY agent_key, status LIMIT 50;`;
+      const metrics = [];
+      for (const row of rows?.[0] ?? []) {
+        const count = Number(row.count);
+        if (!agents.has(row.agent_key) || !statuses.has(row.status)
+            || !Number.isSafeInteger(count) || count < 0 || count > 10_000_000) {
+          throw new TypeError('invalid agent task metrics');
+        }
+        metrics.push({ agent_key: row.agent_key, status: row.status, count });
+      }
+      if (metrics.length > 49) throw new TypeError('invalid agent task metrics');
+      return metrics;
     },
 
     async getSafeTaskQueueHealth() {
