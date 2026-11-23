@@ -8,7 +8,7 @@ function fakeSql(respond) {
     const query = strings.join('?'); calls.push({ query, values });
     return Promise.resolve(respond(query, values));
   };
-  sql.begin = callback => callback(sql);
+  sql.begin = (options, callback) => (callback || options)(sql);
   return { sql, calls };
 }
 
@@ -154,8 +154,9 @@ test('coder bridge claims only allowlisted aggregate payload and finishes the ma
     calls.push(query);
     if (query.includes('SELECT id, payload_json')) return [[{ id,
       payload_json: JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 7 }),
-      status: 'queued', available: true, lease_expired: false }]];
+      status: 'queued', attempt_count: 0, max_attempts: 2, available: true, lease_expired: false }]];
     if (query.includes('SET status = Unwrap(CAST(') && query.includes('claim_token = ?')) savedToken = values[1];
+    if (query.includes('RETURNING id')) return [[{ id }]];
     if (query.includes('SELECT status, claimed_by, claim_token')) return [[{ status: 'claimed',
       claimed_by: 'fam-agent-qwen-coder-v1', claim_token: savedToken, lease_valid: true }]];
     if (query.includes('finished_at = CASE')) finished = true;
@@ -252,6 +253,7 @@ test('coder claim closes expired final leases and requeues expired retryable lea
       id: retryId, payload_json: JSON.stringify({ task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 3 }),
       status: 'queued', attempt_count: 1, max_attempts: 3, available: true, lease_expired: true,
     }]];
+    if (query.includes('RETURNING id')) return [[{ id: retryId }]];
     return [[]];
   }).sql;
   const retryQueue = createYdbAgentTaskQueue(retrySql);
@@ -281,6 +283,7 @@ test('coder claim retries only bounded model failures when no other coder task i
       id, payload_json: JSON.stringify(payload), status: 'queued', attempt_count: 1,
       max_attempts: 2, available: true, lease_expired: true,
     }]];
+    if (query.includes('RETURNING id')) return [[{ id }]];
     return [[]];
   });
   const queue = createYdbAgentTaskQueue(sql);
@@ -288,11 +291,11 @@ test('coder claim retries only bounded model failures when no other coder task i
   assert.equal(claim.id, id);
   assert.deepEqual({ task_key: claim.task_key, event_code: claim.event_code, page_area: claim.page_area, occurrences: claim.occurrences }, payload);
 
-  const eligibility = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks'));
+  const eligibility = calls.find(call => call.query.includes('status = \'failed\''));
   assert.ok(eligibility);
   assert.match(eligibility.query, /attempt_count < max_attempts/);
-  assert.match(eligibility.query, /NOT EXISTS \(SELECT 1 FROM fam_agent_tasks active/);
-  assert.match(eligibility.query, /active\.status IN \('queued', 'claimed', 'in_progress'\)/);
+  const activeGuard = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks'));
+  assert.match(activeGuard.query, /status IN \('queued', 'claimed', 'in_progress'\)/);
   assert.match(eligibility.query, /result_summary = 'Локальный анализатор завершился с ошибкой\.'/);
   const reset = calls.find(call => call.query.includes("SET status = Unwrap(CAST('queued'"));
   assert.ok(reset);

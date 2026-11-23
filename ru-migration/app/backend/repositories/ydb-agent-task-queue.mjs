@@ -120,18 +120,17 @@ export function createYdbAgentTaskQueue(sql) {
 
     async claimSafeCoderTask({ workerId, leaseSeconds = 7200 } = {}) {
       if (workerId !== 'fam-agent-qwen-coder-v1' || leaseSeconds !== 7200) throw new TypeError('invalid coder worker claim');
-      return sql.begin(async tx => {
+      return sql.begin({ idempotent: true }, async tx => {
+        const activeTasks = await tx`SELECT id FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
+            AND status IN ('queued', 'claimed', 'in_progress') LIMIT 1;`;
         const retryableFailures = await tx`SELECT id FROM fam_agent_tasks
           WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
             AND source IN ('system', 'scheduled_audit') AND status = 'failed'
             AND result_summary = 'Локальный анализатор завершился с ошибкой.'
             AND attempt_count < max_attempts
-            AND NOT EXISTS (SELECT 1 FROM fam_agent_tasks active
-              WHERE active.id != fam_agent_tasks.id AND active.agent_key = 'technical'
-                AND active.task_type = 'coder_patch_request'
-                AND active.status IN ('queued', 'claimed', 'in_progress'))
           ORDER BY updated_at ASC LIMIT 1;`;
-        for (const task of retryableFailures?.[0] ?? []) {
+        for (const task of activeTasks?.[0]?.length ? [] : retryableFailures?.[0] ?? []) {
           const summary = 'Повторная попытка поставлена в очередь после ограниченной ошибки запуска.';
           await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('queued' AS Utf8)),
               result_summary = ${summary}, claimed_by = CAST(NULL AS Utf8?),
@@ -142,11 +141,7 @@ export function createYdbAgentTaskQueue(sql) {
             WHERE id = ${task.id} AND agent_key = 'technical' AND task_type = 'coder_patch_request'
               AND approval_required = false AND source IN ('system', 'scheduled_audit')
               AND status = 'failed' AND result_summary = 'Локальный анализатор завершился с ошибкой.'
-              AND attempt_count < max_attempts
-              AND NOT EXISTS (SELECT 1 FROM fam_agent_tasks active
-                WHERE active.id != ${task.id} AND active.agent_key = 'technical'
-                  AND active.task_type = 'coder_patch_request'
-                  AND active.status IN ('queued', 'claimed', 'in_progress'));`;
+              AND attempt_count < max_attempts;`;
           await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
             VALUES (${randomUUID()}, ${task.id}, 'retry_scheduled', ${workerId},
               'Временный сбой запуска будет повторён в пределах разрешённого лимита.', CurrentUtcTimestamp());`;
@@ -208,13 +203,16 @@ export function createYdbAgentTaskQueue(sql) {
           && Number.isInteger(task.occurrences) && task.occurrences >= 0 && task.occurrences <= 1000;
         if (!valid || row.available !== true && row.lease_expired !== true) return null;
         const claimToken = randomUUID();
-        await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
+        const claimed = await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
             result_summary = 'Ограниченное техническое задание принято локальным анализатором.',
             attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
             claimed_by = ${workerId}, claim_token = ${claimToken}, claimed_at = CurrentUtcTimestamp(),
             lease_expires_at = CurrentUtcTimestamp() + Interval('PT2H'), finished_at = CAST(NULL AS Timestamp?),
             updated_at = CurrentUtcTimestamp()
-          WHERE id = ${row.id} AND status = ${row.status};`;
+          WHERE id = ${row.id} AND status = ${row.status}
+            AND attempt_count = ${row.attempt_count} AND attempt_count < max_attempts
+          RETURNING id;`;
+        if (!claimed?.[0]?.[0]) return null;
         await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
           VALUES (${randomUUID()}, ${row.id}, 'claimed', ${workerId}, 'Агрегированная техническая задача передана ограниченному анализатору.', CurrentUtcTimestamp());`;
         return { id: row.id, ...task, claim_token: claimToken };
