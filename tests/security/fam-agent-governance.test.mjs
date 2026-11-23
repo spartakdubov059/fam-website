@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -13,6 +14,14 @@ import {
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
+
+test("Qwen workflow accepts the trusted INSPECTOR dispatch actor", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url), "utf8");
+  const generateJob = workflow.split("  generate:")[1]?.split("  verify:")[0] ?? "";
+  assert.match(generateJob, /github\.actor == 'spartakdubov059'/);
+  assert.match(generateJob, /github\.actor == 'github-actions\[bot\]'/);
+  assert.doesNotMatch(generateJob, /github\.event_name == 'workflow_dispatch'/);
+});
 
 test("ARBITER detects only real code-file overlaps, not docs noise", () => {
   const found = findDisputes([
