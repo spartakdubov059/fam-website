@@ -168,6 +168,8 @@ jobs:
           MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
           SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
           INFERENCE_HOME="$RUNNER_TEMP/fam-inference-home"
+          INFERENCE_SERVER="$INFERENCE_HOME/llama-server"
+          INFERENCE_MODEL="$INFERENCE_HOME/model.gguf"
           if ! getent group fam-inference >/dev/null 2>&1; then
             sudo groupadd --system fam-inference
           fi
@@ -175,10 +177,12 @@ jobs:
             sudo useradd --system --gid fam-inference --no-create-home --shell /usr/sbin/nologin fam-inference
           fi
           sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
+          sudo install -o fam-inference -g fam-inference -m 500 "$SERVER" "$INFERENCE_SERVER"
+          sudo ln "$MODEL" "$INFERENCE_MODEL"
           umask 077
           sudo -u fam-inference env -i \
-            PATH="$PATH" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" \
-            "$SERVER" -m "$MODEL" \
+            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" \
+            "$INFERENCE_SERVER" -m "$INFERENCE_MODEL" \
             --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
             > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
           SERVER_PID=$!
