@@ -145,13 +145,15 @@ test('server routes the internal coder bridge separately from public user APIs',
   await withServer({ coderTaskBridge: async req => {
     calls++;
     assert.equal(req.method, 'POST');
-    return { status: 200, body: { ok: true, task: null } };
+    return { status: 200, body: { ok: true, task: null, diagnostic_id: '123e4567-e89b-42d3-a456-426614174000' },
+      headers: { 'x-fam-diagnostic-id': '123e4567-e89b-42d3-a456-426614174000' } };
   } }, async origin => {
     const response = await fetch(new URL('/api/v1/internal/coder-task', origin), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"claim"}',
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, task: null });
+    assert.equal(response.headers.get('x-fam-diagnostic-id'), '123e4567-e89b-42d3-a456-426614174000');
+    assert.deepEqual(await response.json(), { ok: true, task: null, diagnostic_id: '123e4567-e89b-42d3-a456-426614174000' });
     assert.equal(calls, 1);
   });
 });

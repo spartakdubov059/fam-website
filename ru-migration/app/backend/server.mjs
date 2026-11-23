@@ -84,7 +84,7 @@ export function createRequestHandler({ listingsApi = null, authApi = null, media
     if (!coderTaskBridge) return sendJson(res, 503, { ok: false, error: 'bridge_not_configured' });
     try {
       const result = await coderTaskBridge(req);
-      return sendJson(res, result.status, result.body);
+      return sendJson(res, result.status, result.body, result.headers || {});
     } catch {
       return sendJson(res, 503, { ok: false, error: 'bridge_execution_failed' });
     }
