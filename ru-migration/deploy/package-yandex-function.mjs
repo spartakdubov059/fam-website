@@ -1,29 +1,41 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPO_ROOT = path.dirname(ROOT);
 const BACKEND = path.join(ROOT, 'app/backend');
 const WEB = path.join(ROOT, 'app/web');
 const MAX_DIRECT_UPLOAD_BYTES = 3.5 * 1024 * 1024;
 const EXCLUDED_DIRS = new Set(['node_modules', 'test', '.git']);
 const EXCLUDED_FILES = /^(?:\.env(?:\..*)?|.*\.(?:pem|key|log))$/i;
 
-async function copySafeTree(source, target) {
-  await mkdir(target, { recursive: true });
-  for (const entry of await readdir(source, { withFileTypes: true })) {
-    if (entry.name === 'package.json' || entry.name === 'package-lock.json') continue;
-    if (entry.isSymbolicLink()) throw new Error(`refusing to package symbolic link: ${entry.name}`);
-    if (entry.isDirectory()) {
-      if (EXCLUDED_DIRS.has(entry.name)) continue;
-      await copySafeTree(path.join(source, entry.name), path.join(target, entry.name));
-    } else if (entry.isFile() && !EXCLUDED_FILES.test(entry.name)) {
-      await cp(path.join(source, entry.name), path.join(target, entry.name));
-    }
+async function listTrackedAppFiles() {
+  const { stdout } = await execFileAsync('git', ['ls-files', '-z', '--', 'ru-migration/app/backend', 'ru-migration/app/web'], {
+    cwd: REPO_ROOT, maxBuffer: 4 * 1024 * 1024,
+  });
+  return stdout.split('\0').filter(Boolean);
+}
+
+async function copyTrackedTree(source, target, trackedPaths) {
+  for (const repoPath of trackedPaths) {
+    const input = path.resolve(REPO_ROOT, repoPath);
+    const relative = path.relative(source, input);
+    if (!relative || path.isAbsolute(relative) || relative === '..' || relative.startsWith(`..${path.sep}`)) continue;
+    const segments = relative.split(path.sep);
+    const filename = segments.at(-1);
+    if (segments.some(segment => EXCLUDED_DIRS.has(segment))
+        || filename === 'package.json' || filename === 'package-lock.json' || EXCLUDED_FILES.test(filename)) continue;
+    const info = await lstat(input);
+    if (info.isSymbolicLink()) throw new Error(`refusing to package symbolic link: ${repoPath}`);
+    if (!info.isFile()) continue;
+    const destination = path.join(target, relative);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await cp(input, destination);
   }
 }
 
@@ -39,8 +51,9 @@ async function packageFunction(outputPath) {
   const stage = path.join(temp, 'package');
   try {
     await mkdir(path.join(stage, 'app'), { recursive: true });
-    await copySafeTree(BACKEND, path.join(stage, 'app/backend'));
-    await copySafeTree(WEB, path.join(stage, 'app/web'));
+    const trackedPaths = await listTrackedAppFiles();
+    await copyTrackedTree(BACKEND, path.join(stage, 'app/backend'), trackedPaths);
+    await copyTrackedTree(WEB, path.join(stage, 'app/web'), trackedPaths);
 
     const sourcePackage = JSON.parse(await readFile(path.join(BACKEND, 'package.json'), 'utf8'));
     const packageJson = {

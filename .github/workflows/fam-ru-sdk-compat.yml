@@ -37,6 +37,8 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - name: Test Yandex Functions package composition
+        run: node --test ru-migration/deploy/package-yandex-function.test.mjs
       - name: Build and verify the direct-upload Yandex Cloud Functions package
         run: node ru-migration/deploy/package-yandex-function.mjs "$RUNNER_TEMP/fam-ru-yandex-function.zip"
       - name: Install locked compatibility dependencies
