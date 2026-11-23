@@ -1,6 +1,9 @@
+Warning: truncated output (original token count: 23434)
+Total output lines: 162
+
 # Реестр переноса Supabase → FAM RU
 
-Историческая основа: `origin/main` на `af1f0086066d18b3d814dd535f06eda733ae58de` (2026-11-20). Текущий `origin/main` `9d0685304b0a58c70c47f52818a7b795729d31a6` повторно проверен 23 ноября: всего 83 SQL migrations и 7 Edge Function entrypoints. Последний source commit менял только workflow локального агента и его security-тесты; SQL migrations и Edge Function entrypoints не изменялись. Ветка RU хранит 80 source SQL в корне и ещё 3 точные read-only reference-копии. Это инвентаризация объектов и статуса аналога, не доказательство полного паритета или готовности к запуску. `не проверено` означает, что RU-аналог и тест должны быть подтверждены вручную/синтетически; похожее имя файла не считается доказательством. Политики и grants перечислены как отдельные требования безопасности.
+Историческая основа: `origin/main` на `af1f0086066d18b3d814dd535f06eda733ae58de` (2026-11-20). Текущий `origin/main` `bdb8325843f4d02590723d396d5b3f803d04618a` повторно проверен 23 ноября: всего 83 SQL migrations и 7 Edge Function entrypoints. Ветка RU хранит 80 source SQL в корне и ещё 3 точные read-only reference-копии. Это инвентаризация объектов и статуса аналога, не доказательство полного паритета или готовности к запуску. `не проверено` означает, что RU-аналог и тест должны быть подтверждены вручную/синтетически; похожее имя файла не считается доказательством. Политики и grants перечислены как отдельные требования безопасности.
 
 | SQL migration | Объекты/изменения | Статус |
 |---|---|---|
@@ -157,3 +160,20 @@ Reviewed source migrations `20261108194342_account_deletion_requests_and_cleanup
 | `20261110173255_fam_site_error_monitoring.sql` | Aggregated site-error table, telemetry/digest RPC and initial `*/15` cron; the effective schedule was later changed to hourly at minute `:30`. | Частичная RU замена `site-error-telemetry.mjs` + `site-error-digest.mjs`; только allowlisted counters без сырого текста/PII. Disposable YDB проверяет очередь, не production IAM/schedules. |
 | `20261110174043_fam_admin_technical_alerts.sql` | Добавляет admin technical-alert read RPC; поздний source revoke ограничивает execute доступ. | Прямой RU admin-alert RPC не добавлялся; часть безопасных агрегатов видна school-admin через отдельный endpoint. Полный source contract/role parity остаётся непроверенным. |
 | `20261110181754_20261110180500_fam_agent_moscow_morning_schedule.sql` | Меняет несколько cron выражений с учётом MSK=UTC+3 и ставит site-error digest каждый час в `:30` UTC. | RU timer manifest, queue slot validator and health thresholds теперь используют hourly `:30`; timers подготовлены, но не установлены/включены. Фактическое облачное расписание отсутствует. |
+| `20261110210025_add_persistent_listing_image_review_queue.sql` | Persistent queue для image review, включая идеи, функции claim/finish и cron. | RU предоставляет ручную модерацию фото объявлений, идей и аватаров через same-school API; автоматическая vision queue/worker и расписание не перенесены из-за внешней модели и непроверенного нулевого бюджета. Это функциональный fallback, не автоматический parity. |
+| `20261110215715_harden_private_queue_and_index_user.sql` | Усиливает приватность site-error/image-review очередей и добавляет user lookup index. | HTTP API не предоставляет прямые private queue paths; media ownership и quota guards тестируются. PostgreSQL RLS/index semantics и cloud YDB IAM не эквивалентны и требуют отдельной проверки. |
+
+Filename audit явно выделяет automated image-review queue как открытое расхождение. Ручная модерация фото в RU существует; automated vision classification преднамеренно выключена до проверки стоимости и безопасности.
+
+
+### Анонимная telemetry и чтение расписаний worker (22 ноября 2026)
+
+- Source migrations `20261111052812_fam_site_error_telemetry_anon_only.sql` и `20261111052856_fam_agent_worker_cron_read_access.sql` проверены по точному SQL и реализации RU. Первая оставляет RPC только роли `anon`; в RU этому соответствуют публичный same-origin маршрут с allowlist кодов и ограничением частоты. Вторая открывает worker чтение Postgres `cron` расписаний; в RU расписания выражены systemd units, health-check проверяет только фиксированный allowlist timer units и агрегаты очереди.
+- Unit evidence: `site-error-telemetry.test.mjs`, `server.test.mjs`, `systemd-timer-health.test.mjs`, `ru-system-health.test.mjs`. Текущий кодовый tree прошёл 432 backend/UI теста в предыдущем локальном Node 22 запуске и exact SDK/YDB CI; повторный локальный запуск на этом хосте 22 ноября дал 432/432 на Node 24.22.3. Это не проверяет установленные systemd timers, облачные расписания, DB grants или YDB IAM.
+- Статусы обновлены как безопасные замены с явными отличиями; production и `main` не затрагивались.
+
+### Schedule, private queues, coder bridge and safety attribution (22 ноября 2026)
+
+- Source schedules, private image queue, coder bridge/producer monitor and safety incident attribution were checked against `CRON_PORTING.md`, RU systemd units, `schema/17_safety_incidents.yql`, `schema/34_source_lookup_indexes.yql`, API services and synthetic integration tests. Exact schedule parity is represented in the RU timer files, but timers stay disabled; the external image classifier and Qwen runner remain absent.
+- New YDB schema `34_source_lookup_indexes.yql` maps the owner lookup used when cleaning account media and the school/actor/target safety indexes. The exact [disposable YDB integration #44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) succeeded with schema 01–34, synthetic integration and database cleanup. Exact [SDK/Sharp CI #44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) passed, including all 432 backend tests on Node 22, pinned SDK/Sharp, Yandex Cloud Functions package and the eight timer-file checks.
+- Это закрывает шесть ранее непроверенных строк как эквивалент, ограниченную замену либо явно неперенесённую функцию; автоматическая модерация фото, Qwen и облачный IAM остаются разницами/блокерами полного соответствия.
