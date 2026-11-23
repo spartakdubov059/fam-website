@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkYdbReadiness, createYdbReadinessProbe, getAuthConfiguration, getRuntimeReadiness } from '../runtime.mjs';
+import { checkYdbReadiness, createRuntime, createYdbReadinessProbe, getAuthConfiguration, getRuntimeReadiness } from '../runtime.mjs';
 
 test('auth configuration accepts exactly one complete supported mode', () => {
   assert.deepEqual(getAuthConfiguration({
@@ -24,6 +24,16 @@ test('auth configuration rejects mixed and partially configured modes', () => {
   assert.deepEqual(getAuthConfiguration({ FAM_RU_YANDEX_CLIENT_ID: 'client' }), {
     valid: false, reason: 'incomplete_auth_configuration',
   });
+});
+
+test('runtime refuses mixed or incomplete auth before connecting to YDB', async () => {
+  const databaseOnly = { FAM_RU_DATABASE_URL: 'grpcs://ydb.example/database' };
+  assert.equal(await createRuntime({ ...databaseOnly,
+    FAM_RU_YANDEX_CLIENT_ID: 'client', FAM_RU_YANDEX_REDIRECT_URI: 'https://fam.example/auth/yandex/callback',
+    FAM_RU_SESSION_SECRET: 'x'.repeat(32), FAM_RU_AUTH_ISSUER: 'https://issuer.example',
+  }), null);
+  assert.equal(await createRuntime({ ...databaseOnly, FAM_RU_AUTH_ISSUER: 'https://issuer.example' }), null);
+  assert.equal(await createRuntime({ ...databaseOnly, FAM_RU_YANDEX_CLIENT_ID: 'client' }), null);
 });
 
 test('runtime readiness requires auth, YDB and object storage for the complete Russian copy', () => {
