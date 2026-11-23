@@ -10,6 +10,7 @@ import {
   publicUrl,
   selectPublicPaths,
   sha256,
+  verifyProductionDomains,
   verifyDomains,
 } from "../../scripts/check-fam-domain-sync.mjs";
 
@@ -88,6 +89,42 @@ test("reports the host, path, status, and digest when a deployed file is stale",
         return true;
       },
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("waits for canonical Pages first, then checks paused Netlify once", async () => {
+  const root = mkdtempSync(join(tmpdir(), "fam-domain-primary-first-"));
+  try {
+    writeFileSync(join(root, "index.html"), "current release");
+    writeFileSync(join(root, "school-pulse.js"), "current js");
+    writeFileSync(join(root, "school-pulse.css"), "current css");
+    const calls = { pages: 0, netlify: 0 };
+    const fetchImpl = async url => {
+      if (url.startsWith(DOMAINS[0].origin)) {
+        calls.pages += 1;
+        return new Response(url.includes("school-pulse.js") ? "current js" :
+          url.includes("school-pulse.css") ? "current css" : "current release", { status: 200 });
+      }
+      calls.netlify += 1;
+      return new Response("stale release", { status: 200 });
+    };
+
+    await assert.rejects(
+      verifyProductionDomains({
+        paths: ["index.html"], root, fetchImpl, cacheKey: "paused-test",
+        netlifyPublishEnabled: false, timeoutMs: 0, intervalMs: 1,
+      }),
+      error => {
+        assert.match(error.message, /Netlify index\.html: status=200/);
+        assert.match(error.message, /sha256=[a-f0-9]{12}, expected=[a-f0-9]{12}/);
+        return true;
+      },
+    );
+    assert.equal(calls.pages, 3);
+    assert.equal(calls.netlify, 3);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

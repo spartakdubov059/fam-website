@@ -71,9 +71,10 @@ test("both frontend entry points have working relative assets", () => {
   assert.match(html, /<script src="\.\/school-pulse\.js"><\/script>/);
   assert.match(html, /<link rel="stylesheet" href="\.\/school-pulse\.css">/);
   assert.match(html, /<script src="\.\/supabase-cdn-fallback\.js"><\/script>/);
-  assert.match(html, /<script id="famSupabaseSdk" src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\.119\.0"><\/script>/);
+  assert.match(html, /<script id="famSupabaseSdk" src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\.119\.0" integrity="sha384-[^"]+" crossorigin="anonymous"><\/script>/);
   assert.ok(sdkFallback.includes("document.write("));
   assert.ok(sdkFallback.includes("https://unpkg.com/@supabase/supabase-js@2.119.0"));
+  assert.match(sdkFallback, /integrity="sha384-[^"]+" crossorigin="anonymous"/);
   assert.ok(sdkFallback.includes("Не удалось загрузить модуль FAM"));
 });
 

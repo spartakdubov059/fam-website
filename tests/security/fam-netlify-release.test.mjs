@@ -6,6 +6,15 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildFAMNetlifyRelease, CORE_FILES } from "../../scripts/build-fam-netlify-release.mjs";
+const netlifyWorkflow = readFileSync(new URL("../../.github/workflows/fam-netlify-production.yml", import.meta.url), "utf8");
+
+test("Netlify publishing is opt-in and the paused workflow reports the free publisher", () => {
+  assert.match(netlifyWorkflow, /FAM_NETLIFY_PUBLISH_ENABLED != 'true'/);
+  assert.match(netlifyWorkflow, /FAM_NETLIFY_PUBLISH_ENABLED == 'true'/);
+  assert.match(netlifyWorkflow, /GitHub Pages remains the active free publisher/);
+  const publishJob = netlifyWorkflow.slice(netlifyWorkflow.indexOf("  publish:"));
+  assert.match(publishJob, /NETLIFY_AUTH_TOKEN: \$\{\{ secrets\.NETLIFY_AUTH_TOKEN \}\}/);
+});
 
 test("Netlify deploy contains only the public FAM app, never CI, Git or database files", () => {
   const root = mkdtempSync(join(tmpdir(), "fam-netlify-release-"));

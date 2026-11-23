@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   TASK_PROMPTS,
+  TASK_CONTRACT,
   validateClaimResponse,
   chooseResultCode,
   readTaskSummary,
@@ -30,6 +31,11 @@ test("accepts a single allowlisted aggregate task", () => {
   assert.match(task.prompt, /window\.onerror/);
   assert.match(task.prompt, /window\.onunhandledrejection/);
   assert.equal(Object.keys(TASK_PROMPTS).length, 3);
+  assert.equal(task.contract, TASK_CONTRACT);
+  assert.match(task.prompt, /Карточка задачи:/);
+  assert.match(task.prompt, /required_checks/);
+  assert.ok(task.contract.acceptance.includes("При отсутствии подтверждённого дефекта вернуть no_patch."));
+  assert.ok(task.contract.limits.some((item) => item.includes("Нет секретов")));
 });
 
 test("accepts an empty queue", () => {
@@ -54,7 +60,7 @@ test("rejects non-aggregate and out-of-range payloads", () => {
 });
 
 test("maps model results to fixed result codes only", () => {
-  assert.equal(chooseResultCode({ finding_status: "issue_found", patch_available: true }), "model_completed");
+  assert.equal(chooseResultCode({ finding_status: "issue_found", patch_available: true }), "model_generated");
   assert.equal(chooseResultCode({ finding_status: "no_issue", patch_available: false }), "model_no_patch");
   assert.equal(chooseResultCode({ finding_status: "blocked" }), "model_blocked");
   assert.equal(chooseResultCode(null), "model_failed");
@@ -106,6 +112,34 @@ test("bridge request never logs or returns the supplied token", async () => {
   assert.equal(JSON.stringify(data).includes("secret-test-token"), false);
 });
 
+test("finish request logs only fixed diagnostics when the edge rejects it", async () => {
+  const messages = [];
+  const originalError = console.error;
+  console.error = (...args) => messages.push(args.join(" "));
+  try {
+    await assert.rejects(bridgeRequest({
+      url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+      token: "secret-test-token",
+      body: { action: "finish", task_id: "e6044c1e-0234-43d1-bb61-f27602b7f951", result_code: "model_no_patch" },
+      fetchImpl: async (_url, options) => {
+        assert.equal(options.body.length, 99);
+        return {
+          ok: false,
+          status: 400,
+          headers: new Headers({ "X-FAM-Diagnostic-Id": "123e4567-e89b-42d3-a456-426614174000" }),
+          json: async () => ({ error_code: "invalid_action", stage: "action_validation", diagnostic_id: "123e4567-e89b-42d3-a456-426614174000" }),
+        };
+      },
+    }), /HTTP 400 invalid_action at action_validation/);
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /"request_bytes":99/);
+  assert.match(messages[0], /"result_code":"model_no_patch"/);
+  assert.doesNotMatch(messages[0], /secret-test-token|e6044c1e-0234-43d1-bb61-f27602b7f951/);
+});
+
 import { readFileSync } from "node:fs";
 
 const migration = readFileSync(
@@ -144,6 +178,10 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /request_too_large/);
   assert.match(edgeSource, /claim_fam_agent_coder_tasks/);
   assert.match(edgeSource, /finish_fam_agent_coder_task/);
+  assert.match(edgeSource, /start_fam_agent_coder_task/);
+  assert.match(edgeSource, /heartbeat_fam_agent_coder_task/);
+  assert.match(edgeSource, /advance_fam_agent_coder_task/);
+  assert.doesNotMatch(edgeSource, /owner_approved|postmerge_verified|body\.action === "merge"/);
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
 });

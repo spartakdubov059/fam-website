@@ -13,7 +13,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  paused:
+    if: vars.FAM_NETLIFY_PUBLISH_ENABLED != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Report that Netlify publishing is paused
+        run: echo "::notice::Netlify publishing is paused. GitHub Pages remains the active free publisher; no Netlify credentials or deploy endpoint were used."
+
   publish:
+    if: vars.FAM_NETLIFY_PUBLISH_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

@@ -49,3 +49,16 @@ test("Qwen lease recovery only closes expired tasks owned by the Qwen worker and
   );
   assert.match(recoveryMigration, /t\.attempt_count >= t\.max_attempts/i);
 });
+
+test("new Qwen recovery migration requeues only expired retryable Qwen tasks and clears stale lifecycle", () => {
+  const migration = readFileSync(
+    new URL("../../supabase/migrations/20261123013000_fam_qwen_retry_recovery.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /t\.claimed_by = p_worker_id/i);
+  assert.match(migration, /t\.attempt_count < t\.max_attempts/i);
+  assert.match(migration, /set status = 'queued'/i);
+  assert.match(migration, /result_summary = 'Ограниченное техническое задание принято локальным анализатором\.'/i);
+  assert.match(migration, /for update skip locked/i);
+  assert.doesNotMatch(migration, /delete from private\.fam_agent_tasks/i);
+});

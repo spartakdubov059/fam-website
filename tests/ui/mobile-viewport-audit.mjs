@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { chromium } from "playwright";
 
 const sourceHtml = await readFile(resolve(process.cwd(), "index.html"), "utf8");
 const priceFormatter = await readFile(resolve(process.cwd(), "price-format.js"), "utf8");
-const html = sourceHtml.replace('<script src="price-format.js"></script>', `<script>${priceFormatter}</script>`);
+let html = sourceHtml.replace('<script src="price-format.js"></script>', `<script>${priceFormatter}</script>`);
 assert.notEqual(html, sourceHtml, "price formatter must be included in the browser audit page");
+const priceFormatterHash = `sha256-${createHash("sha256").update(priceFormatter).digest("base64")}`;
+html = html.replace(
+  /(http-equiv="Content-Security-Policy" content="[^"]*script-src )/,
+  `$1'${priceFormatterHash}' `
+);
+assert.ok(html.includes(priceFormatterHash), "injected price formatter must be authorized by its exact CSP hash");
 const listing = {
   id: "e65ad519-bcb1-4b6b-8514-5e1b2b82a1e9",
   user_id: "f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b",
@@ -32,7 +39,7 @@ const approvedListing = {
   status: "active",
   moderation_status: "approved",
   photo_status: "approved",
-  image_url: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
+  image_url: "https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/public/listings-images/listing_8b07e0b4-4fd3-4a95-9715-7cdac57d22b1_f5a84e7c-75ea-4b5c-94e4-2e3f9a8d5a1b.jpg",
   is_event: false
 };
 
@@ -73,16 +80,39 @@ window.supabase = {
       },
       functions: { invoke: async function () { return { data: { ok: true, role: "student", request: null }, error: null }; } },
       rpc: async function () { return { data: { announcements: [], polls: [] }, error: null }; },
+      storage: { from: function (bucket) { return { createSignedUrls: async function (paths) {
+        return { data: paths.map(path => ({ signedUrl: "https://tfacqpljrvfpcrhdovbu.supabase.co/storage/v1/object/sign/" + bucket + "/" + encodeURIComponent(path) + "?token=test" })), error: null };
+      } }; } },
       from: query
     };
   }
 };
 `;
 
+function withSdkMockIntegrity(source, mock) {
+  const hash = `sha384-${createHash("sha384").update(mock).digest("base64")}`;
+  const withIntegrity = source.replace(
+    /(<script id="famSupabaseSdk" src="[^"]+") integrity="[^"]+"/,
+    `$1 integrity="${hash}"`
+  );
+  const withPolicy = withIntegrity.replace(
+    /(http-equiv="Content-Security-Policy" content="[^"]*script-src )/,
+    `$1'${hash}' `
+  );
+  assert.ok(withPolicy.includes(hash), "mock Supabase SDK must use matching SRI and CSP hashes");
+  return withPolicy;
+}
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 360, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 const pageErrors = [];
 page.on("pageerror", error => pageErrors.push(error.message));
+const fulfillSupabaseRequest = route => {
+  if (new URL(route.request().url()).pathname.includes("/storage/v1/object/sign/")) {
+    return route.fulfill({ status: 200, contentType: "image/gif", body: Buffer.from("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=", "base64") });
+  }
+  return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+};
 await page.addInitScript(() => {
   window.__helperFetchCalls = 0;
   const originalFetch = window.fetch.bind(window);
@@ -94,9 +124,7 @@ await page.addInitScript(() => {
 await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", route =>
   route.fulfill({ status: 200, contentType: "application/javascript", body: sdkMock })
 );
-await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
-  route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
-);
+await page.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", fulfillSupabaseRequest);
 
 try {
   // Keep a separate signed-out scenario: anonymous visitors must not see
@@ -112,16 +140,14 @@ try {
   await guestPage.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0", route =>
     route.fulfill({ status: 200, contentType: "application/javascript", body: guestSdkMock })
   );
-  await guestPage.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", route =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
-  );
-  await guestPage.setContent(html, { waitUntil: "domcontentloaded" });
+  await guestPage.route("https://tfacqpljrvfpcrhdovbu.supabase.co/**", fulfillSupabaseRequest);
+  await guestPage.setContent(withSdkMockIntegrity(html, guestSdkMock), { waitUntil: "domcontentloaded" });
   await guestPage.locator('#listingsGrid [data-action="open-auth"]').waitFor({ state: "visible", timeout: 10000 });
   assert.equal(await guestPage.locator("#listingsGrid .l-card").count(), 0, "guest must not see school listings");
   assert.deepEqual(guestPageErrors, [], "guest board must not trigger JavaScript errors");
   await guestPage.close();
 
-  await page.setContent(html, { waitUntil: "domcontentloaded" });
+  await page.setContent(withSdkMockIntegrity(html, sdkMock), { waitUntil: "domcontentloaded" });
   await page.locator("#listingsGrid .l-card").first().waitFor({ state: "visible", timeout: 10000 });
   assert.equal(
     await page.locator("#listingsGrid .l-card").first().locator(".l-price").textContent(),

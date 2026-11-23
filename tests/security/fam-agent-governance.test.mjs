@@ -6,6 +6,9 @@ import {
   inspectAgents,
   proposeRecruitment,
   makeReport,
+  summarizeQwenRuns,
+  summarizeAgentQueue,
+  inspectPostMerge,
 } from "../../scripts/fam-agent-governance.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
@@ -96,4 +99,12 @@ test("Report escapes untrusted GitHub metadata and clarifies human authority", (
   assert.ok(report.includes("отчёт неполный"));
   assert.ok(report.includes("одобрения владельца"));
   assert.ok(report.includes("#1 ↔ #2"));
+});
+
+test("INSPECTOR flags failed post-merge workflows without triggering rollback", () => {
+  const warnings = inspectPostMerge({ runs: [{ conclusion: "failure", event: "push", created_at: earlier(1) }], now: NOW });
+  assert.equal(warnings[0].code, "postmerge_workflow_failure");
+  assert.deepEqual(inspectPostMerge({ runs: [{ conclusion: "success", event: "push", created_at: earlier(1) }], now: NOW }), []);
+  assert.equal(typeof summarizeQwenRuns, "function");
+  assert.equal(typeof summarizeAgentQueue, "function");
 });

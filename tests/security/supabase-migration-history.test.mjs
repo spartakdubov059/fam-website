@@ -15,12 +15,18 @@ test("migration filenames match the versions already recorded in FAM production"
     "20261111182622_recover_expired_fam_coder_tasks_after_final_attempt.sql",
     "20261111183253_monitor_qwen_coder_producer_schedule.sql",
     "20261111184531_scope_qwen_retry_reaper_to_claimed_system_tasks.sql",
+    "20261123001553_fam_qwen_lease_and_lifecycle.sql",
   ];
   const staleFiles = [
+    "20261123001000_fam_qwen_lease_and_lifecycle.sql",
     "20261109162500_school_scoped_agent_reports_and_free_analysts.sql",
     "20261110180500_fam_agent_moscow_morning_schedule.sql",
     "20261110204600_add_persistent_listing_image_review_queue.sql",
     "20261111163500_restrict_unapproved_ideas_from_council.sql",
+  ];
+  const proposedFiles = [
+    "20261123013000_fam_qwen_retry_recovery.sql",
+    "20261123013500_fam_agent_task_metrics.sql",
   ];
 
   for (const file of appliedFiles) {
@@ -28,5 +34,8 @@ test("migration filenames match the versions already recorded in FAM production"
   }
   for (const file of staleFiles) {
     assert.ok(!files.has(file), `Stale migration version could be reapplied: ${file}`);
+  }
+  for (const file of proposedFiles) {
+    assert.ok(files.has(file), `Missing proposed migration: ${file}`);
   }
 });
