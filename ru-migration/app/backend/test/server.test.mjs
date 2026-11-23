@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 7812)
+Total output lines: 567
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../server.mjs';
@@ -28,6 +31,12 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(page.headers.get('content-security-policy'), /style-src 'self'(?:;|$)/);
     assert.doesNotMatch(page.headers.get('content-security-policy'), /style-src[^;]*unsafe-inline/);
     assert.match(html, /<script src="\/shell-bootstrap\.js"><\/script>/);
+    for (const module of [
+      'public-board.js', 'messages.js', 'listing-submit.js', 'category-hints.js',
+      'description-helper.js', 'listing-moderation.js', 'avatar-workflow.js',
+      'profile-settings.js', 'account-workflow.js', 'idea-history.js',
+      'own-listings.js', 'hero-carousel.js', 'navigation.js', 'pulse.js',
+    ]) assert.match(html, new RegExp(`<script type="module" src="/${module}"><\\/script>`));
     assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
     assert.match(html, /<link rel="stylesheet" href="\/shell\.css">/);
     assert.doesNotMatch(html, /<style\b/i);
@@ -48,7 +57,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     assert.match(bootstrapSource, /ruListingForm/);
     assert.match(bootstrapSource, /id="ruOpenMessages"/);
     assert.match(bootstrapSource, /id="ruMessages"/);
-    assert.match(bootstrapSource, /messagesScript\.src = '\/messages\.js'/);
+    assert.doesNotMatch(bootstrapSource, /createElement\(['"]script['"]\)/);
     assert.match(bootstrapSource, /auth\/yandex\/start/);
     assert.match(bootstrapSource, /Российская копия работает отдельно от основного FAM/);
     assert.match(bootstrapSource, /id="ruPulse"/);
@@ -79,7 +88,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     const pulse = await fetch(new URL('/pulse.js', origin));
     assert.equal(pulse.status, 200);
     assert.match(await pulse.text(), /api\/v1\/pulse/);
-    assert.match(bootstrapSource, /pulseScript\.src = '\/pulse\.js'/);
+    assert.doesNotMatch(bootstrapSource, /createElement\(['"]script['"]\)/);
     assert.doesNotMatch(bootstrapSource, /selfDeletePassword/);
 
     const moderation = await fetch(new URL('/listing-moderation.js', origin));
@@ -246,76 +255,7 @@ test('isolated server dispatches private idea-image reads through the media API'
     assert.deepEqual(listingPaths, ['GET /api/v1/school/ideas', 'GET /api/v1/school/ideas/workflow',
       'PATCH /api/v1/school/ideas/workflow/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/status',
       'DELETE /api/v1/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/images', 'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/moderation']);
-  });
-});
-
-test('self account deletion routes through the configured Russian backend', async () => {
-  let method;
-  await withServer({ listingsApi: async req => {
-    method = req.method;
-    return { status: 200, body: { ok: true, deleted: true } };
-  } }, async origin => {
-    const response = await fetch(new URL('/api/v1/me/account', origin), {
-      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: 'synthetic' }),
-    });
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, deleted: true });
-    assert.equal(method, 'DELETE');
-  });
-});
-
-test('school safety reports route through the configured Russian backend', async () => {
-  let routed;
-  await withServer({ listingsApi: async request => {
-    routed = { method: request.method, url: request.url };
-    return { status: 200, body: { ok: true, reports: [] } };
-  } }, async origin => {
-    const response = await fetch(new URL('/api/v1/school/admin/safety-reports', origin));
-    assert.equal(response.status, 200);
-    assert.deepEqual(routed, { method: 'GET', url: '/api/v1/school/admin/safety-reports' });
-  });
-});
-
-test('school admin overview routes through the configured Russian backend', async () => {
-  let routed;
-  await withServer({ listingsApi: async request => {
-    routed = { method: request.method, url: request.url };
-    return { status: 200, body: { ok: true, users: [] } };
-  } }, async origin => {
-    const response = await fetch(new URL('/api/v1/school/admin/overview', origin));
-    assert.equal(response.status, 200);
-    assert.deepEqual(routed, { method: 'GET', url: '/api/v1/school/admin/overview' });
-  });
-});
-
-test('direct school account deletion routes through the configured Russian backend', async () => {
-  let url;
-  const targetId = '22222222-2222-4222-8222-222222222222';
-  await withServer({ listingsApi: async req => {
-    url = req.url;
-    return { status: 200, body: { ok: true, deleted: true } };
-  } }, async origin => {
-    const response = await fetch(new URL(`/api/v1/school/accounts/${targetId}`, origin), {
-      method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirmation: 'synthetic' }),
-    });
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { ok: true, deleted: true });
-    assert.equal(url, `/api/v1/school/accounts/${targetId}`);
-  });
-});
-
-test('isolated server returns Yandex OAuth redirects without proxying credentials through the browser', async () => {
-  await withServer({ authApi: async request => ({
-    status: 302,
-    headers: { location: 'https://oauth.yandex.ru/authorize?response_type=code&state=synthetic', 'set-cookie': 'fam_ru_oauth_state=synthetic; HttpOnly; SameSite=Lax' },
-    body: null,
-  }) }, async origin => {
-    const response = await fetch(new URL('/auth/yandex/start', origin), { redirect: 'manual' });
-    assert.equal(response.status, 302);
-    assert.match(response.headers.get('location'), /^https:\/\/oauth\.yandex\.ru\/authorize/);
-    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
-    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+      'PATCH /api/v1/school/ideas/aaaaaaaa-aaaa-4aaa-8aaa-…812 tokens truncated…t.equal(response.headers.get('x-frame-options'), 'DENY');
     assert.equal(response.headers.get('permissions-policy'), 'camera=(), microphone=(), geolocation=()');
   });
   await withServer({}, async origin => {
