@@ -178,3 +178,12 @@ Filename audit явно выделяет automated image-review queue как о�
 - Source schedules, private image queue, coder bridge/producer monitor and safety incident attribution were checked against `CRON_PORTING.md`, RU systemd units, `schema/17_safety_incidents.yql`, `schema/34_source_lookup_indexes.yql`, API services and synthetic integration tests. Exact schedule parity is represented in the RU timer files, but timers stay disabled; the external image classifier and Qwen runner remain absent.
 - New YDB schema `34_source_lookup_indexes.yql` maps the owner lookup used when cleaning account media and the school/actor/target safety indexes. The exact [disposable YDB integration #44951135661](https://github.com/spartakdubov059/fam-website/actions/runs/44951135661) succeeded with schema 01–34, synthetic integration and database cleanup. Exact [SDK/Sharp CI #44951135767](https://github.com/spartakdubov059/fam-website/actions/runs/44951135767) passed, including all 432 backend tests on Node 22, pinned SDK/Sharp, Yandex Cloud Functions package and the eight timer-file checks.
 - Это закрывает шесть ранее непроверенных строк как эквивалент, ограниченную замену либо явно неперенесённую функцию; автоматическая модерация фото, Qwen и облачный IAM остаются разницами/блокерами полного соответствия.
+
+
+### Source migrations added from current main (23 ноября 2026)
+
+| `20261123203000_fam_qwen_bounded_failure_retry.sql` | Ограничивает повторы временных ошибок Qwen двумя попытками. | Точная read-only копия сохранена. RU очередь ограничивает попытки; локальная модель и автоматический запуск не включены из-за бюджета 0 ₽. |
+| `20261123210000_fam_qwen_retry_scope_and_stale_queue.sql` | Закрывает устаревшие задачи и ограничивает retry свежими задачами INSPECTOR с allowlist сигналов. | Точная read-only копия сохранена. RU claim/retry проверен на YDB; 7-дневная очистка и полный signal allowlist пока не портированы. |
+| `20261123220000_fam_qwen_runtime_smoke_dedupe.sql` | Добавляет cooldown key для ручного synthetic runtime smoke. | Точная read-only копия сохранена. Runtime smoke/INSPECTOR workflow не запускает модель в RU при бюджете 0 ₽; перенос signal dedupe не выполнен. |
+
+Актуальный read-only ref `origin/main`: `6e958f65f6d59dcf7ee1711199fb553dd66c794c`, 87 исходных SQL migrations. Реестр содержит точные имена и исторический status, но это не доказательство YDB/RPC parity. Автоматизация Qwen остаётся выключенной до безопасного бесплатного runtime.
