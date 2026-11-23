@@ -94,6 +94,12 @@ window.onunhandledrejection = function() {
             <div class="hero-slide hero-img"><img src="/assets/banner-4.webp" width="1200" height="675" alt="Вещи и услуги для школьников." loading="lazy"></div>
             <div class="hero-slide hero-img"><img src="/assets/banner-5.webp" width="1200" height="675" alt="Учёба и новые знания." loading="lazy"></div>
             <div class="hero-slide hero-img"><img src="/assets/banner-6.webp" width="1200" height="675" alt="Концерты, квизы и встречи." loading="lazy"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-7.webp" width="1200" height="675" alt="Найди своих на закате." loading="lazy" decoding="async"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-8.webp" width="1200" height="675" alt="Школьная площадка FAM: анонсы и события." loading="lazy" decoding="async"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-9.webp" width="1200" height="675" alt="Вещи и услуги: техника для учёбы." loading="lazy" decoding="async"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-10.webp" width="1200" height="675" alt="Учёба и развитие за чашкой кофе." loading="lazy" decoding="async"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-11.webp" width="1200" height="675" alt="Творчество и идеи: камера и вдохновение." loading="lazy" decoding="async"></div>
+            <div class="hero-slide hero-img"><img src="/assets/banner-12.webp" width="1200" height="675" alt="Ученический совет: команда волонтёров." loading="lazy" decoding="async"></div>
           </div>
           <div id="ruHeroDots" class="hero-dots" aria-label="Выбор баннера"></div>
           <div class="hero-carousel-controls">

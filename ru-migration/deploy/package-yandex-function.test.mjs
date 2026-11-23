@@ -24,6 +24,7 @@ test('Yandex Function archive uses tracked app files and excludes workspace copi
       'index.cjs', 'timer.cjs', 'package.json', 'package-lock.json',
       'app/backend/yandex-function.mjs', 'app/backend/schema/37_step_up_email_challenges.yql',
       'app/web/index.html', 'app/web/step-up-email.js',
+      ...Array.from({ length: 12 }, (_, index) => `app/web/assets/banner-${index + 1}.webp`),
     ]) assert.ok(names.has(required), `archive is missing ${required}`);
     for (const excluded of [
       'app/backend/schema/37_step_up_email_challenges 2.yql',
