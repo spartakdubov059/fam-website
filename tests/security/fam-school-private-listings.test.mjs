@@ -24,3 +24,15 @@ test("guest visitors see a login prompt rather than an empty broken-looking boar
   assert.match(code, /Войдите, чтобы смотреть объявления/i);
   assert.match(code, /data-action="open-auth"/);
 });
+
+test("listing text renders independently of photo signing and overlapping refreshes are coalesced", () => {
+  const loadAll = html.slice(html.indexOf("async function loadAll()"), html.indexOf("const getTaken"));
+  assert.doesNotMatch(loadAll, /await\s+hydrateListingImages\(/);
+  assert.match(loadAll, /void\s+hydrateListingImages\(rowsToHydrate\)/);
+  assert.match(loadAll, /\.catch\(\(\)\s*=>\s*\{\s*reportFamSiteError\("database_request_failed",\s*"database"\)/);
+
+  const helper = html.slice(html.indexOf("function hydrateListingImages(rows)"), html.indexOf("function renderIdeaImages"));
+  assert.match(helper, /listingImageHydrationInFlight/);
+  assert.match(helper, /listingImageHydrationQueuedRows\s*=\s*rows/);
+  assert.match(helper, /hydrateListingImagesBatch\(rowsToHydrate\)/);
+});
