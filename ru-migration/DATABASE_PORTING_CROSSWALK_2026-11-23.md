@@ -5,7 +5,7 @@
 ## Объём и метод
 
 - В source `main` `bdb8325`: 83 файла `supabase/migrations/*.sql`, 7 Edge Function entrypoints. Root source checkout содержит 80 SQL файлов; ещё 3 точных upstream-файла сохранены в [`source-reference/supabase-migrations`](source-reference/supabase-migrations/) с проверенными Git blob SHA. Это только read-only evidence: их нельзя запускать на YDB или Supabase. Семантическая замена остаётся отдельной от наличия исходных SQL-файлов.
-- Лексический поиск SQL-файлов нашёл 19 уникальных имён таблиц в `CREATE TABLE`, 53 имени функции в `CREATE OR REPLACE FUNCTION` и 5 имён триггеров в `CREATE TRIGGER`. Четыре lifecycle-функции добавлены миграцией `20261123001553_fam_qwen_lease_and_lifecycle.sql`, а агрегатная метрика — `20261123013500_fam_agent_task_metrics.sql`. Это подсчёт по тексту, а не анализ итогового живого PostgreSQL-каталога: он не учитывает полностью динамический SQL и жизненный цикл `ALTER`/`DROP`.
+- Лексический поиск SQL-файлов нашёл 19 уникальных имен таблиц в `CREATE TABLE`, 52 имени функции в `CREATE OR REPLACE FUNCTION` и 5 имен триггеров в `CREATE TRIGGER`. Четыре функции сверх прежнего снимка добавлены миграцией `20261123001553_fam_qwen_lease_and_lifecycle.sql`. Это подсчёт по тексту, а не анализ итогового живого PostgreSQL-каталога: он не учитывает полностью динамический SQL и жизненный цикл `ALTER`/`DROP`.
 - RU содержит 37 YQL-файлов и 39 объявлений `CREATE TABLE`. Схема и репозиторий проверены чтением кода, существующие интеграционные проверки указаны в других документах. Это не аудит реальных YDB grants/IAM и не эквивалент PostgreSQL RLS.
 
 ## Подсчёт исходных access-control DDL (лексический)
@@ -17,7 +17,7 @@
 | `ENABLE ROW LEVEL SECURITY` | 14 | Табличный итог требует проверки PostgreSQL catalog и FORCE/RLS role semantics. |
 | `FORCE ROW LEVEL SECURITY` | 4 | Строки миграций, не подтверждение итогового состояния живой базы. |
 
-Эти количества относились к предыдущему source snapshot `cc8b59b`. Текущий source `main` `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL-файла; обновлённый lexical RPC count приведён в [RPC_SECURITY_CROSSWALK_2026-11-23.md](RPC_SECURITY_CROSSWALK_2026-11-23.md). Подсчёты нужны только для оценки охвата аудита; в RU нет эквивалентного набора RLS policy DDL, поэтому каждую доступную операцию следует свести к actor/school/owner проверкам и отдельно подтвердить минимальный Yandex IAM.
+Эти количества подтверждены повторным `rg` по текущим 81 SQL-файлам из `main` `cc8b59bd2517ddfe2b6488b16cff468e99c05980`. Они нужны только для оценки охвата аудита; в RU нет эквивалентного набора RLS policy DDL, поэтому каждую доступную операцию следует свести к actor/school/owner проверкам и минимальному Yandex IAM отдельно.
 
 ## Таблицы, создаваемые исходными миграциями
 
@@ -59,20 +59,15 @@ RU-специфические таблицы без прямой отдельн�
 ## Оставшиеся обязательные проверки
 
 1. Проверить по PostgreSQL parser/catalog все строки из `RPC_SECURITY_CROSSWALK_2026-11-23.md`, включая grants/revokes, итоговые SECURITY/search_path и request/response контракт; текущий каталог — lexical стартовая сверка.
-2. Сверить итоговые активные триггеры и RLS/policy state после всех 83 миграций; значения DDL-операторов остаются только ориентиром lexical scan.
+2. Сверить итоговые активные триггеры и RLS/policy state после всех 81 миграции; текущие количества 71 policy, 153 grant/revoke, 14 enable-RLS и 4 force-RLS — только ориентир lexical scan.
 3. Для каждой из семи Edge Functions закрыть сценарии и явно принять/реализовать отличия, особенно email confirmation, moderation/model safety, worker/coder execution и media flows.
 
 ## Обновление source `main` и RU coder lifecycle — 23 ноября 2026
 
-- Предыдущий скриптовый подсчёт `cc8b59b` дал 81 SQL migration path, 7 Edge Function entrypoints; 19 уникальных `CREATE TABLE`, 52 уникальных `CREATE OR REPLACE FUNCTION`, 5 уникальных `CREATE TRIGGER`. Текущий source `bdb8325` содержит 83 SQL paths, 7 entrypoints, 53 уникальных RPC имени; точные migration filenames теперь сверены в inventory ниже.
+- Повторный скриптовый подсчёт удалённого Git tree `cc8b59b`: 81 SQL migration path, 7 Edge Function entrypoints; 19 уникальных `CREATE TABLE`, 52 уникальных `CREATE OR REPLACE FUNCTION`, 5 уникальных `CREATE TRIGGER`. В source добавлена одна миграция с четырьмя lifecycle RPC функциями.
 - RU теперь поддерживает lease-bound `start`, `heartbeat`, и упорядоченные стадии `model_generated`, `qa_passed`, `pr_created`, `qa_failed`, `model_no_patch`, `model_failed`, `model_blocked`. На YDB task дополнительно требуется одноразовый claim token, а не только worker bearer; максимальные lifecycle lease ограничены 30 минутами, дальнейшее продление — двумя часами. Успешный `finish` допускает только `model_no_patch`; подтверждение `model_completed` отклоняется.
 - Добавлена synthetic YDB integration последовательность для start/heartbeat/model/QA/PR стадии и проверки освобождения аренды после PR handoff. Её синтаксис и локальная имитационная часть проходят; точная последовательность против YDB пока не проверена, потому что нет локального YDB/Docker и текущий diff не опубликован для disposable GitHub Actions.
 - Этот port реализует состояние очереди, но не исполняет Qwen, shell/tools или GitHub PR операции. Он не делает полную эквивалентность source workflow; независимый security review обязателен.
-
-## Проверка RU coder claim относительно источника — 23 ноября 2026
-
-- В `claimSafeCoderTask` RU раньше выбирал задачи по времени создания, а source RPC сначала сортирует по `priority` (`urgent`, `high`, `normal`, затем прочие). RU query и unit assertion обновлены на коммите [`a327510`](https://github.com/spartakdubov059/fam-website/commit/a32751087ae460ada7da175e32171486bc843d47).
-- Для одной синтетической coder-задачи запущены два параллельных claim. Условие «выдана ровно одна аренда» прошло в [disposable YDB integration #45175534283](https://github.com/spartakdubov059/fam-website/actions/runs/45175534283); SDK/Sharp workflow #45175534306 прошёл также. Это исправляет семантику выбора и проверяет конкурентный доступ на тестовой YDB, но не запускает Qwen и не проверяет cloud IAM.
 4. Получить бесплатное безопасное окружение с проверяемым hard stop стоимости; без него облачные ресурсы не включать. В доступных условиях гарантированного 0 ₽ cloud staging нет.
 5. После статического закрытия parity выполнить disposable YDB + private S3 integration на синтетических данных, затем проверить OAuth/Postbox, IAM, backup/restore и права без подключения реальных школьных записей.
 
