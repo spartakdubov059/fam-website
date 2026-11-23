@@ -1,4 +1,5 @@
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_GATEWAY_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PENDING_KEY = /^pending\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i;
 const IDEA_MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -7,8 +8,54 @@ async function readJson(response) {
   try { return await response.json(); } catch { return null; }
 }
 
+export async function prepareListingUploadImage(file, { document = globalThis.document,
+  createImageBitmapImpl = globalThis.createImageBitmap } = {}) {
+  if (!file || file.size <= MAX_GATEWAY_IMAGE_BYTES) return file;
+  if (typeof createImageBitmapImpl !== 'function' || typeof document?.createElement !== 'function') {
+    const error = new Error('image_compression_unavailable');
+    error.code = 'image_compression_unavailable';
+    throw error;
+  }
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmapImpl(file, { imageOrientation: 'from-image' });
+    const sourcePixels = bitmap.width * bitmap.height;
+    if (!Number.isSafeInteger(sourcePixels) || sourcePixels < 1 || sourcePixels > 20_000_000) {
+      const error = new Error('image_dimensions_unsupported');
+      error.code = 'image_dimensions_unsupported';
+      throw error;
+    }
+    const fitScale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) throw new Error('image_canvas_unavailable');
+
+    for (const dimensionScale of [1, 0.85, 0.7, 0.55]) {
+      canvas.width = Math.max(1, Math.round(bitmap.width * fitScale * dimensionScale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * fitScale * dimensionScale));
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.84, 0.72, 0.6, 0.48]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        if (blob && blob.type === 'image/webp' && blob.size > 0 && blob.size <= MAX_GATEWAY_IMAGE_BYTES) return blob;
+      }
+    }
+    const error = new Error('image_compression_limit');
+    error.code = 'image_compression_limit';
+    throw error;
+  } catch (error) {
+    if (error?.code) throw error;
+    const wrapped = new Error('image_compression_failed');
+    wrapped.code = 'image_compression_failed';
+    throw wrapped;
+  } finally {
+    bitmap?.close?.();
+  }
+}
+
 export async function initializeListingSubmission({ document = globalThis.document, fetchImpl = globalThis.fetch,
   FormDataCtor = globalThis.FormData, location = globalThis.location,
+  prepareUploadImage = prepareListingUploadImage,
   confirmImpl = message => typeof globalThis.confirm === 'function' && globalThis.confirm(message) } = {}) {
   if (!document || typeof fetchImpl !== 'function') return;
   const form = document.getElementById('ruListingForm');
@@ -113,9 +160,15 @@ export async function initializeListingSubmission({ document = globalThis.docume
     try {
       status.textContent = 'Отправляем объявление на проверку…';
       if (file) {
+        let uploadFile;
+        try { uploadFile = await prepareUploadImage(file, { document }); }
+        catch {
+          status.textContent = 'Не удалось подготовить фото для безопасной загрузки. Выберите другое изображение.';
+          return;
+        }
         const upload = await fetchImpl('/api/v1/media/pending', {
           method: 'POST', credentials: 'same-origin', cache: 'no-store',
-          headers: { 'content-type': file.type }, body: file,
+          headers: { 'content-type': uploadFile.type || file.type }, body: uploadFile,
         });
         const uploaded = await readJson(upload);
         if (!upload.ok && upload.status === 429 && uploaded?.error === 'rate_limited') {

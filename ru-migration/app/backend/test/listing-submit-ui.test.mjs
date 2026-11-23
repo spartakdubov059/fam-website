@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initializeListingSubmission } from '../../web/listing-submit.js';
+import { initializeListingSubmission, prepareListingUploadImage } from '../../web/listing-submit.js';
 
 function fixture(file = { type: 'image/png', size: 100, name: 'synthetic.png' }) {
   const shellChildren = [];
@@ -23,6 +23,38 @@ function fixture(file = { type: 'image/png', size: 100, name: 'synthetic.png' })
   class FormDataMock { get(name) { return values[name] ?? form.elements[name]?.value ?? ''; } }
   return { document, form, status, login, logout, listeners, shellChildren, values, FormDataCtor: FormDataMock };
 }
+
+test('large listing photos are resized locally to fit the Russian gateway request limit', async () => {
+  const file = { type: 'image/jpeg', size: 3 * 1024 * 1024 };
+  let closed = false;
+  let dimensions;
+  const canvas = {
+    getContext: () => ({ drawImage: (_bitmap, _x, _y, width, height) => { dimensions = [width, height]; } }),
+    toBlob: (resolve, type, quality) => resolve({ type, size: quality > 0.72 ? 2.4 * 1024 * 1024 : 1.8 * 1024 * 1024 }),
+  };
+  const prepared = await prepareListingUploadImage(file, {
+    document: { createElement: tag => { assert.equal(tag, 'canvas'); return canvas; } },
+    createImageBitmapImpl: async (input, options) => {
+      assert.equal(input, file);
+      assert.deepEqual(options, { imageOrientation: 'from-image' });
+      return { width: 4000, height: 3000, close: () => { closed = true; } };
+    },
+  });
+  assert.deepEqual(dimensions, [1600, 1200]);
+  assert.equal(prepared.type, 'image/webp');
+  assert.equal(prepared.size, 1.8 * 1024 * 1024);
+  assert.equal(closed, true);
+});
+
+test('large listing photos fail locally when browser compression cannot fit the gateway limit', async () => {
+  let closed = false;
+  await assert.rejects(prepareListingUploadImage({ size: 3 * 1024 * 1024 }, {
+    document: { createElement: () => ({ getContext: () => ({ drawImage() {} }),
+      toBlob: resolve => resolve({ type: 'image/webp', size: 2.1 * 1024 * 1024 }) }) },
+    createImageBitmapImpl: async () => ({ width: 800, height: 600, close: () => { closed = true; } }),
+  }), error => error.code === 'image_compression_limit');
+  assert.equal(closed, true);
+});
 
 test('listing form authenticates first, then uploads a private photo and submits its key to the Russian API', async () => {
   const f = fixture();
@@ -47,6 +79,25 @@ test('listing form authenticates first, then uploads a private photo and submits
   assert.equal(JSON.parse(calls[2].init.body).price_text, 'Бесплатно');
   assert.equal(f.form.wasReset, true);
   assert.match(f.status.textContent, /отправлено/);
+});
+
+test('listing form uploads the locally compressed WebP for a photo larger than the gateway limit', async () => {
+  const original = { type: 'image/jpeg', size: 3 * 1024 * 1024, name: 'synthetic-large.jpg' };
+  const prepared = { type: 'image/webp', size: 1.5 * 1024 * 1024 };
+  const f = fixture(original);
+  const calls = [];
+  await initializeListingSubmission({ ...f, prepareUploadImage: async file => { assert.equal(file, original); return prepared; },
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, init });
+      if (url === '/api/v1/me') return { ok: true, json: async () => ({ ok: true, profile: { id: 'synthetic-user' } }) };
+      if (url === '/api/v1/media/pending') return { ok: true, json: async () => ({ ok: true, image: { key: 'pending/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp' } }) };
+      if (url === '/api/v1/listings') return { ok: true, json: async () => ({ ok: true, status: 'pending' }) };
+      throw new Error(`unexpected route ${url}`);
+    } });
+  await f.listeners.submit({ preventDefault() {} });
+  assert.equal(calls[1].init.body, prepared);
+  assert.equal(calls[1].init.headers['content-type'], 'image/webp');
+  assert.equal(calls[2].url, '/api/v1/listings');
 });
 
 test('rapid duplicate submit events create only one listing while the first request is pending', async () => {
