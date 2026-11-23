@@ -36,6 +36,7 @@ test('isolated server serves the local FAM RU shell and its price formatter with
     ]) assert.match(html, new RegExp(`<script type="module" src="/${module}"><\\/script>`));
     assert.doesNotMatch(html, /<script\s*>[\s\S]*?<\/script>/i);
     assert.match(html, /<link rel="stylesheet" href="\/shell\.css">/);
+    assert.match(html, /<link rel="stylesheet" href="\/public-board\.css">/);
     assert.doesNotMatch(html, /<style\b/i);
     assert.doesNotMatch(html, /\sstyle\s*=/i);
     assert.match(html, /src="\/price-format\.js"/);
