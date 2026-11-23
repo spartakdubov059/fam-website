@@ -8,6 +8,7 @@ import {
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import sharp from 'sharp';
 import { createYdbListingsRepository } from '../app/backend/repositories/ydb-listings.mjs';
+import { getDueSafeAgentTasks } from '../app/backend/services/scheduled-safe-agent-runner.mjs';
 
 for (const [name, value] of Object.entries({
   Driver, query, identifier, fragment, join, MetadataCredentialsProvider, S3Client, HeadBucketCommand,
@@ -62,5 +63,12 @@ assert.equal(metadata.height, 9);
 assert.equal(metadata.exif, undefined);
 assert.equal(metadata.xmp, undefined);
 assert.equal(metadata.iptc, undefined);
+const siteErrorDigestSlot = new Date('2026-11-23T05:30:00Z');
+assert.deepEqual(getDueSafeAgentTasks(siteErrorDigestSlot), ['site_error_digest'],
+  `site error queue schedule at ${siteErrorDigestSlot.toISOString()}`);
+for (const minute of [0, 15, 45]) {
+  const date = new Date(Date.UTC(2026, 10, 23, 5, minute));
+  assert.deepEqual(getDueSafeAgentTasks(date), [], `no site error schedule at ${date.toISOString()}`);
+}
 console.log('SDK_COMPAT_PASS: pinned Sharp/WebP, YDB query-client methods, and AWS exports verified.');
 console.log('No cloud integration was attempted; deployment remains blocked.');

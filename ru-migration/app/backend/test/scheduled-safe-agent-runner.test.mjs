@@ -26,7 +26,7 @@ test('scheduled worker idempotently enqueues due work before claiming and record
   assert.deepEqual(calls, [['system_health_check', '2026-11-20T03:40'], ['worker', 3]]);
 });
 
-test('scheduled runner enqueues the site error digest only at the upstream UTC minute-30 slot', async () => {
+test('scheduled runner enqueues the site error digest only at the final upstream UTC minute-30 slot', async () => {
   for (const minute of ['30']) {
     const calls = [];
     const runner = createScheduledSafeAgentRunner({
@@ -37,8 +37,9 @@ test('scheduled runner enqueues the site error digest only at the upstream UTC m
     await runner();
     assert.deepEqual(calls, [['site_error_digest', `2026-11-20T05:${minute}`]]);
   }
-  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T05:15:00Z'), []);
-  assert.deepEqual(getDueSafeAgentTasks('2026-11-20T05:45:00Z'), []);
+  for (const minute of ['00', '15', '45']) {
+    assert.deepEqual(getDueSafeAgentTasks(`2026-11-20T05:${minute}:00Z`), []);
+  }
 });
 
 test('coder producer enqueues only bounded quarter-hour slots without reading user content', async () => {
