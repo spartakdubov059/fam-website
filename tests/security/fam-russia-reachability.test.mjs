@@ -9,7 +9,8 @@ test("public diagnostic uses bounded approved endpoints and Russian + EU control
   assert.ok(NODES.includes("ru3.node.check-host.net"));
   assert.ok(NODES.includes("de1.node.check-host.net"));
   assert.equal(TARGETS.length, 5);
-  assert.ok(TARGETS.some(t => t.name === "FAM redirect health marker"));
+  assert.ok(TARGETS.some(t => t.name === "FAM GitHub Pages readiness marker" &&
+    t.url === "https://spartakdubov059.github.io/fam-website/fam-domain-health.json"));
   assert.ok(TARGETS.every(t => t.url.startsWith("https://")));
 });
 

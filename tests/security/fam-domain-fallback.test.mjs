@@ -45,8 +45,8 @@ test("Supabase HTTP 401 confirms the API answered but does not claim login was t
   assert.equal(result.state, "auth-required");
   assert.equal(result.status, "401");
   assert.match(result.info, /дошёл до API/);
-  assert.ok(TARGETS.some(target => target.name === "FAM redirect health marker" &&
-    target.url === "https://famru.netlify.app/fam-domain-health.json"));
+  assert.ok(TARGETS.some(target => target.name === "FAM GitHub Pages readiness marker" &&
+    target.url === "https://spartakdubov059.github.io/fam-website/fam-domain-health.json"));
 });
 
 test("Netlify health marker is uncached and allows only the GitHub Pages fallback origin", () => {
