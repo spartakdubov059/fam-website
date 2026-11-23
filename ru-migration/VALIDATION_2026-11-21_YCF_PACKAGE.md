@@ -32,3 +32,9 @@
 - Exact commit [`cfad890`](https://github.com/spartakdubov059/fam-website/commit/cfad890d9595c920ab2085a16f102dd1cc6b7773) прошёл [SDK/Sharp CI #45173359705](https://github.com/spartakdubov059/fam-website/actions/runs/45173359705) на Node `22.23.5`: package test, ZIP build, `npm ci`, backend/UI **509/509**, семь timer definitions и `SDK_COMPAT_PASS`. Этот workflow не запускал YDB; backend/schema не менялись относительно предыдущего успешного [YDB CI #45121084536](https://github.com/spartakdubov059/fam-website/actions/runs/45121084536).
 - В локальной среде нет `npm`; динамический smoke использовал уже установленные версии из backend lockfile под Node `24.22.3`, поэтому exact Node 22 подтверждён package build и тестами GitHub CI, а не локальным handler smoke.
 - Итоговый локальный ZIP: `FAM_RU_ycf_package_5a9650f.zip`, **1 025 409 байт**, SHA-256 `796fbefe52dd5208a0c2235f8041201e0407db1a7ebb872d4d95ec57d8c2967d`. Cloud Function и Yandex Cloud ресурсы не создавались.
+
+## Проверка упакованных entrypoint в CI — 23 ноября 2026
+
+- В SDK/Sharp workflow добавлен smoke test точного ZIP: распаковка во временный каталог, чистая установка зависимостей через `npm ci --omit=dev` по lockfile и запуск обоих CommonJS entrypoint.
+- На exact commit [`c60c192`](https://github.com/spartakdubov059/fam-website/commit/c60c1920355dc3e79d93c254c994d51f815d4455) workflow [#45219131924](https://github.com/spartakdubov059/fam-website/actions/runs/45219131924) прошёл. ZIP — **1 384 616 байт / 147 файлов**, runtime `nodejs22`; опубликованная в CI проверка: `PACKAGED_YCF_ENTRYPOINTS_PASS http=200 timer=fail-closed`. Полный backend/UI набор — **514/514**, 7 timer units проверены, `SDK_COMPAT_PASS`.
+- Smoke использовал пустое `FAM_RU_*` окружение и синтетическое событие. HTTP entrypoint выдал RU страницу с CSP; таймер отверг незаполненную конфигурацию до вызова задания. Ни Yandex Cloud ресурсов, ни пользовательских данных это не затрагивало.
