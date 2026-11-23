@@ -1301,7 +1301,8 @@ try {
   assert.equal(retriedRow?.[0]?.[0]?.claim_token, retryClaim.claim_token);
   assert.equal(retriedRow?.[0]?.[0]?.started_at, null);
   assert.equal(retriedRow?.[0]?.[0]?.finished_at, null);
-  assert.ok(retriedRow?.[0]?.[0]?.result_summary?.includes('принято локальным анализатором'));
+  assert.equal(retriedRow?.[0]?.[0]?.result_summary,
+    'Ограниченное техническое задание принято локальным анализатором.');
   assert.ok((await sql`SELECT event_type FROM fam_agent_task_events WHERE task_id = ${retryTaskId};`)
     ?. [0]?.some(event => event.event_type === 'retry_scheduled'));
   await sql`DELETE FROM fam_agent_task_events WHERE task_id = ${retryTaskId};`;

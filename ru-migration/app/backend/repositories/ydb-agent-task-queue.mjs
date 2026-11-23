@@ -178,6 +178,7 @@ export function createYdbAgentTaskQueue(sql) {
         if (!valid || row.available !== true && row.lease_expired !== true) return null;
         const claimToken = randomUUID();
         await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('claimed' AS Utf8)),
+            result_summary = 'Ограниченное техническое задание принято локальным анализатором.',
             attempt_count = Unwrap(CAST(Unwrap(CAST(attempt_count AS Uint32)) + Unwrap(CAST(1 AS Uint32)) AS Uint32)),
             claimed_by = ${workerId}, claim_token = ${claimToken}, claimed_at = CurrentUtcTimestamp(),
             lease_expires_at = CurrentUtcTimestamp() + Interval('PT2H'), finished_at = CAST(NULL AS Timestamp?),
