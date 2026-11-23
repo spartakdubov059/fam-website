@@ -34,7 +34,7 @@ concurrency:
 jobs:
   generate:
     name: Локальная модель готовит исправление
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push' || github.actor == 'spartakdubov059')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || github.event_name == 'push' || github.actor == 'spartakdubov059' || github.actor == 'github-actions[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
