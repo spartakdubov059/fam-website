@@ -8,12 +8,14 @@ export const TASK_PROMPTS = Object.freeze({
     "Проведи узкий аудит устойчивости загрузки публичных объявлений FAM. Цель: найти подтверждённые ошибки сетевой обработки и пустых ответов. Scope: только публичный интерфейс; не читай записи пользователей. Evidence: checkout и безопасные агрегаты. Acceptance: конкретное место в коде для каждого дефекта; при отсутствии доказательств верни no_patch. Требуемые проверки: git apply --check и независимые security/moderation тесты. Риск низкий, изменения требуют решения владельца. Секреты и личные данные запрещены; миграции и публикация запрещены.",
   audit_accessibility:
     "Проведи узкий аудит доступности публичного интерфейса FAM: клавиатурная навигация, подписи элементов и фокус. Цель: найти подтверждённые дефекты доступности. Scope: только публичный интерфейс; не меняй Auth, безопасность, серверные функции или базу данных. Evidence: checkout и безопасные агрегаты. Acceptance: конкретное место в коде для каждого дефекта; при отсутствии доказательств верни no_patch. Требуемые проверки: git apply --check и независимые security/moderation тесты. Риск низкий, изменения требуют решения владельца. Секреты и личные данные запрещены; миграции и публикация запрещены.",
+  audit_agent_infrastructure:
+    "Проведи узкую диагностику управляющей инфраструктуры FAM по фиксированному коду сигнала, без чтения журналов GitHub, payload задач и данных пользователей. Scope только: scripts/fam-agent-governance.mjs, scripts/fam-agent-bridge.mjs, .github/workflows/fam-agent-governance.yml, .github/workflows/fam-codex-developer.yml и tests/agent-integration/**. Цель: установить по checkout, есть ли конкретная техническая причина для сигнала и предложить минимальное исправление. Acceptance: если причина не подтверждается кодом — no_patch; если подтверждается — patch с тестами, без секретов, пользовательских данных, Auth/RLS, модерации или auto-merge. Требуемые проверки: git apply --check и полный независимый security/moderation набор. Любой patch инфраструктуры требует review и решения владельца.",
 });
 
 export const TASK_CONTRACT = Object.freeze({
   version: 1,
   goal: "Проверить только заранее утверждённую техническую область без данных пользователей.",
-  scope: Object.freeze(["index.html", "tests/**"]),
+  scope: Object.freeze(["index.html", "css/**", "js/**", "docs/**", "tests/**", "scripts/fam-agent-governance.mjs", "scripts/fam-agent-bridge.mjs", ".github/workflows/fam-agent-governance.yml", ".github/workflows/fam-codex-developer.yml"]),
   evidence: "Только код из checkout и безопасные агрегаты: enum кодов событий, зона интерфейса, количество.",
   acceptance: Object.freeze([
     "Каждое утверждение о дефекте подтверждено конкретным местом в коде.",
@@ -35,8 +37,14 @@ const EVENT_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
   "listings_load_failed", "notifications_load_failed",
   "database_request_failed", "auth_backend_failed",
+  "ci_workflow_failure", "worker_queue_failure", "worker_expired_lease",
+  "qwen_repeated_failure", "qwen_stuck_run", "synthetic_ci_workflow_failure",
 ]);
-const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
+const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other", "agent_infrastructure"]);
+const INSPECTOR_SIGNAL_CODES = new Set([
+  "ci_workflow_failure", "worker_queue_failure", "worker_expired_lease", "synthetic_ci_workflow_failure",
+  "qwen_repeated_failure", "qwen_stuck_run",
+]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function validateClaimResponse(data) {
@@ -51,6 +59,8 @@ export function validateClaimResponse(data) {
     !Object.hasOwn(TASK_PROMPTS, task.task_key) ||
     !EVENT_CODES.has(task.event_code) ||
     !PAGE_AREAS.has(task.page_area) ||
+    (task.task_key === "audit_agent_infrastructure" && (task.page_area !== "agent_infrastructure" || !INSPECTOR_SIGNAL_CODES.has(task.event_code) || task.occurrences < 1)) ||
+    (task.task_key !== "audit_agent_infrastructure" && task.page_area === "agent_infrastructure") ||
     !Number.isSafeInteger(task.occurrences) ||
     task.occurrences < 0 || task.occurrences > 1000
   ) throw new Error("Bridge returned an invalid task.");

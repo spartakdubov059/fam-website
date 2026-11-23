@@ -41,6 +41,8 @@ test("local agent only accepts website, docs and safe test paths", () => {
   assert.equal(isAllowedAgentPath("css/style.css"), true);
   assert.equal(isAllowedAgentPath("js/app.js"), true);
   assert.equal(isAllowedAgentPath("tests/ui/example.test.mjs"), true);
+  assert.equal(isAllowedAgentPath("scripts/fam-agent-governance.mjs"), true);
+  assert.equal(isAllowedAgentPath(".github/workflows/fam-agent-governance.yml"), true);
   assert.equal(isAllowedAgentPath("tests/security/example.test.mjs"), false);
   assert.equal(isAllowedAgentPath("tests/moderation/example.test.mjs"), false);
   assert.equal(isAllowedAgentPath("tests/agent-benchmark/time-ago.test.mjs"), false);
@@ -49,6 +51,8 @@ test("local agent only accepts website, docs and safe test paths", () => {
   for (const path of [
     ".github/workflows/build.yml",
     "scripts/run-local-coder.mjs",
+    "scripts/arbitrary.mjs",
+    ".github/workflows/deploy-production.yml",
     "supabase/migrations/unsafe.sql",
     "supabase/functions/moderate/index.ts",
     "../outside.txt",
@@ -86,6 +90,11 @@ test("HTML, JavaScript and test-suite changes always require review", () => {
   assert.equal(requiresManualApproval(lowRisk, filePatch("js/app.js", "const a = 1;", "const a = 2;")), true);
   assert.equal(requiresManualApproval(lowRisk, filePatch("index.html", "<title>Old</title>", "<title>New</title>")), true);
   assert.equal(requiresManualApproval(lowRisk, filePatch("tests/ui/test.mjs", "assert.ok(true);", "assert.ok(false);")), true);
+});
+
+test("agent governance scripts and workflows are allowlisted only with owner review", () => {
+  assert.equal(requiresManualApproval(lowRisk, filePatch("scripts/fam-agent-governance.mjs", "const x = 1;", "const x = 2;")), true);
+  assert.equal(requiresManualApproval(lowRisk, filePatch(".github/workflows/fam-agent-governance.yml", "timeout-minutes: 5", "timeout-minutes: 6")), true);
 });
 
 test("critical output or active HTML content requires manual approval", () => {

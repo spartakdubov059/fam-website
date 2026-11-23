@@ -25,8 +25,14 @@ const EVENT_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
   "listings_load_failed", "notifications_load_failed",
   "database_request_failed", "auth_backend_failed",
+  "ci_workflow_failure", "worker_queue_failure", "worker_expired_lease",
+  "qwen_repeated_failure", "qwen_stuck_run", "synthetic_ci_workflow_failure",
 ]);
-const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other"]);
+const PAGE_AREAS = new Set(["auth", "listings", "notifications", "database", "other", "agent_infrastructure"]);
+const INSPECTOR_SIGNALS = new Set([
+  "ci_workflow_failure", "worker_queue_failure", "worker_expired_lease",
+  "qwen_repeated_failure", "qwen_stuck_run", "synthetic_ci_workflow_failure",
+]);
 
 function json(body: Record<string, unknown>, status = 200, diagnosticId = crypto.randomUUID()): Response {
   return new Response(JSON.stringify(body), {
@@ -113,6 +119,29 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    if (
+      body.action === "inspector_enqueue" && Object.keys(body).length === 4 &&
+      INSPECTOR_SIGNALS.has(body.signal_code) &&
+      typeof body.event_id === "string" && /^[a-z0-9:_-]{3,100}$/.test(body.event_id) &&
+      Number.isSafeInteger(body.occurrences) && body.occurrences >= 1 && body.occurrences <= 1000
+    ) {
+      const result = await rpc("enqueue_fam_agent_inspector_task", {
+        p_signal_code: body.signal_code,
+        p_event_id: body.event_id,
+        p_occurrences: body.occurrences,
+      });
+      if (!result || typeof result !== "object" || result.ok !== true || typeof result.task_created !== "boolean") {
+        return json({ ok: false, error_code: "invalid_inspector_enqueue_result", stage: "rpc_validation", diagnostic_id: diagnosticId }, 502, diagnosticId);
+      }
+      return json({
+        ok: true,
+        task_created: result.task_created,
+        reason: typeof result.reason === "string" ? result.reason : "unknown",
+        ...(typeof result.task_id === "string" ? { task_id: result.task_id } : {}),
+        diagnostic_id: diagnosticId,
+      }, 200, diagnosticId);
+    }
+
     // Read-only control tower link: no task IDs, descriptions or user information.
     if (body.action === "health" && Object.keys(body).length === 1) {
       const stats = await rpc("get_fam_agent_queue_health", {});
@@ -160,12 +189,14 @@ Deno.serve(async (req: Request) => {
       if (
         typeof task?.id !== "string" ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(task.id) ||
-        !["audit_frontend_runtime", "audit_client_resilience", "audit_accessibility"].includes(task.task_key) ||
-        typeof task.event_code !== "string" ||
-        typeof task.page_area !== "string" ||
+        !["audit_frontend_runtime", "audit_client_resilience", "audit_accessibility", "audit_agent_infrastructure"].includes(task.task_key) ||
+        !EVENT_CODES.has(task.event_code) ||
+        !PAGE_AREAS.has(task.page_area) ||
         !Number.isInteger(task.occurrences) ||
         task.occurrences < 0 ||
-        task.occurrences > 1000
+        task.occurrences > 1000 ||
+        (task.task_key === "audit_agent_infrastructure" && (task.page_area !== "agent_infrastructure" || !INSPECTOR_SIGNALS.has(task.event_code) || task.occurrences < 1)) ||
+        (task.task_key !== "audit_agent_infrastructure" && task.page_area === "agent_infrastructure")
       ) {
         return json({ ok: false, error: "invalid_task_shape" }, 502);
       }

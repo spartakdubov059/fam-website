@@ -7,6 +7,9 @@ import {
   inspectQueueHealth,
   validateAgentMetricsResponse,
   fetchAgentMetrics,
+  enqueueInspectorTask,
+  mapInspectorWarning,
+  validateInspectorEnqueueResponse,
 } from "../../scripts/fam-governance-bridge.mjs";
 import { makeReport, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
 
@@ -27,6 +30,11 @@ const workflow = readFileSync(
   new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url),
   "utf8"
 );
+const governanceScript = readFileSync(new URL("../../scripts/fam-agent-governance.mjs", import.meta.url), "utf8");
+const inspectorMigration = readFileSync(new URL(
+  "../../supabase/migrations/20261123194000_fam_inspector_bounded_coder_enqueue.sql",
+  import.meta.url,
+), "utf8");
 
 test("accepts only six safe queue counters, not raw data or identifying fields", () => {
   const clean = validateQueueHealthResponse({ ok: true, queue: values });
@@ -89,6 +97,60 @@ test("agent metrics client sends a fixed authenticated read-only action", async 
   assert.throws(() => validateAgentMetricsResponse({ ok: true, metrics: [{ agent_key: "technical", status: "completed", count: 1, user_id: "x" }] }));
 });
 
+test("INSPECTOR maps only high-confidence technical warnings to a fixed task allowlist", () => {
+  assert.deepEqual(mapInspectorWarning({ code: "postmerge_workflow_failure", severity: "high", count: 2 }), {
+    signal_code: "ci_workflow_failure", occurrences: 2,
+  });
+  assert.deepEqual(mapInspectorWarning({ code: "supabase_expired_leases", severity: "high", count: 0 }).occurrences, 1);
+  for (const warning of [
+    { code: "stale_prs", severity: "medium", count: 5 },
+    { code: "postmerge_deployment", severity: "high", count: 1 },
+    { code: "arbitrary", severity: "high", count: 1 },
+  ]) assert.equal(mapInspectorWarning(warning), null);
+});
+
+test("INSPECTOR enqueue sends only a fixed code, synthetic event key, and bounded count", async () => {
+  let request;
+  const result = await enqueueInspectorTask({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token", signalCode: "synthetic_ci_workflow_failure",
+    eventId: "synthetic:12345", occurrences: 1,
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ ok: true, task_created: true, task_id: "11111111-1111-4111-8111-111111111111", reason: "queued" }) };
+    },
+  });
+  assert.deepEqual(result, { task_created: true, reason: "queued" });
+  assert.deepEqual(JSON.parse(request.body), {
+    action: "inspector_enqueue", signal_code: "synthetic_ci_workflow_failure", event_id: "synthetic:12345", occurrences: 1,
+  });
+  assert.equal(request.headers["x-fam-agent-token"], "test-governance-token");
+  for (const body of [
+    { ok: true, task_created: true, task_id: "not-uuid", reason: "queued" },
+    { ok: true, task_created: false, reason: "contains student data" },
+  ]) assert.throws(() => validateInspectorEnqueueResponse(body));
+  await assert.rejects(() => enqueueInspectorTask({
+    url: "https://example.invalid", token: "test-governance-token", signalCode: "freeform",
+    eventId: "raw-log-text", occurrences: 1,
+  }));
+});
+
+test("server queue uses dedup, seven-day cooldown, two attempts and no raw logs", () => {
+  assert.match(inspectorMigration, /event_id text primary key/);
+  assert.match(inspectorMigration, /interval '7 days'/);
+  assert.ok(inspectorMigration.includes("'audit_agent_infrastructure'"));
+  assert.match(inspectorMigration, /max_attempts/);
+  assert.match(inspectorMigration, /'scheduled_audit',false[\s\S]*?\),\s*2\s*\)/);
+  assert.match(inspectorMigration, /p_signal_code not in \([\s\S]*?'qwen_stuck_run'/);
+  assert.doesNotMatch(inspectorMigration, /p_description|p_payload|raw_log|student_message/i);
+  assert.match(workflow, /synthetic_signal/);
+  assert.match(workflow, /actions: write/);
+  assert.match(governanceScript, /GITHUB_EVENT_NAME === "workflow_dispatch"/);
+  assert.match(governanceScript, /enqueueInspectorTask\(/);
+  assert.match(governanceScript, /if \(result\.task_created\)[\s\S]*?actions\/workflows\/fam-codex-developer\.yml\/dispatches/);
+  assert.doesNotMatch(governanceScript, /if \(result\.task_created\)[\s\S]*?gh pr merge/);
+});
+
 test("INSPECTOR differentiates healthy, failed and stalled aggregate queue", () => {
   assert.deepEqual(inspectQueueHealth({ ...values, failed_last_24h: 0, expired_leases: 0, queued: 0 }), []);
   const warningCodes = inspectQueueHealth(values).map((x) => x.code);
@@ -120,5 +182,8 @@ test("edge function requires server token and exposes only fixed aggregate RPC o
   assert.match(workflow, /FAM_AGENT_WORKER_TOKEN: \$\{\{ secrets\.FAM_AGENT_WORKER_TOKEN \}\}/);
   assert.match(workflow, /github\.event_name != 'pull_request'/);
   assert.match(workflow, /contents: read/);
+  assert.match(edge, /body\.action === "inspector_enqueue"/);
+  assert.match(edge, /rpc\("enqueue_fam_agent_inspector_task"/);
+  assert.doesNotMatch(edge, /INSPECTOR_SIGNALS\.has\(body\.signal_code\)[\s\S]*?body\.description/);
   assert.doesNotMatch(workflow, /gh pr merge/);
 });

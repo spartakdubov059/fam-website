@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -277,6 +277,7 @@ async function api(path, token, options = {}) {
   if (!response.ok) {
     throw new Error("GitHub API: HTTP " + response.status + " при " + path.split("?")[0]);
   }
+  if (response.status === 204) return null;
   return response.json();
 }
 
@@ -376,6 +377,42 @@ export async function main() {
       message: "Не полностью настроено подключение штаба к защищённой очереди Supabase",
     });
   }
+  let inspectorOutcome = "Автоматическая постановка не запускалась: нет подтверждённого сигнала или защищённого моста.";
+  const syntheticSignal = process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
+    ? (process.env.FAM_INSPECTOR_SYNTHETIC_SIGNAL || "none") : "none";
+  if (syntheticSignal !== "none" && syntheticSignal !== "synthetic_ci_workflow_failure") {
+    throw new Error("Недопустимый код синтетического сигнала INSPECTOR.");
+  }
+  let selectedSignal = null;
+  if (syntheticSignal === "synthetic_ci_workflow_failure") {
+    selectedSignal = { signal_code: syntheticSignal, occurrences: 1, event_id: "synthetic:" + (process.env.GITHUB_RUN_ID || "missing") };
+    inspectorOutcome = "Синтетическое испытание INSPECTOR: CI-сигнал тестовый, ошибка сайта не создавалась.";
+  } else if (bridgeUrl && bridgeToken) {
+    const candidate = warnings.map(mapInspectorWarning).find(Boolean);
+    if (candidate) {
+      selectedSignal = {
+        ...candidate,
+        event_id: "github:" + (process.env.GITHUB_RUN_ID || "missing") + ":" + candidate.signal_code,
+      };
+    }
+  }
+  if (selectedSignal && bridgeUrl && bridgeToken) {
+    const result = await enqueueInspectorTask({
+      url: bridgeUrl, token: bridgeToken,
+      signalCode: selectedSignal.signal_code,
+      eventId: selectedSignal.event_id,
+      occurrences: selectedSignal.occurrences,
+    });
+    inspectorOutcome += "; результат очереди: " + result.reason +
+      (result.task_created ? "; задание создано" : "; новое задание не создано");
+    if (result.task_created) {
+      await api("/actions/workflows/fam-codex-developer.yml/dispatches", token, {
+        method: "POST",
+        body: JSON.stringify({ ref: "main" }),
+      });
+      inspectorOutcome += "; Qwen workflow запущен";
+    }
+  }
   const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
   const integrationPlan = buildIntegrationPlan({
     pulls, disputes,
@@ -385,7 +422,7 @@ export async function main() {
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
     qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
-  });
+  }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import("node:fs/promises");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report + "\n");
