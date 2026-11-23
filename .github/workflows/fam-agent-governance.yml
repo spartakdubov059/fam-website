@@ -20,7 +20,7 @@ on:
         description: "Только безопасное синтетическое испытание очереди INSPECTOR → Qwen"
         required: false
         type: choice
-        options: [none, synthetic_ci_workflow_failure]
+        options: [none, synthetic_ci_workflow_failure, synthetic_qwen_runtime_smoke]
         default: none
   schedule:
     - cron: "45 4 * * *"

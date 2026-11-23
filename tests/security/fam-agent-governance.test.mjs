@@ -44,6 +44,17 @@ test("Qwen workflow accepts the trusted INSPECTOR dispatch actor", () => {
   assert.doesNotMatch(inferenceSetup, /pushd|popd/);
 });
 
+test("runtime smoke test has a separate seven-day deduplication key", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
+  const migration = readFileSync(new URL("../../supabase/migrations/20261123220000_fam_qwen_runtime_smoke_dedupe.sql", import.meta.url), "utf8");
+  const governanceScript = readFileSync(new URL("../../scripts/fam-agent-governance.mjs", import.meta.url), "utf8");
+  assert.match(workflow, /synthetic_qwen_runtime_smoke/);
+  assert.match(governanceScript, /"runtime_smoke:"/);
+  assert.match(migration, /p_event_id like 'runtime_smoke:%'/);
+  assert.match(migration, /interval '7 days'/);
+  assert.match(migration, /'scheduled_audit',false,[\s\S]*?\),\s*2\s*\)/);
+});
+
 test("ARBITER detects only real code-file overlaps, not docs noise", () => {
   const found = findDisputes([
     { number: 2, files: ["docs/README.md", "index.html", "supabase/functions/f.ts"] },
