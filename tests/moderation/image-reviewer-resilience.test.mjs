@@ -13,10 +13,11 @@ const reviewer = readFileSync(
 
 test("photo submissions use one free multimodal moderation request, not a paid image model", () => {
   assert.match(moderator, /https:\/\/api\.openai\.com\/v1\/moderations/);
-  assert.match(moderator, /\{ type: "image_url", image_url: \{ url: imageUrl \} \}/);
+  assert.match(moderator, /\{ type: "image_url", image_url: \{ url: externalImageUrl \} \}/);
+  assert.match(moderator, /fetchPrivateImageAsDataUrl\(imageUrl/);
   assert.doesNotMatch(moderator, /reviewListingImage/);
   assert.match(moderator, /provider: "openai_moderation"/);
-  assert.match(moderator, /fam-openai-moderation-v3/);
+  assert.match(moderator, /fam-openai-moderation-v4/);
   assert.match(reviewer, /https:\/\/api\.openai\.com\/v1\/moderations/);
   assert.doesNotMatch(reviewer, /gpt-5-mini|v1\/chat\/completions/);
 });

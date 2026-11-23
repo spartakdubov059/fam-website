@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { containsContactData, findLocalPolicyFlag } from "./content-safety.js";
+import { fetchPrivateImageAsDataUrl, redactStructuredPersonalData } from "./data-minimization.js";
 import { reviewDisputedContent, reviewIdeaContent } from "./dispute-reviewer.ts";
 import { splitFlaggedCategoriesByInputType } from "./moderation-input-types.js";
 import { recordSafetySignal, type SafetyContext, type SafetyCategory } from "./user-safety-agent.ts";
@@ -36,7 +37,7 @@ const MODERATION_CACHE_MAX_ENTRIES = 400;
 
 async function createModerationCacheKey(text: string, imageUrl: string, mode = "content"): Promise<string> {
   const source = JSON.stringify({
-    version: "fam-openai-moderation-v3",
+    version: "fam-openai-moderation-v4",
     mode,
     text,
     image_url: imageUrl,
@@ -291,6 +292,7 @@ serve(async (req: Request) => {
 
     // Local rules run first and keep contact data out of external requests.
     const policyFlag = findLocalPolicyFlag(value);
+    const externalText = redactStructuredPersonalData(value);
     const isIdea = payload?.rules_only === true;
     const cacheKey = await createModerationCacheKey(value, imageUrl, isIdea ? "idea" : "content");
     const cached = getCachedDecision(cacheKey);
@@ -305,7 +307,7 @@ serve(async (req: Request) => {
     if (isIdea) {
       // reviewIdeaContent uses local checks as a safe fallback when the AI provider
       // is temporarily unavailable; benign ideas do not enter the manual-review inbox.
-      const ideaReview = await reviewIdeaContent(value, OPENAI_KEY, policyFlag?.code ?? null);
+      const ideaReview = await reviewIdeaContent(externalText, OPENAI_KEY, policyFlag?.code ?? null);
       console.info("idea_moderation_completed", JSON.stringify({
         action: ideaReview.action,
         reason_code: ideaReview.reason_code,
@@ -355,7 +357,7 @@ serve(async (req: Request) => {
           reason: "ИИ-модерация не настроена. Материал не опубликован и ожидает проверки.",
         }, 200, headers);
       }
-      const policyReview = await reviewDisputedContent(value, OPENAI_KEY);
+      const policyReview = await reviewDisputedContent(externalText, OPENAI_KEY);
       if (policyReview.action !== "ok") {
         const policySignals: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
           targeted_harassment: { category: "targeted_harassment", severity: "medium" },
@@ -379,6 +381,21 @@ serve(async (req: Request) => {
     // It is a classifier endpoint, not a text-generation model. Never send the same text
     // to a second provider if this provider is unavailable.
     if (OPENAI_KEY) {
+      let externalImageUrl = "";
+      if (imageUrl) {
+        const moderationImage = await fetchPrivateImageAsDataUrl(imageUrl, {
+          storageOrigin: SUPABASE_URL,
+          expectedPathPrefix: `/storage/v1/object/sign/${pendingImageBucket}/${safetyContext?.sender_id}/${pendingImagePrefix}${safetyContext?.sender_id}_`,
+        });
+        if (!moderationImage) {
+          return jsonResponse({
+            action: "pending",
+            reason_code: "image_requires_human_review",
+            reason: "Фото не удалось безопасно подготовить к автоматической проверке. Материал скрыт и ожидает ручной проверки.",
+          }, 200, headers);
+        }
+        externalImageUrl = moderationImage.dataUrl;
+      }
       console.info("moderation_provider_selected", "openai");
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12_000);
@@ -395,10 +412,10 @@ serve(async (req: Request) => {
             model: "omni-moderation-latest",
             input: imageUrl
               ? [
-                  { type: "text", text: value },
-                  { type: "image_url", image_url: { url: imageUrl } },
+                  { type: "text", text: externalText },
+                  { type: "image_url", image_url: { url: externalImageUrl } },
                 ]
-              : value,
+              : externalText,
           }),
           signal: controller.signal,
         });
@@ -516,7 +533,7 @@ serve(async (req: Request) => {
 
         // Contextual text-only flags (for example, harassment) are reviewed as text.
         // If the text is cleared, the attached image must still pass its own visual review below.
-        const secondReview = await reviewDisputedContent(value, OPENAI_KEY);
+        const secondReview = await reviewDisputedContent(externalText, OPENAI_KEY);
         console.info("moderation_second_review_completed", JSON.stringify({
           action: secondReview.action,
           reason_code: secondReview.reason_code,

@@ -39,7 +39,7 @@ test("provider outage approves locally clean ideas but holds text matching local
   const ideaEnd = moderator.indexOf("// For locally flagged text", ideaStart);
   assert.ok(ideaStart >= 0 && ideaEnd > ideaStart);
   const ideaPath = moderator.slice(ideaStart, ideaEnd);
-  assert.match(ideaPath, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
+  assert.match(ideaPath, /reviewIdeaContent\(externalText, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
   assert.doesNotMatch(ideaPath, /if \(!OPENAI_KEY\)/);
 });
 
