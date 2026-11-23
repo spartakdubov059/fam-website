@@ -1,6 +1,6 @@
 # PostgreSQL RPC inventory → FAM RU
 
-Срез исходника: `main` `bdb8325843f4d02590723d396d5b3f803d04618a`; RU код `a32751087ae460ada7da175e32171486bc843d47`. Из 83 SQL-файлов миграций извлечено 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени; каталог ниже содержит последнее найденное определение каждой функции. Для каждой указаны последний найденный файл, объявленные режим безопасности и `search_path`, и RU аналог по исходникам. Это статический lexical каталог, не результат применения миграций к PostgreSQL и не доказательство состояния живой БД.
+Исторический срез исходника: `main` `bdb8325843f4d02590723d396d5b3f803d04618a`; RU код `a32751087ae460ada7da175e32171486bc843d47`. Из 83 SQL-файлов этого снимка извлечено 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени; каталог ниже содержит последнее найденное определение каждой функции для того среза. Текущий просмотренный `main` `e574e905da574356eb847ec4a92b3ea64894adfa` содержит дополнительную migration и RPC, описанные в source-delta заметке ниже, но каталог не пересчитан. Это статический lexical документ, не результат применения миграций к PostgreSQL и не доказательство состояния живой БД.
 
 ## Все последние определения
 
@@ -62,9 +62,14 @@
 
 ## Ключевые выводы проверки безопасности
 
+## Source delta после инвентаризации — 23 ноября 2026
+
+- Актуальный upstream `main` продвинулся до `e574e905da574356eb847ec4a92b3ea64894adfa`, то есть после снимка `bdb8325` в заголовке этого исторического каталога. Новая migration `20261123194000_fam_inspector_bounded_coder_enqueue.sql` добавляет `public.enqueue_fam_agent_inspector_task(text,text,integer)` и таблицу `private.fam_agent_inspector_signals`; эти объекты отсутствуют в каталоге функций выше и не имеют RU/YDB counterpart.
+- Текущий upstream coder bridge уже удалил `inspector_enqueue` и соответствующие inspector task allowlist из `claim` response. Поэтому migration/function inventory и function source tip требуют полного обновления, прежде чем заявлять актуальный source parity. RU не добавляет этот устаревший endpoint; новый upstream миграционный артефакт остаётся помеченным как `не перенесено` в migration inventory.
+
 ### Актуализация подсчёта и claim-порядка — 23 ноября 2026
 
-- Точный source `main` `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL migration path. Повторный лексический подсчёт обнаружил 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени; строка `get_fam_agent_task_metrics()` теперь присутствует в каталоге выше.
+- Точный source snapshot `bdb8325843f4d02590723d396d5b3f803d04618a` содержит 83 SQL migration path. Его лексический подсчёт обнаружил 81 текстовое объявление `CREATE OR REPLACE FUNCTION` и 53 уникальных имени. Это не пересчёт актуального `e574e905`, где появилась дополнительная функция.
 - На RU-коммите [`a327510`](https://github.com/spartakdubov059/fam-website/commit/a32751087ae460ada7da175e32171486bc843d47) порядок coder claim приведён к source `urgent → high → normal → остальное`. Два одновременных claim-запроса к одной synthetic задаче проверены в успешной [disposable YDB integration #45175534283](https://github.com/spartakdubov059/fam-website/actions/runs/45175534283); [SDK/Sharp CI #45175534306](https://github.com/spartakdubov059/fam-website/actions/runs/45175534306) также завершился успешно. YDB контейнер был удалён после интеграции.
 - Проверки относятся к текстовому каталогу и disposable YDB с synthetic data. Они не подтверждают live PostgreSQL catalog, cloud IAM/RLS или исполнение Qwen.
 
