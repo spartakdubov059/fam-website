@@ -990,8 +990,15 @@ try {
   assert.deepEqual([...localIncidentByCategory.keys()].sort(), ['negative_personal_call', 'targeted_harassment']);
   for (const row of localIncidentByCategory.values()) {
     assert.equal(row.severity, 'medium');
-    assert.equal(row.evidence_excerpt, null, 'local classifier never persists the source text');
+    assert.equal(typeof row.evidence_excerpt, 'string', 'local classifier stores bounded evidence for same-school review');
+    assert.ok(row.evidence_excerpt.length > 0 && row.evidence_excerpt.length <= 260);
+    assert.doesNotMatch(row.evidence_excerpt, /@[\w.-]+|https?:\/\/|\+?\d[\d\s().-]{7,}\d/i,
+      'stored evidence excludes email addresses, URLs and phone numbers');
   }
+  assert.equal(localIncidentByCategory.get('targeted_harassment')?.evidence_excerpt,
+    'Давайте все будем высмеивать одного ученика в чате.');
+  assert.equal(localIncidentByCategory.get('negative_personal_call')?.evidence_excerpt,
+    'Напишите ему все неприятные сообщения, чтобы он ушёл из чата.');
   const emittedIncident = await sql`SELECT pair_fingerprint, category, severity, evidence_excerpt FROM fam_safety_incidents
     WHERE actor_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND source_kind = 'message'
       AND category = 'threat_or_intimidation' ORDER BY created_at DESC LIMIT 1;`;
