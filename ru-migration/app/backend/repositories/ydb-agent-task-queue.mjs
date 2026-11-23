@@ -121,6 +121,28 @@ export function createYdbAgentTaskQueue(sql) {
     async claimSafeCoderTask({ workerId, leaseSeconds = 7200 } = {}) {
       if (workerId !== 'fam-agent-qwen-coder-v1' || leaseSeconds !== 7200) throw new TypeError('invalid coder worker claim');
       return sql.begin({ idempotent: true }, async tx => {
+        const staleQueued = await tx`SELECT id FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
+            AND approval_required = false AND source IN ('system', 'scheduled_audit')
+            AND status = 'queued' AND created_at < CurrentUtcTimestamp() - Interval('P7D')
+          ORDER BY created_at ASC LIMIT 50;`;
+        for (const task of staleQueued?.[0] ?? []) {
+          const summary = 'Задача закрыта: техническое задание устарело в очереди.';
+          const closed = await tx`UPDATE fam_agent_tasks SET status = Unwrap(CAST('failed' AS Utf8)),
+              claimed_by = CAST(NULL AS Utf8?), claim_token = CAST(NULL AS Utf8?),
+              claimed_at = CAST(NULL AS Timestamp?), lease_expires_at = CAST(NULL AS Timestamp?),
+              finished_at = CurrentUtcTimestamp(), result_summary = ${summary},
+              updated_at = CurrentUtcTimestamp()
+            WHERE id = ${task.id} AND agent_key = 'technical' AND task_type = 'coder_patch_request'
+              AND approval_required = false AND source IN ('system', 'scheduled_audit')
+              AND status = 'queued' AND created_at < CurrentUtcTimestamp() - Interval('P7D')
+            RETURNING id;`;
+          if (closed?.[0]?.[0]) {
+            await tx`INSERT INTO fam_agent_task_events (id, task_id, event_type, actor, summary, created_at)
+              VALUES (${randomUUID()}, ${task.id}, 'failed', ${workerId},
+                'Задача закрыта без запуска модели: возраст очереди превысил семь дней.', CurrentUtcTimestamp());`;
+          }
+        }
         const activeTasks = await tx`SELECT id FROM fam_agent_tasks
           WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
             AND status IN ('queued', 'claimed', 'in_progress') LIMIT 1;`;
@@ -128,7 +150,7 @@ export function createYdbAgentTaskQueue(sql) {
           WHERE agent_key = 'technical' AND task_type = 'coder_patch_request' AND approval_required = false
             AND source IN ('system', 'scheduled_audit') AND status = 'failed'
             AND result_summary = 'Локальный анализатор завершился с ошибкой.'
-            AND attempt_count < max_attempts
+            AND attempt_count < max_attempts AND created_at >= CurrentUtcTimestamp() - Interval('P7D')
           ORDER BY updated_at ASC LIMIT 1;`;
         for (const task of activeTasks?.[0]?.length ? [] : retryableFailures?.[0] ?? []) {
           const summary = 'Повторная попытка поставлена в очередь после ограниченной ошибки запуска.';
@@ -190,6 +212,7 @@ export function createYdbAgentTaskQueue(sql) {
           FROM fam_agent_tasks WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
             AND approval_required = false AND attempt_count < max_attempts
             AND status = 'queued' AND available_at <= CurrentUtcTimestamp()
+            AND created_at >= CurrentUtcTimestamp() - Interval('P7D')
           ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
             created_at ASC LIMIT 1;`;
         const row = rows?.[0]?.[0];

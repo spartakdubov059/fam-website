@@ -294,7 +294,8 @@ test('coder claim retries only bounded model failures when no other coder task i
   const eligibility = calls.find(call => call.query.includes('status = \'failed\''));
   assert.ok(eligibility);
   assert.match(eligibility.query, /attempt_count < max_attempts/);
-  const activeGuard = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks'));
+  const activeGuard = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks')
+    && call.query.includes("status IN ('queued', 'claimed', 'in_progress')"));
   assert.match(activeGuard.query, /status IN \('queued', 'claimed', 'in_progress'\)/);
   assert.match(eligibility.query, /result_summary = 'Локальный анализатор завершился с ошибкой\.'/);
   const reset = calls.find(call => call.query.includes("SET status = Unwrap(CAST('queued'"));
@@ -305,6 +306,35 @@ test('coder claim retries only bounded model failures when no other coder task i
   assert.ok(reset.query.includes('available_at = CurrentUtcTimestamp()'));
   assert.ok(calls.some(call => call.query.includes("'retry_scheduled'")
     && call.query.includes('Временный сбой запуска будет повторён в пределах разрешённого лимита.')));
+});
+
+test('coder claim closes queued work older than seven days without invoking the worker', async () => {
+  const id = '66666666-6666-4666-8666-666666666666';
+  const calls = [];
+  const { sql } = fakeSql((query, values) => {
+    calls.push({ query, values });
+    if (query.includes('SELECT id FROM fam_agent_tasks') && query.includes("status = 'queued'")
+        && query.includes("Interval('P7D')")) return [[{ id }]];
+    if (query.includes('RETURNING id')) return [[{ id }]];
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  assert.equal(await queue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }), null);
+  const staleSelect = calls.find(call => call.query.includes('SELECT id FROM fam_agent_tasks')
+    && call.query.includes("status = 'queued'") && call.query.includes("Interval('P7D')"));
+  assert.ok(staleSelect);
+  assert.match(staleSelect.query, /source IN \('system', 'scheduled_audit'\)/);
+  const close = calls.find(call => call.query.includes("SET status = Unwrap(CAST('failed'")
+    && call.query.includes("Interval('P7D')"));
+  assert.ok(close);
+  for (const field of ['claimed_by', 'claim_token', 'claimed_at', 'lease_expires_at']) {
+    assert.ok(close.query.includes(field + ' = CAST(NULL'), 'stale close clears ' + field);
+  }
+  assert.ok(calls.some(call => call.query.includes('возраст очереди превысил семь дней.')));
+  const retry = calls.find(call => call.query.includes("result_summary = 'Локальный анализатор завершился с ошибкой.'"));
+  assert.ok(retry?.query.includes("created_at >= CurrentUtcTimestamp() - Interval('P7D')"));
+  const claim = calls.find(call => call.query.includes('SELECT id, payload_json'));
+  assert.ok(claim?.query.includes("created_at >= CurrentUtcTimestamp() - Interval('P7D')"));
 });
 
 test('agent task metrics expose only bounded aggregates for known agents and states', async () => {
