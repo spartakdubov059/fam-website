@@ -1267,7 +1267,16 @@ try {
   assert.ok(['js_runtime', 'unhandled_rejection', 'listings_load_failed'].includes(coderPayload.event_code));
   assert.ok(['auth', 'listings', 'notifications', 'database', 'other'].includes(coderPayload.page_area));
   assert.ok(Number.isInteger(coderPayload.occurrences) && coderPayload.occurrences >= 3 && coderPayload.occurrences <= 1000);
-  const coderClaim = await agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 });
+  const concurrentCoderClaims = await Promise.allSettled([
+    agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }),
+    agentQueue.claimSafeCoderTask({ workerId: 'fam-agent-qwen-coder-v1', leaseSeconds: 7200 }),
+  ]);
+  const successfulCoderClaims = concurrentCoderClaims
+    .filter(result => result.status === 'fulfilled' && result.value !== null)
+    .map(result => result.value);
+  assert.equal(successfulCoderClaims.length, 1,
+    'concurrent coder bridge calls cannot issue two live claims for one synthetic task');
+  const coderClaim = successfulCoderClaims[0];
   assert.equal(coderClaim.id, coderTask.id);
   assert.equal(coderClaim.task_key, coderPayload.task_key);
   const claimedCoderQueueHealth = await agentQueue.getAgentTaskQueueHealth();

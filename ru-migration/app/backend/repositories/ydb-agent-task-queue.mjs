@@ -165,7 +165,8 @@ export function createYdbAgentTaskQueue(sql) {
           FROM fam_agent_tasks WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
             AND approval_required = false AND attempt_count < max_attempts
             AND status = 'queued' AND available_at <= CurrentUtcTimestamp()
-          ORDER BY available_at ASC, created_at ASC LIMIT 1;`;
+          ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+            created_at ASC LIMIT 1;`;
         const row = rows?.[0]?.[0];
         if (!row) return null;
         let task;

@@ -167,6 +167,9 @@ test('coder bridge claims only allowlisted aggregate payload and finishes the ma
     page_area: task.page_area, occurrences: task.occurrences },
   { id, task_key: 'audit_frontend_runtime', event_code: 'js_runtime', page_area: 'other', occurrences: 7 });
   assert.ok(calls.some(query => query.includes("task_type = 'coder_patch_request'")));
+  const claimQuery = calls.find(query => query.includes('SELECT id, payload_json'));
+  assert.match(claimQuery, /ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,\s*created_at ASC/,
+    'coder claims preserve the source priority ordering');
   assert.match(task.claim_token, /^[0-9a-f-]{36}$/i);
   assert.equal(await queue.finishSafeCoderTask({ id, workerId: 'fam-agent-qwen-coder-v1',
     claimToken: task.claim_token, resultCode: 'model_no_patch' }), true);
