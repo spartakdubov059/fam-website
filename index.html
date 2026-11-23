@@ -3,8 +3,8 @@
 <head>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-0m/MvrWFOsZRKDJb3Pvxdd+71p8E+Ds8J2edXe1nbz4=' 'sha256-JJvwaBdXqQz0HoVGQmTCnfms5H/cSRmzbwd7rMOlsis=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
   <script>
-    // Netlify is the primary FAM address. Probe it before leaving this fallback copy.
-    // If the phone's network cannot reach Netlify, keep the GitHub Pages app open.
+    // GitHub Pages is the active publisher. Hand off to Netlify only after its
+    // readiness marker confirms a complete, compatible deployment.
     (function () {
       if (window.location.hostname !== "spartakdubov059.github.io") return;
       var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
@@ -23,7 +23,7 @@
       var timeoutId = setTimeout(function () {
         if (controller) controller.abort();
       }, 4000);
-      var healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now();
+      var healthUrl = "https://spartakdubov059.github.io/fam-website/fam-domain-health.json?t=" + Date.now();
       // Do not mistake a working image for a healthy deployment. The marker
       // must exist, return 200 with CORS, and explicitly report readiness.
       // On failure we stay on the standalone GitHub Pages copy.
@@ -57,21 +57,21 @@
   <meta name="robots" content="index,follow,max-image-preview:large">
   <meta name="theme-color" content="#0F1014">
   <meta name="color-scheme" content="dark">
-  <link rel="canonical" href="https://famru.netlify.app/">
+  <link rel="canonical" href="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:title" content="FAM — Свои рядом">
   <meta property="og:description" content="Школьная доска объявлений. Вещи, услуги, учёба и афиша.">
-  <meta property="og:image" content="https://famru.netlify.app/banner-1.jpg">
+  <meta property="og:image" content="https://spartakdubov059.github.io/fam-website/banner-1.jpg">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="675">
   <meta property="og:image:alt" content="Друзья FAM вместе проводят время; сообщество ближе, чем кажется">
-  <meta property="og:url" content="https://famru.netlify.app/">
+  <meta property="og:url" content="https://spartakdubov059.github.io/fam-website/">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ru_RU">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="FAM — Свои рядом">
   <meta name="twitter:description" content="Школьная доска объявлений.">
-  <meta name="twitter:image" content="https://famru.netlify.app/banner-1.jpg">
+  <meta name="twitter:image" content="https://spartakdubov059.github.io/fam-website/banner-1.jpg">
   <meta name="twitter:image:alt" content="Друзья FAM вместе проводят время; сообщество ближе, чем кажется">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎒</text></svg>">
 
@@ -1807,7 +1807,7 @@ window.onunhandledrejection = function() {
     return window.location.origin === "https://spartakdubov059.github.io"
       && /^\/fam-website(?:\/|$)/.test(window.location.pathname)
       ? "https://spartakdubov059.github.io/fam-website/"
-      : "https://famru.netlify.app/";
+      : "https://spartakdubov059.github.io/fam-website/";
   }
 
 
