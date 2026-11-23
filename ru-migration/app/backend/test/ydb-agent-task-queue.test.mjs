@@ -270,6 +270,19 @@ test('agent task metrics expose only bounded aggregates for known agents and sta
   assert.deepEqual(await queue.getAgentTaskMetrics(), [{ agent_key: 'technical', status: 'completed', count: 7 }]);
   assert.match(calls[0].query, /GROUP BY agent_key, status/);
   assert.match(calls[0].query, /LIMIT 50/);
+  assert.doesNotMatch(calls[0].query, /SELECT[^;]*(?:\bid\b|payload_json|result_summary|school_id|user_id)/i);
+  for (const invalid of [
+    { agent_key: 'unknown', status: 'completed', count: 1 },
+    { agent_key: 'technical', status: 'unknown', count: 1 },
+    { agent_key: 'technical', status: 'completed', count: 10_000_001 },
+  ]) {
+    const invalidQueue = createYdbAgentTaskQueue(fakeSql(() => [[invalid]]).sql);
+    await assert.rejects(invalidQueue.getAgentTaskMetrics(), /invalid agent task metrics/);
+  }
+  const overfullQueue = createYdbAgentTaskQueue(fakeSql(() => [[...Array(50)].map((_, index) => ({
+    agent_key: 'technical', status: 'completed', count: index,
+  }))]).sql);
+  await assert.rejects(overfullQueue.getAgentTaskMetrics(), /invalid agent task metrics/);
 });
 
 test('safe task enqueue binds task values and writes a minimal empty payload', async () => {
