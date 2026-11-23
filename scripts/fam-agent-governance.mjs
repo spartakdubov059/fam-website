@@ -380,12 +380,16 @@ export async function main() {
   let inspectorOutcome = "Автоматическая постановка не запускалась: нет подтверждённого сигнала или защищённого моста.";
   const syntheticSignal = process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
     ? (process.env.FAM_INSPECTOR_SYNTHETIC_SIGNAL || "none") : "none";
-  if (syntheticSignal !== "none" && syntheticSignal !== "synthetic_ci_workflow_failure") {
+  if (!new Set(["none", "synthetic_ci_workflow_failure", "synthetic_qwen_runtime_smoke"]).has(syntheticSignal)) {
     throw new Error("Недопустимый код синтетического сигнала INSPECTOR.");
   }
   let selectedSignal = null;
-  if (syntheticSignal === "synthetic_ci_workflow_failure") {
-    selectedSignal = { signal_code: syntheticSignal, occurrences: 1, event_id: "synthetic:" + (process.env.GITHUB_RUN_ID || "missing") };
+  if (syntheticSignal === "synthetic_ci_workflow_failure" || syntheticSignal === "synthetic_qwen_runtime_smoke") {
+    selectedSignal = {
+      signal_code: "synthetic_ci_workflow_failure",
+      occurrences: 1,
+      event_id: (syntheticSignal === "synthetic_qwen_runtime_smoke" ? "runtime_smoke:" : "synthetic:") + (process.env.GITHUB_RUN_ID || "missing"),
+    };
     inspectorOutcome = "Синтетическое испытание INSPECTOR: CI-сигнал тестовый, ошибка сайта не создавалась.";
   } else if (bridgeUrl && bridgeToken) {
     const candidate = warnings.map(mapInspectorWarning).find(Boolean);
