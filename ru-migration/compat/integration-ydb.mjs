@@ -1198,8 +1198,19 @@ try {
       ])],
     delete: async key => { deletedMediaKeys.push(key); accountMediaKeys.delete(key); },
   } });
-  assert.deepEqual(await recoverAccountDeletions(10), { claimed: 1, completed: 1, failed: 0 },
-    'a durable account deletion job can be resumed after its lease expires');
+  const concurrentRecovery = await Promise.allSettled([
+    recoverAccountDeletions(10),
+    recoverAccountDeletions(10),
+  ]);
+  const completedRecovery = concurrentRecovery.filter(result => result.status === 'fulfilled'
+    && result.value?.claimed === 1 && result.value?.completed === 1 && result.value?.failed === 0);
+  assert.equal(completedRecovery.length, 1,
+    'two concurrent recovery workers must finalize an expired account deletion job only once');
+  const losingRecovery = concurrentRecovery.filter(result => result.status === 'rejected'
+    || result.value?.completed !== 1);
+  assert.equal(losingRecovery.length, 1, 'the competing recovery worker must not finish the same leased job');
+  assert.equal(deletedMediaKeys.filter(key => key === recoveryImageKey).length, 1,
+    'the private recovery image must only be deleted by the successful claim');
   assert.equal(await resolveActor({ issuer: 'https://issuer.synthetic', subject: 'subject-recovery' }), null,
     'manual recovery removes the synthetic account identity after deleting private media');
   assert.equal((await sql`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${recoveryUserId};`)?.[0]?.length ?? 0, 0);
