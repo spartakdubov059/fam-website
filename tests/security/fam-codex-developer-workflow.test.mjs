@@ -267,6 +267,17 @@ test("GitHub approval output uses one validated writer and protects PR creation"
   assert.match(workflow, /gh pr create --draft/);
 });
 
+test("Qwen cache includes runtime libraries and rejects incomplete cache hits", () => {
+  assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/llama\.cpp\/build\/bin\n\s+key: [^\n]+-v2-runtime/);
+  assert.match(workflow, /id: llama-runtime-cache/);
+  assert.match(workflow, /dependencies="\$\(ldd "\$SERVER" 2>&1\)" && ! grep -q 'not found'/);
+  assert.match(workflow, /steps\.llama-runtime-cache\.outputs\.usable != 'true'/);
+  assert.match(workflow, /rm -rf -- "\$RUNNER_TEMP\/llama\.cpp"\n\s+git clone/);
+  const isolatedSmoke = workflow.indexOf('"$INFERENCE_SERVER" --version');
+  assert.ok(isolatedSmoke > workflow.indexOf('done < <(ldd "$SERVER" | awk'));
+  assert.ok(isolatedSmoke < workflow.indexOf('"$INFERENCE_SERVER" -m "$INFERENCE_MODEL"'));
+});
+
 test("untrusted QA never receives bridge credentials, including after failed checks", () => {
   const qa = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
   const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
