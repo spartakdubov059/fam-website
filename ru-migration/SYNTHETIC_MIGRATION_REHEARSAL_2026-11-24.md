@@ -65,3 +65,7 @@ Baseline `05052206459cea433c98ffa00a88228be3f1e3bf` passed all three CI checks, 
 ### Account-role validation hardening
 
 The synthetic account comparison previously accepted arbitrary lowercase role identifiers if both snapshots matched. Restricted it to the three roles already accepted by the legacy-profile mapper. Ten negative cases cover unknown roles on either side, including matching invalid source/target roles. This is only a verifier change; no live account authority or policy changed. New CI required.
+
+## Private attachment staging and thirteen-table restore
+
+Baseline `dab309d6759079edc6e5ca3db5a32bbef0910712` passed 731/731 backend tests, moderation and [disposable YDB restore of eleven tables](https://github.com/spartakdubov059/fam-website/actions/runs/45481942953). Extended the fixed fixture to restore media ownership rows and idea-image links, with three dummy object payloads including two ordered idea images. Local private files are written exclusively, read back and hash checked before any DB writes. Missing or corrupt objects block restore; all thirteen database tables roll back on injected failure. Replay verifies object hashes, linked ownership and fixture moderation state and refuses changed bytes or changed idea-image review state. Files are staged separately from the database and cleaned in finally; this is NOT a distributed S3/YDB transaction, real WebP backup, real-user export or full production importer. Status columns still use explicit fixture-only values. New CI required.
