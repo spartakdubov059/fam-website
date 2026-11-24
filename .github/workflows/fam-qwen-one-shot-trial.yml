@@ -1,0 +1,169 @@
+name: FAM Qwen one-shot isolated inference
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - '.github/workflows/fam-qwen-one-shot-trial.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fam-qwen-one-shot-isolated-trial
+  cancel-in-progress: false
+jobs:
+  inference:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'test/qwen-isolated-inference-once-20261124' && github.event.pull_request.base.ref == 'fix/qwen-complete-runtime-cache'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: '22'
+      - name: Восстановить сборку llama.cpp из кэша
+        id: llama-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # read-only cache restore
+        with:
+          path: ${{ runner.temp }}/llama.cpp/build/bin
+          key: fam-llama-cpu-${{ runner.os }}-${{ runner.arch }}-2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c-v2-runtime
+      - name: Проверить полноту кэша llama.cpp
+        id: llama-runtime-cache
+        run: |
+          set -euo pipefail
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          if [[ -x "$SERVER" ]] && dependencies="$(ldd "$SERVER" 2>&1)" && ! grep -q 'not found' <<< "$dependencies"; then
+            echo "usable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+            echo 'Кэш llama.cpp отсутствует или неполон; необходима чистая сборка.'
+          fi
+      - name: Собрать llama.cpp без GPU и стороннего API
+        if: steps.llama-runtime-cache.outputs.usable != 'true'
+        env:
+          LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
+        run: |
+          set -euo pipefail
+          # An incomplete cache may have populated this directory already.
+          rm -rf -- "$RUNNER_TEMP/llama.cpp"
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
+          git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
+          git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
+          cmake -S "$RUNNER_TEMP/llama.cpp" -B "$RUNNER_TEMP/llama.cpp/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_NATIVE=OFF \
+            -DGGML_AVX2=ON \
+            -DGGML_FMA=ON \
+            -DGGML_CUDA=OFF \
+            -DGGML_VULKAN=OFF \
+            -DGGML_METAL=OFF \
+            -DGGML_OPENMP=ON \
+            -DLLAMA_BUILD_UI=OFF \
+            -DLLAMA_USE_PREBUILT_UI=OFF
+          cmake --build "$RUNNER_TEMP/llama.cpp/build" --config Release --target llama-server -j 4
+          mkdir -p "$RUNNER_TEMP/llama.cpp/build/bin"
+      - name: Восстановить бесплатные веса модели из кэша
+        id: model-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # read-only cache restore
+        with:
+          path: ${{ runner.temp }}/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf
+          key: fam-qwen38-27b-iq2xs-v1
+      - name: Скачать бесплатную модель с лицензией Apache 2.0
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fam-model"
+          MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
+          if [[ ! -s "$MODEL" ]]; then
+            curl --fail --location --retry 3 --retry-delay 3 \
+              "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf" \
+              --output "$MODEL"
+          fi
+          verify_model() {
+            [[ -s "$MODEL" ]] || return 1
+            local actual_size actual_sha
+            actual_size="$(stat -c '%s' "$MODEL")"
+            (( actual_size >= 8500000000 )) || return 1
+            actual_sha="$(sha256sum "$MODEL" | awk '{print $1}')"
+            [[ "$actual_sha" == "eaeb705c72e5b7a55268f9f9a84b855ec3c1dd1b1f8c414cfc2d9ea52ad9eb23" ]]
+          }
+          if ! verify_model; then
+            rm -f "$MODEL"
+            curl --fail --location --retry 3 --retry-delay 5 --retry-all-errors \
+              "https://huggingface.co/sammyblues/Qwen3.8-27B-IQ2_XS-GGUF/resolve/0466a972ecb7e0711efd814b6f2e3856b4b4027b/Qwen3.8-27B-64L-IQ2_XS.gguf" \
+              --output "$MODEL"
+          fi
+          if ! verify_model; then
+            echo "::error::Контрольная сумма модели не совпала с официальной контрольной суммой файла."
+            exit 1
+          fi
+      - name: Run pinned Qwen weights and one synthetic JSON-schema request
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          MODEL="$RUNNER_TEMP/fam-model/Qwen3.8-27B-64L-IQ2_XS.gguf"
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          INFERENCE_HOME="/tmp/fam-inference-home"
+          INFERENCE_SERVER="$INFERENCE_HOME/llama-server"
+          INFERENCE_MODEL="$INFERENCE_HOME/model.gguf"
+          if ! getent group fam-inference >/dev/null 2>&1; then
+            sudo groupadd --system fam-inference
+          fi
+          if ! id fam-inference >/dev/null 2>&1; then
+            sudo useradd --system --gid fam-inference --no-create-home --shell /usr/sbin/nologin fam-inference
+          fi
+          sudo install -d -o fam-inference -g fam-inference -m 700 "$INFERENCE_HOME"
+          sudo install -o fam-inference -g fam-inference -m 500 "$SERVER" "$INFERENCE_SERVER"
+          while IFS= read -r library; do
+            case "$library" in
+              "$RUNNER_TEMP/llama.cpp/"*)
+                sudo install -o fam-inference -g fam-inference -m 400 "$library" "$INFERENCE_HOME/$(basename "$library")"
+                ;;
+            esac
+          done < <(ldd "$SERVER" | awk '$2 == "=>" && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}')
+          # Cheap loader smoke check in the same isolated runtime before inference.
+          sudo -u fam-inference env -i \
+            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" LD_LIBRARY_PATH="$INFERENCE_HOME" \
+            "$INFERENCE_SERVER" --version
+          sudo chmod 644 "$MODEL"
+          sudo ln "$MODEL" "$INFERENCE_MODEL"
+          umask 077
+          sudo -u fam-inference env -i \
+            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" LD_LIBRARY_PATH="$INFERENCE_HOME" \
+            "$INFERENCE_SERVER" -m "$INFERENCE_MODEL" \
+            --host 127.0.0.1 --port 8080 -c 16384 -t 4 -np 1 --reasoning off \
+            > "$RUNNER_TEMP/fam-llama-server.log" 2>&1 &
+          SERVER_PID=$!
+          cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
+          trap cleanup EXIT
+          READY=false
+          for attempt in $(seq 1 180); do
+            if curl --silent --fail --max-time 3 http://127.0.0.1:8080/health >/dev/null; then
+              READY=true; break
+            fi
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo '::error::llama-server exited before readiness'; tail -n 80 "$RUNNER_TEMP/fam-llama-server.log"; exit 1
+            fi
+            sleep 5
+          done
+          if [[ "$READY" != true ]]; then
+            echo '::error::Model health did not become ready'; tail -n 80 "$RUNNER_TEMP/fam-llama-server.log"; exit 1
+          fi
+          echo 'Verified model health endpoint is ready.'
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { postJson } from './scripts/local-model-http.mjs';
+          import { parseJson, assertRequiredFields } from './scripts/local-model-json.mjs';
+          const schema = { type: 'object', properties: { result: { type: 'integer' } }, required: ['result'], additionalProperties: false };
+          const result = await postJson('http://127.0.0.1:8080/v1/chat/completions', {
+            model: 'Qwen3.8-27B-IQ2_XS',
+            messages: [{ role: 'user', content: 'Return the sum of 2 and 2 in the required JSON object as the integer result.' }],
+            temperature: 0.1, top_p: 0.9, max_tokens: 64, stream: false,
+            response_format: { type: 'json_schema', json_schema: { name: 'fam_smoke', strict: true, schema } }
+          }, { timeoutMs: 300000 });
+          assert.ok(result?.usage?.completion_tokens > 0, 'No generated tokens');
+          const parsed = assertRequiredFields(parseJson(result?.choices?.[0]?.message?.content), schema, 'fam_smoke');
+          assert.equal(parsed.result, 4);
+          console.log('FAM synthetic Qwen JSON inference: PASS; generated tokens:', result.usage.completion_tokens);
+          NODE
+          echo 'Verified real model inference and schema response; no queue, patch, merge, or production deployment.' >> "$GITHUB_STEP_SUMMARY"
