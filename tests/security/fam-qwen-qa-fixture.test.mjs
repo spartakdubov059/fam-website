@@ -28,7 +28,7 @@ const branchScript = branchStep[1].split("\n      - name:")[0].split("\n").map(l
   assert.ok(!line.trim() || line.startsWith("          "));
   return line.trim() ? line.slice(10) : "";
 }).join("\n");
-assert.equal(branchScript, proposedScript, "QA and independent branch CI must execute identical proposed tests");
+assert.equal(branchScript.trimEnd(), proposedScript.trimEnd(), "QA and independent branch CI must execute identical proposed tests");
 
 function fixture(t, change, { stale = false, failingBaseline = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "fam-qa-fixture-"));
