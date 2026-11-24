@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
+import { collectCoderLifecycle, formatCoderLifecycle } from "./fam-agent-lifecycle.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
@@ -417,6 +418,8 @@ export async function main() {
       inspectorOutcome += "; Qwen workflow запущен";
     }
   }
+  const lifecycle = await collectCoderLifecycle({ runs: runDetails, repository: process.env.GITHUB_REPOSITORY,
+    read: (path) => api(path, token) });
   const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
   const integrationPlan = buildIntegrationPlan({
     pulls, disputes,
@@ -426,7 +429,7 @@ export async function main() {
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
     qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
-  }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
+  }) + "\n" + formatCoderLifecycle(lifecycle) + "\n\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import("node:fs/promises");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report + "\n");
