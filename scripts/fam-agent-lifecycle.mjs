@@ -28,17 +28,26 @@ export function ownerApproval(reviews, owner, head, mergedAt = null) {
   return relevant[0]?.state === "APPROVED" && relevant[0].commit_id === head;
 }
 
-export function exactPostMergeCI(runs, sha, mergedAt) {
-  if (!Array.isArray(runs) || !SHA.test(sha || "") || !Number.isFinite(timestamp(mergedAt))) return "unconfirmed";
+function exactCI(runs, sha, branch, event, notBefore) {
+  if (!Array.isArray(runs) || !SHA.test(sha || "") || !Number.isFinite(timestamp(notBefore))) return "unconfirmed";
   const matches = runs.filter((r) => validId(r?.id) && r.head_sha === sha &&
-    r.event === "push" && r.head_branch === "main" &&
-    Number.isFinite(timestamp(r.created_at)) && timestamp(r.created_at) >= timestamp(mergedAt))
+    r.event === event && r.head_branch === branch &&
+    Number.isFinite(timestamp(r.created_at)) && timestamp(r.created_at) >= timestamp(notBefore))
     .sort((a, b) => timestamp(b.created_at) - timestamp(a.created_at) || b.id - a.id);
   const latest = matches[0];
   if (!latest) return "unconfirmed";
   if (latest.status !== "completed") return "pending";
   return latest.conclusion === "success" ? "verified" :
     latest.conclusion === "failure" ? "failed" : "unconfirmed";
+}
+
+export function exactPostMergeCI(runs, sha, mergedAt) {
+  return exactCI(runs, sha, "main", "push", mergedAt);
+}
+
+export function exactBranchCI(runs, sha, runId, prCreatedAt) {
+  if (!validId(runId)) return "unconfirmed";
+  return exactCI(runs, sha, "codex/fam-run-" + runId, "workflow_dispatch", prCreatedAt);
 }
 
 export async function collectCoderLifecycle({ runs = [], repository, read, limit = 10 } = {}) {
@@ -56,7 +65,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
   const rows = [];
   for (const run of candidates.slice(0, maximum)) {
     const row = { run_id: run.id, pr_number: null, pr_created: false,
-      owner_approved: false, merged: false, postmerge: "unconfirmed", evidence: "unavailable" };
+      owner_approved: false, merged: false, branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable" };
     rows.push(row);
     const branch = "codex/fam-run-" + run.id;
     try {
@@ -72,16 +81,30 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
       row.evidence = "pr_confirmed";
       row.merged = pr.merged === true && Number.isFinite(timestamp(pr.merged_at)) &&
         SHA.test(pr.merge_commit_sha || "");
-      const reviews = await read("/pulls/" + pr.number + "/reviews?per_page=100");
-      if (Array.isArray(reviews) && reviews.length < 100) {
-        row.owner_approved = ownerApproval(reviews, owner, pr.head.sha, row.merged ? pr.merged_at : null);
-        row.evidence = "review_checked";
+      // Independent reads: a missing review response must not conceal
+      // a separately verified regression run, and vice versa.
+      try {
+        const reviews = await read("/pulls/" + pr.number + "/reviews?per_page=100");
+        if (Array.isArray(reviews) && reviews.length < 100) {
+          row.owner_approved = ownerApproval(reviews, owner, pr.head.sha, row.merged ? pr.merged_at : null);
+          row.evidence = "review_checked";
+        }
+      } catch { /* approval remains unconfirmed */ }
+      if (Number.isFinite(timestamp(pr.created_at))) {
+        try {
+          const result = await read("/actions/workflows/moderation-regression.yml/runs?branch=" +
+            encodeURIComponent(branch) + "&event=workflow_dispatch&head_sha=" + pr.head.sha + "&per_page=20");
+          if (Array.isArray(result?.workflow_runs) && result.workflow_runs.length < 20)
+            row.branch_ci = exactBranchCI(result.workflow_runs, pr.head.sha, run.id, pr.created_at);
+        } catch { /* branch CI remains unconfirmed */ }
       }
       if (row.merged) {
-        const result = await read("/actions/workflows/moderation-regression.yml/runs?branch=main&event=push&head_sha=" +
-          pr.merge_commit_sha + "&per_page=20");
-        if (Array.isArray(result?.workflow_runs) && result.workflow_runs.length < 20)
-          row.postmerge = exactPostMergeCI(result.workflow_runs, pr.merge_commit_sha, pr.merged_at);
+        try {
+          const result = await read("/actions/workflows/moderation-regression.yml/runs?branch=main&event=push&head_sha=" +
+            pr.merge_commit_sha + "&per_page=20");
+          if (Array.isArray(result?.workflow_runs) && result.workflow_runs.length < 20)
+            row.postmerge = exactPostMergeCI(result.workflow_runs, pr.merge_commit_sha, pr.merged_at);
+        } catch { /* postmerge CI remains unconfirmed */ }
       }
     } catch {
       // Never infer a later stage from an API failure; preserve independently confirmed stages.
@@ -94,14 +117,17 @@ export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
   const lines = ["## INTEGRATOR — подтверждённые стадии Qwen после QA"];
   if (!rows.length) lines.push("Нет запусков с подтверждённой генерацией и QA в проверенной выборке.");
   for (const row of rows) {
-    const ci = {verified: "успешен", failed: "ошибка", pending: "ожидается", unconfirmed: "не подтверждён"}[row.postmerge] || "не подтверждён";
+    const label = {verified: "успешен", failed: "ошибка", pending: "ожидается", unconfirmed: "не подтверждён"};
+    const ci = label[row.postmerge] || "не подтверждён";
+    const branchCI = label[row.branch_ci] || "не подтверждён";
     lines.push("- Run " + row.run_id + ": " +
       (row.pr_created ? "PR #" + row.pr_number : "PR не подтверждён") +
+      "; CI текущей ревизии PR: " + branchCI +
       "; одобрение владельца на точной ревизии: " + (row.owner_approved ? "подтверждено" : "не подтверждено") +
       "; merge: " + (row.merged ? "подтверждён" : "не подтверждён") +
       "; CI объединённого коммита: " + ci + ".");
   }
   if (limited) lines.push("Достигнут лимит выборки; отчёт неполный.");
-  lines.push("Это сверка метаданных GitHub, не постоянный журнал Supabase и не доказательство публикации сайта. Merge без подтверждённого одобрения не считается одобрением.");
+  lines.push("Это сверка метаданных GitHub, не постоянный журнал Supabase и не доказательство публикации сайта. CI текущей ревизии не доказывает совпадение с исходным patch модели. Merge без подтверждённого одобрения не считается одобрением.");
   return lines.join("\n");
 }
