@@ -109,7 +109,7 @@ export async function verifyDomains({
   let attempt = 0;
   let latest = [];
 
-  while (Date.now() <= deadline && attempt < maxAttempts) {
+  while (attempt < maxAttempts && (attempt === 0 || Date.now() <= deadline)) {
     attempt += 1;
     latest = (await Promise.all(domains.flatMap(domain =>
       selected.map(path => comparePath(fetchImpl, domain, path, expected.get(path), cacheKey))
@@ -198,7 +198,11 @@ async function main() {
         `\n## Netlify publication paused\n\nExpected state: **${state}**. GitHub Pages serves the current source.\n\n${details.map(item => `- ${item}`).join("\n")}\n`);
     }
   }
-  console.log(`Domain sync verified after ${result.attempts} attempt(s): ${result.paths.join(", ")}`);
+  if (result.netlifyState === "synced") {
+    console.log(`Both production domains verified after ${result.attempts} attempt(s): ${result.paths.join(", ")}`);
+  } else {
+    console.log(`GitHub Pages verified; Netlify is NOT synchronized (${result.netlifyState}).`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
