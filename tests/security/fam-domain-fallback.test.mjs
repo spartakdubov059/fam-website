@@ -22,21 +22,12 @@ function signupRedirect(origin, pathname) {
   });
 }
 
-test("GitHub Pages redirects only after the exact primary readiness marker confirms health", () => {
+test("GitHub Pages is independently usable without redirecting to Netlify", () => {
   const head = html.slice(0, html.indexOf("<meta charset="));
   assert.ok(head.includes("<head>"));
-  assert.ok(head.includes('window.location.hostname !== "spartakdubov059.github.io"'));
-  assert.ok(head.includes('https://famru.netlify.app/fam-domain-health.json?t='));
-  assert.ok(head.includes('mode: "cors"'));
-  assert.ok(head.includes('cache: "no-store"'));
-  assert.ok(head.includes('health && health.site === "famru" && health.ok === true'));
-  assert.ok(head.includes('window.location.replace(target)'));
-  assert.ok(head.includes("}, 4000);"));
-  assert.ok(head.includes("stay on GitHub Pages"));
-  assert.ok(!head.includes("probePrimaryAsset()"));
-  assert.ok(!head.includes("banner-1.webp?probe="));
-  assert.ok(head.includes("stay on GitHub Pages"));
-  assert.ok(head.includes("window.location.search + window.location.hash"));
+  assert.doesNotMatch(head, /<script\b/i);
+  assert.doesNotMatch(head, /location\.replace/);
+  assert.doesNotMatch(html, /fam-domain-health\.json\?t=/);
 });
 
 test("Supabase HTTP 401 confirms the API answered but does not claim login was tested", async () => {
@@ -91,7 +82,7 @@ test("SEO metadata identifies the active GitHub Pages publisher without changing
   assert.ok(html.includes(`property="og:url" content="${activeUrl}"`));
   assert.ok(html.includes(`property="og:image" content="${activeUrl}banner-1.jpg"`));
   assert.ok(html.includes(`name="twitter:image" content="${activeUrl}banner-1.jpg"`));
-  assert.ok(html.includes('https://famru.netlify.app/fam-domain-health.json?t='));
+  assert.doesNotMatch(html, /fam-domain-health\.json\?t=/);
   assert.equal(signupRedirect(fallbackOrigin, "/fam-website/"), fallbackUrl);
   assert.equal(signupRedirect(primaryOrigin, "/"), primaryUrl);
 });
