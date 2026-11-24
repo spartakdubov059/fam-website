@@ -1,54 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-0m/MvrWFOsZRKDJb3Pvxdd+71p8E+Ds8J2edXe1nbz4=' 'sha256-JJvwaBdXqQz0HoVGQmTCnfms5H/cSRmzbwd7rMOlsis=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
-  <script>
-    // Netlify is the primary FAM address. Probe it before leaving this fallback copy.
-    // If the phone's network cannot reach Netlify, keep the GitHub Pages app open.
-    (function () {
-      if (window.location.hostname !== "spartakdubov059.github.io") return;
-      var match = window.location.pathname.match(/^\/fam-website(?=\/|$)(.*)$/);
-      if (!match) return;
-      // OAuth and email-link callbacks must finish on the origin that
-      // received them. For normal visits, use the primary domain whenever
-      // its readiness endpoint confirms the deployment is serving correctly.
-      function keepFallbackAuthContext() {
-        var params = window.location.search + "&" + window.location.hash;
-        return /(?:^|[?&#])(?:code|token_hash|access_token|refresh_token|error|error_code)=/i.test(params);
-      }
-      if (keepFallbackAuthContext()) return;
-      var path = match[1] || "/";
-      var target = "https://famru.netlify.app" + path + window.location.search + window.location.hash;
-      var controller = window.AbortController ? new AbortController() : null;
-      var timeoutId = setTimeout(function () {
-        if (controller) controller.abort();
-      }, 4000);
-      var healthUrl = "https://famru.netlify.app/fam-domain-health.json?t=" + Date.now();
-      // Do not mistake a working image for a healthy deployment. The marker
-      // must exist, return 200 with CORS, and explicitly report readiness.
-      // On failure we stay on the standalone GitHub Pages copy.
-      try {
-        fetch(healthUrl, {
-          mode: "cors",
-          cache: "no-store",
-          credentials: "omit",
-          ...(controller ? { signal: controller.signal } : {})
-        }).then(function (response) {
-          return response.ok ? response.json() : null;
-        }).then(function (health) {
-          if (health && health.site === "famru" && health.ok === true && !keepFallbackAuthContext()) {
-            window.location.replace(target);
-          }
-        }).catch(function () {
-          // The primary host or readiness marker is unavailable; stay on GitHub Pages.
-        }).finally(function () {
-          clearTimeout(timeoutId);
-        });
-      } catch (_) {
-        clearTimeout(timeoutId);
-      }
-    })();
-  </script>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-JJvwaBdXqQz0HoVGQmTCnfms5H/cSRmzbwd7rMOlsis=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
+  <!-- GitHub Pages is the active publisher. Keep each visitor on the opened origin; never force a cross-origin session change. -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FAM — Свои рядом</title>
