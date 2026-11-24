@@ -177,7 +177,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
     });
   }
   const failed = warnings.find((w) => w.code === "repeated_failures");
-  if (failed) {
+  if (failed && !activeRoles.includes("coder_diagnostician")) {
     proposals.push({
       key: "coder_diagnostician",
       role: "Диагност локального кодирующего агента",
@@ -186,7 +186,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
     });
   }
   const stale = warnings.find((w) => w.code === "stale_prs");
-  if (stale && stale.count >= 4) {
+  if (stale && stale.count >= 4 && !activeRoles.includes("pr_triage")) {
     proposals.push({
       key: "pr_triage",
       role: "Куратор очереди Pull Request",
@@ -306,6 +306,29 @@ async function publishIssue(report, token) {
   return "Создана задача #" + created.number;
 }
 
+// Do not lose the control-tower report when enqueue or dispatch fails.
+// A failed dispatch may have reached GitHub; never retry it blindly.
+export async function handoffInspectorSignal({ signal, enqueue, dispatch }) {
+  if (!signal) return { state: "no_signal", taskCreated: false };
+  let result;
+  try {
+    result = await enqueue(signal);
+    if (typeof result?.task_created !== "boolean" ||
+        typeof result.reason !== "string" || !/^[a-z_]{1,48}$/.test(result.reason)) {
+      return { state: "enqueue_unconfirmed", taskCreated: null };
+    }
+  } catch {
+    return { state: "enqueue_unconfirmed", taskCreated: null };
+  }
+  if (!result.task_created) return { state: "not_created", taskCreated: false, reason: result.reason };
+  try {
+    await dispatch();
+    return { state: "dispatch_accepted", taskCreated: true, reason: result.reason };
+  } catch {
+    return { state: "dispatch_unconfirmed", taskCreated: true, reason: result.reason };
+  }
+}
+
 export async function main() {
   const token = process.env.GH_TOKEN;
   if (!token || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(process.env.GITHUB_REPOSITORY || "")) {
@@ -402,20 +425,29 @@ export async function main() {
     }
   }
   if (selectedSignal && bridgeUrl && bridgeToken) {
-    const result = await enqueueInspectorTask({
-      url: bridgeUrl, token: bridgeToken,
-      signalCode: selectedSignal.signal_code,
-      eventId: selectedSignal.event_id,
-      occurrences: selectedSignal.occurrences,
-    });
-    inspectorOutcome += "; результат очереди: " + result.reason +
-      (result.task_created ? "; задание создано" : "; новое задание не создано");
-    if (result.task_created) {
-      await api("/actions/workflows/fam-codex-developer.yml/dispatches", token, {
+    const handoff = await handoffInspectorSignal({
+      signal: selectedSignal,
+      enqueue: (signal) => enqueueInspectorTask({
+        url: bridgeUrl, token: bridgeToken,
+        signalCode: signal.signal_code, eventId: signal.event_id, occurrences: signal.occurrences,
+      }),
+      dispatch: () => api("/actions/workflows/fam-codex-developer.yml/dispatches", token, {
         method: "POST",
         body: JSON.stringify({ ref: "main" }),
+      }),
+    });
+    const prefix = syntheticSignal !== "none" ? "Синтетическое испытание INSPECTOR. " : "";
+    inspectorOutcome = prefix + ({
+      not_created: "Новое задание не создано; причина: " + (handoff.reason || "unknown"),
+      dispatch_accepted: "Задание создано; GitHub принял запрос запуска Qwen (исполнение пока не подтверждено).",
+      dispatch_unconfirmed: "Задание создано; принятие запроса запуска Qwen не подтверждено. Повторный dispatch не выполнялся.",
+      enqueue_unconfirmed: "Результат постановки задания не подтверждён; автоматический повтор не выполнялся.",
+    }[handoff.state] || "Нет подтверждённого сигнала.");
+    if (handoff.state === "dispatch_unconfirmed" || handoff.state === "enqueue_unconfirmed") {
+      warnings.push({
+        code: "inspector_handoff_unconfirmed", severity: "medium", count: 1,
+        message: "Не удалось подтвердить передачу задания INSPECTOR → Qwen; необходимо сверить очередь и Actions",
       });
-      inspectorOutcome += "; Qwen workflow запущен";
     }
   }
   const lifecycle = await collectCoderLifecycle({ runs: runDetails, repository: process.env.GITHUB_REPOSITORY,
