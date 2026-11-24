@@ -335,6 +335,9 @@ jobs:
                 ;;
             esac
           done
+          if git diff --cached --raw --no-renames | grep -E '^:[0-9]{6} (120000|160000) '; then
+            echo '::error::Non-regular file in proposed change.'; exit 1
+          fi
           has_behavior_code=false
           has_tests=false
           for file in "${changed_files[@]}"; do
