@@ -3,6 +3,7 @@ import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { createDatabaseActorResolver } from '../app/backend/auth/database-actor.mjs';
 import { createYdbLegacyAccountLinkRepository } from './legacy-account-link-ydb.mjs';
+import { createSyntheticProfileStageRepository, prepareSyntheticProfileBatch } from './synthetic-profile-stage-ydb.mjs';
 async function main(){
  const driver=new Driver('grpc://127.0.0.1:2136/local');
  try{
@@ -84,8 +85,43 @@ async function main(){
     VALUES (${extraIds[3]}, 'lyceum_3', 'synthetic-migration-suspension', CurrentUtcTimestamp());`;
   assert.deepEqual(await repository.linkVerifiedAccount(bind(3,2,3)),fail,'open suspension blocks account linking');
   assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[2]}),null);
+  await stageIntegration(sql,repository,issuer,success,createDatabaseActorResolver);
   console.log('YDB_SYNTHETIC_LEGACY_EXTRA_GUARDS_PASS');
   console.log('YDB_SYNTHETIC_LEGACY_LINK_PASS: UUID preserved, replay and collisions blocked, one concurrent winner, full transaction rollback and retry');
  }finally{await driver.close();}
+}
+async function stageIntegration(sql,repository,issuer,success,createDatabaseActorResolver){
+  const stage=createSyntheticProfileStageRepository(sql);
+  const fixture=(id,active=true)=>({id,school_id:'lyceum_3',role:'student',active,first_name:'Synthetic',last_name:'Migration',class_name:'7А',city:null,avatar_url:'',person_type:'student',staff_position:null,staff_verification_status:'not_required'});
+  const a=fixture('edededed-eded-4ded-8ded-edededed0010');
+  const b=fixture('edededed-eded-4ded-8ded-edededed0011',false);
+  const c=fixture('edededed-eded-4ded-8ded-edededed0012');
+  const d=fixture('edededed-eded-4ded-8ded-edededed0013');
+  const ok=(inserted,unchanged)=>({ok:true,code:'SYNTHETIC_BATCH_STAGED',inserted,unchanged});
+  assert.deepEqual(await stage.stageBatch([a,b]),ok(2,0));
+  assert.deepEqual(await stage.stageBatch([b,a]),ok(0,2));
+  const inactive=await sql`SELECT active, ready, avatar_url, city FROM fam_legacy_migration_profiles WHERE user_id = ${b.id};`;
+  assert.equal(inactive[0][0].active,false);assert.equal(inactive[0][0].ready,false);
+  assert.equal(inactive[0][0].avatar_url,'');assert.equal(inactive[0][0].city,null);
+  assert.deepEqual(await stage.stageBatch([c,{...a,role:'school_admin'}]),{ok:false,code:'STAGING_CONFLICT'});
+  assert.equal((await sql`SELECT user_id FROM fam_legacy_migration_profiles WHERE user_id = ${c.id};`)[0].length,0);
+  const rollbackSql=(...args)=>sql(...args);
+  rollbackSql.begin=callback=>sql.begin(tx=>callback((strings,...values)=>{
+    if(strings.join(' ').includes('INSERT INTO fam_legacy_migration_profiles')&&values[0]===d.id)throw Error('synthetic batch failure');
+    return tx(strings,...values);
+  }));
+  assert.deepEqual(await createSyntheticProfileStageRepository(rollbackSql).stageBatch([c,d]),{ok:false,code:'STAGING_UNAVAILABLE'});
+  for(const id of [c.id,d.id])assert.equal((await sql`SELECT user_id FROM fam_legacy_migration_profiles WHERE user_id = ${id};`)[0].length,0);
+  assert.deepEqual(await stage.stageBatch([c,d]),ok(2,0));
+  const version=prepareSyntheticProfileBatch([a]).profiles[0].profile_version;
+  const challenge='e'.repeat(64),subject='990000000010';
+  await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id,user_id,profile_version,issuer,subject,expires_at,consumed)
+    VALUES (${challenge},${a.id},${version},${issuer},${subject},Unwrap(CurrentUtcTimestamp()+Interval('PT4M')),false);`;
+  assert.deepEqual(await repository.linkVerifiedAccount({challengeId:challenge,legacyUserId:a.id,profileVersion:version,issuer,subject}),success);
+  assert.deepEqual(await stage.stageBatch([a]),ok(0,1));
+  const final=await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${a.id};`;
+  assert.equal(final[0][0].ready,false,'reimport must never reactivate a consumed staged profile');
+  assert.equal((await createDatabaseActorResolver(sql)({issuer,subject})).id,a.id);
+  console.log('YDB_SYNTHETIC_PROFILE_STAGE_PASS: retry, immutable roles, inactive state, batch rollback and linked profile replay');
 }
 await main();
