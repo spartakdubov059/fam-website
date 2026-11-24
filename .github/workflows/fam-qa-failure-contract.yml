@@ -25,6 +25,8 @@ jobs:
             tests/fixtures/fam-qa-failure/baseline.sql \
             tests/fixtures/fam-qa-failure/proposed.sql \
             tests/fixtures/fam-qa-failure/assertions.sql \
+            supabase/migrations/20261123210000_fam_qwen_retry_scope_and_stale_queue.sql \
+            tests/fixtures/fam-qa-failure/recovery.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove fixture database
         if: always()
