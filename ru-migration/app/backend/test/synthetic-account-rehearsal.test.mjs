@@ -31,3 +31,12 @@ for (const [name,source,target,code] of cases) {
     else assert.deepEqual(Object.keys(result).sort(),['code','ok']);
   });
 }
+
+for(const role of ['owner','super_admin','unknown','admin','']) {
+ test('rejects unknown synthetic source role '+JSON.stringify(role),()=>{
+  assert.equal(verifySyntheticAccountRehearsal([{...a,role}],[{...ta,role}]).code,'INVALID_SYNTHETIC_SOURCE');
+ });
+ test('rejects unknown synthetic target role '+JSON.stringify(role),()=>{
+  assert.equal(verifySyntheticAccountRehearsal([a],[{...ta,role}]).code,'INVALID_SYNTHETIC_TARGET');
+ });
+}

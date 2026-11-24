@@ -61,3 +61,7 @@ Commit `192258ea70d6d7917314d23aca5dde030fa1cf0f` passed backend and moderation,
 ## Eleven-table disposable restoration
 
 Baseline `05052206459cea433c98ffa00a88228be3f1e3bf` passed all three CI checks, with [YDB restore](https://github.com/spartakdubov059/fam-website/actions/runs/45480776720) logging YDB_SYNTHETIC_RESTORE_PASS for six tables. Extended the fixed local fixture to restore ideas, favorites, announcements, polls and votes in the same transaction. Added vote-conflict refusal and late interruption after all writes. School activity allows explicitly bounded far-future synthetic pulse dates solely to keep TTL fixtures alive across future CI runs; actual retention rules are unchanged. Noncovered profile and status columns and favorite timestamp use explicit synthetic defaults; no real import or TTL policy migration is claimed. New CI required.
+
+### Account-role validation hardening
+
+The synthetic account comparison previously accepted arbitrary lowercase role identifiers if both snapshots matched. Restricted it to the three roles already accepted by the legacy-profile mapper. Ten negative cases cover unknown roles on either side, including matching invalid source/target roles. This is only a verifier change; no live account authority or policy changed. New CI required.

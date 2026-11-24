@@ -8,7 +8,7 @@ export function verifySyntheticAccountRehearsal(source, target) {
   const sourceKeys = ['user_id', 'school_id', 'role', 'active'];
   const targetKeys = [...sourceKeys, 'issuer', 'subject'];
   const validProfile = row => id(row.user_id) && id(row.school_id) &&
-    typeof row.role === 'string' && /^[a-z_]{1,32}$/.test(row.role) && typeof row.active === 'boolean';
+    ['student','council_member','school_admin'].includes(row.role) && typeof row.active === 'boolean';
   if (!Array.isArray(source) || !Array.isArray(target) || source.length === 0 ||
       source.length > 10000 || target.length > 10000) return reject('INVALID_MANIFEST');
   const sourceById = new Map();
