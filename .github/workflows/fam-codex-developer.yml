@@ -368,7 +368,7 @@ jobs:
           mapfile -d '' proposed_tests < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
           for file in "${proposed_tests[@]}"; do
             case "$file" in
-              tests/*.test.mjs) has_tests=true ;;
+              tests/agent-proposed/*.test.mjs) has_tests=true ;;
             esac
           done
           if [[ "$has_behavior_code" == "true" && "$has_tests" != "true" ]]; then
@@ -394,11 +394,11 @@ jobs:
         id: proposed_tests
         run: |
           set -euo pipefail
-          mapfile -d '' changed_tests < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
+          mapfile -d '' tracked_tests < <(git ls-files -z -- tests/agent-proposed/)
           proposed_tests=()
-          for file in "${changed_tests[@]}"; do
+          for file in "${tracked_tests[@]}"; do
             case "$file" in
-              tests/*.test.mjs) proposed_tests+=("./$file") ;;
+              tests/agent-proposed/*.test.mjs) proposed_tests+=("./$file") ;;
             esac
           done
           if (( ${#proposed_tests[@]} > 0 )); then
