@@ -90,8 +90,21 @@ jobs:
         id: llama-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # actions/cache v4
         with:
-          path: ${{ runner.temp }}/llama.cpp/build/bin/llama-server
-          key: fam-llama-cpu-${{ runner.os }}-${{ runner.arch }}-2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c-v1
+          path: ${{ runner.temp }}/llama.cpp/build/bin
+          key: fam-llama-cpu-${{ runner.os }}-${{ runner.arch }}-2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c-v2-runtime
+
+      - name: Проверить полноту кэша llama.cpp
+        if: steps.preflight.outputs.schedule_enabled == 'true'
+        id: llama-runtime-cache
+        run: |
+          set -euo pipefail
+          SERVER="$RUNNER_TEMP/llama.cpp/build/bin/llama-server"
+          if [[ -x "$SERVER" ]] && dependencies="$(ldd "$SERVER" 2>&1)" && ! grep -q 'not found' <<< "$dependencies"; then
+            echo "usable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "usable=false" >> "$GITHUB_OUTPUT"
+            echo 'Кэш llama.cpp отсутствует или неполон; необходима чистая сборка.'
+          fi
 
       - name: Скачать бесплатную модель с лицензией Apache 2.0
         if: steps.preflight.outputs.schedule_enabled == 'true'
@@ -124,11 +137,13 @@ jobs:
           fi
 
       - name: Собрать llama.cpp без GPU и стороннего API
-        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.llama-cache.outputs.cache-hit != 'true'
+        if: steps.preflight.outputs.schedule_enabled == 'true' && steps.llama-runtime-cache.outputs.usable != 'true'
         env:
           LLAMA_CPP_COMMIT: 2a4daf0e08d6a9b6993ee0d4a9a3cfc35a6f405c
         run: |
           set -euo pipefail
+          # An incomplete cache may have populated this directory already.
+          rm -rf -- "$RUNNER_TEMP/llama.cpp"
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git "$RUNNER_TEMP/llama.cpp"
           git -C "$RUNNER_TEMP/llama.cpp" fetch --depth 1 origin "$LLAMA_CPP_COMMIT"
           git -C "$RUNNER_TEMP/llama.cpp" checkout --detach "$LLAMA_CPP_COMMIT"
@@ -185,6 +200,10 @@ jobs:
                 ;;
             esac
           done < <(ldd "$SERVER" | awk '$2 == "=>" && $3 ~ /^\// {print $3} $1 ~ /^\// {print $1}')
+          # Cheap loader smoke check in the same isolated runtime before inference.
+          sudo -u fam-inference env -i \
+            PATH="/usr/bin:/bin" HOME="$INFERENCE_HOME" TMPDIR="$INFERENCE_HOME" LD_LIBRARY_PATH="$INFERENCE_HOME" \
+            "$INFERENCE_SERVER" --version
           sudo chmod 644 "$MODEL"
           sudo ln "$MODEL" "$INFERENCE_MODEL"
           umask 077
