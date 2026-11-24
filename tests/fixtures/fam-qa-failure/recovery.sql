@@ -1,6 +1,6 @@
 -- Synthetic recovery tests for the actual repository claim RPC.
 -- Only executed in the disposable fixture DB on GitHub's runner.
-truncate private.fam_agent_task_events, private.fam_agent_tasks;
+truncate private.fam_agent_inspector_signals, private.fam_agent_task_events, private.fam_agent_tasks;
 alter table private.fam_agent_tasks
   add column created_at timestamptz not null default now(),
   add column available_at timestamptz not null default now(),
