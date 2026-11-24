@@ -266,3 +266,34 @@ test("GitHub approval output uses one validated writer and protects PR creation"
   assert.match(validator, /"requires_approval=" \+ String\(result\.requires_approval\) \+ "\\n"/);
   assert.match(workflow, /gh pr create --draft/);
 });
+
+test("untrusted QA never receives bridge credentials, including after failed checks", () => {
+  const qa = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
+  const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
+  const pr = workflow.split("  prepare_review:\n")[1]?.split("  record_pr:\n")[0] || "";
+  const final = workflow.split("  record_pr:\n")[1] || "";
+  assert.ok(qa && record && pr && final);
+  assert.doesNotMatch(qa, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
+  assert.doesNotMatch(pr, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs (advance|heartbeat)/);
+  assert.match(record, /needs\.verify\.result == 'success'/);
+  assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(record, /FAM_RESULT_STAGE: qa_passed/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(final, /export FAM_RESULT_STAGE=pr_created/);
+  assert.match(final, /export FAM_RESULT_STAGE=qa_failed/);
+  assert.doesNotMatch(record + final, /download-artifact|git apply|node --test/);
+  assert.equal((workflow.match(/FAM_RESULT_STAGE: qa_passed/g) || []).length, 1);
+});
+test("PR creation validates staged changes independently, including new files", () => {
+  const qa = workflow.split("  verify:\n")[1].split("  record_qa:\n")[0];
+  const pr = workflow.split("  prepare_review:\n")[1].split("  record_pr:\n")[0];
+  for (const block of [qa, pr]) {
+    assert.match(block, /git apply --index/);
+    assert.match(block, /git diff --cached --name-only -z HEAD/);
+  }
+  assert.match(pr, /node scripts\/validate-local-agent-patch\.mjs/);
+  assert.match(pr, /git diff --cached --raw --no-renames/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
+});
