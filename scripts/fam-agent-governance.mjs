@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
+import { collectCoderLifecycle, formatCoderLifecycle } from "./fam-agent-lifecycle.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
@@ -18,16 +19,24 @@ export function summarizeQwenRuns(runs = []) {
     const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
     const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
     const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
-    const noTask = preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped";
+    const noTask = job.conclusion === "success" && preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped" && modelOutcome !== "success";
     const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
     rows.push({
       status: job.conclusion || job.status || run.conclusion || run.status || "unknown",
       duration_ms: duration,
       no_task: noTask,
       model_outcome: modelOutcome || "not_run",
-      generated: modelOutcome === "success" && verifyJob?.conclusion !== "skipped" && Boolean(verifyJob),
-      qa_passed: verifyJob?.conclusion === "success",
-      pr_created: (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" && item.conclusion === "success"),
+      generated: job.conclusion === "success" && modelOutcome === "success" &&
+        Boolean(verifyJob) && ["in_progress","completed"].includes(verifyJob.status) &&
+        !["skipped","cancelled"].includes(verifyJob.conclusion),
+      no_patch: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "skipped",
+      qa_passed: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success",
+      pr_created: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success" &&
+        (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" &&
+          item.status === "completed" && item.conclusion === "success"),
       estimated_runner_minutes: (run.jobs || []).reduce((sum, item) => {
         const milliseconds = Math.max(0, dateMs(item.completed_at || run.updated_at) - dateMs(item.started_at || run.created_at));
         return sum + Math.ceil(milliseconds / 60_000);
@@ -42,7 +51,8 @@ export function summarizeQwenRuns(runs = []) {
     failed: count((row) => row.status === "failure"),
     no_task: count((row) => row.no_task),
     model_generated: count((row) => row.generated),
-    model_no_patch: count((row) => row.model_outcome === "success" && !row.generated && !row.no_task),
+    model_no_patch: count((row) => row.no_patch),
+    model_result_unconfirmed: count((row) => row.model_outcome === "success" && !row.generated && !row.no_patch && !row.no_task),
     qa_passed: count((row) => row.qa_passed),
     pr_created: count((row) => row.pr_created),
     estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
@@ -176,7 +186,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
     });
   }
   const failed = warnings.find((w) => w.code === "repeated_failures");
-  if (failed) {
+  if (failed && !activeRoles.includes("coder_diagnostician")) {
     proposals.push({
       key: "coder_diagnostician",
       role: "Диагност локального кодирующего агента",
@@ -185,7 +195,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
     });
   }
   const stale = warnings.find((w) => w.code === "stale_prs");
-  if (stale && stale.count >= 4) {
+  if (stale && stale.count >= 4 && !activeRoles.includes("pr_triage")) {
     proposals.push({
       key: "pr_triage",
       role: "Куратор очереди Pull Request",
@@ -243,7 +253,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
   for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
   if (qwenMetrics) {
-    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", результат модели не подтверждён " + (qwenMetrics.model_result_unconfirmed ?? 0) + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
     lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");
@@ -303,6 +313,29 @@ async function publishIssue(report, token) {
     body: JSON.stringify({ title, body: report }),
   });
   return "Создана задача #" + created.number;
+}
+
+// Do not lose the control-tower report when enqueue or dispatch fails.
+// A failed dispatch may have reached GitHub; never retry it blindly.
+export async function handoffInspectorSignal({ signal, enqueue, dispatch }) {
+  if (!signal) return { state: "no_signal", taskCreated: false };
+  let result;
+  try {
+    result = await enqueue(signal);
+    if (typeof result?.task_created !== "boolean" ||
+        typeof result.reason !== "string" || !/^[a-z_]{1,48}$/.test(result.reason)) {
+      return { state: "enqueue_unconfirmed", taskCreated: null };
+    }
+  } catch {
+    return { state: "enqueue_unconfirmed", taskCreated: null };
+  }
+  if (!result.task_created) return { state: "not_created", taskCreated: false, reason: result.reason };
+  try {
+    await dispatch();
+    return { state: "dispatch_accepted", taskCreated: true, reason: result.reason };
+  } catch {
+    return { state: "dispatch_unconfirmed", taskCreated: true, reason: result.reason };
+  }
 }
 
 export async function main() {
@@ -401,22 +434,33 @@ export async function main() {
     }
   }
   if (selectedSignal && bridgeUrl && bridgeToken) {
-    const result = await enqueueInspectorTask({
-      url: bridgeUrl, token: bridgeToken,
-      signalCode: selectedSignal.signal_code,
-      eventId: selectedSignal.event_id,
-      occurrences: selectedSignal.occurrences,
-    });
-    inspectorOutcome += "; результат очереди: " + result.reason +
-      (result.task_created ? "; задание создано" : "; новое задание не создано");
-    if (result.task_created) {
-      await api("/actions/workflows/fam-codex-developer.yml/dispatches", token, {
+    const handoff = await handoffInspectorSignal({
+      signal: selectedSignal,
+      enqueue: (signal) => enqueueInspectorTask({
+        url: bridgeUrl, token: bridgeToken,
+        signalCode: signal.signal_code, eventId: signal.event_id, occurrences: signal.occurrences,
+      }),
+      dispatch: () => api("/actions/workflows/fam-codex-developer.yml/dispatches", token, {
         method: "POST",
         body: JSON.stringify({ ref: "main" }),
+      }),
+    });
+    const prefix = syntheticSignal !== "none" ? "Синтетическое испытание INSPECTOR. " : "";
+    inspectorOutcome = prefix + ({
+      not_created: "Новое задание не создано; причина: " + (handoff.reason || "unknown"),
+      dispatch_accepted: "Задание создано; GitHub принял запрос запуска Qwen (исполнение пока не подтверждено).",
+      dispatch_unconfirmed: "Задание создано; принятие запроса запуска Qwen не подтверждено. Повторный dispatch не выполнялся.",
+      enqueue_unconfirmed: "Результат постановки задания не подтверждён; автоматический повтор не выполнялся.",
+    }[handoff.state] || "Нет подтверждённого сигнала.");
+    if (handoff.state === "dispatch_unconfirmed" || handoff.state === "enqueue_unconfirmed") {
+      warnings.push({
+        code: "inspector_handoff_unconfirmed", severity: "medium", count: 1,
+        message: "Не удалось подтвердить передачу задания INSPECTOR → Qwen; необходимо сверить очередь и Actions",
       });
-      inspectorOutcome += "; Qwen workflow запущен";
     }
   }
+  const lifecycle = await collectCoderLifecycle({ runs: runDetails, repository: process.env.GITHUB_REPOSITORY,
+    read: (path) => api(path, token) });
   const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
   const integrationPlan = buildIntegrationPlan({
     pulls, disputes,
@@ -426,7 +470,7 @@ export async function main() {
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
     qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
-  }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
+  }) + "\n" + formatCoderLifecycle(lifecycle) + "\n\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import("node:fs/promises");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report + "\n");
