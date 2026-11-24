@@ -1,0 +1,77 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { collectCoderLifecycle, ownerApproval, exactPostMergeCI, formatCoderLifecycle } from "../../scripts/fam-agent-lifecycle.mjs";
+
+const repository = "owner/fam";
+const head = "a".repeat(40), merged = "b".repeat(40);
+const when = "2026-11-23T12:00:00Z";
+const after = "2026-11-23T12:10:00Z";
+const before = "2026-11-23T11:00:00Z";
+const pr = { number: 7, user: {login: "github-actions[bot]"},
+  base: {ref:"main", repo:{full_name:repository}},
+  head: {ref:"codex/fam-run-123", sha:head, repo:{full_name:repository}},
+  merged:true, merged_at:when, merge_commit_sha:merged };
+const run = { id:123, head_branch:"main", jobs:[
+  { name:"Локальная модель готовит исправление", status:"completed", conclusion:"success",
+    steps:[{name:"Запустить локальную модель и подготовить patch", conclusion:"success"}] },
+  { name:"Независимая проверка без модели и секретов", status:"completed", conclusion:"success" }
+]};
+const review = { id:1, user:{login:"owner"}, state:"APPROVED", submitted_at:before, commit_id:head };
+const ci = { id:444, head_sha:merged, head_branch:"main", event:"push", created_at:after, status:"completed", conclusion:"success" };
+
+test("owner approval is exact-head, owner-only and not inferred from merge", () => {
+  assert.equal(ownerApproval([review], "owner", head, when), true);
+  for (const bad of [
+    [{...review,user:{login:"other"}}], [{...review,commit_id:merged}],
+    [{...review,submitted_at:after}], [{...review,state:"DISMISSED"}],
+    [review,{...review,id:2,submitted_at:when,state:"CHANGES_REQUESTED"}]
+  ]) assert.equal(ownerApproval(bad,"owner",head,when),false);
+});
+
+test("post-merge verification requires main push CI on exact merge SHA", () => {
+  assert.equal(exactPostMergeCI([ci],merged,when),"verified");
+  for (const bad of [{...ci,head_sha:head},{...ci,event:"pull_request"},
+    {...ci,head_branch:"feature"},{...ci,created_at:before}])
+    assert.equal(exactPostMergeCI([bad],merged,when),"unconfirmed");
+  assert.equal(exactPostMergeCI([ci,{...ci,id:445,status:"in_progress",conclusion:null}],merged,when),"pending");
+  assert.equal(exactPostMergeCI([ci,{...ci,id:445,conclusion:"failure"}],merged,when),"failed");
+});
+
+test("lifecycle reconciles only trusted bot PR and independently verified stages", async () => {
+  const calls=[];
+  const result = await collectCoderLifecycle({runs:[run,run],repository,read:async path=>{
+    calls.push(path);
+    if (path.startsWith("/pulls?")) return [pr];
+    if (path==="/pulls/7") return pr;
+    if (path.startsWith("/pulls/7/reviews")) return [review];
+    if (path.startsWith("/actions/workflows/")) return {workflow_runs:[ci]};
+    throw Error("unexpected endpoint");
+  }});
+  assert.equal(calls.length,4);
+  assert.equal(result.rows.length,1);
+  assert.deepEqual(result.rows[0],{run_id:123,pr_number:7,pr_created:true,
+    owner_approved:true,merged:true,postmerge:"verified",evidence:"review_checked"});
+  assert.match(formatCoderLifecycle(result), /PR #7/);
+  assert.match(formatCoderLifecycle(result), /CI объединённого коммита: успешен/);
+});
+
+test("missing review, unrelated PR, partial metadata never imply authorization", async () => {
+  const withoutReview = await collectCoderLifecycle({runs:[run],repository,read:async path=>{
+    if (path.startsWith("/pulls?")) return [pr];
+    if (path==="/pulls/7") return pr;
+    throw Error("API unavailable");
+  }});
+  assert.equal(withoutReview.rows[0].merged,true);
+  assert.equal(withoutReview.rows[0].owner_approved,false);
+  assert.equal(withoutReview.rows[0].postmerge,"unconfirmed");
+  const spoof = await collectCoderLifecycle({runs:[run],repository,read:async()=>[
+    {...pr,user:{login:"owner"}},{...pr,head:{...pr.head,repo:{full_name:"fork/fam"}}}
+  ]});
+  assert.equal(spoof.rows[0].pr_created,false);
+  assert.equal(spoof.rows[0].merged,false);
+  const noQa = await collectCoderLifecycle({runs:[{...run,jobs:[run.jobs[0]]}],repository,read:async()=>{throw Error("must not call");}});
+  assert.deepEqual(noQa.rows,[]);
+  const limited = await collectCoderLifecycle({runs:[run],repository,limit:0,read:async()=>{throw Error("must not call");}});
+  assert.equal(limited.limited,true);
+  assert.deepEqual(limited.rows,[]);
+});
