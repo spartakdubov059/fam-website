@@ -129,6 +129,7 @@ async function writeSafetySignal(
 async function recordCachedSignal(context: SafetyContext | null, cached: Record<string, unknown>): Promise<void> {
   if (!context || cached.action === "ok") return;
   const code = typeof cached.reason_code === "string" ? cached.reason_code : "";
+  // Provider failures describe infrastructure, not user conduct. Keep the pending decision; do not attribute a cached outage to the pupil.
   const map: Record<string, { category: SafetyCategory; severity: "medium" | "high" }> = {
     targeted_harassment: { category: "targeted_harassment", severity: "medium" },
     negative_personal_call: { category: "negative_personal_call", severity: "medium" },
@@ -144,10 +145,6 @@ async function recordCachedSignal(context: SafetyContext | null, cached: Record<
     second_reviewer_unavailable: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
     second_reviewer_empty_response: { category: "unclear_safety_signal", severity: "medium" },
-    image_review_rate_limited: { category: "unclear_safety_signal", severity: "medium" },
-    image_review_quota_exceeded: { category: "unclear_safety_signal", severity: "medium" },
-    image_review_unavailable: { category: "unclear_safety_signal", severity: "medium" },
-    image_review_no_decision: { category: "unclear_safety_signal", severity: "medium" },
     personal_information: { category: "personal_data_in_image", severity: "medium" },
     private_document: { category: "personal_data_in_image", severity: "medium" },
     unsafe_content: { category: "unsafe_image", severity: "high" },
