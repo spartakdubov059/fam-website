@@ -29,3 +29,7 @@ The previous commit `5f50355dfcb68e97bfe36854a123730ee448c248` passed SDK and di
 ## Immutable synthetic profile staging
 
 Previous PR commit `fb8458b1d050624bc220652f2bbbf454348c4293` passed 648/648 backend tests, disposable YDB and moderation ([SDK](https://github.com/spartakdubov059/fam-website/actions/runs/45404262916), [YDB](https://github.com/spartakdubov059/fam-website/actions/runs/45404263231), [moderation](https://github.com/spartakdubov059/fam-website/actions/runs/45404263087)). The next change adds a bounded synthetic-only profile batch writer with deterministic version digests, no overwrites, exact replays, immutable roles and activity, and transaction rollback. It rejects non-rehearsal UUIDs/names and remains isolated in compat. New CI must pass. This is not the approved real importer; source eligibility, authorization, media migration, and real identity verification remain open.
+
+## Synthetic payload equality
+
+Commit `03f044cd59585c19eb4772d65bcdbbe62b298bbc` passed all three CI workflows (655 backend tests reported in prior iteration). Added separate offline payload comparison for synthetic listing titles/descriptions, idea bodies, approved/pending message bodies and canonical timestamps, with complete coverage of structural IDs. Nine new test cases; CI required. This is not a production schema mapping or full payload migration; votes, events, additional fields and actual media remain open.
