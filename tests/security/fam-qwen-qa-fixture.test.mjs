@@ -21,8 +21,16 @@ function extractStep(id) {
 }
 const safetyScript = extractStep("safety");
 const proposedScript = extractStep("proposed_tests");
+const branchWorkflow = readFileSync(new URL("../../.github/workflows/moderation-regression.yml", import.meta.url), "utf8");
+const branchStep = branchWorkflow.split("        id: proposed_tests\n        run: |\n");
+assert.equal(branchStep.length, 2);
+const branchScript = branchStep[1].split("\n      - name:")[0].split("\n").map(line => {
+  assert.ok(!line.trim() || line.startsWith("          "));
+  return line.trim() ? line.slice(10) : "";
+}).join("\n");
+assert.equal(branchScript, proposedScript, "QA and independent branch CI must execute identical proposed tests");
 
-function fixture(t, change, { stale = false } = {}) {
+function fixture(t, change, { stale = false, failingBaseline = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "fam-qa-fixture-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = join(root, "repo");
@@ -41,7 +49,9 @@ function fixture(t, change, { stale = false } = {}) {
   copyFileSync(validator, join(repo, "scripts/validate-local-agent-patch.mjs"));
   writeFileSync(join(repo, "docs/readme.md"), "# Synthetic fixture\n");
   writeFileSync(join(repo, "js/app.js"), "export const value = 1;\n");
-  writeFileSync(join(repo, "tests/agent-proposed/existing.test.mjs"), "import test from 'node:test'; test('baseline', () => {});\n");
+  writeFileSync(join(repo, "tests/agent-proposed/existing.test.mjs"), failingBaseline
+    ? "import test from 'node:test'; test('accumulated regression', () => { throw Error('synthetic baseline failure'); });\n"
+    : "import test from 'node:test'; test('baseline', () => {});\n");
   git("init", "-q");
   git("config", "user.name", "FAM synthetic QA");
   git("config", "user.email", "synthetic@example.invalid");
@@ -140,4 +150,21 @@ test("actual proposed-test step passes a successful nested test", t => {
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /synthetic regression/);
+});
+
+test("an unchanged previously accepted proposed test is rerun for every subsequent patch", t => {
+  const r = fixture(t, repo => writeFileSync(join(repo, "docs/new.md"), "New synthetic change.\n"), { failingBaseline: true });
+  assert.equal(r.status, 0, r.logs);
+  const result = r.runProposed();
+  assert.ifError(result.error);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /accumulated regression/);
+});
+test("a test outside the designated proposed suite does not satisfy required coverage", t => {
+  const r = fixture(t, repo => {
+    writeFileSync(join(repo, "js/app.js"), "export const value = 2;\n");
+    writeFileSync(join(repo, "tests/other.test.mjs"), "import test from 'node:test'; test('other', () => {});\n");
+  });
+  assert.notEqual(r.status, 0);
+  assert.match(r.logs, /не содержит регрессионного теста/);
 });
