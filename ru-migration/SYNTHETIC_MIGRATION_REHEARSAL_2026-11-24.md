@@ -33,3 +33,7 @@ Previous PR commit `fb8458b1d050624bc220652f2bbbf454348c4293` passed 648/648 bac
 ## Synthetic payload equality
 
 Commit `03f044cd59585c19eb4772d65bcdbbe62b298bbc` passed all three CI workflows (655 backend tests reported in prior iteration). Added separate offline payload comparison for synthetic listing titles/descriptions, idea bodies, approved/pending message bodies and canonical timestamps, with complete coverage of structural IDs. Nine new test cases; CI required. This is not a production schema mapping or full payload migration; votes, events, additional fields and actual media remain open.
+
+## Payload timestamp regression fix
+
+Commit `c0560018f0fd599c5d904b292dc1c249f5cc8fd0` failed 6 of 664 backend tests ([CI](https://github.com/spartakdubov059/fam-website/actions/runs/45417786035)): a double-escaped decimal separator rejected canonical timestamps before payload comparison. Corrected the literal dot and added negative separator cases on both sides. Existing canonical date and payload checks remain intact. New CI required; no production change.

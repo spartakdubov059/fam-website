@@ -6,7 +6,7 @@ const schema={listings:['id','title','description','created_at'],ideas:['id','bo
 const exact=(x,keys)=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).length===keys.length&&keys.every(k=>Object.hasOwn(x,k));
 const fail=(code,table)=>({ok:false,code,table});
 const dummy=x=>typeof x==='string'&&/^synthetic:[a-zA-Z0-9 _.-]{0,200}$/.test(x);
-const timestamp=x=>typeof x==='string'&&/^2026-11-24T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
+const timestamp=x=>typeof x==='string'&&/^2026-11-24T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
 export function verifySyntheticPayloads(metadata,source,target){
  if(!verifySyntheticContentRehearsal(metadata).ok)return fail('INVALID_METADATA','input');
  const tables=Object.keys(schema);
