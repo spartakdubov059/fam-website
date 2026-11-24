@@ -44,3 +44,6 @@ const cases=[
 ["source invalid too",f=>f.source.votes[0].choice_index=-1,"INVALID_VOTE"]
 ];
 for(const [name,mutate,code] of cases)test(name,()=>{const f=fixture();mutate(f);const result=verify(f.metadata,f.source,f.target);assert.equal(result.code,code);assert.equal(result.ok,code==='SYNTHETIC_SCHOOL_ACTIVITY_MATCH');if(result.ok){assert.equal(result.counts.votes,1);assert.equal(result.live_cutover_authorized,false);}});
+
+// Far-future synthetic dates keep TTL-managed rows present in long-lived local CI fixtures.
+test('accepts explicitly bounded future synthetic pulse fixtures for TTL-independent CI',()=>{const f=fixture();for(const side of ['source','target']){for(const row of f[side].announcements){row.published_at='2099-11-24T12:00:00.000Z';row.expires_at='2099-11-25T12:00:00.000Z';}for(const row of f[side].polls){row.created_at='2099-11-24T12:00:00.000Z';row.closes_at='2099-11-25T12:00:00.000Z';}for(const row of f[side].votes)row.created_at='2099-11-24T12:00:00.000Z';}assert.equal(verify(f.metadata,f.source,f.target).ok,true);});

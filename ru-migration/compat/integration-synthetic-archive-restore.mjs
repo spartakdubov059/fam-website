@@ -7,10 +7,11 @@ import {verifySyntheticMigrationAcceptance} from './verify-synthetic-migration-a
 function makeFixture(){
  const a='synthetic-restore-owner',b='synthetic-restore-member',s='synthetic-restore-school',l='synthetic-restore-listing';
  const created_at='2026-11-24T12:00:00.000Z';
+ const pulseStart='2099-11-24T12:00:00.000Z',pulseEnd='2099-11-25T12:00:00.000Z';
  const accounts=[{user_id:a,school_id:s,role:'council_member',active:true},{user_id:b,school_id:s,role:'student',active:false}];
- const content={profiles:accounts.map(({user_id,school_id})=>({user_id,school_id})),listings:[{id:l,user_id:a,school_id:s,image_key:''}],ideas:[],messages:[{id:'synthetic-restore-message',sender_id:b,receiver_id:a,school_id:s,listing_id:l}],pending_messages:[{id:'synthetic-restore-pending',sender_id:a,receiver_id:b,school_id:s,listing_id:l}],favorites:[],media:[],idea_images:[]};
- const payloads={listings:[{id:l,title:'synthetic:restore event',description:'synthetic:restore description',created_at}],ideas:[],messages:[{id:content.messages[0].id,body:'synthetic:approved body',created_at}],pending_messages:[{id:content.pending_messages[0].id,body:'synthetic:pending body',created_at}]};
- const activity={listing_event_fields:[{id:l,is_event:true,event_date:'2026-11-25',event_time:'10:00',event_type:'limited',max_seats:1}],event_registrations:[{event_id:l,user_id:b,school_id:s,status:'confirmed',created_at}],event_occupancy:[{event_id:l,taken:1}],announcements:[],polls:[],votes:[]};
+ const content={profiles:accounts.map(({user_id,school_id})=>({user_id,school_id})),listings:[{id:l,user_id:a,school_id:s,image_key:''}],ideas:[{id:'synthetic-restore-idea',user_id:b,school_id:s}],messages:[{id:'synthetic-restore-message',sender_id:b,receiver_id:a,school_id:s,listing_id:l}],pending_messages:[{id:'synthetic-restore-pending',sender_id:a,receiver_id:b,school_id:s,listing_id:l}],favorites:[{user_id:b,listing_id:l}],media:[],idea_images:[]};
+ const payloads={listings:[{id:l,title:'synthetic:restore event',description:'synthetic:restore description',created_at}],ideas:[{id:content.ideas[0].id,body:'synthetic:restore idea',created_at}],messages:[{id:content.messages[0].id,body:'synthetic:approved body',created_at}],pending_messages:[{id:content.pending_messages[0].id,body:'synthetic:pending body',created_at}]};
+ const activity={listing_event_fields:[{id:l,is_event:true,event_date:'2026-11-25',event_time:'10:00',event_type:'limited',max_seats:1}],event_registrations:[{event_id:l,user_id:b,school_id:s,status:'confirmed',created_at}],event_occupancy:[{event_id:l,taken:1}],announcements:[{announcement_id:'synthetic-restore-news',school_id:s,author_id:a,title:'synthetic:notice',body:'synthetic:notice text',kind:'news',event_starts_at:null,published_at:pulseStart,expires_at:pulseEnd}],polls:[{poll_id:'synthetic-restore-poll',school_id:s,author_id:a,question:'synthetic:question',options:['synthetic:yes','synthetic:no'],created_at:pulseStart,closes_at:pulseEnd}],votes:[{poll_id:'synthetic-restore-poll',voter_id:b,school_id:s,choice_index:1,created_at:pulseStart}]};
  return {snapshot_id:'synthetic-restore-batch',accounts,content,objects:[],payloads,activity};
 }
 async function run(){
@@ -30,10 +31,12 @@ async function run(){
   const [approved]=snap.content.messages,[pending]=snap.content.pending_messages;
   const [approvedPayload]=snap.payloads.messages,[pendingPayload]=snap.payloads.pending_messages;
   const school=listing.school_id,issuer='https://synthetic.invalid';
+  const [idea]=snap.content.ideas,[ideaPayload]=snap.payloads.ideas,[favorite]=snap.content.favorites;
+  const [announcement]=snap.activity.announcements,[poll]=snap.activity.polls,[vote]=snap.activity.votes;
   // This is an intentionally fixed fixture, not an arbitrary import API. Never consume an external archive.
   // Reject unsupported sections rather than silently ignoring records in a future fixture.
-  for(const rows of [snap.content.ideas,snap.content.favorites,snap.content.media,snap.content.idea_images,snap.objects,snap.activity.announcements,snap.activity.polls,snap.activity.votes])assert.equal(rows.length,0);
-  for(const rows of [snap.content.listings,snap.content.messages,snap.content.pending_messages,snap.activity.listing_event_fields,snap.activity.event_registrations,snap.activity.event_occupancy])assert.equal(rows.length,1);
+  for(const rows of [snap.content.media,snap.content.idea_images,snap.objects])assert.equal(rows.length,0);
+  for(const rows of [snap.content.listings,snap.content.messages,snap.content.pending_messages,snap.activity.listing_event_fields,snap.activity.event_registrations,snap.activity.event_occupancy,snap.content.ideas,snap.content.favorites,snap.activity.announcements,snap.activity.polls,snap.activity.votes])assert.equal(rows.length,1);
   const read=async tx=>{
    const profiles=(await tx`SELECT issuer, subject, user_id, school_id, role, active FROM fam_user_profiles WHERE school_id = ${school};`)[0];
    const listings=(await tx`SELECT id,user_id,school_id,image_key,title,description,created_at,is_event,event_date,event_time,event_type,max_seats,category,price_text,photo_status,status FROM fam_listings WHERE id = ${listing.id};`)[0];
@@ -41,7 +44,12 @@ async function run(){
    const pendingMessages=(await tx`SELECT id,sender_id,receiver_id,school_id,listing_id,body,created_at FROM fam_pending_messages WHERE listing_id = ${listing.id};`)[0];
    const registrations=(await tx`SELECT event_id,user_id,school_id,status,created_at FROM fam_event_registrations WHERE event_id = ${listing.id};`)[0];
    const occupancies=(await tx`SELECT event_id,taken FROM fam_event_occupancy WHERE event_id = ${listing.id};`)[0];
-   return {profiles,listings,messages,pendingMessages,registrations,occupancies};
+   const ideas=(await tx`SELECT id,user_id,school_id,text,created_at,image_status,ai_status,ai_summary,ai_reason,admin_status FROM fam_ideas WHERE school_id = ${school};`)[0];
+   const favorites=(await tx`SELECT user_id,listing_id,created_at FROM fam_favorites WHERE listing_id = ${listing.id};`)[0];
+   const announcements=(await tx`SELECT announcement_id,school_id,author_id,title,body,kind,event_starts_at,published_at,expires_at FROM fam_school_announcements WHERE school_id = ${school};`)[0];
+   const polls=(await tx`SELECT poll_id,school_id,author_id,question,options_json,closes_at,created_at FROM fam_school_polls WHERE school_id = ${school};`)[0];
+   const votes=(await tx`SELECT poll_id,voter_id,school_id,choice_index,created_at FROM fam_school_poll_votes WHERE poll_id = ${poll.poll_id};`)[0];
+   return {profiles,listings,messages,pendingMessages,registrations,occupancies,ideas,favorites,announcements,polls,votes};
   };
   const empty=rows=>Object.values(rows).every(list=>list.length===0);
   const asIso=value=>new Date(value).toISOString();
@@ -51,13 +59,16 @@ async function run(){
    const accounts=rows.profiles.map(x=>pick(x,['issuer','subject','user_id','school_id','role','active']));
    const content={profiles:accounts.map(x=>pick(x,['user_id','school_id'])),
     listings:rows.listings.map(x=>pick(x,['id','user_id','school_id','image_key'])),
-    ideas:[],messages:rows.messages.map(x=>pick(x,messageFields)),pending_messages:rows.pendingMessages.map(x=>pick(x,messageFields)),favorites:[],media:[],idea_images:[]};
-   const payloads={listings:rows.listings.map(x=>({...pick(x,['id','title','description']),created_at:asIso(x.created_at)})),ideas:[],
+    ideas:rows.ideas.map(x=>pick(x,['id','user_id','school_id'])),messages:rows.messages.map(x=>pick(x,messageFields)),pending_messages:rows.pendingMessages.map(x=>pick(x,messageFields)),favorites:rows.favorites.map(x=>pick(x,['user_id','listing_id'])),media:[],idea_images:[]};
+   const payloads={listings:rows.listings.map(x=>({...pick(x,['id','title','description']),created_at:asIso(x.created_at)})),ideas:rows.ideas.map(x=>({id:x.id,body:x.text,created_at:asIso(x.created_at)})),
     messages:rows.messages.map(x=>({...pick(x,['id','body']),created_at:asIso(x.created_at)})),
     pending_messages:rows.pendingMessages.map(x=>({...pick(x,['id','body']),created_at:asIso(x.created_at)}))};
    const activity={listing_event_fields:rows.listings.map(x=>({...pick(x,['id','is_event','event_date','event_time','event_type']),max_seats:Number(x.max_seats)})),
     event_registrations:rows.registrations.map(x=>({...pick(x,['event_id','user_id','school_id','status']),created_at:asIso(x.created_at)})),
-    event_occupancy:rows.occupancies.map(x=>({event_id:x.event_id,taken:Number(x.taken)})),announcements:[],polls:[],votes:[]};
+    event_occupancy:rows.occupancies.map(x=>({event_id:x.event_id,taken:Number(x.taken)})),
+    announcements:rows.announcements.map(x=>({...pick(x,['announcement_id','school_id','author_id','title','body','kind']),event_starts_at:x.event_starts_at==null?null:asIso(x.event_starts_at),published_at:asIso(x.published_at),expires_at:asIso(x.expires_at)})),
+    polls:rows.polls.map(x=>({...pick(x,['poll_id','school_id','author_id','question']),options:JSON.parse(x.options_json),closes_at:asIso(x.closes_at),created_at:asIso(x.created_at)})),
+    votes:rows.votes.map(x=>({...pick(x,['poll_id','voter_id','school_id']),choice_index:Number(x.choice_index),created_at:asIso(x.created_at)}))};
    return {snapshot_id:snap.snapshot_id,accounts,content,payloads,activity,objects:[]};
   }
   const assertMatch=rows=>{
@@ -70,6 +81,9 @@ async function run(){
    assert.equal(rows.listings[0].status,'active');
    assert.equal(rows.listings[0].photo_status,'none');
    assert.equal(rows.messages[0].is_read,false);
+   assert.equal(rows.ideas[0].image_status,'none');assert.equal(rows.ideas[0].ai_status,'pending');assert.equal(rows.ideas[0].admin_status,'pending');
+   assert.equal(rows.ideas[0].ai_summary,'');assert.equal(rows.ideas[0].ai_reason,'');
+   assert.equal(asIso(rows.favorites[0].created_at),payload.created_at);
    for(const row of rows.profiles){assert.equal(row.issuer,issuer);assert.equal(row.subject,row.user_id);}
   };
   async function restore(injectFailure=false){
@@ -89,12 +103,23 @@ async function run(){
       VALUES (${listing.id},${listing.user_id},${school},${payload.title},${payload.description},'Мероприятия','Бесплатно',${event.is_event},${event.event_date},${event.event_time},${event.event_type},Unwrap(CAST(${event.max_seats} AS Uint32)),${listing.image_key},'none','active',Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_messages (id,sender_id,receiver_id,school_id,listing_id,body,is_read,created_at)
       VALUES (${approved.id},${approved.sender_id},${approved.receiver_id},${approved.school_id},${approved.listing_id},${approvedPayload.body},false,Unwrap(CAST(${approvedPayload.created_at} AS Timestamp)));`;
-    if(injectFailure)throw Error('synthetic restore interruption');
+    
     await tx`INSERT INTO fam_pending_messages (id,sender_id,receiver_id,school_id,listing_id,body,created_at)
       VALUES (${pending.id},${pending.sender_id},${pending.receiver_id},${pending.school_id},${pending.listing_id},${pendingPayload.body},Unwrap(CAST(${pendingPayload.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_event_registrations (event_id,user_id,school_id,status,created_at)
       VALUES (${reg.event_id},${reg.user_id},${reg.school_id},${reg.status},Unwrap(CAST(${reg.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_event_occupancy (event_id,taken) VALUES (${occupancy.event_id},Unwrap(CAST(${occupancy.taken} AS Uint32)));`;
+    await tx`INSERT INTO fam_ideas (id,user_id,school_id,text,image_status,ai_status,ai_summary,ai_reason,admin_status,created_at)
+      VALUES (${idea.id},${idea.user_id},${idea.school_id},${ideaPayload.body},'none','pending','','','pending',Unwrap(CAST(${ideaPayload.created_at} AS Timestamp)));`;
+    await tx`INSERT INTO fam_favorites (user_id,listing_id,created_at)
+      VALUES (${favorite.user_id},${favorite.listing_id},Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
+    await tx`INSERT INTO fam_school_announcements (announcement_id,school_id,author_id,title,body,kind,event_starts_at,published_at,expires_at)
+      VALUES (${announcement.announcement_id},${announcement.school_id},${announcement.author_id},${announcement.title},${announcement.body},${announcement.kind},CAST(NULL AS Timestamp?),Unwrap(CAST(${announcement.published_at} AS Timestamp)),Unwrap(CAST(${announcement.expires_at} AS Timestamp)));`;
+    await tx`INSERT INTO fam_school_polls (poll_id,school_id,author_id,question,options_json,closes_at,created_at)
+      VALUES (${poll.poll_id},${poll.school_id},${poll.author_id},${poll.question},${JSON.stringify(poll.options)},Unwrap(CAST(${poll.closes_at} AS Timestamp)),Unwrap(CAST(${poll.created_at} AS Timestamp)));`;
+    await tx`INSERT INTO fam_school_poll_votes (poll_id,voter_id,school_id,choice_index,created_at)
+      VALUES (${vote.poll_id},${vote.voter_id},${vote.school_id},Unwrap(CAST(${vote.choice_index} AS Uint32)),Unwrap(CAST(${vote.created_at} AS Timestamp)));`;
+    if(injectFailure)throw Error('synthetic restore interruption');
     assertMatch(await read(tx));
     return 'restored';
    });
@@ -103,7 +128,7 @@ async function run(){
   // SDK wraps a transaction callback failure in Error("Transaction failed.") with its original cause.
   // Verify the exact cause, not merely any rejected transaction.
   await assert.rejects(()=>restore(true),error=>error?.message==='Transaction failed.'&&error.cause?.message==='synthetic restore interruption');
-  assert.equal(empty(await read(sql)),true,'interrupted restore must leave all six tables unchanged');
+  assert.equal(empty(await read(sql)),true,'interrupted restore must leave all eleven tables unchanged');
   assert.equal(await restore(),'restored');
   assertMatch(await read(sql));
   assert.equal(await restore(),'unchanged','exact replay must not duplicate records');
@@ -114,7 +139,12 @@ async function run(){
   assert.equal(altered.messages[0].body,approvedPayload.body);
   await sql`UPDATE fam_pending_messages SET body = ${pendingPayload.body} WHERE id = ${pending.id};`;
   assertMatch(await read(sql));
-  console.log('YDB_SYNTHETIC_RESTORE_PASS: six actual tables, atomic rollback, exact replay, divergent replay refused, pending and approved messages remain separated');
+  await sql`UPDATE fam_school_poll_votes SET choice_index=Unwrap(CAST(0 AS Uint32)) WHERE poll_id = ${vote.poll_id} AND voter_id = ${vote.voter_id};`;
+  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/ACTIVITY_MISMATCH/.test(error.cause.message));
+  assert.equal(Number((await read(sql)).votes[0].choice_index),0,'a conflicting vote must not be silently overwritten');
+  await sql`UPDATE fam_school_poll_votes SET choice_index=Unwrap(CAST(${vote.choice_index} AS Uint32)) WHERE poll_id = ${vote.poll_id} AND voter_id = ${vote.voter_id};`;
+  assertMatch(await read(sql));
+  console.log('YDB_SYNTHETIC_RESTORE_PASS: eleven actual tables, atomic rollback, exact replay, divergent message and vote replay refused, pending and approved messages remain separated');
  }finally{await driver.close();}
 }
 await run();

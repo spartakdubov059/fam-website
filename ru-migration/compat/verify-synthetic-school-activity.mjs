@@ -5,7 +5,7 @@ export function verifySyntheticSchoolActivity(metadata, source, target) {
   const exact=(x,keys)=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&Object.keys(x).length===keys.length&&keys.every(k=>Object.hasOwn(x,k));
   const id=x=>typeof x==='string'&&/^synthetic-[a-z0-9-]{1,64}$/.test(x);
   const dummy=x=>typeof x==='string'&&/^synthetic:[a-zA-Z0-9 _.-]{1,200}$/.test(x);
-  const ts=x=>typeof x==='string'&&/^2026-11-(?:24|25|26)T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
+  const ts=x=>typeof x==='string'&&/^(?:2026|2099)-11-(?:24|25|26)T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString()===x;
   const date=x=>typeof x==='string'&&/^2026-11-(?:24|25|26)$/.test(x);
   const time=x=>typeof x==='string'&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(x);
   const uint=x=>Number.isSafeInteger(x)&&x>=0&&x<=4294967295;
