@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-0m/MvrWFOsZRKDJb3Pvxdd+71p8E+Ds8J2edXe1nbz4=' 'sha256-JJvwaBdXqQz0HoVGQmTCnfms5H/cSRmzbwd7rMOlsis=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'sha256-0m/MvrWFOsZRKDJb3Pvxdd+71p8E+Ds8J2edXe1nbz4=' 'sha256-T3HDZV8T9WuE/bl96RWpqLSIsCrEAGdQYFLgsuaRhJk=' 'sha384-gnyZit14c5lnGcarmA166QQjjJXpucw25ogZXuwH3HxxY904zHkBqmxVpelsPorb' 'sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tfacqpljrvfpcrhdovbu.supabase.co; connect-src 'self' https://tfacqpljrvfpcrhdovbu.supabase.co wss://tfacqpljrvfpcrhdovbu.supabase.co https://famru.netlify.app; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; upgrade-insecure-requests; block-all-mixed-content">
   <script>
     // Netlify is the primary FAM address. Probe it before leaving this fallback copy.
     // If the phone's network cannot reach Netlify, keep the GitHub Pages app open.
@@ -2776,11 +2776,85 @@ window.onunhandledrejection = function() {
     }
   }
 
+  // Never render the long-lived public URL stored in legacy profile records.
+  // The avatars bucket is private; only the owning signed-in account can
+  // request a short-lived signed URL.
+  let ownAvatarSignedUrl = null;
+  let ownAvatarSignedSource = null;
+  let ownAvatarSignedUntil = 0;
+  let ownAvatarSignPromise = null;
+  let ownAvatarSignSource = null;
+
+  function ownAvatarStoragePath() {
+    const stored = profile?.avatar_url;
+    if (!user?.id || typeof stored !== "string") return null;
+    try {
+      const ref = new URL(stored);
+      const prefix = "/storage/v1/object/public/avatars/";
+      if (ref.origin !== SUPABASE_URL || !ref.pathname.startsWith(prefix)) return null;
+      const path = decodeURIComponent(ref.pathname.slice(prefix.length));
+      if (!path.startsWith(user.id + "/") || path.includes("..") ||
+          path.includes("\\") || path.includes("//")) return null;
+      return path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function renderOwnAvatarElements() {
+    const validSignedUrl = ownAvatarSignedSource === profile?.avatar_url
+      && ownAvatarSignedUntil > Date.now() && !!ownAvatarSignedUrl;
+    const initial = (profile?.first_name?.trim()?.[0] || "F").toLocaleUpperCase("ru-RU");
+    for (const id of ["headerAvatar", "avatarPreview", "avatarSettingsPreview"]) {
+      const element = $(id);
+      if (!element) continue;
+      if (validSignedUrl) {
+        const image = document.createElement("img");
+        image.src = ownAvatarSignedUrl;
+        image.alt = "Аватар";
+        element.replaceChildren(image);
+      } else {
+        element.textContent = initial;
+      }
+    }
+  }
+
+  async function hydrateOwnAvatar() {
+    const source = profile?.avatar_url;
+    const viewerId = user?.id;
+    const path = ownAvatarStoragePath();
+    if (!source || !viewerId || !path) return;
+    if (ownAvatarSignedSource === source && ownAvatarSignedUntil > Date.now() + 60_000) return;
+    if (ownAvatarSignPromise && ownAvatarSignSource === source) return ownAvatarSignPromise;
+
+    ownAvatarSignSource = source;
+    const promise = (async () => {
+      const { data, error } = await sb.storage.from("avatars").createSignedUrl(path, 3600);
+      if (user?.id !== viewerId || profile?.avatar_url !== source) return;
+      const candidate = data?.signedUrl;
+      ownAvatarSignedUrl = !error && typeof candidate === "string"
+        && candidate.startsWith(SUPABASE_URL + "/storage/v1/object/sign/avatars/")
+        ? candidate : null;
+      ownAvatarSignedSource = source;
+      ownAvatarSignedUntil = Date.now() + (ownAvatarSignedUrl ? 55 * 60_000 : 2 * 60_000);
+    })().catch(() => {
+      if (user?.id === viewerId && profile?.avatar_url === source) {
+        ownAvatarSignedUrl = null;
+        ownAvatarSignedSource = source;
+        ownAvatarSignedUntil = Date.now() + 2 * 60_000;
+      }
+    }).finally(() => {
+      if (ownAvatarSignPromise === promise) ownAvatarSignPromise = null;
+    });
+    ownAvatarSignPromise = promise;
+    return promise;
+  }
+
   function updateAuthUI() {
     if (user) {
       $("authBtn").classList.add("hidden"); $("headerAvatar").classList.remove("hidden");
-      if (profile?.avatar_url) $("headerAvatar").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
-      else $("headerAvatar").textContent = (profile?.first_name?.trim()?.[0] || "F").toLocaleUpperCase("ru-RU");
+      renderOwnAvatarElements();
+      if (profile?.avatar_url) void hydrateOwnAvatar().then(renderOwnAvatarElements);
       $("profileLoggedOut").classList.add("hidden"); $("profileLoggedIn").classList.remove("hidden");
     } else {
       $("authBtn").classList.remove("hidden"); $("headerAvatar").classList.add("hidden");
@@ -4751,14 +4825,7 @@ window.onunhandledrejection = function() {
           : "Должность отправлена на подтверждение администратору школы.")
         : "";
     }
-    if (profile?.avatar_url) {
-      $("avatarPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
-      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").innerHTML = `<img src="${esc(profile.avatar_url)}" alt="Аватар">`;
-    } else {
-      const avatarInitial = (profile?.first_name?.trim()?.[0] || displayName?.[0] || "F").toLocaleUpperCase("ru-RU");
-      $("avatarPreview").textContent = avatarInitial;
-      if ($("avatarSettingsPreview")) $("avatarSettingsPreview").textContent = avatarInitial;
-    }
+    renderOwnAvatarElements();
     const roleLabel = profile?.role === "school_admin" ? " · Администратор" : profile?.role === "council_member" ? " · Участник совета" : "";
     $("profMeta").textContent = getSchoolDisplayName(profile?.school_id) + roleLabel;
 
