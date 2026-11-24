@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectCoderLifecycle, ownerApproval, exactPostMergeCI, exactBranchCI, formatCoderLifecycle } from "../../scripts/fam-agent-lifecycle.mjs";
+import { collectCoderLifecycle, ownerApproval, exactPostMergeCI, exactBranchCI, formatCoderLifecycle, classifyReviewState } from "../../scripts/fam-agent-lifecycle.mjs";
 
 const repository = "owner/fam";
 const head = "a".repeat(40), merged = "b".repeat(40);
@@ -10,7 +10,7 @@ const before = "2026-11-23T11:00:00Z";
 const pr = { number: 7, user: {login: "github-actions[bot]"},
   base: {ref:"main", repo:{full_name:repository}},
   head: {ref:"codex/fam-run-123", sha:head, repo:{full_name:repository}},
-  created_at:before, merged:true, merged_at:when, merge_commit_sha:merged };
+  created_at:before, state:"closed", merged:true, merged_at:when, merge_commit_sha:merged };
 const run = { id:123, head_branch:"main", jobs:[
   { name:"Локальная модель готовит исправление", status:"completed", conclusion:"success",
     steps:[{name:"Запустить локальную модель и подготовить patch", conclusion:"success"}] },
@@ -52,7 +52,7 @@ test("lifecycle reconciles only trusted bot PR and independently verified stages
   assert.equal(calls.length,5);
   assert.equal(result.rows.length,1);
   assert.deepEqual(result.rows[0],{run_id:123,pr_number:7,pr_created:true,
-    owner_approved:true,merged:true,branch_ci:"verified",postmerge:"verified",evidence:"review_checked"});
+    owner_approved:true,merged:true,pr_state:"merged",branch_ci:"verified",postmerge:"verified",evidence:"review_checked"});
   assert.match(formatCoderLifecycle(result), /PR #7/);
   assert.match(formatCoderLifecycle(result), /CI объединённого коммита: успешен/);
 });
@@ -97,7 +97,7 @@ test("unavailable review and branch CI do not conceal independently proven postm
   assert.equal(result.rows[0].postmerge,"verified");
 });
 test("new PR head cannot inherit successful CI or owner approval from earlier revision", async () => {
-  const changed={...pr,head:{...pr.head,sha:"c".repeat(40)},merged:false,merged_at:null};
+  const changed={...pr,head:{...pr.head,sha:"c".repeat(40)},state:"open",merged:false,merged_at:null};
   const result=await collectCoderLifecycle({runs:[run],repository,read:async path=>{
     if(path.startsWith("/pulls?")) return [changed];
     if(path==="/pulls/7") return changed;
@@ -109,4 +109,30 @@ test("new PR head cannot inherit successful CI or owner approval from earlier re
   assert.equal(result.rows[0].owner_approved,false);
   assert.equal(result.rows[0].branch_ci,"unconfirmed");
   assert.equal(result.rows[0].merged,false);
+});
+
+test("pending review, closed unmerged and verified merge remain distinct and read-only", async () => {
+  for (const [state, mergedFlag, expected] of [
+    ["open",false,"approved_waiting_merge"],
+    ["closed",false,"closed_unmerged"],
+    ["closed",true,"merge_ci_verified"],
+    ["open",true,"unconfirmed"],
+    [undefined,false,"unconfirmed"],
+  ]) {
+    const candidate={...pr,state,merged:mergedFlag,merged_at:mergedFlag?when:null};
+    const result=await collectCoderLifecycle({runs:[run],repository,read:async path=>{
+      if(path.startsWith("/pulls?")) return [candidate];
+      if(path==="/pulls/7") return candidate;
+      if(path.includes("/reviews?")) return [review];
+      if(path.includes("event=workflow_dispatch")) return {workflow_runs:[branchCI]};
+      if(path.includes("event=push")) return {workflow_runs:[ci]};
+      throw Error("unexpected endpoint");
+    }});
+    assert.equal(classifyReviewState(result.rows[0]),expected);
+  }
+  const ready={pr_created:true,pr_state:"merged",merged:true,owner_approved:true,branch_ci:"verified",postmerge:"verified"};
+  assert.equal(classifyReviewState({...ready,owner_approved:false}),"merged_evidence_incomplete");
+  assert.equal(classifyReviewState({...ready,branch_ci:"unconfirmed"}),"merged_evidence_incomplete");
+  assert.equal(classifyReviewState({...ready,postmerge:"failed"}),"postmerge_failed");
+  assert.equal(classifyReviewState({...ready,postmerge:"pending"}),"postmerge_unconfirmed");
 });
