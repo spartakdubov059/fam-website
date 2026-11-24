@@ -37,3 +37,7 @@ Commit `03f044cd59585c19eb4772d65bcdbbe62b298bbc` passed all three CI workflows 
 ## Payload timestamp regression fix
 
 Commit `c0560018f0fd599c5d904b292dc1c249f5cc8fd0` failed 6 of 664 backend tests ([CI](https://github.com/spartakdubov059/fam-website/actions/runs/45417786035)): a double-escaped decimal separator rejected canonical timestamps before payload comparison. Corrected the literal dot and added negative separator cases on both sides. Existing canonical date and payload checks remain intact. New CI required; no production change.
+
+## School activity reconciliation
+
+Baseline `2a1db5308b620f345d41f38275b3cf36aec73bd9` passed 665/665 backend tests, 180/180 moderation tests and disposable YDB including immutable profile staging. Added a separate synthetic-only comparison for event fields (complete listing coverage), registrations and occupancy, school announcements, polls including option order, and individual votes. It checks primary keys, school scope, referenced records, bounded counts and canonical synthetic dates. It does not establish source inventory completeness for standalone tables or implement production ETL; both source and target must be independently extracted in future. Inconsistent historical rows are review blockers, not instructions to erase or rewrite records. 25 regression cases added; current CI must pass.
