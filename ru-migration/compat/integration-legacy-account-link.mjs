@@ -21,9 +21,9 @@ async function main(){
   };
   const seedChallenge=async(challengeId,userId,subject,expired=false)=>{
    if(expired)await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id, user_id, profile_version, issuer, subject, expires_at, consumed)
-     VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, CurrentUtcTimestamp() - Interval("PT1M"), false);`;
+     VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, Unwrap(CurrentUtcTimestamp() - Interval('PT1M')), false);`;
    else await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id, user_id, profile_version, issuer, subject, expires_at, consumed)
-     VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, CurrentUtcTimestamp() + Interval("PT4M"), false);`;
+     VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, Unwrap(CurrentUtcTimestamp() + Interval('PT4M')), false);`;
   };
   const input=(i,j,k)=>({challengeId:challenges[k],legacyUserId:ids[i],profileVersion:version,issuer,subject:subjects[j]});
   const fail={ok:false,code:'LINK_UNAVAILABLE'},success={ok:true,code:'LINKED'};
