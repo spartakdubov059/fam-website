@@ -58,6 +58,33 @@ async function main(){
   assert.equal(afterProfile[0].length,0);assert.equal(afterLedger[0].length,0);
   assert.equal(afterStage[0][0].ready,true);assert.equal(afterChallenge[0][0].consumed,false);
   assert.deepEqual(await repository.linkVerifiedAccount(input(3,4,5)),success,'rolled-back request can be retried');
+  // Two different legacy accounts competing for the same provider identity.
+  const extraIds=['edededed-eded-4ded-8ded-ededededed05','edededed-eded-4ded-8ded-ededededed06','edededed-eded-4ded-8ded-ededededed07','edededed-eded-4ded-8ded-ededededed08'];
+  const extraSubjects=['990000000006','990000000007','990000000008'];
+  const extraChallenges=['7','8','9','a'].map(c=>c.repeat(64));
+  const bind=(i,j,k)=>({challengeId:extraChallenges[k],legacyUserId:extraIds[i],profileVersion:version,issuer,subject:extraSubjects[j]});
+  await seedProfile(extraIds[0]);await seedProfile(extraIds[1]);
+  await seedChallenge(extraChallenges[0],extraIds[0],extraSubjects[0]);
+  await seedChallenge(extraChallenges[1],extraIds[1],extraSubjects[0]);
+  const identityRace=await Promise.all([repository.linkVerifiedAccount(bind(0,0,0)),repository.linkVerifiedAccount(bind(1,0,1))]);
+  assert.equal(identityRace.filter(x=>x.ok).length,1,'one provider identity cannot claim two accounts');
+  const winner=await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[0]});
+  assert.equal(winner.id,extraIds[identityRace[0].ok?0:1]);
+  const loser=identityRace[0].ok?1:0;
+  const loserStage=await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${extraIds[loser]};`;
+  const loserProof=await sql`SELECT consumed FROM fam_legacy_migration_challenges WHERE challenge_id = ${extraChallenges[loser]};`;
+  assert.equal(loserStage[0][0].ready,true);assert.equal(loserProof[0][0].consumed,false);
+  await seedProfile(extraIds[2],true,false);
+  await seedChallenge(extraChallenges[2],extraIds[2],extraSubjects[1]);
+  assert.deepEqual(await repository.linkVerifiedAccount(bind(2,1,2)),fail,'inactive account must remain inactive');
+  assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[1]}),null);
+  await seedProfile(extraIds[3]);
+  await seedChallenge(extraChallenges[3],extraIds[3],extraSubjects[2]);
+  await sql`INSERT INTO fam_account_suspension_open (target_id, school_id, suspension_id, created_at)
+    VALUES (${extraIds[3]}, 'lyceum_3', 'synthetic-migration-suspension', CurrentUtcTimestamp());`;
+  assert.deepEqual(await repository.linkVerifiedAccount(bind(3,2,3)),fail,'open suspension blocks account linking');
+  assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[2]}),null);
+  console.log('YDB_SYNTHETIC_LEGACY_EXTRA_GUARDS_PASS');
   console.log('YDB_SYNTHETIC_LEGACY_LINK_PASS: UUID preserved, replay and collisions blocked, one concurrent winner, full transaction rollback and retry');
  }finally{await driver.close();}
 }

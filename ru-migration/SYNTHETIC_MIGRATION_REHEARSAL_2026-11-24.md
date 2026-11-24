@@ -14,3 +14,10 @@ Before a real migration:
 3. Build isolated source-to-target count and field reconciliation plus attachment integrity checks using synthetic fixtures first. Resolve orphan records explicitly; never silently drop rows.
 4. Verify cloud IAM, real authentication, backup restore, school-scoped authorization and cutover/rollback in an approved non-production environment. No real pupil data until all gates pass.
 5. Keep `main`, production, personal server and paid resources untouched. No live cutover or data export is authorized by this rehearsal.
+
+## Extended rehearsal — 24 November
+
+- PR commit `3beae59197628ea9b65522ba7ce25491e66e8e61`: the pinned backend suite passed **625/625** ([SDK CI](https://github.com/spartakdubov059/fam-website/actions/runs/45398129523)); [disposable YDB CI](https://github.com/spartakdubov059/fam-website/actions/runs/45398129599) confirmed atomic account linking, collision rejection, rollback and retry, and removed the test database. The separate legacy moderation workflow failed; full PR CI is not green.
+- The account link prototype is not wired to HTTP or real identity providers. It requires independently verified legacy and Yandex proofs, preserves UUID and profile authority, refuses ambiguous profile fields and uses a serializable YDB transaction in the disposable test only.
+- `verify-synthetic-cutover-rehearsal.mjs` combines source/target and restored-source/target comparisons and attachment digests. It deliberately returns `live_cutover_authorized: false`. A supplied restored manifest is not evidence of an actual backup restore. Full payload/timestamp equality, real object bytes, unlinked account handling and actual restore remain open.
+- The extended disposable integration test covers two distinct legacy UUIDs racing for one identity, and inactive/suspended profiles. New CI must pass before these scenarios are considered verified.
