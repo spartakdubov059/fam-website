@@ -65,7 +65,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
   const rows = [];
   for (const run of candidates.slice(0, maximum)) {
     const row = { run_id: run.id, pr_number: null, pr_created: false,
-      owner_approved: false, merged: false, branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable" };
+      owner_approved: false, merged: false, pr_state: "unconfirmed", branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable" };
     rows.push(row);
     const branch = "codex/fam-run-" + run.id;
     try {
@@ -81,6 +81,11 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
       row.evidence = "pr_confirmed";
       row.merged = pr.merged === true && Number.isFinite(timestamp(pr.merged_at)) &&
         SHA.test(pr.merge_commit_sha || "");
+      // A closed but unmerged PR is not a completed task. Incomplete or
+      // contradictory metadata never proves an owner decision.
+      if (row.merged && pr.state === "closed") row.pr_state = "merged";
+      else if (pr.merged === false && pr.state === "closed") row.pr_state = "closed_unmerged";
+      else if (pr.merged === false && pr.state === "open") row.pr_state = "open";
       // Independent reads: a missing review response must not conceal
       // a separately verified regression run, and vice versa.
       try {
@@ -113,6 +118,22 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
   return { rows, limited: candidates.length > maximum };
 }
 
+export function classifyReviewState(row) {
+  if (!row?.pr_created) return "unconfirmed";
+  if (row.pr_state === "closed_unmerged" && !row.merged) return "closed_unmerged";
+  if (row.pr_state === "open" && !row.merged) {
+    return row.owner_approved && row.branch_ci === "verified"
+      ? "approved_waiting_merge" : "waiting_review_or_ci";
+  }
+  if (row.pr_state === "merged" && row.merged) {
+    if (!row.owner_approved || row.branch_ci !== "verified") return "merged_evidence_incomplete";
+    if (row.postmerge === "verified") return "merge_ci_verified";
+    if (row.postmerge === "failed") return "postmerge_failed";
+    return "postmerge_unconfirmed";
+  }
+  return "unconfirmed";
+}
+
 export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
   const lines = ["## INTEGRATOR — подтверждённые стадии Qwen после QA"];
   if (!rows.length) lines.push("Нет запусков с подтверждённой генерацией и QA в проверенной выборке.");
@@ -120,12 +141,22 @@ export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
     const label = {verified: "успешен", failed: "ошибка", pending: "ожидается", unconfirmed: "не подтверждён"};
     const ci = label[row.postmerge] || "не подтверждён";
     const branchCI = label[row.branch_ci] || "не подтверждён";
+    const reviewState = {
+      unconfirmed: "не подтверждён",
+      closed_unmerged: "закрыт без merge; требуется решение по заданию",
+      approved_waiting_merge: "одобрен, ожидает merge",
+      waiting_review_or_ci: "ожидает review или CI",
+      merged_evidence_incomplete: "merge есть, доказательства одобрения или CI неполны",
+      merge_ci_verified: "merge и CI подтверждены (не публикация)",
+      postmerge_failed: "CI после merge не прошёл",
+      postmerge_unconfirmed: "CI после merge не подтверждён",
+    }[classifyReviewState(row)];
     lines.push("- Run " + row.run_id + ": " +
       (row.pr_created ? "PR #" + row.pr_number : "PR не подтверждён") +
       "; CI текущей ревизии PR: " + branchCI +
       "; одобрение владельца на точной ревизии: " + (row.owner_approved ? "подтверждено" : "не подтверждено") +
       "; merge: " + (row.merged ? "подтверждён" : "не подтверждён") +
-      "; CI объединённого коммита: " + ci + ".");
+      "; CI объединённого коммита: " + ci + "; состояние: " + reviewState + ".");
   }
   if (limited) lines.push("Достигнут лимит выборки; отчёт неполный.");
   lines.push("Это сверка метаданных GitHub, не постоянный журнал Supabase и не доказательство публикации сайта. CI текущей ревизии не доказывает совпадение с исходным patch модели. Merge без подтверждённого одобрения не считается одобрением.");
