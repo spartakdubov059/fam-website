@@ -15,6 +15,25 @@ declare
   v_result jsonb;
   v_health jsonb;
 begin
+  if has_function_privilege('anon','public.enqueue_fam_agent_inspector_task(text,text,integer)','EXECUTE')
+      or has_function_privilege('authenticated','public.enqueue_fam_agent_inspector_task(text,text,integer)','EXECUTE') then
+    raise exception 'Untrusted roles can enqueue tasks';
+  end if;
+  begin
+    perform public.enqueue_fam_agent_inspector_task('unrecognized','fixture:invalid:1',1);
+    raise exception 'Unexpected acceptance of unrecognized signal';
+  exception when raise_exception then
+    if sqlerrm <> 'invalid inspector signal' then raise; end if;
+  end;
+  begin
+    perform public.enqueue_fam_agent_inspector_task('qwen_repeated_failure','fixture:invalid:2',1001);
+    raise exception 'Unexpected acceptance of out-of-bounds count';
+  exception when raise_exception then
+    if sqlerrm <> 'invalid inspector signal' then raise; end if;
+  end;
+  if exists(select 1 from private.fam_agent_inspector_signals) then
+    raise exception 'Invalid signal left a row';
+  end if;
   v_result := public.enqueue_fam_agent_inspector_task('qwen_repeated_failure','fixture:handoff:1',3);
   if (v_result->>'task_created')::boolean is distinct from true then
     raise exception 'Initial allowed signal did not enqueue';
@@ -26,11 +45,17 @@ begin
   if v_result->>'reason' is distinct from 'signal_cooldown' then raise exception 'Duplicate signature not blocked'; end if;
   select c.id into strict v_claimed from public.claim_fam_agent_coder_tasks('fam-agent-qwen-coder-v1',1,7200) c;
   if v_claimed is distinct from v_id then raise exception 'Unexpected claim'; end if;
-  if public.start_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1',1800) is distinct from true
-      or public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','model_generated') is distinct from true
-      or public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','qa_passed') is distinct from true
-      or public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','pr_created',123) is distinct from true then
-    raise exception 'Failed to reach pending-review state';
+  if public.start_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1',1800) is distinct from true then
+    raise exception 'Start transition failed';
+  end if;
+  if public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','model_generated') is distinct from true then
+    raise exception 'Generation transition failed';
+  end if;
+  if public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','qa_passed') is distinct from true then
+    raise exception 'QA transition failed';
+  end if;
+  if public.advance_fam_agent_coder_task(v_id,'fam-agent-qwen-coder-v1','pr_created',123) is distinct from true then
+    raise exception 'PR transition failed';
   end if;
   if not exists(select 1 from private.fam_agent_tasks where id=v_id and status='in_progress'
       and claimed_by is null and lease_expires_at is null and attempt_count=1
@@ -49,6 +74,9 @@ begin
   v_result := public.enqueue_fam_agent_inspector_task('worker_expired_lease','fixture:handoff:3',1);
   if v_result->>'reason' is distinct from 'coder_task_already_active' then
     raise exception 'Current single-active-task policy was bypassed';
+  end if;
+  if (select count(*) from private.fam_agent_task_events where task_id=v_id and metadata->>'stage'='pr_created' and metadata->>'pr_number'='123') <> 1 then
+    raise exception 'Missing or duplicate PR event link';
   end if;
   if (select count(*) from private.fam_agent_tasks) <> 1 then
     raise exception 'Unexpected extra task';
