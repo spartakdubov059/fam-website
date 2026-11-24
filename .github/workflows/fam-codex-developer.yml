@@ -362,7 +362,13 @@ jobs:
           for file in "${changed_files[@]}"; do
             case "$file" in
               index.html|js/*) has_behavior_code=true ;;
-              tests/*) has_tests=true ;;
+            esac
+          done
+          # A deleted test or a non-test file does not count as regression coverage.
+          mapfile -d '' proposed_tests < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
+          for file in "${proposed_tests[@]}"; do
+            case "$file" in
+              tests/*.test.mjs) has_tests=true ;;
             esac
           done
           if [[ "$has_behavior_code" == "true" && "$has_tests" != "true" ]]; then
@@ -383,6 +389,21 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
+
+      - name: Выполнить тесты, предложенные моделью
+        id: proposed_tests
+        run: |
+          set -euo pipefail
+          mapfile -d '' changed_tests < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
+          proposed_tests=()
+          for file in "${changed_tests[@]}"; do
+            case "$file" in
+              tests/*.test.mjs) proposed_tests+=("./$file") ;;
+            esac
+          done
+          if (( ${#proposed_tests[@]} > 0 )); then
+            node --test "${proposed_tests[@]}"
+          fi
 
       - name: Выполнить полный набор регрессионных тестов
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
