@@ -33,7 +33,14 @@ jobs:
             tests/fixtures/fam-qa-failure/pending-review.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Reproduce concurrent enqueue race and test proposed serialization
-        run: sudo -u postgres python3 tests/fixtures/fam-qa-failure/enqueue-concurrency.py
+        run: |
+          set -euo pipefail
+          FIXTURE_DIR="$(mktemp -d /tmp/fam-queue-race.XXXXXXXX)"
+          trap 'rm -rf -- "$FIXTURE_DIR"' EXIT
+          chmod 755 "$FIXTURE_DIR"
+          install -m 644 tests/fixtures/fam-qa-failure/enqueue-concurrency.py "$FIXTURE_DIR/"
+          install -m 644 tests/fixtures/fam-qa-failure/enqueue-concurrency-proposed.sql "$FIXTURE_DIR/"
+          sudo -u postgres python3 "$FIXTURE_DIR/enqueue-concurrency.py"
       - name: Remove fixture database
         if: always()
         run: sudo -u postgres dropdb --if-exists fam_qa_failure_fixture
