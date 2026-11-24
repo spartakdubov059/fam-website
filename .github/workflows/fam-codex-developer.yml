@@ -320,8 +320,8 @@ jobs:
           node scripts/validate-local-agent-patch.mjs \
             "$RUNNER_TEMP/fam-agent/fam-agent.patch" \
             "$RUNNER_TEMP/fam-agent/summary.json" > "$RUNNER_TEMP/fam-agent/safety.json"
-          git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
-          mapfile -d '' changed_files < <(git diff --name-only -z HEAD)
+          git apply --index "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          mapfile -d '' changed_files < <(git diff --cached --name-only -z HEAD)
           if (( ${#changed_files[@]} == 0 )); then
             echo "::error::Patch не содержит изменений."
             exit 1
@@ -365,24 +365,6 @@ jobs:
       - name: Выполнить полный набор регрессионных тестов
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
 
-      - name: Отметить независимую QA как пройденную
-        if: success() && needs.generate.outputs.has_patch == 'true'
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
-          FAM_RESULT_STAGE: qa_passed
-        run: node scripts/fam-agent-bridge.mjs advance
-
-      - name: Отметить независимую QA как проваленную
-        if: failure() && needs.generate.outputs.has_patch == 'true' && needs.generate.result == 'success'
-        env:
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
-          FAM_RESULT_STAGE: qa_failed
-        run: node scripts/fam-agent-bridge.mjs advance
-
       - name: Проверить синтаксис скриптов локального агента
         run: |
           set -euo pipefail
@@ -405,10 +387,34 @@ jobs:
           NODE
           node --check /tmp/fam-inline-scripts.js
 
-  prepare_review:
-    name: Подготовить PR и проверить исправление без публикации
+  record_qa:
+    name: Записать результат QA из чистого доверенного runner
     needs: [generate, verify]
     if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: '22'
+      - name: Отметить QA как пройденную после завершения всех проверок
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
+          FAM_RESULT_STAGE: qa_passed
+        run: node scripts/fam-agent-bridge.mjs advance
+
+  prepare_review:
+    name: Подготовить PR и проверить исправление без публикации
+    needs: [generate, verify, record_qa]
+    if: needs.generate.outputs.has_patch == 'true' && needs.verify.result == 'success' && needs.record_qa.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -416,6 +422,9 @@ jobs:
       pull-requests: write
       checks: read
       actions: write
+    outputs:
+      pr_number: ${{ steps.pr.outputs.pr_number }}
+      ci_failed: ${{ steps.branch_ci.outputs.ci_failed }}
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -447,7 +456,21 @@ jobs:
             exit 1
           fi
           git apply --check "$RUNNER_TEMP/fam-agent/fam-agent.patch"
-          git apply "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          # Validate again in this clean job, without executing any proposed code.
+          node scripts/validate-local-agent-patch.mjs "$RUNNER_TEMP/fam-agent/fam-agent.patch" "$RUNNER_TEMP/fam-agent/summary.json" >/dev/null
+          git apply --index "$RUNNER_TEMP/fam-agent/fam-agent.patch"
+          mapfile -d '' paths < <(git diff --cached --name-only -z HEAD)
+          (( ${#paths[@]} > 0 ))
+          for file in "${paths[@]}"; do
+            case "$file" in
+              index.html|css/*|js/*|assets/*|docs/*|tests/*) ;;
+              *) echo '::error::Unexpected path in proposed change.'; exit 1 ;;
+            esac
+          done
+          # Reject symlinks and submodules, including newly introduced files.
+          if git diff --cached --raw --no-renames | grep -E '^:[0-9]{6} (120000|160000) '; then
+            echo '::error::Non-regular file in proposed change.'; exit 1
+          fi
           git diff --check HEAD
           BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
           git switch -c "$BRANCH"
@@ -475,15 +498,16 @@ jobs:
             PR_URL="$(gh pr create --base main --head "$BRANCH" --title "Исправление FAM после тестов — ожидает разрешения" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
             echo "requires_approval=false" >> "$GITHUB_OUTPUT"
           fi
+          PR_NUMBER="$(gh pr view "$PR_URL" --json number --jq .number)"
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
+        id: branch_ci
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
-          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
-          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
-          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
           # Step-local shell variables do not survive into this step.
@@ -492,9 +516,6 @@ jobs:
           gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
           TEST_RUN_ID=""
           for attempt in $(seq 1 60); do
-            if (( attempt % 12 == 0 )) && [[ -n "${FAM_CODER_TASK_ID:-}" ]]; then
-              node scripts/fam-agent-bridge.mjs heartbeat
-            fi
             TEST_RUN_ID="$(gh run list --workflow .github/workflows/moderation-regression.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,event --jq ".[] | select(.headSha == \"$BRANCH_SHA\" and .event == \"workflow_dispatch\") | .databaseId" | head -n 1)"
             [[ -n "$TEST_RUN_ID" ]] && break
             sleep 5
@@ -503,24 +524,56 @@ jobs:
             echo "::error::Не найден отдельный запуск регрессионных тестов для ветки агента."
             exit 1
           fi
-          gh run watch "$TEST_RUN_ID" --exit-status --interval 10
+          gh run watch "$TEST_RUN_ID" --exit-status --interval 10 || true
           TEST_CONCLUSION="$(gh run view "$TEST_RUN_ID" --json conclusion --jq '.conclusion')"
           if [[ "$TEST_CONCLUSION" != "success" ]]; then
+            if [[ "$TEST_CONCLUSION" == "failure" ]]; then echo "ci_failed=true" >> "$GITHUB_OUTPUT"; fi
             echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
             exit 1
           fi
           gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
-          if [[ -n "${FAM_CODER_TASK_ID:-}" ]]; then
-            export FAM_RESULT_STAGE="qa_passed"
-            node scripts/fam-agent-bridge.mjs advance
-            export FAM_RESULT_STAGE="pr_created"
-            export FAM_PR_NUMBER="$(gh pr view "$PR_URL" --json number --jq .number)"
-            node scripts/fam-agent-bridge.mjs advance
-          fi
         if: success()
       - name: Сохранить отчёт о PR
         if: always()
+        env:
+          PR_URL: ${{ steps.pr.outputs.pr_url }}
         run: |
           echo "Результат локального ИИ-разработчика FAM:"
-          echo "PR: ${{ steps.pr.outputs.pr_url }}"
+          echo "PR: $PR_URL"
           echo "Автоматическое объединение и публикация запрещены; PR ожидает отдельного разрешения владельца."
+
+  record_pr:
+    name: Записать подтверждённый результат PR из чистого runner
+    needs: [generate, record_qa, prepare_review]
+    if: always() && needs.record_qa.result == 'success' && (needs.prepare_review.result == 'success' || needs.prepare_review.outputs.ci_failed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: '22'
+      - name: Записать единственный подтверждённый переход
+        env:
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
+          FAM_PR_NUMBER: ${{ needs.prepare_review.outputs.pr_number }}
+          PR_RESULT: ${{ needs.prepare_review.result }}
+          PR_CI_FAILED: ${{ needs.prepare_review.outputs.ci_failed }}
+        run: |
+          set -euo pipefail
+          if [[ "$PR_RESULT" == "success" ]]; then
+            [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+            export FAM_RESULT_STAGE=pr_created
+          elif [[ "$PR_CI_FAILED" == "true" ]]; then
+            export FAM_RESULT_STAGE=qa_failed
+          else
+            exit 1
+          fi
+          node scripts/fam-agent-bridge.mjs advance
