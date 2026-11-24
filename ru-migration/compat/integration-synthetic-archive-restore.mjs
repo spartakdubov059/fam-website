@@ -100,13 +100,15 @@ async function run(){
    });
   }
   assert.equal(empty(await read(sql)),true);
-  await assert.rejects(()=>restore(true),/synthetic restore interruption/);
+  // SDK wraps a transaction callback failure in Error("Transaction failed.") with its original cause.
+  // Verify the exact cause, not merely any rejected transaction.
+  await assert.rejects(()=>restore(true),error=>error?.message==='Transaction failed.'&&error.cause?.message==='synthetic restore interruption');
   assert.equal(empty(await read(sql)),true,'interrupted restore must leave all six tables unchanged');
   assert.equal(await restore(),'restored');
   assertMatch(await read(sql));
   assert.equal(await restore(),'unchanged','exact replay must not duplicate records');
   await sql`UPDATE fam_pending_messages SET body = 'synthetic:changed' WHERE id = ${pending.id};`;
-  await assert.rejects(()=>restore(),/PAYLOAD_MISMATCH/);
+  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/PAYLOAD_MISMATCH/.test(error.cause.message));
   const altered=await read(sql);
   assert.equal(altered.pendingMessages[0].body,'synthetic:changed','conflicting replay cannot overwrite existing rows');
   assert.equal(altered.messages[0].body,approvedPayload.body);
