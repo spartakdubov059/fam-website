@@ -1,0 +1,37 @@
+-- Isolated disposable migration rehearsal only. Not a production schema migration.
+CREATE TABLE fam_legacy_migration_profiles (
+  user_id Utf8 NOT NULL,
+  profile_version Utf8 NOT NULL,
+  ready Bool NOT NULL,
+  school_id Utf8 NOT NULL,
+  role Utf8 NOT NULL,
+  active Bool NOT NULL,
+  first_name Utf8,
+  last_name Utf8,
+  class_name Utf8,
+  city Utf8,
+  avatar_url Utf8,
+  person_type Utf8 NOT NULL,
+  staff_position Utf8,
+  staff_verification_status Utf8 NOT NULL,
+  PRIMARY KEY (user_id)
+);
+CREATE TABLE fam_legacy_migration_challenges (
+  challenge_id Utf8 NOT NULL,
+  user_id Utf8 NOT NULL,
+  profile_version Utf8 NOT NULL,
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  expires_at Timestamp NOT NULL,
+  consumed Bool NOT NULL,
+  PRIMARY KEY (challenge_id)
+);
+CREATE TABLE fam_legacy_migration_links (
+  user_id Utf8 NOT NULL,
+  challenge_id Utf8 NOT NULL,
+  issuer Utf8 NOT NULL,
+  subject Utf8 NOT NULL,
+  profile_version Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (user_id)
+);

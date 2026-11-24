@@ -120,6 +120,10 @@ jobs:
         run: node ru-migration/compat/integration-initial-school-admin-bootstrap.mjs
       - name: Exercise the private S3 adapter over local HTTP with synthetic data
         run: node ru-migration/compat/integration-s3-adapter.mjs
+      - name: Rehearse atomic legacy account linking on synthetic data
+        run: |
+          docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$(cat ru-migration/compat/legacy-account-link-schema.yql)"
+          node ru-migration/compat/integration-legacy-account-link.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true
