@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { collectCoderLifecycle, ownerApproval, exactPostMergeCI, formatCoderLifecycle } from "../../scripts/fam-agent-lifecycle.mjs";
+import { collectCoderLifecycle, ownerApproval, exactPostMergeCI, exactBranchCI, formatCoderLifecycle } from "../../scripts/fam-agent-lifecycle.mjs";
 
 const repository = "owner/fam";
 const head = "a".repeat(40), merged = "b".repeat(40);
@@ -10,7 +10,7 @@ const before = "2026-11-23T11:00:00Z";
 const pr = { number: 7, user: {login: "github-actions[bot]"},
   base: {ref:"main", repo:{full_name:repository}},
   head: {ref:"codex/fam-run-123", sha:head, repo:{full_name:repository}},
-  merged:true, merged_at:when, merge_commit_sha:merged };
+  created_at:before, merged:true, merged_at:when, merge_commit_sha:merged };
 const run = { id:123, head_branch:"main", jobs:[
   { name:"Локальная модель готовит исправление", status:"completed", conclusion:"success",
     steps:[{name:"Запустить локальную модель и подготовить patch", conclusion:"success"}] },
@@ -18,6 +18,7 @@ const run = { id:123, head_branch:"main", jobs:[
 ]};
 const review = { id:1, user:{login:"owner"}, state:"APPROVED", submitted_at:before, commit_id:head };
 const ci = { id:444, head_sha:merged, head_branch:"main", event:"push", created_at:after, status:"completed", conclusion:"success" };
+const branchCI = {...ci,id:443,head_sha:head,head_branch:"codex/fam-run-123",event:"workflow_dispatch",created_at:when};
 
 test("owner approval is exact-head, owner-only and not inferred from merge", () => {
   assert.equal(ownerApproval([review], "owner", head, when), true);
@@ -44,13 +45,14 @@ test("lifecycle reconciles only trusted bot PR and independently verified stages
     if (path.startsWith("/pulls?")) return [pr];
     if (path==="/pulls/7") return pr;
     if (path.startsWith("/pulls/7/reviews")) return [review];
+    if (path.includes("event=workflow_dispatch")) return {workflow_runs:[branchCI]};
     if (path.startsWith("/actions/workflows/")) return {workflow_runs:[ci]};
     throw Error("unexpected endpoint");
   }});
-  assert.equal(calls.length,4);
+  assert.equal(calls.length,5);
   assert.equal(result.rows.length,1);
   assert.deepEqual(result.rows[0],{run_id:123,pr_number:7,pr_created:true,
-    owner_approved:true,merged:true,postmerge:"verified",evidence:"review_checked"});
+    owner_approved:true,merged:true,branch_ci:"verified",postmerge:"verified",evidence:"review_checked"});
   assert.match(formatCoderLifecycle(result), /PR #7/);
   assert.match(formatCoderLifecycle(result), /CI объединённого коммита: успешен/);
 });
@@ -74,4 +76,37 @@ test("missing review, unrelated PR, partial metadata never imply authorization",
   const limited = await collectCoderLifecycle({runs:[run],repository,limit:0,read:async()=>{throw Error("must not call");}});
   assert.equal(limited.limited,true);
   assert.deepEqual(limited.rows,[]);
+});
+
+test("branch CI is tied to exact current head, run branch and dispatch after PR creation", () => {
+  assert.equal(exactBranchCI([branchCI],head,123,before),"verified");
+  for (const bad of [{...branchCI,head_sha:merged},{...branchCI,head_branch:"codex/fam-run-124"},
+    {...branchCI,event:"push"},{...branchCI,created_at:"2026-11-22T10:00:00Z"}])
+    assert.equal(exactBranchCI([bad],head,123,before),"unconfirmed");
+  assert.equal(exactBranchCI([branchCI,{...branchCI,id:446,conclusion:"failure"}],head,123,before),"failed");
+});
+test("unavailable review and branch CI do not conceal independently proven postmerge CI", async () => {
+  const result = await collectCoderLifecycle({runs:[run],repository,read:async path=>{
+    if(path.startsWith("/pulls?")) return [pr];
+    if(path==="/pulls/7") return pr;
+    if(path.includes("event=push")) return {workflow_runs:[ci]};
+    throw Error("unavailable");
+  }});
+  assert.equal(result.rows[0].owner_approved,false);
+  assert.equal(result.rows[0].branch_ci,"unconfirmed");
+  assert.equal(result.rows[0].postmerge,"verified");
+});
+test("new PR head cannot inherit successful CI or owner approval from earlier revision", async () => {
+  const changed={...pr,head:{...pr.head,sha:"c".repeat(40)},merged:false,merged_at:null};
+  const result=await collectCoderLifecycle({runs:[run],repository,read:async path=>{
+    if(path.startsWith("/pulls?")) return [changed];
+    if(path==="/pulls/7") return changed;
+    if(path.includes("/reviews?")) return [review];
+    if(path.includes("event=workflow_dispatch")) return {workflow_runs:[branchCI]};
+    throw Error("unexpected endpoint");
+  }});
+  assert.equal(result.rows[0].pr_created,true);
+  assert.equal(result.rows[0].owner_approved,false);
+  assert.equal(result.rows[0].branch_ci,"unconfirmed");
+  assert.equal(result.rows[0].merged,false);
 });
