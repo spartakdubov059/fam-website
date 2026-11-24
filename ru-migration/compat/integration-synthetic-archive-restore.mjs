@@ -6,8 +6,7 @@ import {join} from 'node:path';
 import {verifySyntheticAttachmentReconciliation} from './verify-synthetic-attachment-reconciliation.mjs';
 import {Driver} from '@ydbjs/core';
 import {query} from '@ydbjs/query';
-import {encodeSyntheticFullBackup,decodeSyntheticFullBackup} from './synthetic-full-backup-envelope.mjs';
-import {verifySyntheticMigrationAcceptance} from './verify-synthetic-migration-acceptance.mjs';
+import {encodeSyntheticStateBackup,decodeSyntheticStateBackup,verifySyntheticStateAcceptance} from './synthetic-state-backup-envelope.mjs';
 // Hard-coded loopback database and synthetic fixture. No production route or importer.
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function makeFixture(){
@@ -20,7 +19,13 @@ function makeFixture(){
  const activity={listing_event_fields:[{id:l,is_event:true,event_date:'2026-11-25',event_time:'10:00',event_type:'limited',max_seats:1}],event_registrations:[{event_id:l,user_id:b,school_id:s,status:'confirmed',created_at}],event_occupancy:[{event_id:l,taken:1}],announcements:[{announcement_id:'synthetic-restore-news',school_id:s,author_id:a,title:'synthetic:notice',body:'synthetic:notice text',kind:'news',event_starts_at:null,published_at:pulseStart,expires_at:pulseEnd}],polls:[{poll_id:'synthetic-restore-poll',school_id:s,author_id:a,question:'synthetic:question',options:['synthetic:yes','synthetic:no'],created_at:pulseStart,closes_at:pulseEnd}],votes:[{poll_id:'synthetic-restore-poll',voter_id:b,school_id:s,choice_index:1,created_at:pulseStart}]};
  const files=content.media.map(row=>({object_key:row.object_key,bytes:Buffer.from('synthetic:'+row.object_key)}));
  const objects=content.media.map((row,index)=>({...row,byte_length:files[index].bytes.length,sha256:hash(files[index].bytes)}));
- return {snapshot:{snapshot_id:'synthetic-restore-batch',accounts,content,objects,payloads,activity},files};
+ const state={listings:[{id:l,category:'Мероприятия',price_text:'Бесплатно',status:'active',photo_status:'approved'}],
+  ideas:[{id:content.ideas[0].id,image_status:'pending',ai_status:'pending',ai_summary:'',ai_reason:'synthetic:review',admin_status:'new'}],
+  messages:[{id:content.messages[0].id,is_read:true}],
+  favorites:content.favorites.map(row=>({...row,created_at:'2026-11-24T13:00:00.000Z'})),
+  media:content.media.map(({object_key})=>({object_key,status:'linked',claim_token:'',created_at:'2026-11-24T11:00:00.000Z',claim_until:'2026-11-24T11:00:01.000Z'})),
+  idea_images:content.idea_images.map(({idea_id,image_index})=>({idea_id,image_index,created_at:'2026-11-24T12:00:01.000Z'}))};
+ return {snapshot:{snapshot_id:'synthetic-restore-batch',accounts,content,objects,payloads,activity},files,state};
 }
 async function run(){
  const driver=new Driver('grpc://127.0.0.1:2136/local');
@@ -30,11 +35,14 @@ async function run(){
   const client=query(driver);
   const sql=(strings,...values)=>{const stmt=client(strings,...values);stmt.on('error',()=>{});return stmt;};
   sql.begin=client.begin.bind(client);
-  const {snapshot:source,files}=makeFixture(),archive=encodeSyntheticFullBackup(source,files);
+  const {snapshot:source,files,state}=makeFixture(),archive=encodeSyntheticStateBackup(source,files,state);
   assert.equal(archive.ok,true);
-  const decoded=decodeSyntheticFullBackup(archive.bytes,archive.sha256);
+  const decoded=decodeSyntheticStateBackup(archive.bytes,archive.sha256);
   assert.equal(decoded.ok,true);
-  const snap=decoded.snapshot;
+  const snap=decoded.snapshot,storedState=decoded.state;
+  const [listingState]=storedState.listings,[ideaState]=storedState.ideas,[messageState]=storedState.messages,[favoriteState]=storedState.favorites;
+  const mediaStates=new Map(storedState.media.map(row=>[row.object_key,row]));
+  const imageStates=new Map(storedState.idea_images.map(row=>[JSON.stringify([row.idea_id,row.image_index]),row]));
   dir=await mkdtemp(join(tmpdir(),'fam-ru-disposable-media-'));
   // Only decoded, validated synthetic keys are used as file names. Exclusive writes; never overwrite.
   for(const file of decoded.objects)await writeFile(join(dir,file.object_key),file.bytes,{mode:0o600,flag:'wx'});
@@ -100,22 +108,16 @@ async function run(){
   const assertMatch=async rows=>{
    const restored=await readSnapshot(rows);
    const restoredSource={...restored,accounts:restored.accounts.map(({issuer,subject,...row})=>row)};
-   const result=verifySyntheticMigrationAcceptance({source:snap,target:restored,restored:restoredSource});
+   const actualState={
+    listings:rows.listings.map(x=>pick(x,['id','category','price_text','status','photo_status'])),
+    ideas:rows.ideas.map(x=>pick(x,['id','image_status','ai_status','ai_summary','ai_reason','admin_status'])),
+    messages:rows.messages.map(x=>pick(x,['id','is_read'])),
+    favorites:rows.favorites.map(x=>({...pick(x,['user_id','listing_id']),created_at:asIso(x.created_at)})),
+    media:rows.media.map(x=>({...pick(x,['object_key','status','claim_token']),created_at:asIso(x.created_at),claim_until:asIso(x.claim_until)})),
+    idea_images:rows.ideaImages.map(x=>({idea_id:x.idea_id,image_index:Number(x.image_index),created_at:asIso(x.created_at)}))
+   };
+   const result=verifySyntheticStateAcceptance({source:{snapshot:snap,state:storedState},target:{snapshot:restored,state:actualState},restored:{snapshot:restoredSource,state:actualState}});
    assert.equal(result.ok,true,JSON.stringify(result));
-   assert.equal(rows.listings[0].category,'Мероприятия');
-   assert.equal(rows.listings[0].price_text,'Бесплатно');
-   assert.equal(rows.listings[0].status,'active');
-   assert.equal(rows.listings[0].photo_status,'approved');
-   assert.equal(rows.messages[0].is_read,false);
-   assert.equal(rows.ideas[0].image_status,'pending');assert.equal(rows.ideas[0].ai_status,'pending');assert.equal(rows.ideas[0].admin_status,'pending');
-   assert.equal(rows.ideas[0].ai_summary,'');assert.equal(rows.ideas[0].ai_reason,'');
-   assert.equal(asIso(rows.favorites[0].created_at),payload.created_at);
-   assert.equal(rows.media.length,3);assert.equal(rows.ideaImages.length,2);
-   for(const row of rows.media){
-    assert.equal(row.status,'linked');assert.equal(row.claim_token,'');
-    assert.equal(asIso(row.created_at),payload.created_at);assert.equal(asIso(row.claim_until),payload.created_at);
-   }
-   for(const row of rows.ideaImages)assert.equal(asIso(row.created_at),ideaPayload.created_at);
    for(const row of rows.profiles){assert.equal(row.issuer,issuer);assert.equal(row.subject,row.user_id);}
   };
   async function restore(injectFailure=false){
@@ -135,9 +137,9 @@ async function run(){
        VALUES (${issuer},${a.user_id},${a.user_id},${a.school_id},${a.role},${a.active},'student','not_required');`;
     }
     await tx`INSERT INTO fam_listings (id,user_id,school_id,title,description,category,price_text,is_event,event_date,event_time,event_type,max_seats,image_key,photo_status,status,created_at)
-      VALUES (${listing.id},${listing.user_id},${school},${payload.title},${payload.description},'Мероприятия','Бесплатно',${event.is_event},${event.event_date},${event.event_time},${event.event_type},Unwrap(CAST(${event.max_seats} AS Uint32)),${listing.image_key},'approved','active',Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
+      VALUES (${listing.id},${listing.user_id},${school},${payload.title},${payload.description},${listingState.category},${listingState.price_text},${event.is_event},${event.event_date},${event.event_time},${event.event_type},Unwrap(CAST(${event.max_seats} AS Uint32)),${listing.image_key},${listingState.photo_status},${listingState.status},Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_messages (id,sender_id,receiver_id,school_id,listing_id,body,is_read,created_at)
-      VALUES (${approved.id},${approved.sender_id},${approved.receiver_id},${approved.school_id},${approved.listing_id},${approvedPayload.body},false,Unwrap(CAST(${approvedPayload.created_at} AS Timestamp)));`;
+      VALUES (${approved.id},${approved.sender_id},${approved.receiver_id},${approved.school_id},${approved.listing_id},${approvedPayload.body},${messageState.is_read},Unwrap(CAST(${approvedPayload.created_at} AS Timestamp)));`;
     
     await tx`INSERT INTO fam_pending_messages (id,sender_id,receiver_id,school_id,listing_id,body,created_at)
       VALUES (${pending.id},${pending.sender_id},${pending.receiver_id},${pending.school_id},${pending.listing_id},${pendingPayload.body},Unwrap(CAST(${pendingPayload.created_at} AS Timestamp)));`;
@@ -145,9 +147,9 @@ async function run(){
       VALUES (${reg.event_id},${reg.user_id},${reg.school_id},${reg.status},Unwrap(CAST(${reg.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_event_occupancy (event_id,taken) VALUES (${occupancy.event_id},Unwrap(CAST(${occupancy.taken} AS Uint32)));`;
     await tx`INSERT INTO fam_ideas (id,user_id,school_id,text,image_status,ai_status,ai_summary,ai_reason,admin_status,created_at)
-      VALUES (${idea.id},${idea.user_id},${idea.school_id},${ideaPayload.body},'pending','pending','','','pending',Unwrap(CAST(${ideaPayload.created_at} AS Timestamp)));`;
+      VALUES (${idea.id},${idea.user_id},${idea.school_id},${ideaPayload.body},${ideaState.image_status},${ideaState.ai_status},${ideaState.ai_summary},${ideaState.ai_reason},${ideaState.admin_status},Unwrap(CAST(${ideaPayload.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_favorites (user_id,listing_id,created_at)
-      VALUES (${favorite.user_id},${favorite.listing_id},Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
+      VALUES (${favorite.user_id},${favorite.listing_id},Unwrap(CAST(${favoriteState.created_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_school_announcements (announcement_id,school_id,author_id,title,body,kind,event_starts_at,published_at,expires_at)
       VALUES (${announcement.announcement_id},${announcement.school_id},${announcement.author_id},${announcement.title},${announcement.body},${announcement.kind},CAST(NULL AS Timestamp?),Unwrap(CAST(${announcement.published_at} AS Timestamp)),Unwrap(CAST(${announcement.expires_at} AS Timestamp)));`;
     await tx`INSERT INTO fam_school_polls (poll_id,school_id,author_id,question,options_json,closes_at,created_at)
@@ -155,12 +157,14 @@ async function run(){
     await tx`INSERT INTO fam_school_poll_votes (poll_id,voter_id,school_id,choice_index,created_at)
       VALUES (${vote.poll_id},${vote.voter_id},${vote.school_id},Unwrap(CAST(${vote.choice_index} AS Uint32)),Unwrap(CAST(${vote.created_at} AS Timestamp)));`;
     for(const media of snap.content.media){
+     const detail=mediaStates.get(media.object_key);
      await tx`INSERT INTO fam_pending_media (object_key,user_id,created_at,status,claim_token,claim_until)
-       VALUES (${media.object_key},${media.user_id},Unwrap(CAST(${payload.created_at} AS Timestamp)),'linked','',Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
+       VALUES (${media.object_key},${media.user_id},Unwrap(CAST(${detail.created_at} AS Timestamp)),${detail.status},${detail.claim_token},Unwrap(CAST(${detail.claim_until} AS Timestamp)));`;
     }
     for(const image of snap.content.idea_images){
+     const detail=imageStates.get(JSON.stringify([image.idea_id,image.image_index]));
      await tx`INSERT INTO fam_idea_images (idea_id,image_index,object_key,user_id,school_id,created_at)
-       VALUES (${image.idea_id},Unwrap(CAST(${image.image_index} AS Uint32)),${image.object_key},${image.user_id},${image.school_id},Unwrap(CAST(${ideaPayload.created_at} AS Timestamp)));`;
+       VALUES (${image.idea_id},Unwrap(CAST(${image.image_index} AS Uint32)),${image.object_key},${image.user_id},${image.school_id},Unwrap(CAST(${detail.created_at} AS Timestamp)));`;
     }
     if(injectFailure)throw Error('synthetic restore interruption');
     await assertMatch(await read(tx));
@@ -199,9 +203,13 @@ async function run(){
   await assertMatch(await read(sql));
   // Replays must not accept changed object ownership, moderation state, or modified bytes.
   await sql`UPDATE fam_ideas SET image_status = 'approved' WHERE id = ${idea.id};`;
-  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/pending/.test(error.cause.message));
+  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/RECORD_STATE_MISMATCH/.test(error.cause.message));
   assert.equal((await read(sql)).ideas[0].image_status,'approved','replay must not silently overwrite moderation state');
   await sql`UPDATE fam_ideas SET image_status = 'pending' WHERE id = ${idea.id};`;
+  await sql`UPDATE fam_messages SET is_read = false WHERE id = ${approved.id};`;
+  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/RECORD_STATE_MISMATCH/.test(error.cause.message));
+  assert.equal((await read(sql)).messages[0].is_read,false,'replay cannot overwrite read flags');
+  await sql`UPDATE fam_messages SET is_read = ${messageState.is_read} WHERE id = ${approved.id};`;
   await writeFile(firstPath,corrupted);
   await assert.rejects(()=>restore(),/ATTACHMENT_BYTES_MISMATCH/);
   assert.equal((await read(sql)).media.length,3);
