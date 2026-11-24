@@ -124,6 +124,8 @@ jobs:
         run: |
           docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$(cat ru-migration/compat/legacy-account-link-schema.yql)"
           node ru-migration/compat/integration-legacy-account-link.mjs
+      - name: Rehearse restoring synthetic archive into actual YDB tables
+        run: node ru-migration/compat/integration-synthetic-archive-restore.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true
