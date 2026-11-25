@@ -6,7 +6,8 @@ import {join} from 'node:path';
 import {verifySyntheticAttachmentReconciliation} from './verify-synthetic-attachment-reconciliation.mjs';
 import {Driver} from '@ydbjs/core';
 import {query} from '@ydbjs/query';
-import {encodeSyntheticProfileBackup,decodeSyntheticProfileBackup,verifySyntheticProfileAcceptance} from './synthetic-profile-backup-envelope.mjs';
+import {encodeSyntheticProfileBackup,decodeSyntheticProfileBackup} from './synthetic-profile-backup-envelope.mjs';
+import {verifySyntheticInventoryAcceptance} from './verify-synthetic-inventory-acceptance.mjs';
 // Hard-coded loopback database and synthetic fixture. No production route or importer.
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function makeFixture(){
@@ -43,6 +44,8 @@ async function run(){
   const decoded=decodeSyntheticProfileBackup(archive.bytes,archive.sha256);
   assert.equal(decoded.ok,true);
   const snap=decoded.snapshot,storedState=decoded.state,storedProfiles=decoded.profiles;
+  // Expected fixture inventory, deliberately independent of the archive row counts.
+  const expectedInventory={snapshot_id:'synthetic-restore-batch',counts:{profiles:3,listings:1,ideas:1,messages:1,pending_messages:1,favorites:1,media:3,idea_images:2,event_registrations:1,event_occupancy:1,announcements:1,polls:1,votes:1}};
   const profileDetails=new Map(storedProfiles.map(row=>[row.user_id,row]));
   const [listingState]=storedState.listings,[ideaState]=storedState.ideas,[messageState]=storedState.messages,[favoriteState]=storedState.favorites;
   const mediaStates=new Map(storedState.media.map(row=>[row.object_key,row]));
@@ -121,7 +124,7 @@ async function run(){
     idea_images:rows.ideaImages.map(x=>({idea_id:x.idea_id,image_index:Number(x.image_index),created_at:asIso(x.created_at)}))
    };
    const actualProfiles=rows.profiles.map(row=>({user_id:row.user_id,first_name:row.first_name??null,last_name:row.last_name??null,class_name:row.class_name??null,city:row.city??null,avatar_url:row.avatar_url??null,person_type:row.person_type,staff_position:row.staff_position??null,staff_verification_status:row.staff_verification_status}));
-   const result=verifySyntheticProfileAcceptance({source:{snapshot:snap,state:storedState,profiles:storedProfiles},target:{snapshot:restored,state:actualState,profiles:actualProfiles},restored:{snapshot:restoredSource,state:actualState,profiles:actualProfiles}});
+   const result=verifySyntheticInventoryAcceptance({source:{snapshot:snap,state:storedState,profiles:storedProfiles},target:{snapshot:restored,state:actualState,profiles:actualProfiles},restored:{snapshot:restoredSource,state:actualState,profiles:actualProfiles},inventory:expectedInventory});
    assert.equal(result.ok,true,JSON.stringify(result));
    for(const row of rows.profiles){assert.equal(row.issuer,issuer);assert.equal(row.subject,row.user_id);}
   };

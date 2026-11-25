@@ -25,6 +25,22 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - name: Verify checked-out backend source integrity and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=ru-migration/app/backend/repositories/ydb-listings.mjs
+          expected=$(git rev-parse "HEAD:$path")
+          actual=$(git hash-object --no-filters "$path")
+          printf 'YDB repository blob expected=%s actual=%s\n' "$expected" "$actual"
+          test "$expected" = "$actual"
+          while IFS= read -r -d '' file; do
+            if ! node --check "$file" > "$RUNNER_TEMP/fam-ru-syntax.log" 2>&1; then
+              printf 'Invalid syntax in tracked module: %s\n' "$file" >&2
+              exit 1
+            fi
+          done < <(git ls-files -z -- 'ru-migration/app/backend/*.mjs' 'ru-migration/compat/*.mjs')
+          echo FAM_RU_TRACKED_MODULE_SYNTAX_PASS
       - name: Install locked SDK dependencies
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Start disposable local database
