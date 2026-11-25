@@ -754,11 +754,15 @@ try {
   assert.equal((await sql`SELECT admin_status FROM fam_ideas WHERE id = ${idea.id};`)[0][0].admin_status, 'done');
   assert.deepEqual(new Set((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0].map(row => row.action)),
     new Set(['idea_text_approved', 'idea_workflow_in_progress', 'idea_workflow_done']), 'status transitions are audited without storing idea text');
-  const linkedListingId = '99999999-9999-4999-8999-999999999999';
+  // Use a real fixture listing belonging to the sender, not an unrelated profile UUID.
+  const linkedListingId = listing.id;
+  assert.ok(linkedListingId);
   const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
+  assert.ok(message?.id, 'first linked message must be accepted before counting quota');
   for (let index = 0; index < 7; index++) {
-    await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+    const accepted = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
       school_id: 'synthetic-school', body: `Синтетическое сообщение ${index}` });
+    assert.ok(accepted?.id, `message ${index + 2} must be accepted before counting quota`);
   }
   assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
     school_id: 'synthetic-school', body: 'Девятое синтетическое сообщение' }), { ok: false, code: 'rate_limited' });
