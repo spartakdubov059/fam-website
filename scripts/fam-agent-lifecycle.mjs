@@ -16,27 +16,37 @@ function trustedPR(pr, branch, repository) {
     SHA.test(pr.head?.sha || "");
 }
 
-export function ownerApproval(reviews, owner, head, mergedAt = null) {
+export function ownerApproval(reviews, owner, head, mergedAt = null, createdAt = null) {
   if (!Array.isArray(reviews) || !SHA.test(head || "")) return false;
   const cutoff = mergedAt === null ? Infinity : timestamp(mergedAt);
-  if (Number.isNaN(cutoff)) return false;
+  const lower = createdAt === null ? -Infinity : timestamp(createdAt);
+  if (Number.isNaN(cutoff) || Number.isNaN(lower) || lower > cutoff) return false;
   const relevant = reviews.filter((r) => r?.user?.login === owner &&
     ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(r.state) &&
-    Number.isFinite(timestamp(r.submitted_at)) && timestamp(r.submitted_at) <= cutoff)
+    Number.isFinite(timestamp(r.submitted_at)) && timestamp(r.submitted_at) >= lower &&
+    timestamp(r.submitted_at) <= cutoff)
     .sort((a, b) => timestamp(b.submitted_at) - timestamp(a.submitted_at) ||
       (Number(b.id) || 0) - (Number(a.id) || 0));
   return relevant[0]?.state === "APPROVED" && relevant[0].commit_id === head;
 }
 
-function exactCI(runs, sha, branch, event, notBefore) {
+function exactCI(runs, sha, branch, event, notBefore, notAfter = null) {
   if (!Array.isArray(runs) || !SHA.test(sha || "") || !Number.isFinite(timestamp(notBefore))) return "unconfirmed";
+  const upper = notAfter === null ? Infinity : timestamp(notAfter);
+  if (Number.isNaN(upper) || upper < timestamp(notBefore)) return "unconfirmed";
   const matches = runs.filter((r) => validId(r?.id) && r.head_sha === sha &&
     r.event === event && r.head_branch === branch &&
-    Number.isFinite(timestamp(r.created_at)) && timestamp(r.created_at) >= timestamp(notBefore))
+    Number.isFinite(timestamp(r.created_at)) && timestamp(r.created_at) >= timestamp(notBefore) &&
+    timestamp(r.created_at) <= upper)
     .sort((a, b) => timestamp(b.created_at) - timestamp(a.created_at) || b.id - a.id);
   const latest = matches[0];
   if (!latest) return "unconfirmed";
   if (latest.status !== "completed") return "pending";
+  // For a historical merge, a success observed only after the merge cannot
+  // establish that the branch passed CI before the owner's decision.
+  if (notAfter !== null && (!Number.isFinite(timestamp(latest.updated_at)) ||
+      timestamp(latest.updated_at) < timestamp(latest.created_at) ||
+      timestamp(latest.updated_at) > upper)) return "unconfirmed";
   return latest.conclusion === "success" ? "verified" :
     latest.conclusion === "failure" ? "failed" : "unconfirmed";
 }
@@ -45,9 +55,9 @@ export function exactPostMergeCI(runs, sha, mergedAt) {
   return exactCI(runs, sha, "main", "push", mergedAt);
 }
 
-export function exactBranchCI(runs, sha, runId, prCreatedAt) {
+export function exactBranchCI(runs, sha, runId, prCreatedAt, mergedAt = null) {
   if (!validId(runId)) return "unconfirmed";
-  return exactCI(runs, sha, "codex/fam-run-" + runId, "workflow_dispatch", prCreatedAt);
+  return exactCI(runs, sha, "codex/fam-run-" + runId, "workflow_dispatch", prCreatedAt, mergedAt);
 }
 
 export async function collectCoderLifecycle({ runs = [], repository, read, limit = 10 } = {}) {
@@ -65,7 +75,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
   const rows = [];
   for (const run of candidates.slice(0, maximum)) {
     const row = { run_id: run.id, pr_number: null, pr_created: false,
-      owner_approved: false, merged: false, pr_state: "unconfirmed", branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable" };
+      owner_approved: false, merged: false, pr_state: "unconfirmed", draft: null, branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable" };
     rows.push(row);
     const branch = "codex/fam-run-" + run.id;
     try {
@@ -76,10 +86,16 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
       if (matching.length !== 1) { row.evidence = matching.length ? "ambiguous" : "no_pr"; continue; }
       const pr = await read("/pulls/" + matching[0].number);
       if (!trustedPR(pr, branch, repository) || pr.number !== matching[0].number) continue;
+      if (!Number.isFinite(timestamp(pr.created_at))) continue;
+      // A known workflow start bounds PR creation. Do not accept a PR which
+      // predates its supposed originating run.
+      if (Number.isFinite(timestamp(run.created_at)) && timestamp(pr.created_at) < timestamp(run.created_at)) continue;
       row.pr_number = pr.number;
+      row.draft = typeof pr.draft === "boolean" ? pr.draft : null;
       row.pr_created = true;
       row.evidence = "pr_confirmed";
-      row.merged = pr.merged === true && Number.isFinite(timestamp(pr.merged_at)) &&
+      row.merged = pr.merged === true && pr.state === "closed" &&
+        Number.isFinite(timestamp(pr.merged_at)) && timestamp(pr.merged_at) >= timestamp(pr.created_at) &&
         SHA.test(pr.merge_commit_sha || "");
       // A closed but unmerged PR is not a completed task. Incomplete or
       // contradictory metadata never proves an owner decision.
@@ -91,7 +107,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
       try {
         const reviews = await read("/pulls/" + pr.number + "/reviews?per_page=100");
         if (Array.isArray(reviews) && reviews.length < 100) {
-          row.owner_approved = ownerApproval(reviews, owner, pr.head.sha, row.merged ? pr.merged_at : null);
+          row.owner_approved = ownerApproval(reviews, owner, pr.head.sha, row.merged ? pr.merged_at : null, pr.created_at);
           row.evidence = "review_checked";
         }
       } catch { /* approval remains unconfirmed */ }
@@ -100,7 +116,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
           const result = await read("/actions/workflows/moderation-regression.yml/runs?branch=" +
             encodeURIComponent(branch) + "&event=workflow_dispatch&head_sha=" + pr.head.sha + "&per_page=20");
           if (Array.isArray(result?.workflow_runs) && result.workflow_runs.length < 20)
-            row.branch_ci = exactBranchCI(result.workflow_runs, pr.head.sha, run.id, pr.created_at);
+            row.branch_ci = exactBranchCI(result.workflow_runs, pr.head.sha, run.id, pr.created_at, row.merged ? pr.merged_at : null);
         } catch { /* branch CI remains unconfirmed */ }
       }
       if (row.merged) {
@@ -122,11 +138,12 @@ export function classifyReviewState(row) {
   if (!row?.pr_created) return "unconfirmed";
   if (row.pr_state === "closed_unmerged" && !row.merged) return "closed_unmerged";
   if (row.pr_state === "open" && !row.merged) {
+    if (row.draft !== false) return row.draft === true ? "draft_waiting_review" : "waiting_review_or_ci";
     return row.owner_approved && row.branch_ci === "verified"
       ? "approved_waiting_merge" : "waiting_review_or_ci";
   }
   if (row.pr_state === "merged" && row.merged) {
-    if (!row.owner_approved || row.branch_ci !== "verified") return "merged_evidence_incomplete";
+    if (row.draft !== false || !row.owner_approved || row.branch_ci !== "verified") return "merged_evidence_incomplete";
     if (row.postmerge === "verified") return "merge_ci_verified";
     if (row.postmerge === "failed") return "postmerge_failed";
     return "postmerge_unconfirmed";
@@ -144,6 +161,7 @@ export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
     const reviewState = {
       unconfirmed: "не подтверждён",
       closed_unmerged: "закрыт без merge; требуется решение по заданию",
+      draft_waiting_review: "черновик; не готов к merge",
       approved_waiting_merge: "одобрен, ожидает merge",
       waiting_review_or_ci: "ожидает review или CI",
       merged_evidence_incomplete: "merge есть, доказательства одобрения или CI неполны",

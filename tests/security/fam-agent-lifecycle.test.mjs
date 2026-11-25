@@ -10,15 +10,15 @@ const before = "2026-11-23T11:00:00Z";
 const pr = { number: 7, user: {login: "github-actions[bot]"},
   base: {ref:"main", repo:{full_name:repository}},
   head: {ref:"codex/fam-run-123", sha:head, repo:{full_name:repository}},
-  created_at:before, state:"closed", merged:true, merged_at:when, merge_commit_sha:merged };
-const run = { id:123, head_branch:"main", jobs:[
+  created_at:before, draft:false, state:"closed", merged:true, merged_at:when, merge_commit_sha:merged };
+const run = { id:123, head_branch:"main", created_at:"2026-11-23T10:00:00Z", jobs:[
   { name:"Локальная модель готовит исправление", status:"completed", conclusion:"success",
     steps:[{name:"Запустить локальную модель и подготовить patch", conclusion:"success"}] },
   { name:"Независимая проверка без модели и секретов", status:"completed", conclusion:"success" }
 ]};
 const review = { id:1, user:{login:"owner"}, state:"APPROVED", submitted_at:before, commit_id:head };
 const ci = { id:444, head_sha:merged, head_branch:"main", event:"push", created_at:after, status:"completed", conclusion:"success" };
-const branchCI = {...ci,id:443,head_sha:head,head_branch:"codex/fam-run-123",event:"workflow_dispatch",created_at:when};
+const branchCI = {...ci,id:443,head_sha:head,head_branch:"codex/fam-run-123",event:"workflow_dispatch",created_at:"2026-11-23T11:30:00Z",updated_at:"2026-11-23T11:40:00Z"};
 
 test("owner approval is exact-head, owner-only and not inferred from merge", () => {
   assert.equal(ownerApproval([review], "owner", head, when), true);
@@ -52,7 +52,7 @@ test("lifecycle reconciles only trusted bot PR and independently verified stages
   assert.equal(calls.length,5);
   assert.equal(result.rows.length,1);
   assert.deepEqual(result.rows[0],{run_id:123,pr_number:7,pr_created:true,
-    owner_approved:true,merged:true,pr_state:"merged",branch_ci:"verified",postmerge:"verified",evidence:"review_checked"});
+    owner_approved:true,merged:true,pr_state:"merged",draft:false,branch_ci:"verified",postmerge:"verified",evidence:"review_checked"});
   assert.match(formatCoderLifecycle(result), /PR #7/);
   assert.match(formatCoderLifecycle(result), /CI объединённого коммита: успешен/);
 });
@@ -130,9 +130,42 @@ test("pending review, closed unmerged and verified merge remain distinct and rea
     }});
     assert.equal(classifyReviewState(result.rows[0]),expected);
   }
-  const ready={pr_created:true,pr_state:"merged",merged:true,owner_approved:true,branch_ci:"verified",postmerge:"verified"};
+  const ready={pr_created:true,pr_state:"merged",merged:true,draft:false,owner_approved:true,branch_ci:"verified",postmerge:"verified"};
   assert.equal(classifyReviewState({...ready,owner_approved:false}),"merged_evidence_incomplete");
   assert.equal(classifyReviewState({...ready,branch_ci:"unconfirmed"}),"merged_evidence_incomplete");
   assert.equal(classifyReviewState({...ready,postmerge:"failed"}),"postmerge_failed");
   assert.equal(classifyReviewState({...ready,postmerge:"pending"}),"postmerge_unconfirmed");
+});
+
+test("merge evidence rejects approvals before PR creation and CI completed after merge", () => {
+  assert.equal(ownerApproval([review],"owner",head,when,before),true);
+  assert.equal(ownerApproval([{...review,submitted_at:"2026-11-23T10:59:00Z"}],"owner",head,when,before),false);
+  assert.equal(exactBranchCI([branchCI],head,123,before,when),"verified");
+  assert.equal(exactBranchCI([{...branchCI,updated_at:after}],head,123,before,when),"unconfirmed");
+  assert.equal(exactBranchCI([{...branchCI,updated_at:null}],head,123,before,when),"unconfirmed");
+  assert.equal(exactBranchCI([{...branchCI,created_at:after,updated_at:after}],head,123,before,when),"unconfirmed");
+});
+test("draft and unknown PR metadata never imply merge readiness", () => {
+  const ready={pr_created:true,pr_state:"open",merged:false,draft:false,owner_approved:true,branch_ci:"verified"};
+  assert.equal(classifyReviewState(ready),"approved_waiting_merge");
+  assert.equal(classifyReviewState({...ready,draft:true}),"draft_waiting_review");
+  assert.equal(classifyReviewState({...ready,draft:null}),"waiting_review_or_ci");
+  assert.equal(classifyReviewState({...ready,draft:null,merged:true,pr_state:"merged",postmerge:"verified"}),"merged_evidence_incomplete");
+});
+test("PR originating before the coder run and impossible merge dates cannot prove completion", async () => {
+  for (const candidate of [
+    {...pr,created_at:"2026-11-23T09:00:00Z"},
+    {...pr,merged_at:"2026-11-23T10:30:00Z"},
+  ]) {
+    const result=await collectCoderLifecycle({runs:[run],repository,read:async path=>{
+      if(path.startsWith("/pulls?")) return [candidate];
+      if(path==="/pulls/7") return candidate;
+      if(path.includes("/reviews?")) return [review];
+      if(path.includes("event=workflow_dispatch")) return {workflow_runs:[branchCI]};
+      if(path.includes("event=push")) return {workflow_runs:[ci]};
+      throw Error("unexpected endpoint");
+    }});
+    assert.equal(result.rows[0].merged,false);
+    assert.notEqual(classifyReviewState(result.rows[0]),"merge_ci_verified");
+  }
 });
