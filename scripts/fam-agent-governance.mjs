@@ -310,28 +310,50 @@ async function api(path, token, options = {}) {
   return response.json();
 }
 
-async function publishIssue(report, token) {
-  const existing = await api("/issues?state=open&per_page=100", token);
-  if (!Array.isArray(existing) || existing.length === 100) {
+const REPORT_TITLE = "FAM: контроль конфликтов, работоспособности и найма агентов";
+
+export async function syncReportIssue({ report, request, allowCreate = false }) {
+  const existing = await request("/issues?state=open&per_page=100");
+  if (!Array.isArray(existing) || existing.length >= 100) {
     throw new Error("Недостаточно данных для безопасного поиска уже созданного отчёта.");
   }
-  const found = existing.find((issue) =>
-    !issue.pull_request && typeof issue.body === "string" &&
-    issue.body.includes(REPORT_MARKER)
+  const candidates = existing.filter((issue) =>
+    !issue?.pull_request && typeof issue?.body === "string" && issue.body.includes(REPORT_MARKER)
   );
-  const title = "FAM: контроль конфликтов, работоспособности и найма агентов";
+  if (candidates.length > 1 || candidates.some(issue =>
+    !Number.isSafeInteger(issue.number) || issue.number <= 0 ||
+    issue.user?.login !== "github-actions[bot]" ||
+    issue.title !== REPORT_TITLE || !issue.body.startsWith(REPORT_MARKER + "\n")
+  )) throw new Error("Неоднозначный или неподтверждённый автор отчёта; issue не изменён.");
+  const found = candidates[0];
   if (found) {
-    await api("/issues/" + found.number, token, {
+    await request("/issues/" + found.number, {
       method: "PATCH",
       body: JSON.stringify({ body: report }),
     });
     return "Обновлена задача #" + found.number;
   }
-  const created = await api("/issues", token, {
+  if (!allowCreate) return "Новых сигналов нет, отдельный issue не создаётся.";
+  const created = await request("/issues", {
     method: "POST",
-    body: JSON.stringify({ title, body: report }),
+    body: JSON.stringify({ title: REPORT_TITLE, body: report }),
   });
   return "Создана задача #" + created.number;
+}
+
+export async function collectPullFiles(pr, request) {
+  if (!Number.isSafeInteger(pr?.number) || pr.number <= 0) return { ...pr, files: null };
+  try {
+    const files = await request("/pulls/" + pr.number + "/files?per_page=100");
+    if (!Array.isArray(files) || files.length >= 100 ||
+        files.some(f => typeof f?.filename !== "string" || !f.filename) ||
+        (Number.isSafeInteger(pr.changed_files) && files.length !== pr.changed_files)) {
+      return { ...pr, files: null };
+    }
+    return { ...pr, files: files.map(f => f.filename) };
+  } catch {
+    return { ...pr, files: null };
+  }
 }
 
 // Do not lose the control-tower report when enqueue or dispatch fails.
@@ -365,13 +387,7 @@ export async function main() {
   const prs = await api("/pulls?state=open&per_page=100", token);
   if (!Array.isArray(prs)) throw new Error("Некорректный список PR.");
   const selected = prs.slice(0, MAX_PRS);
-  const pulls = await Promise.all(selected.map(async (pr) => {
-    const files = await api("/pulls/" + pr.number + "/files?per_page=100", token);
-    if (!Array.isArray(files) || files.length === 100) {
-      return { ...pr, files: null };
-    }
-    return { ...pr, files: files.map((f) => f.filename).filter((f) => typeof f === "string") };
-  }));
+  const pulls = await Promise.all(selected.map(pr => collectPullFiles(pr, path => api(path, token))));
   const workflows = await api("/actions/workflows/" + CORE_WORKFLOW + "/runs?branch=main&per_page=100", token);
   if (!Array.isArray(workflows.workflow_runs)) throw new Error("Не удалось получить запуски кодера.");
   const runDetails = await Promise.all(workflows.workflow_runs.slice(0, 20).map(async (run) => {
@@ -384,6 +400,11 @@ export async function main() {
   }));
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
+  const incompleteFiles = pulls.filter(pr => pr.files === null).length;
+  if (incompleteFiles) warnings.push({
+    code: "pr_files_unconfirmed", severity: "medium", count: incompleteFiles,
+    message: "Не удалось полностью проверить списки изменённых файлов отдельных PR",
+  });
   const deploymentAuditResults = await Promise.allSettled([
     api("/actions/workflows/fam-domain-sync.yml/runs?branch=main&per_page=20", token),
     api("/actions/workflows/fam-netlify-production.yml/runs?branch=main&per_page=20", token),
@@ -496,11 +517,11 @@ export async function main() {
   }
   process.stdout.write("FAM governance: конфликтов " + disputes.length +
     ", предупреждений " + warnings.length + ", предложений " + proposals.length + "\n");
-  if (disputes.length || warnings.length || proposals.length) {
-    process.stdout.write(await publishIssue(report, token) + "\n");
-  } else {
-    process.stdout.write("Новых сигналов нет, отдельный issue не создаётся.\n");
-  }
+  process.stdout.write(await syncReportIssue({
+    report,
+    request: (path, options) => api(path, token, options),
+    allowCreate: Boolean(disputes.length || warnings.length || proposals.length),
+  }) + "\n");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

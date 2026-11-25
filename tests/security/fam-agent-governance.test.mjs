@@ -11,6 +11,8 @@ import {
   summarizeAgentQueue,
   inspectPostMerge,
   handoffInspectorSignal,
+  collectPullFiles,
+  syncReportIssue,
 } from "../../scripts/fam-agent-governance.mjs";
 
 import { buildIntegrationPlan } from "../../scripts/fam-integration-coordinator.mjs";
@@ -207,4 +209,38 @@ test("invalid and future dates never fabricate stuck, stale or repeated-failure 
   assert.deepEqual(warnings.map(w=>w.code),["metadata_time_unconfirmed"]);
   assert.equal(mapInspectorWarning(warnings[0]),null);
   assert.deepEqual(inspectPostMerge({now:NOW,runs:[{event:"push",conclusion:"failure",created_at:future}]}),[]);
+});
+
+test("healthy report refreshes existing trusted bot issue without creating new issues", async () => {
+  const report = REPORT_MARKER + "\nHealthy fixture";
+  const trusted = {number:7,user:{login:"github-actions[bot]"},title:"FAM: контроль конфликтов, работоспособности и найма агентов",body:REPORT_MARKER+"\nOld report"};
+  const calls=[];
+  const result=await syncReportIssue({report, request:async(path,options)=>{
+    calls.push({path,options});return options ? {} : [trusted];
+  }});
+  assert.equal(result,"Обновлена задача #7");
+  assert.equal(calls.length,2);
+  assert.equal(calls[1].path,"/issues/7");
+  assert.equal(calls[1].options.method,"PATCH");
+  assert.deepEqual(JSON.parse(calls[1].options.body),{body:report});
+  let writes=0;
+  const empty=await syncReportIssue({report,request:async(path,opts)=>{if(opts) writes++;return []}});
+  assert.match(empty,/не создаётся/);
+  assert.equal(writes,0);
+});
+test("report synchronization refuses ambiguous, non-bot or incomplete issue evidence", async () => {
+  const trusted={number:7,user:{login:"github-actions[bot]"},title:"FAM: контроль конфликтов, работоспособности и найма агентов",body:REPORT_MARKER+"\nOld report"};
+  for (const items of [[{...trusted,user:{login:"owner"}}],[trusted,{...trusted,number:8}],Array(100).fill({body:"unrelated"}),[{...trusted,title:"other"}]]) {
+    let writes=0;
+    await assert.rejects(syncReportIssue({report:REPORT_MARKER+"\nNew",allowCreate:true,request:async(path,opts)=>{if(opts) writes++;return items}}));
+    assert.equal(writes,0);
+  }
+});
+test("PR file fetch failures or partial results cannot be interpreted as no conflicts", async () => {
+  const pr={number:9,changed_files:2};
+  for (const response of [[{filename:"a.js"}], [{filename:"a.js"},{}],null]) {
+    assert.equal((await collectPullFiles(pr,async()=>response)).files,null);
+  }
+  assert.equal((await collectPullFiles(pr,async()=>{throw Error("fixture")})).files,null);
+  assert.deepEqual((await collectPullFiles(pr,async()=>[{filename:"a.js"},{filename:"b.js"}])).files,["a.js","b.js"]);
 });
