@@ -21,7 +21,7 @@ def seed_failures(count):
         "'Локальный анализатор завершился с ошибкой.', now()-i*interval '1 hour' "
         "FROM generate_series(1," + str(count) + ") i")
 
-def pair(first_sql, second_sql, serialized):
+def pair(first_sql, second_sql, serialized, rollback=False):
     with tempfile.TemporaryDirectory(prefix="fam-mixed-race-") as directory:
         log_path = pathlib.Path(directory) / "first.log"
         with log_path.open("w") as log:
@@ -44,14 +44,14 @@ def pair(first_sql, second_sql, serialized):
                     output, err = second.communicate(timeout=8)
                     assert second.returncode == 0, err
                     assert output.strip() == "t", output
-                first.stdin.write("COMMIT;\n\\q\n")
+                first.stdin.write(("ROLLBACK" if rollback else "COMMIT") + ";\n\\q\n")
                 first.stdin.flush()
                 first.wait(timeout=8)
                 assert first.returncode == 0, log_path.read_text()
                 if serialized:
                     output, err = second.communicate(timeout=8)
                     assert second.returncode == 0, err
-                    assert output.strip() == "f", output
+                    assert output.strip() == ("t" if rollback else "f"), output
                 assert run(ACTIVE) == ("1" if serialized else "2")
             finally:
                 for process in (second, first):
@@ -78,6 +78,45 @@ def test_retry_budget(fixed):
         assert run("SET ROLE service_role; " + CLAIM) == "f"
         assert run("SELECT count(*) FROM private.fam_agent_tasks WHERE status='failed'") == "1"
 
+
+def test_rollback():
+    reset()
+    pair(INSPECT, PRODUCE, True, rollback=True)
+    assert run("SELECT count(*) FROM private.fam_agent_inspector_signals") == "0"
+    reset()
+    seed_failures(1)
+    pair(CLAIM, INSPECT, True, rollback=True)
+    assert run("SELECT count(*) FROM private.fam_agent_task_events WHERE event_type='retry_scheduled'") == "0"
+    assert run("SELECT count(*) FROM private.fam_agent_tasks WHERE status='failed' AND attempt_count=1") == "1"
+    reset()
+    pair(PRODUCE, INSPECT, True, rollback=True)
+    assert run("SELECT count(*) FROM private.fam_agent_inspector_signals WHERE outcome='queued'") == "1"
+
+def test_pending_review():
+    reset()
+    seed_failures(1)
+    run("INSERT INTO private.fam_agent_tasks "
+        "(agent_key,task_type,approval_required,source,status,attempt_count,result_summary) "
+        "VALUES ('technical','coder_patch_request',false,'scheduled_audit','in_progress',1,"
+        "'PR создан после независимой QA; ожидает решения владельца.'),"
+        "('technical','coder_patch_request',false,'scheduled_audit','queued',0,null)")
+    # A legacy queued row must not let another inference start during review.
+    before = run("SELECT string_agg(status||':'||attempt_count,',' ORDER BY id) FROM private.fam_agent_tasks")
+    for statement in (CLAIM, INSPECT, PRODUCE):
+        assert run("SET ROLE service_role; " + statement) == "f"
+    assert run("SELECT string_agg(status||':'||attempt_count,',' ORDER BY id) FROM private.fam_agent_tasks") == before
+    assert run("SELECT count(*) FROM private.fam_agent_task_events") == "0"
+
+def test_acl():
+    for signature in (
+        "private.enqueue_fam_agent_coder_task()",
+        "public.enqueue_fam_agent_inspector_task(text,text,integer)",
+        "public.claim_fam_agent_coder_tasks(text,integer,integer)",
+        "public.advance_fam_agent_coder_task(uuid,text,text,integer)",
+    ):
+        for role, expected in (("anon","f"),("authenticated","f"),("service_role","t")):
+            assert run("SELECT has_function_privilege('" + role + "','" + signature + "','EXECUTE')") == expected
+
 if __name__ == "__main__":
     # The preceding test already installed the proposed shared INSPECTOR lock.
     run("CREATE TABLE private.fam_site_error_counts (hour_bucket timestamptz,event_code text,page_area text,event_count integer); "
@@ -90,6 +129,9 @@ if __name__ == "__main__":
     apply("claim-producer-proposed.sql")
     test_mixed(True)
     test_retry_budget(True)
-    assert run("SELECT has_function_privilege('anon','private.enqueue_fam_agent_coder_task()','EXECUTE')") == "f"
-    assert run("SELECT has_function_privilege('authenticated','public.claim_fam_agent_coder_tasks(text,integer,integer)','EXECUTE')") == "f"
     print("PASS: three cooperating entry points share lock; only one eligible retry; active task prevents extra claim", flush=True)
+    test_rollback()
+    print("PASS: rollback releases lock and preserves failed-task attempt count without phantom events", flush=True)
+    test_pending_review()
+    test_acl()
+    print("PASS: pending owner review blocks extra execution; all four RPC ACLs preserved", flush=True)
