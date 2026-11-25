@@ -126,6 +126,8 @@ jobs:
           node ru-migration/compat/integration-legacy-account-link.mjs
       - name: Rehearse restoring synthetic archive into actual YDB tables
         run: node ru-migration/compat/integration-synthetic-archive-restore.mjs
+      - name: Rehearse generated WebP avatar migration and private access
+        run: node ru-migration/compat/integration-synthetic-avatar-restore.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true
