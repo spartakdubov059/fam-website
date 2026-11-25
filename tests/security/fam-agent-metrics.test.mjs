@@ -77,3 +77,20 @@ test("incomplete and failed job evidence is not counted as confirmed no-patch or
   assert.equal(metrics.qa_passed,1);
   assert.equal(metrics.pr_created,1);
 });
+
+test("runner estimates exclude invalid dates, queued and skipped jobs; p95 uses completed jobs", () => {
+  const base = {name:"Локальная модель готовит исправление",status:"completed",conclusion:"success",
+    started_at:"2026-11-23T00:00:00Z",completed_at:"2026-11-23T00:04:00Z"};
+  const stats = summarizeQwenRuns([
+    {jobs:[base,{...base,name:"QA",started_at:null},{...base,name:"PR",status:"queued"},
+      {...base,name:"skip",conclusion:"skipped"}]},
+    {jobs:[{...base,started_at:"invalid"}]},
+    {jobs:[{...base,completed_at:"2026-11-22T00:00:00Z"}]},
+  ]);
+  assert.equal(stats.estimated_runner_minutes,4);
+  assert.equal(stats.timed_jobs,1);
+  assert.equal(stats.untimed_jobs,4);
+  assert.equal(stats.p95_duration_minutes,4);
+  assert.equal(summarizeQwenRuns([{jobs:[{...base,status:"in_progress"}]}]).p95_duration_minutes,null);
+  assert.match(makeReport({qwenMetrics:summarizeQwenRuns([])}),/p95 длительности не подтверждён/);
+});

@@ -8,12 +8,22 @@ on:
       - 'supabase/**'
       - 'tests/**'
       - 'index.html'
+      - 'js/**'
+      - 'css/**'
+      - 'assets/**'
+      - 'docs/**'
+      - 'scripts/**'
       - '.github/workflows/**'
   pull_request:
     paths:
       - 'supabase/**'
       - 'tests/**'
       - 'index.html'
+      - 'js/**'
+      - 'css/**'
+      - 'assets/**'
+      - 'docs/**'
+      - 'scripts/**'
       - '.github/workflows/**'
 
 permissions:
@@ -25,11 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: 22
       - name: Run moderation tests
@@ -59,10 +69,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('index.html', 'utf8');
-          const inlineScript = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+          const inlineScripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
             .map((match) => match[2])
-            .find((script) => script.trim().length > 0);
-          if (!inlineScript) throw new Error('No inline JavaScript found in index.html');
-          fs.writeFileSync('/tmp/fam-inline-scripts.js', inlineScript);
+            .filter((script) => script.trim().length > 0);
+          if (!inlineScripts.length) throw new Error('No inline JavaScript found in index.html');
+          fs.writeFileSync('/tmp/fam-inline-scripts.js', inlineScripts.join('\n;\n'));
           NODE
           node --check /tmp/fam-inline-scripts.js

@@ -10,12 +10,18 @@ const MAX_PRS = 25;
 const CORE_WORKFLOW = "fam-codex-developer.yml";
 const CODER_JOB = "Локальная модель готовит исправление";
 
+function completedJobDuration(job) {
+  if (job?.status !== "completed" || ["skipped","cancelled"].includes(job.conclusion)) return null;
+  const start = Date.parse(job.started_at || ""), end = Date.parse(job.completed_at || "");
+  return Number.isFinite(start) && Number.isFinite(end) && end >= start ? end - start : null;
+}
+
 export function summarizeQwenRuns(runs = []) {
   const rows = [];
   for (const run of runs) {
     const job = (run.jobs || []).find((item) => item.name === CODER_JOB);
     if (!job) continue;
-    const duration = Math.max(0, dateMs(job.completed_at || run.updated_at) - dateMs(job.started_at || run.created_at));
+    const duration = completedJobDuration(job);
     const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
     const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
     const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
@@ -38,13 +44,16 @@ export function summarizeQwenRuns(runs = []) {
         (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" &&
           item.status === "completed" && item.conclusion === "success"),
       estimated_runner_minutes: (run.jobs || []).reduce((sum, item) => {
-        const milliseconds = Math.max(0, dateMs(item.completed_at || run.updated_at) - dateMs(item.started_at || run.created_at));
-        return sum + Math.ceil(milliseconds / 60_000);
+        const milliseconds = completedJobDuration(item);
+        return sum + (milliseconds === null ? 0 : Math.ceil(milliseconds / 60_000));
       }, 0),
+      timed_jobs: (run.jobs || []).filter((item) => completedJobDuration(item) !== null).length,
+      untimed_jobs: (run.jobs || []).filter((item) => item.status !== "completed" ||
+        (!["skipped","cancelled"].includes(item.conclusion) && completedJobDuration(item) === null)).length,
     });
   }
   const count = (predicate) => rows.filter(predicate).length;
-  const sorted = rows.map((row) => row.duration_ms).sort((a, b) => a - b);
+  const sorted = rows.map((row) => row.duration_ms).filter((duration) => duration !== null).sort((a, b) => a - b);
   return Object.freeze({
     runs: rows.length,
     successful: count((row) => row.status === "success"),
@@ -56,7 +65,9 @@ export function summarizeQwenRuns(runs = []) {
     qa_passed: count((row) => row.qa_passed),
     pr_created: count((row) => row.pr_created),
     estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
-    p95_duration_minutes: sorted.length ? Math.ceil(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] / 60_000) : 0,
+    timed_jobs: rows.reduce((sum, row) => sum + row.timed_jobs, 0),
+    untimed_jobs: rows.reduce((sum, row) => sum + row.untimed_jobs, 0),
+    p95_duration_minutes: sorted.length ? Math.ceil(sorted[Math.ceil(sorted.length * 0.95) - 1] / 60_000) : null,
   });
 }
 
@@ -79,16 +90,17 @@ export function summarizeAgentQueue(rows = []) {
 
 export function inspectPostMerge({ runs = [], deployments = [], now = Date.now() } = {}) {
   const warnings = [];
-  const failed = runs.filter((run) => run.conclusion === "failure" && run.event === "push" && now - dateMs(run.created_at) <= 7 * DAY);
+  const failed = runs.filter((run) => run.conclusion === "failure" && run.event === "push" &&
+    ageMs(run.created_at, now) <= 7 * DAY);
   if (failed.length) warnings.push({ code: "postmerge_workflow_failure", severity: "high", count: failed.length, message: "Проверки после объединения PR завершились ошибкой" });
   const badDeployments = deployments.filter((item) => ["error", "failure", "inactive", "in_progress"].includes(item.state));
   if (badDeployments.length) warnings.push({ code: "postmerge_deployment", severity: "high", count: badDeployments.length, message: "Развёртывание после объединения PR требует внимания" });
   return warnings;
 }
 
-function dateMs(value) {
-  const result = Date.parse(value || "");
-  return Number.isFinite(result) ? result : 0;
+function ageMs(value, now) {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) && timestamp <= now ? now - timestamp : Infinity;
 }
 
 function clean(value, maxLength = 150) {
@@ -128,12 +140,19 @@ export function findDisputes(pulls = []) {
 
 export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } = {}) {
   const warnings = [];
-  const active = [...coderRuns].sort((a, b) => dateMs(b.created_at) - dateMs(a.created_at));
-  const recent = active.filter((run) => now - dateMs(run.created_at) <= 7 * DAY);
+  const active = coderRuns.filter((run) => Number.isFinite(ageMs(run.created_at, now)))
+    .sort((a, b) => ageMs(a.created_at, now) - ageMs(b.created_at, now));
+  const recent = active.filter((run) => ageMs(run.created_at, now) <= 7 * DAY);
+  const invalidTimes = coderRuns.length - active.length +
+    pulls.filter((pr) => !Number.isFinite(ageMs(pr.updated_at, now))).length;
+  if (invalidTimes) warnings.push({
+    code: "metadata_time_unconfirmed", severity: "medium", count: invalidTimes,
+    message: "Некорректные или отсутствующие даты GitHub; такие записи исключены из возрастных сигналов",
+  });
   const failures = recent.filter((run) => run.conclusion === "failure");
   const overdue = active.filter((run) =>
     (run.status === "in_progress" || run.status === "queued") &&
-    now - dateMs(run.created_at) > 2 * 60 * 60 * 1000
+    ageMs(run.created_at, now) > 2 * 60 * 60 * 1000
   );
   if (failures.length >= 3) {
     warnings.push({
@@ -152,7 +171,7 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
     });
   }
   const latest = active[0];
-  if (latest && now - dateMs(latest.created_at) > 48 * 60 * 60 * 1000) {
+  if (latest && ageMs(latest.created_at, now) > 48 * 60 * 60 * 1000) {
     warnings.push({
       code: "no_recent_run",
       severity: "medium",
@@ -161,7 +180,7 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
     });
   }
   const stale = pulls.filter((pr) =>
-    !pr.draft && now - dateMs(pr.updated_at) > 4 * DAY
+    !pr.draft && Number.isFinite(ageMs(pr.updated_at, now)) && ageMs(pr.updated_at, now) > 4 * DAY
   );
   if (stale.length) {
     warnings.push({
@@ -253,8 +272,8 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
   for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
   if (qwenMetrics) {
-    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", результат модели не подтверждён " + (qwenMetrics.model_result_unconfirmed ?? 0) + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
-    lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", результат модели не подтверждён " + (qwenMetrics.model_result_unconfirmed ?? 0) + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", успешный job подготовки PR " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + (qwenMetrics.p95_duration_minutes === null ? "не подтверждён" : qwenMetrics.p95_duration_minutes + " мин") + ".");
+    lines.push("Runner-минуты оценены только по завершённым job с подтверждёнными датами: " + (qwenMetrics.timed_jobs ?? 0) + " учтено, " + (qwenMetrics.untimed_jobs ?? 0) + " без подтверждённой длительности. Это не счёт и не стоимость. Успех job подготовки PR не заменяет проверку самого PR. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");
   if (!proposals.length) lines.push("Нет достаточных оснований создавать новые роли.");

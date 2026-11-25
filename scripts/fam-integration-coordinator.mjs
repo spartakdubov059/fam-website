@@ -106,7 +106,8 @@ export function buildIntegrationPlan({ pulls = [], disputes = [], limited = fals
 export function formatIntegrationPlan(plan, maxGroups = 8) {
   const groups = Array.isArray(plan?.groups) ? plan.groups : [];
   if (!groups.length) {
-    return "Нет подтверждённых пересечений файлов между проверенными PR. Это не гарантирует отсутствие логических конфликтов.";
+    return "Нет подтверждённых пересечений файлов между проверенными PR. Это не гарантирует отсутствие логических конфликтов." +
+      (plan?.limited ? " Выборка PR или списков файлов неполная; приоритеты предварительные." : "");
   }
   const lines = [
     "Кластеров пересекающихся изменений: " + groups.length +

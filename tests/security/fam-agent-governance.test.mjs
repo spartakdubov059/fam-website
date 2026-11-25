@@ -198,3 +198,13 @@ test("handoff errors do not retry uncertain operations or report execution succe
   assert.equal((await handoffInspectorSignal({signal:null,enqueue,dispatch})).state,"no_signal");
   assert.equal(enqueues,1);
 });
+
+test("invalid and future dates never fabricate stuck, stale or repeated-failure signals", () => {
+  const future = new Date(NOW + 86400000).toISOString();
+  const warnings = inspectAgents({now:NOW, pulls:[{number:1,draft:false,updated_at:null}],
+    coderRuns:[{status:"in_progress"},{conclusion:"failure",created_at:future},
+      {conclusion:"failure",created_at:future},{conclusion:"failure",created_at:future}]});
+  assert.deepEqual(warnings.map(w=>w.code),["metadata_time_unconfirmed"]);
+  assert.equal(mapInspectorWarning(warnings[0]),null);
+  assert.deepEqual(inspectPostMerge({now:NOW,runs:[{event:"push",conclusion:"failure",created_at:future}]}),[]);
+});
