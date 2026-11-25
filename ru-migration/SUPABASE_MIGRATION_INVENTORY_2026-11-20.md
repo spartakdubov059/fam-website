@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 23434)
-Total output lines: 162
-
 # Реестр переноса Supabase → FAM RU
 
 Историческая основа: `origin/main` на `af1f0086066d18b3d814dd535f06eda733ae58de` (2026-11-20). Последний просмотренный `origin/main` — `e574e905da574356eb847ec4a92b3ea64894adfa`: всего 84 SQL migrations и 7 Edge Function entrypoints. RU inventory содержит 83 migration строки; новая migration `20261123194000_fam_inspector_bounded_coder_enqueue.sql` отмечена в конце таблицы как не перенесённая. Ветка RU хранит 80 source SQL в корне и ещё 3 точные read-only reference-копии по предыдущему source snapshot. Это инвентаризация объектов и статуса аналога, не доказательство полного паритета или готовности к запуску. `не проверено` означает, что RU-аналог и тест должны быть подтверждены вручную/синтетически; похожее имя файла не считается доказательством. Политики и grants перечислены как отдельные требования безопасности.
