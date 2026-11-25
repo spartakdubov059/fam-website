@@ -12,21 +12,26 @@ async function main(){
   const sql=(strings,...values)=>{const stmt=client(strings,...values);stmt.on('error',()=>{});return stmt;};
   sql.begin=client.begin.bind(client);
   const repository=createYdbLegacyAccountLinkRepository(sql);
-  const issuer='https://login.yandex.ru',version='d'.repeat(64);
+  const issuer='https://login.yandex.ru',versions=new Map();
   const ids=['edededed-eded-4ded-8ded-ededededed01','edededed-eded-4ded-8ded-ededededed02','edededed-eded-4ded-8ded-ededededed03','edededed-eded-4ded-8ded-ededededed04'];
   const subjects=['990000000001','990000000002','990000000003','990000000004','990000000005'];
   const challenges=['1','2','3','4','5','6'].map(c=>c.repeat(64));
   const seedProfile=async(id,ready=true,active=true)=>{
+   const prepared=prepareSyntheticProfileBatch([{id,school_id:'lyceum_3',role:'student',active,first_name:'Synthetic',last_name:'Migration',class_name:'7А',city:null,avatar_url:null,person_type:'student',staff_position:null,staff_verification_status:'not_required'}]);
+   assert.equal(prepared.ok,true);
+   const version=prepared.profiles[0].profile_version;
+   versions.set(id,version);
    await sql`INSERT INTO fam_legacy_migration_profiles (user_id, profile_version, ready, school_id, role, active, first_name, last_name, class_name, person_type, staff_verification_status)
     VALUES (${id}, ${version}, ${ready}, 'lyceum_3', 'student', ${active}, 'Synthetic', 'Migration', '7А', 'student', 'not_required');`;
   };
   const seedChallenge=async(challengeId,userId,subject,expired=false)=>{
+   const version=versions.get(userId);assert.ok(version);
    if(expired)await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id, user_id, profile_version, issuer, subject, expires_at, consumed)
      VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, Unwrap(CurrentUtcTimestamp() - Interval('PT1M')), false);`;
    else await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id, user_id, profile_version, issuer, subject, expires_at, consumed)
      VALUES (${challengeId}, ${userId}, ${version}, ${issuer}, ${subject}, Unwrap(CurrentUtcTimestamp() + Interval('PT4M')), false);`;
   };
-  const input=(i,j,k)=>({challengeId:challenges[k],legacyUserId:ids[i],profileVersion:version,issuer,subject:subjects[j]});
+  const input=(i,j,k)=>({challengeId:challenges[k],legacyUserId:ids[i],profileVersion:versions.get(ids[i]),issuer,subject:subjects[j]});
   const fail={ok:false,code:'LINK_UNAVAILABLE'},success={ok:true,code:'LINKED'};
   await seedProfile(ids[0]);await seedChallenge(challenges[0],ids[0],subjects[0]);
   assert.deepEqual(await repository.linkVerifiedAccount({...input(0,0,0),subject:subjects[4]}),fail);
@@ -63,7 +68,7 @@ async function main(){
   const extraIds=['edededed-eded-4ded-8ded-ededededed05','edededed-eded-4ded-8ded-ededededed06','edededed-eded-4ded-8ded-ededededed07','edededed-eded-4ded-8ded-ededededed08'];
   const extraSubjects=['990000000006','990000000007','990000000008'];
   const extraChallenges=['7','8','9','a'].map(c=>c.repeat(64));
-  const bind=(i,j,k)=>({challengeId:extraChallenges[k],legacyUserId:extraIds[i],profileVersion:version,issuer,subject:extraSubjects[j]});
+  const bind=(i,j,k)=>({challengeId:extraChallenges[k],legacyUserId:extraIds[i],profileVersion:versions.get(extraIds[i]),issuer,subject:extraSubjects[j]});
   await seedProfile(extraIds[0]);await seedProfile(extraIds[1]);
   await seedChallenge(extraChallenges[0],extraIds[0],extraSubjects[0]);
   await seedChallenge(extraChallenges[1],extraIds[1],extraSubjects[0]);
@@ -117,7 +122,21 @@ async function stageIntegration(sql,repository,issuer,success,createDatabaseActo
   const challenge='e'.repeat(64),subject='990000000010';
   await sql`INSERT INTO fam_legacy_migration_challenges (challenge_id,user_id,profile_version,issuer,subject,expires_at,consumed)
     VALUES (${challenge},${a.id},${version},${issuer},${subject},Unwrap(CurrentUtcTimestamp()+Interval('PT4M')),false);`;
-  assert.deepEqual(await repository.linkVerifiedAccount({challengeId:challenge,legacyUserId:a.id,profileVersion:version,issuer,subject}),success);
+  // Mutate individually valid fields while leaving the approved digest and challenge unchanged.
+  await sql`UPDATE fam_legacy_migration_profiles SET role = 'school_admin' WHERE user_id = ${a.id};`;
+  const input={challengeId:challenge,legacyUserId:a.id,profileVersion:version,issuer,subject};
+  assert.deepEqual(await repository.linkVerifiedAccount(input),{ok:false,code:'LINK_UNAVAILABLE'});
+  await sql`UPDATE fam_legacy_migration_profiles SET role = 'student', class_name = '8А' WHERE user_id = ${a.id};`;
+  assert.deepEqual(await repository.linkVerifiedAccount(input),{ok:false,code:'LINK_UNAVAILABLE'});
+  await sql`UPDATE fam_legacy_migration_profiles SET class_name = '7А', avatar_url = CAST(NULL AS Utf8?) WHERE user_id = ${a.id};`;
+  assert.deepEqual(await repository.linkVerifiedAccount(input),{ok:false,code:'LINK_UNAVAILABLE'});
+  assert.equal((await sql`SELECT user_id FROM fam_user_profiles WHERE user_id = ${a.id};`)[0].length,0);
+  assert.equal((await sql`SELECT user_id FROM fam_legacy_migration_links WHERE user_id = ${a.id};`)[0].length,0);
+  assert.equal((await sql`SELECT consumed FROM fam_legacy_migration_challenges WHERE challenge_id = ${challenge};`)[0][0].consumed,false);
+  assert.equal((await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${a.id};`)[0][0].ready,true);
+  await sql`UPDATE fam_legacy_migration_profiles SET avatar_url = '' WHERE user_id = ${a.id};`;
+  assert.deepEqual(await repository.linkVerifiedAccount(input),success);
+  console.log('YDB_SYNTHETIC_PROFILE_DIGEST_GUARD_PASS: valid role/class/null-empty changes blocked, challenge unconsumed, exact retry succeeds');
   assert.deepEqual(await stage.stageBatch([a]),ok(0,1));
   const final=await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${a.id};`;
   assert.equal(final[0][0].ready,false,'reimport must never reactivate a consumed staged profile');

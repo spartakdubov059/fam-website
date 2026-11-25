@@ -1,5 +1,5 @@
 // Prototype for the isolated rehearsal only; do not connect this to a live route.
-import { mapLegacyProfileForMigration } from '../app/backend/services/legacy-profile-migration.mjs';
+import { prepareSyntheticProfileBatch } from './synthetic-profile-stage-ydb.mjs';
 export function createYdbLegacyAccountLinkRepository(sql) {
   if(typeof sql!=='function'||typeof sql.begin!=='function')throw new TypeError('transactional query client required');
   const fail=()=>({ok:false,code:'LINK_UNAVAILABLE'});
@@ -23,10 +23,12 @@ export function createYdbLegacyAccountLinkRepository(sql) {
             FROM fam_legacy_migration_profiles WHERE user_id = ${legacyUserId} AND profile_version = ${profileVersion} AND ready = true AND active = true;`);
           if(profiles.length!==1)return fail();
           const p=profiles[0];
-          const mapped=mapLegacyProfileForMigration({id:p.user_id,school_id:p.school_id,role:p.role,active:p.active,
+          const prepared=prepareSyntheticProfileBatch([{id:p.user_id,school_id:p.school_id,role:p.role,active:p.active,
             first_name:p.first_name??null,last_name:p.last_name??null,class_name:p.class_name??null,city:p.city??null,
-            avatar_url:p.avatar_url??null,person_type:p.person_type,staff_position:p.staff_position??null,staff_verification_status:p.staff_verification_status});
-          if(!mapped.ok||p.user_id!==legacyUserId||p.active!==true)return fail();
+            avatar_url:p.avatar_url??null,person_type:p.person_type,staff_position:p.staff_position??null,staff_verification_status:p.staff_verification_status}]);
+          // The stored version is not evidence that the staged columns still match it.
+          // Recompute the canonical synthetic digest inside the same transaction.
+          if(!prepared.ok||prepared.profiles.length!==1||prepared.profiles[0].profile_version!==profileVersion||p.user_id!==legacyUserId||p.active!==true)return fail();
           if(rows(await tx`SELECT user_id FROM fam_user_profiles WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`).length||
              rows(await tx`SELECT user_id FROM fam_user_profiles WHERE user_id = ${legacyUserId} LIMIT 1;`).length||
              rows(await tx`SELECT user_id FROM fam_legacy_migration_links WHERE user_id = ${legacyUserId} LIMIT 1;`).length||
