@@ -10,7 +10,11 @@ import {
   summarizeQwenRuns,
   summarizeAgentQueue,
   inspectPostMerge,
+  handoffInspectorSignal,
 } from "../../scripts/fam-agent-governance.mjs";
+
+import { buildIntegrationPlan } from "../../scripts/fam-integration-coordinator.mjs";
+import { inspectQueueHealth, mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -148,4 +152,49 @@ test("INSPECTOR flags failed post-merge workflows without triggering rollback", 
   assert.deepEqual(inspectPostMerge({ runs: [{ conclusion: "success", event: "push", created_at: earlier(1) }], now: NOW }), []);
   assert.equal(typeof summarizeQwenRuns, "function");
   assert.equal(typeof summarizeAgentQueue, "function");
+});
+
+test("synthetic control tower cooperates: ARBITER, INSPECTOR, INTEGRATOR, RECRUITER and bounded Qwen handoff", async () => {
+  const pulls = [1,2,3].map(number => ({ number, draft: false, updated_at: earlier(0), files:["scripts/fam-agent-governance.mjs"] }));
+  const disputes = findDisputes(pulls);
+  assert.equal(disputes.length,3);
+  const plan = buildIntegrationPlan({ pulls, disputes });
+  assert.deepEqual(plan.groups[0].prs,[1,2,3]);
+  assert.equal(plan.groups[0].highRisk,true);
+  const runs = [1,2,3].map(id => ({id,created_at:earlier(id),status:"completed",conclusion:"failure"}));
+  const warnings = [...inspectAgents({pulls,coderRuns:runs,now:NOW}), ...inspectQueueHealth({
+    queued:0,claimed:0,in_progress:0,failed_last_24h:0,expired_leases:0,oldest_queued_minutes:0
+  })];
+  const roles = proposeRecruitment({disputes,warnings,activeRoles:["integration_specialist"]});
+  assert.deepEqual(roles.map(role=>role.key),["coder_diagnostician"]);
+  assert.deepEqual(proposeRecruitment({disputes,warnings,activeRoles:["integration_specialist","coder_diagnostician"]}),[]);
+  const signal = warnings.map(mapInspectorWarning).find(Boolean);
+  assert.deepEqual(signal,{signal_code:"qwen_repeated_failure",occurrences:3});
+  let enqueues=0,dispatches=0;
+  const enqueue = async candidate => {
+    assert.deepEqual(candidate,signal);
+    return {task_created:++enqueues===1,reason:enqueues===1?"created":"duplicate_signal"};
+  };
+  const dispatch=async()=>{dispatches++};
+  assert.equal((await handoffInspectorSignal({signal,enqueue,dispatch})).state,"dispatch_accepted");
+  assert.equal((await handoffInspectorSignal({signal,enqueue,dispatch})).state,"not_created");
+  assert.equal(dispatches,1);
+  const report=makeReport({disputes,warnings,proposals:roles,integrationPlan:plan,count:pulls.length,now:NOW});
+  for(const role of ["ARBITER","INSPECTOR","INTEGRATOR","RECRUITER"]) assert.ok(report.includes(role));
+  assert.match(report,/одобрения владельца/);
+});
+
+test("handoff errors do not retry uncertain operations or report execution success", async () => {
+  const signal={signal_code:"qwen_repeated_failure",occurrences:3};
+  let enqueues=0,dispatches=0;
+  const dispatch=async()=>{dispatches++;throw Error("synthetic transport failure")};
+  const enqueue=async()=>{enqueues++;return {task_created:true,reason:"created"}};
+  assert.deepEqual(await handoffInspectorSignal({signal,enqueue,dispatch}),{state:"dispatch_unconfirmed",taskCreated:true,reason:"created"});
+  assert.equal(enqueues,1);
+  assert.equal(dispatches,1);
+  const failed=await handoffInspectorSignal({signal,enqueue:async()=>{throw Error("synthetic enqueue failure")},dispatch});
+  assert.deepEqual(failed,{state:"enqueue_unconfirmed",taskCreated:null});
+  assert.equal(dispatches,1);
+  assert.equal((await handoffInspectorSignal({signal:null,enqueue,dispatch})).state,"no_signal");
+  assert.equal(enqueues,1);
 });
