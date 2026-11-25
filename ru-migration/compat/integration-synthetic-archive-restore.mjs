@@ -6,14 +6,17 @@ import {join} from 'node:path';
 import {verifySyntheticAttachmentReconciliation} from './verify-synthetic-attachment-reconciliation.mjs';
 import {Driver} from '@ydbjs/core';
 import {query} from '@ydbjs/query';
-import {encodeSyntheticStateBackup,decodeSyntheticStateBackup,verifySyntheticStateAcceptance} from './synthetic-state-backup-envelope.mjs';
+import {encodeSyntheticProfileBackup,decodeSyntheticProfileBackup,verifySyntheticProfileAcceptance} from './synthetic-profile-backup-envelope.mjs';
 // Hard-coded loopback database and synthetic fixture. No production route or importer.
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function makeFixture(){
  const a='synthetic-restore-owner',b='synthetic-restore-member',s='synthetic-restore-school',l='synthetic-restore-listing';
  const created_at='2026-11-24T12:00:00.000Z';
  const pulseStart='2099-11-24T12:00:00.000Z',pulseEnd='2099-11-25T12:00:00.000Z';
- const accounts=[{user_id:a,school_id:s,role:'council_member',active:true},{user_id:b,school_id:s,role:'student',active:false}];
+ const accounts=[{user_id:a,school_id:s,role:'council_member',active:true},{user_id:b,school_id:s,role:'student',active:false},{user_id:'synthetic-restore-parent',school_id:s,role:'student',active:true}];
+ const profiles=[{user_id:a,first_name:'synthetic:First',last_name:'synthetic:Last',class_name:'8Б',city:null,avatar_url:'',person_type:'student',staff_position:null,staff_verification_status:'not_required'},
+  {user_id:b,first_name:'synthetic:Staff',last_name:null,class_name:null,city:'',avatar_url:null,person_type:'school_staff',staff_position:'synthetic:Teacher',staff_verification_status:'pending'},
+  {user_id:'synthetic-restore-parent',first_name:'synthetic:Parent',last_name:'',class_name:null,city:null,avatar_url:null,person_type:'parent',staff_position:null,staff_verification_status:'not_required'}];
  const content={profiles:accounts.map(({user_id,school_id})=>({user_id,school_id})),listings:[{id:l,user_id:a,school_id:s,image_key:'synthetic-restore-listing-image'}],ideas:[{id:'synthetic-restore-idea',user_id:b,school_id:s}],messages:[{id:'synthetic-restore-message',sender_id:b,receiver_id:a,school_id:s,listing_id:l}],pending_messages:[{id:'synthetic-restore-pending',sender_id:a,receiver_id:b,school_id:s,listing_id:l}],favorites:[{user_id:b,listing_id:l}],media:[{object_key:'synthetic-restore-listing-image',user_id:a},{object_key:'synthetic-restore-idea-image',user_id:b},{object_key:'synthetic-restore-idea-image-2',user_id:b}],idea_images:[{idea_id:'synthetic-restore-idea',image_index:0,object_key:'synthetic-restore-idea-image',user_id:b,school_id:s},{idea_id:'synthetic-restore-idea',image_index:1,object_key:'synthetic-restore-idea-image-2',user_id:b,school_id:s}]};
  const payloads={listings:[{id:l,title:'synthetic:restore event',description:'synthetic:restore description',created_at}],ideas:[{id:content.ideas[0].id,body:'synthetic:restore idea',created_at}],messages:[{id:content.messages[0].id,body:'synthetic:approved body',created_at}],pending_messages:[{id:content.pending_messages[0].id,body:'synthetic:pending body',created_at}]};
  const activity={listing_event_fields:[{id:l,is_event:true,event_date:'2026-11-25',event_time:'10:00',event_type:'limited',max_seats:1}],event_registrations:[{event_id:l,user_id:b,school_id:s,status:'confirmed',created_at}],event_occupancy:[{event_id:l,taken:1}],announcements:[{announcement_id:'synthetic-restore-news',school_id:s,author_id:a,title:'synthetic:notice',body:'synthetic:notice text',kind:'news',event_starts_at:null,published_at:pulseStart,expires_at:pulseEnd}],polls:[{poll_id:'synthetic-restore-poll',school_id:s,author_id:a,question:'synthetic:question',options:['synthetic:yes','synthetic:no'],created_at:pulseStart,closes_at:pulseEnd}],votes:[{poll_id:'synthetic-restore-poll',voter_id:b,school_id:s,choice_index:1,created_at:pulseStart}]};
@@ -25,7 +28,7 @@ function makeFixture(){
   favorites:content.favorites.map(row=>({...row,created_at:'2026-11-24T13:00:00.000Z'})),
   media:content.media.map(({object_key})=>({object_key,status:'linked',claim_token:'',created_at:'2026-11-24T11:00:00.000Z',claim_until:'2026-11-24T11:00:01.000Z'})),
   idea_images:content.idea_images.map(({idea_id,image_index})=>({idea_id,image_index,created_at:'2026-11-24T12:00:01.000Z'}))};
- return {snapshot:{snapshot_id:'synthetic-restore-batch',accounts,content,objects,payloads,activity},files,state};
+ return {snapshot:{snapshot_id:'synthetic-restore-batch',accounts,content,objects,payloads,activity},files,state,profiles};
 }
 async function run(){
  const driver=new Driver('grpc://127.0.0.1:2136/local');
@@ -35,11 +38,12 @@ async function run(){
   const client=query(driver);
   const sql=(strings,...values)=>{const stmt=client(strings,...values);stmt.on('error',()=>{});return stmt;};
   sql.begin=client.begin.bind(client);
-  const {snapshot:source,files,state}=makeFixture(),archive=encodeSyntheticStateBackup(source,files,state);
+  const {snapshot:source,files,state,profiles}=makeFixture(),archive=encodeSyntheticProfileBackup(source,files,state,profiles);
   assert.equal(archive.ok,true);
-  const decoded=decodeSyntheticStateBackup(archive.bytes,archive.sha256);
+  const decoded=decodeSyntheticProfileBackup(archive.bytes,archive.sha256);
   assert.equal(decoded.ok,true);
-  const snap=decoded.snapshot,storedState=decoded.state;
+  const snap=decoded.snapshot,storedState=decoded.state,storedProfiles=decoded.profiles;
+  const profileDetails=new Map(storedProfiles.map(row=>[row.user_id,row]));
   const [listingState]=storedState.listings,[ideaState]=storedState.ideas,[messageState]=storedState.messages,[favoriteState]=storedState.favorites;
   const mediaStates=new Map(storedState.media.map(row=>[row.object_key,row]));
   const imageStates=new Map(storedState.idea_images.map(row=>[JSON.stringify([row.idea_id,row.image_index]),row]));
@@ -70,7 +74,7 @@ async function run(){
   assert.equal(snap.content.idea_images.length,2);
   for(const rows of [snap.content.listings,snap.content.messages,snap.content.pending_messages,snap.activity.listing_event_fields,snap.activity.event_registrations,snap.activity.event_occupancy,snap.content.ideas,snap.content.favorites,snap.activity.announcements,snap.activity.polls,snap.activity.votes])assert.equal(rows.length,1);
   const read=async tx=>{
-   const profiles=(await tx`SELECT issuer, subject, user_id, school_id, role, active FROM fam_user_profiles WHERE school_id = ${school};`)[0];
+   const profiles=(await tx`SELECT issuer, subject, user_id, school_id, role, active, first_name,last_name,class_name,city,avatar_url,person_type,staff_position,staff_verification_status FROM fam_user_profiles WHERE school_id = ${school};`)[0];
    const listings=(await tx`SELECT id,user_id,school_id,image_key,title,description,created_at,is_event,event_date,event_time,event_type,max_seats,category,price_text,photo_status,status FROM fam_listings WHERE id = ${listing.id};`)[0];
    const messages=(await tx`SELECT id,sender_id,receiver_id,school_id,listing_id,body,created_at,is_read FROM fam_messages WHERE listing_id = ${listing.id};`)[0];
    const pendingMessages=(await tx`SELECT id,sender_id,receiver_id,school_id,listing_id,body,created_at FROM fam_pending_messages WHERE listing_id = ${listing.id};`)[0];
@@ -116,7 +120,8 @@ async function run(){
     media:rows.media.map(x=>({...pick(x,['object_key','status','claim_token']),created_at:asIso(x.created_at),claim_until:asIso(x.claim_until)})),
     idea_images:rows.ideaImages.map(x=>({idea_id:x.idea_id,image_index:Number(x.image_index),created_at:asIso(x.created_at)}))
    };
-   const result=verifySyntheticStateAcceptance({source:{snapshot:snap,state:storedState},target:{snapshot:restored,state:actualState},restored:{snapshot:restoredSource,state:actualState}});
+   const actualProfiles=rows.profiles.map(row=>({user_id:row.user_id,first_name:row.first_name??null,last_name:row.last_name??null,class_name:row.class_name??null,city:row.city??null,avatar_url:row.avatar_url??null,person_type:row.person_type,staff_position:row.staff_position??null,staff_verification_status:row.staff_verification_status}));
+   const result=verifySyntheticProfileAcceptance({source:{snapshot:snap,state:storedState,profiles:storedProfiles},target:{snapshot:restored,state:actualState,profiles:actualProfiles},restored:{snapshot:restoredSource,state:actualState,profiles:actualProfiles}});
    assert.equal(result.ok,true,JSON.stringify(result));
    for(const row of rows.profiles){assert.equal(row.issuer,issuer);assert.equal(row.subject,row.user_id);}
   };
@@ -133,8 +138,15 @@ async function run(){
     for(const a of snap.accounts){
      // Reject any cross-school UUID collision even with a different provider key.
      assert.equal((await tx`SELECT user_id FROM fam_user_profiles WHERE user_id = ${a.user_id} LIMIT 1;`)[0].length,0);
-     await tx`INSERT INTO fam_user_profiles (issuer,subject,user_id,school_id,role,active,person_type,staff_verification_status)
-       VALUES (${issuer},${a.user_id},${a.user_id},${a.school_id},${a.role},${a.active},'student','not_required');`;
+     const detail=profileDetails.get(a.user_id);
+     await tx`INSERT INTO fam_user_profiles (issuer,subject,user_id,school_id,role,active,first_name,last_name,class_name,city,avatar_url,person_type,staff_position,staff_verification_status)
+       VALUES (${issuer},${a.user_id},${a.user_id},${a.school_id},${a.role},${a.active},
+         IF(${detail.first_name===null},NULL,${detail.first_name??''}),
+         IF(${detail.last_name===null},NULL,${detail.last_name??''}),
+         IF(${detail.class_name===null},NULL,${detail.class_name??''}),
+         IF(${detail.city===null},NULL,${detail.city??''}),
+         IF(${detail.avatar_url===null},NULL,${detail.avatar_url??''}),
+         ${detail.person_type},IF(${detail.staff_position===null},NULL,${detail.staff_position??''}),${detail.staff_verification_status});`;
     }
     await tx`INSERT INTO fam_listings (id,user_id,school_id,title,description,category,price_text,is_event,event_date,event_time,event_type,max_seats,image_key,photo_status,status,created_at)
       VALUES (${listing.id},${listing.user_id},${school},${payload.title},${payload.description},${listingState.category},${listingState.price_text},${event.is_event},${event.event_date},${event.event_time},${event.event_type},Unwrap(CAST(${event.max_seats} AS Uint32)),${listing.image_key},${listingState.photo_status},${listingState.status},Unwrap(CAST(${payload.created_at} AS Timestamp)));`;
@@ -215,6 +227,13 @@ async function run(){
   assert.equal((await read(sql)).media.length,3);
   await writeFile(firstPath,first.bytes);
   await assertMatch(await read(sql));
+  const staff=storedProfiles.find(row=>row.person_type==='school_staff');
+  await sql`UPDATE fam_user_profiles SET staff_verification_status = 'approved' WHERE issuer = ${issuer} AND subject = ${staff.user_id};`;
+  await assert.rejects(()=>restore(),error=>error?.message==='Transaction failed.'&&error.cause?.code==='ERR_ASSERTION'&&/PROFILE_DETAILS_MISMATCH/.test(error.cause.message));
+  assert.equal((await read(sql)).profiles.find(row=>row.user_id===staff.user_id).staff_verification_status,'approved');
+  await sql`UPDATE fam_user_profiles SET staff_verification_status = ${staff.staff_verification_status} WHERE issuer = ${issuer} AND subject = ${staff.user_id};`;
+  await assertMatch(await read(sql));
+  console.log('YDB_SYNTHETIC_PROFILE_DETAILS_RESTORE_PASS: student, staff, parent, exact nullable fields, staff review replay refusal');
   console.log('YDB_SYNTHETIC_RESTORE_PASS: thirteen actual tables, local file byte reconciliation, missing and corrupt object rejection, atomic DB rollback, replay and moderation conflict refusal');
  }finally{try{if(dir)await rm(dir,{recursive:true,force:true});}finally{await driver.close();}}
 }
