@@ -187,3 +187,28 @@ Filename audit явно выделяет automated image-review queue как о�
 | `20261123220000_fam_qwen_runtime_smoke_dedupe.sql` | Добавляет cooldown key для ручного synthetic runtime smoke. | Точная read-only копия сохранена. Runtime smoke/INSPECTOR workflow не запускает модель в RU при бюджете 0 ₽; перенос signal dedupe не выполнен. |
 
 Актуальный read-only ref `origin/main`: `6e958f65f6d59dcf7ee1711199fb553dd66c794c`, 87 исходных SQL migrations. Реестр содержит точные имена и исторический status, но это не доказательство YDB/RPC parity. Автоматизация Qwen остаётся выключенной до безопасного бесплатного runtime.
+
+## Source delta на 23 ноября 2026
+
+Полный snapshot исходных migration names и blob hashes на `main` `0ee38af542869248c87b95d5124a8c5b866c5bd2` подтверждён локальным inventory verifier: **87 upstream / 87 копий / 87 имён, 0 несовпадений blob**. Четыре новые точные копии находятся в `source-reference/supabase-migrations/`; они только для чтения и не являются YDB-переносом.
+
+| Source migration | Требуемое поведение | Состояние FAM RU |
+|---|---|---|
+| `20261123194000_fam_inspector_bounded_coder_enqueue.sql` | Приватный журнал агрегированных INSPECTOR-сигналов и ограниченная постановка coder задачи с idempotency, допустимыми категориями и недельным окном | **Не перенесено полностью.** RU имеет отдельный агрегированный synthetic coder queue, но private signal table, source RPC contract и полный row-level parity не доказаны. Модель исполнения остаётся выключенной. |
+| `20261123203000_fam_qwen_bounded_failure_retry.sql` | Ограниченный retry Qwen task после подходящей ошибки с исчерпывающим allowlist и лимитами попыток | RU worker/retry path имеет собственные ограниченные автоматические переходы. Эквивалентность точным новым кодам ошибок и source state transitions требует отдельного semantic audit; считать parity непроверенным. |
+| `20261123210000_fam_qwen_retry_scope_and_stale_queue.sql` | Ограничить retry свежими INSPECTOR-задачами, закрывать старые queued задачи и не выполнять устаревшую работу | RU commit `cbc57a90` закрывает безопасные queued задачи старше 7 дней партиями до 50 и ограничивает retry/claim неделей; source migration дополнительно ограничивает область задач/сигналов. Полный parity не подтверждён. |
+| `20261123220000_fam_qwen_runtime_smoke_dedupe.sql` | Дедупликация runtime smoke сигналов на заданном интервале | **Не перенесено.** RU не запускает Qwen smoke runtime и не создаёт соответствующий source signal. |
+
+Проверено вручную: RU `GET /api/v1/listings` требует аутентифицированный профиль и выбирает активные объявления по `school_id`; `GET /api/v1/listings/:id/photo` разрешает одобренное фото только автору либо активному участнику той же школы, с `private, no-store`. Source политики same-school listing/image (`20261121190000`, `20261122012818`) этим покрыты на уровне API-поведения; фактическая облачная IAM/Object Storage policy RU всё ещё требует staging-проверки.
+
+## Дополнение по исходному `main` от 25 ноября 2026
+
+Исходный `main` продвинулся до `3f2f00f9a26be8254b1a2508eb569783461b1c3a`; три новые SQL migration сохранены в `source-reference/supabase-migrations/` для чтения. Текущий verifier проверяет точные имена и blob SHA всего каталога. Наличие копий не означает, что эти политики уже применены к YDB.
+
+| Source migration | RU сопоставление |
+|---|---|
+| `20261124200000_make_fam_avatars_private.sql` | RU фото одобренного аватара выдаётся только владельцу после проверки активного профиля и текущей ссылки; ответ `private, no-store`. Другие ученики не получают фото через прямой URL. В Yandex Object Storage/IAM это отдельно ещё не проверено. |
+| `20261124203000_guard_same_school_message_recipients.sql` | RU уже проверял школу получателя; теперь YDB repository дополнительно требует, чтобы отправитель и получатель были активны в одной школе, а указанный listing принадлежал одному из участников и той же школе. Повторная проверка действует при отправке на модерацию и одобрении. Это приложение к БД, не YDB trigger для произвольных привилегированных записей; доступ Service Account должен быть строго закрыт только backend. |
+| `20261124210000_make_fam_event_images_private.sql` | RU не импортирует архивный Supabase bucket `event-images`: схемы и маршрута доступа к историческим объектам нет. Новые школьные события используют listing media с приватной выдачей и теми же проверками школы. Переноса самих архивных изображений и их владельцев нет. |
+
+Локальные regression tests проверяют блокировку межшкольных участников и сообщения о несвязанном объявлении перед INSERT. Тесты не заменяют российскую облачную проверку IAM, которая не выполняется из-за условия строгого бюджета 0 ₽.
