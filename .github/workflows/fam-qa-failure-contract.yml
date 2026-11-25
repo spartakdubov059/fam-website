@@ -40,7 +40,12 @@ jobs:
           chmod 755 "$FIXTURE_DIR"
           install -m 644 tests/fixtures/fam-qa-failure/enqueue-concurrency.py "$FIXTURE_DIR/"
           install -m 644 tests/fixtures/fam-qa-failure/enqueue-concurrency-proposed.sql "$FIXTURE_DIR/"
+          install -m 644 tests/fixtures/fam-qa-failure/enqueue-concurrency.py "$FIXTURE_DIR/enqueue_concurrency.py"
+          install -m 644 tests/fixtures/fam-qa-failure/mixed-queue.py "$FIXTURE_DIR/"
+          install -m 644 tests/fixtures/fam-qa-failure/producer-baseline.sql "$FIXTURE_DIR/"
+          install -m 644 tests/fixtures/fam-qa-failure/claim-producer-proposed.sql "$FIXTURE_DIR/"
           sudo -u postgres python3 "$FIXTURE_DIR/enqueue-concurrency.py"
+          sudo -u postgres python3 "$FIXTURE_DIR/mixed-queue.py"
       - name: Remove fixture database
         if: always()
         run: sudo -u postgres dropdb --if-exists fam_qa_failure_fixture
