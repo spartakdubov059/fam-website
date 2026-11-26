@@ -2,6 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runIsolatedAgentGovernanceRehearsal } from './fam-agent-governance-rehearsal.mjs';
 
+const sha = 'a'.repeat(64);
+const observed = '2026-11-27T00:00:00.000Z';
+const qaEvidence = passed => ({
+  passed,
+  tests_run: 788,
+  production_access: false,
+  test_digest: sha,
+  output_sha256: sha,
+  observed_at: observed,
+});
+const patchEvidence = scope => ({
+  approved_scope: scope,
+  has_patch: true,
+  synthetic_only: true,
+  patch_digest: sha,
+  production_access: false,
+});
+
 test('isolated full governance pipeline connects inspector developer QA arbiter integrator recruiter', () => {
   const result = runIsolatedAgentGovernanceRehearsal({
     pulls: [
@@ -10,8 +28,8 @@ test('isolated full governance pipeline connects inspector developer QA arbiter 
     ],
     queue: { failed_last_24h: 4, expired_leases: 1 },
     warnings: [{ code: 'repeated_failures', severity: 'high', count: 3 }],
-    developerPatch: { approved_scope: ['ru-migration/app/backend/server.mjs'], has_patch: true, synthetic_only: true },
-    qaResult: { passed: true, tests_run: 788, production_access: false },
+    developerPatch: patchEvidence(['ru-migration/app/backend/server.mjs']),
+    qaResult: qaEvidence(true),
   });
   assert.equal(result.ok, true);
   assert.deepEqual(result.stages.map(stage => stage.role),
@@ -28,11 +46,11 @@ test('isolated pipeline stops patch release when QA or scope is invalid', () => 
     pulls: [{ number: 167, draft: false, files: ['ru-migration/app/backend/server.mjs'] }],
     queue: { failed_last_24h: 0, expired_leases: 0 },
     warnings: [],
-    developerPatch: { approved_scope: ['ru-migration/app/backend/server.mjs'], has_patch: true, synthetic_only: true },
-    qaResult: { passed: true, tests_run: 32, production_access: false },
+    developerPatch: patchEvidence(['ru-migration/app/backend/server.mjs']),
+    qaResult: qaEvidence(true),
   };
-  const failedQa = { ...base, qaResult: { passed: false, tests_run: 32, production_access: false } };
+  const failedQa = { ...base, qaResult: qaEvidence(false) };
   assert.equal(runIsolatedAgentGovernanceRehearsal(failedQa).code, 'QA_GATE_NOT_PASSED');
-  const scope = { ...base, developerPatch: { approved_scope: ['supabase/functions/moderate/index.ts'], has_patch: true, synthetic_only: true } };
+  const scope = { ...base, developerPatch: patchEvidence(['supabase/functions/moderate/index.ts']) };
   assert.equal(runIsolatedAgentGovernanceRehearsal(scope).code, 'DEVELOPER_SCOPE_VIOLATION');
 });

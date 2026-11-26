@@ -1,6 +1,26 @@
 import {
   runIsolatedAgentGovernanceRehearsal,
 } from './fam-agent-governance-rehearsal.mjs';
+import { executeAgentQaEvidence, executeDeveloperPatchEvidence } from './fam-agent-execution-evidence.mjs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const cwd = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+const qa = executeAgentQaEvidence({
+  cwd,
+  testFiles: [
+    'ru-migration/compat/fam-agent-team-governance.test.mjs',
+    'ru-migration/compat/fam-agent-governance-rehearsal.test.mjs',
+  ],
+});
+const developer = executeDeveloperPatchEvidence({
+  cwd,
+  approvedScope: [
+    'ru-migration/app/backend/server.mjs',
+    'ru-migration/app/backend/repositories/ydb-agent-task-queue.mjs',
+  ],
+});
 
 const rehearsal = runIsolatedAgentGovernanceRehearsal({
   pulls: [
@@ -12,15 +32,19 @@ const rehearsal = runIsolatedAgentGovernanceRehearsal({
   ],
   queue: { failed_last_24h: 0, expired_leases: 0 },
   warnings: [],
-  developerPatch: {
-    approved_scope: [
-      'ru-migration/app/backend/server.mjs',
-      'ru-migration/app/backend/repositories/ydb-agent-task-queue.mjs',
-    ],
-    has_patch: true,
-    synthetic_only: true,
-  },
-  qaResult: { passed: true, tests_run: 788, production_access: false },
+  developerPatch: developer.ok
+    ? {
+        approved_scope: developer.approved_scope,
+        has_patch: developer.has_patch,
+        synthetic_only: true,
+        patch_digest: developer.patch_digest,
+        production_access: false,
+      }
+    : { approved_scope: [], has_patch: false, synthetic_only: true, patch_digest: '0'.repeat(64), production_access: false },
+  qaResult: qa.ok
+    ? { passed: true, tests_run: qa.tests_run, production_access: false, test_digest: qa.test_digest,
+        output_sha256: qa.output_sha256, observed_at: qa.observed_at }
+    : { passed: false, tests_run: qa.tests_run || 0, production_access: false },
 });
 
 if (!rehearsal.ok) {

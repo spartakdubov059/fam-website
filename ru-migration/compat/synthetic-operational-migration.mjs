@@ -42,6 +42,29 @@ function validateRows(section, rows) {
     for (const field of ['created_at', 'expires_at']) {
       if (Object.hasOwn(row, field) && !validTimestamp(row[field])) return false;
     }
+    if (section === 'notifications') {
+      if (typeof row.read !== 'boolean' || !['message', 'listing', 'release', 'deletion', 'role'].includes(row.kind)) return false;
+    }
+    if (section === 'suspensions') {
+      if (typeof row.active !== 'boolean'
+          || typeof row.reason_code !== 'string'
+          || row.reason_code.length < 3
+          || row.reason_code.length > 100) return false;
+    }
+    if (section === 'deletion_requests') {
+      if (!['pending', 'reviewing', 'approved', 'rejected', 'cancelled'].includes(row.status)) return false;
+    }
+    if (section === 'role_requests') {
+      if (!['student', 'council_member', 'school_admin'].includes(row.role)
+          || !['pending', 'reviewing', 'approved', 'rejected', 'cancelled'].includes(row.status)) return false;
+    }
+    if (section === 'admin_audit') {
+      if (!['grant_role', 'revoke_role', 'approve_request', 'reject_request', 'issue_suspension', 'lift_suspension'].includes(row.action)) return false;
+    }
+    if (section === 'safety_incidents') {
+      if (!['low', 'medium', 'high', 'critical'].includes(row.level)
+          || typeof row.category !== 'string' || row.category.length < 3 || row.category.length > 100) return false;
+    }
   }
   return true;
 }
@@ -63,7 +86,18 @@ export function verifySyntheticOperationalSnapshot(snapshot) {
       return { ok: false, code: 'INVALID_OPERATIONAL_SECTION', table: section, live_cutover_authorized: false };
     }
   }
-  if (Object.hasOwn(snapshot, 'inventory_digest') && typeof snapshot.inventory_digest !== 'string') {
+  const schoolIds = new Set();
+  for (const section of Object.keys(sections)) {
+    for (const row of snapshot[section]) {
+      if (Object.hasOwn(row, 'school_id')) schoolIds.add(row.school_id);
+    }
+  }
+  if (schoolIds.size !== 1) {
+    return { ok: false, code: 'OPERATIONAL_SCHOOL_SCOPE_MISMATCH', live_cutover_authorized: false };
+  }
+  if (Object.hasOwn(snapshot, 'inventory_digest')
+      && (!/^synthetic:/.test(snapshot.inventory_digest)
+        && !/^[a-f0-9]{64}$/.test(snapshot.inventory_digest))) {
     return { ok: false, code: 'INVALID_OPERATIONAL_DIGEST', live_cutover_authorized: false };
   }
   return { ok: true, code: 'SYNTHETIC_OPERATIONAL_SNAPSHOT_PASS', live_cutover_authorized: false };

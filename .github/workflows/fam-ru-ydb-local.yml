@@ -148,6 +148,10 @@ jobs:
         run: node ru-migration/compat/integration-synthetic-avatar-restore.mjs
       - name: Rehearse infrastructure inspector signal lifecycle
         run: node ru-migration/compat/integration-synthetic-inspector.mjs
+      - name: Rehearse remaining operational table restoration
+        run: node ru-migration/compat/integration-synthetic-operational-restore.mjs
+      - name: Rehearse remaining operational table restoration
+        run: node ru-migration/compat/integration-synthetic-operational-restore.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true

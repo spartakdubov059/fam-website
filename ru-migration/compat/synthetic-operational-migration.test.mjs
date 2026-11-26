@@ -10,7 +10,6 @@ function fixture() {
   const expires = '2026-11-25T12:00:00.000Z';
   return {
     snapshot_id: 'synthetic-operational-1',
-    inventory_digest: 'synthetic',
     notifications: [{ notification_id: 'synthetic-notification-1', user_id: 'synthetic-user-1', school_id: 'synthetic-school-1', kind: 'message', read: false, created_at: created }],
     suspensions: [{ suspension_id: 'synthetic-suspension-1', user_id: 'synthetic-user-1', school_id: 'synthetic-school-1', active: true, reason_code: 'synthetic-rule', expires_at: expires }],
     deletion_requests: [{ request_id: 'synthetic-deletion-1', user_id: 'synthetic-user-1', school_id: 'synthetic-school-1', status: 'pending', created_at: created }],
