@@ -1,0 +1,5 @@
+# Operational reconciliation safety follow-up — 2026-11-27
+
+The prior disposable YDB run 45898999859 passed the existing 13-table, avatar and INSPECTOR rehearsals, then failed the new operational rollback assertion: original notification key synthetic-notification-1 was compared with synthetic:notification:1. The transaction had rolled back. Parallel commit 5a7b49c corrected the notification read-marker handling and expectation; that change is preserved unchanged.
+
+This commit restricts the offline operational format to reserved synthetic identifiers instead of arbitrary UUIDs, limits reason/category/entity values to synthetic tokens, refuses caller-supplied unverified inventory claims, checks duplicate IDs by the declared primary field and canonicalizes field/row order for reconciliation. Eight new regression tests. This is a deliberately restricted one-school synthetic format; synthetic prefixes do not prove real anonymization. No real personal data, cloud, production access, deletion or retention changes. CI required.

@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SYNTHETIC_ID = /^synthetic-[a-z0-9-]{3,100}$/i;
 const TS = /^2026-11-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -30,15 +29,15 @@ function validateRows(section, rows) {
   const keys = new Set();
   for (const row of rows) {
     if (!exact(row, fields)) return false;
-    const key = row[Object.keys(row)[0]];
-    if (!SYNTHETIC_ID.test(key) && !UUID.test(key)) return false;
+    const key = row[fields[0]];
+    if (typeof key !== 'string' || !SYNTHETIC_ID.test(key)) return false;
     if (keys.has(key)) return false;
     keys.add(key);
     if (!Object.entries(row).every(([, value]) => typeof value === 'string' || typeof value === 'boolean')) return false;
-    if (Object.hasOwn(row, 'school_id') && !SYNTHETIC_ID.test(row.school_id) && !UUID.test(row.school_id)) return false;
-    if (Object.hasOwn(row, 'user_id') && !SYNTHETIC_ID.test(row.user_id) && !UUID.test(row.user_id)) return false;
-    if (Object.hasOwn(row, 'actor_id') && !SYNTHETIC_ID.test(row.actor_id) && !UUID.test(row.actor_id)) return false;
-    if (Object.hasOwn(row, 'entity_id') && typeof row.entity_id !== 'string') return false;
+    if (Object.hasOwn(row, 'school_id') && (typeof row.school_id !== 'string' || !SYNTHETIC_ID.test(row.school_id))) return false;
+    if (Object.hasOwn(row, 'user_id') && (typeof row.user_id !== 'string' || !SYNTHETIC_ID.test(row.user_id))) return false;
+    if (Object.hasOwn(row, 'actor_id') && (typeof row.actor_id !== 'string' || !SYNTHETIC_ID.test(row.actor_id))) return false;
+    if (Object.hasOwn(row, 'entity_id') && (typeof row.entity_id !== 'string' || !SYNTHETIC_ID.test(row.entity_id))) return false;
     for (const field of ['created_at', 'expires_at']) {
       if (Object.hasOwn(row, field) && !validTimestamp(row[field])) return false;
     }
@@ -48,8 +47,7 @@ function validateRows(section, rows) {
     if (section === 'suspensions') {
       if (typeof row.active !== 'boolean'
           || typeof row.reason_code !== 'string'
-          || row.reason_code.length < 3
-          || row.reason_code.length > 100) return false;
+          || !SYNTHETIC_ID.test(row.reason_code)) return false;
     }
     if (section === 'deletion_requests') {
       if (!['pending', 'reviewing', 'approved', 'rejected', 'cancelled'].includes(row.status)) return false;
@@ -63,7 +61,7 @@ function validateRows(section, rows) {
     }
     if (section === 'safety_incidents') {
       if (!['low', 'medium', 'high', 'critical'].includes(row.level)
-          || typeof row.category !== 'string' || row.category.length < 3 || row.category.length > 100) return false;
+          || typeof row.category !== 'string' || !SYNTHETIC_ID.test(row.category)) return false;
     }
   }
   return true;
@@ -71,13 +69,13 @@ function validateRows(section, rows) {
 
 export function verifySyntheticOperationalSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
-      || (Object.keys(snapshot).length !== 7 && Object.keys(snapshot).length !== 8)
+      || Object.keys(snapshot).length !== 7
       || !Object.hasOwn(snapshot, 'snapshot_id')
       || typeof snapshot.snapshot_id !== 'string'
       || !/^synthetic-[a-z0-9-]{3,64}$/i.test(snapshot.snapshot_id)) {
     return { ok: false, code: 'INVALID_OPERATIONAL_SNAPSHOT', live_cutover_authorized: false };
   }
-  const allowed = new Set(['snapshot_id', 'inventory_digest', ...Object.keys(sections)]);
+  const allowed = new Set(['snapshot_id', ...Object.keys(sections)]);
   if (Object.keys(snapshot).some(key => !allowed.has(key))) {
     return { ok: false, code: 'INVALID_OPERATIONAL_SNAPSHOT', live_cutover_authorized: false };
   }
@@ -95,12 +93,13 @@ export function verifySyntheticOperationalSnapshot(snapshot) {
   if (schoolIds.size !== 1) {
     return { ok: false, code: 'OPERATIONAL_SCHOOL_SCOPE_MISMATCH', live_cutover_authorized: false };
   }
-  if (Object.hasOwn(snapshot, 'inventory_digest')
-      && (!/^synthetic:/.test(snapshot.inventory_digest)
-        && !/^[a-f0-9]{64}$/.test(snapshot.inventory_digest))) {
-    return { ok: false, code: 'INVALID_OPERATIONAL_DIGEST', live_cutover_authorized: false };
-  }
   return { ok: true, code: 'SYNTHETIC_OPERATIONAL_SNAPSHOT_PASS', live_cutover_authorized: false };
+}
+
+function canonicalRows(section,rows) {
+  const fields=sections[section];
+  return rows.map(row=>Object.fromEntries(fields.map(field=>[field,row[field]])))
+    .sort((a,b)=>a[fields[0]]<b[fields[0]]?-1:a[fields[0]]>b[fields[0]]?1:0);
 }
 
 export function compareSyntheticOperationalSnapshots(source, target, restored) {
@@ -112,22 +111,14 @@ export function compareSyntheticOperationalSnapshots(source, target, restored) {
     return { ok: false, code: 'SNAPSHOT_ID_MISMATCH', stage: 'operational', live_cutover_authorized: false };
   }
   for (const section of Object.keys(sections)) {
-    const canonical = rows => JSON.stringify(rows.slice().sort((a, b) =>
-      JSON.stringify(a).localeCompare(JSON.stringify(b))));
+    const canonical = rows => JSON.stringify(canonicalRows(section, rows));
     if (canonical(source[section]) !== canonical(target[section])
         || canonical(source[section]) !== canonical(restored[section])) {
       return { ok: false, code: 'OPERATIONAL_STATE_MISMATCH', table: section, live_cutover_authorized: false };
     }
   }
-  const digest = createHash('sha256').update(JSON.stringify({
-    snapshot_id: source.snapshot_id,
-    notifications: source.notifications,
-    suspensions: source.suspensions,
-    deletion_requests: source.deletion_requests,
-    role_requests: source.role_requests,
-    admin_audit: source.admin_audit,
-    safety_incidents: source.safety_incidents,
-  })).digest('hex');
+  const canonicalSource={snapshot_id:source.snapshot_id,...Object.fromEntries(Object.keys(sections).map(section=>[section,canonicalRows(section,source[section])]))};
+  const digest=createHash('sha256').update(JSON.stringify(canonicalSource)).digest('hex');
   return {
     ok: true,
     code: 'SYNTHETIC_OPERATIONAL_RECONCILIATION_PASS',
