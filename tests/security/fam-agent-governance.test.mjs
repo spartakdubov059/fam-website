@@ -10,7 +10,13 @@ import {
   summarizeQwenRuns,
   summarizeAgentQueue,
   inspectPostMerge,
+  handoffInspectorSignal,
+  collectPullFiles,
+  syncReportIssue,
 } from "../../scripts/fam-agent-governance.mjs";
+
+import { buildIntegrationPlan } from "../../scripts/fam-integration-coordinator.mjs";
+import { inspectQueueHealth, mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -148,4 +154,93 @@ test("INSPECTOR flags failed post-merge workflows without triggering rollback", 
   assert.deepEqual(inspectPostMerge({ runs: [{ conclusion: "success", event: "push", created_at: earlier(1) }], now: NOW }), []);
   assert.equal(typeof summarizeQwenRuns, "function");
   assert.equal(typeof summarizeAgentQueue, "function");
+});
+
+test("synthetic control tower cooperates: ARBITER, INSPECTOR, INTEGRATOR, RECRUITER and bounded Qwen handoff", async () => {
+  const pulls = [1,2,3].map(number => ({ number, draft: false, updated_at: earlier(0), files:["scripts/fam-agent-governance.mjs"] }));
+  const disputes = findDisputes(pulls);
+  assert.equal(disputes.length,3);
+  const plan = buildIntegrationPlan({ pulls, disputes });
+  assert.deepEqual(plan.groups[0].prs,[1,2,3]);
+  assert.equal(plan.groups[0].highRisk,true);
+  const runs = [1,2,3].map(id => ({id,created_at:earlier(id),status:"completed",conclusion:"failure"}));
+  const warnings = [...inspectAgents({pulls,coderRuns:runs,now:NOW}), ...inspectQueueHealth({
+    queued:0,claimed:0,in_progress:0,failed_last_24h:0,expired_leases:0,oldest_queued_minutes:0
+  })];
+  const roles = proposeRecruitment({disputes,warnings,activeRoles:["integration_specialist"]});
+  assert.deepEqual(roles.map(role=>role.key),["coder_diagnostician"]);
+  assert.deepEqual(proposeRecruitment({disputes,warnings,activeRoles:["integration_specialist","coder_diagnostician"]}),[]);
+  const signal = warnings.map(mapInspectorWarning).find(Boolean);
+  assert.deepEqual(signal,{signal_code:"qwen_repeated_failure",occurrences:3});
+  let enqueues=0,dispatches=0;
+  const enqueue = async candidate => {
+    assert.deepEqual(candidate,signal);
+    return {task_created:++enqueues===1,reason:enqueues===1?"created":"duplicate_signal"};
+  };
+  const dispatch=async()=>{dispatches++};
+  assert.equal((await handoffInspectorSignal({signal,enqueue,dispatch})).state,"dispatch_accepted");
+  assert.equal((await handoffInspectorSignal({signal,enqueue,dispatch})).state,"not_created");
+  assert.equal(dispatches,1);
+  const report=makeReport({disputes,warnings,proposals:roles,integrationPlan:plan,count:pulls.length,now:NOW});
+  for(const role of ["ARBITER","INSPECTOR","INTEGRATOR","RECRUITER"]) assert.ok(report.includes(role));
+  assert.match(report,/одобрения владельца/);
+});
+
+test("handoff errors do not retry uncertain operations or report execution success", async () => {
+  const signal={signal_code:"qwen_repeated_failure",occurrences:3};
+  let enqueues=0,dispatches=0;
+  const dispatch=async()=>{dispatches++;throw Error("synthetic transport failure")};
+  const enqueue=async()=>{enqueues++;return {task_created:true,reason:"created"}};
+  assert.deepEqual(await handoffInspectorSignal({signal,enqueue,dispatch}),{state:"dispatch_unconfirmed",taskCreated:true,reason:"created"});
+  assert.equal(enqueues,1);
+  assert.equal(dispatches,1);
+  const failed=await handoffInspectorSignal({signal,enqueue:async()=>{throw Error("synthetic enqueue failure")},dispatch});
+  assert.deepEqual(failed,{state:"enqueue_unconfirmed",taskCreated:null});
+  assert.equal(dispatches,1);
+  assert.equal((await handoffInspectorSignal({signal:null,enqueue,dispatch})).state,"no_signal");
+  assert.equal(enqueues,1);
+});
+
+test("invalid and future dates never fabricate stuck, stale or repeated-failure signals", () => {
+  const future = new Date(NOW + 86400000).toISOString();
+  const warnings = inspectAgents({now:NOW, pulls:[{number:1,draft:false,updated_at:null}],
+    coderRuns:[{status:"in_progress"},{conclusion:"failure",created_at:future},
+      {conclusion:"failure",created_at:future},{conclusion:"failure",created_at:future}]});
+  assert.deepEqual(warnings.map(w=>w.code),["metadata_time_unconfirmed"]);
+  assert.equal(mapInspectorWarning(warnings[0]),null);
+  assert.deepEqual(inspectPostMerge({now:NOW,runs:[{event:"push",conclusion:"failure",created_at:future}]}),[]);
+});
+
+test("healthy report refreshes existing trusted bot issue without creating new issues", async () => {
+  const report = REPORT_MARKER + "\nHealthy fixture";
+  const trusted = {number:7,user:{login:"github-actions[bot]"},title:"FAM: контроль конфликтов, работоспособности и найма агентов",body:REPORT_MARKER+"\nOld report"};
+  const calls=[];
+  const result=await syncReportIssue({report, request:async(path,options)=>{
+    calls.push({path,options});return options ? {} : [trusted];
+  }});
+  assert.equal(result,"Обновлена задача #7");
+  assert.equal(calls.length,2);
+  assert.equal(calls[1].path,"/issues/7");
+  assert.equal(calls[1].options.method,"PATCH");
+  assert.deepEqual(JSON.parse(calls[1].options.body),{body:report});
+  let writes=0;
+  const empty=await syncReportIssue({report,request:async(path,opts)=>{if(opts) writes++;return []}});
+  assert.match(empty,/не создаётся/);
+  assert.equal(writes,0);
+});
+test("report synchronization refuses ambiguous, non-bot or incomplete issue evidence", async () => {
+  const trusted={number:7,user:{login:"github-actions[bot]"},title:"FAM: контроль конфликтов, работоспособности и найма агентов",body:REPORT_MARKER+"\nOld report"};
+  for (const items of [[{...trusted,user:{login:"owner"}}],[trusted,{...trusted,number:8}],Array(100).fill({body:"unrelated"}),[{...trusted,title:"other"}]]) {
+    let writes=0;
+    await assert.rejects(syncReportIssue({report:REPORT_MARKER+"\nNew",allowCreate:true,request:async(path,opts)=>{if(opts) writes++;return items}}));
+    assert.equal(writes,0);
+  }
+});
+test("PR file fetch failures or partial results cannot be interpreted as no conflicts", async () => {
+  const pr={number:9,changed_files:2};
+  for (const response of [[{filename:"a.js"}], [{filename:"a.js"},{}],null]) {
+    assert.equal((await collectPullFiles(pr,async()=>response)).files,null);
+  }
+  assert.equal((await collectPullFiles(pr,async()=>{throw Error("fixture")})).files,null);
+  assert.deepEqual((await collectPullFiles(pr,async()=>[{filename:"a.js"},{filename:"b.js"}])).files,["a.js","b.js"]);
 });

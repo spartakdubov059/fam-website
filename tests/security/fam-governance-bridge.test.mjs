@@ -147,8 +147,9 @@ test("server queue uses dedup, seven-day cooldown, two attempts and no raw logs"
   assert.match(workflow, /actions: write/);
   assert.match(governanceScript, /GITHUB_EVENT_NAME === "workflow_dispatch"/);
   assert.match(governanceScript, /enqueueInspectorTask\(/);
-  assert.match(governanceScript, /if \(result\.task_created\)[\s\S]*?actions\/workflows\/fam-codex-developer\.yml\/dispatches/);
-  assert.doesNotMatch(governanceScript, /if \(result\.task_created\)[\s\S]*?gh pr merge/);
+  assert.match(governanceScript, /if \(!result\.task_created\) return[\s\S]*?await dispatch\(\)/);
+  assert.match(governanceScript, /dispatch: \(\) => api\("\/actions\/workflows\/fam-codex-developer\.yml\/dispatches"/);
+  assert.doesNotMatch(governanceScript, /gh pr merge/);
 });
 
 test("INSPECTOR differentiates healthy, failed and stalled aggregate queue", () => {

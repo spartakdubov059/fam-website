@@ -29,7 +29,7 @@ test("metrics distinguish no-task, analysis, generation, independent QA and PR",
   const base = { status: "success", run_minutes: 14, created_at: "2026-11-23T00:00:00Z", updated_at: "2026-11-23T00:15:00Z" };
   const runs = summarizeQwenRuns([
     { ...base, id: 1, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Проверить настройки затрат до сборки модели", conclusion: "success" }, { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" }] }] },
-    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", conclusion: "success" }] },
+    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "success" }] },
   ]);
   assert.equal(runs.no_task, 1);
   assert.equal(runs.model_generated, 1);
@@ -58,3 +58,39 @@ test("expired Qwen leases retry only within attempt limit and clear stale lifecy
   assert.doesNotMatch(recovery, /delete from private\.fam_agent_tasks/i);
 });
 
+
+test("incomplete and failed job evidence is not counted as confirmed no-patch or QA", () => {
+  const gen = {name:"Локальная модель готовит исправление",status:"completed",conclusion:"success",steps:[{name:"Запустить локальную модель и подготовить patch",conclusion:"success"}]};
+  const qa = {name:"Независимая проверка без модели и секретов",status:"completed",conclusion:"success"};
+  const pr = {name:"Подготовить PR и проверить исправление без публикации",status:"completed",conclusion:"success"};
+  const metrics = summarizeQwenRuns([
+    {jobs:[gen]},
+    {jobs:[gen,{...qa,conclusion:"skipped"}]},
+    {jobs:[{...gen,conclusion:"failure"},{...qa,conclusion:"skipped"}]},
+    {jobs:[gen,{...qa,status:"queued",conclusion:null}]},
+    {jobs:[gen,qa,pr]},
+    {jobs:[gen,{...qa,conclusion:"failure"},pr]},
+  ]);
+  assert.equal(metrics.model_no_patch,1);
+  assert.equal(metrics.model_result_unconfirmed,3);
+  assert.equal(metrics.model_generated,2);
+  assert.equal(metrics.qa_passed,1);
+  assert.equal(metrics.pr_created,1);
+});
+
+test("runner estimates exclude invalid dates, queued and skipped jobs; p95 uses completed jobs", () => {
+  const base = {name:"Локальная модель готовит исправление",status:"completed",conclusion:"success",
+    started_at:"2026-11-23T00:00:00Z",completed_at:"2026-11-23T00:04:00Z"};
+  const stats = summarizeQwenRuns([
+    {jobs:[base,{...base,name:"QA",started_at:null},{...base,name:"PR",status:"queued"},
+      {...base,name:"skip",conclusion:"skipped"}]},
+    {jobs:[{...base,started_at:"invalid"}]},
+    {jobs:[{...base,completed_at:"2026-11-22T00:00:00Z"}]},
+  ]);
+  assert.equal(stats.estimated_runner_minutes,4);
+  assert.equal(stats.timed_jobs,1);
+  assert.equal(stats.untimed_jobs,4);
+  assert.equal(stats.p95_duration_minutes,4);
+  assert.equal(summarizeQwenRuns([{jobs:[{...base,status:"in_progress"}]}]).p95_duration_minutes,null);
+  assert.match(makeReport({qwenMetrics:summarizeQwenRuns([])}),/p95 длительности не подтверждён/);
+});

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 const workflow = readFileSync(
   new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url),
@@ -265,4 +266,74 @@ test("GitHub approval output uses one validated writer and protects PR creation"
   assert.match(validator, /appendFileSync\(/);
   assert.match(validator, /"requires_approval=" \+ String\(result\.requires_approval\) \+ "\\n"/);
   assert.match(workflow, /gh pr create --draft/);
+});
+
+test("Qwen cache includes runtime libraries and rejects incomplete cache hits", () => {
+  assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/llama\.cpp\/build\/bin\n\s+key: [^\n]+-v2-runtime/);
+  assert.match(workflow, /id: llama-runtime-cache/);
+  assert.match(workflow, /dependencies="\$\(ldd "\$SERVER" 2>&1\)" && ! grep -q 'not found'/);
+  assert.match(workflow, /steps\.llama-runtime-cache\.outputs\.usable != 'true'/);
+  assert.match(workflow, /rm -rf -- "\$RUNNER_TEMP\/llama\.cpp"\n\s+git clone/);
+  const isolatedSmoke = workflow.indexOf('"$INFERENCE_SERVER" --version');
+  assert.ok(isolatedSmoke > workflow.indexOf('done < <(ldd "$SERVER" | awk'));
+  assert.ok(isolatedSmoke < workflow.indexOf('"$INFERENCE_SERVER" -m "$INFERENCE_MODEL"'));
+});
+
+test("untrusted QA never receives bridge credentials, including after failed checks", () => {
+  const qa = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
+  const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
+  const pr = workflow.split("  prepare_review:\n")[1]?.split("  record_pr:\n")[0] || "";
+  const final = workflow.split("  record_pr:\n")[1] || "";
+  assert.ok(qa && record && pr && final);
+  assert.doesNotMatch(qa, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
+  assert.doesNotMatch(pr, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs (advance|heartbeat)/);
+  assert.match(record, /needs\.verify\.result == 'success'/);
+  assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(record, /success\) export FAM_RESULT_STAGE=qa_passed/);
+  assert.match(record, /failure\) export FAM_RESULT_STAGE=qa_failed/);
+  assert.match(record, /always\(\) && !cancelled\(\)/);
+  assert.match(record, /needs\.generate\.result == 'success'/);
+  assert.match(record, /needs\.verify\.result == 'failure'/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(final, /export FAM_RESULT_STAGE=pr_created/);
+  assert.match(final, /export FAM_RESULT_STAGE=qa_failed/);
+  assert.doesNotMatch(record + final, /download-artifact|git apply|node --test/);
+  assert.equal((workflow.match(/export FAM_RESULT_STAGE=qa_passed/g) || []).length, 1);
+});
+test("PR creation validates staged changes independently, including new files", () => {
+  const qa = workflow.split("  verify:\n")[1].split("  record_qa:\n")[0];
+  const pr = workflow.split("  prepare_review:\n")[1].split("  record_pr:\n")[0];
+  for (const block of [qa, pr]) {
+    assert.match(block, /git apply --index/);
+    assert.match(block, /git diff --cached --name-only -z HEAD/);
+  }
+  assert.match(pr, /node scripts\/validate-local-agent-patch\.mjs/);
+  assert.match(pr, /git diff --cached --raw --no-renames/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
+});
+
+test("actual trusted QA recording shell maps only final success and failure to one bridge call", () => {
+  const record = workflow.split("  record_qa:\n")[1].split("  prepare_review:\n")[0];
+  const marker = "        run: |\n";
+  assert.equal(record.split(marker).length, 2);
+  const shell = record.split(marker)[1].split("\n").filter(line => line.trim()).map(line => {
+    assert.ok(line.startsWith("          "));
+    return line.slice(10);
+  }).join("\n");
+  // Replace node only in this synthetic shell; no network, credentials or database.
+  const stub = 'node() { test "$#" -eq 2 && test "$1" = "scripts/fam-agent-bridge.mjs" && test "$2" = "advance" && printf "%s\\n" "$FAM_RESULT_STAGE"; }\n';
+  for (const [qa, expected] of [["success", "qa_passed"], ["failure", "qa_failed"]]) {
+    const result = spawnSync("bash", ["-c", stub + shell], { env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), expected);
+  }
+  for (const qa of ["cancelled", "skipped", "", "unknown"]) {
+    const result = spawnSync("bash", ["-c", stub + shell], { env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+  }
 });

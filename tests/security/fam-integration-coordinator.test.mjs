@@ -100,3 +100,8 @@ test("INTEGRATOR appears in the existing single governance issue report", () => 
   assert.match(report, /## INSPECTOR/);
   assert.match(report, /защищённых файлов/);
 });
+
+test("empty integration report preserves the incomplete-evidence warning", () => {
+  const plan = buildIntegrationPlan({pulls:[{number:1,files:null}],limited:true});
+  assert.match(formatIntegrationPlan(plan),/Выборка PR или списков файлов неполная/);
+});
