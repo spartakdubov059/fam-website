@@ -402,6 +402,12 @@ test('isolated server routes private image uploads only to the configured media 
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), { ok: false, error: 'media_unavailable' });
   });
+  const paths = [];
+  await withServer({ mediaApi: async request => { paths.push(`${request.method} ${request.url}`); return { status: 201, body: { ok: true } }; } }, async origin => {
+    const response = await fetch(new URL('/api/v1/avatars/media/pending', origin), { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'synthetic-image' });
+    assert.equal(response.status, 201);
+    assert.deepEqual(paths, ['POST /api/v1/avatars/media/pending']);
+  });
 });
 
 test('isolated server sends photo bytes with verified image headers instead of JSON serialization', async () => {

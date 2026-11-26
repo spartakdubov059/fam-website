@@ -1053,7 +1053,11 @@ test('message repository verifies same-school active recipient before inserting 
   const sql = (strings, ...values) => {
     const query = { text: strings.join('?'), values };
     calls.push(query);
-    if (query.text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
+    if (query.text.includes('FROM fam_user_profiles')) return Promise.resolve([[
+      { user_id: 'sender-id', school_id: 'school-id', active: true },
+      { user_id: 'recipient-id', school_id: 'school-id', active: true },
+    ]]);
+    if (query.text.includes('FROM fam_listings')) return Promise.resolve([[{ user_id: 'recipient-id', school_id: 'school-id' }]]);
     return Promise.resolve([[]]);
   };
   sql.begin = callback => callback(sql);
@@ -1081,6 +1085,43 @@ test('message repository verifies same-school active recipient before inserting 
   assert.equal(inserts, 0);
 });
 
+test('message repository blocks cross-school participants and listings unrelated to the chat', async () => {
+  const inserts = [];
+  const sql = (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('SELECT user_id, school_id, active FROM fam_user_profiles')) return Promise.resolve([[
+      { user_id: 'sender-id', school_id: 'school-a', active: true },
+      { user_id: 'recipient-id', school_id: 'school-b', active: true },
+    ]]);
+    if (text.includes('SELECT user_id, school_id FROM fam_listings')) return Promise.resolve([[{ user_id: 'other-id', school_id: 'school-a' }]]);
+    if (text.includes('INSERT INTO fam_messages') || text.includes('INSERT INTO fam_pending_messages')) inserts.push({ text, values });
+    return Promise.resolve([[]]);
+  };
+  sql.begin = callback => callback(sql);
+  const repository = createYdbListingsRepository(sql);
+  const mismatchedSchool = { sender_id: 'sender-id', receiver_id: 'recipient-id', school_id: 'school-a', body: 'synthetic' };
+  assert.deepEqual(await repository.createMessage(mismatchedSchool), { ok: false, code: 'recipient_unavailable' });
+  await assert.rejects(repository.createPendingMessage(mismatchedSchool), error => error.code === 'recipient_unavailable');
+  assert.equal(inserts.length, 0, 'a cross-school recipient is rejected before either message table is written');
+
+  const participants = [
+    { user_id: 'sender-id', school_id: 'school-a', active: true },
+    { user_id: 'recipient-id', school_id: 'school-a', active: true },
+  ];
+  const unrelatedListingSql = (strings, ...values) => {
+    const text = strings.join('?');
+    if (text.includes('SELECT user_id, school_id, active FROM fam_user_profiles')) return Promise.resolve([participants]);
+    if (text.includes('SELECT user_id, school_id FROM fam_listings')) return Promise.resolve([[{ user_id: 'other-id', school_id: 'school-a' }]]);
+    if (text.includes('INSERT INTO fam_messages')) inserts.push({ text, values });
+    return Promise.resolve([[]]);
+  };
+  unrelatedListingSql.begin = callback => callback(unrelatedListingSql);
+  const unrelatedListingRepository = createYdbListingsRepository(unrelatedListingSql);
+  assert.deepEqual(await unrelatedListingRepository.createMessage({ ...mismatchedSchool,
+    receiver_id: 'recipient-id', listing_id: 'unrelated-listing' }), { ok: false, code: 'recipient_unavailable' });
+  assert.equal(inserts.length, 0, 'a listing outside the sender/recipient pair is rejected before insert');
+});
+
 test('directly delivered messages enforce a rolling eight-per-minute durable account quota', async () => {
   const statements = [];
   let count = 0;
@@ -1088,7 +1129,11 @@ test('directly delivered messages enforce a rolling eight-per-minute durable acc
   const sql = (strings, ...values) => {
     const text = strings.join('?');
     statements.push({ text, values });
-    if (text.includes('FROM fam_user_profiles')) return Promise.resolve([[{ user_id: 'recipient-id' }]]);
+    if (text.includes('FROM fam_user_profiles')) return Promise.resolve([[
+      { user_id: 'sender-id', school_id: 'school-id', active: true },
+      { user_id: 'recipient-id', school_id: 'school-id', active: true },
+    ]]);
+    if (text.includes('FROM fam_listings')) return Promise.resolve([[{ user_id: 'recipient-id', school_id: 'school-id' }]]);
     if (text.includes('SELECT submission_count FROM fam_submission_quotas')) {
       return Promise.resolve(now - lastSentAt < 60_000 && count ? [[{ submission_count: count }]] : [[]]);
     }
@@ -1126,7 +1171,7 @@ test('pending messages share the upstream eight-per-minute quota with delivered 
       { user_id: 'sender-id', school_id: 'school-id', active: true },
       { user_id: 'recipient-id', school_id: 'school-id', active: true },
     ]];
-    if (text.includes('SELECT user_id AS user_id FROM fam_user_profiles')) return [[{ user_id: 'recipient-id' }]];
+    if (text.includes('FROM fam_listings')) return [[{ user_id: 'recipient-id', school_id: 'school-id' }]];
     if (text.includes('SELECT submission_count FROM fam_submission_quotas')) return count ? [[{ submission_count: count }]] : [[]];
     if (text.includes('DELETE FROM fam_submission_quotas')) { count = 0; return [[]]; }
     if (text.includes('UPSERT INTO fam_submission_quotas')) { count = values.find(Number.isInteger); return [[]]; }

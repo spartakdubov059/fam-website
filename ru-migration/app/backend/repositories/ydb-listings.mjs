@@ -30,6 +30,22 @@ async function consumeRollingSubmissionQuota(tx, userId, action, limit) {
   return true;
 }
 
+async function messageContextIsValid(tx, { sender_id, receiver_id, school_id, listing_id = '' }) {
+  const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
+    WHERE (user_id = ${sender_id} OR user_id = ${receiver_id}) LIMIT 2;`;
+  const byId = new Map((participants?.[0] ?? []).map(row => [row.user_id, row]));
+  for (const id of [sender_id, receiver_id]) {
+    const profile = byId.get(id);
+    if (!profile || profile.school_id !== school_id || profile.active !== true) return false;
+  }
+  if (listing_id) {
+    const listings = await tx`SELECT user_id, school_id FROM fam_listings WHERE id = ${listing_id} LIMIT 1;`;
+    const listing = listings?.[0]?.[0];
+    if (!listing || listing.school_id !== school_id || ![sender_id, receiver_id].includes(listing.user_id)) return false;
+  }
+  return true;
+}
+
 const isIsoDate = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -1568,9 +1584,7 @@ export function createYdbListingsRepository(sql) {
           || record.sender_id === record.receiver_id) throw new TypeError('invalid message');
       const id = randomUUID();
       return sql.begin(async tx => {
-        const recipients = await tx`SELECT user_id AS user_id FROM fam_user_profiles
-          WHERE user_id = ${record.receiver_id} AND school_id = ${record.school_id} AND active = true LIMIT 1;`;
-        if (!(recipients?.[0] ?? []).length) return { ok: false, code: 'recipient_unavailable' };
+        if (!await messageContextIsValid(tx, record)) return { ok: false, code: 'recipient_unavailable' };
         if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
           return { ok: false, code: 'rate_limited' };
         }
@@ -1586,11 +1600,7 @@ export function createYdbListingsRepository(sql) {
           || record.sender_id === record.receiver_id) throw new TypeError('invalid pending message');
       const id = randomUUID();
       return sql.begin(async tx => {
-        const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
-          WHERE (user_id = ${record.sender_id} OR user_id = ${record.receiver_id}) AND school_id = ${record.school_id};`;
-        const byId = new Map((participants?.[0] ?? []).map(row => [row.user_id, row]));
-        if (byId.get(record.sender_id)?.active !== true) throw new Error('sender unavailable');
-        if (byId.get(record.receiver_id)?.active !== true) {
+        if (!await messageContextIsValid(tx, record)) {
           const error = new Error('recipient unavailable'); error.code = 'recipient_unavailable'; throw error;
         }
         if (!await consumeRollingSubmissionQuota(tx, record.sender_id, 'message', 8)) {
@@ -1625,10 +1635,7 @@ export function createYdbListingsRepository(sql) {
         const pending = rows?.[0]?.[0];
         if (!pending) return false;
         if (decision === 'approve') {
-          const participants = await tx`SELECT user_id, school_id, active FROM fam_user_profiles
-            WHERE (user_id = ${pending.sender_id} OR user_id = ${pending.receiver_id}) AND school_id = ${schoolId};`;
-          const activeIds = new Set((participants?.[0] ?? []).filter(row => row.school_id === schoolId && row.active === true).map(row => row.user_id));
-          if (!activeIds.has(pending.sender_id) || !activeIds.has(pending.receiver_id)) return false;
+          if (!await messageContextIsValid(tx, { ...pending, school_id: schoolId })) return false;
           await tx`INSERT INTO fam_messages (id, sender_id, receiver_id, school_id, listing_id, body, is_read, created_at)
             VALUES (${pending.id}, ${pending.sender_id}, ${pending.receiver_id}, ${schoolId}, ${pending.listing_id ?? ''}, ${pending.body}, false, CurrentUtcTimestamp());`;
         }

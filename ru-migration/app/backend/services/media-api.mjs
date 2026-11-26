@@ -24,8 +24,10 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
       let actor; try { actor = await resolveActor(identity); } catch { actor = null; }
       if (!actor || !UUID.test(actor.id || '')) return { status: 403, body: { ok: false, error: 'forbidden' } };
       if (typeof repository?.getSchoolIdeaImage !== 'function' || typeof pendingImages?.get !== 'function') return { status: 503, body: { ok: false, error: 'media_unavailable' } };
+      let image;
+      try { image = await repository.getSchoolIdeaImage(ideaPhotoMatch[1], Number(ideaPhotoMatch[2])); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       try {
-        const image = await repository.getSchoolIdeaImage(ideaPhotoMatch[1], Number(ideaPhotoMatch[2]));
         if (!image || !UUID.test(image.user_id || '') || (typeof image.school_id !== 'string' || !image.school_id)
             || !/^pending\/[0-9a-f-]{36}\/[0-9a-f-]{8}-[0-9a-f-]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i.test(image.image_key)) {
           return { status: 404, body: { ok: false, error: 'idea_image_unavailable' } };
@@ -77,7 +79,8 @@ export function createMediaApi({ authenticate, resolveActor, pendingImages, repo
     const photoMatch = pathname.match(/^\/api\/v1\/listings\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/photo$/i);
     if (req.method === 'GET' && photoMatch) {
       let listing;
-      try { listing = await repository?.getListingPhoto?.(photoMatch[1]); } catch { listing = null; }
+      try { listing = await repository?.getListingPhoto?.(photoMatch[1]); }
+      catch { return { status: 503, body: { ok: false, error: 'database_unavailable' } }; }
       if (!listing?.image_key || !['pending', 'approved'].includes(listing.photo_status)) return { status: 404, body: { ok: false, error: 'photo_unavailable' } };
       if (listing.photo_status === 'pending') {
         let identity; try { identity = await authenticate(req); } catch { identity = null; }

@@ -159,6 +159,29 @@ test('pending photo access fails closed when suspension status cannot be verifie
   assert.equal(imageReads, 0);
 });
 
+test('private image reads distinguish database outages from missing images', async () => {
+  const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const listingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'student', school_id: 'school-a' };
+  const pendingImages = { get: async () => { throw new Error('storage should not be reached'); } };
+  const unavailable = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: {
+      getSchoolIdeaImage: async () => { throw new Error('synthetic database outage'); },
+      getListingPhoto: async () => { throw new Error('synthetic database outage'); },
+    }, pendingImages });
+  assert.deepEqual(await unavailable(request({ method: 'GET', path: `/api/v1/ideas/${ideaId}/images/0` })),
+    { status: 503, body: { ok: false, error: 'database_unavailable' } });
+  assert.deepEqual(await unavailable(request({ method: 'GET', path: `/api/v1/listings/${listingId}/photo` })),
+    { status: 503, body: { ok: false, error: 'database_unavailable' } });
+
+  const missing = createMediaApi({ authenticate: async () => ({ subject: 'synthetic' }), resolveActor: async () => actor,
+    repository: { getSchoolIdeaImage: async () => null, getListingPhoto: async () => null }, pendingImages });
+  assert.deepEqual(await missing(request({ method: 'GET', path: `/api/v1/ideas/${ideaId}/images/0` })),
+    { status: 404, body: { ok: false, error: 'idea_image_unavailable' } });
+  assert.deepEqual(await missing(request({ method: 'GET', path: `/api/v1/listings/${listingId}/photo` })),
+    { status: 404, body: { ok: false, error: 'photo_unavailable' } });
+});
+
 test('suspended school moderators cannot read pending avatar or idea images by direct URL', async () => {
   const actor = { id: '11111111-1111-4111-8111-111111111111', role: 'school_admin', school_id: 'school-a' };
   const ideaId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
