@@ -93,3 +93,11 @@ The v4 equality rehearsal cannot detect a record omitted from every input snapsh
 ### Inventory integration and CI checkout diagnostics
 
 Integrated the explicit independent fixture inventory into the existing thirteen-table YDB restore reconciliation. The earlier failed SDK package HTTP smoke test returned 503 instead of 200; YDB logs reported a syntax error on line 1 of ydb-listings.mjs showing a truncation warning as source. A bounded failed-job retry reproduced the YDB error, but repository reads report the same blob SHA `67d9c79753cda5f01b30cf910eaff77a38f6a38b` on the last green and failing commits and a valid first line. Do not replace the large repository module with a partial fetch. Both CI workflows now preflight the checked-out repository blob against the checked-out commit and syntax-check tracked backend/compat modules before installing dependencies or packaging. This is diagnostic instrumentation, not a claimed fix of an unverified cause; no checks are relaxed. Prior generated WebP test did pass on commit 778f86c ([YDB](https://github.com/spartakdubov059/fam-website/actions/runs/45625254456)). Current full CI still required.
+
+## Synthetic migration runner and infrastructure inspector
+
+Added `compat/synthetic-migration-runner.mjs` to produce a versioned offline migration package only after source/target/restored acceptance and independent inventory checks pass. The runner rejects non-synthetic snapshot IDs, snapshot mismatches, invalid complete snapshots and live-cutover authorization remains permanently false. This is an executable rehearsal boundary, not a production exporter or importer.
+
+Added the bounded FAM agent-team policy to represent the existing coordinator, developer, tester, security reviewer, analyst, documentator and Russian-interface roles. It rejects shell/tool fields and permits at most one model-enabled role; no prompt, secret or raw user payload can be stored in the policy task.
+
+Ported the bounded infrastructure INSPECTOR signal path to YDB: allowlisted signal codes, event-ID/digest deduplication, seven-day cooldown, no raw logs, a one-active-coder-task guard and an infrastructure-only coder task payload. The authenticated coder bridge exposes `inspector_enqueue` only to the same strong worker-token boundary and does not enable Qwen execution, shell tools or PR creation.

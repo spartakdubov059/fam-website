@@ -33,7 +33,7 @@ try {
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
   const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 39, content_read: false, write_permissions_checked: false });
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 40, content_read: false, write_permissions_checked: false });
   const stepClock = Math.floor(Date.now() / 1000) - 10;
   const stepVerifyClock = stepClock + 1;
   const stepIdentity = { issuer: 'https://issuer.synthetic', subject: 'step-up-subject', email: 'step-up@example.test' };

@@ -405,3 +405,45 @@ test('task finish rejects invalid inputs and refuses an expired or mismatched le
   await assert.rejects(queue.finishSafeTask({ ...result, status: 'cancelled' }), /safe agent task result/);
   await assert.rejects(queue.finishSafeTask({ ...result, summary: 'x'.repeat(1001) }), /safe agent task result/);
 });
+
+test('inspector signal enqueue is bounded, deduplicated and creates an infrastructure audit task', async () => {
+  let existing = false;
+  let cooldown = false;
+  let active = false;
+  const { sql, calls } = fakeSql(query => {
+    if (query.includes('SELECT outcome FROM fam_agent_inspector_signals')) return existing ? [[{ outcome: 'queued' }]] : [[]];
+    if (query.includes('SELECT event_id FROM fam_agent_inspector_signals')) return cooldown ? [[{ event_id: 'old:event' }]] : [[]];
+    if (query.includes('SELECT id FROM fam_agent_tasks') && query.includes("task_type = 'coder_patch_request'")) return active ? [[{ id: '33333333-3333-4333-8333-333333333333' }]] : [[]];
+    if (query.includes('INSERT INTO fam_agent_tasks')) existing = true;
+    return [[]];
+  });
+  const queue = createYdbAgentTaskQueue(sql);
+  const accepted = await queue.enqueueInspectorSignal({
+    signalCode: 'worker_queue_failure',
+    eventId: 'ci:worker:queue',
+    occurrences: 4,
+  });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.task_created, true);
+  assert.equal(accepted.reason, 'queued');
+  assert.ok(calls.some(call => call.query.includes('fam_agent_inspector_signals')));
+  assert.ok(calls.some(call => call.values.includes(JSON.stringify({
+    task_key: 'audit_agent_infrastructure',
+    event_code: 'worker_queue_failure',
+    page_area: 'agent_infrastructure',
+    occurrences: 4,
+  }))));
+  await assert.rejects(queue.enqueueInspectorSignal({
+    signalCode: 'unknown',
+    eventId: 'ci:unknown',
+    occurrences: 1,
+  }), /inspector signal/);
+  existing = false;
+  active = true;
+  const activeResult = await queue.enqueueInspectorSignal({
+    signalCode: 'qwen_stuck_run',
+    eventId: 'ci:qwen:stuck',
+    occurrences: 2,
+  });
+  assert.deepEqual(activeResult, { ok: true, task_created: false, reason: 'coder_task_already_active' });
+});
