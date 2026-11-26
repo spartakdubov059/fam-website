@@ -30,7 +30,7 @@ begin
   if p_worker_id is distinct from 'fam-agent-integrator-v1' then
     raise exception 'invalid integrator worker';
   end if;
-  if p_stage not in (
+  if p_stage is null or p_stage not in (
     'owner_approved','merged','postmerge_verified','postmerge_failed','pr_closed_unmerged'
   ) then
     raise exception 'invalid coder resolution stage';
@@ -40,6 +40,10 @@ begin
   end if;
   if p_head_sha is null or p_head_sha !~ '^[0-9a-fA-F]{40}$' then
     raise exception 'invalid pull request head sha';
+  end if;
+
+  if p_stage in ('owner_approved','pr_closed_unmerged') and p_merge_commit_sha is not null then
+    raise exception 'unexpected merge commit sha';
   end if;
 
   select * into v_task
