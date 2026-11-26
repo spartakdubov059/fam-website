@@ -84,7 +84,7 @@ begin
   end;
   if not exists(select 1 from private.fam_agent_tasks where id=task_a
     and status='in_progress' and payload->>'lifecycle_state'='pending_review')
-    or (select count(*) from private.fam_agent_task_events where task_id=task_a) <> 1
+    or (select count(*) from private.fam_agent_task_events as e where e.task_id=task_a) <> 1
   then raise exception 'Invalid lifecycle input changed state or audit'; end if;
 
   -- Completed replay is idempotent only for the exact terminal evidence.
