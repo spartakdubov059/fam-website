@@ -69,6 +69,24 @@ begin
     values(task_id,'progress',worker,'PR создан','{"stage":"pr_created","pr_number":123}');
   end loop;
 
+  -- Direct RPC validation must reject NULL and inconsistent evidence without changing state.
+  begin
+    perform public.resolve_fam_agent_coder_lifecycle(task_a,worker,null,123,head_a);
+    raise exception 'NULL stage accepted';
+  exception when others then
+    if sqlerrm <> 'invalid coder resolution stage' then raise; end if;
+  end;
+  begin
+    perform public.resolve_fam_agent_coder_lifecycle(task_a,worker,'owner_approved',123,head_a,merge_a);
+    raise exception 'Unexpected merge evidence accepted';
+  exception when others then
+    if sqlerrm <> 'unexpected merge commit sha' then raise; end if;
+  end;
+  if not exists(select 1 from private.fam_agent_tasks where id=task_a
+    and status='in_progress' and payload->>'lifecycle_state'='pending_review')
+    or (select count(*) from private.fam_agent_task_events where task_id=task_a) <> 1
+  then raise exception 'Invalid lifecycle input changed state or audit'; end if;
+
   -- Completed replay is idempotent only for the exact terminal evidence.
   if public.resolve_fam_agent_coder_lifecycle(task_a,worker,'owner_approved',123,head_a) is distinct from true
     or public.resolve_fam_agent_coder_lifecycle(task_a,worker,'merged',123,head_a,merge_a) is distinct from true
