@@ -1,0 +1,44 @@
+name: FAM Qwen QA failure migration contract
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'tests/fixtures/fam-qa-failure/**'
+      - '.github/workflows/fam-qwen-qa-failure-migration.yml'
+permissions:
+  contents: read
+jobs:
+  postgres-fixture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Reproduce defect and apply deployable migration in disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          sudo systemctl start postgresql.service
+          sudo -u postgres createdb fam_qa_failure_fixture
+          cat tests/fixtures/fam-qa-failure/setup.sql \
+            supabase/migrations/20261123001553_fam_qwen_lease_and_lifecycle.sql \
+            tests/fixtures/fam-qa-failure/baseline.sql \
+            supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
+            tests/fixtures/fam-qa-failure/assertions.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Roll back QA transition and preserve task/event evidence
+        run: |
+          set -euo pipefail
+          cat tests/fixtures/fam-qa-failure/rollback-prepare.sql \
+            docs/sql/fam-qwen-qa-failed-transition-rollback.sql \
+            tests/fixtures/fam-qa-failure/rollback-assertions.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Reapply migration and verify first-attempt QA failure
+        run: |
+          set -euo pipefail
+          cat supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
+            tests/fixtures/fam-qa-failure/reapply-assertions.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Remove disposable database
+        if: always()
+        run: sudo -u postgres dropdb --if-exists fam_qa_failure_fixture
