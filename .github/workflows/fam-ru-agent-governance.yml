@@ -1,0 +1,30 @@
+name: FAM RU agent governance
+
+on:
+  pull_request:
+    branches: ["migration/yandex-cloud"]
+    paths:
+      - "ru-migration/app/backend/policies/agent-team.mjs"
+      - "ru-migration/app/backend/repositories/ydb-agent-task-queue.mjs"
+      - "ru-migration/app/backend/services/coder-task-bridge.mjs"
+      - "ru-migration/compat/fam-agent-team-governance.mjs"
+      - "ru-migration/compat/fam-agent-team-governance.test.mjs"
+      - ".github/workflows/fam-ru-agent-governance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Изолированные тесты штаба FAM RU
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: "22"
+      - run: node --test ru-migration/compat/fam-agent-team-governance.test.mjs ru-migration/app/backend/test/coder-task-bridge.test.mjs ru-migration/app/backend/test/ydb-agent-task-queue.test.mjs
