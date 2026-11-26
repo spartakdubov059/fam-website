@@ -8,6 +8,8 @@ const CODER_EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'listing
   'notifications_load_failed', 'database_request_failed', 'auth_backend_failed',
   'ci_workflow_failure', 'worker_queue_failure', 'worker_expired_lease',
   'qwen_repeated_failure', 'qwen_stuck_run', 'synthetic_ci_workflow_failure']);
+const INSPECTOR_SIGNALS = new Set(['ci_workflow_failure','worker_queue_failure','worker_expired_lease','qwen_repeated_failure','qwen_stuck_run','synthetic_ci_workflow_failure']);
+const INSPECTOR_SKIP_REASONS = new Set(['duplicate_event','signal_cooldown','coder_task_already_active']);
 const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other', 'agent_infrastructure']);
 const AGENT_KEYS = new Set(['orchestrator', 'technical', 'database', 'moderation', 'safety', 'quality', 'growth']);
 const TASK_STATUSES = new Set(['queued', 'claimed', 'in_progress', 'blocked', 'completed', 'failed', 'cancelled']);
@@ -103,7 +105,7 @@ export function createCoderTaskBridge({ queue, token } = {}) {
           claim_token: task.claim_token } });
       }
       if (body.action === 'inspector_enqueue' && Object.keys(body).length === 4
-          && typeof body.signal_code === 'string'
+          && INSPECTOR_SIGNALS.has(body.signal_code)
           && typeof body.event_id === 'string'
           && /^[a-z0-9:_-]{3,100}$/.test(body.event_id)
           && Number.isSafeInteger(body.occurrences)
@@ -118,7 +120,11 @@ export function createCoderTaskBridge({ queue, token } = {}) {
           eventId: body.event_id,
           occurrences: body.occurrences,
         });
-        if (!result || result.ok !== true) return json(502, { ok: false, error: 'invalid_inspector_result' });
+        if (!result || result.ok !== true || typeof result.task_created !== 'boolean'
+            || (result.task_created ? result.reason !== 'queued' || !UUID.test(result.task_id || '')
+              : !INSPECTOR_SKIP_REASONS.has(result.reason) || Object.hasOwn(result,'task_id'))) {
+          return json(502, { ok: false, error: 'invalid_inspector_result' });
+        }
         return json(200, {
           ok: true,
           task_created: result.task_created === true,

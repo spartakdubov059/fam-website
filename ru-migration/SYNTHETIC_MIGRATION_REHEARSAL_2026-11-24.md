@@ -105,3 +105,7 @@ Ported the bounded infrastructure INSPECTOR signal path to YDB: allowlisted sign
 ### Independent runner acceptance and CI coverage
 
 The newly added offline runner previously reused source state/profile arrays for both target and restored comparisons, masking differences. Require independently supplied state/profile sections for each side, preserve rejection stage/table, bind the independent inventory digest into the plan and derive table count from the verifier. Added eight regression cases and explicitly run the compat runner tests in SDK CI (the backend test glob does not discover them). This is still offline synthetic acceptance, not a real importer. Latest prior two commits were not yet verified by CI at inspection. No production access.
+
+### INSPECTOR bridge validation and real local YDB rehearsal
+
+The new bridge now rejects unsupported signal codes before invoking the queue and only returns validated, allowlisted result reasons and UUIDs. Added negative response-shape tests. Added a separate disposable local YDB integration at the end of existing tests: concurrent identical signal requests, cooldown and active-task suppression, exact payload and attempt bound, synthetic claim/start/heartbeat/finish and stale lease rejection. No actual model inference or PR creation is claimed. CI required.

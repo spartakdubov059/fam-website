@@ -235,3 +235,14 @@ test('coder bridge returns a safe diagnostic when the request stream fails', asy
   assert.match(messages[0], /"stage":"request_body"/);
   assert.doesNotMatch(messages[0], /private request stream detail/);
 });
+
+
+test('inspector rejects unknown signals before invoking the repository and refuses untrusted result fields',async()=>{
+ let calls=0,result={ok:true,task_created:false,reason:'duplicate_event'};
+ const queue={...lifecycleStub,getAgentTaskQueueHealth:async()=>({}),claimSafeCoderTask:async()=>null,finishSafeCoderTask:async()=>false,enqueueInspectorSignal:async()=>{calls++;return result;}};
+ const bridge=createCoderTaskBridge({queue,token});
+ const input={action:'inspector_enqueue',signal_code:'worker_queue_failure',event_id:'ci:synthetic:guard',occurrences:3};
+ assert.equal((await bridge(request({...input,signal_code:'unknown'}))).status,400);assert.equal(calls,0);
+ assert.equal((await bridge(request(input))).status,200);
+ for(const invalid of [{ok:true,task_created:true,reason:'queued',task_id:'not-a-uuid'},{ok:true,task_created:false,reason:'unapproved arbitrary reason'},{ok:true,task_created:false,reason:'duplicate_event',task_id:'11111111-1111-4111-8111-111111111111'},{ok:true,task_created:'true',reason:'queued'}]){result=invalid;const r=await bridge(request(input));assert.equal(r.status,502);assert.equal(r.body.error,'invalid_inspector_result');assert.equal(Object.hasOwn(r.body,'task_id'),false);}
+});
