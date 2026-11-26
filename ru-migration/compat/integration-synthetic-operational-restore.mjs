@@ -13,16 +13,19 @@ const expiresAt = new Date(expires);
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 
 async function seedOperationalTables(sql, snapshot) {
-  const notification = snapshot.notifications[0];
   const suspension = snapshot.suspensions[0];
   const deletion = snapshot.deletion_requests[0];
   const role = snapshot.role_requests[0];
   const adminAudit = snapshot.admin_audit[0];
   const safety = snapshot.safety_incidents[0];
   await sql.begin(async tx => {
-    await tx`INSERT INTO fam_notification_reads
-      (user_id, notification_key, read_at)
-      VALUES (${notification.user_id}, ${notification.notification_id}, ${createdAt});`;
+    for (const notification of snapshot.notifications) {
+      // This table stores read markers only; unread notifications have no row.
+      if (!notification.read) continue;
+      await tx`INSERT INTO fam_notification_reads
+        (user_id, notification_key, read_at)
+        VALUES (${notification.user_id}, ${notification.notification_id}, ${createdAt});`;
+    }
     await tx`INSERT INTO fam_account_suspensions
       (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
       VALUES (${suspension.school_id}, ${suspension.user_id}, ${suspension.suspension_id}, 'student', Unwrap(CAST(24 AS Uint32)), ${suspension.reason_code}, 'issued', ${actor}, ${createdAt}, ${expiresAt});`;
@@ -50,7 +53,7 @@ async function seedOperationalTables(sql, snapshot) {
   });
 }
 
-async function verifyOperationalTables(sql) {
+async function verifyOperationalTables(sql, snapshot) {
   const notification = (await sql`SELECT notification_key, read_at FROM fam_notification_reads WHERE user_id = ${target};`)[0];
   const suspension = (await sql`SELECT target_id, school_id, status, expires_at FROM fam_account_suspensions WHERE target_id = ${target};`)[0];
   const openSuspension = (await sql`SELECT suspension_id, school_id FROM fam_account_suspension_open WHERE target_id = ${target};`)[0];
@@ -61,7 +64,8 @@ async function verifyOperationalTables(sql) {
   const adminAudit = (await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE event_id = 'synthetic-admin-audit-1';`)[0];
   const safety = (await sql`SELECT category, severity FROM fam_safety_incidents WHERE school_id = ${school};`)[0];
 
-  assert.equal(notification.length, 1);
+  const expectedReadKeys = snapshot.notifications.filter(row => row.read).map(row => row.notification_id).sort();
+  assert.deepEqual(notification.map(row => row.notification_key).sort(), expectedReadKeys);
   assert.equal(suspension.length, 1);
   assert.equal(openSuspension.length, 1);
   assert.equal(deletion.length, 1);
@@ -90,7 +94,10 @@ try {
 
   const operationalSnapshot = {
     snapshot_id: 'synthetic-operational-restore',
-    notifications: [{ notification_id: 'synthetic-notification-1', user_id: target, school_id: school, kind: 'message', read: false, created_at: created }],
+    notifications: [
+      { notification_id: 'synthetic-notification-1', user_id: target, school_id: school, kind: 'message', read: true, created_at: created },
+      { notification_id: 'synthetic-notification-2', user_id: target, school_id: school, kind: 'listing', read: false, created_at: created },
+    ],
     suspensions: [{ suspension_id: 'synthetic-suspension-1', user_id: target, school_id: school, active: true, reason_code: 'synthetic-rule', expires_at: expires }],
     deletion_requests: [{ request_id: 'synthetic-deletion-1', user_id: target, school_id: school, status: 'pending', created_at: created }],
     role_requests: [{ request_id: 'synthetic-role-1', user_id: target, school_id: school, role: 'council_member', status: 'pending', created_at: created }],
@@ -101,6 +108,7 @@ try {
   assert.equal(envelope.ok, true);
   const decoded = decodeSyntheticOperationalEnvelope(envelope.bytes, envelope.sha256);
   assert.equal(decoded.ok, true);
+  assert.deepEqual(decoded.snapshot, operationalSnapshot);
 
   await sql.begin(async tx => {
     await tx`DELETE FROM fam_notification_reads WHERE user_id = ${target};`;
@@ -115,7 +123,7 @@ try {
   });
 
   await seedOperationalTables(sql, decoded.snapshot);
-  await verifyOperationalTables(sql);
+  await verifyOperationalTables(sql, operationalSnapshot);
 
   await assert.rejects(
     () => sql.begin(async tx => {
@@ -128,8 +136,9 @@ try {
     error => error?.message === 'Transaction failed.' && error.cause?.message === 'synthetic operational restore interruption',
   );
   const notificationAfterRollback = (await sql`SELECT notification_key FROM fam_notification_reads WHERE user_id = ${target};`)[0];
-  assert.equal(notificationAfterRollback.length, 1);
-  assert.equal(notificationAfterRollback[0].notification_key, 'synthetic:notification:1');
+  const expectedReadKeys = operationalSnapshot.notifications.filter(row => row.read).map(row => row.notification_id).sort();
+  assert.deepEqual(notificationAfterRollback.map(row => row.notification_key).sort(), expectedReadKeys);
+  await verifyOperationalTables(sql, operationalSnapshot);
 
   console.log('YDB_SYNTHETIC_OPERATIONAL_RESTORE_PASS: notifications, suspensions, deletion/role requests, audits and safety incidents restored atomically');
 } finally {
