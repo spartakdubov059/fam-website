@@ -26,6 +26,19 @@ export function ownerApproval(reviews, owner, head, mergedAt = null, createdAt =
   const reopenLower = reopenedAt === null ? -Infinity : timestamp(reopenedAt);
   const lower = Math.max(createdLower, reopenLower);
   if (Number.isNaN(cutoff) || Number.isNaN(lower) || lower > cutoff) return false;
+  // A malformed decisive review must never disappear from history and leave
+  // an earlier approval looking current. Pending/comment-only reviews do not decide.
+  const decisive = new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]);
+  const reviewIds = new Set();
+  for (const review of reviews) {
+    if (!review || typeof review !== "object" || typeof review.state !== "string") return false;
+    if (review.state === "COMMENTED" || review.state === "PENDING") continue;
+    if (!decisive.has(review.state) || typeof review.user?.login !== "string") return false;
+    if (review.user.login !== owner) continue;
+    if (!validId(review.id) || reviewIds.has(review.id) ||
+        !Number.isFinite(timestamp(review.submitted_at))) return false;
+    reviewIds.add(review.id);
+  }
   const relevant = reviews.filter((review) =>
     review?.user?.login === owner &&
     ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state) &&
