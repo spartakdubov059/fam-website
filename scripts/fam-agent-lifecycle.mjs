@@ -19,22 +19,44 @@ function trustedPR(pr, branch, repository) {
     SHA.test(pr.head?.sha || "");
 }
 
-export function ownerApproval(reviews, owner, head, mergedAt = null, createdAt = null) {
+export function ownerApproval(reviews, owner, head, mergedAt = null, createdAt = null, reopenedAt = null) {
   if (!Array.isArray(reviews) || !SHA.test(head || "")) return false;
   const cutoff = mergedAt === null ? Infinity : timestamp(mergedAt);
-  const lower = createdAt === null ? -Infinity : timestamp(createdAt);
+  const createdLower = createdAt === null ? -Infinity : timestamp(createdAt);
+  const reopenLower = reopenedAt === null ? -Infinity : timestamp(reopenedAt);
+  const lower = Math.max(createdLower, reopenLower);
   if (Number.isNaN(cutoff) || Number.isNaN(lower) || lower > cutoff) return false;
   const relevant = reviews.filter((review) =>
     review?.user?.login === owner &&
     ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state) &&
     Number.isFinite(timestamp(review.submitted_at)) &&
-    timestamp(review.submitted_at) >= lower &&
+    (reopenedAt === null
+      ? timestamp(review.submitted_at) >= lower
+      : timestamp(review.submitted_at) > lower) &&
     timestamp(review.submitted_at) <= cutoff
   ).sort((a, b) =>
     timestamp(b.submitted_at) - timestamp(a.submitted_at) ||
     (Number(b.id) || 0) - (Number(a.id) || 0)
   );
   return relevant[0]?.state === "APPROVED" && relevant[0].commit_id === head;
+}
+
+async function latestReopenedAt(read, prNumber, mergedAt) {
+  const upper = mergedAt === null ? Infinity : timestamp(mergedAt);
+  if (Number.isNaN(upper)) throw new Error("Invalid merge timestamp for PR timeline");
+  const transitions = [];
+  for (let page = 1; page <= 10; page++) {
+    const events = await read("/issues/" + prNumber + "/timeline?per_page=100&page=" + page);
+    if (!Array.isArray(events) || events.length > 100) throw new Error("Invalid PR timeline response");
+    for (const event of events) {
+      if (event?.event !== "reopened") continue;
+      const at = timestamp(event.created_at);
+      if (!Number.isFinite(at)) throw new Error("Incomplete PR reopen event");
+      if (at <= upper) transitions.push(at);
+    }
+    if (events.length < 100) return transitions.length ? Math.max(...transitions) : null;
+  }
+  throw new Error("PR timeline exceeds the reconciliation limit");
 }
 
 function exactCI(runs, sha, branch, event, notBefore, notAfter = null) {
@@ -96,6 +118,7 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
       owner_approved: false, merged: false, pr_state: "unconfirmed",
       draft: null, head_sha: null, merge_commit_sha: null,
       branch_ci: "unconfirmed", postmerge: "unconfirmed", evidence: "unavailable",
+      reopened_at: null, review_history_complete: false, persistence: { status: "not_attempted" },
     };
     rows.push(row);
     const branch = "codex/fam-run-" + run.id;
@@ -137,10 +160,16 @@ export async function collectCoderLifecycle({ runs = [], repository, read, limit
         row.pr_state = "open";
       }
       try {
+        row.reopened_at = await latestReopenedAt(read, pr.number, row.merged ? pr.merged_at : null);
+        row.review_history_complete = true;
+      } catch {
+        row.review_history_complete = false;
+      }
+      try {
         const reviews = await read("/pulls/" + pr.number + "/reviews?per_page=100");
-        if (Array.isArray(reviews) && reviews.length < 100) {
+        if (Array.isArray(reviews) && reviews.length < 100 && row.review_history_complete) {
           row.owner_approved = ownerApproval(reviews, owner, pr.head.sha,
-            row.merged ? pr.merged_at : null, pr.created_at);
+            row.merged ? pr.merged_at : null, pr.created_at, row.reopened_at);
           row.evidence = "review_checked";
         }
       } catch { /* approval remains unconfirmed */ }
@@ -186,6 +215,60 @@ export function classifyReviewState(row) {
   return "unconfirmed";
 }
 
+export function lifecycleStagesForRow(row) {
+  const state = classifyReviewState(row);
+  const base = {
+    task_id: row?.task_id,
+    pr_number: row?.pr_number,
+    head_sha: row?.head_sha,
+  };
+  if (!base.task_id || !validId(base.pr_number) || !SHA.test(base.head_sha || "")) return [];
+  if (state === "closed_unmerged") return [{ ...base, stage: "pr_closed_unmerged" }];
+  if (state === "approved_waiting_merge") return [{ ...base, stage: "owner_approved" }];
+  if (state === "merge_ci_verified" || state === "postmerge_failed" ||
+      state === "postmerge_unconfirmed") {
+    if (!SHA.test(row.merge_commit_sha || "")) return [];
+    const stages = [
+      { ...base, stage: "owner_approved" },
+      { ...base, stage: "merged", merge_commit_sha: row.merge_commit_sha },
+    ];
+    if (state === "merge_ci_verified") {
+      stages.push({ ...base, stage: "postmerge_verified", merge_commit_sha: row.merge_commit_sha });
+    } else if (state === "postmerge_failed") {
+      stages.push({ ...base, stage: "postmerge_failed", merge_commit_sha: row.merge_commit_sha });
+    }
+    return stages;
+  }
+  return [];
+}
+
+export async function persistLifecycleRows(rows, persist) {
+  if (typeof persist !== "function") throw new Error("Lifecycle persistence adapter is required");
+  for (const row of rows) {
+    const stages = lifecycleStagesForRow(row);
+    if (!stages.length) continue;
+    row.persistence = { status: "saved", stages: [] };
+    for (const stage of stages) {
+      try {
+        const result = await persist(stage);
+        if (result?.ok !== true || result?.resolved !== true) {
+          row.persistence = {
+            status: "rejected", stage: stage.stage, stages: [...row.persistence.stages],
+          };
+          break;
+        }
+        row.persistence.stages.push(stage.stage);
+      } catch {
+        row.persistence = {
+          status: "failed", stage: stage.stage, stages: [...row.persistence.stages],
+        };
+        break;
+      }
+    }
+  }
+  return rows;
+}
+
 export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
   const lines = ["## INTEGRATOR — подтверждённые стадии Qwen после QA"];
   if (!rows.length) lines.push("Нет запусков с подтверждённой генерацией и QA в проверенной выборке.");
@@ -212,6 +295,16 @@ export function formatCoderLifecycle({ rows = [], limited = false } = {}) {
       "; merge: " + (row.merged ? "подтверждён" : "не подтверждён") +
       "; CI объединённого коммита: " + (ciLabel[row.postmerge] || "не подтверждён") +
       "; состояние: " + (stateLabel[classifyReviewState(row)] || "не подтверждён") + ".");
+    const persistenceLabel = {
+      saved: "сохранено",
+      rejected: "Supabase отклонил переход",
+      failed: "ошибка сохранения",
+      not_attempted: "не требовалось",
+      not_configured: "токен INTEGRATOR не настроен",
+    }[row.persistence?.status] || "не подтверждено";
+    lines[lines.length - 1] = lines[lines.length - 1].slice(0, -1) +
+      "; запись lifecycle: " + persistenceLabel +
+      (row.persistence?.stage ? " (" + row.persistence.stage + ")" : "") + ".";
   }
   if (limited) lines.push("Достигнут лимит выборки; отчёт неполный.");
   lines.push("Это read-only сверка метаданных GitHub. Не подтверждённое одобрение не считается разрешением.");

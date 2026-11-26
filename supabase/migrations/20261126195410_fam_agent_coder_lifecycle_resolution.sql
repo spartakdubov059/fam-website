@@ -27,8 +27,8 @@ declare
   v_event text;
   v_finished boolean := false;
 begin
-  if p_worker_id is distinct from 'fam-agent-qwen-coder-v1' then
-    raise exception 'invalid coder worker';
+  if p_worker_id is distinct from 'fam-agent-integrator-v1' then
+    raise exception 'invalid integrator worker';
   end if;
   if p_stage not in (
     'owner_approved','merged','postmerge_verified','postmerge_failed','pr_closed_unmerged'
@@ -267,6 +267,7 @@ begin
     v_status := 'in_progress';
     v_event := 'progress';
     v_lifecycle_state := 'closed_unmerged';
+    v_head_sha := p_head_sha;
     v_approved_head_sha := null;
     v_merge_commit_sha := null;
   end if;

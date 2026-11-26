@@ -16,6 +16,10 @@ import {
   exactPostMergeCI,
   exactBranchCI,
   classifyReviewState,
+  collectCoderLifecycle,
+  lifecycleStagesForRow,
+  persistLifecycleRows,
+  formatCoderLifecycle,
 } from "../../scripts/fam-agent-lifecycle.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
@@ -165,6 +169,12 @@ test("Lifecycle approval and CI require exact commits and owner evidence", () =>
   };
   assert.equal(ownerApproval([review], "spartakdubov059", head,
     "2026-11-26T11:00:00Z", "2026-11-26T09:00:00Z"), true);
+  assert.equal(ownerApproval([review], "spartakdubov059", head,
+    null, "2026-11-26T09:00:00Z", "2026-11-26T10:30:00Z"), false);
+  assert.equal(ownerApproval([{
+    ...review, submitted_at: "2026-11-26T10:40:00Z",
+  }], "spartakdubov059", head, null,
+  "2026-11-26T09:00:00Z", "2026-11-26T10:30:00Z"), true);
   assert.equal(ownerApproval([{ ...review, commit_id: mergeSha }],
     "spartakdubov059", head, "2026-11-26T11:00:00Z",
     "2026-11-26T09:00:00Z"), false);
@@ -188,6 +198,88 @@ test("Lifecycle approval and CI require exact commits and owner evidence", () =>
   }), "merged_evidence_incomplete");
 });
 
+test("Lifecycle requires complete reopen history and ignores stale owner approvals", async () => {
+  const head = "a".repeat(40);
+  const openedAt = "2026-11-26T09:00:00Z";
+  const reopenedAt = "2026-11-26T10:30:00Z";
+  const baseRun = {
+    id: 123,
+    created_at: "2026-11-26T08:00:00Z",
+    head_branch: "main",
+    jobs: [
+      { name: "Локальная модель готовит исправление", status: "completed", conclusion: "success",
+        steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] },
+      { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "success" },
+    ],
+  };
+  const pr = {
+    number: 123, user: { login: "github-actions[bot]" },
+    base: { ref: "main", repo: { full_name: "spartakdubov059/fam-website" } },
+    head: { ref: "codex/fam-run-123", repo: { full_name: "spartakdubov059/fam-website" }, sha: head },
+    created_at: openedAt, state: "open", merged: false, merged_at: null,
+    draft: false, body: "FAM task ID: `11111111-1111-4111-8111-111111111111`",
+  };
+  const staleReview = {
+    id: 1, user: { login: "spartakdubov059" }, state: "APPROVED",
+    submitted_at: "2026-11-26T10:00:00Z", commit_id: head,
+  };
+  const readFor = (review, timeline = [{ event: "reopened", created_at: reopenedAt }]) =>
+    async (path) => {
+      if (path.startsWith("/pulls?")) return [pr];
+      if (path === "/pulls/123") return pr;
+      if (path === "/issues/123/timeline?per_page=100&page=1") return timeline;
+      if (path === "/pulls/123/reviews?per_page=100") return [review];
+      if (path.startsWith("/actions/workflows/")) return { workflow_runs: [] };
+      throw new Error("Unexpected lifecycle evidence path");
+    };
+  const stale = await collectCoderLifecycle({
+    runs: [baseRun], repository: "spartakdubov059/fam-website", read: readFor(staleReview),
+  });
+  assert.equal(stale.rows[0].review_history_complete, true);
+  assert.equal(stale.rows[0].reopened_at, reopenedAt);
+  assert.equal(stale.rows[0].owner_approved, false);
+
+  const fresh = await collectCoderLifecycle({
+    runs: [baseRun], repository: "spartakdubov059/fam-website",
+    read: readFor({ ...staleReview, submitted_at: "2026-11-26T10:40:00Z" }),
+  });
+  assert.equal(fresh.rows[0].owner_approved, true);
+
+  const incomplete = await collectCoderLifecycle({
+    runs: [baseRun], repository: "spartakdubov059/fam-website",
+    read: readFor({ ...staleReview, submitted_at: "2026-11-26T10:40:00Z" }, null),
+  });
+  assert.equal(incomplete.rows[0].review_history_complete, false);
+  assert.equal(incomplete.rows[0].owner_approved, false);
+});
+
+test("Lifecycle persistence uses report classification and surfaces resolver failures", async () => {
+  const approved = {
+    task_id: "11111111-1111-4111-8111-111111111111",
+    pr_number: 123, head_sha: "a".repeat(40), pr_created: true,
+    pr_state: "open", merged: false, draft: false, owner_approved: true,
+    branch_ci: "verified", postmerge: "unconfirmed",
+  };
+  assert.deepEqual(lifecycleStagesForRow(approved).map((stage) => stage.stage), ["owner_approved"]);
+  const rejected = [{ ...approved }];
+  await persistLifecycleRows(rejected, async () => ({ ok: true, resolved: false }));
+  assert.equal(rejected[0].persistence.status, "rejected");
+  assert.equal(rejected[0].persistence.stage, "owner_approved");
+  const failed = [{ ...approved }];
+  await persistLifecycleRows(failed, async () => { throw new Error("network failure"); });
+  assert.equal(failed[0].persistence.status, "failed");
+  const report = formatCoderLifecycle({ rows: rejected });
+  assert.match(report, /Supabase отклонил переход/);
+
+  const merged = {
+    ...approved, pr_state: "merged", merged: true,
+    merge_commit_sha: "b".repeat(40), postmerge: "verified",
+  };
+  assert.deepEqual(lifecycleStagesForRow(merged).map((stage) => stage.stage),
+    ["owner_approved", "merged", "postmerge_verified"]);
+  assert.equal(lifecycleStagesForRow({ ...merged, owner_approved: false }).length, 0);
+});
+
 test("Lifecycle migration preserves reopen and failed-CI recovery transitions", () => {
   const migration = readFileSync(new URL("../../supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql", import.meta.url), "utf8");
   assert.match(migration, /for update/);
@@ -197,4 +289,16 @@ test("Lifecycle migration preserves reopen and failed-CI recovery transitions", 
   assert.match(migration, /metadata->>'stage' = 'owner_approved'/);
   assert.match(migration, /revoke all on function public\.resolve_fam_agent_coder_lifecycle/);
   assert.match(migration, /grant execute on function public\.resolve_fam_agent_coder_lifecycle[\s\S]*?to service_role/);
+  assert.match(migration, /p_worker_id is distinct from 'fam-agent-integrator-v1'/);
+  assert.match(migration, /v_lifecycle_state := 'closed_unmerged';\s*v_head_sha := p_head_sha;/);
+  const edge = readFileSync(new URL("../../supabase/functions/fam-agent-coder-bridge/index.ts", import.meta.url), "utf8");
+  const governance = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
+  const qwenWorkflow = readFileSync(new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url), "utf8");
+  assert.match(edge, /FAM_AGENT_INTEGRATOR_TOKEN/);
+  assert.match(edge, /body\.action === "resolve" \? INTEGRATOR_TOKEN : WORKER_TOKEN/);
+  assert.match(edge, /p_worker_id: INTEGRATOR_ID/);
+  assert.match(governance, /FAM_AGENT_INTEGRATOR_TOKEN: \$\{\{ secrets\.FAM_AGENT_INTEGRATOR_TOKEN \}\}/);
+  assert.doesNotMatch(qwenWorkflow, /FAM_AGENT_INTEGRATOR_TOKEN/);
+  assert.doesNotMatch(readFileSync(new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url), "utf8"),
+    /FAM_AGENT_INTEGRATOR_TOKEN/);
 });

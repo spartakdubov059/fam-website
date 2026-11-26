@@ -70,5 +70,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_AGENT_INTEGRATOR_TOKEN: ${{ secrets.FAM_AGENT_INTEGRATOR_TOKEN }}
           FAM_INSPECTOR_SYNTHETIC_SIGNAL: ${{ inputs.synthetic_signal || 'none' }}
         run: node scripts/fam-agent-governance.mjs

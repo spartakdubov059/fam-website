@@ -1,5 +1,6 @@
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const WORKER_TOKEN = Deno.env.get("FAM_AGENT_WORKER_TOKEN") ?? "";
+const INTEGRATOR_TOKEN = Deno.env.get("FAM_AGENT_INTEGRATOR_TOKEN") ?? "";
 
 function readDefaultKey(variable: string): string {
   const raw = Deno.env.get(variable) ?? "";
@@ -20,6 +21,7 @@ const SUPABASE_SECRET_KEY =
   "";
 const LEGACY_SECRET_IS_JWT = SUPABASE_SECRET_KEY.startsWith("eyJ");
 const WORKER_ID = "fam-agent-qwen-coder-v1";
+const INTEGRATOR_ID = "fam-agent-integrator-v1";
 const MAX_BODY_BYTES = 2048;
 const EVENT_CODES = new Set([
   "js_runtime", "unhandled_rejection", "supabase_sdk_unavailable",
@@ -91,11 +93,8 @@ Deno.serve(async (req: Request) => {
   const diagnosticId = crypto.randomUUID();
   if (req.method !== "POST") return json({ ok: false, error_code: "method_not_allowed", stage: "request" , diagnostic_id: diagnosticId }, 405, diagnosticId);
   if (req.headers.get("origin")) return json({ ok: false, error_code: "origin_not_allowed", stage: "request", diagnostic_id: diagnosticId }, 403, diagnosticId);
-  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY || !WORKER_TOKEN) {
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
     return json({ ok: false, error_code: "bridge_not_configured", stage: "configuration", diagnostic_id: diagnosticId }, 503, diagnosticId);
-  }
-  if (!await sameSecret(req.headers.get("x-fam-agent-token") ?? "", WORKER_TOKEN)) {
-    return json({ ok: false, error_code: "unauthorized", stage: "authentication", diagnostic_id: diagnosticId }, 401, diagnosticId);
   }
 
   const declaredLength = Number(req.headers.get("content-length") ?? "0");
@@ -116,6 +115,11 @@ Deno.serve(async (req: Request) => {
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return json({ ok: false, error_code: "invalid_body", stage: "request_validation", diagnostic_id: diagnosticId }, 400, diagnosticId);
+  }
+  const expectedToken = body.action === "resolve" ? INTEGRATOR_TOKEN : WORKER_TOKEN;
+  if (!expectedToken || (body.action === "resolve" && expectedToken === WORKER_TOKEN) ||
+      !await sameSecret(req.headers.get("x-fam-agent-token") ?? "", expectedToken)) {
+    return json({ ok: false, error_code: "unauthorized", stage: "authentication", diagnostic_id: diagnosticId }, 401, diagnosticId);
   }
 
   try {
@@ -277,7 +281,7 @@ Deno.serve(async (req: Request) => {
       }
       const resolved = await rpc("resolve_fam_agent_coder_lifecycle", {
         p_task_id: body.task_id,
-        p_worker_id: WORKER_ID,
+        p_worker_id: INTEGRATOR_ID,
         p_stage: body.stage,
         p_pr_number: body.pr_number,
         p_head_sha: body.head_sha,

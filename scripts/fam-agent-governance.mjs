@@ -2,7 +2,12 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
-import { collectCoderLifecycle, formatCoderLifecycle } from "./fam-agent-lifecycle.mjs";
+import {
+  collectCoderLifecycle,
+  formatCoderLifecycle,
+  lifecycleStagesForRow,
+  persistLifecycleRows,
+} from "./fam-agent-lifecycle.mjs";
 import { bridgeRequest } from "./fam-agent-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
@@ -356,6 +361,7 @@ export async function main() {
   // Raw Supabase task payloads and student content never enter GitHub.
   const bridgeUrl = process.env.FAM_AGENT_BRIDGE_URL || "";
   const bridgeToken = process.env.FAM_AGENT_WORKER_TOKEN || "";
+  const integratorToken = process.env.FAM_AGENT_INTEGRATOR_TOKEN || "";
   let queueHealth = null;
   let queueLink = "not_configured";
   let agentMetrics = [];
@@ -384,42 +390,27 @@ export async function main() {
       message: "Не полностью настроено подключение штаба к защищённой очереди Supabase",
     });
   }
-  if (bridgeUrl && bridgeToken) {
-    for (const row of lifecycle.rows) {
-      if (!row.task_id || !row.pr_number || !row.head_sha) continue;
-      const base = {
-        task_id: row.task_id,
-        pr_number: row.pr_number,
-        head_sha: row.head_sha,
-      };
-      const stages = [];
-      if (row.pr_state === "closed_unmerged") {
-        stages.push({ ...base, stage: "pr_closed_unmerged" });
-      } else if (row.pr_state === "open" && row.owner_approved && row.branch_ci === "verified" && row.draft === false) {
-        stages.push({ ...base, stage: "owner_approved" });
-      } else if (row.pr_state === "merged" && row.owner_approved && row.branch_ci === "verified") {
-        stages.push(
-          { ...base, stage: "owner_approved" },
-          { ...base, stage: "merged", merge_commit_sha: row.merge_commit_sha },
-        );
-        if (row.postmerge === "verified") stages.push({
-          ...base, stage: "postmerge_verified", merge_commit_sha: row.merge_commit_sha,
-        });
-        if (row.postmerge === "failed") stages.push({
-          ...base, stage: "postmerge_failed", merge_commit_sha: row.merge_commit_sha,
-        });
-      }
-      for (const stage of stages) {
-        try {
-          await bridgeRequest({
-            url: bridgeUrl,
-            token: bridgeToken,
-            body: { action: "resolve", ...stage },
-          });
-        } catch {
-          // A rejected or unavailable lifecycle update stays unconfirmed.
-        }
-      }
+  const lifecycleRowsToPersist = lifecycle.rows.filter((row) => lifecycleStagesForRow(row).length);
+  if (lifecycleRowsToPersist.length && bridgeUrl && integratorToken) {
+    await persistLifecycleRows(lifecycleRowsToPersist, (stage) =>
+      bridgeRequest({
+        url: bridgeUrl,
+        token: integratorToken,
+        body: { action: "resolve", ...stage },
+      })
+    );
+  } else if (lifecycleRowsToPersist.length) {
+    for (const row of lifecycleRowsToPersist) row.persistence = { status: "not_configured" };
+  }
+  for (const row of lifecycleRowsToPersist) {
+    if (row.persistence.status !== "saved") {
+      warnings.push({
+        code: "lifecycle_persistence_failed",
+        severity: "high",
+        count: 1,
+        message: "INTEGRATOR: подтверждённое GitHub состояние не сохранено в Supabase (" +
+          row.persistence.status + (row.persistence.stage ? ", " + row.persistence.stage : "") + ")",
+      });
     }
   }
   let inspectorOutcome = "Автоматическая постановка не запускалась: нет подтверждённого сигнала или защищённого моста.";

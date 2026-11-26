@@ -34,7 +34,8 @@ cascade;
 
 do $$
 declare
-  worker text := 'fam-agent-qwen-coder-v1';
+  worker text := 'fam-agent-integrator-v1';
+  qwen_worker text := 'fam-agent-qwen-coder-v1';
   task_a uuid := gen_random_uuid();
   task_b uuid := gen_random_uuid();
   task_c uuid := gen_random_uuid();
@@ -45,6 +46,16 @@ declare
   merge_wrong text := repeat('d',40);
   task_id uuid;
 begin
+  begin
+    perform public.resolve_fam_agent_coder_lifecycle(
+      gen_random_uuid(),qwen_worker,'owner_approved',123,repeat('a',40)
+    );
+    raise exception 'Qwen worker unexpectedly resolved lifecycle';
+  exception when others then
+    if sqlerrm = 'Qwen worker unexpectedly resolved lifecycle' then raise; end if;
+    if sqlerrm <> 'invalid integrator worker' then raise; end if;
+  end;
+
   foreach task_id in array array[task_a,task_b,task_c,task_d] loop
     insert into private.fam_agent_tasks(
       id,agent_key,task_type,approval_required,source,status,result_summary,
