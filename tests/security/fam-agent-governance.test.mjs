@@ -187,3 +187,14 @@ test("Lifecycle approval and CI require exact commits and owner evidence", () =>
     owner_approved: false, branch_ci: "verified", postmerge: "verified",
   }), "merged_evidence_incomplete");
 });
+
+test("Lifecycle migration preserves reopen and failed-CI recovery transitions", () => {
+  const migration = readFileSync(new URL("../../supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql", import.meta.url), "utf8");
+  assert.match(migration, /for update/);
+  assert.match(migration, /v_status := 'in_progress';[\s\S]*?Merge-коммит не прошёл/);
+  assert.match(migration, /PR закрыт без merge; требуется повторно проверить reopened PR/);
+  assert.match(migration, /PR закрыт без merge[\s\S]*?v_status := 'in_progress'/);
+  assert.match(migration, /metadata->>'stage' = 'owner_approved'/);
+  assert.match(migration, /revoke all on function public\.resolve_fam_agent_coder_lifecycle/);
+  assert.match(migration, /grant execute on function public\.resolve_fam_agent_coder_lifecycle[\s\S]*?to service_role/);
+});
