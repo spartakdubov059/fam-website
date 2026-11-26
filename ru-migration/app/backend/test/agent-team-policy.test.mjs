@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FAM_AGENT_TEAM, validateAgentTeamTask } from '../policies/agent-team.mjs';
 
-test('RU agent team preserves the existing sequential role set', () => {
+test('RU agent team preserves the existing sequential role set without a separate Qwen role', () => {
   assert.deepEqual(FAM_AGENT_TEAM.map(role => role.key),
     ['coordinator', 'developer', 'tester', 'security_reviewer', 'analyst', 'documentator', 'russian_editor']);
   assert.equal(FAM_AGENT_TEAM.filter(role => role.allows_model).length, 1);
-  assert.equal(FAM_AGENT_TEAM.find(role => role.key === 'developer').title, 'Разработчик');
+  assert.equal(FAM_AGENT_TEAM.find(role => role.key === 'developer').title, 'Разработчик / локальная модель Qwen');
 });
 
 test('RU agent team rejects model-only secrets, tools and raw payload fields', () => {

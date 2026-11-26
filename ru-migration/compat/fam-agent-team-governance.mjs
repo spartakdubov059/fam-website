@@ -3,7 +3,6 @@ import { FAM_AGENT_TEAM, validateAgentTeamTask } from '../app/backend/policies/a
 export const RU_AGENT_TEAM = Object.freeze([
   ...FAM_AGENT_TEAM,
   Object.freeze({ key: 'inspector', title: 'INSPECTOR', allows_model: false, permissions: Object.freeze(['aggregate_diagnostics', 'enqueue_allowlisted_task']) }),
-  Object.freeze({ key: 'qwen', title: 'Qwen 3.8', allows_model: true, permissions: Object.freeze(['prepare_patch']) }),
   Object.freeze({ key: 'qa', title: 'QA', allows_model: false, permissions: Object.freeze(['independent_validation']) }),
   Object.freeze({ key: 'arbiter', title: 'ARBITER', allows_model: false, permissions: Object.freeze(['detect_file_conflicts']) }),
   Object.freeze({ key: 'integrator', title: 'INTEGRATOR', allows_model: false, permissions: Object.freeze(['coordinate_review_order']) }),

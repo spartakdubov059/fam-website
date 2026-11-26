@@ -12,8 +12,9 @@ import {
 
 test('RU team preserves the original governance roles and no recruitment authority', () => {
   const keys = RU_AGENT_TEAM.map(role => role.key);
-  for (const key of ['inspector', 'qwen', 'qa', 'arbiter', 'integrator', 'recruiter']) assert.ok(keys.includes(key));
-  assert.equal(RU_AGENT_TEAM.filter(role => role.allows_model).length, 2);
+  for (const key of ['developer', 'inspector', 'qa', 'arbiter', 'integrator', 'recruiter']) assert.ok(keys.includes(key));
+  assert.equal(keys.includes('qwen'), false);
+  assert.equal(RU_AGENT_TEAM.filter(role => role.allows_model).length, 1);
   assert.equal(RU_AGENT_TEAM.find(role => role.key === 'recruiter').permissions.includes('propose_human_review'), true);
 });
 

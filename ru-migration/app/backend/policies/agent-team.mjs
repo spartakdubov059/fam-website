@@ -1,6 +1,6 @@
 export const FAM_AGENT_TEAM = Object.freeze([
   Object.freeze({ key: 'coordinator', title: 'Координатор', allows_model: false, permissions: Object.freeze(['prioritize', 'collect_results']) }),
-  Object.freeze({ key: 'developer', title: 'Разработчик', allows_model: true, permissions: Object.freeze(['prepare_patch']) }),
+  Object.freeze({ key: 'developer', title: 'Разработчик / локальная модель Qwen', allows_model: true, permissions: Object.freeze(['prepare_patch']) }),
   Object.freeze({ key: 'tester', title: 'Тестировщик', allows_model: false, permissions: Object.freeze(['run_regression', 'check_syntax']) }),
   Object.freeze({ key: 'security_reviewer', title: 'Рецензент безопасности', allows_model: false, permissions: Object.freeze(['review_diff', 'check_secrets']) }),
   Object.freeze({ key: 'analyst', title: 'Аналитик', allows_model: false, permissions: Object.freeze(['aggregate_results']) }),
