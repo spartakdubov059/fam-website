@@ -302,3 +302,23 @@ test("Lifecycle migration preserves reopen and failed-CI recovery transitions", 
   assert.doesNotMatch(readFileSync(new URL("../../scripts/fam-agent-bridge.mjs", import.meta.url), "utf8"),
     /FAM_AGENT_INTEGRATOR_TOKEN/);
 });
+
+test("Lifecycle fails closed when decisive owner review evidence is malformed or duplicated", () => {
+  const head = "a".repeat(40);
+  const owner = "spartakdubov059";
+  const approval = {
+    id: 1, user: { login: owner }, state: "APPROVED",
+    submitted_at: "2026-11-26T10:00:00Z", commit_id: head,
+  };
+  const revoked = { ...approval, id: 2, state: "CHANGES_REQUESTED" };
+  for (const review of [
+    { ...revoked, submitted_at: null },
+    { ...revoked, id: 1 },
+    { ...revoked, id: null },
+    { ...revoked, user: null },
+    { ...revoked, state: "UNKNOWN" },
+    null,
+  ]) assert.equal(ownerApproval([approval, review], owner, head), false);
+  assert.equal(ownerApproval([approval, { ...revoked, state: "PENDING", submitted_at: null }], owner, head), true);
+  assert.equal(ownerApproval([approval], owner, head), true);
+});
