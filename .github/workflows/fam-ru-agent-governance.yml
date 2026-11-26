@@ -27,5 +27,5 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: "22"
-      - run: node --test ru-migration/compat/fam-agent-team-governance.test.mjs ru-migration/compat/fam-agent-governance-rehearsal.test.mjs ru-migration/compat/synthetic-batch-migration.test.mjs ru-migration/compat/synthetic-operational-migration.test.mjs ru-migration/compat/fam-cutover-readiness.test.mjs ru-migration/compat/fam-route-parity.test.mjs ru-migration/app/backend/test/coder-task-bridge.test.mjs ru-migration/app/backend/test/ydb-agent-task-queue.test.mjs
+      - run: node --test ru-migration/compat/fam-agent-team-governance.test.mjs ru-migration/compat/fam-agent-governance-rehearsal.test.mjs ru-migration/compat/synthetic-batch-migration.test.mjs ru-migration/compat/synthetic-operational-migration.test.mjs ru-migration/compat/synthetic-operational-envelope.test.mjs ru-migration/compat/fam-cutover-readiness.test.mjs ru-migration/compat/fam-route-parity.test.mjs ru-migration/app/backend/test/coder-task-bridge.test.mjs ru-migration/app/backend/test/ydb-agent-task-queue.test.mjs
       - run: node ru-migration/compat/run-fam-agent-governance-rehearsal.mjs
