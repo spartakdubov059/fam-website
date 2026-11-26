@@ -105,7 +105,7 @@ test("a provider outage does not block a locally clean idea, while local risk st
   const ideaEnd = moderate.indexOf("// For locally flagged text", ideaStart);
   assert.ok(ideaStart >= 0 && ideaEnd > ideaStart);
   const ideaPath = moderate.slice(ideaStart, ideaEnd);
-  assert.match(ideaPath, /reviewIdeaContent\(value, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
+  assert.match(ideaPath, /reviewIdeaContent\(externalText, OPENAI_KEY, policyFlag\?\.code \?\? null\)/);
   assert.doesNotMatch(ideaPath, /if \(!OPENAI_KEY\)/);
   assert.match(contentSafety, /serious_hate_or_threat/);
 });
