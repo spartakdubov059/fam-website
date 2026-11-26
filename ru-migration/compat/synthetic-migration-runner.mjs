@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { encodeSyntheticProfileBackup, decodeSyntheticProfileBackup } from './synthetic-profile-backup-envelope.mjs';
-import { verifySyntheticMigrationAcceptance } from './verify-synthetic-migration-acceptance.mjs';
 import { verifySyntheticInventoryAcceptance } from './verify-synthetic-inventory-acceptance.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -12,7 +11,7 @@ function exact(value, keys) {
 
 export function createSyntheticMigrationPlan(input) {
   const fail = code => ({ ok: false, code, live_cutover_authorized: false });
-  if (!exact(input, ['source', 'target', 'restored', 'inventory', 'objects', 'state', 'profiles'])) {
+  if (!exact(input, ['source', 'target', 'restored', 'inventory', 'objects', 'state', 'profiles', 'target_state', 'target_profiles', 'restored_state', 'restored_profiles'])) {
     return fail('INVALID_MIGRATION_PLAN_INPUT');
   }
   if (typeof input.source?.snapshot_id !== 'string'
@@ -24,27 +23,22 @@ export function createSyntheticMigrationPlan(input) {
       || input.source.snapshot_id !== input.inventory?.snapshot_id) {
     return fail('SNAPSHOT_ID_MISMATCH');
   }
-  const acceptance = verifySyntheticMigrationAcceptance({
-    source: input.source,
-    target: input.target,
-    restored: input.restored,
-  });
-  if (!acceptance.ok) return { ok: false, code: acceptance.code, stage: acceptance.stage, live_cutover_authorized: false };
   const inventory = verifySyntheticInventoryAcceptance({
     source: { snapshot: input.source, state: input.state, profiles: input.profiles },
-    target: { snapshot: input.target, state: input.state, profiles: input.profiles },
-    restored: { snapshot: input.restored, state: input.state, profiles: input.profiles },
+    target: { snapshot: input.target, state: input.target_state, profiles: input.target_profiles },
+    restored: { snapshot: input.restored, state: input.restored_state, profiles: input.restored_profiles },
     inventory: input.inventory,
   });
-  if (!inventory.ok) return { ok: false, code: inventory.code, stage: inventory.stage, live_cutover_authorized: false };
+  if (!inventory.ok) return { ...inventory, live_cutover_authorized: false };
   const archive = encodeSyntheticProfileBackup(input.source, input.objects, input.state, input.profiles);
   if (!archive.ok) return archive;
   const plan = {
     version: 1,
     snapshot_id: input.source.snapshot_id,
     archive_sha256: archive.sha256,
-    table_count: 13,
+    table_count: inventory.inventory_tables,
     inventory_tables: inventory.inventory_tables,
+    inventory_sha256: hash(JSON.stringify(Object.entries(input.inventory.counts).sort(([a],[b])=>a.localeCompare(b)))),
     live_cutover_authorized: false,
   };
   const canonical = JSON.stringify(plan);

@@ -63,6 +63,8 @@ jobs:
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Install and test isolated FAM RU backend
         run: npm ci --prefix ru-migration/app/backend --no-audit --no-fund && npm test --prefix ru-migration/app/backend
+      - name: Test synthetic migration package runner
+        run: node --test ru-migration/compat/synthetic-migration-runner.test.mjs
       - name: Validate systemd timer schedules and service references
         run: node ru-migration/compat/verify-systemd-timers.mjs
       - name: Test actual native image processing and SDK exports

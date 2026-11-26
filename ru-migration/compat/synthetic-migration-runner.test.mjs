@@ -13,7 +13,7 @@ test('synthetic migration runner rejects non-synthetic and mismatched snapshots'
     inventory: { snapshot_id: 'real-production' },
     objects: [],
     state: {},
-    profiles: [],
+    profiles: [], target_state: {}, target_profiles: [], restored_state: {}, restored_profiles: [],
   };
   assert.deepEqual(createSyntheticMigrationPlan(input),
     { ok: false, code: 'NON_SYNTHETIC_SNAPSHOT', live_cutover_authorized: false });
@@ -26,7 +26,7 @@ test('synthetic migration package verifier rejects untrusted inputs and digest m
     { ok: false, code: 'MIGRATION_PACKAGE_DIGEST_MISMATCH', live_cutover_authorized: false });
 });
 
-test('synthetic migration runner creates a package with no live cutover authorization', () => {
+function fixture() {
   const a = 'synthetic-a';
   const b = 'synthetic-b';
   const school = 'synthetic-school';
@@ -101,14 +101,23 @@ test('synthetic migration runner creates a package with no live cutover authoriz
   restored.objects[0].byte_length = bytes.length;
   restored.objects[0].sha256 = sha256;
 
-  const prepared = createSyntheticMigrationPlan({
-    source, target, restored, inventory,
-    objects: [{ object_key: 'synthetic-photo', bytes }],
-    state,
-    profiles,
-  });
+  return {source,target,restored,inventory,objects:[{object_key:'synthetic-photo',bytes}],state,profiles,target_state:structuredClone(state),target_profiles:structuredClone(profiles),restored_state:structuredClone(state),restored_profiles:structuredClone(profiles)};
+}
+test('synthetic migration runner creates a package with no live cutover authorization', () => {
+  const prepared = createSyntheticMigrationPlan(fixture());
   assert.equal(prepared.ok, true, JSON.stringify(prepared));
   assert.equal(prepared.live_cutover_authorized, false);
   assert.match(prepared.plan_sha256, /^[a-f0-9]{64}$/);
   assert.equal(verifySyntheticMigrationPackage(prepared.archive, prepared.archiveSha256 ?? prepared.plan.archive_sha256).ok, true);
 });
+
+for (const [name,mutate,code,stage] of [
+ ['changed target read status',x=>x.target_state.messages[0].is_read=false,'RECORD_STATE_MISMATCH','target_state'],
+ ['changed restored moderation',x=>x.restored_state.ideas[0].ai_status='approved','RECORD_STATE_MISMATCH','restored_state'],
+ ['changed target class',x=>x.target_profiles[0].class_name='9Б','PROFILE_DETAILS_MISMATCH','target_profiles'],
+ ['changed restored name',x=>x.restored_profiles[0].first_name='synthetic:Different','PROFILE_DETAILS_MISMATCH','restored_profiles'],
+ ['missing independent target state',x=>delete x.target_state,'INVALID_MIGRATION_PLAN_INPUT',undefined],
+ ['missing independent restored profiles',x=>delete x.restored_profiles,'INVALID_MIGRATION_PLAN_INPUT',undefined],
+ ['shared omission despite matching copies',x=>{for(const k of ['source','target','restored'])x[k].activity.votes=[];},'SOURCE_INVENTORY_COUNT_MISMATCH','source']
+]) test(name,()=>{const x=fixture();mutate(x);const r=createSyntheticMigrationPlan(x);assert.equal(r.ok,false);assert.equal(r.code,code);assert.equal(r.stage,stage);assert.equal(r.live_cutover_authorized,false);assert.equal(Object.hasOwn(r,'archive'),false);});
+test('inventory digest is order independent and plan binds archive digest',()=>{const x=fixture();const a=createSyntheticMigrationPlan(x);assert.equal(a.ok,true);x.inventory.counts=Object.fromEntries(Object.entries(x.inventory.counts).reverse());const b=createSyntheticMigrationPlan(x);assert.equal(b.ok,true);assert.equal(a.plan.inventory_sha256,b.plan.inventory_sha256);assert.equal(a.plan_sha256,b.plan_sha256);assert.equal(a.plan.archive_sha256,createHash('sha256').update(a.archive).digest('hex'));});
