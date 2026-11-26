@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - 'supabase/migrations/**'
-      - 'tests/fixtures/fam-qa-failure/**'
+      - 'tests/fixtures/fam-qwen-qa-failure-migration/**'
       - '.github/workflows/fam-qwen-qa-failure-migration.yml'
 permissions:
   contents: read
@@ -20,24 +20,24 @@ jobs:
           set -euo pipefail
           sudo systemctl start postgresql.service
           sudo -u postgres createdb fam_qa_failure_fixture
-          cat tests/fixtures/fam-qa-failure/setup.sql \
+          cat tests/fixtures/fam-qwen-qa-failure-migration/setup.sql \
             supabase/migrations/20261123001553_fam_qwen_lease_and_lifecycle.sql \
-            tests/fixtures/fam-qa-failure/baseline.sql \
+            tests/fixtures/fam-qwen-qa-failure-migration/baseline.sql \
             supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
-            tests/fixtures/fam-qa-failure/assertions.sql \
+            tests/fixtures/fam-qwen-qa-failure-migration/assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Roll back QA transition and preserve task/event evidence
         run: |
           set -euo pipefail
-          cat tests/fixtures/fam-qa-failure/rollback-prepare.sql \
+          cat tests/fixtures/fam-qwen-qa-failure-migration/rollback-prepare.sql \
             docs/sql/fam-qwen-qa-failed-transition-rollback.sql \
-            tests/fixtures/fam-qa-failure/rollback-assertions.sql \
+            tests/fixtures/fam-qwen-qa-failure-migration/rollback-assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Reapply migration and verify first-attempt QA failure
         run: |
           set -euo pipefail
           cat supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
-            tests/fixtures/fam-qa-failure/reapply-assertions.sql \
+            tests/fixtures/fam-qwen-qa-failure-migration/reapply-assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove disposable database
         if: always()
