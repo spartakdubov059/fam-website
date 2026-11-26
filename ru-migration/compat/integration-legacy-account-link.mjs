@@ -65,9 +65,9 @@ async function main(){
   assert.equal(afterStage[0][0].ready,true);assert.equal(afterChallenge[0][0].consumed,false);
   assert.deepEqual(await repository.linkVerifiedAccount(input(3,4,5)),success,'rolled-back request can be retried');
   // Two different legacy accounts competing for the same provider identity.
-  const extraIds=['edededed-eded-4ded-8ded-ededededed05','edededed-eded-4ded-8ded-ededededed06','edededed-eded-4ded-8ded-ededededed07','edededed-eded-4ded-8ded-ededededed08'];
-  const extraSubjects=['990000000006','990000000007','990000000008'];
-  const extraChallenges=['7','8','9','a'].map(c=>c.repeat(64));
+  const extraIds=['edededed-eded-4ded-8ded-ededededed05','edededed-eded-4ded-8ded-ededededed06','edededed-eded-4ded-8ded-ededededed07','edededed-eded-4ded-8ded-ededededed08','edededed-eded-4ded-8ded-ededededed09','edededed-eded-4ded-8ded-ededededed0a','edededed-eded-4ded-8ded-ededededed0b'];
+  const extraSubjects=['990000000006','990000000007','990000000008','990000000009','990000000010','990000000011'];
+  const extraChallenges=['7','8','9','a','b','c','d'].map(c=>c.repeat(64));
   const bind=(i,j,k)=>({challengeId:extraChallenges[k],legacyUserId:extraIds[i],profileVersion:versions.get(extraIds[i]),issuer,subject:extraSubjects[j]});
   await seedProfile(extraIds[0]);await seedProfile(extraIds[1]);
   await seedChallenge(extraChallenges[0],extraIds[0],extraSubjects[0]);
@@ -90,6 +90,26 @@ async function main(){
     VALUES (${extraIds[3]}, 'lyceum_3', 'synthetic-migration-suspension', CurrentUtcTimestamp());`;
   assert.deepEqual(await repository.linkVerifiedAccount(bind(3,2,3)),fail,'open suspension blocks account linking');
   assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[2]}),null);
+  const deletionGuards=[
+    {id:extraIds[4],subject:extraSubjects[3],challenge:extraChallenges[4],request:'synthetic-migration-deletion-pending',status:'pending'},
+    {id:extraIds[5],subject:extraSubjects[4],challenge:extraChallenges[5],request:'synthetic-migration-deletion-processing',status:'processing'},
+  ];
+  for(const guard of deletionGuards){
+    await seedProfile(guard.id);await seedChallenge(guard.challenge,guard.id,guard.subject);
+    await sql`INSERT INTO fam_account_deletion_requests (request_id,school_id,requester_id,target_id,target_role,reason_code,reason,status,created_at)
+      VALUES (${guard.request},'lyceum_3','synthetic-migration-admin',${guard.id},'student','other','synthetic:reason',${guard.status},CurrentUtcTimestamp());`;
+    assert.deepEqual(await repository.linkVerifiedAccount({challengeId:guard.challenge,legacyUserId:guard.id,profileVersion:versions.get(guard.id),issuer,subject:guard.subject}),fail,`${guard.status} deletion request blocks account linking`);
+    assert.equal((await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${guard.id};`)[0][0].ready,true);
+    assert.equal((await sql`SELECT consumed FROM fam_legacy_migration_challenges WHERE challenge_id = ${guard.challenge};`)[0][0].consumed,false);
+    assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:guard.subject}),null);
+  }
+  await seedProfile(extraIds[6]);await seedChallenge(extraChallenges[6],extraIds[6],extraSubjects[5]);
+  await sql`INSERT INTO fam_account_deletion_open (target_id,request_id,school_id,created_at)
+    VALUES (${extraIds[6]},'synthetic-orphaned-deletion-open','lyceum_3',CurrentUtcTimestamp());`;
+  assert.deepEqual(await repository.linkVerifiedAccount(bind(6,5,6)),fail,'open deletion index blocks account linking even without a matching request row');
+  assert.equal((await sql`SELECT ready FROM fam_legacy_migration_profiles WHERE user_id = ${extraIds[6]};`)[0][0].ready,true);
+  assert.equal((await sql`SELECT consumed FROM fam_legacy_migration_challenges WHERE challenge_id = ${extraChallenges[6]};`)[0][0].consumed,false);
+  assert.equal(await createDatabaseActorResolver(sql)({issuer,subject:extraSubjects[5]}),null);
   await stageIntegration(sql,repository,issuer,success,createDatabaseActorResolver);
   console.log('YDB_SYNTHETIC_LEGACY_EXTRA_GUARDS_PASS');
   console.log('YDB_SYNTHETIC_LEGACY_LINK_PASS: UUID preserved, replay and collisions blocked, one concurrent winner, full transaction rollback and retry');

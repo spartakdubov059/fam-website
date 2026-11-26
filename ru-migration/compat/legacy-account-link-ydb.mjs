@@ -34,6 +34,8 @@ export function createYdbLegacyAccountLinkRepository(sql) {
              rows(await tx`SELECT user_id FROM fam_legacy_migration_links WHERE user_id = ${legacyUserId} LIMIT 1;`).length||
              rows(await tx`SELECT request_id FROM fam_profile_requests WHERE issuer = ${issuer} AND subject = ${subject} LIMIT 1;`).length||
              rows(await tx`SELECT user_id FROM fam_account_deletion_jobs WHERE user_id = ${legacyUserId} LIMIT 1;`).length||
+             rows(await tx`SELECT request_id FROM fam_account_deletion_requests WHERE target_id = ${legacyUserId} AND status IN ('pending', 'processing') LIMIT 1;`).length||
+             rows(await tx`SELECT request_id FROM fam_account_deletion_open WHERE target_id = ${legacyUserId} LIMIT 1;`).length||
              rows(await tx`SELECT target_id FROM fam_account_suspension_open WHERE target_id = ${legacyUserId} LIMIT 1;`).length)return fail();
           // INSERT (not UPSERT) protects existing provider keys. Copy from staged columns
           // to retain nullable fields and the original user UUID exactly.
