@@ -9,6 +9,9 @@ on:
       - "ru-migration/app/backend/services/coder-task-bridge.mjs"
       - "ru-migration/compat/fam-agent-team-governance.mjs"
       - "ru-migration/compat/fam-agent-team-governance.test.mjs"
+      - "ru-migration/compat/fam-cutover-readiness*.mjs"
+      - "ru-migration/compat/fam-legal-cutover-evidence.mjs"
+      - "ru-migration/legal/**"
       - ".github/workflows/fam-ru-agent-governance.yml"
   workflow_dispatch:
 

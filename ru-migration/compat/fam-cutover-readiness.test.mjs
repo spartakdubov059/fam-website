@@ -1,30 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { evaluateFamCutoverReadiness } from './fam-cutover-readiness.mjs';
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { LEGAL_CUTOVER_CRITERIA, evaluateLegalCutoverEvidence } from './fam-legal-cutover-evidence.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const observed = '2026-11-27T00:00:00.000Z';
 const evaluationAt = '2026-11-27T12:00:00.000Z';
-const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-const publicPem = publicKey.export({ format: 'pem', type: 'spki' });
-const trustedKeys = { 'test-cutover-key-1': publicPem };
 const receipt = (kind, name) => {
   const subject_sha256 = sha(`subject:${name}`);
-  const evidenceCanonical = JSON.stringify({ kind, subject_sha256, observed_at: observed, producer: 'independent-test-reporter' });
-  const evidence_sha256 = sha(evidenceCanonical);
-  const signedCanonical = JSON.stringify({ kind, subject_sha256, evidence_sha256, observed_at: observed, producer: 'independent-test-reporter', issuer: 'independent-test-issuer' });
-  return {
-    kind,
-    subject_sha256,
-    evidence_sha256,
-    observed_at: observed,
-    producer: 'independent-test-reporter',
-    issuer: 'independent-test-issuer',
-    public_key_id: 'test-cutover-key-1',
-    payload_sha256: sha(signedCanonical),
-    signature: sign(null, Buffer.from(signedCanonical), privateKey).toString('base64'),
-  };
+  return { kind, subject_sha256, evidence_sha256: sha(`evidence:${name}`), observed_at: observed, producer: 'independent-test-reporter' };
 };
 const ready = () => ({
   target_mode: 'real-cutover',
@@ -37,65 +22,65 @@ const ready = () => ({
   legacy_identity_evidence: receipt('identity', 'legacy'),
   yandex_identity_evidence: receipt('identity', 'yandex'),
   cloud_evidence: receipt('cloud', 'cloud'),
-  owner_authorization: signOwner(),
-});
-
-function signOwner() {
-  const owner = {
+  legal_evidence: {
+    version: 1,
+    release_sha256: sha('approved-cutover-subject'),
+    receipts: LEGAL_CUTOVER_CRITERIA.map(({id}) => ({
+      criterion: id,
+      release_sha256: sha('approved-cutover-subject'),
+      artifact_sha256: sha('synthetic:' + id),
+      reviewed_at: observed,
+      status: 'reviewed',
+    })),
+  },
+  owner_authorization: {
     authorization_id: 'owner-cutover-approved-20261127',
     subject_sha256: sha('approved-cutover-subject'),
     observed_at: observed,
     producer: 'owner-offline-attestation',
     scope: 'real-cutover',
-    issuer: 'owner-issuer',
-  };
-  const canonical = JSON.stringify({
-    authorization_id: owner.authorization_id,
-    subject_sha256: owner.subject_sha256,
-    observed_at: owner.observed_at,
-    producer: owner.producer,
-    scope: owner.scope,
-    issuer: owner.issuer,
-  });
-  return {
-    ...owner,
-    public_key_id: 'test-cutover-key-1',
-    payload_sha256: sha(canonical),
-    signature: sign(null, Buffer.from(canonical), privateKey).toString('base64'),
-  };
-}
-
-test('cutover gate requires every hard readiness gate', () => {
-  assert.deepEqual(evaluateFamCutoverReadiness(ready(), { evaluation_at: evaluationAt, trustedKeys }), {
-    ok: true,
-    code: 'CUTOVER_AUTHORIZATION_READY',
-    live_cutover_authorized: true,
-    blockers: [],
-  });
+  },
 });
 
-test('cutover gate stays fail-closed for missing infrastructure or owner approval', () => {
-  for (const mutation of [
-    value => { value.cloud_evidence = receipt('mobile', 'wrong'); },
-    value => { value.owner_authorization.scope = 'synthetic'; },
-    value => { value.legacy_identity_evidence.observed_at = '2026-01-01T00:00:00.000Z'; },
-    value => { value.target_mode = 'synthetic'; },
-  ]) {
-    const input = ready();
-    mutation(input);
-    const result = evaluateFamCutoverReadiness(input, { evaluation_at: evaluationAt, trustedKeys });
-    assert.equal(result.ok, false);
-    assert.equal(result.live_cutover_authorized, false);
-    assert.equal(result.code, 'CUTOVER_NOT_AUTHORIZED');
-    assert.ok(result.blockers.length);
-  }
+test('cutover gate always blocks real cutover until external legal and technical verification exists', () => {
+  const result = evaluateFamCutoverReadiness(ready(), { evaluation_at: evaluationAt });
+  assert.equal(result.ok, false);
+  assert.equal(result.live_cutover_authorized, false);
+  assert.ok(result.blockers.includes('legal: trusted operator and school evidence verification not implemented'));
+  assert.ok(result.blockers.includes('trusted technical and owner authorization verification not implemented'));
+});
+
+test('cutover gate stays fail-closed for synthetic mode and stale evidence', () => {
+  const synthetic = ready();
+  synthetic.target_mode = 'synthetic';
+  assert.equal(evaluateFamCutoverReadiness(synthetic, { evaluation_at: evaluationAt }).live_cutover_authorized, false);
+  const stale = ready();
+  stale.ci_evidence.observed_at = '2026-01-01T00:00:00.000Z';
+  assert.equal(evaluateFamCutoverReadiness(stale, { evaluation_at: evaluationAt }).live_cutover_authorized, false);
 });
 
 test('cutover gate rejects malformed readiness manifests', () => {
-  assert.deepEqual(evaluateFamCutoverReadiness({ ci_green: true }).blockers,
-    ['invalid_readiness_manifest']);
+  assert.deepEqual(evaluateFamCutoverReadiness({ ci_green: true }).blockers, ['invalid_readiness_manifest']);
   const input = ready();
   input.extra = true;
-  assert.deepEqual(evaluateFamCutoverReadiness(input).blockers,
-    ['invalid_readiness_manifest']);
+  assert.deepEqual(evaluateFamCutoverReadiness(input).blockers, ['invalid_readiness_manifest']);
 });
+
+for (const [label, mutate] of [
+  ['missing localization', x => { x.receipts = x.receipts.filter(r => r.criterion !== 'localization'); }],
+  ['wrong release', x => { x.release_sha256 = sha('other'); }],
+  ['duplicate', x => { x.receipts[1] = x.receipts[0]; }],
+  ['expired', x => { x.receipts[0].reviewed_at = '2026-01-01T00:00:00.000Z'; }],
+  ['future', x => { x.receipts[0].reviewed_at = '2026-12-01T00:00:00.000Z'; }],
+  ['invalid hash', x => { x.receipts[0].artifact_sha256 = 'not-a-digest'; }],
+  ['unreviewed', x => { x.receipts[0].status = 'pending'; }],
+  ['extra raw field', x => { x.receipts[0].raw_document = 'synthetic prohibited field'; }],
+]) {
+  test('legal gate blocks ' + label, () => {
+    const input = ready();
+    mutate(input.legal_evidence);
+    const result = evaluateLegalCutoverEvidence(input.legal_evidence, input.owner_authorization.subject_sha256, Date.parse(evaluationAt));
+    assert.equal(result.ok, false);
+    assert.equal(result.live_cutover_authorized, false);
+  });
+}
