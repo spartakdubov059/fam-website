@@ -11,7 +11,7 @@ begin
     raise exception 'Rollback or rejected transition changed task rows';
   end if;
   if (select data from qa_rollback_event_snapshot) is distinct from
-     (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.task_id,e.event_type,e.metadata::text),'[]'::jsonb) from private.fam_agent_task_events e) then
+     (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) from private.fam_agent_task_events e) then
     raise exception 'Rollback or rejected transition changed event history';
   end if;
   if has_function_privilege('anon','public.advance_fam_agent_coder_task(uuid,text,text,integer)','execute')
