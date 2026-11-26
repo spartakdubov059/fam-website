@@ -5,6 +5,7 @@ on:
       - 'tests/fixtures/fam-qa-failure/**'
       - '.github/workflows/fam-qa-failure-contract.yml'
       - 'supabase/migrations/**'
+      - 'docs/sql/fam-agent-coder-lifecycle-resolution-rollback.sql'
 permissions:
   contents: read
 jobs:
@@ -61,6 +62,18 @@ jobs:
           set -euo pipefail
           cat supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql \
             tests/fixtures/fam-qa-failure/lifecycle-178-fixed.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Roll back only the PR 178 lifecycle resolver and preserve evidence
+        run: |
+          set -euo pipefail
+          cat docs/sql/fam-agent-coder-lifecycle-resolution-rollback.sql \
+            tests/fixtures/fam-qa-failure/lifecycle-178-rollback.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Reapply lifecycle resolver and verify terminal replay
+        run: |
+          set -euo pipefail
+          cat supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql \
+            tests/fixtures/fam-qa-failure/lifecycle-178-reapply.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove fixture database
         if: always()
