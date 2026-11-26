@@ -1,3 +1,4 @@
+import { evaluateLegalCutoverEvidence } from './fam-legal-cutover-evidence.mjs';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 const exactKeys = (value, keys) =>
@@ -44,7 +45,7 @@ export function evaluateFamCutoverReadiness(input, options = {}) {
     'target_mode', 'source_inventory', 'ru_schema_inventory', 'ci_evidence',
     'security_evidence', 'mobile_evidence', 'operational_evidence',
     'legacy_identity_evidence', 'yandex_identity_evidence', 'cloud_evidence',
-    'owner_authorization',
+    'owner_authorization', 'legal_evidence',
   ])) return fail(['invalid_readiness_manifest']);
   if (input.target_mode !== 'real-cutover') return fail(['synthetic readiness cannot authorize real cutover']);
   const now = Number.isSafeInteger(options.now) ? options.now : Date.now();
@@ -87,11 +88,9 @@ export function evaluateFamCutoverReadiness(input, options = {}) {
       || evaluatedAt - Date.parse(owner.observed_at) > maxAgeMs) {
     blockers.push('owner cutover authorization is missing or stale');
   }
-  if (blockers.length) return fail(blockers);
-  return {
-    ok: true,
-    code: 'CUTOVER_AUTHORIZATION_READY',
-    live_cutover_authorized: true,
-    blockers: [],
-  };
+  const legal = evaluateLegalCutoverEvidence(input.legal_evidence, owner?.subject_sha256, evaluatedAt);
+  blockers.push(...legal.blockers);
+  // This offline rehearsal cannot authenticate technical receipts or an owner's authority.
+  blockers.push('trusted technical and owner authorization verification not implemented');
+  return fail(blockers);
 }
