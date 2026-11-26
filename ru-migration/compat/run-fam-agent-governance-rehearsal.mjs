@@ -56,8 +56,8 @@ const rehearsal = runIsolatedAgentGovernanceRehearsal({
       },
 });
 
-if (!rehearsal.ok) {
-  console.error(JSON.stringify({ ok: false, code: rehearsal.code, production_access: false }));
+if (!developer.ok || !qa.ok || !rehearsal.ok) {
+  console.error(JSON.stringify({ ok: false, code: !developer.ok ? developer.code : !qa.ok ? qa.code : rehearsal.code, production_access: false }));
   process.exitCode = 1;
 } else {
   console.log(JSON.stringify({

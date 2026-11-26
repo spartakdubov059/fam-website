@@ -58,3 +58,12 @@ test('isolated pipeline stops patch release when QA or scope is invalid', () => 
   const scope = { ...base, developerPatch: patchEvidence(['supabase/functions/moderate/index.ts']) };
   assert.equal(runIsolatedAgentGovernanceRehearsal(scope).code, 'DEVELOPER_SCOPE_VIOLATION');
 });
+
+
+test('governance cannot pass on failed or empty QA even when there is no patch',()=>{
+ const base={pulls:[{number:167,draft:false,files:[]}],queue:{failed_last_24h:0,expired_leases:0},warnings:[],developerPatch:{...patchEvidence(['ru-migration/app/backend/server.mjs']),has_patch:false},qaResult:qaEvidence(true)};
+ assert.equal(runIsolatedAgentGovernanceRehearsal({...base,qaResult:qaEvidence(false)}).code,'QA_GATE_NOT_PASSED');
+ assert.equal(runIsolatedAgentGovernanceRehearsal({...base,qaResult:{...qaEvidence(true),tests_run:0}}).code,'QA_GATE_NOT_PASSED');
+ assert.equal(runIsolatedAgentGovernanceRehearsal({...base,qaResult:{...qaEvidence(true),revision_sha256:'b'.repeat(64)}}).code,'QA_REVISION_MISMATCH');
+ assert.equal(runIsolatedAgentGovernanceRehearsal({...base,developerPatch:patchEvidence(['ru-migration/../supabase/functions/moderate/index.ts'])}).code,'DEVELOPER_SCOPE_VIOLATION');
+});

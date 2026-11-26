@@ -1,3 +1,4 @@
+import { isSafeRehearsalScope } from './fam-agent-execution-evidence.mjs';
 import {
   findAgentDisputes,
   buildAgentIntegrationPlan,
@@ -46,9 +47,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
       || !/^[a-f0-9]{64}$/.test(patch.patch_digest)
       || typeof patch.revision_sha256 !== 'string'
       || !/^[a-f0-9]{64}$/.test(patch.revision_sha256)) return fail('INVALID_DEVELOPER_RESULT');
-  if (patch.approved_scope.some(path =>
-    typeof path !== 'string'
-    || (!path.startsWith('ru-migration/') && !path.startsWith('docs/') && !path.startsWith('tests/')))) {
+  if (patch.approved_scope.some(path=>!isSafeRehearsalScope(path)) || new Set(patch.approved_scope).size!==patch.approved_scope.length || (patch.has_patch&&patch.approved_scope.length===0)) {
     return fail('DEVELOPER_SCOPE_VIOLATION');
   }
 
@@ -67,6 +66,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
       || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(qa.observed_at)
       || !Number.isFinite(Date.parse(qa.observed_at))) return fail('INVALID_QA_RESULT');
   if (qa.patch_digest !== patch.patch_digest) return fail('QA_PATCH_MISMATCH');
+  if (qa.revision_sha256 !== patch.revision_sha256) return fail('QA_REVISION_MISMATCH');
 
   const stages = [
     { role: 'inspector', status: inspectorSignal ? 'signal_ready' : 'no_signal' },
@@ -77,7 +77,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
     { role: 'recruiter', status: recruitment.length ? 'human_review_proposed' : 'no_recruitment_proposed' },
   ];
 
-  if (patch.has_patch && (!qa.passed || qa.tests_run === 0)) return fail('QA_GATE_NOT_PASSED');
+  if (!qa.passed || qa.tests_run === 0) return fail('QA_GATE_NOT_PASSED');
   return Object.freeze({
     ok: true,
     code: 'ISOLATED_AGENT_GOVERNANCE_REHEARSAL_PASS',

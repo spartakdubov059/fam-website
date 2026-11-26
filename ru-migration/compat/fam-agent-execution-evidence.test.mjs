@@ -26,3 +26,12 @@ test('QA evidence rejects unknown test files and developer evidence rejects prot
     approvedScope: ['supabase/functions/moderate/index.ts'],
   }).code, 'INVALID_DEVELOPER_SCOPE');
 });
+
+
+test('agent execution refuses arbitrary binaries, duplicate tests and traversal scopes',()=>{
+ const cwd=new URL('../..',import.meta.url).pathname;
+ const file='ru-migration/compat/fam-agent-team-governance.test.mjs';
+ assert.equal(executeAgentQaEvidence({cwd,testFiles:[file],nodeExecutable:'not-approved'}).code,'INVALID_AGENT_QA_REQUEST');
+ assert.equal(executeAgentQaEvidence({cwd,testFiles:[file,file]}).code,'INVALID_AGENT_QA_REQUEST');
+ for(const path of ['ru-migration/../supabase/functions/moderate/index.ts','ru-migration/**','ru-migration//compat/file.mjs','ru-migration/./compat/file.mjs'])assert.equal(executeDeveloperPatchEvidence({cwd,approvedScope:[path]}).code,'INVALID_DEVELOPER_SCOPE');
+});
