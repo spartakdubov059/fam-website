@@ -56,6 +56,13 @@ jobs:
           cat tests/fixtures/fam-qa-failure/lifecycle-178-baseline.sql \
             tests/fixtures/fam-qa-failure/lifecycle-178-diagnostic.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
+      - name: Verify fixed PR 178 resolver and queue integration without production
+        run: |
+          set -euo pipefail
+          cat tests/fixtures/fam-qa-failure/lifecycle-178-candidate.sql \
+            tests/fixtures/fam-qa-failure/lifecycle-178-fixed.sql \
+            tests/fixtures/fam-qa-failure/lifecycle-178-queue-integration.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove fixture database
         if: always()
         run: sudo -u postgres dropdb --if-exists fam_qa_failure_fixture
