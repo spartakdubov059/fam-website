@@ -50,6 +50,12 @@ jobs:
           install -m 644 tests/fixtures/fam-qa-failure/rollout-forward.sql "$FIXTURE_DIR/"
           install -m 644 tests/fixtures/fam-qa-failure/verify-rollout.py "$FIXTURE_DIR/"
           sudo -u postgres python3 "$FIXTURE_DIR/verify-rollout.py"
+      - name: Diagnose exact PR 178 lifecycle SQL on disposable fixture
+        run: |
+          set -euo pipefail
+          cat tests/fixtures/fam-qa-failure/lifecycle-178-baseline.sql \
+            tests/fixtures/fam-qa-failure/lifecycle-178-diagnostic.sql \
+            | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove fixture database
         if: always()
         run: sudo -u postgres dropdb --if-exists fam_qa_failure_fixture
