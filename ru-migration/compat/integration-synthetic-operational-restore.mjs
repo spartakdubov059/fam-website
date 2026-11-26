@@ -16,7 +16,6 @@ async function seedOperationalTables(sql, snapshot) {
   const suspension = snapshot.suspensions[0];
   const deletion = snapshot.deletion_requests[0];
   const role = snapshot.role_requests[0];
-  const roleAudit = snapshot.role_audit[0];
   const adminAudit = snapshot.admin_audit[0];
   const safety = snapshot.safety_incidents[0];
   await sql.begin(async tx => {
@@ -29,28 +28,28 @@ async function seedOperationalTables(sql, snapshot) {
     }
     await tx`INSERT INTO fam_account_suspensions
       (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at, lifted_by, lifted_at)
-      VALUES (${suspension.school_id}, ${suspension.user_id}, ${suspension.suspension_id}, ${suspension.target_role}, Unwrap(CAST(${suspension.duration_hours} AS Uint32)), ${suspension.reason_code}, ${suspension.status}, ${suspension.issued_by}, ${createdAt}, ${expiresAt}, ${suspension.lifted_by}, ${suspension.lifted_at});`;
+      VALUES (${suspension.school_id}, ${suspension.user_id}, ${suspension.suspension_id}, 'student', Unwrap(CAST(24 AS Uint32)), ${suspension.reason_code}, ${suspension.active ? 'active' : 'lifted'}, ${actor}, ${createdAt}, ${expiresAt}, NULL, NULL);`;
     await tx`INSERT INTO fam_account_suspension_open
       (target_id, school_id, suspension_id, created_at)
       VALUES (${target}, ${suspension.school_id}, ${suspension.suspension_id}, ${createdAt});`;
     await tx`INSERT INTO fam_account_deletion_requests
       (request_id, school_id, requester_id, target_id, target_role, reason_code, reason, status, reviewed_by, reviewed_at, review_note, created_at)
-      VALUES (${deletion.request_id}, ${deletion.school_id}, ${deletion.requester_id}, ${deletion.target_id}, ${deletion.target_role}, ${deletion.reason_code}, ${deletion.reason}, ${deletion.status}, ${deletion.reviewed_by}, ${deletion.reviewed_at}, ${deletion.review_note}, ${createdAt});`;
+      VALUES (${deletion.request_id}, ${deletion.school_id}, ${actor}, ${deletion.user_id}, 'student', 'other', 'synthetic:reason', ${deletion.status}, NULL, NULL, NULL, ${createdAt});`;
     await tx`INSERT INTO fam_account_deletion_open
       (target_id, request_id, school_id, created_at)
       VALUES (${target}, ${deletion.request_id}, ${deletion.school_id}, ${createdAt});`;
     await tx`INSERT INTO fam_school_role_requests
       (issuer, subject, request_id, user_id, school_id, requested_role, status, review_started_by, review_started_at, reviewed_by, reviewed_at, review_note, created_at)
-      VALUES (${role.issuer}, ${role.subject}, ${role.request_id}, ${role.user_id}, ${role.school_id}, ${role.role}, ${role.status}, ${role.review_started_by}, ${role.review_started_at}, ${role.reviewed_by}, ${role.reviewed_at}, ${role.review_note}, ${createdAt});`;
+      VALUES ('https://synthetic.invalid', 'synthetic-subject-1', ${role.request_id}, ${role.user_id}, ${role.school_id}, ${role.role}, ${role.status}, NULL, NULL, NULL, NULL, NULL, ${createdAt});`;
     await tx`INSERT INTO fam_school_role_request_audit
       (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
-      VALUES (${roleAudit.event_id}, ${role.request_id}, ${role.school_id}, ${roleAudit.actor_id}, ${role.role}, ${roleAudit.action}, ${roleAudit.status}, ${createdAt});`;
+      VALUES ('synthetic-role-audit-1', ${role.request_id}, ${role.school_id}, ${actor}, ${role.role}, 'submitted', 'pending', ${createdAt});`;
     await tx`INSERT INTO fam_school_admin_audit
       (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
       VALUES (${adminAudit.audit_id}, ${adminAudit.school_id}, ${adminAudit.actor_id}, ${adminAudit.entity_id}, ${adminAudit.action}, 'school_admin', ${createdAt});`;
     await tx`INSERT INTO fam_safety_incidents
       (school_id, pair_fingerprint, source_kind, category, incident_id, severity, created_at, reviewed_at, reviewed_by, actor_id, target_id, source_origin, evidence_excerpt)
-      VALUES (${safety.school_id}, ${safety.pair_fingerprint}, ${safety.source_kind}, ${safety.category}, ${safety.incident_id}, ${safety.level}, ${createdAt}, ${safety.reviewed_at}, ${safety.reviewed_by}, ${safety.actor_id}, ${safety.target_id}, ${safety.source_origin}, ${safety.evidence_excerpt});`;
+      VALUES (${safety.school_id}, 'synthetic-fingerprint-1', 'message', ${safety.category}, ${safety.incident_id}, ${safety.level}, ${createdAt}, NULL, NULL, ${safety.actor_id}, NULL, NULL, NULL);`;
   });
 }
 
@@ -99,12 +98,11 @@ try {
       { notification_id: 'synthetic-notification-1', user_id: target, school_id: school, kind: 'message', read: true, created_at: created },
       { notification_id: 'synthetic-notification-2', user_id: target, school_id: school, kind: 'listing', read: false, created_at: created },
     ],
-    suspensions: [{ suspension_id: 'synthetic-suspension-1', user_id: target, school_id: school, target_role: 'student', duration_hours: 24, reason_code: 'synthetic-rule', status: 'active', issued_by: actor, expires_at: expires, lifted_by: null, lifted_at: null }],
-    deletion_requests: [{ request_id: 'synthetic-deletion-1', requester_id: actor, target_id: target, user_id: target, school_id: school, target_role: 'student', reason_code: 'other', reason: 'synthetic:reason', status: 'pending', reviewed_by: null, reviewed_at: null, review_note: null, created_at: created }],
-    role_requests: [{ issuer: 'https://synthetic.invalid', subject: 'synthetic-subject-1', request_id: 'synthetic-role-1', user_id: target, school_id: school, role: 'council_member', status: 'pending', review_started_by: null, review_started_at: null, reviewed_by: null, reviewed_at: null, review_note: null, created_at: created }],
-    role_audit: [{ event_id: 'synthetic-role-audit-1', actor_id: actor, action: 'submitted', status: 'pending' }],
+    suspensions: [{ suspension_id: 'synthetic-suspension-1', user_id: target, school_id: school, active: true, reason_code: 'synthetic-rule', expires_at: expires }],
+    deletion_requests: [{ request_id: 'synthetic-deletion-1', user_id: target, school_id: school, status: 'pending', created_at: created }],
+    role_requests: [{ request_id: 'synthetic-role-1', user_id: target, school_id: school, role: 'council_member', status: 'pending', created_at: created }],
     admin_audit: [{ audit_id: 'synthetic-admin-audit-1', school_id: school, actor_id: actor, action: 'revoke_role', entity_id: target, created_at: created }],
-    safety_incidents: [{ incident_id: 'synthetic-safety-1', school_id: school, actor_id: target, category: 'synthetic-category', level: 'medium', pair_fingerprint: 'synthetic-fingerprint-1', source_kind: 'message', reviewed_at: null, reviewed_by: null, target_id: null, source_origin: null, evidence_excerpt: null, created_at: created }],
+    safety_incidents: [{ incident_id: 'synthetic-safety-1', school_id: school, actor_id: target, category: 'synthetic-category', level: 'medium', created_at: created }],
   };
   const envelope = encodeSyntheticOperationalEnvelope(operationalSnapshot);
   assert.equal(envelope.ok, true);
