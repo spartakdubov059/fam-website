@@ -19,6 +19,9 @@ declare
   v_task private.fam_agent_tasks%rowtype;
   v_pr_number integer;
   v_head_sha text;
+  v_approved_head_sha text;
+  v_merge_commit_sha text;
+  v_lifecycle_state text;
   v_summary text;
   v_status text;
   v_event text;
@@ -47,7 +50,10 @@ begin
     and approval_required = false
     and source in ('system','scheduled_audit')
   for update;
-  if not found or v_task.status <> 'in_progress' or v_task.claimed_by is not null then
+  if not found or v_task.claimed_by is not null then
+    return false;
+  end if;
+  if v_task.status not in ('in_progress','completed') then
     return false;
   end if;
 
@@ -67,6 +73,48 @@ begin
     return false;
   end if;
   v_head_sha := v_task.payload->>'pr_head_sha';
+  v_approved_head_sha := v_task.payload->>'approved_head_sha';
+  v_merge_commit_sha := v_task.payload->>'merge_commit_sha';
+  v_lifecycle_state := coalesce(v_task.payload->>'lifecycle_state','pending_review');
+
+  -- Terminal replay is acknowledged only for the exact same evidence.
+  if v_task.status = 'completed' then
+    if p_stage = 'postmerge_verified'
+      and v_lifecycle_state = 'completed'
+      and v_head_sha = p_head_sha
+      and v_merge_commit_sha = p_merge_commit_sha
+      and exists (
+        select 1 from private.fam_agent_task_events
+        where task_id = p_task_id and metadata->>'stage' = 'postmerge_verified'
+          and metadata->>'pr_number' = p_pr_number::text
+          and metadata->>'head_sha' = p_head_sha
+          and metadata->>'merge_commit_sha' = p_merge_commit_sha
+      ) then
+      return true;
+    end if;
+    if p_stage = 'owner_approved'
+      and v_lifecycle_state = 'completed'
+      and v_head_sha = p_head_sha
+      and v_approved_head_sha = p_head_sha
+    then
+      return true;
+    end if;
+    if p_stage = 'merged'
+      and v_lifecycle_state = 'completed'
+      and v_head_sha = p_head_sha
+      and v_merge_commit_sha = p_merge_commit_sha
+      and exists (
+        select 1 from private.fam_agent_task_events
+        where task_id = p_task_id and metadata->>'stage' = 'merged'
+          and metadata->>'pr_number' = p_pr_number::text
+          and metadata->>'head_sha' = p_head_sha
+          and metadata->>'merge_commit_sha' = p_merge_commit_sha
+      )
+    then
+      return true;
+    end if;
+    return false;
+  end if;
 
   if p_stage = 'owner_approved' then
     if exists (
@@ -74,18 +122,38 @@ begin
       where task_id = p_task_id and metadata->>'stage' = 'owner_approved'
         and metadata->>'pr_number' = p_pr_number::text
         and metadata->>'head_sha' = p_head_sha
+        and v_lifecycle_state in ('approved_waiting_merge','merged_pending_postmerge','merged_postmerge_failed','completed')
+        and v_approved_head_sha = p_head_sha
     ) then
       return true;
     end if;
-    if v_task.result_summary not in (
-      'PR создан после независимой QA; ожидает решения владельца.',
-      'PR закрыт без merge; требуется повторно проверить reopened PR.'
-    ) then
+    if v_lifecycle_state in ('merged_pending_postmerge','merged_postmerge_failed','completed') then
       return false;
+    end if;
+    -- Before merge, a changed head SHA replaces the previous approval.
+    -- After close/reopen, the same head can be approved again.
+    if v_lifecycle_state not in ('pending_review','closed_unmerged','approved_waiting_merge') then
+      return false;
+    end if;
+    if v_lifecycle_state = 'approved_waiting_merge'
+      and v_head_sha is distinct from p_head_sha
+    then
+      -- A new revision invalidates prior merge evidence and starts a fresh review.
+      v_lifecycle_state := 'pending_review';
+      v_merge_commit_sha := null;
+    elsif v_lifecycle_state = 'closed_unmerged'
+      and v_head_sha is distinct from p_head_sha
+    then
+      v_lifecycle_state := 'pending_review';
+      v_merge_commit_sha := null;
     end if;
     v_summary := 'Подтверждено одобрение владельца точной ревизии PR.';
     v_status := 'in_progress';
     v_event := 'progress';
+    v_lifecycle_state := 'approved_waiting_merge';
+    v_head_sha := p_head_sha;
+    v_approved_head_sha := p_head_sha;
+    v_merge_commit_sha := null;
   elsif p_stage = 'merged' then
     if exists (
       select 1 from private.fam_agent_task_events
@@ -93,12 +161,21 @@ begin
         and metadata->>'pr_number' = p_pr_number::text
         and metadata->>'head_sha' = p_head_sha
         and metadata->>'merge_commit_sha' = p_merge_commit_sha
+        and v_lifecycle_state in ('merged_pending_postmerge','merged_postmerge_failed','completed')
+        and v_head_sha = p_head_sha
+        and v_merge_commit_sha = p_merge_commit_sha
     ) then
       return true;
     end if;
-    if p_merge_commit_sha is null or p_merge_commit_sha !~ '^[0-9a-fA-F]{40}$'
+    if v_lifecycle_state not in ('approved_waiting_merge') then
+      return false;
+    end if;
+    if v_approved_head_sha is distinct from p_head_sha
       or v_head_sha is distinct from p_head_sha
-      or v_task.result_summary <> 'Подтверждено одобрение владельца точной ревизии PR.'
+    then
+      return false;
+    end if;
+    if p_merge_commit_sha is null or p_merge_commit_sha !~ '^[0-9a-fA-F]{40}$'
       or not exists (
         select 1 from private.fam_agent_task_events
         where task_id = p_task_id and event_type = 'progress'
@@ -112,6 +189,8 @@ begin
     v_summary := 'PR объединён; ожидается проверка точного merge-коммита.';
     v_status := 'in_progress';
     v_event := 'progress';
+    v_lifecycle_state := 'merged_pending_postmerge';
+    v_merge_commit_sha := p_merge_commit_sha;
   elsif p_stage = 'postmerge_verified' then
     if exists (
       select 1 from private.fam_agent_task_events
@@ -122,12 +201,12 @@ begin
     ) then
       return true;
     end if;
+    if v_lifecycle_state not in ('merged_pending_postmerge','merged_postmerge_failed') then
+      return false;
+    end if;
     if p_merge_commit_sha is null or p_merge_commit_sha !~ '^[0-9a-fA-F]{40}$'
       or v_head_sha is distinct from p_head_sha
-      or v_task.result_summary not in (
-        'PR объединён; ожидается проверка точного merge-коммита.',
-        'Merge-коммит не прошёл проверку CI после объединения.'
-      )
+      or v_merge_commit_sha is distinct from p_merge_commit_sha
       or not exists (
         select 1 from private.fam_agent_task_events
         where task_id = p_task_id and event_type = 'progress'
@@ -141,6 +220,7 @@ begin
     v_status := 'completed';
     v_event := 'completed';
     v_finished := true;
+    v_lifecycle_state := 'completed';
   elsif p_stage = 'postmerge_failed' then
     if exists (
       select 1 from private.fam_agent_task_events
@@ -151,30 +231,44 @@ begin
     ) then
       return true;
     end if;
+    if v_lifecycle_state not in ('merged_pending_postmerge','merged_postmerge_failed') then
+      return false;
+    end if;
+    if v_lifecycle_state = 'merged_postmerge_failed'
+      and v_merge_commit_sha = p_merge_commit_sha
+      and v_head_sha = p_head_sha
+    then
+      return true;
+    end if;
     if p_merge_commit_sha is null or p_merge_commit_sha !~ '^[0-9a-fA-F]{40}$'
       or v_head_sha is distinct from p_head_sha
-      or v_task.result_summary <> 'PR объединён; ожидается проверка точного merge-коммита.'
+      or v_merge_commit_sha is distinct from p_merge_commit_sha
     then
       return false;
     end if;
     v_summary := 'Merge-коммит не прошёл проверку CI после объединения.';
     v_status := 'in_progress';
     v_event := 'progress';
+    v_lifecycle_state := 'merged_postmerge_failed';
   else
     if exists (
       select 1 from private.fam_agent_task_events
       where task_id = p_task_id and metadata->>'stage' = 'pr_closed_unmerged'
         and metadata->>'pr_number' = p_pr_number::text
         and metadata->>'head_sha' = p_head_sha
+        and v_lifecycle_state = 'closed_unmerged'
     ) then
       return true;
     end if;
-    if v_task.result_summary = 'Одобрение владельца, merge и CI объединённого коммита подтверждены.' then
+    if v_lifecycle_state in ('merged_pending_postmerge','merged_postmerge_failed','completed') then
       return false;
     end if;
     v_summary := 'PR закрыт без merge; требуется повторно проверить reopened PR.';
     v_status := 'in_progress';
     v_event := 'progress';
+    v_lifecycle_state := 'closed_unmerged';
+    v_approved_head_sha := null;
+    v_merge_commit_sha := null;
   end if;
 
   update private.fam_agent_tasks as t
@@ -183,8 +277,10 @@ begin
       payload = t.payload
         || pg_catalog.jsonb_build_object(
           'pr_number', p_pr_number,
-          'pr_head_sha', p_head_sha,
-          'merge_commit_sha', coalesce(p_merge_commit_sha, t.payload->>'merge_commit_sha')
+          'pr_head_sha', v_head_sha,
+          'approved_head_sha', v_approved_head_sha,
+          'merge_commit_sha', v_merge_commit_sha,
+          'lifecycle_state', v_lifecycle_state
         ),
       lease_expires_at = null,
       finished_at = case when v_finished then pg_catalog.now() else null end,
