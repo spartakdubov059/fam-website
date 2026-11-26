@@ -10,5 +10,5 @@ create temporary table qa_rollback_task_snapshot as
 select coalesce(jsonb_agg(to_jsonb(t) order by t.id::text),'[]'::jsonb) as data
 from private.fam_agent_tasks t;
 create temporary table qa_rollback_event_snapshot as
-select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.task_id,e.event_type,e.metadata::text),'[]'::jsonb) as data
+select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at,e.id),'[]'::jsonb) as data
 from private.fam_agent_task_events e;
