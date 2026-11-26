@@ -236,7 +236,7 @@ test("Lifecycle requires complete reopen history and ignores stale owner approva
     runs: [baseRun], repository: "spartakdubov059/fam-website", read: readFor(staleReview),
   });
   assert.equal(stale.rows[0].review_history_complete, true);
-  assert.equal(stale.rows[0].reopened_at, Date.parse(reopenedAt));
+  assert.equal(stale.rows[0].reopened_at, reopenedAt);
   assert.equal(stale.rows[0].owner_approved, false);
 
   const fresh = await collectCoderLifecycle({

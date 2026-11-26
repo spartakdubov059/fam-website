@@ -54,7 +54,9 @@ async function latestReopenedAt(read, prNumber, mergedAt) {
       if (!Number.isFinite(at)) throw new Error("Incomplete PR reopen event");
       if (at <= upper) transitions.push(at);
     }
-    if (events.length < 100) return transitions.length ? Math.max(...transitions) : null;
+    if (events.length < 100) {
+      return transitions.length ? new Date(Math.max(...transitions)).toISOString() : null;
+    }
   }
   throw new Error("PR timeline exceeds the reconciliation limit");
 }
