@@ -7,18 +7,19 @@ import { dirname, resolve } from 'node:path';
 
 const cwd = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const qa = executeAgentQaEvidence({
-  cwd,
-  testFiles: [
-    'ru-migration/compat/fam-agent-team-governance.test.mjs',
-    'ru-migration/compat/fam-agent-governance-rehearsal.test.mjs',
-  ],
-});
 const developer = executeDeveloperPatchEvidence({
   cwd,
   approvedScope: [
     'ru-migration/app/backend/server.mjs',
     'ru-migration/app/backend/repositories/ydb-agent-task-queue.mjs',
+  ],
+});
+const qa = executeAgentQaEvidence({
+  cwd,
+  patchDigest: developer.ok ? developer.patch_digest : '0'.repeat(64),
+  testFiles: [
+    'ru-migration/compat/fam-agent-team-governance.test.mjs',
+    'ru-migration/compat/fam-agent-governance-rehearsal.test.mjs',
   ],
 });
 
@@ -45,12 +46,13 @@ const rehearsal = runIsolatedAgentGovernanceRehearsal({
   qaResult: qa.ok
     ? { passed: true, tests_run: qa.tests_run, production_access: false, test_digest: qa.test_digest,
         output_sha256: qa.output_sha256, observed_at: qa.observed_at,
-        revision_sha256: qa.revision_sha256, subject_sha256: qa.subject_sha256 }
+        revision_sha256: qa.revision_sha256, subject_sha256: qa.subject_sha256,
+        patch_digest: qa.patch_digest }
     : {
         passed: false, tests_run: qa.tests_run || 0, production_access: false,
         test_digest: '0'.repeat(64), output_sha256: '0'.repeat(64),
         observed_at: new Date().toISOString(), revision_sha256: '0'.repeat(64),
-        subject_sha256: '0'.repeat(64),
+        subject_sha256: '0'.repeat(64), patch_digest: '0'.repeat(64),
       },
 });
 

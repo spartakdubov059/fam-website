@@ -53,7 +53,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
   }
 
   const qa = input.qaResult;
-  if (!exactKeys(qa, ['passed', 'tests_run', 'production_access', 'test_digest', 'output_sha256', 'observed_at', 'revision_sha256', 'subject_sha256'])
+  if (!exactKeys(qa, ['passed', 'tests_run', 'production_access', 'test_digest', 'output_sha256', 'observed_at', 'revision_sha256', 'subject_sha256', 'patch_digest'])
       || typeof qa.passed !== 'boolean'
       || !Number.isSafeInteger(qa.tests_run)
       || qa.tests_run < 0
@@ -63,8 +63,10 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
       || typeof qa.observed_at !== 'string'
       || typeof qa.revision_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(qa.revision_sha256)
       || typeof qa.subject_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(qa.subject_sha256)
+      || typeof qa.patch_digest !== 'string' || !/^[a-f0-9]{64}$/.test(qa.patch_digest)
       || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(qa.observed_at)
       || !Number.isFinite(Date.parse(qa.observed_at))) return fail('INVALID_QA_RESULT');
+  if (qa.patch_digest !== patch.patch_digest) return fail('QA_PATCH_MISMATCH');
 
   const stages = [
     { role: 'inspector', status: inspectorSignal ? 'signal_ready' : 'no_signal' },

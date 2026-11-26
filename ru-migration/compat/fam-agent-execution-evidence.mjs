@@ -13,7 +13,7 @@ const ALLOWED_TESTS = new Set([
   'ru-migration/compat/fam-route-parity.test.mjs',
 ]);
 
-export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node', now = Date.now } = {}) {
+export function executeAgentQaEvidence({ cwd, testFiles, patchDigest = '0'.repeat(64), nodeExecutable = 'node', now = Date.now } = {}) {
   if (typeof cwd !== 'string' || !Array.isArray(testFiles) || !testFiles.length
       || testFiles.length > 20 || testFiles.some(file => !ALLOWED_TESTS.has(file))) {
     return { ok: false, code: 'INVALID_AGENT_QA_REQUEST', production_access: false };
@@ -27,6 +27,9 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
     return { ok: false, code: 'MISSING_AGENT_QA_TEST', production_access: false };
   }
   const testDigest = hash(Buffer.concat(testContents));
+  if (!/^[a-f0-9]{64}$/.test(patchDigest)) {
+    return { ok: false, code: 'INVALID_AGENT_QA_PATCH_DIGEST', production_access: false };
+  }
   const headResult = spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8', timeout: 30_000 });
   const headSha = headResult.status === 0 ? headResult.stdout.trim() : '';
   if (!/^[a-f0-9]{40}$/.test(headSha)) {
@@ -49,7 +52,7 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
   if (hash(afterDiff) !== beforeDigest) {
     return { ok: false, code: 'AGENT_QA_WORKTREE_CHANGED', production_access: false };
   }
-  const subjectSha = hash(JSON.stringify({ revision: headSha, test_digest: testDigest, patch_digest: beforeDigest }));
+  const subjectSha = hash(JSON.stringify({ revision: headSha, test_digest: testDigest, patch_digest: patchDigest, test_patch_digest: beforeDigest }));
   return {
     ok: passed,
     code: passed ? 'AGENT_QA_EXECUTED_PASS' : 'AGENT_QA_EXECUTED_FAIL',
@@ -61,6 +64,7 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
     observed_at: new Date(now()).toISOString(),
     revision_sha256: hash(headSha),
     subject_sha256: subjectSha,
+    patch_digest: patchDigest,
     production_access: false,
   };
 }

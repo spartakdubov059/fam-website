@@ -12,35 +12,41 @@ const createdAt = new Date(created);
 const expiresAt = new Date(expires);
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 
-async function seedOperationalTables(sql) {
+async function seedOperationalTables(sql, snapshot) {
+  const notification = snapshot.notifications[0];
+  const suspension = snapshot.suspensions[0];
+  const deletion = snapshot.deletion_requests[0];
+  const role = snapshot.role_requests[0];
+  const adminAudit = snapshot.admin_audit[0];
+  const safety = snapshot.safety_incidents[0];
   await sql.begin(async tx => {
     await tx`INSERT INTO fam_notification_reads
       (user_id, notification_key, read_at)
-      VALUES (${target}, 'synthetic:notification:1', ${createdAt});`;
+      VALUES (${notification.user_id}, ${notification.notification_id}, ${createdAt});`;
     await tx`INSERT INTO fam_account_suspensions
       (school_id, target_id, suspension_id, target_role, duration_hours, reason, status, issued_by, created_at, expires_at)
-      VALUES (${school}, ${target}, 'synthetic-suspension-1', 'student', Unwrap(CAST(24 AS Uint32)), 'synthetic-rule', 'issued',       ${actor}, ${createdAt}, ${expiresAt});`;
+      VALUES (${suspension.school_id}, ${suspension.user_id}, ${suspension.suspension_id}, 'student', Unwrap(CAST(24 AS Uint32)), ${suspension.reason_code}, 'issued', ${actor}, ${createdAt}, ${expiresAt});`;
     await tx`INSERT INTO fam_account_suspension_open
       (target_id, school_id, suspension_id, created_at)
-      VALUES (${target}, ${school}, 'synthetic-suspension-1', ${createdAt});`;
+      VALUES (${target}, ${suspension.school_id}, ${suspension.suspension_id}, ${createdAt});`;
     await tx`INSERT INTO fam_account_deletion_requests
       (request_id, school_id, requester_id, target_id, target_role, reason_code, reason, status, created_at)
-      VALUES ('synthetic-deletion-1', ${school}, ${actor}, ${target}, 'student', 'other', 'synthetic:reason', 'pending', ${createdAt});`;
+      VALUES (${deletion.request_id}, ${deletion.school_id}, ${actor}, ${deletion.user_id}, 'student', 'other', 'synthetic:reason', ${deletion.status}, ${createdAt});`;
     await tx`INSERT INTO fam_account_deletion_open
       (target_id, request_id, school_id, created_at)
-      VALUES (${target}, 'synthetic-deletion-1', ${school}, ${createdAt});`;
+      VALUES (${target}, ${deletion.request_id}, ${deletion.school_id}, ${createdAt});`;
     await tx`INSERT INTO fam_school_role_requests
       (issuer, subject, request_id, user_id, school_id, requested_role, status, created_at)
-      VALUES ('https://synthetic.invalid', 'synthetic-subject-1', 'synthetic-role-1', ${target}, ${school}, 'council_member', 'pending', ${createdAt});`;
+      VALUES ('https://synthetic.invalid', 'synthetic-subject-1', ${role.request_id}, ${role.user_id}, ${role.school_id}, ${role.role}, ${role.status}, ${createdAt});`;
     await tx`INSERT INTO fam_school_role_request_audit
       (event_id, request_id, school_id, actor_id, requested_role, action, status, created_at)
-      VALUES ('synthetic-role-audit-1', 'synthetic-role-1', ${school}, ${actor}, 'council_member', 'submitted', 'pending', ${createdAt});`;
+      VALUES (${adminAudit.audit_id}, ${role.request_id}, ${role.school_id}, ${actor}, ${role.role}, 'submitted', 'pending', ${createdAt});`;
     await tx`INSERT INTO fam_school_admin_audit
       (event_id, school_id, actor_id, target_id, action, previous_role, created_at)
-      VALUES ('synthetic-admin-audit-1', ${school}, ${actor}, ${target}, 'revoke_role', 'school_admin', ${createdAt});`;
+      VALUES (${adminAudit.audit_id}, ${adminAudit.school_id}, ${adminAudit.actor_id}, ${adminAudit.entity_id}, ${adminAudit.action}, 'school_admin', ${createdAt});`;
     await tx`INSERT INTO fam_safety_incidents
       (school_id, pair_fingerprint, source_kind, category, incident_id, severity, created_at)
-      VALUES (${school}, 'synthetic-fingerprint-1', 'message', 'synthetic-category', 'synthetic-safety-1', 'medium', ${createdAt});`;
+      VALUES (${safety.school_id}, 'synthetic-fingerprint-1', 'message', ${safety.category}, ${safety.incident_id}, ${safety.level}, ${createdAt});`;
   });
 }
 
@@ -108,7 +114,7 @@ try {
     await tx`DELETE FROM fam_safety_incidents WHERE school_id = ${school};`;
   });
 
-  await seedOperationalTables(sql);
+  await seedOperationalTables(sql, decoded.snapshot);
   await verifyOperationalTables(sql);
 
   await assert.rejects(
