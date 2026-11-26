@@ -31,9 +31,9 @@ export function createSyntheticMigrationPlan(input) {
   });
   if (!acceptance.ok) return { ok: false, code: acceptance.code, stage: acceptance.stage, live_cutover_authorized: false };
   const inventory = verifySyntheticInventoryAcceptance({
-    source: { snapshot: input.source },
-    target: { snapshot: input.target },
-    restored: { snapshot: input.restored },
+    source: { snapshot: input.source, state: input.state, profiles: input.profiles },
+    target: { snapshot: input.target, state: input.state, profiles: input.profiles },
+    restored: { snapshot: input.restored, state: input.state, profiles: input.profiles },
     inventory: input.inventory,
   });
   if (!inventory.ok) return { ok: false, code: inventory.code, stage: inventory.stage, live_cutover_authorized: false };
