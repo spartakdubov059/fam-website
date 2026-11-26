@@ -38,13 +38,20 @@ const rehearsal = runIsolatedAgentGovernanceRehearsal({
         has_patch: developer.has_patch,
         synthetic_only: true,
         patch_digest: developer.patch_digest,
+        revision_sha256: developer.revision_sha256,
         production_access: false,
       }
-    : { approved_scope: [], has_patch: false, synthetic_only: true, patch_digest: '0'.repeat(64), production_access: false },
+    : { approved_scope: [], has_patch: false, synthetic_only: true, patch_digest: '0'.repeat(64), revision_sha256: '0'.repeat(64), production_access: false },
   qaResult: qa.ok
     ? { passed: true, tests_run: qa.tests_run, production_access: false, test_digest: qa.test_digest,
-        output_sha256: qa.output_sha256, observed_at: qa.observed_at }
-    : { passed: false, tests_run: qa.tests_run || 0, production_access: false },
+        output_sha256: qa.output_sha256, observed_at: qa.observed_at,
+        revision_sha256: qa.revision_sha256, subject_sha256: qa.subject_sha256 }
+    : {
+        passed: false, tests_run: qa.tests_run || 0, production_access: false,
+        test_digest: '0'.repeat(64), output_sha256: '0'.repeat(64),
+        observed_at: new Date().toISOString(), revision_sha256: '0'.repeat(64),
+        subject_sha256: '0'.repeat(64),
+      },
 });
 
 if (!rehearsal.ok) {

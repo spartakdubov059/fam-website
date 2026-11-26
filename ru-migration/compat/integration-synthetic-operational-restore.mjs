@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
+import { encodeSyntheticOperationalEnvelope, decodeSyntheticOperationalEnvelope } from './synthetic-operational-envelope.mjs';
 
 const school = 'synthetic-operational-school';
 const target = 'synthetic-operational-target';
@@ -80,6 +81,20 @@ try {
     return statement;
   };
   sql.begin = client.begin.bind(client);
+
+  const operationalSnapshot = {
+    snapshot_id: 'synthetic-operational-restore',
+    notifications: [{ notification_id: 'synthetic-notification-1', user_id: target, school_id: school, kind: 'message', read: false, created_at: created }],
+    suspensions: [{ suspension_id: 'synthetic-suspension-1', user_id: target, school_id: school, active: true, reason_code: 'synthetic-rule', expires_at: expires }],
+    deletion_requests: [{ request_id: 'synthetic-deletion-1', user_id: target, school_id: school, status: 'pending', created_at: created }],
+    role_requests: [{ request_id: 'synthetic-role-1', user_id: target, school_id: school, role: 'council_member', status: 'pending', created_at: created }],
+    admin_audit: [{ audit_id: 'synthetic-admin-audit-1', school_id: school, actor_id: actor, action: 'revoke_role', entity_id: target, created_at: created }],
+    safety_incidents: [{ incident_id: 'synthetic-safety-1', school_id: school, actor_id: target, category: 'synthetic-category', level: 'medium', created_at: created }],
+  };
+  const envelope = encodeSyntheticOperationalEnvelope(operationalSnapshot);
+  assert.equal(envelope.ok, true);
+  const decoded = decodeSyntheticOperationalEnvelope(envelope.bytes, envelope.sha256);
+  assert.equal(decoded.ok, true);
 
   await sql.begin(async tx => {
     await tx`DELETE FROM fam_notification_reads WHERE user_id = ${target};`;

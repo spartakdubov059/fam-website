@@ -27,6 +27,14 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
     return { ok: false, code: 'MISSING_AGENT_QA_TEST', production_access: false };
   }
   const testDigest = hash(Buffer.concat(testContents));
+  const headResult = spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8', timeout: 30_000 });
+  const headSha = headResult.status === 0 ? headResult.stdout.trim() : '';
+  if (!/^[a-f0-9]{40}$/.test(headSha)) {
+    return { ok: false, code: 'AGENT_QA_REVISION_UNAVAILABLE', production_access: false };
+  }
+  const beforeResult = spawnSync('git', ['diff', '--binary', 'HEAD', '--', ...testFiles], { cwd, encoding: 'utf8', timeout: 30_000 });
+  const beforeDiff = beforeResult.status === 0 ? beforeResult.stdout : '';
+  const beforeDigest = hash(beforeDiff);
   const args = ['--test', ...testFiles];
   const result = spawnSync(nodeExecutable, args, {
     cwd,
@@ -36,6 +44,12 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
   });
   const passed = result.status === 0 && result.error === undefined;
   const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+  const afterResult = spawnSync('git', ['diff', '--binary', 'HEAD', '--', ...testFiles], { cwd, encoding: 'utf8', timeout: 30_000 });
+  const afterDiff = afterResult.status === 0 ? afterResult.stdout : '';
+  if (hash(afterDiff) !== beforeDigest) {
+    return { ok: false, code: 'AGENT_QA_WORKTREE_CHANGED', production_access: false };
+  }
+  const subjectSha = hash(JSON.stringify({ revision: headSha, test_digest: testDigest, patch_digest: beforeDigest }));
   return {
     ok: passed,
     code: passed ? 'AGENT_QA_EXECUTED_PASS' : 'AGENT_QA_EXECUTED_FAIL',
@@ -45,6 +59,8 @@ export function executeAgentQaEvidence({ cwd, testFiles, nodeExecutable = 'node'
     exit_status: Number.isInteger(result.status) ? result.status : null,
     output_sha256: hash(output),
     observed_at: new Date(now()).toISOString(),
+    revision_sha256: hash(headSha),
+    subject_sha256: subjectSha,
     production_access: false,
   };
 }
@@ -56,19 +72,26 @@ export function executeDeveloperPatchEvidence({ cwd, approvedScope, nodeExecutab
         || (!path.startsWith('ru-migration/') && !path.startsWith('docs/') && !path.startsWith('tests/')))) {
     return { ok: false, code: 'INVALID_DEVELOPER_SCOPE', production_access: false };
   }
-  const result = spawnSync('git', ['diff', '--stat', 'HEAD', '--', ...approvedScope], {
+  const headResult = spawnSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8', timeout: 30_000 });
+  const headSha = headResult.status === 0 ? headResult.stdout.trim() : '';
+  if (!/^[a-f0-9]{40}$/.test(headSha)) {
+    return { ok: false, code: 'DEVELOPER_PATCH_REVISION_UNAVAILABLE', production_access: false };
+  }
+  const result = spawnSync('git', ['diff', '--binary', 'HEAD', '--', ...approvedScope], {
     cwd,
     encoding: 'utf8',
     timeout: 30_000,
   });
   if (result.status !== 0) return { ok: false, code: 'DEVELOPER_PATCH_EVIDENCE_UNAVAILABLE', production_access: false };
+  const patchSha = hash(result.stdout);
   return {
     ok: true,
     code: 'DEVELOPER_PATCH_EVIDENCE_READY',
     approved_scope: approvedScope,
     synthetic_only: true,
     has_patch: result.stdout.trim().length > 0,
-    patch_digest: hash(result.stdout),
+    patch_digest: patchSha,
+    revision_sha256: hash(headSha),
     production_access: false,
   };
 }

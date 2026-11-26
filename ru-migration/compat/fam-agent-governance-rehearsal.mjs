@@ -36,14 +36,16 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
   if (inspectorSignal && !validateInspectorSignal(inspectorSignal).ok) return fail('INVALID_INSPECTOR_SIGNAL');
 
   const patch = input.developerPatch;
-  if (!exactKeys(patch, ['approved_scope', 'has_patch', 'synthetic_only', 'patch_digest', 'production_access'])
+  if (!exactKeys(patch, ['approved_scope', 'has_patch', 'synthetic_only', 'patch_digest', 'revision_sha256', 'production_access'])
       || !Array.isArray(patch.approved_scope)
       || patch.approved_scope.length > 20
       || typeof patch.has_patch !== 'boolean'
       || patch.synthetic_only !== true
       || patch.production_access !== false
       || typeof patch.patch_digest !== 'string'
-      || !/^[a-f0-9]{64}$/.test(patch.patch_digest)) return fail('INVALID_DEVELOPER_RESULT');
+      || !/^[a-f0-9]{64}$/.test(patch.patch_digest)
+      || typeof patch.revision_sha256 !== 'string'
+      || !/^[a-f0-9]{64}$/.test(patch.revision_sha256)) return fail('INVALID_DEVELOPER_RESULT');
   if (patch.approved_scope.some(path =>
     typeof path !== 'string'
     || (!path.startsWith('ru-migration/') && !path.startsWith('docs/') && !path.startsWith('tests/')))) {
@@ -51,7 +53,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
   }
 
   const qa = input.qaResult;
-  if (!exactKeys(qa, ['passed', 'tests_run', 'production_access', 'test_digest', 'output_sha256', 'observed_at'])
+  if (!exactKeys(qa, ['passed', 'tests_run', 'production_access', 'test_digest', 'output_sha256', 'observed_at', 'revision_sha256', 'subject_sha256'])
       || typeof qa.passed !== 'boolean'
       || !Number.isSafeInteger(qa.tests_run)
       || qa.tests_run < 0
@@ -59,6 +61,8 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
       || typeof qa.test_digest !== 'string' || !/^[a-f0-9]{64}$/.test(qa.test_digest)
       || typeof qa.output_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(qa.output_sha256)
       || typeof qa.observed_at !== 'string'
+      || typeof qa.revision_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(qa.revision_sha256)
+      || typeof qa.subject_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(qa.subject_sha256)
       || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(qa.observed_at)
       || !Number.isFinite(Date.parse(qa.observed_at))) return fail('INVALID_QA_RESULT');
 

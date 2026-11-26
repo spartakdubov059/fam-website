@@ -11,12 +11,15 @@ const qaEvidence = passed => ({
   test_digest: sha,
   output_sha256: sha,
   observed_at: observed,
+  revision_sha256: sha,
+  subject_sha256: sha,
 });
 const patchEvidence = scope => ({
   approved_scope: scope,
   has_patch: true,
   synthetic_only: true,
   patch_digest: sha,
+  revision_sha256: sha,
   production_access: false,
 });
 
