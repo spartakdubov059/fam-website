@@ -11,6 +11,12 @@ import {
   summarizeAgentQueue,
   inspectPostMerge,
 } from "../../scripts/fam-agent-governance.mjs";
+import {
+  ownerApproval,
+  exactPostMergeCI,
+  exactBranchCI,
+  classifyReviewState,
+} from "../../scripts/fam-agent-lifecycle.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -148,4 +154,36 @@ test("INSPECTOR flags failed post-merge workflows without triggering rollback", 
   assert.deepEqual(inspectPostMerge({ runs: [{ conclusion: "success", event: "push", created_at: earlier(1) }], now: NOW }), []);
   assert.equal(typeof summarizeQwenRuns, "function");
   assert.equal(typeof summarizeAgentQueue, "function");
+});
+
+test("Lifecycle approval and CI require exact commits and owner evidence", () => {
+  const head = "a".repeat(40);
+  const mergeSha = "b".repeat(40);
+  const review = {
+    id: 1, user: { login: "spartakdubov059" }, state: "APPROVED",
+    submitted_at: "2026-11-26T10:00:00Z", commit_id: head,
+  };
+  assert.equal(ownerApproval([review], "spartakdubov059", head,
+    "2026-11-26T11:00:00Z", "2026-11-26T09:00:00Z"), true);
+  assert.equal(ownerApproval([{ ...review, commit_id: mergeSha }],
+    "spartakdubov059", head, "2026-11-26T11:00:00Z",
+    "2026-11-26T09:00:00Z"), false);
+  assert.equal(exactPostMergeCI([{
+    id: 1, head_sha: mergeSha, head_branch: "main", event: "push",
+    created_at: "2026-11-26T11:10:00Z", updated_at: "2026-11-26T11:20:00Z",
+    status: "completed", conclusion: "success",
+  }], mergeSha, "2026-11-26T11:00:00Z"), "verified");
+  assert.equal(exactBranchCI([{
+    id: 2, head_sha: head, head_branch: "codex/fam-run-123",
+    event: "workflow_dispatch", created_at: "2026-11-26T10:10:00Z",
+    updated_at: "2026-11-26T10:20:00Z",
+    status: "completed", conclusion: "success",
+  }], head, 123, "2026-11-26T10:00:00Z"), "verified");
+  assert.equal(classifyReviewState({
+    pr_created: true, pr_state: "closed_unmerged", merged: false,
+  }), "closed_unmerged");
+  assert.equal(classifyReviewState({
+    pr_created: true, pr_state: "merged", merged: true, draft: false,
+    owner_approved: false, branch_ci: "verified", postmerge: "verified",
+  }), "merged_evidence_incomplete");
 });

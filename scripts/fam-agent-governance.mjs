@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { collectCoderLifecycle, formatCoderLifecycle } from "./fam-agent-lifecycle.mjs";
+import { bridgeRequest } from "./fam-agent-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -330,6 +332,11 @@ export async function main() {
       return { ...run, jobs: [] };
     }
   }));
+  const lifecycle = await collectCoderLifecycle({
+    runs: runDetails,
+    repository: process.env.GITHUB_REPOSITORY,
+    read: (path) => api(path, token),
+  });
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
   const deploymentAuditResults = await Promise.allSettled([
@@ -376,6 +383,44 @@ export async function main() {
       count: 1,
       message: "Не полностью настроено подключение штаба к защищённой очереди Supabase",
     });
+  }
+  if (bridgeUrl && bridgeToken) {
+    for (const row of lifecycle.rows) {
+      if (!row.task_id || !row.pr_number || !row.head_sha) continue;
+      const base = {
+        task_id: row.task_id,
+        pr_number: row.pr_number,
+        head_sha: row.head_sha,
+      };
+      const stages = [];
+      if (row.pr_state === "closed_unmerged") {
+        stages.push({ ...base, stage: "pr_closed_unmerged" });
+      } else if (row.pr_state === "open" && row.owner_approved && row.branch_ci === "verified" && row.draft === false) {
+        stages.push({ ...base, stage: "owner_approved" });
+      } else if (row.pr_state === "merged" && row.owner_approved && row.branch_ci === "verified") {
+        stages.push(
+          { ...base, stage: "owner_approved" },
+          { ...base, stage: "merged", merge_commit_sha: row.merge_commit_sha },
+        );
+        if (row.postmerge === "verified") stages.push({
+          ...base, stage: "postmerge_verified", merge_commit_sha: row.merge_commit_sha,
+        });
+        if (row.postmerge === "failed") stages.push({
+          ...base, stage: "postmerge_failed", merge_commit_sha: row.merge_commit_sha,
+        });
+      }
+      for (const stage of stages) {
+        try {
+          await bridgeRequest({
+            url: bridgeUrl,
+            token: bridgeToken,
+            body: { action: "resolve", ...stage },
+          });
+        } catch {
+          // A rejected or unavailable lifecycle update stays unconfirmed.
+        }
+      }
+    }
   }
   let inspectorOutcome = "Автоматическая постановка не запускалась: нет подтверждённого сигнала или защищённого моста.";
   const syntheticSignal = process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
@@ -426,7 +471,8 @@ export async function main() {
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
     qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
-  }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
+  }) + "\n" + formatCoderLifecycle(lifecycle) +
+    "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import("node:fs/promises");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report + "\n");

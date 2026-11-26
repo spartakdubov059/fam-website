@@ -260,6 +260,33 @@ Deno.serve(async (req: Request) => {
     }
 
     if (
+      body.action === "resolve" &&
+      typeof body.task_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
+      ["owner_approved", "merged", "postmerge_verified", "postmerge_failed", "pr_closed_unmerged"].includes(body.stage) &&
+      Number.isSafeInteger(body.pr_number) && body.pr_number > 0 && body.pr_number < 100_000_000 &&
+      typeof body.head_sha === "string" && /^[0-9a-f]{40}$/i.test(body.head_sha) &&
+      ((["merged", "postmerge_verified", "postmerge_failed"].includes(body.stage) &&
+        typeof body.merge_commit_sha === "string" && /^[0-9a-f]{40}$/i.test(body.merge_commit_sha)) ||
+       (!["merged", "postmerge_verified", "postmerge_failed"].includes(body.stage) &&
+        body.merge_commit_sha === undefined))
+    ) {
+      const keyCount = Object.keys(body).length;
+      if (keyCount !== (body.merge_commit_sha === undefined ? 5 : 6)) {
+        return json({ ok: false, error_code: "invalid_action", stage: "action_validation", diagnostic_id: diagnosticId }, 400, diagnosticId);
+      }
+      const resolved = await rpc("resolve_fam_agent_coder_lifecycle", {
+        p_task_id: body.task_id,
+        p_worker_id: WORKER_ID,
+        p_stage: body.stage,
+        p_pr_number: body.pr_number,
+        p_head_sha: body.head_sha,
+        p_merge_commit_sha: body.merge_commit_sha ?? null,
+      });
+      return json({ ok: true, resolved: resolved === true, diagnostic_id: diagnosticId }, 200, diagnosticId);
+    }
+
+    if (
       body.action === "finish" &&
       Object.keys(body).length === 3 &&
       typeof body.task_id === "string" &&

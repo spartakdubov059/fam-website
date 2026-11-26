@@ -11,6 +11,7 @@ on:
       - "supabase/migrations/*fam_agent_task_metrics.sql"
       - "supabase/migrations/*fam_qwen_retry_recovery.sql"
       - "scripts/fam-integration-coordinator.mjs"
+      - "scripts/fam-agent-lifecycle.mjs"
       - "tests/security/fam-agent-governance.test.mjs"
       - "tests/security/fam-agent-metrics.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
