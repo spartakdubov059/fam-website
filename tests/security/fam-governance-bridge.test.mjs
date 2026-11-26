@@ -172,7 +172,8 @@ test("report marks disconnected bridge as unknown, never as healthy", () => {
 });
 
 test("edge function requires server token and exposes only fixed aggregate RPC on health", () => {
-  assert.match(edge, /if \(!await sameSecret\(/);
+  assert.match(edge, /const expectedToken = body\.action === "resolve" \? INTEGRATOR_TOKEN : WORKER_TOKEN/);
+  assert.match(edge, /if \(!expectedToken \|\|[\s\S]*?await sameSecret/);
   assert.match(edge, /origin_not_allowed/);
   assert.match(edge, /body\.action === "health" && Object\.keys\(body\)\.length === 1/);
   assert.match(edge, /rpc\("get_fam_agent_queue_health", \{\}\)/);
@@ -180,6 +181,7 @@ test("edge function requires server token and exposes only fixed aggregate RPC o
   assert.doesNotMatch(edge, /rpc\(body\./);
   assert.match(workflow, /FAM_AGENT_BRIDGE_URL: \$\{\{ secrets\.FAM_AGENT_BRIDGE_URL \}\}/);
   assert.match(workflow, /FAM_AGENT_WORKER_TOKEN: \$\{\{ secrets\.FAM_AGENT_WORKER_TOKEN \}\}/);
+  assert.match(workflow, /FAM_AGENT_INTEGRATOR_TOKEN: \$\{\{ secrets\.FAM_AGENT_INTEGRATOR_TOKEN \}\}/);
   assert.match(workflow, /github\.event_name != 'pull_request'/);
   assert.match(workflow, /contents: read/);
   assert.match(edge, /body\.action === "inspector_enqueue"/);
