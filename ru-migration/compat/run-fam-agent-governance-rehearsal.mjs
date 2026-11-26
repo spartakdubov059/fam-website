@@ -33,6 +33,20 @@ const rehearsal = runIsolatedAgentGovernanceRehearsal({
   ],
   queue: { failed_last_24h: 0, expired_leases: 0 },
   warnings: [],
+  legalConsultation: {
+    scope: 'FAM_RU',
+    revision_sha256: developer.ok ? developer.revision_sha256 : '0'.repeat(64),
+    impact: 'possible',
+    classifier: 'arbiter',
+    guidance: {
+      role: 'legal_advisor', scope: 'FAM_RU',
+      revision_sha256: developer.ok ? developer.revision_sha256 : '0'.repeat(64),
+      advice_status: 'advisory_only', human_review: 'pending_human_review',
+      requirement_codes: ['minimize_data'], alternative_codes: ['synthetic_only', 'defer_live_transfer'],
+      source_checks: [{ url: 'https://publication.pravo.gov.ru/', checked_at: new Date().toISOString(), source_digest: '0'.repeat(64) }],
+      decision_digest: '0'.repeat(64), synthetic_only: true,
+    },
+  },
   developerPatch: developer.ok
     ? {
         approved_scope: developer.approved_scope,

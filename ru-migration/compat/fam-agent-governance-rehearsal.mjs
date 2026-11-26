@@ -5,6 +5,7 @@ import {
   inspectInfrastructureSignals,
   proposeHumanRecruitment,
   validateInspectorSignal,
+  evaluateLegalConsultation,
 } from './fam-agent-team-governance.mjs';
 
 function exactKeys(value, keys) {
@@ -14,12 +15,19 @@ function exactKeys(value, keys) {
 
 export function runIsolatedAgentGovernanceRehearsal(input) {
   const fail = code => ({ ok: false, code, production_access: false, live_cutover_authorized: false });
-  if (!exactKeys(input, ['pulls', 'queue', 'warnings', 'developerPatch', 'qaResult'])) return fail('INVALID_REHEARSAL_INPUT');
+  if (!exactKeys(input, ['pulls', 'queue', 'warnings', 'legalConsultation', 'developerPatch', 'qaResult'])) return fail('INVALID_REHEARSAL_INPUT');
   if (!Array.isArray(input.pulls) || !input.pulls.length || input.pulls.length > 25
       || !Array.isArray(input.warnings)
       || typeof input.queue !== 'object' || input.queue === null
+      || typeof input.legalConsultation !== 'object' || input.legalConsultation === null
       || typeof input.developerPatch !== 'object' || input.developerPatch === null
       || typeof input.qaResult !== 'object' || input.qaResult === null) return fail('INVALID_REHEARSAL_INPUT');
+
+  // The legal scope check precedes developer result processing. The rehearsal
+  // accepts only synthetic advisory receipts and never grants release authority.
+  const legalConsultation = evaluateLegalConsultation(input.legalConsultation);
+  if (!legalConsultation.ok) return fail(legalConsultation.code);
+  if (legalConsultation.scope !== 'FAM_RU') return fail('LEGAL_SCOPE_MISMATCH');
 
   const disputed = findAgentDisputes(input.pulls);
   const plan = buildAgentIntegrationPlan({ pulls: input.pulls, disputes: disputed.disputes });
@@ -70,6 +78,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
 
   const stages = [
     { role: 'inspector', status: inspectorSignal ? 'signal_ready' : 'no_signal' },
+    { role: 'legal_advisor', status: legalConsultation.status },
     { role: 'developer', status: patch.has_patch ? 'patch_ready' : 'no_patch' },
     { role: 'qa', status: qa.passed ? 'passed' : 'failed' },
     { role: 'arbiter', status: disputed.disputes.length ? 'conflicts_detected' : 'no_conflicts' },
@@ -84,6 +93,7 @@ export function runIsolatedAgentGovernanceRehearsal(input) {
     stages: Object.freeze(stages.map(stage => Object.freeze(stage))),
     disputes: Object.freeze(disputed),
     integrationPlan: Object.freeze(plan),
+    legalConsultation: Object.freeze(legalConsultation),
     inspectorSignal: inspectorSignal ? Object.freeze(inspectorSignal) : null,
     recruitment: Object.freeze(recruitment),
     production_access: false,
