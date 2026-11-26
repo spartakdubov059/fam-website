@@ -27,7 +27,10 @@ create table if not exists private.fam_agent_task_events (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default pg_catalog.now()
 );
-truncate private.fam_agent_task_events, private.fam_agent_tasks;
+truncate private.fam_agent_inspector_signals,
+  private.fam_agent_task_events,
+  private.fam_agent_tasks
+cascade;
 
 do $$
 declare
