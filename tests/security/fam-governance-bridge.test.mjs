@@ -9,6 +9,8 @@ import {
   fetchAgentMetrics,
   validateDevelopmentAdvisorResponse,
   fetchDevelopmentAdvisorSnapshots,
+  validateLegalEvidenceResponse,
+  fetchLegalEvidenceSummary,
   validateModerationSummaryResponse,
   fetchModerationSummary,
   enqueueInspectorTask,
@@ -118,6 +120,37 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings: -1 }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
   assert.match(workflow, /fam-development-advisor\.test\.mjs/);
+});
+
+test("LEGAL bridge exposes exactly two isolated source-check summaries, never legal approval details", async () => {
+  let request;
+  const legalEvidence = [
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T06:00:00Z", latest_status: "change_detected", observations_30d: 2 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ];
+  const result = await fetchLegalEvidenceSummary({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token",
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ ok: true, legal_evidence: legalEvidence }) };
+    },
+  });
+  assert.deepEqual(result.FAM_CURRENT, {
+    latest_checked_at: "2026-11-27T06:00:00Z", latest_status: "change_detected", observations_30d: 2,
+  });
+  assert.deepEqual(result.FAM_RU, { latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 });
+  assert.deepEqual(JSON.parse(request.body), { action: "legal_evidence_summary" });
+  assert.equal(request.headers["x-fam-agent-token"], "test-governance-token");
+  for (const unsafe of [
+    { ok: true, legal_evidence: [{ ...legalEvidence[0], user_id: "private" }, legalEvidence[1]] },
+    { ok: true, legal_evidence: [legalEvidence[0], legalEvidence[0]] },
+    { ok: true, legal_evidence: [legalEvidence[0]] },
+    { ok: true, legal_evidence: [{ ...legalEvidence[0], latest_status: "approved" }, legalEvidence[1]] },
+    { ok: true, legal_evidence: [{ ...legalEvidence[0], observations_30d: "2" }, legalEvidence[1]] },
+  ]) assert.throws(() => validateLegalEvidenceResponse(unsafe));
+  assert.match(edge, /rpc\("get_fam_legal_evidence_summary", \{\}\)/);
+  assert.match(edge, /body\.action === "legal_evidence_summary" && Object\.keys\(body\)\.length === 1/);
 });
 
 test("moderation bridge exposes only thresholded category buckets, never raw incident data", async () => {
