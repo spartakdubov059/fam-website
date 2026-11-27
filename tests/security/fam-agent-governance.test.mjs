@@ -15,6 +15,11 @@ import {
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
+test("daily Boss report is scheduled for 07:00 Moscow time", () => {
+  const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
+  assert.match(workflow, /schedule:\\s*\\n\\s*- cron: "0 4 \\* \\* \\*"/);
+});
+
 test("Qwen retry recovery is restricted to recent infrastructure signals and retires stale queue entries", () => {
   const migration = readFileSync(new URL("../../supabase/migrations/20261123210000_fam_qwen_retry_scope_and_stale_queue.sql", import.meta.url), "utf8");
   assert.match(migration, /task_key'='audit_agent_infrastructure/);
