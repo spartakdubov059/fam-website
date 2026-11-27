@@ -2,6 +2,13 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import {
+  collectCoderLifecycle,
+  formatCoderLifecycle,
+  lifecycleStagesForRow,
+  persistLifecycleRows,
+} from "./fam-agent-lifecycle.mjs";
+import { bridgeRequest } from "./fam-agent-bridge.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -330,6 +337,11 @@ export async function main() {
       return { ...run, jobs: [] };
     }
   }));
+  const lifecycle = await collectCoderLifecycle({
+    runs: runDetails,
+    repository: process.env.GITHUB_REPOSITORY,
+    read: (path) => api(path, token),
+  });
   const disputes = findDisputes(pulls);
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
   const deploymentAuditResults = await Promise.allSettled([
@@ -349,6 +361,7 @@ export async function main() {
   // Raw Supabase task payloads and student content never enter GitHub.
   const bridgeUrl = process.env.FAM_AGENT_BRIDGE_URL || "";
   const bridgeToken = process.env.FAM_AGENT_WORKER_TOKEN || "";
+  const integratorToken = process.env.FAM_AGENT_INTEGRATOR_TOKEN || "";
   let queueHealth = null;
   let queueLink = "not_configured";
   let agentMetrics = [];
@@ -376,6 +389,29 @@ export async function main() {
       count: 1,
       message: "Не полностью настроено подключение штаба к защищённой очереди Supabase",
     });
+  }
+  const lifecycleRowsToPersist = lifecycle.rows.filter((row) => lifecycleStagesForRow(row).length);
+  if (lifecycleRowsToPersist.length && bridgeUrl && integratorToken) {
+    await persistLifecycleRows(lifecycleRowsToPersist, (stage) =>
+      bridgeRequest({
+        url: bridgeUrl,
+        token: integratorToken,
+        body: { action: "resolve", ...stage },
+      })
+    );
+  } else if (lifecycleRowsToPersist.length) {
+    for (const row of lifecycleRowsToPersist) row.persistence = { status: "not_configured" };
+  }
+  for (const row of lifecycleRowsToPersist) {
+    if (row.persistence.status !== "saved") {
+      warnings.push({
+        code: "lifecycle_persistence_failed",
+        severity: "high",
+        count: 1,
+        message: "INTEGRATOR: подтверждённое GitHub состояние не сохранено в Supabase (" +
+          row.persistence.status + (row.persistence.stage ? ", " + row.persistence.stage : "") + ")",
+      });
+    }
   }
   let inspectorOutcome = "Автоматическая постановка не запускалась: нет подтверждённого сигнала или защищённого моста.";
   const syntheticSignal = process.env.GITHUB_EVENT_NAME === "workflow_dispatch"
@@ -426,7 +462,8 @@ export async function main() {
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
     qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
-  }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
+  }) + "\n" + formatCoderLifecycle(lifecycle) +
+    "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
     const { appendFile } = await import("node:fs/promises");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, report + "\n");

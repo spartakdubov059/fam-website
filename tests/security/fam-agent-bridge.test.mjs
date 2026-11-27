@@ -197,7 +197,8 @@ test("Edge Function exposes only fixed RPC names and rejects browser origins", (
   assert.match(edgeSource, /start_fam_agent_coder_task/);
   assert.match(edgeSource, /heartbeat_fam_agent_coder_task/);
   assert.match(edgeSource, /advance_fam_agent_coder_task/);
-  assert.doesNotMatch(edgeSource, /owner_approved|postmerge_verified|body\.action === "merge"/);
+  assert.match(edgeSource, /resolve_fam_agent_coder_lifecycle/);
+  assert.doesNotMatch(edgeSource, /body\.action === "merge"|rpc\(body\./);
   assert.doesNotMatch(edgeSource, /rpc\(body\./);
   assert.match(edgeSource, /sameSecret/);
 });

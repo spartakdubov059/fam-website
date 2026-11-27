@@ -35,3 +35,5 @@ node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
 - [Фоновый исполнитель безопасных задач FAM](supabase/functions/fam-agent-worker/index.ts)
 
 Фоновый исполнитель намеренно использует отдельный секрет `FAM_AGENT_WORKER_TOKEN` вместо пользовательского JWT (`verify_jwt=false` в настройках функции). Без корректного серверного токена он отвечает отказом; его SQL-очередь независимо разрешает только безопасную проверку очереди без пользовательских данных. Не размещайте этот токен в браузерном коде или репозитории.
+
+Запись lifecycle подтверждений PR выполняется только управляющим INTEGRATOR через отдельный серверный секрет `FAM_AGENT_INTEGRATOR_TOKEN`, отличный от токена Qwen. Настраивайте его только как Supabase Function Secret и GitHub Actions Secret для governance job; не передавайте модели.

@@ -213,6 +213,38 @@ async function main() {
     const taskId = process.env.FAM_CODER_TASK_ID || "";
     const stage = process.env.FAM_RESULT_STAGE || "";
     if (!taskId) return;
+    const resolutionStages = new Set([
+      "owner_approved", "merged", "postmerge_verified",
+      "postmerge_failed", "pr_closed_unmerged",
+    ]);
+    if (resolutionStages.has(stage)) {
+      const prNumber = Number(process.env.FAM_PR_NUMBER);
+      const headSha = process.env.FAM_HEAD_SHA || "";
+      const mergeSha = process.env.FAM_MERGE_SHA || "";
+      if (!Number.isSafeInteger(prNumber) || prNumber < 1 ||
+          !/^[0-9a-f]{40}$/i.test(headSha)) {
+        throw new Error("A lifecycle stage requires exact PR and head SHA evidence.");
+      }
+      const body = {
+        action: "resolve",
+        task_id: taskId,
+        stage,
+        pr_number: prNumber,
+        head_sha: headSha.toLowerCase(),
+      };
+      if (["merged", "postmerge_verified", "postmerge_failed"].includes(stage)) {
+        if (!/^[0-9a-f]{40}$/i.test(mergeSha)) {
+          throw new Error("A merge lifecycle stage requires an exact merge SHA.");
+        }
+        body.merge_commit_sha = mergeSha.toLowerCase();
+      }
+      const result = await bridgeRequest({ url, token, body });
+      if (result?.ok !== true || result?.resolved !== true) {
+        throw new Error("Bridge did not persist the verified lifecycle stage.");
+      }
+      console.log("Verified coder lifecycle stage persisted.");
+      return;
+    }
     const body = { action: "advance", task_id: taskId, stage };
     if (!body.stage) throw new Error("A lifecycle stage is required.");
     if (["pr_created", "owner_approved", "merged", "postmerge_verified"].includes(stage)) {
