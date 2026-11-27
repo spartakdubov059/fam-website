@@ -664,7 +664,8 @@ jobs:
             [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
             export FAM_RESULT_STAGE=pr_created
           elif [[ "$PR_CI_FAILED" == "true" ]]; then
-            export FAM_RESULT_STAGE=qa_failed
+            [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+            export FAM_RESULT_STAGE=pr_ci_failed
           else
             exit 1
           fi

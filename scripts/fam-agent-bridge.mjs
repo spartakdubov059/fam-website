@@ -260,7 +260,7 @@ async function main() {
     }
     const body = { action: "advance", task_id: taskId, stage };
     if (!body.stage) throw new Error("A lifecycle stage is required.");
-    if (["pr_created", "owner_approved", "merged", "postmerge_verified"].includes(stage)) {
+    if (["pr_created", "pr_ci_failed", "owner_approved", "merged", "postmerge_verified"].includes(stage)) {
       body.pr_number = Number(process.env.FAM_PR_NUMBER);
     }
     const result = await bridgeRequest({ url, token, body });

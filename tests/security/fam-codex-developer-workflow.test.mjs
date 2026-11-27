@@ -302,7 +302,9 @@ test("untrusted QA never receives bridge credentials, including after failed che
   assert.match(final, /needs\.record_qa\.result == 'success'/);
   assert.match(final, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(final, /export FAM_RESULT_STAGE=pr_created/);
-  assert.match(final, /export FAM_RESULT_STAGE=qa_failed/);
+  assert.match(final, /export FAM_RESULT_STAGE=pr_ci_failed/);
+  assert.match(final, /FAM_PR_NUMBER.*=~.*\[1-9\]/);
+  assert.doesNotMatch(final, /PR_CI_FAILED.*qa_failed/);
   assert.doesNotMatch(record + final, /download-artifact|git apply|node --test/);
   assert.equal((workflow.match(/export FAM_RESULT_STAGE=qa_passed/g) || []).length, 1);
 });
