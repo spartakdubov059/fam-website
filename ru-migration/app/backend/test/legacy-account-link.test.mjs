@@ -48,3 +48,17 @@ test('missing repository fails closed', async()=>{
   assert.equal(service.available,false);
   assert.deepEqual(await service.link(f.input),{ok:false,code:'LINK_UNAVAILABLE'});
 });
+
+test('accepts independently verified proofs at the exact five-minute freshness boundary',async()=>{
+ const f=fixture();
+ f.source.verifiedAt=f.seconds-300;
+ f.target.verifiedAt=f.seconds-300;
+ assert.deepEqual(await createLegacyAccountLinkService(f.options).link(f.input),{ok:true,code:'LINKED'});
+ assert.equal(f.calls.length,1);
+});
+
+test('clock failure prevents account-link repository writes',async()=>{
+ const f=fixture();f.options.now=()=>{throw Error('synthetic clock failure');};
+ assert.deepEqual(await createLegacyAccountLinkService(f.options).link(f.input),{ok:false,code:'LINK_UNAVAILABLE'});
+ assert.equal(f.calls.length,0);
+});
