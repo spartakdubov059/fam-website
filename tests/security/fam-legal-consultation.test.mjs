@@ -11,6 +11,11 @@ test("ordinary FAM_CURRENT changes receive advisory guidance without a migration
   assert.equal(advice.legal_opinion, false);
   assert.equal(advice.release_authority, false);
   assert.deepEqual(advice.version_scopes, ["FAM_CURRENT"]);
+  assert.equal(advice.provisional_priority, "advisory");
+  assert.equal(advice.source_verification.status, "not_performed");
+  assert.equal(advice.scope_assessments[0].status, "not_assessed");
+  assert.equal(advice.scope_assessments[0].readiness_percent, null);
+  assert.equal(advice.qwen_guidance.human_decision_required_before_release, false);
 });
 
 test("sensitive paths produce category-only evidence and keep the review pending", () => {
@@ -29,6 +34,11 @@ test("sensitive paths produce category-only evidence and keep the review pending
     database_change: 1,
     student_data_handling: 1,
   });
+  assert.equal(advice.independent_review, "pending_human_review");
+  assert.equal(advice.risk_options.every((option) => option.priority === "unassessed" && option.source_status === "not_verified"), true);
+  assert.ok(advice.risk_options.find((option) => option.category === "content_moderation")
+    .qa_acceptance_check.includes("травли, угроз и запрещённых контактов"));
+  assert.ok(advice.qwen_guidance.alternatives.some((option) => option.category === "student_data_handling"));
   assert.doesNotMatch(JSON.stringify(advice), /adjust_student_policy/);
 });
 
@@ -38,6 +48,11 @@ test("FAM_RU review stays separate and shared changes get two explicit scopes", 
   assert.deepEqual(ru.version_scopes, ["FAM_RU"]);
   const shared = buildLegalConsultation({ scope: "SHARED", revision: REVISION });
   assert.deepEqual(shared.version_scopes, ["FAM_CURRENT", "FAM_RU"]);
+  assert.deepEqual(shared.scope_assessments.map(({ scope, status }) => ({ scope, status })), [
+    { scope: "FAM_CURRENT", status: "not_assessed" },
+    { scope: "FAM_RU", status: "human_review_pending" },
+  ]);
+  assert.equal(shared.scope_assessments[1].release_gate, "migration_evidence_pending_for_ru_only");
   assert.ok(shared.qwen_guidance.qa_acceptance_checks.some((item) => item.includes("несвязанные безопасные изменения FAM_CURRENT")));
 });
 
