@@ -13,21 +13,21 @@ values('00000000-0000-4000-8000-000000000010','progress','fam-agent-integrator-v
 set role service_role;
 do $$
 declare
-  task_id uuid := '00000000-0000-4000-8000-000000000010';
+  v_task_id uuid := '00000000-0000-4000-8000-000000000010';
   worker text := 'fam-agent-integrator-v1';
   head_sha text := repeat('a',40);
   merge_sha text := repeat('b',40);
 begin
-  if public.resolve_fam_agent_coder_lifecycle(task_id,worker,'owner_approved',123,head_sha) is distinct from true
-      or public.resolve_fam_agent_coder_lifecycle(task_id,worker,'merged',123,head_sha,merge_sha) is distinct from true
-      or public.resolve_fam_agent_coder_lifecycle(task_id,worker,'postmerge_verified',123,head_sha,merge_sha) is distinct from true
-      or public.resolve_fam_agent_coder_lifecycle(task_id,worker,'postmerge_verified',123,head_sha,merge_sha) is distinct from true then
+  if public.resolve_fam_agent_coder_lifecycle(v_task_id,worker,'owner_approved',123,head_sha) is distinct from true
+      or public.resolve_fam_agent_coder_lifecycle(v_task_id,worker,'merged',123,head_sha,merge_sha) is distinct from true
+      or public.resolve_fam_agent_coder_lifecycle(v_task_id,worker,'postmerge_verified',123,head_sha,merge_sha) is distinct from true
+      or public.resolve_fam_agent_coder_lifecycle(v_task_id,worker,'postmerge_verified',123,head_sha,merge_sha) is distinct from true then
     raise exception 'Lifecycle resolver did not complete and acknowledge exact terminal replay';
   end if;
-  if (select count(*) from private.fam_agent_task_events as e where e.task_id=task_id) <> 4 then
+  if (select count(*) from private.fam_agent_task_events as e where e.task_id=v_task_id) <> 4 then
     raise exception 'Lifecycle history is missing or has duplicate events';
   end if;
-  if not exists(select 1 from private.fam_agent_tasks as t where t.id=task_id and t.status='completed'
+  if not exists(select 1 from private.fam_agent_tasks as t where t.id=v_task_id and t.status='completed'
        and t.payload->>'lifecycle_state'='completed' and t.payload->>'merge_commit_sha'=merge_sha) then
     raise exception 'Lifecycle completion state is incorrect';
   end if;
