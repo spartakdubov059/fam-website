@@ -663,12 +663,10 @@ jobs:
             echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
             exit 1
           fi
-          if [[ "$REUSED_EXISTING" == "true" ]]; then
-            CURRENT_PR_SHA="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
-            if [[ "$CURRENT_PR_SHA" != "$BRANCH_SHA" ]]; then
-              echo "::error::Ревизия PR изменилась во время проверки; CI не засчитывается."
-              exit 1
-            fi
+          CURRENT_PR_SHA="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
+          if [[ "$CURRENT_PR_SHA" != "$BRANCH_SHA" ]]; then
+            echo "::error::Ревизия PR изменилась во время проверки; CI не засчитывается."
+            exit 1
           fi
           if [[ "$REUSED_EXISTING" != "true" ]]; then
             gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
