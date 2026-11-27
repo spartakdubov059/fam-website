@@ -38,13 +38,17 @@ jobs:
         id: proposed_tests
         run: |
           set -euo pipefail
-          mapfile -d '' tracked_tests < <(git ls-files -z -- tests/agent-proposed/)
+          tracked_tests=()
+          while IFS= read -r -d '' file; do tracked_tests+=("$file"); done \
+            < <(git ls-files -z -- tests/agent-proposed/)
           proposed_tests=()
-          for file in "${tracked_tests[@]}"; do
-            case "$file" in
-              tests/agent-proposed/*.test.mjs) proposed_tests+=("./$file") ;;
-            esac
-          done
+          if (( ${#tracked_tests[@]} > 0 )); then
+            for file in "${tracked_tests[@]}"; do
+              case "$file" in
+                tests/agent-proposed/*.test.mjs) proposed_tests+=("./$file") ;;
+              esac
+            done
+          fi
           if (( ${#proposed_tests[@]} > 0 )); then
             node --test "${proposed_tests[@]}"
           fi
