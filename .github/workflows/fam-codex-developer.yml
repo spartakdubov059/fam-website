@@ -434,6 +434,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUIRES_APPROVAL: ${{ needs.verify.outputs.requires_approval }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
           node scripts/render-fam-agent-report.mjs \
@@ -467,6 +468,7 @@ jobs:
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Production этим workflow не изменяется."
             echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
+            echo "- FAM task ID: \`${FAM_CODER_TASK_ID:-unknown}\`"
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
           if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
             PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
