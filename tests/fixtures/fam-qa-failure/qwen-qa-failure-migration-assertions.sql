@@ -1,6 +1,14 @@
 -- Exercise the real proposed function in local PostgreSQL, not a JS mock.
 do $$
 begin
+  if to_regprocedure('public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)') is null then
+    raise exception 'Earlier lifecycle resolver migration was not retained';
+  end if;
+  if has_function_privilege('anon','public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)','execute')
+      or has_function_privilege('authenticated','public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)','execute')
+      or not has_function_privilege('service_role','public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)','execute') then
+    raise exception 'Earlier lifecycle resolver grants changed';
+  end if;
   if has_function_privilege('anon','public.advance_fam_agent_coder_task(uuid,text,text,integer)','execute')
     or has_function_privilege('authenticated','public.advance_fam_agent_coder_task(uuid,text,text,integer)','execute')
     or not has_function_privilege('service_role','public.advance_fam_agent_coder_task(uuid,text,text,integer)','execute') then

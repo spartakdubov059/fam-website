@@ -8,13 +8,14 @@ create table private.fam_agent_tasks (
   approval_required boolean not null, source text not null, status text not null,
   result_summary text, claimed_by text, claimed_at timestamptz,
   started_at timestamptz, finished_at timestamptz, lease_expires_at timestamptz,
-  updated_at timestamptz
+  updated_at timestamptz, payload jsonb not null default '{}'::jsonb
 );
 create table private.fam_agent_task_events (
   id bigint generated always as identity primary key,
   task_id uuid not null references private.fam_agent_tasks(id),
   event_type text not null, actor text not null, summary text not null,
   metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 grant usage on schema private to service_role;

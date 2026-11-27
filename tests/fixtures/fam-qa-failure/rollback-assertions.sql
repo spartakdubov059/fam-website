@@ -1,5 +1,8 @@
 do $$
 begin
+  if to_regprocedure('public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)') is null then
+    raise exception 'QA rollback removed the earlier lifecycle resolver';
+  end if;
   if public.advance_fam_agent_coder_task(
     '00000000-0000-4000-8000-000000000008',
     'fam-agent-qwen-coder-v1','qa_failed'
