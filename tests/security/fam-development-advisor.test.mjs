@@ -11,10 +11,11 @@ test("advisor asks for a proposal only after six consecutive aggregate snapshots
     generated_at: `2026-11-${String(27 - i).padStart(2, "0")}T06:00:00Z`,
     active_listings: i < 3 ? 6 : 20,
     new_listings_24h: i < 3 ? 0 : 5,
+    pending_council_ideas_band: i < 3 ? "10_24" : "5_9",
   }));
   const result = buildDevelopmentAdvisor(rows, { now: Date.parse("2026-11-27T07:00:00Z") });
   assert.equal(result.state, "confirmed");
-  assert.equal(result.proposals.length, 1);
+  assert.equal(result.proposals.length, 2);
   assert.equal(result.proposals[0].key, "review_listing_discovery");
   assert.equal(result.proposals[0].authority, "recommendation_only");
   assert.equal(result.proposals[0].scope, "FAM_CURRENT");
@@ -25,6 +26,22 @@ test("advisor asks for a proposal only after six consecutive aggregate snapshots
   assert.match(renderDevelopmentAdvisor(result), /UX-задание:/);
   assert.match(renderDevelopmentAdvisor(result), /Критерии:/);
   assert.match(renderDevelopmentAdvisor(result), /гипотеза/);
+  assert.equal(result.proposals[1].key, "review_idea_feedback_loop");
+  assert.equal(result.proposals[1].authority, "recommendation_only");
+  assert.match(renderDevelopmentAdvisor(result), /не менее пяти школ/);
+});
+
+test("advisor suppresses idea signals for small samples and emits no idea proposal", () => {
+  const rows = Array.from({ length: 6 }, (_, i) => ({
+    report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
+    generated_at: `2026-11-${String(27 - i).padStart(2, "0")}T06:00:00Z`,
+    active_listings: 10,
+    new_listings_24h: 2,
+    pending_council_ideas_band: i < 3 ? "suppressed" : "5_9",
+  }));
+  const result = buildDevelopmentAdvisor(rows, { now: Date.parse("2026-11-27T07:00:00Z") });
+  assert.equal(result.state, "checked_no_signal");
+  assert.deepEqual(result.proposals, []);
 });
 
 test("advisor emits no product hypothesis for missing, stale, gapped or malformed data", () => {
@@ -32,6 +49,7 @@ test("advisor emits no product hypothesis for missing, stale, gapped or malforme
   const stale = Array.from({ length: 6 }, (_, i) => ({
     report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
     generated_at: "2026-11-20T06:00:00Z", active_listings: 10, new_listings_24h: 2,
+    pending_council_ideas_band: "none",
   }));
   assert.equal(buildDevelopmentAdvisor(stale, { now: Date.parse("2026-11-27T07:00:00Z") }).proposals.length, 0);
   assert.equal(buildDevelopmentAdvisor([{ report_date: "bad", active_listings: -1 }]).state, "no_data");
@@ -43,6 +61,10 @@ test("advisor SQL is limited to predefined aggregates and service-role execution
   assert.match(migration, /private\.fam_agent_daily_reports/);
   assert.match(migration, /metrics #>> '\{listings,active\}'/);
   assert.match(migration, /metrics #>> '\{listings,new_24h\}'/);
+  assert.match(migration, /private\.fam_agent_school_daily_reports/);
+  assert.match(migration, /least\(pending_count, 5\)/);
+  assert.match(migration, /positive_schools between 1 and 4 then 'suppressed'/);
+  assert.match(migration, /pending_council_ideas_band text/);
   assert.match(migration, /grant execute[\s\S]*to service_role/i);
   assert.doesNotMatch(body, /public\.(profiles|event_registrations|messages|fam_safety_incidents)|user_id|email|payload/i);
 });

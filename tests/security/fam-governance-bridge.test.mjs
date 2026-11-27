@@ -101,7 +101,7 @@ test("agent metrics client sends a fixed authenticated read-only action", async 
 
 test("development advisor bridge exposes only bounded listing aggregates", async () => {
   let request;
-  const snapshots = [{ report_date: "2026-11-27", generated_at: "2026-11-27T06:00:00Z", active_listings: 12, new_listings_24h: 2 }];
+  const snapshots = [{ report_date: "2026-11-27", generated_at: "2026-11-27T06:00:00Z", active_listings: 12, new_listings_24h: 2, pending_council_ideas_band: "5_9" }];
   const result = await fetchDevelopmentAdvisorSnapshots({
     url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
     token: "test-governance-token",
@@ -114,6 +114,8 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.deepEqual(JSON.parse(request.body), { action: "development_advisor_metrics" });
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], user_id: "private" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings: -1 }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas_band: "17" }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas: 17 }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
   assert.match(workflow, /fam-development-advisor\.test\.mjs/);
 });
