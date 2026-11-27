@@ -233,6 +233,27 @@ Deno.serve(async (req: Request) => {
       }, 200, diagnosticId);
     }
 
+    if (body.action === "legal_evidence_summary" && Object.keys(body).length === 1) {
+      const rows = await rpc("get_fam_legal_evidence_summary", {});
+      const scopes = new Set(["FAM_CURRENT", "FAM_RU"]);
+      const statuses = new Set(["source_checked", "change_detected", "source_unavailable", "not_assessed"]);
+      if (!Array.isArray(rows) || rows.length !== 2 || rows.some((row) =>
+        !row || Object.keys(row).length !== 4 || !scopes.has(row.scope) ||
+        !(row.latest_checked_at === null || (typeof row.latest_checked_at === "string" && Number.isFinite(Date.parse(row.latest_checked_at)))) ||
+        !statuses.has(row.latest_status) || !Number.isSafeInteger(row.observations_30d) ||
+        row.observations_30d < 0 || row.observations_30d > 10_000_000
+      ) || new Set(rows.map((row) => row.scope).filter((scope) => scopes.has(scope))).size !== 2) {
+        return json({ ok: false, error: "invalid_legal_evidence_summary" }, 502);
+      }
+      const safe = rows.map((row) => ({
+        scope: row.scope,
+        latest_checked_at: row.latest_checked_at,
+        latest_status: row.latest_status,
+        observations_30d: row.observations_30d,
+      }));
+      return json({ ok: true, legal_evidence: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
+    }
+
     if (body.action === "claim" && Object.keys(body).length === 1) {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,
