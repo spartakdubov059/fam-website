@@ -15,7 +15,6 @@ create table private.fam_agent_task_events (
   task_id uuid not null references private.fam_agent_tasks(id),
   event_type text not null, actor text not null, summary text not null,
   metadata jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 grant usage on schema private to service_role;
