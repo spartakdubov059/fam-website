@@ -14,6 +14,7 @@ begin
     into strict v_task_id, pr_number, head_sha, merge_sha
   from private.fam_agent_task_events e
   where e.metadata->>'stage' = 'postmerge_verified'
+  order by e.task_id, e.metadata::text
   limit 1;
 
   if public.resolve_fam_agent_coder_lifecycle(

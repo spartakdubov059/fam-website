@@ -7,7 +7,7 @@ declare
 begin
   select coalesce(jsonb_agg(to_jsonb(t) order by t.id::text), '[]'::jsonb)
     into tasks_before from private.fam_agent_tasks t;
-  select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at, e.task_id, e.event_type, e.metadata::text), '[]'::jsonb)
+  select coalesce(jsonb_agg(to_jsonb(e) order by to_jsonb(e)::text), '[]'::jsonb)
     into events_before from private.fam_agent_task_events e;
 
   if to_regprocedure('public.resolve_fam_agent_coder_lifecycle(uuid,text,text,integer,text,text)') is not null then
@@ -16,7 +16,7 @@ begin
 
   select coalesce(jsonb_agg(to_jsonb(t) order by t.id::text), '[]'::jsonb)
     into tasks_after from private.fam_agent_tasks t;
-  select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at, e.task_id, e.event_type, e.metadata::text), '[]'::jsonb)
+  select coalesce(jsonb_agg(to_jsonb(e) order by to_jsonb(e)::text), '[]'::jsonb)
     into events_after from private.fam_agent_task_events e;
 
   if tasks_after is distinct from tasks_before or events_after is distinct from events_before then
