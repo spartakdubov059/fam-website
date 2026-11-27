@@ -8,6 +8,7 @@ import {Driver} from '@ydbjs/core';
 import {query} from '@ydbjs/query';
 import {encodeSyntheticProfileBackup,decodeSyntheticProfileBackup} from './synthetic-profile-backup-envelope.mjs';
 import {verifySyntheticInventoryAcceptance} from './verify-synthetic-inventory-acceptance.mjs';
+import {stageSyntheticObjects} from './synthetic-object-staging.mjs';
 // Hard-coded loopback database and synthetic fixture. No production route or importer.
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function makeFixture(){
@@ -50,9 +51,17 @@ async function run(){
   const [listingState]=storedState.listings,[ideaState]=storedState.ideas,[messageState]=storedState.messages,[favoriteState]=storedState.favorites;
   const mediaStates=new Map(storedState.media.map(row=>[row.object_key,row]));
   const imageStates=new Map(storedState.idea_images.map(row=>[JSON.stringify([row.idea_id,row.image_index]),row]));
-  dir=await mkdtemp(join(tmpdir(),'fam-ru-disposable-media-'));
-  // Only decoded, validated synthetic keys are used as file names. Exclusive writes; never overwrite.
-  for(const file of decoded.objects)await writeFile(join(dir,file.object_key),file.bytes,{mode:0o600,flag:'wx'});
+  // Only decoded, validated synthetic keys are used as file names. Failed staging is removed in full.
+  const interruptedRoot=await mkdtemp(join(tmpdir(),'fam-ru-stage-parent-'));
+  try{
+   let writes=0;
+   await assert.rejects(()=>stageSyntheticObjects(decoded.objects,{root:interruptedRoot,writeObject:async(...args)=>{
+    if(++writes===2)throw Error('synthetic extraction interruption');
+    return writeFile(...args);
+   }}),/synthetic extraction interruption/);
+   assert.deepEqual(await readdir(interruptedRoot),[],'interrupted file staging must leave no partial archive directory');
+  }finally{await rm(interruptedRoot,{recursive:true,force:true});}
+  dir=await stageSyntheticObjects(decoded.objects);
   const inventory=async owners=>{
    const names=await readdir(dir);
    const expected=new Map(owners.map(row=>[row.object_key,row.user_id]));
@@ -237,7 +246,7 @@ async function run(){
   await sql`UPDATE fam_user_profiles SET staff_verification_status = ${staff.staff_verification_status} WHERE issuer = ${issuer} AND subject = ${staff.user_id};`;
   await assertMatch(await read(sql));
   console.log('YDB_SYNTHETIC_PROFILE_DETAILS_RESTORE_PASS: student, staff, parent, exact nullable fields, staff review replay refusal');
-  console.log('YDB_SYNTHETIC_RESTORE_PASS: thirteen actual tables, local file byte reconciliation, missing and corrupt object rejection, atomic DB rollback, replay and moderation conflict refusal');
+  console.log('YDB_SYNTHETIC_RESTORE_PASS: thirteen actual tables, atomic local file staging cleanup after interruption, byte reconciliation, missing and corrupt object rejection, atomic DB rollback, replay and moderation conflict refusal');
  }finally{try{if(dir)await rm(dir,{recursive:true,force:true});}finally{await driver.close();}}
 }
 await run();
