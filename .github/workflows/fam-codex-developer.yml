@@ -631,6 +631,11 @@ jobs:
             BRANCH_SHA="$PR_HEAD_SHA"
             [[ "$BRANCH" =~ ^codex/fam-run-[1-9][0-9]{0,15}$ ]]
             [[ "$BRANCH_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
+            CURRENT_PR_SHA="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
+            if [[ "$CURRENT_PR_SHA" != "$BRANCH_SHA" ]]; then
+              echo "::error::Ревизия PR изменилась после обнаружения; CI не может подтвердить сохранённый SHA."
+              exit 1
+            fi
           else
             BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
             BRANCH_SHA="$(git rev-parse HEAD)"
@@ -648,9 +653,19 @@ jobs:
           fi
           gh run watch "$TEST_RUN_ID" --exit-status --interval 10 || true
           TEST_CONCLUSION="$(gh run view "$TEST_RUN_ID" --json conclusion --jq '.conclusion')"
+          TEST_HEAD_SHA="$(gh run view "$TEST_RUN_ID" --json headSha --jq '.headSha')"
+          if [[ "$TEST_HEAD_SHA" != "$BRANCH_SHA" ]]; then
+            echo "::error::Завершённый CI проверил другой SHA; результат не засчитывается."
+            exit 1
+          fi
           if [[ "$TEST_CONCLUSION" != "success" ]]; then
             if [[ "$TEST_CONCLUSION" == "failure" ]]; then echo "ci_failed=true" >> "$GITHUB_OUTPUT"; fi
             echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
+            exit 1
+          fi
+          CURRENT_PR_SHA="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
+          if [[ "$CURRENT_PR_SHA" != "$BRANCH_SHA" ]]; then
+            echo "::error::Ревизия PR изменилась во время проверки; CI не засчитывается."
             exit 1
           fi
           if [[ "$REUSED_EXISTING" != "true" ]]; then
