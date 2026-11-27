@@ -211,6 +211,34 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
+const MODERATOR_QA_GUIDANCE = Object.freeze({
+  targeted_harassment: "Проверить синтетические примеры адресной травли и отличать их от несогласия без личных нападок.",
+  hate_or_discrimination: "Проверить синтетические примеры дискриминационного нападения и нейтрального обсуждения темы.",
+  threat_or_intimidation: "Проверить синтетические примеры прямых угроз и отличать их от безобидного образного выражения.",
+  negative_personal_call: "Проверить границу между критикой действий и оскорблением человека на синтетических примерах.",
+  spam_or_repeated_abuse: "Проверить синтетические повторы и убедиться, что обычное повторное сообщение не трактуется как травля.",
+  unsafe_image: "Проверить синтетические изображения и безопасные тестовые заглушки для запрещённых визуальных материалов.",
+  personal_data_in_image: "Проверить синтетические изображения с тестовыми контактными данными и отсутствие их вывода в отчёт.",
+  unclear_safety_signal: "Проверить неоднозначные синтетические примеры и понятную передачу сложных случаев человеку.",
+});
+
+export function buildModeratorRecommendations(summary = null) {
+  if (!summary || !Array.isArray(summary.categories) ||
+      summary.total_bucket === "none" || summary.total_bucket === "suppressed") return [];
+  const seen = new Set();
+  const recommendations = [];
+  for (const item of summary.categories.slice(0, 16)) {
+    if (!item || !Object.hasOwn(MODERATOR_QA_GUIDANCE, item.category) ||
+        !["medium", "high"].includes(item.severity) ||
+        !["5_9", "10_24", "25_plus"].includes(item.count_bucket)) continue;
+    const key = item.category + ":" + item.severity;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    recommendations.push(MODERATOR_QA_GUIDANCE[item.category]);
+  }
+  return recommendations;
+}
+
 export function renderModerationStatus(summary = null, link = "not_configured") {
   const heading = "## MODERATOR — обезличенные сигналы безопасности";
   if (link !== "connected" || !summary) {
@@ -228,12 +256,16 @@ export function renderModerationStatus(summary = null, link = "not_configured") 
   const categories = summary.categories.map((item) =>
     item.category + "/" + item.severity + ": " + item.count_bucket.replace("_", "–")
   );
+  const recommendations = buildModeratorRecommendations(summary);
   return [
     heading,
     "Период: 7 дней; только FAM_CURRENT; " + bucketLabel + ".",
     categories.length ? "Категории, отмеченные не менее чем в пяти школах: " + categories.join(", ") + "." :
       "Категории, встречающиеся менее чем в пяти школах, скрыты; выводы по ним не делаются.",
     "Это автоматические сигналы для проверки, не подтверждённые нарушения. FAM_RU не оценён.",
+    recommendations.length
+      ? "Рекомендации для Испытателя (QA): " + recommendations.join(" ") + " Только синтетические проверки; без санкций, автоматических задач и изменений production."
+      : "Рекомендаций по агрегату нет; скрытые малые группы не интерпретируются.",
   ].join("\n");
 }
 
