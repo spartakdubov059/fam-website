@@ -44,6 +44,9 @@ begin
   end loop;
   -- An unavailable runner blocks separately from a rejected patch.
   task := '00000000-0000-4000-8000-000000000003';
+  if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','model_generated') is distinct from true then
+    raise exception 'Expected model-generated transition before QA';
+  end if;
   if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','qa_unavailable') is distinct from true then
     raise exception 'Expected QA-unavailable transition';
   end if;
