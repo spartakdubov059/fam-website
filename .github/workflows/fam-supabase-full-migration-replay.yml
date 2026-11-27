@@ -1,0 +1,29 @@
+name: FAM full Supabase migration replay
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/fam-supabase-full-migration-replay.yml'
+permissions:
+  contents: read
+jobs:
+  replay-all-migrations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb
+        with:
+          version: 3.4.0
+      - name: Initialize local Supabase configuration
+        run: supabase init --workdir "$GITHUB_WORKSPACE"
+      - name: Start isolated local Supabase services
+        run: supabase start
+      - name: Replay every migration from a clean local database
+        run: supabase db reset
+      - name: Stop and remove the disposable local stack
+        if: always()
+        run: supabase stop --no-backup
+        continue-on-error: true

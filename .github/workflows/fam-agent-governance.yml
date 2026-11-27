@@ -1,0 +1,75 @@
+name: FAM agent governance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/fam-agent-governance.yml"
+      - "scripts/fam-agent-governance.mjs"
+      - "scripts/fam-governance-bridge.mjs"
+      - "supabase/migrations/*fam_inspector_bounded_coder_enqueue.sql"
+      - "supabase/functions/fam-agent-coder-bridge/**"
+      - "supabase/migrations/*fam_agent_task_metrics.sql"
+      - "supabase/migrations/*fam_qwen_retry_recovery.sql"
+      - "scripts/fam-integration-coordinator.mjs"
+      - "scripts/fam-agent-lifecycle.mjs"
+      - "tests/security/fam-agent-governance.test.mjs"
+      - "tests/security/fam-agent-metrics.test.mjs"
+      - "tests/security/fam-integration-coordinator.test.mjs"
+  workflow_dispatch:
+    inputs:
+      synthetic_signal:
+        description: "Только безопасное синтетическое испытание очереди INSPECTOR → Qwen"
+        required: false
+        type: choice
+        options: [none, synthetic_ci_workflow_failure, synthetic_qwen_runtime_smoke]
+        default: none
+  schedule:
+    - cron: "45 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fam-agent-governance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Независимые тесты штаба агентов
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs tests/security/fam-agent-metrics.test.mjs
+
+  governance:
+    name: Арбитр, инспектор и рекрутер
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+      issues: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+      - name: Собрать доказательные сигналы из метаданных GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
+          FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_AGENT_INTEGRATOR_TOKEN: ${{ secrets.FAM_AGENT_INTEGRATOR_TOKEN }}
+          FAM_INSPECTOR_SYNTHETIC_SIGNAL: ${{ inputs.synthetic_signal || 'none' }}
+        run: node scripts/fam-agent-governance.mjs

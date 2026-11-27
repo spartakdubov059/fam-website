@@ -1,0 +1,46 @@
+name: FAM School Pulse PostgreSQL safety test
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*school_polls*.sql'
+      - 'supabase/migrations/*poll_options*.sql'
+      - 'tests/sql/school-pulse-*'
+      - 'tests/security/fam-domain-auth-context.test.mjs'
+      - '.github/workflows/school-pulse-db.yml'
+permissions:
+  contents: read
+jobs:
+  school-pulse-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: school_pulse_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d school_pulse_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+      PGDATABASE: school_pulse_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Build disposable school database
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-pulse-bootstrap.sql
+      - name: Apply the production schema and option expansion
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261112231634_fam_announcements_open_events_school_polls.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120045732_expand_school_poll_options.sql
+      - name: Verify privacy, one vote and school isolation
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-pulse-assert.sql

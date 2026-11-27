@@ -1,0 +1,31 @@
+name: FAM legal consultation contract
+
+on:
+  pull_request:
+    paths:
+      - "scripts/fam-legal-consultation.mjs"
+      - "scripts/fam-legal-evidence.mjs"
+      - "docs/FAM_LEGAL_EVIDENCE_CONTRACT.md"
+      - "scripts/fam-agent-bridge.mjs"
+      - "tests/security/fam-legal-consultation.test.mjs"
+      - "tests/security/fam-legal-evidence.test.mjs"
+      - "tests/security/fam-agent-bridge.test.mjs"
+      - "tests/security/fam-agent-live-smoke.test.mjs"
+      - ".github/workflows/fam-legal-consultation-contract.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Проверка безопасного контракта консультаций
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
+        with:
+          node-version: "22"
+      - run: node --test tests/security/fam-legal-consultation.test.mjs tests/security/fam-legal-evidence.test.mjs tests/security/fam-agent-bridge.test.mjs tests/security/fam-agent-live-smoke.test.mjs
