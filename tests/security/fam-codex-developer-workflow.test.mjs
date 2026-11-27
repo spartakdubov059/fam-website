@@ -268,34 +268,57 @@ test("GitHub approval output uses one validated writer and protects PR creation"
   assert.match(workflow, /gh pr create --draft/);
 });
 
-test("untrusted QA runner never receives bridge credentials and PR creation waits for trusted writeback", () => {
-  const verify = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
+test("Qwen cache includes runtime libraries and rejects incomplete cache hits", () => {
+  assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/llama\.cpp\/build\/bin\n\s+key: [^\n]+-v2-runtime/);
+  assert.match(workflow, /id: llama-runtime-cache/);
+  assert.match(workflow, /dependencies="\$\(ldd "\$SERVER" 2>&1\)" && ! grep -q 'not found'/);
+  assert.match(workflow, /steps\.llama-runtime-cache\.outputs\.usable != 'true'/);
+  assert.match(workflow, /rm -rf -- "\$RUNNER_TEMP\/llama\.cpp"\n\s+git clone/);
+  const isolatedSmoke = workflow.indexOf('"$INFERENCE_SERVER" --version');
+  assert.ok(isolatedSmoke > workflow.indexOf('done < <(ldd "$SERVER" | awk'));
+  assert.ok(isolatedSmoke < workflow.indexOf('"$INFERENCE_SERVER" -m "$INFERENCE_MODEL"'));
+});
+
+test("untrusted QA never receives bridge credentials, including after failed checks", () => {
+  const qa = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
   const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
-  const prepare = workflow.split("  prepare_review:\n")[1] || "";
-  assert.ok(verify && record && prepare);
-  assert.doesNotMatch(verify, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
-  assert.match(verify, /qa_outcome: \$\{\{ steps\.qa_classification\.outputs\.result \}\}/);
-  assert.match(verify, /id: qa_classification\n\s+if: always\(\)/);
-  assert.match(verify, /result=rejected/);
-  assert.match(verify, /result=unavailable/);
-  assert.match(verify, /result=passed/);
-  assert.match(record, /runs-on: ubuntu-latest/);
-  assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
-  assert.match(record, /FAM_AGENT_WORKER_TOKEN: \$\{\{ secrets\.FAM_AGENT_WORKER_TOKEN \}\}/);
-  assert.match(record, /needs\.verify\.outputs\.qa_outcome/);
+  const pr = workflow.split("  prepare_review:\n")[1]?.split("  record_pr:\n")[0] || "";
+  const final = workflow.split("  record_pr:\n")[1] || "";
+  assert.ok(qa && record && pr && final);
+  assert.doesNotMatch(qa, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
+  assert.doesNotMatch(pr, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs (advance|heartbeat)/);
+  assert.match(qa, /qa_outcome: \$\{\{ steps\.qa_classification\.outputs\.result \}\}/);
+  assert.match(qa, /id: qa_classification\n\s+if: always\(\)/);
   assert.match(record, /needs\.verify\.outputs\.qa_outcome == 'passed'.*needs\.verify\.outputs\.qa_outcome == 'rejected'/);
+  assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(record, /passed\) export FAM_RESULT_STAGE=qa_passed/);
   assert.match(record, /rejected\) export FAM_RESULT_STAGE=qa_failed/);
   assert.doesNotMatch(record, /qa_unavailable/);
-  assert.match(prepare, /needs: \[generate, verify, record_qa\]/);
-  assert.match(prepare, /needs\.record_qa\.result == 'success'/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /needs\.record_qa\.result == 'success'/);
+  assert.match(final, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(final, /export FAM_RESULT_STAGE=pr_created/);
+  assert.match(final, /export FAM_RESULT_STAGE=qa_failed/);
+  assert.doesNotMatch(record + final, /download-artifact|git apply|node --test/);
+  assert.equal((workflow.match(/export FAM_RESULT_STAGE=qa_passed/g) || []).length, 1);
+});
+test("PR creation validates staged changes independently, including new files", () => {
+  const qa = workflow.split("  verify:\n")[1].split("  record_qa:\n")[0];
+  const pr = workflow.split("  prepare_review:\n")[1].split("  record_pr:\n")[0];
+  for (const block of [qa, pr]) {
+    assert.match(block, /git apply --index/);
+    assert.match(block, /git diff --cached --name-only -z HEAD/);
+  }
+  assert.match(pr, /node scripts\/validate-local-agent-patch\.mjs/);
+  assert.match(pr, /git diff --cached --raw --no-renames/);
+  assert.match(pr, /needs\.record_qa\.result == 'success'/);
 });
 
-test("trusted QA writeback shell maps verified outcomes and rejects unknown ones", () => {
+test("trusted QA writeback maps only independent pass or rejection", () => {
   const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
   const marker = "        run: |\n";
   const blocks = record.split(marker);
-  assert.equal(blocks.length, 2, "exactly one bridge call shell must be present");
+  assert.equal(blocks.length, 2, "exactly one bridge writeback shell must be present");
   const shell = blocks[1].split("\n  prepare_review:")[0].split("\n").map(line => {
     assert.ok(!line.trim() || line.startsWith("          "), "unexpected YAML indentation");
     return line.trim() ? line.slice(10) : "";
@@ -310,10 +333,10 @@ test("trusted QA writeback shell maps verified outcomes and rejects unknown ones
     assert.equal(result.stdout.trim(), expected);
   }
   for (const qa of ["unavailable", "", "cancelled"]) {
-    const invalid = spawnSync("bash", ["-c", stub + shell], {
+    const result = spawnSync("bash", ["-c", stub + shell], {
       env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000,
     });
-    assert.ifError(invalid.error);
-    assert.equal(invalid.status, 1);
+    assert.ifError(result.error);
+    assert.equal(result.status, 1);
   }
 });
