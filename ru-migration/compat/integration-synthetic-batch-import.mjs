@@ -16,6 +16,7 @@ assert.equal(mapped.ok,true);
 const mappedById=new Map(mapped.rows.map(row=>['synthetic-'+createHash('sha256').update(JSON.stringify(row)).digest('hex').slice(0,32),row]));
 const fixtureRows=[...mappedById.keys()].map(id=>({id}));
 const userId=mapped.rows[0].user_id;
+const notificationKeys=rows=>rows.map(row=>mappedById.get(row.id).notification_key).sort();
 const tableSnapshot = Object.fromEntries(RU_MIGRATION_TABLES.map(table => [table, []]));
 tableSnapshot.fam_notification_reads = fixtureRows;
 const plan = prepareCompleteSyntheticBatchPlan({
@@ -123,7 +124,7 @@ try {
   const rowsAfterManifestFailure = (await sql`SELECT notification_key FROM fam_notification_reads
     WHERE user_id = ${userId} ORDER BY notification_key;`)[0];
   assert.deepEqual(rowsAfterManifestFailure.map(row => row.notification_key).sort(),
-    chunks[0].rows.map(row => row.id).sort(), 'manifest refusal leaves target rows unchanged');
+    notificationKeys(chunks[0].rows), 'manifest refusal leaves target rows unchanged');
   await sql`INSERT INTO fam_migration_rehearsal_plan_tables
     (snapshot_id, table_name, row_count, batch_count, plan_digest, created_at)
     VALUES (${plan.snapshot_id}, 'fam_favorites', Unwrap(CAST(0 AS Uint32)),
@@ -134,7 +135,7 @@ try {
   );
   const failedRows = (await sql`SELECT notification_key FROM fam_notification_reads
     WHERE user_id = ${userId} ORDER BY notification_key;`)[0];
-  assert.deepEqual(failedRows.map(row => row.notification_key).sort(), chunks[0].rows.map(row => row.id).sort());
+  assert.deepEqual(failedRows.map(row => row.notification_key).sort(), notificationKeys(chunks[0].rows));
   const receiptAfterInterruption = (await sql`SELECT batch_offset FROM fam_migration_rehearsal_batches
     WHERE snapshot_id = ${plan.snapshot_id} ORDER BY batch_offset;`)[0];
   assert.deepEqual(receiptAfterInterruption.map(row => Number(row.batch_offset)), [0]);
@@ -146,7 +147,7 @@ try {
 
   const finalRows = (await sql`SELECT notification_key FROM fam_notification_reads
     WHERE user_id = ${userId} ORDER BY notification_key;`)[0];
-  assert.deepEqual(finalRows.map(row => row.notification_key).sort(), fixtureRows.map(row => row.id).sort());
+  assert.deepEqual(finalRows.map(row => row.notification_key).sort(), notificationKeys(fixtureRows));
   await sql`DELETE FROM fam_migration_rehearsal_plan_tables
     WHERE snapshot_id = ${plan.snapshot_id} AND table_name = 'fam_favorites';`;
   assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code,
