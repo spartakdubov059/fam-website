@@ -25,13 +25,17 @@ jobs:
             tests/fixtures/fam-qa-failure/qwen-qa-failure-migration-baseline.sql \
             supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql \
             supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
+            supabase/migrations/20261127120000_fam_qwen_pr_ci_failed_transition.sql \
             tests/fixtures/fam-qa-failure/qwen-qa-failure-migration-assertions.sql \
+            tests/fixtures/fam-qa-failure/pr-ci-failed-assertions.sql \
             tests/fixtures/fam-qa-failure/lifecycle-chain-assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Roll back QA transition and preserve task/event evidence
         run: |
           set -euo pipefail
           cat tests/fixtures/fam-qa-failure/rollback-prepare.sql \
+            docs/sql/fam-qwen-pr-ci-failed-transition-rollback.sql \
+            tests/fixtures/fam-qa-failure/pr-ci-failed-rollback-assertions.sql \
             docs/sql/fam-qwen-qa-failed-transition-rollback.sql \
             tests/fixtures/fam-qa-failure/rollback-assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
@@ -49,6 +53,8 @@ jobs:
             tests/fixtures/fam-qa-failure/lifecycle-chain-reapply-assertions.sql \
             supabase/migrations/20261126232721_fam_qwen_qa_failed_transition.sql \
             tests/fixtures/fam-qa-failure/reapply-assertions.sql \
+            supabase/migrations/20261127120000_fam_qwen_pr_ci_failed_transition.sql \
+            tests/fixtures/fam-qa-failure/pr-ci-failed-reapply-assertions.sql \
             | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d fam_qa_failure_fixture
       - name: Remove disposable database
         if: always()

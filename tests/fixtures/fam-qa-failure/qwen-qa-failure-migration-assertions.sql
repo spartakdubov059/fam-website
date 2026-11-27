@@ -42,8 +42,32 @@ begin
       raise exception 'False QA success recorded';
     end if;
   end loop;
+  -- An unavailable runner blocks separately from a rejected patch.
+  task := '00000000-0000-4000-8000-000000000003';
+  if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','model_generated') is distinct from true then
+    raise exception 'Expected model-generated transition before QA';
+  end if;
+  if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','qa_unavailable') is distinct from true then
+    raise exception 'Expected QA-unavailable transition';
+  end if;
+  if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','qa_unavailable') is distinct from false then
+    raise exception 'Repeated QA-unavailable transition accepted';
+  end if;
+  if not exists(select 1 from private.fam_agent_tasks where id=task and status='blocked'
+      and result_summary='Независимая QA не состоялась из-за сбоя среды; качество изменения не установлено.'
+      and claimed_by is null and claimed_at is null and lease_expires_at is null) then
+    raise exception 'QA-unavailable task was not safely blocked';
+  end if;
+  if (select count(*) from private.fam_agent_task_events where task_id=task
+      and event_type='blocked' and metadata->>'stage'='qa_unavailable') <> 1 then
+    raise exception 'Missing or duplicate QA-unavailable event';
+  end if;
+  if exists(select 1 from private.fam_agent_task_events where task_id=task
+      and metadata->>'stage' in ('qa_passed','qa_failed')) then
+    raise exception 'Unavailable QA was reported as a pass or patch rejection';
+  end if;
   -- Reject pre-generation, expired lease, different owner, approval-required task.
-  for i in 3..6 loop
+  for i in 4..6 loop
     task := ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid;
     if public.advance_fam_agent_coder_task(task,'fam-agent-qwen-coder-v1','qa_failed') is distinct from false then
       raise exception 'Unexpected failure transition for fixture %',i;
@@ -66,4 +90,4 @@ begin
   end if;
 end $$;
 reset role;
-select 'PASS: original defect reproduced; proposed QA failure contract verified; access and normal PR path unchanged' as result;
+select 'PASS: QA rejection and unavailable runner are distinct; access and normal PR path unchanged' as result;

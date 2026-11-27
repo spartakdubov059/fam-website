@@ -365,9 +365,19 @@ jobs:
           for file in "${changed_files[@]}"; do
             case "$file" in
               index.html|js/*) has_behavior_code=true ;;
-              tests/*) has_tests=true ;;
             esac
           done
+          # Only added or modified executable proposed tests count as coverage.
+          proposed_tests=()
+          while IFS= read -r -d '' file; do proposed_tests+=("$file"); done \
+            < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
+          if (( ${#proposed_tests[@]} > 0 )); then
+            for file in "${proposed_tests[@]}"; do
+              case "$file" in
+                tests/agent-proposed/*.test.mjs) has_tests=true ;;
+              esac
+            done
+          fi
           if [[ "$has_behavior_code" == "true" && "$has_tests" != "true" ]]; then
             # Exception only for a single, existing timeAgo function with a
             # committed independent benchmark; all other HTML/JS changes
@@ -386,6 +396,25 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
+
+      - name: Выполнить тесты, предложенные моделью
+        id: proposed_tests
+        run: |
+          set -euo pipefail
+          tracked_tests=()
+          while IFS= read -r -d '' file; do tracked_tests+=("$file"); done \
+            < <(git ls-files -z -- tests/agent-proposed/)
+          proposed_tests=()
+          if (( ${#tracked_tests[@]} > 0 )); then
+            for file in "${tracked_tests[@]}"; do
+              case "$file" in
+                tests/agent-proposed/*.test.mjs) proposed_tests+=("./$file") ;;
+              esac
+            done
+          fi
+          if (( ${#proposed_tests[@]} > 0 )); then
+            node --test "${proposed_tests[@]}"
+          fi
 
       - name: Выполнить полный набор регрессионных тестов
         id: regression_tests
@@ -420,17 +449,20 @@ jobs:
         if: always()
         env:
           SAFETY_RESULT: ${{ steps.safety.outcome }}
+          PROPOSED_TESTS_RESULT: ${{ steps.proposed_tests.outcome }}
           REGRESSION_TESTS_RESULT: ${{ steps.regression_tests.outcome }}
           AGENT_SYNTAX_RESULT: ${{ steps.agent_syntax.outcome }}
           INLINE_SYNTAX_RESULT: ${{ steps.inline_syntax.outcome }}
         run: |
           set -euo pipefail
           result=unavailable
-          if [[ "$SAFETY_RESULT" == "failure" || "$REGRESSION_TESTS_RESULT" == "failure" || \
-                "$AGENT_SYNTAX_RESULT" == "failure" || "$INLINE_SYNTAX_RESULT" == "failure" ]]; then
+          if [[ "$SAFETY_RESULT" == "failure" || "$PROPOSED_TESTS_RESULT" == "failure" || \
+                "$REGRESSION_TESTS_RESULT" == "failure" || "$AGENT_SYNTAX_RESULT" == "failure" || \
+                "$INLINE_SYNTAX_RESULT" == "failure" ]]; then
             result=rejected
-          elif [[ "$SAFETY_RESULT" == "success" && "$REGRESSION_TESTS_RESULT" == "success" && \
-                  "$AGENT_SYNTAX_RESULT" == "success" && "$INLINE_SYNTAX_RESULT" == "success" ]]; then
+          elif [[ "$SAFETY_RESULT" == "success" && "$PROPOSED_TESTS_RESULT" == "success" && \
+                  "$REGRESSION_TESTS_RESULT" == "success" && "$AGENT_SYNTAX_RESULT" == "success" && \
+                  "$INLINE_SYNTAX_RESULT" == "success" ]]; then
             result=passed
           fi
           echo "result=$result" >> "$GITHUB_OUTPUT"
@@ -438,7 +470,7 @@ jobs:
   record_qa:
     name: Записать результат QA из чистого доверенного runner
     needs: [generate, verify]
-    if: always() && !cancelled() && needs.generate.result == 'success' && needs.generate.outputs.has_patch == 'true' && (needs.verify.outputs.qa_outcome == 'passed' || needs.verify.outputs.qa_outcome == 'rejected')
+    if: always() && !cancelled() && needs.generate.result == 'success' && needs.generate.outputs.has_patch == 'true' && (needs.verify.result == 'success' || needs.verify.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -462,6 +494,7 @@ jobs:
           case "$QA_RESULT" in
             passed) export FAM_RESULT_STAGE=qa_passed ;;
             rejected) export FAM_RESULT_STAGE=qa_failed ;;
+            ''|unavailable) export FAM_RESULT_STAGE=qa_unavailable ;;
             *) exit 1 ;;
           esac
           node scripts/fam-agent-bridge.mjs advance
@@ -498,6 +531,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUIRES_APPROVAL: ${{ needs.verify.outputs.requires_approval }}
+          FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
           node scripts/render-fam-agent-report.mjs \
@@ -547,6 +581,7 @@ jobs:
             echo "- Run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Production этим workflow не изменяется."
             echo "- Любое объединение PR и публикация требуют отдельного явного разрешения владельца."
+            echo "- FAM task ID: \`${FAM_CODER_TASK_ID:-unknown}\`"
           } > "$RUNNER_TEMP/fam-agent-pr-body.md"
           if [[ "$REQUIRES_APPROVAL" == "true" ]]; then
             PR_URL="$(gh pr create --draft --base main --head "$BRANCH" --title "Предложение локального ИИ: исправление FAM" --body-file "$RUNNER_TEMP/fam-agent-pr-body.md")"
@@ -629,7 +664,8 @@ jobs:
             [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
             export FAM_RESULT_STAGE=pr_created
           elif [[ "$PR_CI_FAILED" == "true" ]]; then
-            export FAM_RESULT_STAGE=qa_failed
+            [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+            export FAM_RESULT_STAGE=pr_ci_failed
           else
             exit 1
           fi

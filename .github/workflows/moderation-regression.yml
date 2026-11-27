@@ -26,12 +26,32 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Run moderation tests
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
+      - name: Run accumulated Qwen regression tests
+        id: proposed_tests
+        run: |
+          set -euo pipefail
+          tracked_tests=()
+          while IFS= read -r -d '' file; do tracked_tests+=("$file"); done \
+            < <(git ls-files -z -- tests/agent-proposed/)
+          proposed_tests=()
+          if (( ${#tracked_tests[@]} > 0 )); then
+            for file in "${tracked_tests[@]}"; do
+              case "$file" in
+                tests/agent-proposed/*.test.mjs) proposed_tests+=("./$file") ;;
+              esac
+            done
+          fi
+          if (( ${#proposed_tests[@]} > 0 )); then
+            node --test "${proposed_tests[@]}"
+          fi
       - name: Check Qwen bridge client syntax
         run: node --check scripts/fam-agent-bridge.mjs
       - name: Check local Qwen model runner syntax
