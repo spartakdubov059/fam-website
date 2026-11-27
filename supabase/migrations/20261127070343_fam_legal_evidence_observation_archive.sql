@@ -32,6 +32,10 @@ create table private.fam_legal_evidence_archive (
   status text not null check (status in ('source_checked', 'change_detected', 'source_unavailable')),
   document_id text not null default '' check (document_id = '' or document_id ~ '^[0-9]{10,20}$'),
   document_sha256 text not null default '' check (document_sha256 = '' or document_sha256 ~ '^[0-9a-f]{64}$'),
+  priority text not null default 'unassessed' check (priority = 'unassessed'),
+  previous_record_id uuid references private.fam_legal_evidence_archive(id),
+  previous_record_sha256 text not null default '' check (previous_record_sha256 = '' or previous_record_sha256 ~ '^[0-9a-f]{64}$'),
+  record_sha256 text not null check (record_sha256 ~ '^[0-9a-f]{64}$'),
   decision text not null default 'pending_human_review'
     check (decision = 'pending_human_review'),
   checked_at timestamptz not null default clock_timestamp(),
@@ -96,6 +100,9 @@ declare
   v_checked_at timestamptz := pg_catalog.clock_timestamp();
   v_checked_day date := (v_checked_at at time zone 'UTC')::date;
   v_record_id uuid;
+  v_previous_record_id uuid;
+  v_previous_record_sha256 text := '';
+  v_record_sha256 text;
 begin
   if current_user <> 'service_role' then
     raise exception 'LEGAL archive requires the protected service role' using errcode = '42501';
@@ -122,12 +129,36 @@ begin
     raise exception 'LEGAL source observation is outside the fixed archive contract' using errcode = '22023';
   end if;
 
+  -- Serialize each scope so concurrent observations form one verifiable chain.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_scope, 781943));
+
+  select archive.id, archive.record_sha256
+    into v_previous_record_id, v_previous_record_sha256
+  from private.fam_legal_evidence_archive as archive
+  where archive.scope = p_scope
+  order by archive.checked_at desc, archive.id desc
+  limit 1;
+  v_previous_record_sha256 := coalesce(v_previous_record_sha256, '');
+  v_record_sha256 := encode(extensions.digest(convert_to(
+    jsonb_build_object(
+      'scope', p_scope, 'revision', p_revision, 'criterion_id', p_criterion_id,
+      'source_id', p_source_id, 'source_url', p_source_url, 'status', p_status,
+      'document_id', v_document_id, 'document_sha256', v_document_sha256,
+      'priority', 'unassessed', 'previous_record_id', v_previous_record_id,
+      'previous_record_sha256', v_previous_record_sha256,
+      'decision', 'pending_human_review',
+      'checked_at', pg_catalog.to_char(v_checked_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
+      'checked_day', v_checked_day
+    )::text, 'UTF8'), 'sha256'), 'hex');
+
   insert into private.fam_legal_evidence_archive as archive (
     scope, revision, criterion_id, source_id, source_url, status,
-    document_id, document_sha256, decision, checked_at, checked_day
+    document_id, document_sha256, priority, previous_record_id,
+    previous_record_sha256, record_sha256, decision, checked_at, checked_day
   ) values (
     p_scope, p_revision, p_criterion_id, p_source_id, p_source_url, p_status,
-    v_document_id, v_document_sha256, 'pending_human_review', v_checked_at, v_checked_day
+    v_document_id, v_document_sha256, 'unassessed', v_previous_record_id,
+    v_previous_record_sha256, v_record_sha256, 'pending_human_review', v_checked_at, v_checked_day
   )
   on conflict do nothing
   returning archive.id into v_record_id;
@@ -206,7 +237,7 @@ revoke all on function public.get_fam_legal_evidence_summary() from public, anon
 grant execute on function public.get_fam_legal_evidence_summary() to service_role;
 
 comment on table private.fam_legal_evidence_archive is
-  'Append-only metadata for official-source checks. Stores identifiers and SHA-256 only; no source text, student data, legal conclusions, or release approvals.';
+  'Append-only metadata for official-source checks with a per-scope SHA-256 chain. Priority remains unassessed; no source text, student data, legal conclusions, or release approvals.';
 comment on function public.get_fam_legal_evidence_summary() is
   'Returns only per-scope source-check freshness and status. Every observation remains pending human review and is not a legal readiness decision.';
 
