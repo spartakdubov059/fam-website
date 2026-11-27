@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - "scripts/fam-legal-consultation.mjs"
+      - "scripts/fam-legal-evidence.mjs"
+      - "docs/FAM_LEGAL_EVIDENCE_CONTRACT.md"
       - "scripts/fam-agent-bridge.mjs"
       - "tests/security/fam-legal-consultation.test.mjs"
+      - "tests/security/fam-legal-evidence.test.mjs"
       - "tests/security/fam-agent-bridge.test.mjs"
       - "tests/security/fam-agent-live-smoke.test.mjs"
       - ".github/workflows/fam-legal-consultation-contract.yml"
@@ -25,4 +28,4 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - run: node --test tests/security/fam-legal-consultation.test.mjs tests/security/fam-agent-bridge.test.mjs tests/security/fam-agent-live-smoke.test.mjs
+      - run: node --test tests/security/fam-legal-consultation.test.mjs tests/security/fam-legal-evidence.test.mjs tests/security/fam-agent-bridge.test.mjs tests/security/fam-agent-live-smoke.test.mjs
