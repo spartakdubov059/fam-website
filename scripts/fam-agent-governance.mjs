@@ -82,6 +82,19 @@ function dateMs(value) {
   return Number.isFinite(result) ? result : 0;
 }
 
+export function formatMoscowTimestamp(value = Date.now()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(value)).map((part) => [part.type, part.value]));
+  return parts.day + "." + parts.month + "." + parts.year + " " + parts.hour + ":" + parts.minute + " МСК";
+}
+
+export function shouldPublishGovernanceReport({ eventName = "", disputes = [], warnings = [], proposals = [] } = {}) {
+  return eventName === "schedule" || disputes.length > 0 || warnings.length > 0 || proposals.length > 0;
+}
+
 function clean(value, maxLength = 150) {
   return String(value ?? "")
     .replace(/[\r\n\t\u0000-\u001f]/g, " ")
@@ -202,7 +215,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
     "",
-    "Отчёт на " + new Date(now).toISOString().slice(0, 16).replace("T", " ") + " UTC.",
+    "Ежедневный доклад на " + formatMoscowTimestamp(now) + ".",
     "Проверено открытых PR: " + count + (limited ? " (достигнут лимит выборки; отчёт неполный)" : "") + ".",
     "",
     "## ARBITER — конфликты изменений",
@@ -292,11 +305,11 @@ async function publishIssue(report, token) {
     !issue.pull_request && typeof issue.body === "string" &&
     issue.body.includes(REPORT_MARKER)
   );
-  const title = "FAM: контроль конфликтов, работоспособности и найма агентов";
+  const title = "FAM: ежедневный доклад штаба агентов";
   if (found) {
     await api("/issues/" + found.number, token, {
       method: "PATCH",
-      body: JSON.stringify({ body: report }),
+      body: JSON.stringify({ title, body: report }),
     });
     return "Обновлена задача #" + found.number;
   }
@@ -470,7 +483,10 @@ export async function main() {
   }
   process.stdout.write("FAM governance: конфликтов " + disputes.length +
     ", предупреждений " + warnings.length + ", предложений " + proposals.length + "\n");
-  if (disputes.length || warnings.length || proposals.length) {
+  if (shouldPublishGovernanceReport({
+    eventName: process.env.GITHUB_EVENT_NAME,
+    disputes, warnings, proposals,
+  })) {
     process.stdout.write(await publishIssue(report, token) + "\n");
   } else {
     process.stdout.write("Новых сигналов нет, отдельный issue не создаётся.\n");

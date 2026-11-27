@@ -10,6 +10,8 @@ import {
   summarizeQwenRuns,
   summarizeAgentQueue,
   inspectPostMerge,
+  formatMoscowTimestamp,
+  shouldPublishGovernanceReport,
 } from "../../scripts/fam-agent-governance.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
@@ -17,7 +19,7 @@ const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
 test("daily Boss report is scheduled for 07:00 Moscow time", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
-  assert.match(workflow, /schedule:\s*\n\s*- cron: "0 4 \* \* \*"/);
+  assert.match(workflow, /schedule:\s*\n\s*- cron: "0 4 \\* \\* \\*"/);
 });
 
 test("Qwen retry recovery is restricted to recent infrastructure signals and retires stale queue entries", () => {
@@ -145,6 +147,16 @@ test("Report escapes untrusted GitHub metadata and clarifies human authority", (
   assert.ok(report.includes("отчёт неполный"));
   assert.ok(report.includes("одобрения владельца"));
   assert.ok(report.includes("#1 ↔ #2"));
+});
+
+test("Boss report uses Moscow time and updates even when the scheduled day has no warnings", () => {
+  assert.equal(formatMoscowTimestamp("2026-11-27T04:00:00Z"), "27.11.2026 07:00 МСК");
+  assert.equal(shouldPublishGovernanceReport({ eventName: "schedule" }), true);
+  assert.equal(shouldPublishGovernanceReport({ eventName: "workflow_dispatch" }), false);
+  assert.equal(shouldPublishGovernanceReport({ eventName: "workflow_dispatch", warnings: [{ code: "issue" }] }), true);
+  const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
+  assert.match(workflow, /schedule:[\s\S]*?cron: "0 4 \* \* \*"/);
+  assert.match(makeReport({ now: Date.parse("2026-11-27T04:00:00Z") }), /Ежедневный доклад на 27\.11\.2026 07:00 МСК/);
 });
 
 test("INSPECTOR flags failed post-merge workflows without triggering rollback", () => {
