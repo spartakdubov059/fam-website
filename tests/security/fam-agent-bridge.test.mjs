@@ -34,6 +34,7 @@ test("accepts a single allowlisted aggregate task", () => {
   assert.equal(Object.keys(TASK_PROMPTS).length, 4);
   assert.equal(task.contract, TASK_CONTRACT);
   assert.match(task.prompt, /Карточка задачи:/);
+  assert.match(task.prompt, /"risk_categories":\[\]/);
   assert.match(task.prompt, /required_checks/);
   assert.ok(task.contract.acceptance.includes("При отсутствии подтверждённого дефекта вернуть no_patch."));
   assert.ok(task.contract.limits.some((item) => item.includes("Нет секретов")));
@@ -50,6 +51,10 @@ test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mism
     task: { id, task_key: "audit_agent_infrastructure", event_code: "synthetic_ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
   }, revision);
   assert.match(task.prompt, /без чтения журналов GitHub/);
+  assert.match(task.prompt, /"risk_categories":\["access_control","external_processing"\]/);
+  assert.match(task.prompt, /"signal_source":"allowlisted_task_scope_and_declared_paths"/);
+  assert.match(task.prompt, /"legal_opinion":false/);
+  assert.match(task.prompt, /"release_authority":false/);
   assert.throws(() => validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_agent_infrastructure", event_code: "js_runtime", page_area: "agent_infrastructure", occurrences: 1 },

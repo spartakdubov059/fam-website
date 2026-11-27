@@ -56,6 +56,25 @@ test("FAM_RU review stays separate and shared changes get two explicit scopes", 
   assert.ok(shared.qwen_guidance.qa_acceptance_checks.some((item) => item.includes("несвязанные безопасные изменения FAM_CURRENT")));
 });
 
+test("the bridge gets advisory risk topics from the allowlisted task scope", () => {
+  const advice = buildLegalConsultation({
+    scope: "FAM_CURRENT",
+    revision: REVISION,
+    taskKey: "audit_agent_infrastructure",
+  });
+  assert.deepEqual(advice.risk_categories, ["access_control", "external_processing"]);
+  assert.equal(advice.evidence.changed_file_count, 0);
+  assert.equal(advice.evidence.signal_source, "allowlisted_task_scope_and_declared_paths");
+  assert.equal(advice.status, "advisory_review_pending");
+  assert.equal(advice.legal_opinion, false);
+  assert.equal(advice.release_authority, false);
+  assert.throws(() => buildLegalConsultation({
+    scope: "FAM_CURRENT",
+    revision: REVISION,
+    taskKey: "untrusted_task",
+  }), /allowlisted task key/);
+});
+
 test("missing scope, invalid revision and oversized evidence fail closed", () => {
   assert.throws(() => buildLegalConsultation({ revision: REVISION }), /explicit product scope/);
   assert.throws(() => buildLegalConsultation({ scope: "FAM_CURRENT", revision: "main" }), /exact 40-character revision/);

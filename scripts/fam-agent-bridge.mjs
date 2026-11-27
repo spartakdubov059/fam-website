@@ -70,6 +70,7 @@ export function validateClaimResponse(data, revision) {
     scope: "FAM_CURRENT",
     revision,
     changedFiles: [],
+    taskKey: task.task_key,
   });
   return Object.freeze({
     id: task.id,

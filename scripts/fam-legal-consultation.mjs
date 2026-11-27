@@ -1,5 +1,11 @@
 const SHA = /^[0-9a-f]{40}$/i;
 const SCOPES = new Set(["FAM_CURRENT", "FAM_RU", "SHARED"]);
+const TASK_RISK_TOPICS = Object.freeze({
+  audit_frontend_runtime: Object.freeze([]),
+  audit_client_resilience: Object.freeze(["external_processing"]),
+  audit_accessibility: Object.freeze([]),
+  audit_agent_infrastructure: Object.freeze(["access_control", "external_processing"]),
+});
 
 const RISK_OPTIONS = Object.freeze({
   access_control: Object.freeze({
@@ -64,7 +70,7 @@ function classifyPath(path) {
   return [...new Set(risks)];
 }
 
-export function buildLegalConsultation({ scope, revision, changedFiles = [] } = {}) {
+export function buildLegalConsultation({ scope, revision, changedFiles = [], taskKey } = {}) {
   if (!SCOPES.has(scope)) throw new Error("Legal consultation requires an explicit product scope.");
   if (typeof revision !== "string" || !SHA.test(revision)) {
     throw new Error("Legal consultation requires an exact 40-character revision.");
@@ -73,8 +79,14 @@ export function buildLegalConsultation({ scope, revision, changedFiles = [] } = 
       changedFiles.some((path) => typeof path !== "string" || path.length > 240 || path.startsWith("/") || path.includes(".."))) {
     throw new Error("Invalid changed-file evidence.");
   }
+  if (taskKey !== undefined && !Object.hasOwn(TASK_RISK_TOPICS, taskKey)) {
+    throw new Error("Legal consultation requires an allowlisted task key.");
+  }
 
   const riskCounts = new Map();
+  for (const risk of taskKey ? TASK_RISK_TOPICS[taskKey] : []) {
+    riskCounts.set(risk, (riskCounts.get(risk) || 0) + 1);
+  }
   for (const path of changedFiles) {
     for (const risk of classifyPath(path)) riskCounts.set(risk, (riskCounts.get(risk) || 0) + 1);
   }
@@ -106,7 +118,8 @@ export function buildLegalConsultation({ scope, revision, changedFiles = [] } = 
   });
   const riskOptions = riskCategories.map((category) => Object.freeze({
     category,
-    signal_status: "path_signal_only",
+    signal_status: taskKey && TASK_RISK_TOPICS[taskKey].includes(category)
+      ? "allowlisted_task_scope_signal" : "declared_path_signal",
     priority: "unassessed",
     source_status: "not_verified",
     recommendation: RISK_OPTIONS[category].recommendation,
@@ -122,7 +135,7 @@ export function buildLegalConsultation({ scope, revision, changedFiles = [] } = 
     revision,
     risk_categories: riskCategories,
     provisional_priority: "advisory",
-    priority_basis: "Правовые источники и применимость к этой ревизии не проверялись; путь файла является только техническим сигналом.",
+    priority_basis: "Правовые источники и применимость к этой ревизии не проверялись; тип задачи и пути дают только технические сигналы.",
     status: reviewRequired ? "advisory_review_pending" : "no_trigger_detected_not_legal_approval",
     human_review_required: reviewRequired,
     legal_opinion: false,
@@ -134,7 +147,12 @@ export function buildLegalConsultation({ scope, revision, changedFiles = [] } = 
     ],
     scope_assessments: scopeAssessments,
     independent_review: reviewRequired ? "pending_human_review" : "not_triggered_by_path_signal",
-    evidence: { changed_file_count: changedFiles.length, risk_counts: Object.fromEntries([...riskCounts].sort(([a], [b]) => a.localeCompare(b))) },
+    evidence: {
+      changed_file_count: changedFiles.length,
+      task_key: taskKey ?? null,
+      signal_source: taskKey ? "allowlisted_task_scope_and_declared_paths" : "declared_paths",
+      risk_counts: Object.fromEntries([...riskCounts].sort(([a], [b]) => a.localeCompare(b))),
+    },
     risk_options: riskOptions,
     qwen_guidance: {
       goal: "Учитывать перечисленные технические риски и не выходить за согласованный scope.",
