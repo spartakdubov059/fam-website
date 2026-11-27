@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://spartakdubov059.github.io/fam-website/sitemap.xml
