@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { validateClaimResponse } from "../../scripts/fam-agent-bridge.mjs";
 
+const branch = "codex/fam-legal-consultation-20261127";
+
 const workflow = readFileSync(
   new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url),
   "utf8",
@@ -42,7 +44,7 @@ test("smoke task is a zero-occurrence aggregate-only audit, not a fabricated inc
       user_id: "must-never-reach-Qwen",
       arbitrary_payload: "must-never-reach-Qwen",
     },
-  }, "abcdef0123456789abcdef0123456789abcdef01");
+  }, "abcdef0123456789abcdef0123456789abcdef01", branch);
   assert.equal(valid.task_key, "audit_accessibility");
   assert.doesNotMatch(valid.prompt, /must-never-reach-Qwen/);
   assert.match(valid.prompt, /Предварительная консультация LEGAL/);
