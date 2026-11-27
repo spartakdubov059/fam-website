@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
 import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
 const DAY = 86_400_000;
@@ -196,7 +197,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -252,6 +253,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     lines.push("- **" + clean(p.role) + "**: " + clean(p.reason, 300) +
       ". Права: " + clean(p.permissions, 250) + ".");
   }
+  lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
     "- Сигналы основаны на метаданных GitHub, не на частных сообщениях пользователей.",
     "- Пересечение файлов — возможный конфликт, а не доказательство ошибки разработчика.",
@@ -418,13 +420,43 @@ export async function main() {
     }
   }
   const proposals = proposeRecruitment({ disputes, warnings, activeRoles: ["integration_specialist"] });
+  const qwenMetrics = summarizeQwenRuns(runDetails);
   const integrationPlan = buildIntegrationPlan({
     pulls, disputes,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
+  const staffSignals = {
+    arbiter: { state: "confirmed", evidence_count: disputes.length, detail: "сводка по конфликтам и открытым PR сформирована" },
+    inspector: {
+      state: warnings.length ? "confirmed" : "checked_no_signal",
+      evidence_count: warnings.length,
+      detail: warnings.length ? "собраны предупреждения из проверенных источников" : "проверенные источники не дали предупреждений",
+    },
+    qwen: {
+      state: qwenMetrics.runs ? "confirmed" : "checked_no_signal",
+      evidence_count: qwenMetrics.runs,
+      detail: qwenMetrics.runs
+        ? "запуски: " + qwenMetrics.runs + ", patch сгенерирован: " + qwenMetrics.model_generated + ", без patch: " + qwenMetrics.model_no_patch
+        : "в выборке запусков нет",
+    },
+    qa: {
+      state: qwenMetrics.qa_passed ? "confirmed" : qwenMetrics.runs ? "checked_no_signal" : "no_data",
+      evidence_count: qwenMetrics.qa_passed,
+      detail: qwenMetrics.qa_passed ? "независимые проверки patch завершились успешно" : "успешных независимых проверок patch в выборке нет",
+    },
+    integrator: {
+      state: "confirmed", evidence_count: pulls.length,
+      detail: "план проверки построен по " + pulls.length + " PR; сам по себе он не подтверждает merge",
+    },
+    recruiter: {
+      state: proposals.length ? "confirmed" : "checked_no_signal",
+      evidence_count: proposals.length,
+      detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
+    },
+  };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics: summarizeQwenRuns(runDetails), count: selected.length,
+    qwenMetrics, staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
