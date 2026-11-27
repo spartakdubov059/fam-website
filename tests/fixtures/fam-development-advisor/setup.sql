@@ -49,8 +49,11 @@ select
   (pg_catalog.now() at time zone 'UTC')::date - offsets.offset_days,
   'synthetic-school-' || schools.school_number,
   pg_catalog.jsonb_build_object('ideas',pg_catalog.jsonb_build_object(
-    'awaiting_council',case when offsets.offset_days <= 2 then 5
-      when offsets.offset_days <= 5 then 1 else 3 end))
+    'awaiting_council',case
+      when offsets.offset_days <= 2 then 5
+      when offsets.offset_days = 5 and schools.school_number = 5 then 0
+      when offsets.offset_days <= 5 then 1
+      else 3 end))
 from pg_catalog.generate_series(0,6) as offsets(offset_days)
 cross join lateral pg_catalog.generate_series(
   1,case when offsets.offset_days = 6 then 4 else 5 end

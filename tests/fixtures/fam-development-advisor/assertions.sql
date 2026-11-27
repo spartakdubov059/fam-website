@@ -59,6 +59,12 @@ begin
   if v_band <> 'suppressed' then
     raise exception 'Fewer than five reporting schools must suppress the signal; got %',v_band;
   end if;
+  select pending_council_ideas_band into v_band
+  from public.get_fam_development_advisor_snapshots(7)
+  where report_date = (pg_catalog.now() at time zone 'UTC')::date - 5;
+  if v_band <> 'suppressed' then
+    raise exception 'One to four positive schools must suppress the signal even when five schools report; got %',v_band;
+  end if;
   if exists(select 1 from public.get_fam_development_advisor_snapshots(2)) then
     raise exception 'Out-of-range request should return no rows';
   end if;
