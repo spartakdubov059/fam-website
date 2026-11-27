@@ -103,15 +103,45 @@ test("INSPECTOR does not treat a draft PR awaiting approval as agent failure", (
   assert.deepEqual(found.filter((w) => w.code === "stale_prs")[0].prs, [6]);
 });
 
-test("INSPECTOR detects stuck runs and a missing schedule separately", () => {
+test("INSPECTOR does not flag Qwen during its configured 180-minute workflow window", () => {
+  for (const minutes of [179, 180, 190]) {
+    const found = inspectAgents({
+      now: NOW,
+      coderRuns: [{
+        id: 11,
+        created_at: new Date(NOW - minutes * 60_000).toISOString(),
+        status: "in_progress",
+        conclusion: null,
+      }],
+    });
+    assert.equal(found.some((warning) => warning.code === "stuck_runs"), false, `${minutes} minutes`);
+  }
+});
+
+test("INSPECTOR flags an active Qwen run only after the workflow timeout and grace period", () => {
+  const found = inspectAgents({
+    now: NOW,
+    coderRuns: [{
+      id: 11,
+      created_at: new Date(NOW - 191 * 60_000).toISOString(),
+      status: "in_progress",
+      conclusion: null,
+    }],
+  });
+  assert.ok(found.some((warning) => warning.code === "stuck_runs"));
+  assert.match(found.find((warning) => warning.code === "stuck_runs").message, /180 минут и запас 10 минут/);
+});
+
+test("INSPECTOR ignores queued, malformed, or missing Qwen timestamps for stuck-run alerts", () => {
   const found = inspectAgents({
     now: NOW,
     coderRuns: [
-      { id: 11, created_at: earlier(3), status: "in_progress", conclusion: null },
+      { id: 11, created_at: earlier(1), status: "queued", conclusion: null },
+      { id: 12, created_at: "not-a-date", status: "in_progress", conclusion: null },
+      { id: 13, status: "in_progress", conclusion: null },
     ],
   });
-  assert.ok(found.some((w) => w.code === "stuck_runs"));
-  assert.ok(found.some((w) => w.code === "no_recent_run"));
+  assert.equal(found.some((warning) => warning.code === "stuck_runs"), false);
 });
 
 test("RECRUITER proposes a role only for demonstrated repeated gaps", () => {
