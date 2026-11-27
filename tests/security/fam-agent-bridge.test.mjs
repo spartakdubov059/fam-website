@@ -14,6 +14,7 @@ import {
 
 const id = "123e4567-e89b-42d3-a456-426614174000";
 const revision = "abcdef0123456789abcdef0123456789abcdef01";
+const branch = "codex/fam-legal-consultation-20261127";
 
 test("accepts a single allowlisted aggregate task", () => {
   const task = validateClaimResponse({
@@ -25,7 +26,7 @@ test("accepts a single allowlisted aggregate task", () => {
       page_area: "other",
       occurrences: 7,
     },
-  }, revision);
+  }, revision, branch);
   assert.equal(task.id, id);
   assert.match(task.prompt, /js_runtime/);
   assert.match(task.prompt, /index\.html/);
@@ -58,7 +59,7 @@ test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mism
   assert.throws(() => validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_agent_infrastructure", event_code: "js_runtime", page_area: "agent_infrastructure", occurrences: 1 },
-  }));
+  }, revision, branch));
   assert.throws(() => validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_frontend_runtime", event_code: "ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
@@ -73,7 +74,7 @@ test("legal preflight fails closed when the checkout revision is missing", () =>
   assert.throws(() => validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_accessibility", event_code: "js_runtime", page_area: "other", occurrences: 1 },
-  }), /exact 40-character revision/);
+  }, undefined, branch), /exact 40-character revision/);
 });
 
 test("rejects unapproved task keys and malformed task identifiers", () => {
@@ -89,7 +90,7 @@ test("rejects non-aggregate and out-of-range payloads", () => {
   for (const occurrences of [-1, 1001, 1.5, "4"]) {
     assert.throws(() => validateClaimResponse({
       ok: true, task: { id, task_key: "audit_accessibility", event_code: "js_runtime", page_area: "other", occurrences },
-    }));
+    }, revision, branch));
   }
 });
 
