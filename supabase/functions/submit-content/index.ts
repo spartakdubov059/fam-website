@@ -877,18 +877,30 @@ Deno.serve(async (req: Request) => {
     if (body.length < 1 || body.length > 1000) return fail("Сообщение должно содержать от 1 до 1000 символов.", 400, headers);
     if (!UUID_RE.test(receiverId) || receiverId === userId) return fail("Некорректный получатель сообщения.", 400, headers);
 
+    // Reject cross-school delivery before moderation or message insertion.
+    // A recipient's existence alone is not authorization to contact them.
     const recipientResult = await adminRequest(
-      "profiles?select=id&id=eq." + encodeURIComponent(receiverId) + "&limit=1",
+      "profiles?select=id,school_id&id=eq." + encodeURIComponent(receiverId) + "&limit=1",
     );
     const recipient = Array.isArray(recipientResult.data) ? recipientResult.data[0] : null;
-    if (!recipientResult.ok || !recipient) return fail("Получатель не найден.", 404, headers);
+    if (!recipientResult.ok || !recipient || !profile.school_id
+        || recipient.school_id !== profile.school_id) {
+      return fail("Получатель недоступен в вашей школе.", 404, headers);
+    }
 
     const listingId = typeof payload.listing_id === "string" ? payload.listing_id : null;
     if (listingId) {
       if (!UUID_RE.test(listingId)) return fail("Некорректное объявление для переписки.", 400, headers);
-      const listingResult = await adminRequest("listings?select=id,school_id&id=eq." + encodeURIComponent(listingId) + "&limit=1");
+      const listingResult = await adminRequest(
+        "listings?select=id,school_id,user_id&id=eq." + encodeURIComponent(listingId) + "&limit=1",
+      );
       const listing = Array.isArray(listingResult.data) ? listingResult.data[0] : null;
-      if (!listing || listing.school_id !== profile.school_id) return fail("Объявление для переписки не найдено.", 404, headers);
+      // Both peers must belong to the school, and at least one must own the
+      // listing. Prevent attaching a private conversation to an unrelated ad.
+      if (!listing || listing.school_id !== profile.school_id
+          || (listing.user_id !== userId && listing.user_id !== receiverId)) {
+        return fail("Объявление для переписки не найдено.", 404, headers);
+      }
     }
 
     const moderation = await moderate(body, authorization, origin, false, null, {

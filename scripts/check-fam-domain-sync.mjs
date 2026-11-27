@@ -109,7 +109,9 @@ export async function verifyDomains({
   let attempt = 0;
   let latest = [];
 
-  while (Date.now() <= deadline && attempt < maxAttempts) {
+  // Even timeoutMs=0 means one diagnostic attempt, never an empty result.
+  // Comparing Date.now() twice in the same millisecond was flaky in CI.
+  while ((attempt === 0 || Date.now() <= deadline) && attempt < maxAttempts) {
     attempt += 1;
     latest = (await Promise.all(domains.flatMap(domain =>
       selected.map(path => comparePath(fetchImpl, domain, path, expected.get(path), cacheKey))
