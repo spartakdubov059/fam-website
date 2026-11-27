@@ -50,7 +50,7 @@ test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mism
   const task = validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_agent_infrastructure", event_code: "synthetic_ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
-  }, revision);
+  }, revision, branch);
   assert.match(task.prompt, /без чтения журналов GitHub/);
   assert.match(task.prompt, /"risk_categories":\["access_control","external_processing"\]/);
   assert.match(task.prompt, /"signal_source":"allowlisted_task_scope_and_declared_paths"/);
@@ -63,7 +63,7 @@ test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mism
   assert.throws(() => validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_frontend_runtime", event_code: "ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
-  }));
+  }, revision, branch));
 });
 
 test("accepts an empty queue", () => {
@@ -80,10 +80,10 @@ test("legal preflight fails closed when the checkout revision is missing", () =>
 test("rejects unapproved task keys and malformed task identifiers", () => {
   assert.throws(() => validateClaimResponse({
     ok: true, task: { id, task_key: "run_sql", event_code: "js_runtime", page_area: "other", occurrences: 1 },
-  }));
+  }, revision, branch));
   assert.throws(() => validateClaimResponse({
     ok: true, task: { id: "not-a-uuid", task_key: "audit_accessibility", event_code: "js_runtime", page_area: "other", occurrences: 1 },
-  }));
+  }, revision, branch));
 });
 
 test("rejects non-aggregate and out-of-range payloads", () => {
@@ -231,6 +231,6 @@ test("rejects unrecognized telemetry enum values before building a model prompt"
       occurrences: 2,
     };
     task[field] = "untrusted arbitrary text";
-    assert.throws(() => validateClaimResponse({ ok: true, task }));
+    assert.throws(() => validateClaimResponse({ ok: true, task }, revision, branch));
   }
 });
