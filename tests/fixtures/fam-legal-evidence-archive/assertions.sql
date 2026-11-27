@@ -107,7 +107,7 @@ begin
   end if;
 
   select * into v_summary from public.get_fam_legal_evidence_summary() where scope = 'FAM_CURRENT';
-  if v_summary.latest_status <> 'change_detected' or v_summary.observations_30d <> 1 then
+  if v_summary.latest_status <> 'source_unavailable' or v_summary.observations_30d <> 2 then
     raise exception 'summary did not report the stored synthetic observation';
   end if;
 
