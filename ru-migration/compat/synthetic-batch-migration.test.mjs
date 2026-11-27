@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   RU_MIGRATION_TABLES,
+  prepareCompleteSyntheticBatchPlan,
   prepareSyntheticBatchPlan,
   verifySyntheticBatchRecovery,
 } from './synthetic-batch-migration.mjs';
@@ -19,6 +20,20 @@ test('batch migration covers the RU table catalog and creates bounded chunks', (
   assert.deepEqual(plan.batches.map(batch => batch.count), [100, 100, 5]);
   assert.match(plan.plan_digest, /^[a-f0-9]{64}$/);
   assert.equal(plan.live_cutover_authorized, false);
+});
+
+test('complete migration rehearsal requires an explicit entry for all 40 target tables', () => {
+  const tables=Object.fromEntries(RU_MIGRATION_TABLES.map(table=>[table,[]]));
+  tables.fam_messages=[{id:'synthetic-message-1'}];
+  const plan=prepareCompleteSyntheticBatchPlan({snapshot_id:'synthetic-complete-catalog',tables},{batchSize:1});
+  assert.equal(plan.ok,true);
+  assert.equal(plan.table_count,40);
+  assert.deepEqual(plan.table_counts.map(row=>row.table),[...RU_MIGRATION_TABLES].sort());
+  assert.equal(plan.table_counts.filter(row=>row.count===0).length,39);
+  assert.equal(plan.live_cutover_authorized,false);
+  const incomplete={...tables};delete incomplete.fam_messages;
+  assert.equal(prepareCompleteSyntheticBatchPlan({snapshot_id:'synthetic-incomplete-catalog',tables:incomplete}).code,'INCOMPLETE_TABLE_CATALOG');
+  assert.equal(prepareCompleteSyntheticBatchPlan({snapshot_id:'synthetic-unknown-catalog',tables:{...tables,fam_unknown:[]}}).code,'INCOMPLETE_TABLE_CATALOG');
 });
 
 test('batch recovery refuses tampered chunks and resumes only missing work', () => {

@@ -89,6 +89,15 @@ export function prepareSyntheticBatchPlan(snapshot,{batchSize=100}={}) {
   return Object.freeze({...plan,plan_digest:hash(canonical(plan))});
 }
 
+// Use for a complete target migration rehearsal. Every classified destination table
+// must be present, including tables with zero rows, so omissions cannot look empty.
+export function prepareCompleteSyntheticBatchPlan(snapshot,options={}) {
+  if(!exact(snapshot,['snapshot_id','tables'])||!snapshot.tables||typeof snapshot.tables!=='object'||Array.isArray(snapshot.tables))return fail('INVALID_SYNTHETIC_BATCH');
+  const expected=[...RU_MIGRATION_TABLES].sort(),actual=Object.keys(snapshot.tables).sort();
+  if(actual.length!==expected.length||actual.some((table,index)=>table!==expected[index]))return fail('INCOMPLETE_TABLE_CATALOG');
+  return prepareSyntheticBatchPlan(snapshot,options);
+}
+
 function validPlan(plan,expectedPlanDigest){
   if(!exact(plan,['ok','code','snapshot_id','batch_size','table_count','table_counts','batch_count','batches','live_cutover_authorized','plan_digest'])||plan.ok!==true||plan.code!=='SYNTHETIC_BATCH_PLAN_READY'||plan.live_cutover_authorized!==false||typeof plan.snapshot_id!=='string'||!snapshotPattern.test(plan.snapshot_id)||!Number.isSafeInteger(plan.batch_size)||plan.batch_size<1||plan.batch_size>500||!Array.isArray(plan.table_counts)||plan.table_counts.length!==plan.table_count||plan.table_count<1||plan.table_count>RU_MIGRATION_TABLES.length||!Array.isArray(plan.batches)||plan.batches.length!==plan.batch_count||plan.batch_count>MAX_ROWS||!digest(plan.plan_digest)||!digest(expectedPlanDigest)||plan.plan_digest!==expectedPlanDigest)return false;
   let cursor=0,total=0,previous='';

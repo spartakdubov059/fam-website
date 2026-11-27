@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
-import { prepareSyntheticBatchPlan } from './synthetic-batch-migration.mjs';
+import { RU_MIGRATION_TABLES, prepareCompleteSyntheticBatchPlan } from './synthetic-batch-migration.mjs';
 import { createSyntheticYdbBatchWriter } from './synthetic-ydb-batch-writer.mjs';
 
 const userId = 'synthetic-batch-import-user';
 const createdAt = new Date('2026-11-27T12:00:00.000Z');
 const fixtureRows = Array.from({ length: 5 }, (_, index) => ({ id: 'synthetic-batch-read-' + index }));
-const plan = prepareSyntheticBatchPlan({
+const tableSnapshot = Object.fromEntries(RU_MIGRATION_TABLES.map(table => [table, []]));
+tableSnapshot.fam_notification_reads = fixtureRows;
+const plan = prepareCompleteSyntheticBatchPlan({
   snapshot_id: 'synthetic-ydb-batch-import',
-  tables: { fam_favorites: [], fam_notification_reads: fixtureRows },
+  tables: tableSnapshot,
 }, { batchSize: 2 });
 assert.equal(plan.ok, true);
+assert.equal(plan.table_count, 40);
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 let failOnce = true;
 let failPlanOnce = true;
@@ -58,14 +61,16 @@ try {
   assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code, 'SYNTHETIC_PLAN_REPLAY_VERIFIED');
   const boundTables = (await sql`SELECT table_name, row_count, batch_count, plan_digest
     FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id} ORDER BY table_name;`)[0];
-  assert.deepEqual(boundTables.map(row => [row.table_name, Number(row.row_count), Number(row.batch_count)]), [
-    ['fam_favorites', 0, 0],
-    ['fam_notification_reads', fixtureRows.length, plan.batch_count],
-  ], 'the manifest explicitly binds empty and non-empty tables');
+  assert.equal(boundTables.length, 40, 'the manifest explicitly binds every classified target table');
+  assert.deepEqual(boundTables.map(row => [row.table_name, Number(row.row_count), Number(row.batch_count)]),
+    [...RU_MIGRATION_TABLES].sort().map(table => [table,
+      table === 'fam_notification_reads' ? fixtureRows.length : 0,
+      table === 'fam_notification_reads' ? plan.batch_count : 0]),
+    'the manifest explicitly binds empty and non-empty tables');
   assert.ok(boundTables.every(row => row.plan_digest === plan.plan_digest));
   const substitutedPlan = prepareSyntheticBatchPlan({
     snapshot_id: plan.snapshot_id,
-    tables: { fam_favorites: [{ id: 'synthetic-changed-row' }], fam_notification_reads: fixtureRows },
+    tables: { ...tableSnapshot, fam_favorites: [{ id: 'synthetic-changed-row' }] },
   }, { batchSize: 2 });
   assert.equal((await writer.initializePlan({ plan: substitutedPlan, expectedPlanDigest: substitutedPlan.plan_digest })).code,
     'STORED_PLAN_MISMATCH', 'the same snapshot id cannot be rebound to a changed plan');
@@ -99,6 +104,14 @@ try {
   });
 
   assert.equal((await commit(chunks[0])).code, 'SYNTHETIC_BATCH_COMMITTED');
+  await sql`DELETE FROM fam_migration_rehearsal_plan_tables
+    WHERE snapshot_id = ${plan.snapshot_id} AND table_name = 'fam_favorites';`;
+  assert.equal((await commit(chunks[1])).code, 'PLAN_TABLES_NOT_BOUND',
+    'a damaged full-table manifest blocks later batch writes');
+  await sql`INSERT INTO fam_migration_rehearsal_plan_tables
+    (snapshot_id, table_name, row_count, batch_count, plan_digest, created_at)
+    VALUES (${plan.snapshot_id}, 'fam_favorites', Unwrap(CAST(0 AS Uint32)),
+      Unwrap(CAST(0 AS Uint32)), ${plan.plan_digest}, CurrentUtcTimestamp());`;
   await assert.rejects(
     () => commit(chunks[1]),
     error => error?.cause?.message === 'synthetic interruption before batch checkpoint',

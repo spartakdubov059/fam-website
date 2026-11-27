@@ -97,14 +97,20 @@ export function createSyntheticYdbBatchWriter({
         if (boundPlan.length !== 1 || boundPlan[0].plan_digest !== expectedPlanDigest
             || Number(boundPlan[0].table_count) !== plan.table_count
             || Number(boundPlan[0].batch_count) !== plan.batch_count) return fail('PLAN_NOT_BOUND');
-        const boundTable = rows(await tx`SELECT row_count, batch_count, plan_digest
-          FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id}
-            AND table_name = ${table};`);
+        const boundTables = rows(await tx`SELECT table_name, row_count, batch_count, plan_digest
+          FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id};`);
+        if (boundTables.length !== plan.table_count) return fail('PLAN_TABLES_NOT_BOUND');
+        const boundByName = new Map(boundTables.map(row => [row.table_name, row]));
+        for (const item of plan.table_counts) {
+          const storedTable = boundByName.get(item.table);
+          const expectedBatches = plan.batches.filter(batch => batch.table === item.table).length;
+          if (!storedTable || Number(storedTable.row_count) !== item.count
+              || Number(storedTable.batch_count) !== expectedBatches
+              || storedTable.plan_digest !== expectedPlanDigest) return fail('PLAN_TABLES_NOT_BOUND');
+        }
+        if (boundByName.size !== plan.table_count) return fail('PLAN_TABLES_NOT_BOUND');
         const expectedTable = plan.table_counts.find(item => item.table === table);
-        if (boundTable.length !== 1 || !expectedTable
-            || Number(boundTable[0].row_count) !== expectedTable.count
-            || Number(boundTable[0].batch_count) !== plan.batches.filter(item => item.table === table).length
-            || boundTable[0].plan_digest !== expectedPlanDigest) return fail('PLAN_TABLE_NOT_BOUND');
+        if (!expectedTable || !boundByName.has(table)) return fail('PLAN_TABLE_NOT_BOUND');
 
         const stored = rows(await tx`SELECT table_name, batch_offset, row_count, batch_digest
           FROM fam_migration_rehearsal_batches WHERE snapshot_id = ${plan.snapshot_id};`);
