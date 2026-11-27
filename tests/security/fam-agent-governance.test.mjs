@@ -13,6 +13,7 @@ import {
   formatMoscowTimestamp,
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
+  mapLegalEvidenceScopes,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
 
@@ -166,6 +167,23 @@ test("Boss report shows separate unassessed LEGAL scopes and never implies relea
   const unknown = renderLegalScopeStatus({ FAM_CURRENT: "owner_approved", FAM_RU: "merged" });
   assert.match(unknown, /FAM_CURRENT:[^\n]*не оценено/);
   assert.match(unknown, /FAM_RU:[^\n]*не оценено/);
+});
+
+test("LEGAL archive maps source observations only to pending human review and keeps scopes independent", () => {
+  const mapped = mapLegalEvidenceScopes({
+    FAM_CURRENT: { latest_status: "change_detected", observations_30d: 1 },
+    FAM_RU: { latest_status: "source_unavailable", observations_30d: 0 },
+  });
+  assert.deepEqual(mapped, {
+    FAM_CURRENT: "evidence_pending_human_review",
+    FAM_RU: "source_unavailable",
+  });
+  const output = renderLegalScopeStatus(mapped);
+  assert.match(output, /\*\*FAM_CURRENT:\*\* свидетельства ожидают независимой проверки человека/);
+  assert.match(output, /\*\*FAM_RU:\*\* источник недоступен/);
+  assert.doesNotMatch(output, /FAM_CURRENT:[^\n]*(?:одобрен|разрешён)/i);
+  assert.match(output, /не являются юридическим заключением или разрешением на выпуск/);
+  assert.deepEqual(mapLegalEvidenceScopes(null), { FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
 });
 
 test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {
