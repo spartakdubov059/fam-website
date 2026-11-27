@@ -27,7 +27,7 @@ on:
         options: [none, synthetic_ci_workflow_failure, synthetic_qwen_runtime_smoke]
         default: none
   schedule:
-    - cron: "45 4 * * *"
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
