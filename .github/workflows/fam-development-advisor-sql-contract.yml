@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/*fam_development_advisor_aggregate_snapshots.sql"
+      - "supabase/migrations/*fam_development_advisor_idea_backlog_band.sql"
+      - "tests/fixtures/fam-development-advisor/**"
 
 permissions:
   contents: read
@@ -38,7 +40,27 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127050000_fam_development_advisor_aggregate_snapshots.sql
+      - name: Проверить исходный установленный контракт перед upgrade
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions-before-upgrade.sql
+      - name: Применить отдельную forward migration
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127060000_fam_development_advisor_idea_backlog_band.sql
       - name: Проверить границы данных и прав
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions.sql
+      - name: Откатить поле диапазона и проверить сохранность старого контракта
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/rollback-idea-backlog-band.sql
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions-before-upgrade.sql
+      - name: Повторно применить forward migration
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127060000_fam_development_advisor_idea_backlog_band.sql
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions.sql

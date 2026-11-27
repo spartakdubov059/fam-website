@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "../../scripts/fam-development-advisor.mjs";
 
 const migration = readFileSync(new URL("../../supabase/migrations/20261127050000_fam_development_advisor_aggregate_snapshots.sql", import.meta.url), "utf8");
+const upgradeMigration = readFileSync(new URL("../../supabase/migrations/20261127060000_fam_development_advisor_idea_backlog_band.sql", import.meta.url), "utf8");
 
 test("advisor asks for a proposal only after six consecutive aggregate snapshots", () => {
   const rows = Array.from({ length: 6 }, (_, i) => ({
@@ -61,10 +62,18 @@ test("advisor SQL is limited to predefined aggregates and service-role execution
   assert.match(migration, /private\.fam_agent_daily_reports/);
   assert.match(migration, /metrics #>> '\{listings,active\}'/);
   assert.match(migration, /metrics #>> '\{listings,new_24h\}'/);
-  assert.match(migration, /private\.fam_agent_school_daily_reports/);
-  assert.match(migration, /least\(pending_count, 5\)/);
-  assert.match(migration, /positive_schools between 1 and 4 then 'suppressed'/);
-  assert.match(migration, /pending_council_ideas_band text/);
+  assert.match(migration, /new_listings_24h integer\s*\n\)/);
+  assert.match(upgradeMigration, /drop function public\.get_fam_development_advisor_snapshots\(integer\)/i);
+  assert.match(upgradeMigration, /pending_council_ideas_band text/);
+  assert.match(upgradeMigration, /security invoker/i);
+  assert.match(upgradeMigration, /grant execute[\s\S]*to service_role/i);
+  assert.doesNotMatch(upgradeMigration, /drop function[^;]*cascade/i);
+  assert.match(upgradeMigration, /private\.fam_agent_school_daily_reports/);
+  assert.match(upgradeMigration, /least\(pending_count, 5\)/);
+  assert.match(upgradeMigration, /positive_schools between 1 and 4 then 'suppressed'/);
+  assert.match(upgradeMigration, /pending_council_ideas_band text/);
   assert.match(migration, /grant execute[\s\S]*to service_role/i);
   assert.doesNotMatch(body, /public\.(profiles|event_registrations|messages|fam_safety_incidents)|user_id|email|payload/i);
+  const upgradeBody = upgradeMigration.slice(upgradeMigration.indexOf("$function$"), upgradeMigration.lastIndexOf("$function$"));
+  assert.doesNotMatch(upgradeBody, /public\.(profiles|event_registrations|messages|fam_safety_incidents)|user_id|email|payload/i);
 });

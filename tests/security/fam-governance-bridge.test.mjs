@@ -117,6 +117,9 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas_band: "17" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas: 17 }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
+  assert.match(edge, /pending_council_ideas_band/);
+  assert.match(edge, /\["none", "suppressed", "5_9", "10_24", "25_plus"\]/);
+  assert.match(edge, /pending_council_ideas_band: row\.pending_council_ideas_band/);
   assert.match(workflow, /fam-development-advisor\.test\.mjs/);
 });
 
