@@ -78,6 +78,51 @@ test("scope readiness is isolated and human evidence is required before counting
   assert.throws(() => scopesForLegalAssessment("unknown"), /explicit product scope/);
 });
 
+test("a newer legal archive decision supersedes older approval for the same criterion", () => {
+  let archive = [];
+  for (const [index, criterion_id] of criterionIds.entries()) {
+    archive = appendLegalArchiveEntry(archive, baseEntry({
+      criterion_id,
+      checked_at: `2026-11-27T04:00:0${index}Z`,
+      status: criterion_id === "qualified_counsel_review" ? "counsel_reviewed" : "operator_reviewed",
+    }));
+  }
+  archive = appendLegalArchiveEntry(archive, baseEntry({
+    checked_at: "2026-11-27T06:00:00Z",
+    status: "operator_reviewed",
+    decision: "rejected",
+  }));
+  const trustedEntries = new Set(archive.map((entry) => entry.entry_hash));
+  const result = evaluateLegalReadiness({
+    scope: "FAM_CURRENT", revision: REVISION, criteria: fullCriteria(), archive,
+    verifyHumanDecision: (entry) => trustedEntries.has(entry.entry_hash),
+  });
+  assert.equal(result.verified_criteria, 4);
+  assert.equal(result.readiness_percent, 80);
+  assert.ok(result.pending_criteria.includes("official_source_review"));
+});
+
+test("a newer pending record cannot reuse old not-applicable approval", () => {
+  let archive = appendLegalArchiveEntry([], baseEntry({
+    status: "not_applicable", priority: "unassessed", decision: "not_applicable",
+  }));
+  archive = appendLegalArchiveEntry(archive, baseEntry({
+    checked_at: "2026-11-27T05:00:00Z", status: "source_checked", priority: "unassessed",
+    decision: "pending_human_review",
+  }));
+  const trustedEntries = new Set([archive[0].entry_hash, ...archive.slice(2).map((entry) => entry.entry_hash)]);
+  const criteria = fullCriteria({
+    official_source_review: { applicability: "not_applicable", reason: "outside_release_scope" },
+  });
+  const result = evaluateLegalReadiness({
+    scope: "FAM_CURRENT", revision: REVISION, criteria, archive,
+    verifyHumanDecision: (entry) => trustedEntries.has(entry.entry_hash),
+  });
+  assert.equal(result.status, "not_assessed");
+  assert.equal(result.readiness_percent, null);
+  assert.ok(result.pending_criteria.includes("official_source_review"));
+});
+
 test("unknown applicability and unsupported exclusions produce no readiness percentage", () => {
   const unknown = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: fullCriteria({
     official_source_review: { applicability: "unknown", reason: "undetermined" },
