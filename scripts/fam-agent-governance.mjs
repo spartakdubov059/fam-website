@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchLegalEvidenceSummary, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
 import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
@@ -373,6 +373,20 @@ export function renderLegalScopeStatus(statuses = {}) {
   ].join("\n");
 }
 
+export function mapLegalEvidenceScopes(summary) {
+  if (!summary || typeof summary !== "object") return Object.freeze({ FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
+  const mapStatus = (row) => {
+    if (!row || !["source_checked", "change_detected", "source_unavailable", "not_assessed"].includes(row.latest_status)) return "not_assessed";
+    if (row.latest_status === "source_unavailable") return "source_unavailable";
+    if (row.latest_status === "source_checked" || row.latest_status === "change_detected") return "evidence_pending_human_review";
+    return "not_assessed";
+  };
+  return Object.freeze({
+    FAM_CURRENT: mapStatus(summary.FAM_CURRENT),
+    FAM_RU: mapStatus(summary.FAM_RU),
+  });
+}
+
 async function api(path, token, options = {}) {
   const response = await fetch("https://api.github.com/repos/" + process.env.GITHUB_REPOSITORY + path, {
     ...options,
@@ -467,6 +481,8 @@ export async function main() {
   let developmentAdvisorLink = "not_configured";
   let moderationSummary = null;
   let moderationLink = "not_configured";
+  let legalEvidence = null;
+  let legalEvidenceLink = "not_configured";
   if (bridgeUrl && bridgeToken) {
     try {
       queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
@@ -506,6 +522,18 @@ export async function main() {
         severity: "medium",
         count: 1,
         message: "Не удалось получить безопасные агрегаты сигналов модерации",
+      });
+    }
+    try {
+      legalEvidence = await fetchLegalEvidenceSummary({ url: bridgeUrl, token: bridgeToken });
+      legalEvidenceLink = "connected";
+    } catch {
+      legalEvidenceLink = "unavailable";
+      warnings.push({
+        code: "legal_evidence_unavailable",
+        severity: "medium",
+        count: 1,
+        message: "Не удалось получить безопасную сводку проверок источников LEGAL",
       });
     }
   } else if (bridgeUrl || bridgeToken) {
@@ -592,9 +620,13 @@ export async function main() {
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
     },
     legal: {
-      state: "no_data",
-      evidence_count: 0,
-      detail: "аутентифицированные статусы юридической проверки по FAM_CURRENT и FAM_RU ещё не подключены",
+      state: legalEvidenceLink === "connected" && Object.values(legalEvidence).some((row) => row.observations_30d > 0)
+        ? "confirmed" : "no_data",
+      evidence_count: legalEvidenceLink === "connected"
+        ? Object.values(legalEvidence).reduce((sum, row) => sum + row.observations_30d, 0) : 0,
+      detail: legalEvidenceLink === "connected"
+        ? "получена только сводка проверок источников; юридические решения остаются на проверке человеком, выпуск не одобрен"
+        : "сводка проверок официальных источников недоступна; готовность не оценена",
     },
     development_advisor: {
       state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
@@ -624,6 +656,7 @@ export async function main() {
       FAM_CURRENT: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
       FAM_RU: "no_data",
     },
+    legalScopes: legalEvidenceLink === "connected" ? mapLegalEvidenceScopes(legalEvidence) : {},
     staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
