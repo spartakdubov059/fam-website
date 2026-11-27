@@ -118,6 +118,10 @@ try {
   const finalRows = (await sql`SELECT notification_key FROM fam_notification_reads
     WHERE user_id = ${userId} ORDER BY notification_key;`)[0];
   assert.deepEqual(finalRows.map(row => row.notification_key).sort(), fixtureRows.map(row => row.id).sort());
+  await sql`DELETE FROM fam_migration_rehearsal_plan_tables
+    WHERE snapshot_id = ${plan.snapshot_id} AND table_name = 'fam_favorites';`;
+  assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code,
+    'STORED_PLAN_TABLES_MISMATCH', 'a partially missing table manifest must fail closed on resume');
   console.log('YDB_SYNTHETIC_BATCH_IMPORT_PASS: target rows and checkpoints commit atomically, interruption resumes, exact replay verifies');
 
   await sql.begin(async tx => {
