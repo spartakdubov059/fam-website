@@ -637,7 +637,7 @@ jobs:
   record_pr:
     name: Записать подтверждённый результат PR из чистого runner
     needs: [generate, record_qa, prepare_review]
-    if: always() && needs.record_qa.result == 'success' && (needs.prepare_review.result == 'success' || needs.prepare_review.outputs.ci_failed == 'true')
+    if: always() && needs.record_qa.result == 'success' && (needs.prepare_review.result == 'success' || needs.prepare_review.outputs.ci_failed == 'true' || needs.prepare_review.outputs.pr_number != '')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -660,13 +660,16 @@ jobs:
           PR_CI_FAILED: ${{ needs.prepare_review.outputs.ci_failed }}
         run: |
           set -euo pipefail
+          if [[ ! "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]; then
+            exit 1
+          fi
           if [[ "$PR_RESULT" == "success" ]]; then
-            [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
             export FAM_RESULT_STAGE=pr_created
           elif [[ "$PR_CI_FAILED" == "true" ]]; then
-            [[ "$FAM_PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
             export FAM_RESULT_STAGE=pr_ci_failed
           else
-            exit 1
+            # The PR already exists. Unknown or cancelled CI must not leave
+            # the task retryable or permit a duplicate PR.
+            export FAM_RESULT_STAGE=pr_created
           fi
           node scripts/fam-agent-bridge.mjs advance
