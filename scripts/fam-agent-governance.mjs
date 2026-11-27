@@ -10,6 +10,8 @@ const DAY = 86_400_000;
 const MAX_PRS = 25;
 const CORE_WORKFLOW = "fam-codex-developer.yml";
 const CODER_JOB = "Локальная модель готовит исправление";
+const QWEN_WORKFLOW_TIMEOUT_MS = 180 * 60 * 1000;
+const QWEN_STUCK_GRACE_MS = 10 * 60 * 1000;
 
 export function summarizeQwenRuns(runs = []) {
   const rows = [];
@@ -136,10 +138,11 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
   const active = [...coderRuns].sort((a, b) => dateMs(b.created_at) - dateMs(a.created_at));
   const recent = active.filter((run) => now - dateMs(run.created_at) <= 7 * DAY);
   const failures = recent.filter((run) => run.conclusion === "failure");
-  const overdue = active.filter((run) =>
-    (run.status === "in_progress" || run.status === "queued") &&
-    now - dateMs(run.created_at) > 2 * 60 * 60 * 1000
-  );
+  const overdue = active.filter((run) => {
+    if (run.status !== "in_progress" || typeof run.created_at !== "string") return false;
+    const startedAt = Date.parse(run.created_at);
+    return Number.isFinite(startedAt) && now - startedAt > QWEN_WORKFLOW_TIMEOUT_MS + QWEN_STUCK_GRACE_MS;
+  });
   if (failures.length >= 3) {
     warnings.push({
       code: "repeated_failures",
@@ -153,7 +156,7 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
       code: "stuck_runs",
       severity: "high",
       count: overdue.length,
-      message: "Локальный Qwen-разработчик: запуск выполняется или ожидает более 2 часов",
+      message: "Локальный Qwen-разработчик: активный запуск превысил лимит workflow 180 минут и запас 10 минут",
     });
   }
   const latest = active[0];
