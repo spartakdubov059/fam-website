@@ -96,7 +96,7 @@ async function run(){
   assert.equal(prepared.ok,true);
   const profileStage=createSyntheticProfileStageRepository(sql);
   assert.deepEqual(await profileStage.stageBatch([migratedProfile]),{ok:true,code:'SYNTHETIC_BATCH_STAGED',inserted:1,unchanged:0});
-  const challengeId='a'.repeat(64),profileVersion=prepared.profiles[0].profile_version;
+  const challengeId=hash(Buffer.from('synthetic-avatar-verified-link:'+owner)),profileVersion=prepared.profiles[0].profile_version;
   await sql`INSERT INTO fam_legacy_migration_challenges
     (challenge_id,user_id,profile_version,issuer,subject,expires_at,consumed)
     VALUES (${challengeId},${owner},${profileVersion},${linkedIssuer},${ownerSubject},
