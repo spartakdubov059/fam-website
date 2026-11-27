@@ -534,8 +534,8 @@ jobs:
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
-          OPEN_PR_CANDIDATES="$(gh pr list --state open --search "in:body $FAM_CODER_TASK_ID" --json number,url,body --limit 100)"
-          EXISTING_PR="$(printf '%s\n' "$OPEN_PR_CANDIDATES" | node scripts/find-fam-agent-task-pr.mjs "$FAM_CODER_TASK_ID")"
+          OPEN_PR_CANDIDATES="$(gh pr list --state open --search "in:body $FAM_CODER_TASK_ID" --json number,url,body,author,baseRefName,headRefName,headRepository,headRepositoryOwner,isCrossRepository --limit 100)"
+          EXISTING_PR="$(printf '%s\n' "$OPEN_PR_CANDIDATES" | node scripts/find-fam-agent-task-pr.mjs "$FAM_CODER_TASK_ID" "$GITHUB_REPOSITORY")"
           if [[ -n "$EXISTING_PR" ]]; then
             IFS=$'\t' read -r PR_NUMBER PR_URL <<< "$EXISTING_PR"
             [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
