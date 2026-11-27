@@ -37,6 +37,11 @@ begin
       v_summary := 'Независимая QA не прошла; изменение не считается выполненным.';
       v_status := 'blocked';
       v_event := 'blocked';
+    when 'qa_unavailable' then
+      v_expected := 'Модель подготовила предложение; независимая QA ещё не подтверждена.';
+      v_summary := 'Независимая QA не состоялась из-за сбоя среды; качество изменения не установлено.';
+      v_status := 'blocked';
+      v_event := 'blocked';
     when 'model_no_patch' then
       v_expected := 'Задание принято локальным анализатором; независимая QA ещё не подтверждена.';
       v_summary := 'Локальная модель не предложила подтверждённое исправление.';
@@ -76,7 +81,7 @@ begin
     and t.source in ('system','scheduled_audit') and t.claimed_by = p_worker_id
     and t.status = 'in_progress'
     and (t.result_summary = v_expected or
-      (p_stage = 'qa_failed' and
+      (p_stage in ('qa_failed','qa_unavailable') and
         t.result_summary = 'Модель подготовила предложение; независимая QA ещё не подтверждена.'))
     and t.lease_expires_at > pg_catalog.now()
   returning t.id into v_updated;

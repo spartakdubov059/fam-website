@@ -311,6 +311,7 @@ jobs:
       contents: read
     outputs:
       requires_approval: ${{ steps.safety.outputs.requires_approval }}
+      qa_outcome: ${{ steps.qa_classification.outputs.result }}
     steps:
       - name: Получить чистую основную ветку
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
@@ -416,9 +417,11 @@ jobs:
           fi
 
       - name: Выполнить полный набор регрессионных тестов
+        id: regression_tests
         run: node --test tests/moderation/*.test.mjs tests/security/*.test.mjs
 
       - name: Проверить синтаксис скриптов локального агента
+        id: agent_syntax
         run: |
           set -euo pipefail
           node --check scripts/run-local-coder.mjs
@@ -427,6 +430,7 @@ jobs:
           node --check scripts/validate-local-agent-time-ago.mjs
 
       - name: Проверить синтаксис встроенного JavaScript
+        id: inline_syntax
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -439,6 +443,29 @@ jobs:
           fs.writeFileSync("/tmp/fam-inline-scripts.js", scripts.join("\n;\n"));
           NODE
           node --check /tmp/fam-inline-scripts.js
+
+      - name: Классифицировать результат независимой проверки
+        id: qa_classification
+        if: always()
+        env:
+          SAFETY_RESULT: ${{ steps.safety.outcome }}
+          PROPOSED_TESTS_RESULT: ${{ steps.proposed_tests.outcome }}
+          REGRESSION_TESTS_RESULT: ${{ steps.regression_tests.outcome }}
+          AGENT_SYNTAX_RESULT: ${{ steps.agent_syntax.outcome }}
+          INLINE_SYNTAX_RESULT: ${{ steps.inline_syntax.outcome }}
+        run: |
+          set -euo pipefail
+          result=unavailable
+          if [[ "$SAFETY_RESULT" == "failure" || "$PROPOSED_TESTS_RESULT" == "failure" || \
+                "$REGRESSION_TESTS_RESULT" == "failure" || "$AGENT_SYNTAX_RESULT" == "failure" || \
+                "$INLINE_SYNTAX_RESULT" == "failure" ]]; then
+            result=rejected
+          elif [[ "$SAFETY_RESULT" == "success" && "$PROPOSED_TESTS_RESULT" == "success" && \
+                  "$REGRESSION_TESTS_RESULT" == "success" && "$AGENT_SYNTAX_RESULT" == "success" && \
+                  "$INLINE_SYNTAX_RESULT" == "success" ]]; then
+            result=passed
+          fi
+          echo "result=$result" >> "$GITHUB_OUTPUT"
 
   record_qa:
     name: Записать результат QA из чистого доверенного runner
@@ -461,12 +488,13 @@ jobs:
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
-          QA_RESULT: ${{ needs.verify.result }}
+          QA_RESULT: ${{ needs.verify.outputs.qa_outcome }}
         run: |
           set -euo pipefail
           case "$QA_RESULT" in
-            success) export FAM_RESULT_STAGE=qa_passed ;;
-            failure) export FAM_RESULT_STAGE=qa_failed ;;
+            passed) export FAM_RESULT_STAGE=qa_passed ;;
+            rejected) export FAM_RESULT_STAGE=qa_failed ;;
+            ''|unavailable) export FAM_RESULT_STAGE=qa_unavailable ;;
             *) exit 1 ;;
           esac
           node scripts/fam-agent-bridge.mjs advance

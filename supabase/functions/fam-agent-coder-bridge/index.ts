@@ -250,7 +250,7 @@ Deno.serve(async (req: Request) => {
       (Object.keys(body).length === 3 || Object.keys(body).length === 4) &&
       typeof body.task_id === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.task_id) &&
-      ["model_generated", "qa_passed", "pr_created", "qa_failed", "model_no_patch", "model_failed", "model_blocked"].includes(body.stage) &&
+      ["model_generated", "qa_passed", "pr_created", "qa_failed", "qa_unavailable", "model_no_patch", "model_failed", "model_blocked"].includes(body.stage) &&
       ((body.stage === "pr_created" && Number.isSafeInteger(body.pr_number) && body.pr_number > 0 && body.pr_number < 100_000_000) ||
        (body.stage !== "pr_created" && body.pr_number === undefined))
     ) {

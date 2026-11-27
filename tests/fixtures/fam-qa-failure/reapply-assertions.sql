@@ -40,4 +40,27 @@ begin
   end if;
 end $$;
 
-select 'PASS: reapply accepts one first-attempt failure and blocks without false success' as result;
+insert into private.fam_agent_tasks
+  (id,agent_key,task_type,approval_required,source,status,result_summary,
+   claimed_by,claimed_at,lease_expires_at,updated_at)
+values
+  ('00000000-0000-4000-8000-000000000010','technical','coder_patch_request',false,'system','in_progress',
+   'Модель подготовила предложение; независимая QA ещё не подтверждена.',
+   'fam-agent-qwen-coder-v1',now(),now()+interval '1 hour',now());
+
+do $$
+begin
+  if public.advance_fam_agent_coder_task(
+    '00000000-0000-4000-8000-000000000010',
+    'fam-agent-qwen-coder-v1','qa_unavailable'
+  ) is distinct from true then
+    raise exception 'Reapplied migration did not distinguish unavailable QA';
+  end if;
+  if (select count(*) from private.fam_agent_task_events
+      where task_id='00000000-0000-4000-8000-000000000010'
+        and event_type='blocked' and metadata->>'stage'='qa_unavailable') <> 1 then
+    raise exception 'Reapplied migration omitted QA-unavailable evidence';
+  end if;
+end $$;
+
+select 'PASS: reapply distinguishes a rejected patch from an unavailable QA runner' as result;
