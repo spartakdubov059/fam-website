@@ -337,3 +337,18 @@ test("actual trusted QA recording shell maps only final success and failure to o
     assert.equal(result.stdout, "");
   }
 });
+
+
+test("stacked rollback fixtures preserve deterministic ordering without assuming event columns", () => {
+  const rollback = readFileSync(
+    new URL("../../tests/fixtures/fam-qa-failure/lifecycle-178-rollback.sql", import.meta.url),
+    "utf8",
+  );
+  const reapply = readFileSync(
+    new URL("../../tests/fixtures/fam-qa-failure/lifecycle-178-reapply.sql", import.meta.url),
+    "utf8",
+  );
+  assert.equal((rollback.match(/jsonb_agg\\(to_jsonb\\(e\\) order by to_jsonb\\(e\\)::text\\)/g) || []).length, 2);
+  assert.doesNotMatch(rollback, /e\\.(?:created_at|event_type|id)\\b/);
+  assert.match(reapply, /where e\\.metadata->>'stage' = 'postmerge_verified'\\s+order by e\\.task_id, e\\.metadata::text\\s+limit 1/);
+});
