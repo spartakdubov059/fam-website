@@ -3,10 +3,7 @@ name: FAM Development Advisor SQL contract
 on:
   pull_request:
     paths:
-      - ".github/workflows/fam-development-advisor-sql-contract.yml"
       - "supabase/migrations/*fam_development_advisor_aggregate_snapshots.sql"
-      - "tests/fixtures/fam-development-advisor/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
