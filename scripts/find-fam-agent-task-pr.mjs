@@ -13,10 +13,13 @@ export function findOpenTaskPr(pullRequests, taskId, repositoryFullName) {
     Number.isSafeInteger(pullRequest?.number) &&
     pullRequest.number > 0 &&
     typeof pullRequest.url === "string" &&
+    typeof pullRequest.headRefName === "string" &&
+    typeof pullRequest.headRefOid === "string" &&
+    /^[0-9a-f]{40}$/i.test(pullRequest.headRefOid) &&
     typeof pullRequest.body === "string" &&
     pullRequest.author?.login === "github-actions[bot]" &&
     pullRequest.baseRefName === "main" &&
-    pullRequest.headRefName?.match(/^codex\/fam-run-[1-9][0-9]{0,15}$/) &&
+    pullRequest.headRefName.match(/^codex\/fam-run-[1-9][0-9]{0,15}$/) &&
     pullRequest.headRepository?.name === repository &&
     pullRequest.headRepositoryOwner?.login === owner &&
     pullRequest.isCrossRepository === false &&
@@ -32,7 +35,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     const repositoryFullName = process.argv[3];
     const pullRequests = JSON.parse(readFileSync(0, "utf8"));
     const match = findOpenTaskPr(pullRequests, taskId, repositoryFullName);
-    if (match) process.stdout.write(`${match.number}\t${match.url}\n`);
+    if (match) process.stdout.write(`${match.number}\t${match.url}\t${match.headRefName}\t${match.headRefOid}\n`);
   } catch {
     process.stderr.write("Unable to safely reconcile an existing FAM task PR.\n");
     process.exitCode = 1;

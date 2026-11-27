@@ -512,6 +512,9 @@ jobs:
       actions: write
     outputs:
       pr_number: ${{ steps.pr.outputs.pr_number }}
+      pr_head_branch: ${{ steps.pr.outputs.pr_head_branch }}
+      pr_head_sha: ${{ steps.pr.outputs.pr_head_sha }}
+      reused_existing: ${{ steps.pr.outputs.reused_existing }}
       ci_failed: ${{ steps.branch_ci.outputs.ci_failed }}
     steps:
       - name: Получить чистую основную ветку
@@ -534,14 +537,16 @@ jobs:
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
-          OPEN_PR_CANDIDATES="$(gh pr list --state open --search "in:body $FAM_CODER_TASK_ID" --json number,url,body,author,baseRefName,headRefName,headRepository,headRepositoryOwner,isCrossRepository --limit 100)"
+          OPEN_PR_CANDIDATES="$(gh pr list --state open --search "in:body $FAM_CODER_TASK_ID" --json number,url,body,author,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository --limit 100)"
           EXISTING_PR="$(printf '%s\n' "$OPEN_PR_CANDIDATES" | node scripts/find-fam-agent-task-pr.mjs "$FAM_CODER_TASK_ID" "$GITHUB_REPOSITORY")"
           if [[ -n "$EXISTING_PR" ]]; then
-            IFS=$'\t' read -r PR_NUMBER PR_URL <<< "$EXISTING_PR"
+            IFS=$'\t' read -r PR_NUMBER PR_URL PR_HEAD_BRANCH PR_HEAD_SHA <<< "$EXISTING_PR"
             [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
             [[ "$PR_URL" == "https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}" ]]
             echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
             echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "pr_head_branch=$PR_HEAD_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
             echo "reused_existing=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -604,20 +609,32 @@ jobs:
           fi
           PR_NUMBER="$(gh pr view "$PR_URL" --json number --jq .number)"
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+          PR_HEAD_SHA="$(git rev-parse HEAD)"
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "pr_head_branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "pr_head_sha=$PR_HEAD_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
         id: branch_ci
-        if: success() && steps.pr.outputs.reused_existing != 'true'
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
+          REUSED_EXISTING: ${{ steps.pr.outputs.reused_existing }}
+          PR_HEAD_BRANCH: ${{ steps.pr.outputs.pr_head_branch }}
+          PR_HEAD_SHA: ${{ steps.pr.outputs.pr_head_sha }}
         run: |
           set -euo pipefail
-          # Step-local shell variables do not survive into this step.
-          BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
-          BRANCH_SHA="$(git rev-parse HEAD)"
+          if [[ "$REUSED_EXISTING" == "true" ]]; then
+            BRANCH="$PR_HEAD_BRANCH"
+            BRANCH_SHA="$PR_HEAD_SHA"
+            [[ "$BRANCH" =~ ^codex/fam-run-[1-9][0-9]{0,15}$ ]]
+            [[ "$BRANCH_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
+          else
+            BRANCH="codex/fam-run-${GITHUB_RUN_ID}"
+            BRANCH_SHA="$(git rev-parse HEAD)"
+          fi
           gh workflow run .github/workflows/moderation-regression.yml --ref "$BRANCH"
           TEST_RUN_ID=""
           for attempt in $(seq 1 60); do
@@ -636,7 +653,9 @@ jobs:
             echo "::error::Независимый CI не прошёл: $TEST_CONCLUSION"
             exit 1
           fi
-          gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
+          if [[ "$REUSED_EXISTING" != "true" ]]; then
+            gh pr comment "$PR_URL" --body "Независимые регрессионные проверки прошли успешно. Production не изменён. PR оставлен открытым: для публикации требуется отдельное явное разрешение владельца и ручное объединение PR."
+          fi
         if: success()
       - name: Сохранить отчёт о PR
         if: always()

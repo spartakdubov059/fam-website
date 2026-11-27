@@ -14,6 +14,7 @@ const trustedPr = (overrides = {}) => ({
   author: { login: "github-actions[bot]" },
   baseRefName: "main",
   headRefName: "codex/fam-run-46000000000",
+  headRefOid: "a".repeat(40),
   headRepository: { name: "repo" },
   headRepositoryOwner: { login: "example" },
   isCrossRepository: false,
@@ -58,7 +59,7 @@ test("CLI returns a tab-separated existing PR and emits no output on ambiguous m
     input: JSON.stringify([row]), encoding: "utf8", timeout: 5000,
   });
   assert.equal(found.status, 0, found.stderr);
-  assert.equal(found.stdout, `${row.number}\t${row.url}\n`);
+  assert.equal(found.stdout, `${row.number}\t${row.url}\t${row.headRefName}\t${row.headRefOid}\n`);
   const ambiguous = spawnSync(process.execPath, [script, TASK_ID, REPOSITORY], {
     input: JSON.stringify([row, { ...row, number: 42, url: "https://github.com/example/repo/pull/42" }]),
     encoding: "utf8", timeout: 5000,
