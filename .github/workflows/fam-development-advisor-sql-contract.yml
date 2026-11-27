@@ -1,0 +1,47 @@
+name: FAM Development Advisor SQL contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/fam-development-advisor-sql-contract.yml"
+      - "supabase/migrations/*fam_development_advisor_aggregate_snapshots.sql"
+      - "tests/fixtures/fam-development-advisor/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  advisor-sql-contract:
+    name: Проверить SQL Советника на одноразовой PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - name: Подготовить синтетические агрегаты без пользовательских данных
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/setup.sql
+      - name: Применить миграцию Советника
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127050000_fam_development_advisor_aggregate_snapshots.sql
+      - name: Проверить границы данных и прав
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions.sql
