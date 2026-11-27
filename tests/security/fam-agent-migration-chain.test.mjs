@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const workflow = readFileSync(new URL("../../.github/workflows/fam-qwen-qa-failure-migration.yml", import.meta.url), "utf8");
 const setup = readFileSync(new URL("../fixtures/fam-qa-failure/qwen-qa-failure-migration-setup.sql", import.meta.url), "utf8");
 const lifecycle = readFileSync(new URL("../fixtures/fam-qa-failure/lifecycle-chain-assertions.sql", import.meta.url), "utf8");
+const fullReplay = readFileSync(new URL("../../.github/workflows/fam-supabase-full-migration-replay.yml", import.meta.url), "utf8");
 
 test("ordered lifecycle migrations coexist and rollback in reverse order", () => {
   const resolver = workflow.indexOf("supabase/migrations/20261126195410_fam_agent_coder_lifecycle_resolution.sql");
@@ -28,4 +29,15 @@ test("synthetic schema contains only the queue fields needed by both RPC migrati
   assert.match(lifecycle, /resolve_fam_agent_coder_lifecycle/);
   assert.match(lifecycle, /postmerge_verified/);
   assert.match(lifecycle, /repeat\('a',40\)/);
+});
+
+
+test("full Supabase replay initializes local config before starting services and resetting migrations", () => {
+  const initialize = fullReplay.indexOf("supabase init --workdir \"$GITHUB_WORKSPACE\"");
+  const start = fullReplay.indexOf("supabase start");
+  const reset = fullReplay.indexOf("supabase db reset");
+
+  assert.ok(initialize >= 0 && initialize < start, "initialize config before local Supabase services start");
+  assert.ok(start >= 0 && start < reset, "apply migrations only after local services are ready");
+  assert.doesNotMatch(fullReplay, /supabase (?:db reset|start).*--(?:linked|db-url)/);
 });

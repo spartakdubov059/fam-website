@@ -17,6 +17,8 @@ jobs:
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb
         with:
           version: 3.4.0
+      - name: Initialize local Supabase configuration
+        run: supabase init --workdir "$GITHUB_WORKSPACE"
       - name: Start isolated local Supabase services
         run: supabase start
       - name: Replay every migration from a clean local database
