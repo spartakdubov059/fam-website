@@ -33,7 +33,7 @@ try {
   sql.begin = client.begin.bind(client);
   const repo = createYdbListingsRepository(sql);
   const schemaHealth = await createYdbSchemaHealthCheck(sql, { identifier, fragment, join })();
-  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 39, content_read: false, write_permissions_checked: false });
+  assert.deepEqual(schemaHealth, { ok: true, tables_checked: 40, content_read: false, write_permissions_checked: false });
   const stepClock = Math.floor(Date.now() / 1000) - 10;
   const stepVerifyClock = stepClock + 1;
   const stepIdentity = { issuer: 'https://issuer.synthetic', subject: 'step-up-subject', email: 'step-up@example.test' };
@@ -754,15 +754,18 @@ try {
   assert.equal((await sql`SELECT admin_status FROM fam_ideas WHERE id = ${idea.id};`)[0][0].admin_status, 'done');
   assert.deepEqual(new Set((await sql`SELECT action FROM fam_school_content_audit WHERE entity_id = ${idea.id};`)[0].map(row => row.action)),
     new Set(['idea_text_approved', 'idea_workflow_in_progress', 'idea_workflow_done']), 'status transitions are audited without storing idea text');
+  // Use a real fixture listing belonging to the sender, not an unrelated profile UUID.
   const linkedListingId = listing.id;
+  assert.ok(linkedListingId);
   const message = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111', school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Синтетическое одобренное сообщение' });
   assert.match(message.id, /^[0-9a-f-]{36}$/i, 'message linked to an existing same-school participant listing is inserted');
   for (let index = 0; index < 7; index++) {
-    await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-      school_id: 'synthetic-school', body: `Синтетическое сообщение ${index}` });
+    const accepted = await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
+      school_id: 'synthetic-school', listing_id: linkedListingId, body: `Синтетическое сообщение ${index}` });
+    assert.ok(accepted?.id, `message ${index + 2} must be accepted before counting quota`);
   }
   assert.deepEqual(await repo.createMessage({ sender_id: 'synthetic-user', receiver_id: '11111111-1111-4111-8111-111111111111',
-    school_id: 'synthetic-school', body: 'Девятое синтетическое сообщение' }), { ok: false, code: 'rate_limited' });
+    school_id: 'synthetic-school', listing_id: linkedListingId, body: 'Девятое синтетическое сообщение' }), { ok: false, code: 'rate_limited' });
   const messageQuota = await sql`SELECT submission_count FROM fam_submission_quotas
     WHERE user_id = 'synthetic-user' AND action = 'message' ORDER BY window_start DESC LIMIT 1;`;
   assert.equal(messageQuota?.[0]?.[0]?.submission_count, 8, 'direct messages enforce the eight-per-minute bucket');

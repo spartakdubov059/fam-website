@@ -34,8 +34,11 @@ try {
   assert.equal(profileRows?.[0]?.[0]?.user_id, identity.userId);
   const markerRows = await sql`SELECT user_id FROM fam_initial_school_admin_bootstrap WHERE school_id = ${identity.schoolId} LIMIT 1;`;
   assert.equal(markerRows?.[0]?.[0]?.user_id, identity.userId);
-  const auditRows = await sql`SELECT action, previous_role FROM fam_school_admin_audit WHERE target_id = ${identity.userId} LIMIT 1;`;
-  assert.deepEqual(auditRows?.[0]?.[0], { action: 'initial_admin_bootstrap', previous_role: 'none' });
+  const auditRows = await sql`SELECT action, previous_role FROM fam_school_admin_audit
+    WHERE school_id = ${identity.schoolId} AND target_id = ${identity.userId}
+      AND action = 'initial_admin_bootstrap';`;
+  assert.deepEqual(auditRows?.[0], [{ action: 'initial_admin_bootstrap', previous_role: 'none' }],
+    'the bootstrap must create exactly one matching audit entry, independent of prior role-change audit rows');
   console.log('YDB_SYNTHETIC_INITIAL_ADMIN_BOOTSTRAP_PASS');
 } finally {
   await driver.close();

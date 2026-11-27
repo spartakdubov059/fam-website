@@ -3,15 +3,19 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 const WORKER_ID = 'fam-agent-qwen-coder-v1';
 const MAX_BODY_BYTES = 2048;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const CODER_TASK_KEYS = new Set(['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility']);
+const CODER_TASK_KEYS = new Set(['audit_frontend_runtime', 'audit_client_resilience', 'audit_accessibility', 'audit_agent_infrastructure']);
 const CODER_EVENT_CODES = new Set(['js_runtime', 'unhandled_rejection', 'listings_load_failed',
-  'notifications_load_failed', 'database_request_failed', 'auth_backend_failed']);
-const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other']);
+  'notifications_load_failed', 'database_request_failed', 'auth_backend_failed',
+  'ci_workflow_failure', 'worker_queue_failure', 'worker_expired_lease',
+  'qwen_repeated_failure', 'qwen_stuck_run', 'synthetic_ci_workflow_failure']);
+const INSPECTOR_SIGNALS = new Set(['ci_workflow_failure','worker_queue_failure','worker_expired_lease','qwen_repeated_failure','qwen_stuck_run','synthetic_ci_workflow_failure']);
+const INSPECTOR_SKIP_REASONS = new Set(['duplicate_event','signal_cooldown','coder_task_already_active']);
+const PAGE_AREAS = new Set(['auth', 'listings', 'notifications', 'database', 'other', 'agent_infrastructure']);
 const AGENT_KEYS = new Set(['orchestrator', 'technical', 'database', 'moderation', 'safety', 'quality', 'growth']);
 const TASK_STATUSES = new Set(['queued', 'claimed', 'in_progress', 'blocked', 'completed', 'failed', 'cancelled']);
 const MAX_METRIC_ROWS = AGENT_KEYS.size * TASK_STATUSES.size;
 const MAX_METRIC_COUNT = 10_000_000;
-const BRIDGE_ACTIONS = new Set(['health', 'metrics', 'claim', 'start', 'heartbeat', 'advance', 'finish']);
+const BRIDGE_ACTIONS = new Set(['health', 'metrics', 'claim', 'inspector_enqueue', 'start', 'heartbeat', 'advance', 'finish']);
 
 function matchesSecret(provided, expected) {
   if (typeof provided !== 'string' || !provided || typeof expected !== 'string' || Buffer.byteLength(expected) < 32) return false;
@@ -99,6 +103,34 @@ export function createCoderTaskBridge({ queue, token } = {}) {
         return json(200, { ok: true, task: { id: task.id, task_key: task.task_key,
           event_code: task.event_code, page_area: task.page_area, occurrences: task.occurrences,
           claim_token: task.claim_token } });
+      }
+      if (body.action === 'inspector_enqueue' && Object.keys(body).length === 4
+          && INSPECTOR_SIGNALS.has(body.signal_code)
+          && typeof body.event_id === 'string'
+          && /^[a-z0-9:_-]{3,100}$/.test(body.event_id)
+          && Number.isSafeInteger(body.occurrences)
+          && body.occurrences >= 1
+          && body.occurrences <= 1000) {
+        stage = 'inspector_enqueue';
+        if (typeof queue.enqueueInspectorSignal !== 'function') {
+          return json(503, { ok: false, error: 'inspector_unavailable' });
+        }
+        const result = await queue.enqueueInspectorSignal({
+          signalCode: body.signal_code,
+          eventId: body.event_id,
+          occurrences: body.occurrences,
+        });
+        if (!result || result.ok !== true || typeof result.task_created !== 'boolean'
+            || (result.task_created ? result.reason !== 'queued' || !UUID.test(result.task_id || '')
+              : !INSPECTOR_SKIP_REASONS.has(result.reason) || Object.hasOwn(result,'task_id'))) {
+          return json(502, { ok: false, error: 'invalid_inspector_result' });
+        }
+        return json(200, {
+          ok: true,
+          task_created: result.task_created === true,
+          reason: result.reason,
+          ...(result.task_created ? { task_id: result.task_id } : {}),
+        });
       }
       if (['start', 'heartbeat'].includes(body.action) && Object.keys(body).length === 3
           && UUID.test(body.task_id || '') && UUID.test(body.claim_token || '')) {

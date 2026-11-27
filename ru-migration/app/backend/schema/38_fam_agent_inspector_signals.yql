@@ -1,0 +1,12 @@
+CREATE TABLE fam_agent_inspector_signals (
+  event_id Utf8 NOT NULL,
+  signal_code Utf8 NOT NULL,
+  signature Utf8 NOT NULL,
+  outcome Utf8 NOT NULL,
+  task_id Utf8?,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (event_id)
+);
+
+ALTER TABLE fam_agent_inspector_signals
+  ADD INDEX fam_agent_inspector_signals_signature_idx GLOBAL ON (signature, created_at);

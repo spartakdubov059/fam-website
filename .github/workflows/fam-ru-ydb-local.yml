@@ -25,6 +25,22 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+      - name: Verify checked-out backend source integrity and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=ru-migration/app/backend/repositories/ydb-listings.mjs
+          expected=$(git rev-parse "HEAD:$path")
+          actual=$(git hash-object --no-filters "$path")
+          printf 'YDB repository blob expected=%s actual=%s\n' "$expected" "$actual"
+          test "$expected" = "$actual"
+          while IFS= read -r -d '' file; do
+            if ! node --check "$file" > "$RUNNER_TEMP/fam-ru-syntax.log" 2>&1; then
+              printf 'Invalid syntax in tracked module: %s\n' "$file" >&2
+              exit 1
+            fi
+          done < <(git ls-files -z -- 'ru-migration/app/backend/*.mjs' 'ru-migration/compat/*.mjs')
+          echo FAM_RU_TRACKED_MODULE_SYNTAX_PASS
       - name: Install locked SDK dependencies
         run: npm ci --prefix ru-migration/compat --no-audit --no-fund
       - name: Start disposable local database
@@ -107,6 +123,8 @@ jobs:
           schema+="$(cat ru-migration/app/backend/schema/36_role_email_verification.yql)"
           schema+=$'\n'
           schema+="$(cat ru-migration/app/backend/schema/37_step_up_email_challenges.yql)"
+          schema+=$'\n'
+          schema+="$(cat ru-migration/app/backend/schema/38_fam_agent_inspector_signals.yql)"
           for i in $(seq 1 120); do
             if docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$schema" > /tmp/fam-ydb-schema.log 2>&1; then break; fi
             if [ "$i" = 120 ]; then cat /tmp/fam-ydb-schema.log; docker logs fam-ru-test-ydb; exit 1; fi
@@ -120,6 +138,22 @@ jobs:
         run: node ru-migration/compat/integration-initial-school-admin-bootstrap.mjs
       - name: Exercise the private S3 adapter over local HTTP with synthetic data
         run: node ru-migration/compat/integration-s3-adapter.mjs
+      - name: Rehearse atomic legacy account linking on synthetic data
+        run: |
+          docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$(cat ru-migration/compat/legacy-account-link-schema.yql)"
+          node ru-migration/compat/integration-legacy-account-link.mjs
+      - name: Rehearse restoring synthetic archive into actual YDB tables
+        run: node ru-migration/compat/integration-synthetic-archive-restore.mjs
+      - name: Rehearse generated WebP avatar migration and private access
+        run: node ru-migration/compat/integration-synthetic-avatar-restore.mjs
+      - name: Rehearse infrastructure inspector signal lifecycle
+        run: node ru-migration/compat/integration-synthetic-inspector.mjs
+      - name: Rehearse remaining operational table restoration
+        run: node ru-migration/compat/integration-synthetic-operational-restore.mjs
+      - name: Rehearse checkpointed synthetic batch import and resume
+        run: |
+          docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$(cat ru-migration/compat/synthetic-migration-checkpoint-schema.yql)"
+          node ru-migration/compat/integration-synthetic-batch-import.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true

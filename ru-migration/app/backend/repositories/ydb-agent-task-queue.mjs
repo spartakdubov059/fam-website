@@ -13,7 +13,17 @@ const CODER_EVENT_CODES = Object.freeze({
   notifications_load_failed: 'audit_client_resilience',
   database_request_failed: 'audit_client_resilience',
   auth_backend_failed: 'audit_client_resilience',
+  ci_workflow_failure: 'audit_agent_infrastructure',
+  worker_queue_failure: 'audit_agent_infrastructure',
+  worker_expired_lease: 'audit_agent_infrastructure',
+  qwen_repeated_failure: 'audit_agent_infrastructure',
+  qwen_stuck_run: 'audit_agent_infrastructure',
+  synthetic_ci_workflow_failure: 'audit_agent_infrastructure',
 });
+const INSPECTOR_SIGNAL_CODES = new Set([
+  'ci_workflow_failure', 'worker_queue_failure', 'worker_expired_lease',
+  'qwen_repeated_failure', 'qwen_stuck_run', 'synthetic_ci_workflow_failure',
+]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = 'fam-ru-safe-worker-v1';
 const CODER_WORKER_ID = 'fam-agent-qwen-coder-v1';
@@ -59,6 +69,68 @@ function isUtcTaskSlot(taskType, value) {
 export function createYdbAgentTaskQueue(sql) {
   if (typeof sql !== 'function') throw new TypeError('YDB query client is required');
   return Object.freeze({
+    async enqueueInspectorSignal({ signalCode, eventId, occurrences } = {}) {
+      if (!INSPECTOR_SIGNAL_CODES.has(signalCode)
+          || typeof eventId !== 'string'
+          || !/^[a-z0-9:_-]{3,100}$/.test(eventId)
+          || !Number.isSafeInteger(occurrences)
+          || occurrences < 1
+          || occurrences > 1000) {
+        throw new TypeError('invalid inspector signal');
+      }
+      return sql.begin({ idempotent: true }, async tx => {
+        const existing = await tx`SELECT outcome FROM fam_agent_inspector_signals WHERE event_id = ${eventId} LIMIT 1;`;
+        if (existing?.[0]?.[0]) return { ok: true, task_created: false, reason: 'duplicate_event' };
+
+        const cooldown = await tx`SELECT event_id FROM fam_agent_inspector_signals
+          WHERE signal_code = ${signalCode} AND outcome = 'queued'
+            AND created_at > CurrentUtcTimestamp() - Interval('P7D') LIMIT 1;`;
+        if (cooldown?.[0]?.[0]) {
+          await tx`INSERT INTO fam_agent_inspector_signals
+            (event_id, signal_code, signature, outcome, task_id, created_at)
+            VALUES (${eventId}, ${signalCode}, ${signalCode}, 'deduped', CAST(NULL AS Utf8?), CurrentUtcTimestamp());`;
+          return { ok: true, task_created: false, reason: 'signal_cooldown' };
+        }
+
+        const active = await tx`SELECT id FROM fam_agent_tasks
+          WHERE agent_key = 'technical' AND task_type = 'coder_patch_request'
+            AND status IN ('queued', 'claimed', 'in_progress') LIMIT 1;`;
+        if (active?.[0]?.[0]) {
+          await tx`INSERT INTO fam_agent_inspector_signals
+            (event_id, signal_code, signature, outcome, task_id, created_at)
+            VALUES (${eventId}, ${signalCode}, ${signalCode}, 'active_task', CAST(NULL AS Utf8?), CurrentUtcTimestamp());`;
+          return { ok: true, task_created: false, reason: 'coder_task_already_active' };
+        }
+
+        const taskId = randomUUID();
+        const priority = ['worker_queue_failure', 'worker_expired_lease'].includes(signalCode) ? 'high' : 'normal';
+        const payloadJson = JSON.stringify({
+          task_key: 'audit_agent_infrastructure',
+          event_code: signalCode,
+          page_area: 'agent_infrastructure',
+          occurrences,
+        });
+        await tx`INSERT INTO fam_agent_tasks
+          (id, agent_key, task_type, title, description, priority, status, source, approval_required,
+            payload_json, result_summary, attempt_count, max_attempts, available_at, claim_token,
+            claimed_by, claimed_at, lease_expires_at, started_at, finished_at, created_at, updated_at)
+          VALUES (${taskId}, 'technical', 'coder_patch_request',
+            'Проверка подтверждённого сигнала инфраструктуры агентов',
+            'Проверить узкую область управляющей инфраструктуры по коду сигнала. Не читать журналы, пользовательские данные или секреты.',
+            ${priority}, 'queued', 'scheduled_audit', false, ${payloadJson}, NULL,
+            Unwrap(CAST(0 AS Uint32)), Unwrap(CAST(2 AS Uint32)), CurrentUtcTimestamp(), NULL,
+            NULL, NULL, NULL, NULL, NULL, CurrentUtcTimestamp(), CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_agent_inspector_signals
+          (event_id, signal_code, signature, outcome, task_id, created_at)
+          VALUES (${eventId}, ${signalCode}, ${signalCode}, 'queued', ${taskId}, CurrentUtcTimestamp());`;
+        await tx`INSERT INTO fam_agent_task_events
+          (id, task_id, event_type, actor, summary, created_at)
+          VALUES (${randomUUID()}, ${taskId}, 'created', 'fam-agent-inspector',
+            'INSPECTOR поставил ограниченную техническую проверку в очередь.', CurrentUtcTimestamp());`;
+        return { ok: true, task_created: true, task_id: taskId, reason: 'queued' };
+      });
+    },
+
     async enqueueSafeTask(taskType, slot) {
       const task = Object.hasOwn(TASKS, taskType) ? TASKS[taskType] : null;
       if (!task || !isUtcTaskSlot(taskType, slot)) throw new TypeError('invalid safe agent task');
@@ -222,7 +294,7 @@ export function createYdbAgentTaskQueue(sql) {
         const valid = task && typeof task === 'object' && !Array.isArray(task)
           && Object.keys(task).sort().join(',') === 'event_code,occurrences,page_area,task_key'
           && Object.entries(CODER_EVENT_CODES).some(([eventCode, taskKey]) => eventCode === task.event_code && taskKey === task.task_key)
-          && ['auth', 'listings', 'notifications', 'database', 'other'].includes(task.page_area)
+          && ['auth', 'listings', 'notifications', 'database', 'other', 'agent_infrastructure'].includes(task.page_area)
           && Number.isInteger(task.occurrences) && task.occurrences >= 0 && task.occurrences <= 1000;
         if (!valid || row.available !== true && row.lease_expired !== true) return null;
         const claimToken = randomUUID();

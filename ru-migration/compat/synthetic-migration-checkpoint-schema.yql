@@ -1,0 +1,28 @@
+CREATE TABLE fam_migration_rehearsal_plans (
+  snapshot_id Utf8 NOT NULL,
+  plan_digest Utf8 NOT NULL,
+  table_count Uint32 NOT NULL,
+  batch_count Uint32 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (snapshot_id)
+);
+
+CREATE TABLE fam_migration_rehearsal_plan_tables (
+  snapshot_id Utf8 NOT NULL,
+  table_name Utf8 NOT NULL,
+  row_count Uint32 NOT NULL,
+  batch_count Uint32 NOT NULL,
+  plan_digest Utf8 NOT NULL,
+  created_at Timestamp NOT NULL,
+  PRIMARY KEY (snapshot_id, table_name)
+);
+
+CREATE TABLE fam_migration_rehearsal_batches (
+  snapshot_id Utf8 NOT NULL,
+  table_name Utf8 NOT NULL,
+  batch_offset Uint32 NOT NULL,
+  row_count Uint32 NOT NULL,
+  batch_digest Utf8 NOT NULL,
+  committed_at Timestamp NOT NULL,
+  PRIMARY KEY (snapshot_id, table_name, batch_offset)
+);
