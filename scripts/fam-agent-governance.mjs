@@ -211,7 +211,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, legalScopes = {}, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -268,6 +268,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
       ". Права: " + clean(p.permissions, 250) + ".");
   }
   lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
+  lines.push("", renderDevelopmentScopeStatus(developmentScopes));
   lines.push("", renderLegalScopeStatus(legalScopes));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
@@ -278,6 +279,22 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     "- Этот процесс не имеет прав менять код, закрывать PR, выполнять merge или публиковать сайт.",
     "");
   return lines.join("\n");
+}
+
+export function renderDevelopmentScopeStatus(statuses = {}) {
+  const labels = {
+    confirmed: "агрегаты проверены, подготовлено только предложение",
+    checked_no_signal: "агрегаты проверены, порог для гипотезы не достигнут",
+    no_data: "не оценено: источник агрегатов этого контура не подключён",
+  };
+  const current = labels[statuses?.FAM_CURRENT] || labels.no_data;
+  const ru = labels[statuses?.FAM_RU] || labels.no_data;
+  return [
+    "## Советник по развитию — охват версий",
+    "- **FAM_CURRENT:** " + current + ".",
+    "- **FAM_RU:** " + ru + ".",
+    "Предложения относятся только к указанному контуру и не являются изменениями продукта.",
+  ].join("\n");
 }
 
 export function renderLegalScopeStatus(statuses = {}) {
@@ -510,13 +527,18 @@ export async function main() {
       state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
       evidence_count: developmentAdvisorLink === "connected" ? developmentAdvisor.proposals.length : 0,
       detail: developmentAdvisorLink === "connected"
-        ? "проверены только дневные агрегаты объявлений; гипотезы переданы Боссу без автоматической постановки задач"
+        ? "проверены только дневные агрегаты объявлений FAM_CURRENT; гипотезы переданы Боссу без автоматической постановки задач"
         : "агрегированный источник Советника не подключён или недоступен; работа не подтверждена",
     },
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics, developmentAdvisor, staffSignals, count: selected.length,
+    qwenMetrics, developmentAdvisor,
+    developmentScopes: {
+      FAM_CURRENT: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
+      FAM_RU: "no_data",
+    },
+    staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
