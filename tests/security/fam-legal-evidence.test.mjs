@@ -14,6 +14,11 @@ const baseEntry = (overrides = {}) => ({
   source_url: SOURCE, checked_at: "2026-11-27T04:00:00Z", status: "operator_reviewed",
   priority: "advisory", decision: "confirmed", ...overrides,
 });
+const criterionIds = ["official_source_review", "scope_applicability_review", "student_data_minimization_review",
+  "access_control_review", "qualified_counsel_review"];
+const fullCriteria = (overrides = {}) => criterionIds.map((criterion_id) => ({
+  criterion_id, applicability: "applicable", reason: "scope_declared", ...(overrides[criterion_id] || {}),
+}));
 
 test("archive is append-only, hash chained, idempotent for the same event, and rejects edits", () => {
   const first = appendLegalArchiveEntry([], baseEntry());
@@ -43,14 +48,22 @@ test("archive accepts only allowlisted public official HTTPS sources and bounded
   })), /status and decision/);
 });
 
-test("scope readiness is isolated and human evidence is required before counting a criterion", () => {
-  const current = appendLegalArchiveEntry([], baseEntry());
-  const criteria = [{ criterion_id: "official_source_review", applicability: "applicable", reason: "scope_declared" }];
+test("scope readiness is isolated and human evidence is required before counting criteria", () => {
+  let current = [];
+  for (const [index, criterion_id] of criterionIds.entries()) {
+    current = appendLegalArchiveEntry(current, baseEntry({
+      criterion_id,
+      checked_at: `2026-11-27T04:00:0${index}Z`,
+      status: criterion_id === "qualified_counsel_review" ? "counsel_reviewed" : "operator_reviewed",
+    }));
+  }
+  const criteria = fullCriteria();
   const withoutVerifier = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria, archive: current });
   assert.equal(withoutVerifier.readiness_percent, 0);
   assert.equal(withoutVerifier.status, "evidence_pending_human_review");
   assert.equal(withoutVerifier.release_gate, "not_authorized_by_legal_evidence");
-  const verifyExactEntry = (entry) => entry.entry_hash === current[0].entry_hash;
+  const knownEntries = new Set(current.map((entry) => entry.entry_hash));
+  const verifyExactEntry = (entry) => knownEntries.has(entry.entry_hash);
   const verified = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria, archive: current, verifyHumanDecision: verifyExactEntry });
   assert.equal(verified.readiness_percent, 100);
   assert.equal(verified.status, "criteria_evidenced_pending_release_decision");
@@ -66,16 +79,25 @@ test("scope readiness is isolated and human evidence is required before counting
 });
 
 test("unknown applicability and unsupported exclusions produce no readiness percentage", () => {
-  const unknown = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: [
-    { criterion_id: "official_source_review", applicability: "unknown", reason: "undetermined" },
-  ] });
+  const unknown = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: fullCriteria({
+    official_source_review: { applicability: "unknown", reason: "undetermined" },
+  }) });
   assert.equal(unknown.status, "not_assessed");
   assert.equal(unknown.readiness_percent, null);
-  const falseNA = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: [
-    { criterion_id: "official_source_review", applicability: "not_applicable", reason: "outside_release_scope" },
-  ] });
+  assert.ok(unknown.pending_criteria.includes("official_source_review"));
+  const falseNA = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: fullCriteria({
+    official_source_review: { applicability: "not_applicable", reason: "outside_release_scope" },
+  }) });
   assert.equal(falseNA.status, "not_assessed");
   assert.equal(falseNA.applicable_criteria, null);
+  const incomplete = evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: [
+    { criterion_id: "official_source_review", applicability: "applicable", reason: "scope_declared" },
+  ] });
+  assert.equal(incomplete.readiness_percent, null);
+  assert.equal(incomplete.pending_criteria.length, 4);
+  assert.throws(() => evaluateLegalReadiness({ scope: "FAM_CURRENT", revision: REVISION, criteria: fullCriteria({
+    official_source_review: { applicability: "applicable", reason: "outside_release_scope" },
+  }) }), /reason does not match applicability/);
 });
 
 test("counsel review is not inferred from operator review", () => {
@@ -84,7 +106,7 @@ test("counsel review is not inferred from operator review", () => {
   }));
   const result = evaluateLegalReadiness({
     scope: "FAM_CURRENT", revision: REVISION,
-    criteria: [{ criterion_id: "qualified_counsel_review", applicability: "applicable", reason: "scope_declared" }],
+    criteria: fullCriteria(),
     archive,
   });
   assert.equal(result.verified_criteria, 0);
