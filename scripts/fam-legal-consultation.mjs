@@ -1,4 +1,5 @@
 const SHA = /^[0-9a-f]{40}$/i;
+const BRANCH_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 const SCOPES = new Set(["FAM_CURRENT", "FAM_RU", "SHARED"]);
 const TASK_RISK_TOPICS = Object.freeze({
   audit_frontend_runtime: Object.freeze([]),
@@ -70,8 +71,16 @@ function classifyPath(path) {
   return [...new Set(risks)];
 }
 
-export function buildLegalConsultation({ scope, revision, changedFiles = [], taskKey } = {}) {
+function validBranchRef(value) {
+  if (typeof value !== "string" || value.length < 1 || value.length > 200 ||
+      value.startsWith("/") || value.endsWith("/") || value.includes("//") ||
+      value.includes("..") || value.includes("@{") || /[~^:?*[\\\x00-\x20\x7f]/.test(value)) return false;
+  return value.split("/").every((part) => BRANCH_COMPONENT.test(part) && !part.endsWith(".lock"));
+}
+
+export function buildLegalConsultation({ scope, branch, revision, changedFiles = [], taskKey } = {}) {
   if (!SCOPES.has(scope)) throw new Error("Legal consultation requires an explicit product scope.");
+  if (!validBranchRef(branch)) throw new Error("Legal consultation requires an exact safe branch ref.");
   if (typeof revision !== "string" || !SHA.test(revision)) {
     throw new Error("Legal consultation requires an exact 40-character revision.");
   }
@@ -131,6 +140,7 @@ export function buildLegalConsultation({ scope, revision, changedFiles = [], tas
     schema_version: 1,
     role: "LEGAL",
     scope,
+    branch,
     version_scopes: versionScopes,
     revision,
     risk_categories: riskCategories,
