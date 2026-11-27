@@ -373,7 +373,7 @@ test("created PR is recorded from its job output when CI is unavailable so retri
   assert.ok(branchCi);
   assert.match(branchCi, /gh pr view "\$PR_URL" --json headRefOid --jq \.headRefOid/);
   assert.match(branchCi, /TEST_RESULT="\$\(gh run view "\$TEST_RUN_ID" --json conclusion,headSha/);
-  assert.match(branchCi, /TEST_HEAD_SHA" != "\$BRANCH_SHA/);
+  assert.match(branchCi, /\$TEST_HEAD_SHA" != "\$BRANCH_SHA/);
   assert.match(branchCi, /Ревизия PR изменилась во время проверки/);
   assert.match(workflow, /if: success\(\)\n\s+env:\n\s+GH_TOKEN:/);
   assert.doesNotMatch(workflow, /if: success\(\) && steps\.pr\.outputs\.reused_existing/);
