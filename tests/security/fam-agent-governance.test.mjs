@@ -109,7 +109,8 @@ test("INSPECTOR does not flag Qwen during its configured 180-minute workflow win
       now: NOW,
       coderRuns: [{
         id: 11,
-        created_at: new Date(NOW - minutes * 60_000).toISOString(),
+        created_at: new Date(NOW - (minutes + 120) * 60_000).toISOString(),
+        run_started_at: new Date(NOW - minutes * 60_000).toISOString(),
         status: "in_progress",
         conclusion: null,
       }],
@@ -123,7 +124,8 @@ test("INSPECTOR flags an active Qwen run only after the workflow timeout and gra
     now: NOW,
     coderRuns: [{
       id: 11,
-      created_at: new Date(NOW - 191 * 60_000).toISOString(),
+      created_at: new Date(NOW - 311 * 60_000).toISOString(),
+      run_started_at: new Date(NOW - 191 * 60_000).toISOString(),
       status: "in_progress",
       conclusion: null,
     }],
