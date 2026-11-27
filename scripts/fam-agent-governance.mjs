@@ -453,6 +453,11 @@ export async function main() {
       evidence_count: proposals.length,
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
     },
+    development_advisor: {
+      state: "no_data",
+      evidence_count: 0,
+      detail: "В исходниках есть школьные правила предложений по агрегатам; штаб не получает их результаты, поэтому работа Советника не подтверждена.",
+    },
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,

@@ -34,7 +34,7 @@ export function buildStaffSnapshot(signals = {}) {
       name,
       state,
       evidence_count: evidenceCount,
-      detail: state === "no_data" ? "Подтверждённый источник результатов не подключён." : detail,
+      detail: detail || (state === "no_data" ? "Подтверждённый источник результатов не подключён." : ""),
     });
   });
 }

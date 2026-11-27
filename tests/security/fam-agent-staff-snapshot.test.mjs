@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildStaffSnapshot, renderStaffSnapshot } from "../../scripts/fam-agent-staff-snapshot.mjs";
 import { makeReport } from "../../scripts/fam-agent-governance.mjs";
 
@@ -28,4 +29,19 @@ test("existing governance report includes the nine-role snapshot without inventi
   }
   assert.match(report, /нет подтверждённых данных/);
   assert.match(report, /выполнять merge или публиковать сайт/);
+});
+
+test("Advisor role reports existing rule-based proposals as disconnected, not as live work", () => {
+  const report = makeReport({
+    staffSignals: {
+      development_advisor: {
+        state: "no_data", evidence_count: 0,
+        detail: "В исходниках есть школьные правила предложений по агрегатам; штаб не получает их результаты, поэтому работа Советника не подтверждена.",
+      },
+    },
+  });
+  const existingRules = readFileSync(new URL("../../supabase/migrations/20261109152842_school_scoped_agent_reports_and_free_analysts.sql", import.meta.url), "utf8");
+  assert.match(existingRules, /fam_growth_analyst/);
+  assert.match(report, /штаб не получает их результаты/);
+  assert.match(report, /Советник по развитию\*\* — нет подтверждённых данных/);
 });
