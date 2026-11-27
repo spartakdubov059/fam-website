@@ -139,8 +139,9 @@ export function inspectAgents({ pulls = [], coderRuns = [], now = Date.now() } =
   const recent = active.filter((run) => now - dateMs(run.created_at) <= 7 * DAY);
   const failures = recent.filter((run) => run.conclusion === "failure");
   const overdue = active.filter((run) => {
-    if (run.status !== "in_progress" || typeof run.created_at !== "string") return false;
-    const startedAt = Date.parse(run.created_at);
+    const timestamp = run.run_started_at || run.created_at;
+    if (run.status !== "in_progress" || typeof timestamp !== "string") return false;
+    const startedAt = Date.parse(timestamp);
     return Number.isFinite(startedAt) && now - startedAt > QWEN_WORKFLOW_TIMEOUT_MS + QWEN_STUCK_GRACE_MS;
   });
   if (failures.length >= 3) {
