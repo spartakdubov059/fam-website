@@ -360,3 +360,43 @@ test("stacked rollback fixtures preserve deterministic ordering without assuming
   assert.doesNotMatch(rollback, /e\.(?:created_at|event_type|id)\b/);
   assert.match(reapply, /where e\.metadata->>'stage' = 'postmerge_verified'\s+order by e\.task_id, e\.metadata::text\s+limit 1/);
 });
+
+test("created PR is recorded from its job output when CI is unavailable so retries do not duplicate it", () => {
+  assert.match(workflow, /gh pr list --state open --search "in:body \$FAM_CODER_TASK_ID"/);
+  assert.match(workflow, /scripts\/find-fam-agent-task-pr\.mjs/);
+  const recordJob = workflow.split("  record_pr:\n")[1] || "";
+  assert.match(recordJob, /needs\.prepare_review\.outputs\.pr_number != ''/);
+  assert.match(workflow, /REUSED_EXISTING: \$\{\{ steps\.pr\.outputs\.reused_existing \}\}/);
+  assert.match(workflow, /BRANCH="\$PR_HEAD_BRANCH"/);
+  assert.match(workflow, /BRANCH_SHA="\$PR_HEAD_SHA"/);
+  assert.match(workflow, /if: success\(\)\n\s+env:\n\s+GH_TOKEN:/);
+  assert.doesNotMatch(workflow, /if: success\(\) && steps\.pr\.outputs\.reused_existing/);
+  const marker = "        run: |\n";
+  const blocks = recordJob.split(marker);
+  assert.equal(blocks.length, 2);
+  const lines = blocks[1].split("\n").filter(line => line.trim());
+  const executable = lines.map(line => {
+    assert.ok(line.startsWith("          "), "unexpected YAML indentation in record_pr shell");
+    return line.slice(10);
+  }).join("\n");
+  const stub = 'node() { test "$#" -eq 2 && test "$1" = "scripts/fam-agent-bridge.mjs" && test "$2" = "advance" && printf "%s\\n" "$FAM_RESULT_STAGE"; }\n';
+  for (const [env, expected] of [
+    [{ FAM_PR_NUMBER: "149", PR_RESULT: "success", PR_CI_FAILED: "" }, "pr_created"],
+    [{ FAM_PR_NUMBER: "149", PR_RESULT: "failure", PR_CI_FAILED: "true" }, "pr_ci_failed"],
+    [{ FAM_PR_NUMBER: "149", PR_RESULT: "failure", PR_CI_FAILED: "" }, "pr_created"],
+  ]) {
+    const result = spawnSync("bash", ["-c", stub + executable], {
+      env: { PATH: process.env.PATH, ...env }, encoding: "utf8", timeout: 5000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), expected);
+  }
+  const missing = spawnSync("bash", ["-c", stub + executable], {
+    env: { PATH: process.env.PATH, FAM_PR_NUMBER: "", PR_RESULT: "failure", PR_CI_FAILED: "" },
+    encoding: "utf8", timeout: 5000,
+  });
+  assert.ifError(missing.error);
+  assert.equal(missing.status, 1);
+  assert.equal(missing.stdout, "");
+});
