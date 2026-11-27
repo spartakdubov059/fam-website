@@ -9,7 +9,7 @@ const createdAt = new Date('2026-11-27T12:00:00.000Z');
 const fixtureRows = Array.from({ length: 5 }, (_, index) => ({ id: 'synthetic-batch-read-' + index }));
 const plan = prepareSyntheticBatchPlan({
   snapshot_id: 'synthetic-ydb-batch-import',
-  tables: { fam_notification_reads: fixtureRows },
+  tables: { fam_favorites: [], fam_notification_reads: fixtureRows },
 }, { batchSize: 2 });
 assert.equal(plan.ok, true);
 const driver = new Driver('grpc://127.0.0.1:2136/local');
@@ -34,6 +34,26 @@ try {
       }
     },
   });
+  const unbound = await writer.commitBatch({
+    plan, expectedPlanDigest: plan.plan_digest, table: 'fam_notification_reads', offset: 0,
+    batchRows: fixtureRows.slice(0, 2), writeRows: async () => {}, verifyRows: async () => true,
+  });
+  assert.equal(unbound.code, 'PLAN_NOT_BOUND', 'target rows cannot be written before the run manifest is committed');
+  assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code, 'SYNTHETIC_PLAN_BOUND');
+  assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code, 'SYNTHETIC_PLAN_REPLAY_VERIFIED');
+  const boundTables = (await sql`SELECT table_name, row_count, batch_count, plan_digest
+    FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id} ORDER BY table_name;`)[0];
+  assert.deepEqual(boundTables.map(row => [row.table_name, Number(row.row_count), Number(row.batch_count)]), [
+    ['fam_favorites', 0, 0],
+    ['fam_notification_reads', fixtureRows.length, plan.batch_count],
+  ], 'the manifest explicitly binds empty and non-empty tables');
+  assert.ok(boundTables.every(row => row.plan_digest === plan.plan_digest));
+  const substitutedPlan = prepareSyntheticBatchPlan({
+    snapshot_id: plan.snapshot_id,
+    tables: { fam_favorites: [{ id: 'synthetic-changed-row' }], fam_notification_reads: fixtureRows },
+  }, { batchSize: 2 });
+  assert.equal((await writer.initializePlan({ plan: substitutedPlan, expectedPlanDigest: substitutedPlan.plan_digest })).code,
+    'STORED_PLAN_MISMATCH', 'the same snapshot id cannot be rebound to a changed plan');
   const writeRows = async (tx, batchRows) => {
     for (const row of batchRows) {
       await tx`INSERT INTO fam_notification_reads (user_id, notification_key, read_at)
@@ -88,6 +108,8 @@ try {
   await sql.begin(async tx => {
     await tx`DELETE FROM fam_notification_reads WHERE user_id = ${userId};`;
     await tx`DELETE FROM fam_migration_rehearsal_batches WHERE snapshot_id = ${plan.snapshot_id};`;
+    await tx`DELETE FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id};`;
+    await tx`DELETE FROM fam_migration_rehearsal_plans WHERE snapshot_id = ${plan.snapshot_id};`;
   });
 } finally {
   await driver.close();

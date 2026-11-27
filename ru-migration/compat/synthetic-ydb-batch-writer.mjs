@@ -20,6 +20,57 @@ export function createSyntheticYdbBatchWriter({ sql, beforeCheckpoint = async ()
   }
 
   return Object.freeze({
+    async initializePlan({ plan, expectedPlanDigest } = {}) {
+      if (!verifySyntheticBatchRecovery(plan, [], -1, expectedPlanDigest).ok) return fail('INVALID_BATCH_PLAN');
+      return sql.begin(async tx => {
+        const planRows = rows(await tx`SELECT plan_digest, table_count, batch_count
+          FROM fam_migration_rehearsal_plans WHERE snapshot_id = ${plan.snapshot_id};`);
+        const tableRows = rows(await tx`SELECT table_name, row_count, batch_count, plan_digest
+          FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id};`);
+        if (planRows.length > 1 || tableRows.length > plan.table_count) return fail('INVALID_STORED_PLAN');
+        if (planRows.length && (planRows[0].plan_digest !== expectedPlanDigest
+            || Number(planRows[0].table_count) !== plan.table_count
+            || Number(planRows[0].batch_count) !== plan.batch_count)) return fail('STORED_PLAN_MISMATCH');
+
+        const expectedTables = plan.table_counts.map(item => ({
+          table: item.table,
+          count: item.count,
+          batches: plan.batches.filter(batch => batch.table === item.table).length,
+        }));
+        const storedTables = new Map();
+        for (const item of tableRows) {
+          if (storedTables.has(item.table_name)) return fail('DUPLICATE_STORED_PLAN_TABLE');
+          storedTables.set(item.table_name, {
+            count: Number(item.row_count),
+            batches: Number(item.batch_count),
+            digest: item.plan_digest,
+          });
+        }
+        if (storedTables.size && (storedTables.size !== expectedTables.length
+            || expectedTables.some(item => {
+              const stored = storedTables.get(item.table);
+              return !stored || stored.count !== item.count || stored.batches !== item.batches
+                || stored.digest !== expectedPlanDigest;
+            }))) return fail('STORED_PLAN_TABLES_MISMATCH');
+        if (!planRows.length && storedTables.size) return fail('ORPHANED_STORED_PLAN_TABLES');
+
+        if (!planRows.length) {
+          await tx`INSERT INTO fam_migration_rehearsal_plans
+            (snapshot_id, plan_digest, table_count, batch_count, created_at)
+            VALUES (${plan.snapshot_id}, ${expectedPlanDigest}, Unwrap(CAST(${plan.table_count} AS Uint32)),
+              Unwrap(CAST(${plan.batch_count} AS Uint32)), CurrentUtcTimestamp());`;
+          for (const item of expectedTables) {
+            await tx`INSERT INTO fam_migration_rehearsal_plan_tables
+              (snapshot_id, table_name, row_count, batch_count, plan_digest, created_at)
+              VALUES (${plan.snapshot_id}, ${item.table}, Unwrap(CAST(${item.count} AS Uint32)),
+                Unwrap(CAST(${item.batches} AS Uint32)), ${expectedPlanDigest}, CurrentUtcTimestamp());`;
+          }
+          return { ok: true, code: 'SYNTHETIC_PLAN_BOUND', table_count: plan.table_count, live_cutover_authorized: false };
+        }
+        if (!tableRows.length && expectedTables.length) return fail('MISSING_STORED_PLAN_TABLES');
+        return { ok: true, code: 'SYNTHETIC_PLAN_REPLAY_VERIFIED', table_count: plan.table_count, live_cutover_authorized: false };
+      });
+    },
     async commitBatch({ plan, expectedPlanDigest, table, offset, batchRows, writeRows, verifyRows } = {}) {
       if (!verifySyntheticBatchRecovery(plan, [], -1, expectedPlanDigest).ok
           || typeof table !== 'string' || !Number.isSafeInteger(offset) || offset < 0
@@ -35,6 +86,20 @@ export function createSyntheticYdbBatchWriter({ sql, beforeCheckpoint = async ()
         || hash(JSON.stringify(batchRows)) !== batch.digest) return fail('BATCH_DIGEST_MISMATCH');
 
       return sql.begin(async tx => {
+        const boundPlan = rows(await tx`SELECT plan_digest, table_count, batch_count
+          FROM fam_migration_rehearsal_plans WHERE snapshot_id = ${plan.snapshot_id};`);
+        if (boundPlan.length !== 1 || boundPlan[0].plan_digest !== expectedPlanDigest
+            || Number(boundPlan[0].table_count) !== plan.table_count
+            || Number(boundPlan[0].batch_count) !== plan.batch_count) return fail('PLAN_NOT_BOUND');
+        const boundTable = rows(await tx`SELECT row_count, batch_count, plan_digest
+          FROM fam_migration_rehearsal_plan_tables WHERE snapshot_id = ${plan.snapshot_id}
+            AND table_name = ${table};`);
+        const expectedTable = plan.table_counts.find(item => item.table === table);
+        if (boundTable.length !== 1 || !expectedTable
+            || Number(boundTable[0].row_count) !== expectedTable.count
+            || Number(boundTable[0].batch_count) !== plan.batches.filter(item => item.table === table).length
+            || boundTable[0].plan_digest !== expectedPlanDigest) return fail('PLAN_TABLE_NOT_BOUND');
+
         const stored = rows(await tx`SELECT table_name, batch_offset, row_count, batch_digest
           FROM fam_migration_rehearsal_batches WHERE snapshot_id = ${plan.snapshot_id};`);
         const receiptMap = new Map();
