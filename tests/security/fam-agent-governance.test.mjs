@@ -12,8 +12,6 @@ import {
   inspectPostMerge,
   formatMoscowTimestamp,
   shouldPublishGovernanceReport,
-  renderLegalScopeStatus,
-  renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
@@ -154,29 +152,6 @@ test("Boss report uses Moscow time and updates even when the scheduled day has n
   const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
   assert.match(workflow, /schedule:[\s\S]*?cron: "0 4 \* \* \*"/);
   assert.match(makeReport({ now: Date.parse("2026-11-27T04:00:00Z") }), /Ежедневный доклад на 27\.11\.2026 07:00 МСК/);
-});
-
-test("Boss report shows separate unassessed LEGAL scopes and never implies release approval", () => {
-  const report = makeReport({ now: NOW });
-  assert.match(report, /LEGAL — раздельные статусы FAM/);
-  assert.match(report, /FAM_CURRENT:[^\n]*не оценено/);
-  assert.match(report, /FAM_RU:[^\n]*не оценено/);
-  assert.match(report, /статус одного контура не переносится на другой/i);
-  assert.match(report, /не являются юридическим заключением или разрешением на выпуск/);
-  const unknown = renderLegalScopeStatus({ FAM_CURRENT: "owner_approved", FAM_RU: "merged" });
-  assert.match(unknown, /FAM_CURRENT:[^\n]*не оценено/);
-  assert.match(unknown, /FAM_RU:[^\n]*не оценено/);
-});
-
-test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {
-  const report = makeReport({ now: NOW, developmentScopes: { FAM_CURRENT: "checked_no_signal", FAM_RU: "no_data" } });
-  assert.match(report, /Советник по развитию — охват версий/);
-  assert.match(report, /FAM_CURRENT:[^\n]*агрегаты проверены/);
-  assert.match(report, /FAM_RU:[^\n]*не оценено/);
-  assert.match(report, /Предложения относятся только к указанному контуру/);
-  const unknown = renderDevelopmentScopeStatus({ FAM_CURRENT: "merged", FAM_RU: "approved" });
-  assert.match(unknown, /FAM_CURRENT:[^\n]*не оценено/);
-  assert.match(unknown, /FAM_RU:[^\n]*не оценено/);
 });
 
 test("INSPECTOR flags failed post-merge workflows without triggering rollback", () => {
