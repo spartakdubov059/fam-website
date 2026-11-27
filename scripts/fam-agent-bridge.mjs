@@ -1,5 +1,7 @@
 import { appendFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { buildLegalConsultation } from "./fam-legal-consultation.mjs";
 
 export const TASK_PROMPTS = Object.freeze({
   audit_frontend_runtime:
@@ -47,7 +49,7 @@ const INSPECTOR_SIGNAL_CODES = new Set([
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function validateClaimResponse(data) {
+export function validateClaimResponse(data, revision) {
   if (!data || typeof data !== "object" || data.ok !== true) {
     throw new Error("Bridge claim failed.");
   }
@@ -64,6 +66,11 @@ export function validateClaimResponse(data) {
     !Number.isSafeInteger(task.occurrences) ||
     task.occurrences < 0 || task.occurrences > 1000
   ) throw new Error("Bridge returned an invalid task.");
+  const legalConsultation = buildLegalConsultation({
+    scope: "FAM_CURRENT",
+    revision,
+    changedFiles: [],
+  });
   return Object.freeze({
     id: task.id,
     task_key: task.task_key,
@@ -72,7 +79,9 @@ export function validateClaimResponse(data) {
       " Карточка задачи: " + JSON.stringify(TASK_CONTRACT) +
       ". Контекст: код события " + task.event_code +
       ", раздел " + task.page_area +
-      ", агрегированное число событий " + task.occurrences + ".",
+      ", агрегированное число событий " + task.occurrences + "." +
+      " Предварительная консультация LEGAL (не юридическое заключение и не разрешение на выпуск): " +
+      JSON.stringify(legalConsultation),
   });
 }
 
@@ -145,8 +154,9 @@ async function main() {
   const token = process.env.FAM_AGENT_WORKER_TOKEN || "";
   if (mode === "claim") {
     if (!url || !token) throw new Error("Safe task bridge is unavailable; model execution is blocked.");
+    const revision = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     const data = await bridgeRequest({ url, token, body: { action: "claim" } });
-    const task = validateClaimResponse(data);
+    const task = validateClaimResponse(data, revision);
     if (!task) {
       if (output) appendFileSync(output, "claimed=false\n");
       console.log("No queued coder task; model download and execution are skipped.");

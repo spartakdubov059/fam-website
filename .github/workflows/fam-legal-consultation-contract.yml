@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "scripts/fam-legal-consultation.mjs"
+      - "scripts/fam-agent-bridge.mjs"
       - "tests/security/fam-legal-consultation.test.mjs"
+      - "tests/security/fam-agent-bridge.test.mjs"
       - ".github/workflows/fam-legal-consultation-contract.yml"
 
 permissions:
@@ -22,4 +24,4 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - run: node --test tests/security/fam-legal-consultation.test.mjs
+      - run: node --test tests/security/fam-legal-consultation.test.mjs tests/security/fam-agent-bridge.test.mjs

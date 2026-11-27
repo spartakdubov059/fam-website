@@ -13,6 +13,7 @@ import {
 } from "../../scripts/fam-agent-bridge.mjs";
 
 const id = "123e4567-e89b-42d3-a456-426614174000";
+const revision = "abcdef0123456789abcdef0123456789abcdef01";
 
 test("accepts a single allowlisted aggregate task", () => {
   const task = validateClaimResponse({
@@ -24,7 +25,7 @@ test("accepts a single allowlisted aggregate task", () => {
       page_area: "other",
       occurrences: 7,
     },
-  });
+  }, revision);
   assert.equal(task.id, id);
   assert.match(task.prompt, /js_runtime/);
   assert.match(task.prompt, /index\.html/);
@@ -36,13 +37,18 @@ test("accepts a single allowlisted aggregate task", () => {
   assert.match(task.prompt, /required_checks/);
   assert.ok(task.contract.acceptance.includes("При отсутствии подтверждённого дефекта вернуть no_patch."));
   assert.ok(task.contract.limits.some((item) => item.includes("Нет секретов")));
+  assert.match(task.prompt, /Предварительная консультация LEGAL/);
+  assert.match(task.prompt, /"scope":"FAM_CURRENT"/);
+  assert.match(task.prompt, /"revision":"abcdef0123456789abcdef0123456789abcdef01"/);
+  assert.match(task.prompt, /"legal_opinion":false/);
+  assert.match(task.prompt, /"release_authority":false/);
 });
 
 test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mismatch", () => {
   const task = validateClaimResponse({
     ok: true,
     task: { id, task_key: "audit_agent_infrastructure", event_code: "synthetic_ci_workflow_failure", page_area: "agent_infrastructure", occurrences: 1 },
-  });
+  }, revision);
   assert.match(task.prompt, /без чтения журналов GitHub/);
   assert.throws(() => validateClaimResponse({
     ok: true,
@@ -56,6 +62,13 @@ test("accepts only fixed INSPECTOR infrastructure signals and rejects scope mism
 
 test("accepts an empty queue", () => {
   assert.equal(validateClaimResponse({ ok: true, task: null }), null);
+});
+
+test("legal preflight fails closed when the checkout revision is missing", () => {
+  assert.throws(() => validateClaimResponse({
+    ok: true,
+    task: { id, task_key: "audit_accessibility", event_code: "js_runtime", page_area: "other", occurrences: 1 },
+  }), /exact 40-character revision/);
 });
 
 test("rejects unapproved task keys and malformed task identifiers", () => {
