@@ -14,8 +14,13 @@ function rows(result) {
 
 // Synthetic YDB rehearsal writer. Domain row mapping stays explicit in each caller;
 // receipts and target rows commit together in one serializable transaction.
-export function createSyntheticYdbBatchWriter({ sql, beforeCheckpoint = async () => {} } = {}) {
-  if (typeof sql !== 'function' || typeof sql.begin !== 'function' || typeof beforeCheckpoint !== 'function') {
+export function createSyntheticYdbBatchWriter({
+  sql,
+  beforeCheckpoint = async () => {},
+  beforePlanCommit = async () => {},
+} = {}) {
+  if (typeof sql !== 'function' || typeof sql.begin !== 'function'
+      || typeof beforeCheckpoint !== 'function' || typeof beforePlanCommit !== 'function') {
     throw new TypeError('transactional YDB query client and checkpoint hook are required');
   }
 
@@ -65,6 +70,7 @@ export function createSyntheticYdbBatchWriter({ sql, beforeCheckpoint = async ()
               VALUES (${plan.snapshot_id}, ${item.table}, Unwrap(CAST(${item.count} AS Uint32)),
                 Unwrap(CAST(${item.batches} AS Uint32)), ${expectedPlanDigest}, CurrentUtcTimestamp());`;
           }
+          await beforePlanCommit({ snapshotId: plan.snapshot_id, plan });
           return { ok: true, code: 'SYNTHETIC_PLAN_BOUND', table_count: plan.table_count, live_cutover_authorized: false };
         }
         if (!tableRows.length && expectedTables.length) return fail('MISSING_STORED_PLAN_TABLES');

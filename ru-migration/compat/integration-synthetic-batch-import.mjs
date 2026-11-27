@@ -14,6 +14,7 @@ const plan = prepareSyntheticBatchPlan({
 assert.equal(plan.ok, true);
 const driver = new Driver('grpc://127.0.0.1:2136/local');
 let failOnce = true;
+let failPlanOnce = true;
 
 try {
   await driver.ready();
@@ -27,6 +28,12 @@ try {
 
   const writer = createSyntheticYdbBatchWriter({
     sql,
+    beforePlanCommit: async () => {
+      if (failPlanOnce) {
+        failPlanOnce = false;
+        throw new Error('synthetic interruption before plan commit');
+      }
+    },
     beforeCheckpoint: async ({ offset }) => {
       if (offset === 2 && failOnce) {
         failOnce = false;
@@ -39,6 +46,14 @@ try {
     batchRows: fixtureRows.slice(0, 2), writeRows: async () => {}, verifyRows: async () => true,
   });
   assert.equal(unbound.code, 'PLAN_NOT_BOUND', 'target rows cannot be written before the run manifest is committed');
+  await assert.rejects(
+    () => writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest }),
+    error => error?.cause?.message === 'synthetic interruption before plan commit',
+  );
+  assert.equal((await sql`SELECT snapshot_id FROM fam_migration_rehearsal_plans
+    WHERE snapshot_id = ${plan.snapshot_id};`)[0].length, 0, 'interrupted manifest header rolls back');
+  assert.equal((await sql`SELECT table_name FROM fam_migration_rehearsal_plan_tables
+    WHERE snapshot_id = ${plan.snapshot_id};`)[0].length, 0, 'interrupted table manifest rolls back');
   assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code, 'SYNTHETIC_PLAN_BOUND');
   assert.equal((await writer.initializePlan({ plan, expectedPlanDigest: plan.plan_digest })).code, 'SYNTHETIC_PLAN_REPLAY_VERIFIED');
   const boundTables = (await sql`SELECT table_name, row_count, batch_count, plan_digest
