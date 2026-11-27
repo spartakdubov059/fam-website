@@ -40,6 +40,7 @@ declare
   v_second record;
   v_summary record;
   v_second_scope record;
+  v_ru record;
   v_chain_ok boolean;
   v_failed boolean := false;
 begin
@@ -97,6 +98,17 @@ begin
       )::text, 'UTF8'), 'sha256'), 'hex')
   ) into v_chain_ok;
   if not v_chain_ok then raise exception 'archive chain link or hash verification failed'; end if;
+
+  select * into v_ru from public.append_fam_legal_evidence_observation(
+    'FAM_RU', repeat('d', 40), 'official_source_review', 'official_portal_government',
+    'https://publication.pravo.gov.ru', 'source_unavailable', null, null);
+  if not exists (
+    select 1 from private.fam_legal_evidence_archive ru_record
+    where ru_record.id = v_ru.record_id and ru_record.scope = 'FAM_RU'
+      and ru_record.previous_record_id is null and ru_record.previous_record_sha256 = ''
+      and ru_record.priority = 'unassessed'
+      and ru_record.decision = 'pending_human_review'
+  ) then raise exception 'FAM_RU archive chain was not isolated from FAM_CURRENT'; end if;
 
   select * into v_second from public.append_fam_legal_evidence_observation(
     'FAM_CURRENT', repeat('c', 40), 'official_source_review', 'official_portal_government',
