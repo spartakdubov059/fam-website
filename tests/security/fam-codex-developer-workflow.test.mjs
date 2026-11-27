@@ -362,6 +362,9 @@ test("stacked rollback fixtures preserve deterministic ordering without assuming
 });
 
 test("created PR is recorded from its job output when CI is unavailable so retries do not duplicate it", () => {
+  assert.match(workflow, /gh pr list --state open --search "in:body \$FAM_CODER_TASK_ID"/);
+  assert.match(workflow, /scripts\/find-fam-agent-task-pr\.mjs/);
+  assert.match(workflow, /steps\.pr\.outputs\.reused_existing != 'true'/);
   const recordJob = workflow.split("  record_pr:\n")[1] || "";
   assert.match(recordJob, /needs\.prepare_review\.outputs\.pr_number != ''/);
   const marker = "        run: |\n";

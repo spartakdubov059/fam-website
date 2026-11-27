@@ -534,6 +534,18 @@ jobs:
           FAM_CODER_TASK_ID: ${{ needs.generate.outputs.fam_task_id }}
         run: |
           set -euo pipefail
+          OPEN_PR_CANDIDATES="$(gh pr list --state open --search "in:body $FAM_CODER_TASK_ID" --json number,url,body --limit 100)"
+          EXISTING_PR="$(printf '%s\n' "$OPEN_PR_CANDIDATES" | node scripts/find-fam-agent-task-pr.mjs "$FAM_CODER_TASK_ID")"
+          if [[ -n "$EXISTING_PR" ]]; then
+            IFS=$'\t' read -r PR_NUMBER PR_URL <<< "$EXISTING_PR"
+            [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,7}$ ]]
+            [[ "$PR_URL" == "https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER}" ]]
+            echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+            echo "reused_existing=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "reused_existing=false" >> "$GITHUB_OUTPUT"
           node scripts/render-fam-agent-report.mjs \
             "$RUNNER_TEMP/fam-agent/summary.json" \
             "$RUNNER_TEMP/fam-agent/verified-report.md" \
@@ -597,6 +609,7 @@ jobs:
 
       - name: Дождаться независимых проверок PR и оставить его на утверждение владельца
         id: branch_ci
+        if: success() && steps.pr.outputs.reused_existing != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ steps.pr.outputs.pr_url }}
