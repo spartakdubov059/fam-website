@@ -369,6 +369,12 @@ test("created PR is recorded from its job output when CI is unavailable so retri
   assert.match(workflow, /REUSED_EXISTING: \$\{\{ steps\.pr\.outputs\.reused_existing \}\}/);
   assert.match(workflow, /BRANCH="\$PR_HEAD_BRANCH"/);
   assert.match(workflow, /BRANCH_SHA="\$PR_HEAD_SHA"/);
+  const branchCi = workflow.split("      - name: Дождаться независимых проверок PR и оставить его на утверждение владельца")[1]?.split("      - name: Сохранить отчёт о PR")[0] || "";
+  assert.ok(branchCi);
+  assert.match(branchCi, /gh pr view "\$PR_URL" --json headRefOid --jq \.headRefOid/);
+  assert.match(branchCi, /TEST_RESULT="\$\(gh run view "\$TEST_RUN_ID" --json conclusion,headSha/);
+  assert.match(branchCi, /TEST_HEAD_SHA" != "\$BRANCH_SHA/);
+  assert.match(branchCi, /Ревизия PR изменилась во время проверки/);
   assert.match(workflow, /if: success\(\)\n\s+env:\n\s+GH_TOKEN:/);
   assert.doesNotMatch(workflow, /if: success\(\) && steps\.pr\.outputs\.reused_existing/);
   const marker = "        run: |\n";
