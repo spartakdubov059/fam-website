@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
@@ -210,7 +211,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -266,6 +267,9 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     lines.push("- **" + clean(p.role) + "**: " + clean(p.reason, 300) +
       ". Права: " + clean(p.permissions, 250) + ".");
   }
+  lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
+  lines.push("", renderDevelopmentScopeStatus(developmentScopes));
+  lines.push("", renderLegalScopeStatus(legalScopes));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
     "- Сигналы основаны на метаданных GitHub, не на частных сообщениях пользователей.",
@@ -275,6 +279,39 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     "- Этот процесс не имеет прав менять код, закрывать PR, выполнять merge или публиковать сайт.",
     "");
   return lines.join("\n");
+}
+
+export function renderDevelopmentScopeStatus(statuses = {}) {
+  const labels = {
+    confirmed: "агрегаты проверены, подготовлено только предложение",
+    checked_no_signal: "агрегаты проверены, порог для гипотезы не достигнут",
+    no_data: "не оценено: источник агрегатов этого контура не подключён",
+  };
+  const current = labels[statuses?.FAM_CURRENT] || labels.no_data;
+  const ru = labels[statuses?.FAM_RU] || labels.no_data;
+  return [
+    "## Советник по развитию — охват версий",
+    "- **FAM_CURRENT:** " + current + ".",
+    "- **FAM_RU:** " + ru + ".",
+    "Предложения относятся только к указанному контуру и не являются изменениями продукта.",
+  ].join("\n");
+}
+
+export function renderLegalScopeStatus(statuses = {}) {
+  const labels = {
+    not_assessed: "не оценено: подтверждённый источник статуса не подключён",
+    source_unavailable: "источник недоступен; готовность не подтверждена",
+    evidence_pending_human_review: "свидетельства ожидают независимой проверки человека",
+    criteria_evidenced_pending_release_decision: "критерии подтверждены; решение о выпуске не принято",
+  };
+  const current = labels[statuses?.FAM_CURRENT] || labels.not_assessed;
+  const ru = labels[statuses?.FAM_RU] || labels.not_assessed;
+  return [
+    "## LEGAL — раздельные статусы FAM",
+    "- **FAM_CURRENT:** " + current + ".",
+    "- **FAM_RU:** " + ru + ".",
+    "Статус одного контура не переносится на другой. Эти отметки не являются юридическим заключением или разрешением на выпуск.",
+  ].join("\n");
 }
 
 async function api(path, token, options = {}) {
@@ -367,6 +404,8 @@ export async function main() {
   let queueHealth = null;
   let queueLink = "not_configured";
   let agentMetrics = [];
+  let developmentAdvisor = buildDevelopmentAdvisor([]);
+  let developmentAdvisorLink = "not_configured";
   if (bridgeUrl && bridgeToken) {
     try {
       queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
@@ -381,6 +420,19 @@ export async function main() {
         severity: "medium",
         count: 1,
         message: "Не удалось получить защищённые агрегаты очереди Supabase",
+      });
+    }
+    try {
+      const snapshots = await fetchDevelopmentAdvisorSnapshots({ url: bridgeUrl, token: bridgeToken });
+      developmentAdvisor = buildDevelopmentAdvisor(snapshots);
+      developmentAdvisorLink = "connected";
+    } catch {
+      developmentAdvisorLink = "unavailable";
+      warnings.push({
+        code: "development_advisor_metrics_unavailable",
+        severity: "medium",
+        count: 1,
+        message: "Не удалось получить ограниченные дневные агрегаты Советника по развитию",
       });
     }
   } else if (bridgeUrl || bridgeToken) {
@@ -466,15 +518,27 @@ export async function main() {
       evidence_count: proposals.length,
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
     },
-    development_advisor: {
+    legal: {
       state: "no_data",
       evidence_count: 0,
-      detail: "В исходниках есть школьные правила предложений по агрегатам; штаб не получает их результаты, поэтому работа Советника не подтверждена.",
+      detail: "аутентифицированные статусы юридической проверки по FAM_CURRENT и FAM_RU ещё не подключены",
+    },
+    development_advisor: {
+      state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
+      evidence_count: developmentAdvisorLink === "connected" ? developmentAdvisor.proposals.length : 0,
+      detail: developmentAdvisorLink === "connected"
+        ? "проверены только дневные агрегаты объявлений FAM_CURRENT; гипотезы переданы Боссу без автоматической постановки задач"
+        : "агрегированный источник Советника не подключён или недоступен; работа не подтверждена",
     },
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics, staffSignals, count: selected.length,
+    qwenMetrics, developmentAdvisor,
+    developmentScopes: {
+      FAM_CURRENT: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
+      FAM_RU: "no_data",
+    },
+    staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
