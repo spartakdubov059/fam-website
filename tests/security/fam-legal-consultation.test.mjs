@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import { buildLegalConsultation } from "../../scripts/fam-legal-consultation.mjs";
 
 const REVISION = "a".repeat(40);
+const BRANCH = "codex/legal-synthetic-test";
+const consult = (input) => buildLegalConsultation({ branch: BRANCH, ...input });
 
 test("ordinary FAM_CURRENT changes receive advisory guidance without a migration gate", () => {
-  const advice = buildLegalConsultation({ scope: "FAM_CURRENT", revision: REVISION, changedFiles: ["docs/technical-note.md"] });
+  const advice = consult({ scope: "FAM_CURRENT", revision: REVISION, changedFiles: ["docs/technical-note.md"] });
+  assert.equal(advice.branch, BRANCH);
   assert.equal(advice.status, "no_trigger_detected_not_legal_approval");
   assert.equal(advice.human_review_required, false);
   assert.equal(advice.legal_opinion, false);
@@ -19,7 +22,7 @@ test("ordinary FAM_CURRENT changes receive advisory guidance without a migration
 });
 
 test("sensitive paths produce category-only evidence and keep the review pending", () => {
-  const advice = buildLegalConsultation({
+  const advice = consult({
     scope: "FAM_CURRENT", revision: REVISION,
     changedFiles: ["supabase/migrations/adjust_student_policy.sql", "supabase/functions/moderate/index.ts"],
   });
@@ -43,10 +46,10 @@ test("sensitive paths produce category-only evidence and keep the review pending
 });
 
 test("FAM_RU review stays separate and shared changes get two explicit scopes", () => {
-  const ru = buildLegalConsultation({ scope: "FAM_RU", revision: REVISION });
+  const ru = consult({ scope: "FAM_RU", revision: REVISION });
   assert.equal(ru.human_review_required, true);
   assert.deepEqual(ru.version_scopes, ["FAM_RU"]);
-  const shared = buildLegalConsultation({ scope: "SHARED", revision: REVISION });
+  const shared = consult({ scope: "SHARED", revision: REVISION });
   assert.deepEqual(shared.version_scopes, ["FAM_CURRENT", "FAM_RU"]);
   assert.deepEqual(shared.scope_assessments.map(({ scope, status }) => ({ scope, status })), [
     { scope: "FAM_CURRENT", status: "not_assessed" },
@@ -57,7 +60,7 @@ test("FAM_RU review stays separate and shared changes get two explicit scopes", 
 });
 
 test("the bridge gets advisory risk topics from the allowlisted task scope", () => {
-  const advice = buildLegalConsultation({
+  const advice = consult({
     scope: "FAM_CURRENT",
     revision: REVISION,
     taskKey: "audit_agent_infrastructure",
@@ -68,7 +71,7 @@ test("the bridge gets advisory risk topics from the allowlisted task scope", () 
   assert.equal(advice.status, "advisory_review_pending");
   assert.equal(advice.legal_opinion, false);
   assert.equal(advice.release_authority, false);
-  assert.throws(() => buildLegalConsultation({
+  assert.throws(() => consult({
     scope: "FAM_CURRENT",
     revision: REVISION,
     taskKey: "untrusted_task",
@@ -76,7 +79,17 @@ test("the bridge gets advisory risk topics from the allowlisted task scope", () 
 });
 
 test("missing scope, invalid revision and oversized evidence fail closed", () => {
-  assert.throws(() => buildLegalConsultation({ revision: REVISION }), /explicit product scope/);
-  assert.throws(() => buildLegalConsultation({ scope: "FAM_CURRENT", revision: "main" }), /exact 40-character revision/);
-  assert.throws(() => buildLegalConsultation({ scope: "FAM_CURRENT", revision: REVISION, changedFiles: Array(201).fill("index.html") }), /Invalid changed-file evidence/);
+  assert.throws(() => consult({ revision: REVISION }), /explicit product scope/);
+  assert.throws(() => consult({ scope: "FAM_CURRENT", revision: "main" }), /exact 40-character revision/);
+  assert.throws(() => consult({ scope: "FAM_CURRENT", revision: REVISION, changedFiles: Array(201).fill("index.html") }), /Invalid changed-file evidence/);
+});
+
+test("branch and exact revision must be supplied as a safe pair of scope metadata", () => {
+  assert.throws(() => buildLegalConsultation({ scope: "FAM_CURRENT", revision: REVISION }), /exact safe branch ref/);
+  for (const branch of ["", "../main", "main..pr", "main//test", "main@{1}", "main.lock", "main?x"]) {
+    assert.throws(() => buildLegalConsultation({ scope: "FAM_CURRENT", branch, revision: REVISION }), /exact safe branch ref/);
+  }
+  const result = consult({ scope: "FAM_CURRENT", revision: REVISION });
+  assert.equal(result.branch, BRANCH);
+  assert.equal(result.revision, REVISION);
 });
