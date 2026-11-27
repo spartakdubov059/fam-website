@@ -11,6 +11,7 @@ on:
       - "supabase/migrations/*fam_agent_task_metrics.sql"
       - "supabase/migrations/*fam_qwen_retry_recovery.sql"
       - "scripts/fam-integration-coordinator.mjs"
+      - "scripts/fam-agent-lifecycle.mjs"
       - "tests/security/fam-agent-governance.test.mjs"
       - "tests/security/fam-agent-metrics.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
@@ -69,5 +70,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}
+          FAM_AGENT_INTEGRATOR_TOKEN: ${{ secrets.FAM_AGENT_INTEGRATOR_TOKEN }}
           FAM_INSPECTOR_SYNTHETIC_SIGNAL: ${{ inputs.synthetic_signal || 'none' }}
         run: node scripts/fam-agent-governance.mjs
