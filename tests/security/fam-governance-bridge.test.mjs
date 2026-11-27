@@ -7,6 +7,8 @@ import {
   inspectQueueHealth,
   validateAgentMetricsResponse,
   fetchAgentMetrics,
+  validateDevelopmentAdvisorResponse,
+  fetchDevelopmentAdvisorSnapshots,
   enqueueInspectorTask,
   mapInspectorWarning,
   validateInspectorEnqueueResponse,
@@ -95,6 +97,25 @@ test("agent metrics client sends a fixed authenticated read-only action", async 
   assert.deepEqual(result, [{ agent_key: "technical", status: "completed", count: 2 }]);
   assert.deepEqual(JSON.parse(request.options.body), { action: "metrics" });
   assert.throws(() => validateAgentMetricsResponse({ ok: true, metrics: [{ agent_key: "technical", status: "completed", count: 1, user_id: "x" }] }));
+});
+
+test("development advisor bridge exposes only bounded listing aggregates", async () => {
+  let request;
+  const snapshots = [{ report_date: "2026-11-27", generated_at: "2026-11-27T06:00:00Z", active_listings: 12, new_listings_24h: 2 }];
+  const result = await fetchDevelopmentAdvisorSnapshots({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token",
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ ok: true, snapshots }) };
+    },
+  });
+  assert.deepEqual(result, snapshots);
+  assert.deepEqual(JSON.parse(request.body), { action: "development_advisor_metrics" });
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], user_id: "private" }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings: -1 }] }));
+  assert.match(edge, /get_fam_development_advisor_snapshots/);
+  assert.match(workflow, /fam-development-advisor\.test\.mjs/);
 });
 
 test("INSPECTOR maps only high-confidence technical warnings to a fixed task allowlist", () => {

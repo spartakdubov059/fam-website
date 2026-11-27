@@ -175,6 +175,23 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, metrics: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
+    if (body.action === "development_advisor_metrics" && Object.keys(body).length === 1) {
+      const snapshots = await rpc("get_fam_development_advisor_snapshots", { p_days: 7 });
+      if (!Array.isArray(snapshots) || snapshots.length > 7 || snapshots.some((row) =>
+        !row || typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
+        typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
+        !Number.isSafeInteger(row.active_listings) || row.active_listings < 0 || row.active_listings > 10_000_000 ||
+        !Number.isSafeInteger(row.new_listings_24h) || row.new_listings_24h < 0 || row.new_listings_24h > 10_000_000
+      )) return json({ ok: false, error: "invalid_development_advisor_metrics" }, 502);
+      const safe = snapshots.map((row) => ({
+        report_date: row.report_date,
+        generated_at: row.generated_at,
+        active_listings: row.active_listings,
+        new_listings_24h: row.new_listings_24h,
+      }));
+      return json({ ok: true, snapshots: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
+    }
+
     if (body.action === "claim" && Object.keys(body).length === 1) {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,

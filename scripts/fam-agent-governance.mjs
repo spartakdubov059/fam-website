@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
 export const REPORT_MARKER = "<!-- fam-governance-control-tower-v1 -->";
@@ -210,7 +211,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -266,6 +267,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     lines.push("- **" + clean(p.role) + "**: " + clean(p.reason, 300) +
       ". Права: " + clean(p.permissions, 250) + ".");
   }
+  lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
     "- Сигналы основаны на метаданных GitHub, не на частных сообщениях пользователей.",
@@ -367,6 +369,8 @@ export async function main() {
   let queueHealth = null;
   let queueLink = "not_configured";
   let agentMetrics = [];
+  let developmentAdvisor = buildDevelopmentAdvisor([]);
+  let developmentAdvisorLink = "not_configured";
   if (bridgeUrl && bridgeToken) {
     try {
       queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
@@ -381,6 +385,19 @@ export async function main() {
         severity: "medium",
         count: 1,
         message: "Не удалось получить защищённые агрегаты очереди Supabase",
+      });
+    }
+    try {
+      const snapshots = await fetchDevelopmentAdvisorSnapshots({ url: bridgeUrl, token: bridgeToken });
+      developmentAdvisor = buildDevelopmentAdvisor(snapshots);
+      developmentAdvisorLink = "connected";
+    } catch {
+      developmentAdvisorLink = "unavailable";
+      warnings.push({
+        code: "development_advisor_metrics_unavailable",
+        severity: "medium",
+        count: 1,
+        message: "Не удалось получить ограниченные дневные агрегаты Советника по развитию",
       });
     }
   } else if (bridgeUrl || bridgeToken) {
@@ -467,14 +484,16 @@ export async function main() {
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
     },
     development_advisor: {
-      state: "no_data",
-      evidence_count: 0,
-      detail: "В исходниках есть школьные правила предложений по агрегатам; штаб не получает их результаты, поэтому работа Советника не подтверждена.",
+      state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
+      evidence_count: developmentAdvisorLink === "connected" ? developmentAdvisor.proposals.length : 0,
+      detail: developmentAdvisorLink === "connected"
+        ? "проверены только дневные агрегаты объявлений; гипотезы переданы Боссу без автоматической постановки задач"
+        : "агрегированный источник Советника не подключён или недоступен; работа не подтверждена",
     },
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics, staffSignals, count: selected.length,
+    qwenMetrics, developmentAdvisor, staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
   if (process.env.GITHUB_STEP_SUMMARY) {
