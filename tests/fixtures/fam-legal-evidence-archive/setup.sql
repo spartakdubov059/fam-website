@@ -7,4 +7,5 @@ end $$;
 create schema if not exists private;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+grant usage on schema extensions to service_role;
 grant usage on schema private to authenticated;
