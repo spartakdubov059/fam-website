@@ -49,7 +49,7 @@ const INSPECTOR_SIGNAL_CODES = new Set([
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function validateClaimResponse(data, revision) {
+export function validateClaimResponse(data, revision, branch) {
   if (!data || typeof data !== "object" || data.ok !== true) {
     throw new Error("Bridge claim failed.");
   }
@@ -68,6 +68,7 @@ export function validateClaimResponse(data, revision) {
   ) throw new Error("Bridge returned an invalid task.");
   const legalConsultation = buildLegalConsultation({
     scope: "FAM_CURRENT",
+    branch,
     revision,
     changedFiles: [],
     taskKey: task.task_key,
@@ -157,7 +158,8 @@ async function main() {
     if (!url || !token) throw new Error("Safe task bridge is unavailable; model execution is blocked.");
     const revision = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     const data = await bridgeRequest({ url, token, body: { action: "claim" } });
-    const task = validateClaimResponse(data, revision);
+    const branch = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME || "";
+    const task = validateClaimResponse(data, revision, branch);
     if (!task) {
       if (output) appendFileSync(output, "claimed=false\n");
       console.log("No queued coder task; model download and execution are skipped.");
