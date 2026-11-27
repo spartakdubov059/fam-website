@@ -17,6 +17,13 @@ test("advisor asks for a proposal only after six consecutive aggregate snapshots
   assert.equal(result.proposals.length, 1);
   assert.equal(result.proposals[0].key, "review_listing_discovery");
   assert.equal(result.proposals[0].authority, "recommendation_only");
+  assert.equal(result.proposals[0].scope, "FAM_CURRENT");
+  assert.equal(result.proposals[0].design_brief.status, "proposal_only");
+  assert.equal(result.proposals[0].design_brief.priority, "advisory");
+  assert.ok(result.proposals[0].design_brief.options.some((item) => item.includes("макет")));
+  assert.ok(result.proposals[0].design_brief.acceptance_checks.some((item) => item.includes("независимую QA")));
+  assert.match(renderDevelopmentAdvisor(result), /UX-задание:/);
+  assert.match(renderDevelopmentAdvisor(result), /Критерии:/);
   assert.match(renderDevelopmentAdvisor(result), /гипотеза/);
 });
 

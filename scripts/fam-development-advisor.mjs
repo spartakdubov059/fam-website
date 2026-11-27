@@ -58,6 +58,7 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
   const newListingDrop = previousNew >= 3 && recentNew === 0;
   const proposals = activeDrop || newListingDrop ? [Object.freeze({
     key: "review_listing_discovery",
+    scope: "FAM_CURRENT",
     title: "Проверить, насколько заметен и понятен раздел объявлений",
     evidence: Object.freeze({
       snapshots: REQUIRED_DAYS,
@@ -68,6 +69,27 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
     }),
     hypothesis: "Снижение агрегатов может быть связано с заметностью или понятностью раздела; причина этими счётчиками не устанавливается.",
     next_step: "Предложить владельцу проверку сценария просмотра и добавления объявления; не менять продукт автоматически.",
+    design_brief: Object.freeze({
+      status: "proposal_only",
+      user_scenario: "Ученик с действующей сессией хочет быстро найти объявления и понять, как посмотреть детали или добавить своё.",
+      options: Object.freeze([
+        "Проверить заметность входа в раздел на мобильном и настольном экране.",
+        "Проверить пустое состояние, загрузку и ошибку: понятно ли, что происходит и какой безопасный следующий шаг доступен.",
+        "Сравнить текущий сценарий с одним упрощённым макетом до разработки; не менять Auth и роли.",
+      ]),
+      acceptance_checks: Object.freeze([
+        "Синтетический проход на узком и широком экране находит раздел без поиска по странице.",
+        "При пустом результате и ошибке видны разные понятные состояния.",
+        "Клавиатурный фокус и подписи элементов остаются доступными.",
+        "Любое изменение интерфейса проходит независимую QA и отдельное решение владельца.",
+      ]),
+      risks: Object.freeze([
+        "Счётчики не объясняют причину снижения и не подтверждают проблемы интерфейса.",
+        "Нельзя делать выводы о поведении отдельных учеников или малых групп.",
+      ]),
+      cost: "Только проектная проверка без нового сервиса; трудоёмкость реализации не оценивалась.",
+      priority: "advisory",
+    }),
     authority: "recommendation_only",
   })] : [];
 
@@ -102,6 +124,9 @@ export function renderDevelopmentAdvisor(result) {
         "; новые за сутки — " + proposal.evidence.previous_new_listings_24h_avg +
         " → " + proposal.evidence.recent_new_listings_24h_avg + ".",
       "  Следующий шаг: " + proposal.next_step,
+      "  UX-задание: " + proposal.design_brief.options.join(" "),
+      "  Критерии: " + proposal.design_brief.acceptance_checks.join(" "),
+      "  Риски: " + proposal.design_brief.risks.join(" "),
     );
   }
   lines.push("Используются только дневные счётчики объявлений. Нет доступа к профилям, регистрациям, перепискам или содержимому учеников; Советник только рекомендует и не создаёт задачи автоматически.");
