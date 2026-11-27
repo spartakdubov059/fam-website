@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 const workflow = readFileSync(
   new URL("../../.github/workflows/fam-codex-developer.yml", import.meta.url),
@@ -265,4 +266,54 @@ test("GitHub approval output uses one validated writer and protects PR creation"
   assert.match(validator, /appendFileSync\(/);
   assert.match(validator, /"requires_approval=" \+ String\(result\.requires_approval\) \+ "\\n"/);
   assert.match(workflow, /gh pr create --draft/);
+});
+
+test("untrusted QA runner never receives bridge credentials and PR creation waits for trusted writeback", () => {
+  const verify = workflow.split("  verify:\n")[1]?.split("  record_qa:\n")[0] || "";
+  const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
+  const prepare = workflow.split("  prepare_review:\n")[1] || "";
+  assert.ok(verify && record && prepare);
+  assert.doesNotMatch(verify, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
+  assert.match(verify, /qa_outcome: \$\{\{ steps\.qa_classification\.outputs\.result \}\}/);
+  assert.match(verify, /id: qa_classification\n\s+if: always\(\)/);
+  assert.match(verify, /result=rejected/);
+  assert.match(verify, /result=unavailable/);
+  assert.match(verify, /result=passed/);
+  assert.match(record, /runs-on: ubuntu-latest/);
+  assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(record, /FAM_AGENT_WORKER_TOKEN: \$\{\{ secrets\.FAM_AGENT_WORKER_TOKEN \}\}/);
+  assert.match(record, /needs\.verify\.outputs\.qa_outcome/);
+  assert.match(record, /needs\.verify\.outputs\.qa_outcome == 'passed'.*needs\.verify\.outputs\.qa_outcome == 'rejected'/);
+  assert.match(record, /passed\) export FAM_RESULT_STAGE=qa_passed/);
+  assert.match(record, /rejected\) export FAM_RESULT_STAGE=qa_failed/);
+  assert.doesNotMatch(record, /qa_unavailable/);
+  assert.match(prepare, /needs: \[generate, verify, record_qa\]/);
+  assert.match(prepare, /needs\.record_qa\.result == 'success'/);
+});
+
+test("trusted QA writeback shell maps verified outcomes and rejects unknown ones", () => {
+  const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
+  const marker = "        run: |\n";
+  const blocks = record.split(marker);
+  assert.equal(blocks.length, 2, "exactly one bridge call shell must be present");
+  const shell = blocks[1].split("\n  prepare_review:")[0].split("\n").map(line => {
+    assert.ok(!line.trim() || line.startsWith("          "), "unexpected YAML indentation");
+    return line.trim() ? line.slice(10) : "";
+  }).join("\n");
+  const stub = 'node() { test "$#" -eq 2 && test "$1" = "scripts/fam-agent-bridge.mjs" && test "$2" = "advance" && printf "%s\\n" "$FAM_RESULT_STAGE"; }\n';
+  for (const [qa, expected] of [["passed", "qa_passed"], ["rejected", "qa_failed"]]) {
+    const result = spawnSync("bash", ["-c", stub + shell], {
+      env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), expected);
+  }
+  for (const qa of ["unavailable", "", "cancelled"]) {
+    const invalid = spawnSync("bash", ["-c", stub + shell], {
+      env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000,
+    });
+    assert.ifError(invalid.error);
+    assert.equal(invalid.status, 1);
+  }
 });
