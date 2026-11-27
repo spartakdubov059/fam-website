@@ -211,7 +211,7 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, legalScopes = {}, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -268,6 +268,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
       ". Права: " + clean(p.permissions, 250) + ".");
   }
   lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
+  lines.push("", renderLegalScopeStatus(legalScopes));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
     "- Сигналы основаны на метаданных GitHub, не на частных сообщениях пользователей.",
@@ -277,6 +278,23 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     "- Этот процесс не имеет прав менять код, закрывать PR, выполнять merge или публиковать сайт.",
     "");
   return lines.join("\n");
+}
+
+export function renderLegalScopeStatus(statuses = {}) {
+  const labels = {
+    not_assessed: "не оценено: подтверждённый источник статуса не подключён",
+    source_unavailable: "источник недоступен; готовность не подтверждена",
+    evidence_pending_human_review: "свидетельства ожидают независимой проверки человека",
+    criteria_evidenced_pending_release_decision: "критерии подтверждены; решение о выпуске не принято",
+  };
+  const current = labels[statuses?.FAM_CURRENT] || labels.not_assessed;
+  const ru = labels[statuses?.FAM_RU] || labels.not_assessed;
+  return [
+    "## LEGAL — раздельные статусы FAM",
+    "- **FAM_CURRENT:** " + current + ".",
+    "- **FAM_RU:** " + ru + ".",
+    "Статус одного контура не переносится на другой. Эти отметки не являются юридическим заключением или разрешением на выпуск.",
+  ].join("\n");
 }
 
 async function api(path, token, options = {}) {
@@ -482,6 +500,11 @@ export async function main() {
       state: proposals.length ? "confirmed" : "checked_no_signal",
       evidence_count: proposals.length,
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
+    },
+    legal: {
+      state: "no_data",
+      evidence_count: 0,
+      detail: "аутентифицированные статусы юридической проверки по FAM_CURRENT и FAM_RU ещё не подключены",
     },
     development_advisor: {
       state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
