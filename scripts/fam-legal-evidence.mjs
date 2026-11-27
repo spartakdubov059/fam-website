@@ -120,6 +120,7 @@ export function evaluateLegalReadiness({ scope, revision, criteria = [], archive
   const seen = new Set();
   const applicable = [];
   let unresolvedApplicability = false;
+  const pendingApplicability = [];
   for (const criterion of criteria) {
     if (!criterion || Object.keys(criterion).some((key) => !["criterion_id", "applicability", "reason"].includes(key)) ||
         !CRITERIA.has(criterion.criterion_id) || !APPLICABILITY.has(criterion.applicability) ||
@@ -127,17 +128,31 @@ export function evaluateLegalReadiness({ scope, revision, criteria = [], archive
       throw new Error("Legal readiness criterion is invalid.");
     }
     seen.add(criterion.criterion_id);
-    if (criterion.applicability === "unknown" || criterion.reason === "undetermined") unresolvedApplicability = true;
+    const reasonMatches = criterion.applicability === "applicable"
+      ? criterion.reason === "scope_declared"
+      : criterion.applicability === "not_applicable"
+        ? ["no_relevant_data", "outside_release_scope"].includes(criterion.reason)
+        : criterion.reason === "undetermined";
+    if (!reasonMatches) throw new Error("Legal criterion reason does not match applicability.");
+    if (criterion.applicability === "unknown") {
+      unresolvedApplicability = true;
+      pendingApplicability.push(criterion.criterion_id);
+    }
     if (criterion.applicability === "not_applicable" && !archive.some((entry) =>
       entry.scope === scope && entry.revision === revision && entry.criterion_id === criterion.criterion_id &&
       entry.status === "not_applicable" && entry.decision === "not_applicable" &&
-      hasTrustedHumanDecision(entry, verifyHumanDecision))) unresolvedApplicability = true;
+      hasTrustedHumanDecision(entry, verifyHumanDecision))) {
+      unresolvedApplicability = true;
+      pendingApplicability.push(criterion.criterion_id);
+    }
     if (criterion.applicability === "applicable") applicable.push(criterion);
   }
 
-  if (!criteria.length || unresolvedApplicability) {
+  const missingCriteria = [...CRITERIA].filter((criterionId) => !seen.has(criterionId));
+  if (missingCriteria.length || unresolvedApplicability) {
     return Object.freeze({ scope, revision, status: "not_assessed", readiness_percent: null,
-      applicable_criteria: null, verified_criteria: 0, pending_criteria: [],
+      applicable_criteria: null, verified_criteria: 0,
+      pending_criteria: Object.freeze([...new Set([...missingCriteria, ...pendingApplicability])]),
       release_gate: "not_authorized_by_legal_evidence",
       authority: "evidence_summary_only; legal opinion and release approval are not provided" });
   }
