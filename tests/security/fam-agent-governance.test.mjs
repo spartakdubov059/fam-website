@@ -14,8 +14,10 @@ import {
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
   mapLegalEvidenceScopes,
+  inspectLegalEvidenceWarnings,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
+import { mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -184,6 +186,27 @@ test("LEGAL archive maps source observations only to pending human review and ke
   assert.doesNotMatch(output, /FAM_CURRENT:[^\n]*(?:одобрен|разрешён)/i);
   assert.match(output, /не являются юридическим заключением или разрешением на выпуск/);
   assert.deepEqual(mapLegalEvidenceScopes(null), { FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
+});
+
+test("INSPECTOR reports an unavailable LEGAL source without creating an automatic task", () => {
+  const warnings = inspectLegalEvidenceWarnings({
+    FAM_CURRENT: { latest_status: "source_checked", observations_30d: 3 },
+    FAM_RU: { latest_status: "source_unavailable", observations_30d: 1 },
+  });
+  assert.deepEqual(warnings, [{
+    code: "legal_source_unavailable",
+    severity: "medium",
+    count: 1,
+    message: "LEGAL: официальный источник недоступен для FAM_RU; правовая готовность не подтверждена",
+  }]);
+  const report = makeReport({ warnings, legalScopes: { FAM_RU: "source_unavailable" }, now: NOW });
+  assert.match(report, /INSPECTOR — эффективность и простой[\s\S]*LEGAL: официальный источник недоступен для FAM&#95;RU/);
+  assert.equal(mapInspectorWarning(warnings[0]), null, "transient source outages must not auto-enqueue Qwen work");
+  assert.deepEqual(inspectLegalEvidenceWarnings({
+    FAM_CURRENT: { latest_status: "source_checked" },
+    FAM_RU: { latest_status: "change_detected" },
+  }), []);
+  assert.deepEqual(inspectLegalEvidenceWarnings(null), []);
 });
 
 test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {

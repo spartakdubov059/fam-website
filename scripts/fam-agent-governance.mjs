@@ -373,6 +373,19 @@ export function renderLegalScopeStatus(statuses = {}) {
   ].join("\n");
 }
 
+export function inspectLegalEvidenceWarnings(summary) {
+  if (!summary || typeof summary !== "object") return [];
+  return ["FAM_CURRENT", "FAM_RU"].flatMap((scope) => {
+    if (summary[scope]?.latest_status !== "source_unavailable") return [];
+    return [{
+      code: "legal_source_unavailable",
+      severity: "medium",
+      count: 1,
+      message: "LEGAL: официальный источник недоступен для " + scope + "; правовая готовность не подтверждена",
+    }];
+  });
+}
+
 export function mapLegalEvidenceScopes(summary) {
   if (!summary || typeof summary !== "object") return Object.freeze({ FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
   const mapStatus = (row) => {
@@ -526,6 +539,7 @@ export async function main() {
     }
     try {
       legalEvidence = await fetchLegalEvidenceSummary({ url: bridgeUrl, token: bridgeToken });
+      warnings.push(...inspectLegalEvidenceWarnings(legalEvidence));
       legalEvidenceLink = "connected";
     } catch {
       legalEvidenceLink = "unavailable";
