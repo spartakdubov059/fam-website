@@ -68,7 +68,7 @@ try {
       table === 'fam_notification_reads' ? plan.batch_count : 0]),
     'the manifest explicitly binds empty and non-empty tables');
   assert.ok(boundTables.every(row => row.plan_digest === plan.plan_digest));
-  const substitutedPlan = prepareSyntheticBatchPlan({
+  const substitutedPlan = prepareCompleteSyntheticBatchPlan({
     snapshot_id: plan.snapshot_id,
     tables: { ...tableSnapshot, fam_favorites: [{ id: 'synthetic-changed-row' }] },
   }, { batchSize: 2 });
