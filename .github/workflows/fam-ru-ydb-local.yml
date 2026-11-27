@@ -150,6 +150,10 @@ jobs:
         run: node ru-migration/compat/integration-synthetic-inspector.mjs
       - name: Rehearse remaining operational table restoration
         run: node ru-migration/compat/integration-synthetic-operational-restore.mjs
+      - name: Rehearse checkpointed synthetic batch import and resume
+        run: |
+          docker exec fam-ru-test-ydb /ydb -e grpc://localhost:2136 -d /local --no-discovery sql -s "$(cat ru-migration/compat/synthetic-migration-checkpoint-schema.yql)"
+          node ru-migration/compat/integration-synthetic-batch-import.mjs
       - name: Remove disposable database
         if: always()
         run: docker rm -f fam-ru-test-ydb || true

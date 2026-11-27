@@ -1,0 +1,9 @@
+CREATE TABLE fam_migration_rehearsal_batches (
+  snapshot_id Utf8 NOT NULL,
+  table_name Utf8 NOT NULL,
+  batch_offset Uint32 NOT NULL,
+  row_count Uint32 NOT NULL,
+  batch_digest Utf8 NOT NULL,
+  committed_at Timestamp NOT NULL,
+  PRIMARY KEY (snapshot_id, table_name, batch_offset)
+);
