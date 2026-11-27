@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { Driver } from '@ydbjs/core';
 import { query } from '@ydbjs/query';
 import { RU_MIGRATION_TABLES, prepareCompleteSyntheticBatchPlan } from './synthetic-batch-migration.mjs';
 import { createSyntheticYdbBatchWriter } from './synthetic-ydb-batch-writer.mjs';
+import { mapLegacyNotificationReads } from './notification-read-migration.mjs';
 
-const userId = 'synthetic-batch-import-user';
-const createdAt = new Date('2026-11-27T12:00:00.000Z');
-const fixtureRows = Array.from({ length: 5 }, (_, index) => ({ id: 'synthetic-batch-read-' + index }));
+const sourceFixtureRows=Array.from({length:5},(_,index)=>({
+  user_id:'edededed-eded-4ded-8ded-edededed0001',
+  notification_key:'synthetic-batch-read-'+index,
+  read_at:new Date(Date.parse('2026-11-27T12:00:00.000Z')+index*1000).toISOString(),
+}));
+const mapped=mapLegacyNotificationReads(sourceFixtureRows);
+assert.equal(mapped.ok,true);
+const mappedById=new Map(mapped.rows.map(row=>['synthetic-'+createHash('sha256').update(JSON.stringify(row)).digest('hex').slice(0,32),row]));
+const fixtureRows=[...mappedById.keys()].map(id=>({id}));
+const userId=mapped.rows[0].user_id;
 const tableSnapshot = Object.fromEntries(RU_MIGRATION_TABLES.map(table => [table, []]));
 tableSnapshot.fam_notification_reads = fixtureRows;
 const plan = prepareCompleteSyntheticBatchPlan({
@@ -76,15 +85,18 @@ try {
     'STORED_PLAN_MISMATCH', 'the same snapshot id cannot be rebound to a changed plan');
   const writeRows = async (tx, batchRows) => {
     for (const row of batchRows) {
+      const mappedRow=mappedById.get(row.id);
+      assert.ok(mappedRow,'every planner digest must resolve to its mapped synthetic source row');
       await tx`INSERT INTO fam_notification_reads (user_id, notification_key, read_at)
-        VALUES (${userId}, ${row.id}, ${createdAt});`;
+        VALUES (${mappedRow.user_id}, ${mappedRow.notification_key}, ${mappedRow.read_at});`;
     }
   };
   const verifyRows = async (tx, batchRows) => {
     for (const row of batchRows) {
+      const mappedRow=mappedById.get(row.id);
       const found = await tx`SELECT read_at FROM fam_notification_reads
-        WHERE user_id = ${userId} AND notification_key = ${row.id};`;
-      if (found[0].length !== 1 || new Date(found[0][0].read_at).getTime() !== createdAt.getTime()) return false;
+        WHERE user_id = ${mappedRow.user_id} AND notification_key = ${mappedRow.notification_key};`;
+      if (found[0].length !== 1 || new Date(found[0][0].read_at).getTime() !== mappedRow.read_at.getTime()) return false;
     }
     return true;
   };
