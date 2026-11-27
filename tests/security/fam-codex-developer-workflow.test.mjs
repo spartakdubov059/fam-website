@@ -376,6 +376,9 @@ test("created PR is recorded from its job output when CI is unavailable so retri
   assert.match(branchCi, /TEST_HEAD_SHA="\$\(gh run view "\$TEST_RUN_ID" --json headSha/);
   assert.ok(branchCi.includes('if [[ "$TEST_HEAD_SHA" != "$BRANCH_SHA" ]]; then'));
   assert.ok(branchCi.includes('if [[ "$TEST_CONCLUSION" != "success" ]]; then'));
+  const reusedOnlyChecks = [...branchCi.matchAll(/if \[\[ "\$REUSED_EXISTING" == "true" \]\]; then/g)];
+  assert.equal(reusedOnlyChecks.length, 1, "the reused-PR-only preflight must not gate the post-CI revision check");
+  assert.ok(reusedOnlyChecks[0].index < branchCi.indexOf("TEST_CONCLUSION="));
   const postCiHeadCheck = branchCi.indexOf('CURRENT_PR_SHA="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"', branchCi.indexOf('TEST_CONCLUSION'));
   assert.notEqual(postCiHeadCheck, -1);
   assert.ok(branchCi.indexOf('if [[ "$CURRENT_PR_SHA" != "$BRANCH_SHA" ]]; then', postCiHeadCheck) > postCiHeadCheck);
