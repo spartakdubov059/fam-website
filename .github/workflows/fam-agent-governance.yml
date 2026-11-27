@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/fam-agent-governance.yml"
       - "scripts/fam-agent-governance.mjs"
+      - "scripts/fam-agent-staff-snapshot.mjs"
+      - "scripts/fam-agent-authority.mjs"
       - "scripts/fam-governance-bridge.mjs"
       - "supabase/migrations/*fam_inspector_bounded_coder_enqueue.sql"
       - "supabase/functions/fam-agent-coder-bridge/**"
@@ -12,6 +14,8 @@ on:
       - "supabase/migrations/*fam_qwen_retry_recovery.sql"
       - "scripts/fam-integration-coordinator.mjs"
       - "tests/security/fam-agent-governance.test.mjs"
+      - "tests/security/fam-agent-staff-snapshot.test.mjs"
+      - "tests/security/fam-agent-authority.test.mjs"
       - "tests/security/fam-agent-metrics.test.mjs"
       - "tests/security/fam-integration-coordinator.test.mjs"
   workflow_dispatch:
@@ -23,7 +27,7 @@ on:
         options: [none, synthetic_ci_workflow_failure, synthetic_qwen_runtime_smoke]
         default: none
   schedule:
-    - cron: "45 4 * * *"
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
@@ -44,7 +48,7 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # actions/setup-node v6.3.0
         with:
           node-version: "22"
-      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs tests/security/fam-agent-metrics.test.mjs
+      - run: node --test tests/security/fam-agent-governance.test.mjs tests/security/fam-agent-staff-snapshot.test.mjs tests/security/fam-agent-authority.test.mjs tests/security/fam-integration-coordinator.test.mjs tests/security/fam-governance-bridge.test.mjs tests/security/fam-agent-metrics.test.mjs
 
   governance:
     name: Арбитр, инспектор и рекрутер
