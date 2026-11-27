@@ -367,7 +367,7 @@ jobs:
               index.html|js/*) has_behavior_code=true ;;
             esac
           done
-          # A deleted test or a non-test file does not count as regression coverage.
+          # Only added or modified executable proposed tests count as coverage.
           proposed_tests=()
           while IFS= read -r -d '' file; do proposed_tests+=("$file"); done \
             < <(git diff --cached --name-only --diff-filter=AM -z HEAD -- tests/)
@@ -483,7 +483,7 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with:
           node-version: '22'
-      - name: Записать итог независимой QA после завершения проверок
+      - name: Сохранить результат независимой QA
         env:
           FAM_AGENT_BRIDGE_URL: ${{ secrets.FAM_AGENT_BRIDGE_URL }}
           FAM_AGENT_WORKER_TOKEN: ${{ secrets.FAM_AGENT_WORKER_TOKEN }}

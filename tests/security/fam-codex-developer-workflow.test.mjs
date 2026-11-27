@@ -287,17 +287,15 @@ test("untrusted QA never receives bridge credentials, including after failed che
   assert.ok(qa && record && pr && final);
   assert.doesNotMatch(qa, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs advance/);
   assert.doesNotMatch(pr, /secrets\.|FAM_AGENT_WORKER_TOKEN|FAM_AGENT_BRIDGE_URL|fam-agent-bridge\.mjs (advance|heartbeat)/);
-  assert.match(record, /needs\.verify\.outputs\.qa_outcome/);
-  assert.match(record, /qa_unavailable/);
-  assert.match(qa, /result=rejected/);
-  assert.match(qa, /result=unavailable/);
+  assert.match(qa, /qa_outcome: \$\{\{ steps\.qa_classification\.outputs\.result \}\}/);
+  assert.match(qa, /id: qa_classification\n\s+if: always\(\)/);
+  assert.match(qa, /id: proposed_tests/);
+  assert.match(record, /needs\.verify\.result == 'failure'/);
+  assert.match(record, /QA_RESULT: \$\{\{ needs\.verify\.outputs\.qa_outcome \}\}/);
   assert.match(record, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(record, /passed\) export FAM_RESULT_STAGE=qa_passed/);
   assert.match(record, /rejected\) export FAM_RESULT_STAGE=qa_failed/);
-  assert.match(record, /unavailable\) export FAM_RESULT_STAGE=qa_unavailable/);
-  assert.match(record, /always\(\) && !cancelled\(\)/);
-  assert.match(record, /needs\.generate\.result == 'success'/);
-  assert.match(record, /needs\.verify\.result == 'failure'/);
+  assert.match(record, /qa_unavailable/);
   assert.match(pr, /needs\.record_qa\.result == 'success'/);
   assert.match(final, /needs\.record_qa\.result == 'success'/);
   assert.match(final, /ref: \$\{\{ github\.sha \}\}/);
@@ -305,6 +303,7 @@ test("untrusted QA never receives bridge credentials, including after failed che
   assert.match(final, /export FAM_RESULT_STAGE=pr_ci_failed/);
   assert.match(final, /FAM_PR_NUMBER.*=~.*\[1-9\]/);
   assert.doesNotMatch(final, /PR_CI_FAILED.*qa_failed/);
+  assert.match(pr, /FAM_CODER_TASK_ID/);
   assert.doesNotMatch(record + final, /download-artifact|git apply|node --test/);
   assert.equal((workflow.match(/export FAM_RESULT_STAGE=qa_passed/g) || []).length, 1);
 });
@@ -320,30 +319,33 @@ test("PR creation validates staged changes independently, including new files", 
   assert.match(pr, /needs\.record_qa\.result == 'success'/);
 });
 
-test("actual trusted QA recording shell maps pass, rejection, and unavailable outcomes once", () => {
-  const record = workflow.split("  record_qa:\n")[1].split("  prepare_review:\n")[0];
+test("trusted QA writeback maps independent pass, rejection, and unavailable results", () => {
+  const record = workflow.split("  record_qa:\n")[1]?.split("  prepare_review:\n")[0] || "";
   const marker = "        run: |\n";
-  assert.equal(record.split(marker).length, 2);
-  const shell = record.split(marker)[1].split("\n").filter(line => line.trim()).map(line => {
-    assert.ok(line.startsWith("          "));
-    return line.slice(10);
+  const blocks = record.split(marker);
+  assert.equal(blocks.length, 2, "exactly one bridge writeback shell must be present");
+  const shell = blocks[1].split("\n  prepare_review:")[0].split("\n").map(line => {
+    assert.ok(!line.trim() || line.startsWith("          "), "unexpected YAML indentation");
+    return line.trim() ? line.slice(10) : "";
   }).join("\n");
-  // Replace node only in this synthetic shell; no network, credentials or database.
   const stub = 'node() { test "$#" -eq 2 && test "$1" = "scripts/fam-agent-bridge.mjs" && test "$2" = "advance" && printf "%s\\n" "$FAM_RESULT_STAGE"; }\n';
   for (const [qa, expected] of [["passed", "qa_passed"], ["rejected", "qa_failed"], ["unavailable", "qa_unavailable"], ["", "qa_unavailable"]]) {
-    const result = spawnSync("bash", ["-c", stub + shell], { env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000 });
+    const result = spawnSync("bash", ["-c", stub + shell], {
+      env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000,
+    });
     assert.ifError(result.error);
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.trim(), expected);
   }
   for (const qa of ["cancelled", "skipped", "unknown"]) {
-    const result = spawnSync("bash", ["-c", stub + shell], { env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000 });
+    const result = spawnSync("bash", ["-c", stub + shell], {
+      env: { PATH: process.env.PATH, QA_RESULT: qa }, encoding: "utf8", timeout: 5000,
+    });
     assert.ifError(result.error);
     assert.equal(result.status, 1);
     assert.equal(result.stdout, "");
   }
 });
-
 
 test("stacked rollback fixtures preserve deterministic ordering without assuming event columns", () => {
   const rollback = readFileSync(
