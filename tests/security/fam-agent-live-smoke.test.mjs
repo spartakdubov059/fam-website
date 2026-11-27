@@ -42,9 +42,10 @@ test("smoke task is a zero-occurrence aggregate-only audit, not a fabricated inc
       user_id: "must-never-reach-Qwen",
       arbitrary_payload: "must-never-reach-Qwen",
     },
-  });
+  }, "abcdef0123456789abcdef0123456789abcdef01");
   assert.equal(valid.task_key, "audit_accessibility");
   assert.doesNotMatch(valid.prompt, /must-never-reach-Qwen/);
+  assert.match(valid.prompt, /Предварительная консультация LEGAL/);
   assert.deepEqual(Object.keys(valid), ["id", "task_key", "contract", "prompt"]);
 });
 
