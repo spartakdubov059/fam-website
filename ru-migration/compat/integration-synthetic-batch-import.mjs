@@ -108,6 +108,10 @@ try {
     WHERE snapshot_id = ${plan.snapshot_id} AND table_name = 'fam_favorites';`;
   assert.equal((await commit(chunks[1])).code, 'PLAN_TABLES_NOT_BOUND',
     'a damaged full-table manifest blocks later batch writes');
+  const rowsAfterManifestFailure = (await sql`SELECT notification_key FROM fam_notification_reads
+    WHERE user_id = ${userId} ORDER BY notification_key;`)[0];
+  assert.deepEqual(rowsAfterManifestFailure.map(row => row.notification_key).sort(),
+    chunks[0].rows.map(row => row.id).sort(), 'manifest refusal leaves target rows unchanged');
   await sql`INSERT INTO fam_migration_rehearsal_plan_tables
     (snapshot_id, table_name, row_count, batch_count, plan_digest, created_at)
     VALUES (${plan.snapshot_id}, 'fam_favorites', Unwrap(CAST(0 AS Uint32)),
