@@ -160,6 +160,35 @@ test("INSPECTOR flags failed post-merge workflows without triggering rollback", 
   assert.equal(typeof summarizeAgentQueue, "function");
 });
 
+test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR stages", () => {
+  const base = { status: "completed", conclusion: "success", started_at: earlier(15), completed_at: earlier(1) };
+  const generated = { ...base, name: "Локальная модель готовит исправление", steps: [
+    { name: "Проверить настройки затрат до сборки модели", conclusion: "success" },
+    { name: "Запустить локальную модель и подготовить patch", conclusion: "success" },
+  ] };
+  const noTask = { ...base, name: "Локальная модель готовит исправление", steps: [
+    { name: "Проверить настройки затрат до сборки модели", conclusion: "success" },
+    { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" },
+  ] };
+  const qa = { ...base, name: "Независимая проверка без модели и секретов" };
+  const pr = { ...base, name: "Подготовить PR и проверить исправление без публикации" };
+  const result = summarizeQwenRuns([
+    { jobs: [noTask] },
+    { jobs: [generated, { ...qa, conclusion: "skipped" }] },
+    { jobs: [{ ...generated, status: "in_progress", conclusion: null }] },
+    { jobs: [generated, { ...qa, status: "queued", conclusion: null }] },
+    { jobs: [generated, qa, pr] },
+    { jobs: [generated, { ...qa, conclusion: "failure" }, pr] },
+    { jobs: [{ ...generated, conclusion: "failure" }, { ...qa, conclusion: "skipped" }] },
+  ]);
+  assert.equal(result.no_task, 1);
+  assert.equal(result.model_no_patch, 1);
+  assert.equal(result.model_result_unconfirmed, 3);
+  assert.equal(result.model_generated, 2);
+  assert.equal(result.qa_passed, 1);
+  assert.equal(result.pr_created, 1);
+});
+
 test("Lifecycle approval and CI require exact commits and owner evidence", () => {
   const head = "a".repeat(40);
   const mergeSha = "b".repeat(40);
