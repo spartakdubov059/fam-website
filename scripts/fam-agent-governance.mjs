@@ -25,16 +25,25 @@ export function summarizeQwenRuns(runs = []) {
     const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
     const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
     const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
-    const noTask = preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped";
+    const noTask = job.conclusion === "success" && preflight?.conclusion === "success" &&
+      modelDownload?.conclusion === "skipped" && modelOutcome !== "success";
     const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
     rows.push({
       status: job.conclusion || job.status || run.conclusion || run.status || "unknown",
       duration_ms: duration,
       no_task: noTask,
       model_outcome: modelOutcome || "not_run",
-      generated: modelOutcome === "success" && verifyJob?.conclusion !== "skipped" && Boolean(verifyJob),
-      qa_passed: verifyJob?.conclusion === "success",
-      pr_created: (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" && item.conclusion === "success"),
+      generated: job.conclusion === "success" && modelOutcome === "success" &&
+        Boolean(verifyJob) && ["in_progress", "completed"].includes(verifyJob.status) &&
+        !["skipped", "cancelled"].includes(verifyJob.conclusion),
+      no_patch: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "skipped",
+      qa_passed: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success",
+      pr_created: job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success" &&
+        (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" &&
+          item.status === "completed" && item.conclusion === "success"),
       estimated_runner_minutes: (run.jobs || []).reduce((sum, item) => {
         const milliseconds = Math.max(0, dateMs(item.completed_at || run.updated_at) - dateMs(item.started_at || run.created_at));
         return sum + Math.ceil(milliseconds / 60_000);
@@ -49,7 +58,9 @@ export function summarizeQwenRuns(runs = []) {
     failed: count((row) => row.status === "failure"),
     no_task: count((row) => row.no_task),
     model_generated: count((row) => row.generated),
-    model_no_patch: count((row) => row.model_outcome === "success" && !row.generated && !row.no_task),
+    model_no_patch: count((row) => row.no_patch),
+    model_result_unconfirmed: count((row) => row.model_outcome === "success" &&
+      !row.generated && !row.no_patch && !row.no_task),
     qa_passed: count((row) => row.qa_passed),
     pr_created: count((row) => row.pr_created),
     estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
