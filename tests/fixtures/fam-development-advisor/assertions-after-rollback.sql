@@ -11,7 +11,7 @@ begin
     into v_active_band, v_new_band
   from public.get_fam_development_advisor_snapshots(7)
   order by report_date desc limit 1;
-  if v_active_band <> '25_plus' or v_new_band <> 'none' then
+  if v_active_band <> '25_plus' or v_new_band <> 'suppressed' then
     raise exception 'Rollback returned an unexpected or unbanded synthetic result';
   end if;
 end

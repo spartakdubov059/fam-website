@@ -3,9 +3,8 @@ name: FAM Development Advisor SQL contract
 on:
   pull_request:
     paths:
-      - "supabase/migrations/*fam_development_advisor_aggregate_snapshots.sql"
-      - "supabase/migrations/*fam_development_advisor_idea_backlog_band.sql"
       - "tests/fixtures/fam-development-advisor/**"
+      - "supabase/migrations/*fam_development_advisor*"
 
 permissions:
   contents: read
@@ -36,18 +35,22 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/setup.sql
-      - name: Применить миграцию Советника
+      - name: Применить исходную миграцию агрегатов Советника
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127050000_fam_development_advisor_aggregate_snapshots.sql
-      - name: Проверить исходный установленный контракт перед upgrade
+      - name: Применить privacy-banded обновление результата RPC
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261128085459_fam_development_advisor_privacy_banded_snapshots.sql
+      - name: Проверить исходный privacy-banded контракт перед расширением
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions-before-upgrade.sql
-      - name: Применить отдельную forward migration
+      - name: Добавить privacy-banded сигнал очереди идей
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
-        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127060000_fam_development_advisor_idea_backlog_band.sql
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261128100000_fam_development_advisor_idea_backlog_band.sql
       - name: Проверить границы данных и прав
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
@@ -63,5 +66,5 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: |
-          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127060000_fam_development_advisor_idea_backlog_band.sql
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261128100000_fam_development_advisor_idea_backlog_band.sql
           docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions.sql

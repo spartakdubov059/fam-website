@@ -114,6 +114,8 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.deepEqual(JSON.parse(request.body), { action: "development_advisor_metrics" });
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], user_id: "private" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings_band: "1_4" }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings_band: "none" }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], new_listings_24h_band: "none" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas_band: "17" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas: 17 }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
