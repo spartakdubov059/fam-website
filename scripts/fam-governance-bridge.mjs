@@ -192,12 +192,16 @@ const MODERATION_CATEGORIES = new Set([
 const MODERATION_SEVERITIES = new Set(["medium", "high"]);
 const MODERATION_BUCKETS = new Set(["5_9", "10_24", "25_plus"]);
 const MODERATION_TOTAL_BUCKETS = new Set(["none", "suppressed", ...MODERATION_BUCKETS]);
+const MODERATION_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+const MODERATION_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
-export function validateModerationSummaryResponse(body) {
+export function validateModerationSummaryResponse(body, { now = Date.now() } = {}) {
   const row = body?.summary;
+  const generatedAtMs = typeof row?.generated_at === "string" ? Date.parse(row.generated_at) : NaN;
   if (!body || typeof body !== "object" || body.ok !== true || !row || typeof row !== "object" ||
       Array.isArray(row) || Object.keys(row).length !== 3 ||
-      typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
+      !Number.isFinite(generatedAtMs) || !Number.isFinite(now) ||
+      generatedAtMs > now + MODERATION_FUTURE_SKEW_MS || now - generatedAtMs > MODERATION_MAX_AGE_MS ||
       !MODERATION_TOTAL_BUCKETS.has(row.total_bucket) || !Array.isArray(row.categories) || row.categories.length > 16) {
     throw new Error("Invalid protected moderation aggregate response");
   }
@@ -223,7 +227,7 @@ export function validateModerationSummaryResponse(body) {
   });
 }
 
-export async function fetchModerationSummary({ url, token, fetchImpl = fetch }) {
+export async function fetchModerationSummary({ url, token, fetchImpl = fetch, now = Date.now() }) {
   if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
     throw new Error("FAM governance bridge credentials unavailable");
   }
@@ -234,5 +238,5 @@ export async function fetchModerationSummary({ url, token, fetchImpl = fetch }) 
     signal: AbortSignal.timeout(15_000),
   });
   if (!response?.ok) throw new Error("FAM moderation aggregate request failed");
-  return validateModerationSummaryResponse(await response.json());
+  return validateModerationSummaryResponse(await response.json(), { now });
 }

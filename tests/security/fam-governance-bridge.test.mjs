@@ -130,6 +130,7 @@ test("moderation bridge exposes only thresholded category buckets, never raw inc
   const result = await fetchModerationSummary({
     url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
     token: "test-governance-token",
+    now: Date.parse("2026-11-27T06:10:00Z"),
     fetchImpl: async (_url, options) => {
       request = options;
       return { ok: true, json: async () => ({ ok: true, summary }) };
@@ -145,7 +146,18 @@ test("moderation bridge exposes only thresholded category buckets, never raw inc
     { ...summary, categories: [{ ...summary.categories[0], count_bucket: "1_4" }] },
     { ...summary, categories: [summary.categories[0], summary.categories[0]] },
     { ...summary, total_bucket: "suppressed" },
-  ]) assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: unsafe }));
+  ]) assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: unsafe }, {
+    now: Date.parse("2026-11-27T06:10:00Z"),
+  }));
+  assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: {
+    ...summary, generated_at: "2026-11-24T06:00:00Z",
+  } }, { now: Date.parse("2026-11-27T06:10:00Z") }), /Invalid protected moderation aggregate/);
+  assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: {
+    ...summary, generated_at: "2026-11-27T06:20:00Z",
+  } }, { now: Date.parse("2026-11-27T06:10:00Z") }), /Invalid protected moderation aggregate/);
+  assert.equal(validateModerationSummaryResponse({ ok: true, summary }, {
+    now: Date.parse("2026-11-27T06:10:00Z"),
+  }).total_bucket, "5_9");
   assert.match(edge, /get_fam_moderation_aggregate_summary/);
   assert.match(edge, /body\.action === "moderation_metrics"/);
   assert.match(workflow, /fam-governance-bridge\.test\.mjs/);
