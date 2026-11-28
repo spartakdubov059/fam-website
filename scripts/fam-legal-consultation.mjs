@@ -7,6 +7,30 @@ const TASK_RISK_TOPICS = Object.freeze({
   audit_accessibility: Object.freeze([]),
   audit_agent_infrastructure: Object.freeze(["access_control", "external_processing"]),
 });
+const FEATURE_KEYS = new Set([
+  "announcements",
+  "student_marketplace",
+  "media_upload",
+  "content_moderation",
+  "agent_coordination",
+  "custom_feature",
+]);
+const FEATURE_RISK_FLAGS = Object.freeze({
+  handles_student_data: "student_data_handling",
+  uses_private_media: "file_and_media_handling",
+  adds_external_provider: "external_processing",
+  changes_access_control: "access_control",
+  changes_moderation: "content_moderation",
+  adds_persistent_storage: "database_change",
+});
+const FEATURE_QA_CHECKS = Object.freeze({
+  student_data_handling: "Подтвердить, что используются только необходимые поля; проверить отсутствие персональных данных в моделях, логах и артефактах на синтетических примерах.",
+  file_and_media_handling: "Проверить закрытый доступ к файлам, принадлежность объекта и истечение временных ссылок.",
+  external_processing: "Проверить, что внешний получатель, передаваемые поля и условия хранения перечислены; без согласования сетевой вызов не выполнять.",
+  access_control: "Проверить матрицу ролей, отрицательные сценарии и отсутствие непредусмотренного расширения Auth/RLS.",
+  content_moderation: "Сравнить синтетические безопасные и запрещённые примеры; подтвердить, что правила модерации не ослаблены.",
+  database_change: "Проверить одноразовое применение, откат, повторное применение и сохранность данных на пустой изолированной базе.",
+});
 
 const RISK_OPTIONS = Object.freeze({
   access_control: Object.freeze({
@@ -78,7 +102,51 @@ function validBranchRef(value) {
   return value.split("/").every((part) => BRANCH_COMPONENT.test(part) && !part.endsWith(".lock"));
 }
 
-export function buildLegalConsultation({ scope, branch, revision, changedFiles = [], taskKey } = {}) {
+function assessPlannedFeature(feature, { scope, branch, revision, versionScopes }) {
+  if (feature === undefined || feature === null) return null;
+  if (!feature || typeof feature !== "object" || Array.isArray(feature) ||
+      Object.keys(feature).sort().join(",") !== "featureKey,riskFlags") {
+    throw new Error("Planned feature must contain only an allowlisted feature key and fixed risk flags.");
+  }
+  if (!FEATURE_KEYS.has(feature.featureKey)) {
+    throw new Error("Planned feature key is not allowlisted.");
+  }
+  if (!feature.riskFlags || typeof feature.riskFlags !== "object" || Array.isArray(feature.riskFlags) ||
+      Object.keys(feature.riskFlags).sort().join(",") !== Object.keys(FEATURE_RISK_FLAGS).sort().join(",")) {
+    throw new Error("Planned feature must provide every fixed risk flag.");
+  }
+  for (const value of Object.values(feature.riskFlags)) {
+    if (typeof value !== "boolean") throw new Error("Planned feature risk flags must be boolean.");
+  }
+  const riskCategories = [...new Set(Object.entries(FEATURE_RISK_FLAGS)
+    .filter(([flag]) => feature.riskFlags[flag])
+    .map(([, category]) => category))].sort();
+  const scopeAssessments = versionScopes.map((versionScope) => Object.freeze({
+    scope: versionScope,
+    status: "human_review_pending",
+    release_gate: "feature_review_pending_for_affected_scope",
+    applicable_criteria: null,
+    verified_criteria: 0,
+    readiness_percent: null,
+  }));
+  return Object.freeze({
+    status: "preliminary_technical_risk_screen_only",
+    feature_key: feature.featureKey,
+    scope,
+    branch,
+    revision,
+    risk_categories: riskCategories,
+    risk_flags: Object.freeze({ ...feature.riskFlags }),
+    scope_assessments: scopeAssessments,
+    qa_acceptance_checks: riskCategories.map((category) => FEATURE_QA_CHECKS[category]),
+    legal_opinion: false,
+    release_authority: false,
+    independent_human_review: "pending_human_review",
+    source_verification: "not_performed",
+  });
+}
+
+export function buildLegalConsultation({ scope, branch, revision, changedFiles = [], taskKey, plannedFeature } = {}) {
   if (!SCOPES.has(scope)) throw new Error("Legal consultation requires an explicit product scope.");
   if (!validBranchRef(branch)) throw new Error("Legal consultation requires an exact safe branch ref.");
   if (typeof revision !== "string" || !SHA.test(revision)) {
@@ -99,9 +167,18 @@ export function buildLegalConsultation({ scope, branch, revision, changedFiles =
   for (const path of changedFiles) {
     for (const risk of classifyPath(path)) riskCounts.set(risk, (riskCounts.get(risk) || 0) + 1);
   }
+  if (plannedFeature !== undefined && plannedFeature !== null) {
+    const featureKeys = plannedFeature && typeof plannedFeature === "object" &&
+      !Array.isArray(plannedFeature) && plannedFeature.riskFlags &&
+      typeof plannedFeature.riskFlags === "object" && !Array.isArray(plannedFeature.riskFlags)
+      ? Object.entries(FEATURE_RISK_FLAGS).filter(([flag]) => plannedFeature.riskFlags[flag] === true)
+      : [];
+    for (const [, category] of featureKeys) riskCounts.set(category, (riskCounts.get(category) || 0) + 1);
+  }
   const riskCategories = [...riskCounts.keys()].sort();
-  const reviewRequired = riskCategories.length > 0 || scope !== "FAM_CURRENT";
   const versionScopes = scope === "SHARED" ? ["FAM_CURRENT", "FAM_RU"] : [scope];
+  const featureAssessment = assessPlannedFeature(plannedFeature, { scope, branch, revision, versionScopes });
+  const reviewRequired = riskCategories.length > 0 || scope !== "FAM_CURRENT" || featureAssessment !== null;
   const checks = [
     "Проверить минимизацию данных и отсутствие персональных данных школьников в запросах и журналах.",
     "Не менять Auth, RLS, роли и модерацию без отдельного обоснования и независимой проверки.",
@@ -114,14 +191,15 @@ export function buildLegalConsultation({ scope, branch, revision, changedFiles =
 
   const scopeAssessments = versionScopes.map((versionScope) => {
     const ruEvidencePending = versionScope === "FAM_RU";
-    const pathReviewPending = riskCategories.length > 0;
+    const pathReviewPending = riskCategories.length > 0 || featureAssessment !== null;
     return Object.freeze({
       scope: versionScope,
       status: pathReviewPending || ruEvidencePending ? "human_review_pending" : "not_assessed",
       applicable_criteria: null,
       verified_criteria: 0,
       readiness_percent: null,
-      release_gate: pathReviewPending ? "review_required_for_affected_scope" :
+      release_gate: featureAssessment ? "feature_review_pending_for_affected_scope" :
+        pathReviewPending ? "review_required_for_affected_scope" :
         ruEvidencePending ? "migration_evidence_pending_for_ru_only" : "no_path_trigger_detected_not_approval",
     });
   });
@@ -156,6 +234,7 @@ export function buildLegalConsultation({ scope, branch, revision, changedFiles =
       "Подтвердили ли вывод ответственный оператор и, если требуется, квалифицированный юрист?",
     ],
     scope_assessments: scopeAssessments,
+    planned_feature_assessment: featureAssessment,
     independent_review: reviewRequired ? "pending_human_review" : "not_triggered_by_path_signal",
     evidence: {
       changed_file_count: changedFiles.length,
@@ -169,6 +248,7 @@ export function buildLegalConsultation({ scope, branch, revision, changedFiles =
       restrictions: ["Не включать реальные данные школьников или секреты.", "Не менять Auth, RLS, роли или production-модерацию без отдельного согласования."],
       qa_acceptance_checks: checks,
       alternatives: riskOptions,
+      planned_feature_assessment: featureAssessment,
       human_decision_required_before_release: reviewRequired,
     },
   });
