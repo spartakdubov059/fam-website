@@ -29,7 +29,7 @@ test("metrics distinguish no-task, analysis, generation, independent QA and PR",
   const base = { status: "success", run_minutes: 14, created_at: "2026-11-23T00:00:00Z", updated_at: "2026-11-23T00:15:00Z" };
   const runs = summarizeQwenRuns([
     { ...base, id: 1, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Проверить настройки затрат до сборки модели", conclusion: "success" }, { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" }] }] },
-    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", conclusion: "success" }] },
+    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "success" }] },
   ]);
   assert.equal(runs.no_task, 1);
   assert.equal(runs.model_generated, 1);
@@ -45,6 +45,58 @@ test("metrics distinguish no-task, analysis, generation, independent QA and PR",
   assert.match(report, /анализ без patch 0/);
   assert.match(report, /QA прошла 1/);
   assert.match(report, /runner-минуты/);
+});
+
+test("Qwen outcome metrics keep a failed or cancelled QA out of no-patch, passed QA, and PR totals", () => {
+  const base = {
+    status: "success",
+    created_at: "2026-11-23T00:00:00Z",
+    updated_at: "2026-11-23T00:15:00Z",
+  };
+  const coder = {
+    name: "Локальная модель готовит исправление",
+    conclusion: "success",
+    steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }],
+  };
+  const failedQa = summarizeQwenRuns([{
+    ...base,
+    id: 10,
+    jobs: [coder,
+      { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "failure" },
+      { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "success" }],
+  }]);
+  assert.equal(failedQa.model_generated, 1);
+  assert.equal(failedQa.model_no_patch, 0);
+  assert.equal(failedQa.model_result_unconfirmed, 0);
+  assert.equal(failedQa.qa_passed, 0);
+  assert.equal(failedQa.pr_created, 0);
+
+  const cancelledQa = summarizeQwenRuns([{
+    ...base,
+    id: 11,
+    jobs: [coder,
+      { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "cancelled" },
+      { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "success" }],
+  }]);
+  assert.equal(cancelledQa.model_generated, 0);
+  assert.equal(cancelledQa.model_no_patch, 0);
+  assert.equal(cancelledQa.model_result_unconfirmed, 1);
+  assert.equal(cancelledQa.qa_passed, 0);
+  assert.equal(cancelledQa.pr_created, 0);
+
+  const failedNoTask = summarizeQwenRuns([{
+    ...base,
+    id: 12,
+    jobs: [{
+      ...coder,
+      conclusion: "failure",
+      steps: [
+        { name: "Проверить настройки затрат до сборки модели", conclusion: "success" },
+        { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" },
+      ],
+    }],
+  }]);
+  assert.equal(failedNoTask.no_task, 0);
 });
 
 test("expired Qwen leases retry only within attempt limit and clear stale lifecycle", () => {
