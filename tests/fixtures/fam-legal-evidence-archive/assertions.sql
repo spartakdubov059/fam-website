@@ -43,6 +43,19 @@ end $$;
 
 begin;
 set role service_role;
+do $$
+declare
+  v_failed boolean := false;
+begin
+  begin
+    perform * from public.append_fam_legal_evidence_observation(
+      'FAM_CURRENT', repeat('a', 40), 'official_source_review', 'official_portal_government',
+      'https://publication.pravo.gov.ru', 'source_unavailable', null, null);
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'append RPC accepted a call without a service_role JWT claim'; end if;
+end $$;
 select set_config('request.jwt.claim.role', 'service_role', true);
 do $$
 declare
@@ -145,7 +158,6 @@ begin
 end $$;
 reset role;
 
-begin;
 set role service_role;
 do $$
 declare
@@ -164,24 +176,7 @@ begin
   end;
   if not v_failed then raise exception 'service_role direct archive insert was accepted'; end if;
 end $$;
-rollback;
-
-begin;
-set role service_role;
-do $$
-declare
-  v_failed boolean := false;
-begin
-  begin
-    perform * from public.append_fam_legal_evidence_observation(
-      'FAM_CURRENT', repeat('a', 40), 'official_source_review', 'official_portal_government',
-      'https://publication.pravo.gov.ru', 'source_unavailable', null, null);
-  exception when insufficient_privilege then
-    v_failed := true;
-  end;
-  if not v_failed then raise exception 'append RPC accepted a call without a service_role JWT claim'; end if;
-end $$;
-rollback;
+reset role;
 
 do $$
 declare
