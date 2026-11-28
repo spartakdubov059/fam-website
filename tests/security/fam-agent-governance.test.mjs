@@ -189,12 +189,40 @@ test("Boss brief reports queue failures and separates Qwen analysis, QA and PR o
     ],
     moderationLink: "connected",
     moderationSummary: { total_bucket: "none" },
-    qwenMetrics: { runs: 4, model_no_patch: 2, model_generated: 2, qa_passed: 1, pr_created: 1 },
+    qwenMetrics: { runs: 4, model_no_patch: 2, model_generated: 2, model_result_unconfirmed: 0, qa_passed: 1, pr_created: 1 },
   });
   assert.match(brief, /Состояние: требует внимания/);
   assert.match(brief, /ошибки за сутки 1, просроченные аренды 1/);
-  assert.match(brief, /анализ без patch 2, patch 2, QA пройдена 1, PR 1/);
+  assert.match(brief, /анализ без patch 2, patch 2, результат не подтверждён 0, QA пройдена 1, PR 1/);
   assert.match(brief, /решения остаются на проверке человека/);
+});
+
+test("Boss brief highlights unconfirmed Qwen results and treats a missing metric as unknown", () => {
+  const validSources = {
+    queueLink: "connected",
+    queueHealth: { queued: 0, in_progress: 0, failed_last_24h: 0, expired_leases: 0 },
+    legalEvidenceLink: "connected",
+    legalEvidenceSummary: [
+      { scope: "FAM_CURRENT", latest_status: "source_checked" },
+      { scope: "FAM_RU", latest_status: "source_checked" },
+    ],
+    moderationLink: "connected",
+    moderationSummary: { total_bucket: "none" },
+  };
+  const unconfirmed = renderBossBrief({
+    ...validSources,
+    qwenMetrics: { runs: 3, model_no_patch: 0, model_generated: 0, model_result_unconfirmed: 2, qa_passed: 0, pr_created: 0 },
+  });
+  assert.match(unconfirmed, /Состояние: требует внимания/);
+  assert.match(unconfirmed, /результат не подтверждён 2/);
+  assert.match(unconfirmed, /Разобрать запуски Qwen, для которых этапы результата не подтверждены/);
+
+  const missingMetric = renderBossBrief({
+    ...validSources,
+    qwenMetrics: { runs: 3, model_no_patch: 1, model_generated: 2, qa_passed: 1, pr_created: 1 },
+  });
+  assert.match(missingMetric, /данные неполные; готовность не подтверждена/);
+  assert.match(missingMetric, /результат не подтверждён метрика отсутствует/);
 });
 
 test("Boss brief treats a detected legal-source change as pending human review", () => {
