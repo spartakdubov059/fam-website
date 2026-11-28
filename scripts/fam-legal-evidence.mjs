@@ -112,6 +112,14 @@ export function appendLegalArchiveEntry(archive = [], input = {}) {
   return Object.freeze([...archive, entry]);
 }
 
+function latestArchiveEntry(archive, predicate) {
+  let latest = null;
+  for (const entry of archive) {
+    if (predicate(entry)) latest = entry;
+  }
+  return latest;
+}
+
 export function evaluateLegalReadiness({ scope, revision, criteria = [], archive = [], verifyHumanDecision } = {}) {
   if (!SCOPES.has(scope) || !SHA.test(revision || "") || !verifyLegalArchive(archive) ||
       !Array.isArray(criteria) || criteria.length > CRITERIA.size) {
@@ -138,10 +146,10 @@ export function evaluateLegalReadiness({ scope, revision, criteria = [], archive
       unresolvedApplicability = true;
       pendingApplicability.push(criterion.criterion_id);
     }
-    if (criterion.applicability === "not_applicable" && !archive.some((entry) =>
-      entry.scope === scope && entry.revision === revision && entry.criterion_id === criterion.criterion_id &&
-      entry.status === "not_applicable" && entry.decision === "not_applicable" &&
-      hasTrustedHumanDecision(entry, verifyHumanDecision))) {
+    const latestEvidence = latestArchiveEntry(archive, (entry) =>
+      entry.scope === scope && entry.revision === revision && entry.criterion_id === criterion.criterion_id);
+    if (criterion.applicability === "not_applicable" && !(latestEvidence?.status === "not_applicable" &&
+        latestEvidence.decision === "not_applicable" && hasTrustedHumanDecision(latestEvidence, verifyHumanDecision))) {
       unresolvedApplicability = true;
       pendingApplicability.push(criterion.criterion_id);
     }
@@ -160,12 +168,12 @@ export function evaluateLegalReadiness({ scope, revision, criteria = [], archive
   const pending = [];
   let verified = 0;
   for (const criterion of applicable) {
-    const evidence = archive.find((entry) => entry.scope === scope && entry.revision === revision &&
-      entry.criterion_id === criterion.criterion_id && entry.decision === "confirmed" &&
-      hasTrustedHumanDecision(entry, verifyHumanDecision) &&
-      ((criterion.criterion_id === "qualified_counsel_review" && entry.status === "counsel_reviewed") ||
-       (criterion.criterion_id !== "qualified_counsel_review" && entry.status === "operator_reviewed")));
-    if (evidence) verified++;
+    const evidence = latestArchiveEntry(archive, (entry) =>
+      entry.scope === scope && entry.revision === revision && entry.criterion_id === criterion.criterion_id);
+    const confirmed = evidence?.decision === "confirmed" && hasTrustedHumanDecision(evidence, verifyHumanDecision) &&
+      ((criterion.criterion_id === "qualified_counsel_review" && evidence.status === "counsel_reviewed") ||
+       (criterion.criterion_id !== "qualified_counsel_review" && evidence.status === "operator_reviewed"));
+    if (confirmed) verified++;
     else pending.push(criterion.criterion_id);
   }
   const total = applicable.length;
