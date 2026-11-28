@@ -44,6 +44,9 @@ test("metrics distinguish no-task, analysis, generation, independent QA and PR",
   const report = makeReport({ agentMetrics: agents, qwenMetrics: runs });
   assert.match(report, /no_patch 0/);
   assert.match(report, /независимая QA прошла 1/);
+  assert.match(report, /тайм-ауты 0/);
+  assert.match(report, /отменены 0/);
+  assert.match(report, /не завершены или не подтверждены 0/);
   assert.match(report, /runner-минуты/);
 });
 

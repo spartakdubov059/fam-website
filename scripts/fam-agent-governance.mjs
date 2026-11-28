@@ -59,7 +59,10 @@ export function summarizeQwenRuns(runs = []) {
   return Object.freeze({
     runs: rows.length,
     successful: count((row) => row.status === "success"),
-    failed: count((row) => row.status === "failure"),
+    failed: count((row) => ["failure", "startup_failure"].includes(row.status)),
+    timed_out: count((row) => row.status === "timed_out"),
+    cancelled: count((row) => row.status === "cancelled"),
+    unconfirmed: count((row) => !["success", "failure", "startup_failure", "timed_out", "cancelled"].includes(row.status)),
     no_task: count((row) => row.no_task),
     model_generated: count((row) => row.generated),
     model_no_patch: count((row) => row.no_patch),
@@ -264,7 +267,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
   for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
   if (qwenMetrics) {
-    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", no_patch " + qwenMetrics.model_no_patch + ", результат не подтверждён " + qwenMetrics.model_result_unconfirmed + ", patch сгенерирован " + qwenMetrics.model_generated + ", независимая QA прошла " + qwenMetrics.qa_passed + ", PR создан " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", ошибки " + qwenMetrics.failed + ", тайм-ауты " + qwenMetrics.timed_out + ", отменены " + qwenMetrics.cancelled + ", не завершены или не подтверждены " + qwenMetrics.unconfirmed + ", без задачи " + qwenMetrics.no_task + ", no_patch " + qwenMetrics.model_no_patch + ", результат не подтверждён " + qwenMetrics.model_result_unconfirmed + ", patch сгенерирован " + qwenMetrics.model_generated + ", независимая QA прошла " + qwenMetrics.qa_passed + ", PR создан " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
     lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");

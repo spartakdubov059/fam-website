@@ -182,15 +182,19 @@ test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR s
     { status: "completed", conclusion: "failure", jobs: [generated, { ...qa, conclusion: "failure" }, pr] },
     { status: "completed", conclusion: "failure", jobs: [{ ...generated, conclusion: "failure" }, { ...qa, conclusion: "skipped" }] },
     { status: "completed", conclusion: "cancelled", jobs: [generated, { ...qa, conclusion: "skipped" }] },
+    { status: "completed", conclusion: "timed_out", jobs: [generated, { ...qa, conclusion: "skipped" }] },
   ]);
   assert.equal(result.no_task, 1);
   assert.equal(result.model_no_patch, 1);
-  assert.equal(result.model_result_unconfirmed, 4);
+  assert.equal(result.model_result_unconfirmed, 5);
   assert.equal(result.model_generated, 2);
   assert.equal(result.qa_passed, 1);
   assert.equal(result.pr_created, 1);
   assert.equal(result.successful, 3);
   assert.equal(result.failed, 2);
+  assert.equal(result.timed_out, 1);
+  assert.equal(result.cancelled, 1);
+  assert.equal(result.unconfirmed, 2);
 });
 
 test("Lifecycle approval and CI require exact commits and owner evidence", () => {
