@@ -202,8 +202,8 @@ test("LEGAL staff metric counts only archive observations and never labels them 
 
 test("INSPECTOR reports unavailable LEGAL sources but never auto-enqueues Qwen work", () => {
   const warnings = inspectLegalEvidenceWarnings([
-    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
-    { scope: "FAM_RU", latest_checked_at: null, latest_status: "source_unavailable", observations_30d: 1 },
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_unavailable", observations_30d: 1 },
   ]);
   assert.deepEqual(warnings, [{
     code: "legal_source_unavailable",
@@ -213,12 +213,12 @@ test("INSPECTOR reports unavailable LEGAL sources but never auto-enqueues Qwen w
   }]);
   assert.equal(mapInspectorWarning(warnings[0]), null, "source outages are not coder tasks");
   assert.deepEqual(inspectLegalEvidenceWarnings([
-    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
-    { scope: "FAM_RU", latest_checked_at: null, latest_status: "change_detected", observations_30d: 1 },
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "change_detected", observations_30d: 1 },
   ]), []);
   assert.deepEqual(inspectLegalEvidenceWarnings([
-    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_unavailable", observations_30d: "unsafe" },
-    { scope: "FAM_RU", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_unavailable", observations_30d: "unsafe" },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
   ]), []);
 });
 
