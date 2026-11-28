@@ -11,7 +11,7 @@ begin
     raise exception 'Aggregate source table privileges are broader than expected';
   end if;
   if pg_catalog.pg_get_function_result('public.get_fam_development_advisor_snapshots(integer)'::regprocedure)
-      <> 'TABLE(report_date date, generated_at timestamp with time zone, active_listings integer, new_listings_24h integer)' then
+      <> 'TABLE(report_date date, generated_at timestamp with time zone, active_listings_band text, new_listings_24h_band text)' then
     raise exception 'Advisor RPC exposes an unexpected result shape';
   end if;
 end
@@ -21,15 +21,20 @@ set role service_role;
 do $service_role_assertions$
 declare
   v_rows integer;
-  v_active integer;
-  v_new integer;
+  v_active_banded integer;
+  v_new_none integer;
+  v_new_suppressed integer;
+  v_new_5_9 integer;
   v_recent_rows integer;
 begin
-  select count(*), sum(active_listings), sum(new_listings_24h)
-  into v_rows, v_active, v_new
+  select count(*), count(*) filter (where active_listings_band = '25_plus'),
+    count(*) filter (where new_listings_24h_band = 'none'),
+    count(*) filter (where new_listings_24h_band = 'suppressed'),
+    count(*) filter (where new_listings_24h_band = '5_9')
+  into v_rows, v_active_banded, v_new_none, v_new_suppressed, v_new_5_9
   from public.get_fam_development_advisor_snapshots(7);
-  if v_rows <> 7 or v_active <> 259 or v_new <> 21 then
-    raise exception 'Unexpected seven-day synthetic aggregates: %, %, %',v_rows,v_active,v_new;
+  if v_rows <> 7 or v_active_banded <> 7 or v_new_none <> 1 or v_new_suppressed <> 4 or v_new_5_9 <> 2 then
+    raise exception 'Unexpected seven-day synthetic aggregate bands';
   end if;
   select count(*) into v_recent_rows from public.get_fam_development_advisor_snapshots(3);
   if v_recent_rows <> 3 then
