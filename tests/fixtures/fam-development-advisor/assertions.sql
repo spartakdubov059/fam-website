@@ -22,18 +22,16 @@ do $service_role_assertions$
 declare
   v_rows integer;
   v_active_banded integer;
-  v_new_none integer;
   v_new_suppressed integer;
   v_new_5_9 integer;
   v_recent_rows integer;
 begin
   select count(*), count(*) filter (where active_listings_band = '25_plus'),
-    count(*) filter (where new_listings_24h_band = 'none'),
     count(*) filter (where new_listings_24h_band = 'suppressed'),
     count(*) filter (where new_listings_24h_band = '5_9')
-  into v_rows, v_active_banded, v_new_none, v_new_suppressed, v_new_5_9
+  into v_rows, v_active_banded, v_new_suppressed, v_new_5_9
   from public.get_fam_development_advisor_snapshots(7);
-  if v_rows <> 7 or v_active_banded <> 7 or v_new_none <> 1 or v_new_suppressed <> 4 or v_new_5_9 <> 2 then
+  if v_rows <> 7 or v_active_banded <> 7 or v_new_suppressed <> 5 or v_new_5_9 <> 2 then
     raise exception 'Unexpected seven-day synthetic aggregate bands';
   end if;
   select count(*) into v_recent_rows from public.get_fam_development_advisor_snapshots(3);

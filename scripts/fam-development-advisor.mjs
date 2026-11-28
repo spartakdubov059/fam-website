@@ -1,8 +1,8 @@
 const MAX_ROWS = 14;
 const REQUIRED_DAYS = 6;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
-const LISTING_BANDS = new Set(["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"]);
-const LISTING_BAND_RANK = Object.freeze({ none: 0, suppressed: 1, "5_9": 2, "10_24": 3, "25_plus": 4 });
+const LISTING_BANDS = new Set(["unknown", "suppressed", "5_9", "10_24", "25_plus"]);
+const LISTING_BAND_RANK = Object.freeze({ suppressed: 1, "5_9": 2, "10_24": 3, "25_plus": 4 });
 
 function validDate(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -60,7 +60,7 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
   const previousNew = averageRank(previous, "new_listings_24h_band");
   const recentNew = averageRank(recent, "new_listings_24h_band");
   const activeDrop = previousActive >= 3 && recentActive <= previousActive - 0.75;
-  const newListingDrop = previousNew >= 2 && recentNew === 0;
+  const newListingDrop = previousNew >= 2 && recentNew <= 1;
   const proposals = activeDrop || newListingDrop ? [Object.freeze({
     key: "review_listing_discovery",
     scope: "FAM_CURRENT",

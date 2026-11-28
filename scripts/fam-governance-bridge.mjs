@@ -157,8 +157,8 @@ export function validateDevelopmentAdvisorResponse(body) {
     if (!row || Object.keys(row).length !== 4 ||
         typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
-        !["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.active_listings_band) ||
-        !["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.new_listings_24h_band)) {
+        !["unknown", "suppressed", "5_9", "10_24", "25_plus"].includes(row.active_listings_band) ||
+        !["unknown", "suppressed", "5_9", "10_24", "25_plus"].includes(row.new_listings_24h_band)) {
       throw new Error("Invalid development advisor aggregate row");
     }
     return Object.freeze({

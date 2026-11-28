@@ -3,7 +3,7 @@ name: FAM Development Advisor SQL contract
 on:
   pull_request:
     paths:
-      - "supabase/migrations/*fam_development_advisor_aggregate_snapshots.sql"
+      - "supabase/migrations/*fam_development_advisor*"
 
 permissions:
   contents: read
@@ -34,10 +34,14 @@ jobs:
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/setup.sql
-      - name: Применить миграцию Советника
+      - name: Применить исходную миграцию агрегатов Советника
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
         run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261127050000_fam_development_advisor_aggregate_snapshots.sql
+      - name: Репетировать обновление уже созданной RPC до диапазонов приватности
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/migrations/20261128085459_fam_development_advisor_privacy_banded_snapshots.sql
       - name: Проверить границы данных и прав
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
