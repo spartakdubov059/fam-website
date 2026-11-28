@@ -25,16 +25,32 @@ export function summarizeQwenRuns(runs = []) {
     const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
     const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
     const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
-    const noTask = preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped";
+    const noTask = run.status === "completed" && run.conclusion === "success" &&
+      job.status === "completed" && job.conclusion === "success" &&
+      preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped" && modelOutcome !== "success";
     const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
+    const runStatus = run.status === "completed"
+      ? (run.conclusion || "unconfirmed")
+      : (run.status || "unknown");
     rows.push({
-      status: job.conclusion || job.status || run.conclusion || run.status || "unknown",
+      status: runStatus,
       duration_ms: duration,
       no_task: noTask,
       model_outcome: modelOutcome || "not_run",
-      generated: modelOutcome === "success" && verifyJob?.conclusion !== "skipped" && Boolean(verifyJob),
-      qa_passed: verifyJob?.conclusion === "success",
-      pr_created: (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" && item.conclusion === "success"),
+      generated: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
+        Boolean(verifyJob) && ["in_progress", "completed"].includes(verifyJob.status) &&
+        !["skipped", "cancelled"].includes(verifyJob.conclusion),
+      no_patch: run.status === "completed" && run.conclusion === "success" &&
+        job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "skipped",
+      qa_passed: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success",
+      qa_not_passed: modelOutcome === "success" && verifyJob?.status === "completed" &&
+        verifyJob.conclusion === "failure",
+      pr_created: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
+        verifyJob?.status === "completed" && verifyJob.conclusion === "success" &&
+        (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" &&
+          item.status === "completed" && item.conclusion === "success"),
       estimated_runner_minutes: (run.jobs || []).reduce((sum, item) => {
         const milliseconds = Math.max(0, dateMs(item.completed_at || run.updated_at) - dateMs(item.started_at || run.created_at));
         return sum + Math.ceil(milliseconds / 60_000);
@@ -46,11 +62,16 @@ export function summarizeQwenRuns(runs = []) {
   return Object.freeze({
     runs: rows.length,
     successful: count((row) => row.status === "success"),
-    failed: count((row) => row.status === "failure"),
+    failed: count((row) => ["failure", "startup_failure"].includes(row.status)),
+    timed_out: count((row) => row.status === "timed_out"),
+    cancelled: count((row) => row.status === "cancelled"),
+    unconfirmed: count((row) => !["success", "failure", "startup_failure", "timed_out", "cancelled"].includes(row.status)),
     no_task: count((row) => row.no_task),
     model_generated: count((row) => row.generated),
-    model_no_patch: count((row) => row.model_outcome === "success" && !row.generated && !row.no_task),
+    model_no_patch: count((row) => row.no_patch),
+    model_result_unconfirmed: count((row) => row.model_outcome === "success" && !row.generated && !row.no_patch && !row.no_task),
     qa_passed: count((row) => row.qa_passed),
+    qa_not_passed: count((row) => row.qa_not_passed),
     pr_created: count((row) => row.pr_created),
     estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
     p95_duration_minutes: sorted.length ? Math.ceil(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] / 60_000) : 0,
@@ -250,7 +271,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
   for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
   if (qwenMetrics) {
-    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", ошибки " + qwenMetrics.failed + ", тайм-ауты " + qwenMetrics.timed_out + ", отменены " + qwenMetrics.cancelled + ", не завершены или не подтверждены " + qwenMetrics.unconfirmed + ", без задачи " + qwenMetrics.no_task + ", no_patch " + qwenMetrics.model_no_patch + ", результат не подтверждён " + qwenMetrics.model_result_unconfirmed + ", patch сгенерирован " + qwenMetrics.model_generated + ", независимая QA прошла " + qwenMetrics.qa_passed + ", QA-job завершился ошибкой " + qwenMetrics.qa_not_passed + ", PR создан " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
     lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");
