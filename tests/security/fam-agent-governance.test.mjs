@@ -18,11 +18,30 @@ import {
   summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
   renderBossBrief,
+  classifyPullEvidence,
 } from "../../scripts/fam-agent-governance.mjs";
 import { mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
+
+test("ARBITER and INTEGRATOR report no signal for empty evidence and no data for incomplete evidence", () => {
+  assert.deepEqual(classifyPullEvidence({ complete: true, disputes: [], pulls: [] }), {
+    arbiter: { state: "checked_no_signal", evidence_count: 0, detail: "в полной выборке PR пересечений файлов не обнаружено" },
+    integrator: { state: "checked_no_signal", evidence_count: 0, detail: "полная выборка не содержит открытых PR для плана внедрения" },
+  });
+  const confirmed = classifyPullEvidence({
+    complete: true,
+    disputes: [{ number: 2 }],
+    pulls: [{ number: 1 }],
+  });
+  assert.equal(confirmed.arbiter.state, "confirmed");
+  assert.equal(confirmed.arbiter.evidence_count, 1);
+  assert.equal(confirmed.integrator.state, "confirmed");
+  assert.equal(confirmed.integrator.evidence_count, 1);
+  assert.equal(classifyPullEvidence({ complete: false, disputes: [{ number: 2 }], pulls: [{ number: 1 }] }).arbiter.state, "no_data");
+  assert.equal(classifyPullEvidence({ complete: false, disputes: [{ number: 2 }], pulls: [{ number: 1 }] }).integrator.state, "no_data");
+});
 
 test("daily Boss report is scheduled for 07:00 Moscow time", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/fam-agent-governance.yml", import.meta.url), "utf8");
