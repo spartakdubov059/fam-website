@@ -56,10 +56,20 @@ export function authorizeStaffAction({ role, action, scope, evidence, verifyEvid
   if (!evidence || !FAILURE_SOURCES.has(evidence.source) || !FAILURE_KINDS.has(evidence.kind) || !sourceEvidenceValid) {
     return deny("confirmed_failure_evidence_required");
   }
+  if (scope !== "FAM_CURRENT") return deny("task_scope_not_enabled_for_reassignment");
+  if (!TASK_KEYS.has(evidence.task_key)) return deny("task_type_not_allowlisted");
+  if (!Number.isFinite(now) || !Number.isFinite(Date.parse(evidence.lease_expires_at || "")) ||
+      Date.parse(evidence.lease_expires_at) > now) return deny("active_or_unverified_lease");
+  if (!Number.isSafeInteger(evidence.attempt_count) || !Number.isSafeInteger(evidence.max_attempts) ||
+      evidence.attempt_count < 0 || evidence.max_attempts < 1 || evidence.max_attempts > 2 ||
+      evidence.attempt_count >= evidence.max_attempts) return deny("retry_budget_exhausted_or_invalid");
+  if (evidence.duplicate_active !== false) return deny("duplicate_status_not_proven_clear");
+
   // Boolean claims in the evidence payload are caller-controlled. The caller
   // must supply a trusted source verifier; never treat `confirmed: true` or
-  // `source_verified: true` as proof by themselves. Pass only the bounded
-  // evidence fields that the verifier needs, never arbitrary caller fields.
+  // `source_verified: true` as proof by themselves. Run it only after cheap
+  // allowlist/lease/budget gates, and pass bounded fields instead of arbitrary
+  // caller content.
   if (typeof verifyEvidence !== "function") return deny("trusted_evidence_verifier_required");
   const verificationInput = Object.freeze({
     source: evidence.source,
@@ -75,14 +85,6 @@ export function authorizeStaffAction({ role, action, scope, evidence, verifyEvid
   let evidenceVerified = false;
   try { evidenceVerified = verifyEvidence(verificationInput) === true; } catch { /* fail closed */ }
   if (!evidenceVerified) return deny("source_evidence_not_verified");
-  if (scope !== "FAM_CURRENT") return deny("task_scope_not_enabled_for_reassignment");
-  if (!TASK_KEYS.has(evidence.task_key)) return deny("task_type_not_allowlisted");
-  if (!Number.isFinite(now) || !Number.isFinite(Date.parse(evidence.lease_expires_at || "")) ||
-      Date.parse(evidence.lease_expires_at) > now) return deny("active_or_unverified_lease");
-  if (!Number.isSafeInteger(evidence.attempt_count) || !Number.isSafeInteger(evidence.max_attempts) ||
-      evidence.attempt_count < 0 || evidence.max_attempts < 1 || evidence.max_attempts > 2 ||
-      evidence.attempt_count >= evidence.max_attempts) return deny("retry_budget_exhausted_or_invalid");
-  if (evidence.duplicate_active !== false) return deny("duplicate_status_not_proven_clear");
 
   return Object.freeze({
     allowed: true,

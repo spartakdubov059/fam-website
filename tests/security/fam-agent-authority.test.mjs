@@ -54,6 +54,11 @@ test("Boss retry eligibility requires a confirmed, allowlisted, expired and dedu
     "source_evidence_not_verified");
   assert.equal(authorizeStaffAction({ ...base, verifyEvidence: () => Promise.resolve(true) }).reason,
     "source_evidence_not_verified");
+  let verifierCalls = 0;
+  assert.equal(authorizeStaffAction({
+    ...base, scope: "FAM_RU", verifyEvidence: () => { verifierCalls++; return true; },
+  }).reason, "task_scope_not_enabled_for_reassignment");
+  assert.equal(verifierCalls, 0, "reject ineligible work before invoking external evidence verification");
   assert.equal(authorizeStaffAction({
     ...base, evidence: { ...base.evidence, confirmed: true, source_verified: true },
   }).reason, "trusted_evidence_verifier_required", "caller-supplied booleans cannot authenticate evidence");
