@@ -28,8 +28,8 @@ test("metrics endpoint accepts only fixed aggregate agent and task states", () =
 test("metrics distinguish no-task, analysis, generation, independent QA and PR", () => {
   const base = { status: "success", run_minutes: 14, created_at: "2026-11-23T00:00:00Z", updated_at: "2026-11-23T00:15:00Z" };
   const runs = summarizeQwenRuns([
-    { ...base, id: 1, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Проверить настройки затрат до сборки модели", conclusion: "success" }, { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" }] }] },
-    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", conclusion: "success" }] },
+    { ...base, id: 1, jobs: [{ name: "Локальная модель готовит исправление", status: "completed", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Проверить настройки затрат до сборки модели", conclusion: "success" }, { name: "Скачать бесплатную модель с лицензией Apache 2.0", conclusion: "skipped" }] }] },
+    { ...base, id: 2, jobs: [{ name: "Локальная модель готовит исправление", status: "completed", conclusion: "success", started_at: base.created_at, completed_at: base.updated_at, steps: [{ name: "Запустить локальную модель и подготовить patch", conclusion: "success" }] }, { name: "Независимая проверка без модели и секретов", status: "completed", conclusion: "success" }, { name: "Подготовить PR и проверить исправление без публикации", status: "completed", conclusion: "success" }] },
   ]);
   assert.equal(runs.no_task, 1);
   assert.equal(runs.model_generated, 1);
@@ -42,8 +42,8 @@ test("metrics distinguish no-task, analysis, generation, independent QA and PR",
   ]);
   assert.deepEqual(agents, [{ agent: "technical", total: 4, completed: 2, failed: 1, active: 1 }]);
   const report = makeReport({ agentMetrics: agents, qwenMetrics: runs });
-  assert.match(report, /анализ без patch 0/);
-  assert.match(report, /QA прошла 1/);
+  assert.match(report, /no_patch 0/);
+  assert.match(report, /независимая QA прошла 1/);
   assert.match(report, /runner-минуты/);
 });
 
