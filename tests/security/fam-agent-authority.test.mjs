@@ -20,9 +20,19 @@ const base = {
     duplicate_active: false,
   },
 };
-const verifiedWorkflowRuns = new Set([45186664053]);
-const verifyEvidence = (evidence) => evidence.source === "github_actions" &&
-  evidence.kind === "workflow_failure" && verifiedWorkflowRuns.has(evidence.run_id);
+const trustedEvidence = Object.freeze({
+  source: "github_actions",
+  kind: "workflow_failure",
+  run_id: 45186664053,
+  event_id: null,
+  task_key: "audit_accessibility",
+  lease_expires_at: "2026-11-27T06:30:00Z",
+  attempt_count: 0,
+  max_attempts: 2,
+  duplicate_active: false,
+});
+const verifyEvidence = (evidence) => Object.entries(trustedEvidence)
+  .every(([key, value]) => evidence[key] === value);
 
 test("authority contract names all nine roles and labels policy as non-executing", () => {
   assert.equal(Object.keys(STAFF_AUTHORITY_CONTRACT).length, 9);
@@ -54,6 +64,17 @@ test("Boss retry eligibility requires a confirmed, allowlisted, expired and dedu
     "source_evidence_not_verified");
   assert.equal(authorizeStaffAction({ ...base, verifyEvidence: () => Promise.resolve(true) }).reason,
     "source_evidence_not_verified");
+  for (const evidenceChange of [
+    { run_id: 45186664054 },
+    { task_key: "audit_client_resilience" },
+    { lease_expires_at: "2026-11-27T06:00:00Z" },
+    { attempt_count: 1 },
+    { max_attempts: 1 },
+  ]) {
+    assert.equal(authorizeStaffAction({
+      ...base, verifyEvidence, evidence: { ...base.evidence, ...evidenceChange },
+    }).reason, "source_evidence_not_verified", "all retry facts must match the source record");
+  }
   let verifierCalls = 0;
   assert.equal(authorizeStaffAction({
     ...base, scope: "FAM_RU", verifyEvidence: () => { verifierCalls++; return true; },
