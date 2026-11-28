@@ -119,9 +119,12 @@ export function renderBossBrief({ disputes = [], warnings = [], proposals = [], 
   const legalChangeDetected = legalAvailable && legalEvidenceSummary.some((row) => row.latest_status === "change_detected");
   const moderationAvailable = moderationLink === "connected" && moderationSummary !== null;
   const moderationSuppressed = moderationAvailable && moderationSummary.total_bucket === "suppressed";
-  const sourcesUnknown = !queueAvailable || !legalAvailable || !moderationAvailable || !qwenMetrics || moderationSuppressed;
+  const qwenUnconfirmed = Number.isSafeInteger(qwenMetrics?.model_result_unconfirmed) &&
+    qwenMetrics.model_result_unconfirmed >= 0 ? qwenMetrics.model_result_unconfirmed : null;
+  const sourcesUnknown = !queueAvailable || !legalAvailable || !moderationAvailable || !qwenMetrics ||
+    qwenUnconfirmed === null || moderationSuppressed;
   const queueIssues = queueAvailable && (queueHealth.failed_last_24h > 0 || queueHealth.expired_leases > 0);
-  const status = highWarnings || highRiskDisputes || queueIssues || legalChangeDetected
+  const status = highWarnings || highRiskDisputes || queueIssues || legalChangeDetected || qwenUnconfirmed > 0
     ? "требует внимания"
     : limited || sourcesUnknown
       ? "данные неполные; готовность не подтверждена"
@@ -134,6 +137,7 @@ export function renderBossBrief({ disputes = [], warnings = [], proposals = [], 
   if (highWarnings) nextStep = "Разобрать подтверждённые предупреждения высокой важности.";
   else if (highRiskDisputes) nextStep = "Сверить PR, затрагивающие защищённые файлы.";
   else if (queueIssues) nextStep = "Разобрать сбои и просроченные аренды очереди.";
+  else if (qwenUnconfirmed > 0) nextStep = "Разобрать запуски Qwen, для которых этапы результата не подтверждены.";
   else if (limited) nextStep = "Повторить обзор после восстановления полной выборки.";
   else if (sourcesUnknown) nextStep = "Восстановить недоступные источники; их отсутствие не считать нулевой статистикой.";
   else if (proposals.length) nextStep = "Рассмотреть предложения штаба; они не применяются автоматически.";
@@ -144,7 +148,9 @@ export function renderBossBrief({ disputes = [], warnings = [], proposals = [], 
     "- Очередь Supabase: " + queue + ".",
     "- Qwen: " + (qwenMetrics
       ? "запусков " + qwenMetrics.runs + ", анализ без patch " + qwenMetrics.model_no_patch +
-        ", patch " + qwenMetrics.model_generated + ", QA пройдена " + qwenMetrics.qa_passed + ", PR " + qwenMetrics.pr_created
+        ", patch " + qwenMetrics.model_generated + ", результат не подтверждён " +
+        (qwenUnconfirmed === null ? "метрика отсутствует" : qwenUnconfirmed) +
+        ", QA пройдена " + qwenMetrics.qa_passed + ", PR " + qwenMetrics.pr_created
       : "метрики не подтверждены") + ".",
     "- LEGAL: " + (legalChangeDetected ? "обнаружено изменение; требуется проверка человека" : legalAvailable ? "техническая сводка доступна; решения остаются на проверке человека" : "данные не подтверждены") +
       "; MODERATOR: " + (moderationSuppressed ? "агрегат подавлен порогом приватности" : moderationAvailable ? "агрегат доступен" : "данные не подтверждены") + ".",
