@@ -14,9 +14,11 @@ import {
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
   renderLegalObservationStatus,
+  inspectLegalEvidenceWarnings,
   summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
+import { mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -196,6 +198,28 @@ test("LEGAL staff metric counts only archive observations and never labels them 
     rows[0], { ...rows[1], observations_30d: "<unsafe>" },
   ], "connected"), /неожиданные поля или статусы; результат неизвестен/);
   assert.doesNotMatch(makeReport({ legalEvidenceSummary: rows, legalEvidenceLink: "connected" }), /Юрист \(LEGAL\).*решение о выпуске принято/);
+});
+
+test("INSPECTOR reports unavailable LEGAL sources but never auto-enqueues Qwen work", () => {
+  const warnings = inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "source_unavailable", observations_30d: 1 },
+  ]);
+  assert.deepEqual(warnings, [{
+    code: "legal_source_unavailable",
+    severity: "medium",
+    count: 1,
+    message: "LEGAL: официальный источник недоступен для FAM_RU; правовая готовность не подтверждена",
+  }]);
+  assert.equal(mapInspectorWarning(warnings[0]), null, "source outages are not coder tasks");
+  assert.deepEqual(inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "change_detected", observations_30d: 1 },
+  ]), []);
+  assert.deepEqual(inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "source_unavailable", observations_30d: "unsafe" },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "source_checked", observations_30d: 1 },
+  ]), []);
 });
 
 test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {

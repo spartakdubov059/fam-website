@@ -404,6 +404,19 @@ export function renderLegalObservationStatus(rows = null, link = "not_configured
   ].join("\n");
 }
 
+export function inspectLegalEvidenceWarnings(rows = null) {
+  if (!Array.isArray(rows)) return [];
+  let validatedRows;
+  try { validatedRows = validateLegalEvidenceSummaryResponse({ ok: true, scopes: rows }); }
+  catch { return []; }
+  return validatedRows.flatMap((row) => row.latest_status === "source_unavailable" ? [{
+    code: "legal_source_unavailable",
+    severity: "medium",
+    count: 1,
+    message: "LEGAL: официальный источник недоступен для " + row.scope + "; правовая готовность не подтверждена",
+  }] : []);
+}
+
 export function summarizeLegalStaffSignal(rows = null, link = "not_configured") {
   if (link !== "connected" || !Array.isArray(rows) || rows.length !== 2) {
     return Object.freeze({
@@ -570,6 +583,7 @@ export async function main() {
     }
     try {
       legalEvidenceSummary = await fetchLegalEvidenceSummary({ url: bridgeUrl, token: bridgeToken });
+      warnings.push(...inspectLegalEvidenceWarnings(legalEvidenceSummary));
       legalEvidenceLink = "connected";
     } catch {
       legalEvidenceLink = "unavailable";
