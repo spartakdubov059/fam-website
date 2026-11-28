@@ -52,7 +52,7 @@ alter table private.fam_legal_evidence_archive force row level security;
 
 grant usage on schema private to service_role;
 revoke all on table private.fam_legal_evidence_archive from public, anon, authenticated, service_role;
-grant select, insert on table private.fam_legal_evidence_archive to service_role;
+grant select on table private.fam_legal_evidence_archive to service_role;
 
 create unique index fam_legal_evidence_archive_daily_observation_idx
   on private.fam_legal_evidence_archive (
@@ -91,7 +91,7 @@ create or replace function public.append_fam_legal_evidence_observation(
 )
 returns table(record_id uuid, inserted boolean, status text, decision text)
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $function$
 declare
@@ -104,7 +104,11 @@ declare
   v_previous_record_sha256 text := '';
   v_record_sha256 text;
 begin
-  if current_user <> 'service_role' then
+  if coalesce(
+       nullif(pg_catalog.current_setting('request.jwt.claims', true)::jsonb ->> 'role', ''),
+       nullif(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+       ''
+     ) <> 'service_role' then
     raise exception 'LEGAL archive requires the protected service role' using errcode = '42501';
   end if;
   if p_scope not in ('FAM_CURRENT', 'FAM_RU')
@@ -196,6 +200,9 @@ begin
   return query select v_record_id, false, p_status, 'pending_human_review'::text;
 end;
 $function$;
+
+alter function public.append_fam_legal_evidence_observation(text, text, text, text, text, text, text, text)
+  owner to postgres;
 
 revoke all on function public.append_fam_legal_evidence_observation(text, text, text, text, text, text, text, text)
   from public, anon, authenticated;
