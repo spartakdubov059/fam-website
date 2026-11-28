@@ -172,21 +172,25 @@ test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR s
   ] };
   const qa = { ...base, name: "Независимая проверка без модели и секретов" };
   const pr = { ...base, name: "Подготовить PR и проверить исправление без публикации" };
+  const successfulRun = (...jobs) => ({ status: "completed", conclusion: "success", jobs });
   const result = summarizeQwenRuns([
-    { jobs: [noTask] },
-    { jobs: [generated, { ...qa, conclusion: "skipped" }] },
-    { jobs: [{ ...generated, status: "in_progress", conclusion: null }] },
-    { jobs: [generated, { ...qa, status: "queued", conclusion: null }] },
-    { jobs: [generated, qa, pr] },
-    { jobs: [generated, { ...qa, conclusion: "failure" }, pr] },
-    { jobs: [{ ...generated, conclusion: "failure" }, { ...qa, conclusion: "skipped" }] },
+    successfulRun(noTask),
+    successfulRun(generated, { ...qa, conclusion: "skipped" }),
+    { status: "in_progress", conclusion: null, jobs: [{ ...generated, status: "in_progress", conclusion: null }] },
+    { status: "in_progress", conclusion: null, jobs: [generated, { ...qa, status: "queued", conclusion: null }] },
+    successfulRun(generated, qa, pr),
+    { status: "completed", conclusion: "failure", jobs: [generated, { ...qa, conclusion: "failure" }, pr] },
+    { status: "completed", conclusion: "failure", jobs: [{ ...generated, conclusion: "failure" }, { ...qa, conclusion: "skipped" }] },
+    { status: "completed", conclusion: "cancelled", jobs: [generated, { ...qa, conclusion: "skipped" }] },
   ]);
   assert.equal(result.no_task, 1);
   assert.equal(result.model_no_patch, 1);
-  assert.equal(result.model_result_unconfirmed, 3);
+  assert.equal(result.model_result_unconfirmed, 4);
   assert.equal(result.model_generated, 2);
   assert.equal(result.qa_passed, 1);
   assert.equal(result.pr_created, 1);
+  assert.equal(result.successful, 3);
+  assert.equal(result.failed, 2);
 });
 
 test("Lifecycle approval and CI require exact commits and owner evidence", () => {

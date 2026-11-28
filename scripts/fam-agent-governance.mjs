@@ -28,15 +28,19 @@ export function summarizeQwenRuns(runs = []) {
     const noTask = job.status === "completed" && job.conclusion === "success" &&
       preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped" && modelOutcome !== "success";
     const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
+    const runStatus = run.status === "completed"
+      ? (run.conclusion || "unconfirmed")
+      : (run.status || "unknown");
     rows.push({
-      status: job.conclusion || job.status || run.conclusion || run.status || "unknown",
+      status: runStatus,
       duration_ms: duration,
       no_task: noTask,
       model_outcome: modelOutcome || "not_run",
       generated: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
         Boolean(verifyJob) && ["in_progress", "completed"].includes(verifyJob.status) &&
         !["skipped", "cancelled"].includes(verifyJob.conclusion),
-      no_patch: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
+      no_patch: run.status === "completed" && run.conclusion === "success" &&
+        job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
         verifyJob?.status === "completed" && verifyJob.conclusion === "skipped",
       qa_passed: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
         verifyJob?.status === "completed" && verifyJob.conclusion === "success",
