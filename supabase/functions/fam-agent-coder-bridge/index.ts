@@ -192,6 +192,47 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, snapshots: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }
 
+    if (body.action === "moderation_metrics" && Object.keys(body).length === 1) {
+      const summaries = await rpc("get_fam_moderation_aggregate_summary", {});
+      const categories = new Set([
+        "targeted_harassment", "hate_or_discrimination", "threat_or_intimidation",
+        "negative_personal_call", "spam_or_repeated_abuse", "unsafe_image",
+        "personal_data_in_image", "unclear_safety_signal",
+      ]);
+      const severities = new Set(["medium", "high"]);
+      const buckets = new Set(["5_9", "10_24", "25_plus"]);
+      const totalBuckets = new Set(["none", "suppressed", "5_9", "10_24", "25_plus"]);
+      if (!Array.isArray(summaries) || summaries.length !== 1) {
+        return json({ ok: false, error: "invalid_moderation_summary" }, 502);
+      }
+      const row = summaries[0];
+      if (!row || Object.keys(row).length !== 3 ||
+          typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
+          !totalBuckets.has(row.total_bucket) || !Array.isArray(row.categories) || row.categories.length > 16 ||
+          row.categories.some((item) => !item || Object.keys(item).length !== 3 ||
+            !categories.has(item.category) || !severities.has(item.severity) || !buckets.has(item.count_bucket))) {
+        return json({ ok: false, error: "invalid_moderation_summary" }, 502);
+      }
+      const seen = new Set(row.categories.map((item) => item.category + ":" + item.severity));
+      if (seen.size !== row.categories.length ||
+          (["none", "suppressed"].includes(row.total_bucket) && row.categories.length > 0)) {
+        return json({ ok: false, error: "invalid_moderation_summary" }, 502);
+      }
+      return json({
+        ok: true,
+        summary: {
+          generated_at: row.generated_at,
+          total_bucket: row.total_bucket,
+          categories: row.categories.map((item) => ({
+            category: item.category,
+            severity: item.severity,
+            count_bucket: item.count_bucket,
+          })),
+        },
+        diagnostic_id: diagnosticId,
+      }, 200, diagnosticId);
+    }
+
     if (body.action === "claim" && Object.keys(body).length === 1) {
       const tasks = await rpc("claim_fam_agent_coder_tasks", {
         p_worker_id: WORKER_ID,

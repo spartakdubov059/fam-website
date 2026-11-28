@@ -183,3 +183,60 @@ export async function fetchDevelopmentAdvisorSnapshots({ url, token, fetchImpl =
   if (!response?.ok) throw new Error("FAM development advisor aggregate request failed");
   return validateDevelopmentAdvisorResponse(await response.json());
 }
+
+const MODERATION_CATEGORIES = new Set([
+  "targeted_harassment", "hate_or_discrimination", "threat_or_intimidation",
+  "negative_personal_call", "spam_or_repeated_abuse", "unsafe_image",
+  "personal_data_in_image", "unclear_safety_signal",
+]);
+const MODERATION_SEVERITIES = new Set(["medium", "high"]);
+const MODERATION_BUCKETS = new Set(["5_9", "10_24", "25_plus"]);
+const MODERATION_TOTAL_BUCKETS = new Set(["none", "suppressed", ...MODERATION_BUCKETS]);
+const MODERATION_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+const MODERATION_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+export function validateModerationSummaryResponse(body, { now = Date.now() } = {}) {
+  const row = body?.summary;
+  const generatedAtMs = typeof row?.generated_at === "string" ? Date.parse(row.generated_at) : NaN;
+  if (!body || typeof body !== "object" || body.ok !== true || !row || typeof row !== "object" ||
+      Array.isArray(row) || Object.keys(row).length !== 3 ||
+      !Number.isFinite(generatedAtMs) || !Number.isFinite(now) ||
+      generatedAtMs > now + MODERATION_FUTURE_SKEW_MS || now - generatedAtMs > MODERATION_MAX_AGE_MS ||
+      !MODERATION_TOTAL_BUCKETS.has(row.total_bucket) || !Array.isArray(row.categories) || row.categories.length > 16) {
+    throw new Error("Invalid protected moderation aggregate response");
+  }
+  const seen = new Set();
+  const categories = row.categories.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item) || Object.keys(item).length !== 3 ||
+        !MODERATION_CATEGORIES.has(item.category) || !MODERATION_SEVERITIES.has(item.severity) ||
+        !MODERATION_BUCKETS.has(item.count_bucket)) {
+      throw new Error("Invalid moderation aggregate category");
+    }
+    const key = item.category + ":" + item.severity;
+    if (seen.has(key)) throw new Error("Duplicate moderation aggregate category");
+    seen.add(key);
+    return Object.freeze({ category: item.category, severity: item.severity, count_bucket: item.count_bucket });
+  });
+  if ((row.total_bucket === "none" || row.total_bucket === "suppressed") && categories.length) {
+    throw new Error("Suppressed moderation summary contains category details");
+  }
+  return Object.freeze({
+    generated_at: row.generated_at,
+    total_bucket: row.total_bucket,
+    categories: Object.freeze(categories),
+  });
+}
+
+export async function fetchModerationSummary({ url, token, fetchImpl = fetch, now = Date.now() }) {
+  if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
+    throw new Error("FAM governance bridge credentials unavailable");
+  }
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-fam-agent-token": token },
+    body: JSON.stringify({ action: "moderation_metrics" }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response?.ok) throw new Error("FAM moderation aggregate request failed");
+  return validateModerationSummaryResponse(await response.json(), { now });
+}

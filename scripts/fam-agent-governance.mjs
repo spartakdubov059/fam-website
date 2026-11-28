@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
 import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
@@ -211,7 +211,33 @@ export function proposeRecruitment({ disputes = [], warnings = [], activeRoles =
   return proposals;
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function renderModerationStatus(summary = null, link = "not_configured") {
+  const heading = "## MODERATOR — обезличенные сигналы безопасности";
+  if (link !== "connected" || !summary) {
+    return [heading, link === "not_configured"
+      ? "Источник защищённых агрегатов не настроен; работа Надзирателя не подтверждена."
+      : "Источник защищённых агрегатов недоступен или ответ отклонён; результат неизвестен."].join("\n");
+  }
+  const bucketLabel = {
+    none: "школ с сигналами за последние 7 дней не обнаружено",
+    suppressed: "школ с сигналами меньше пяти; данные скрыты и детализация не оценивается",
+    "5_9": "школ с сигналами: 5–9",
+    "10_24": "школ с сигналами: 10–24",
+    "25_plus": "школ с сигналами: 25 и более",
+  }[summary.total_bucket];
+  const categories = summary.categories.map((item) =>
+    item.category + "/" + item.severity + ": " + item.count_bucket.replace("_", "–")
+  );
+  return [
+    heading,
+    "Период: 7 дней; только FAM_CURRENT; " + bucketLabel + ".",
+    categories.length ? "Категории, отмеченные не менее чем в пяти школах: " + categories.join(", ") + "." :
+      "Категории, встречающиеся менее чем в пяти школах, скрыты; выводы по ним не делаются.",
+    "Это автоматические сигналы для проверки, не подтверждённые нарушения. FAM_RU не оценён.",
+  ].join("\n");
+}
+
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, moderationSummary = null, moderationLink = "not_configured", staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -270,6 +296,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
   lines.push("", renderDevelopmentScopeStatus(developmentScopes));
   lines.push("", renderLegalScopeStatus(legalScopes));
+  lines.push("", renderModerationStatus(moderationSummary, moderationLink));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
     "- Сигналы основаны на метаданных GitHub, не на частных сообщениях пользователей.",
@@ -406,6 +433,8 @@ export async function main() {
   let agentMetrics = [];
   let developmentAdvisor = buildDevelopmentAdvisor([]);
   let developmentAdvisorLink = "not_configured";
+  let moderationSummary = null;
+  let moderationLink = "not_configured";
   if (bridgeUrl && bridgeToken) {
     try {
       queueHealth = await fetchQueueHealth({ url: bridgeUrl, token: bridgeToken });
@@ -433,6 +462,18 @@ export async function main() {
         severity: "medium",
         count: 1,
         message: "Не удалось получить ограниченные дневные агрегаты Советника по развитию",
+      });
+    }
+    try {
+      moderationSummary = await fetchModerationSummary({ url: bridgeUrl, token: bridgeToken });
+      moderationLink = "connected";
+    } catch {
+      moderationLink = "unavailable";
+      warnings.push({
+        code: "moderation_metrics_unavailable",
+        severity: "medium",
+        count: 1,
+        message: "Не удалось получить безопасные агрегаты сигналов модерации",
       });
     }
   } else if (bridgeUrl || bridgeToken) {
@@ -530,10 +571,23 @@ export async function main() {
         ? "проверены только дневные агрегаты объявлений FAM_CURRENT; гипотезы переданы Боссу без автоматической постановки задач"
         : "агрегированный источник Советника не подключён или недоступен; работа не подтверждена",
     },
+    moderator: {
+      state: moderationLink !== "connected" || moderationSummary?.total_bucket === "suppressed"
+        ? "no_data"
+        : moderationSummary?.total_bucket === "none" ? "checked_no_signal" : "confirmed",
+      evidence_count: moderationLink === "connected" && moderationSummary?.total_bucket !== "suppressed" ? 1 : 0,
+      detail: moderationLink !== "connected"
+        ? "защищённые агрегаты модерации не подключены или недоступны"
+        : moderationSummary.total_bucket === "suppressed"
+          ? "сигналов меньше пяти; из-за порога приватности вывод невозможен"
+          : moderationSummary.total_bucket === "none"
+            ? "проверен 7-дневный агрегат FAM_CURRENT; сигналов нет"
+            : "проверен 7-дневный агрегат FAM_CURRENT; сигналы не трактуются как подтверждённые нарушения",
+    },
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics, developmentAdvisor,
+    qwenMetrics, developmentAdvisor, moderationSummary, moderationLink,
     developmentScopes: {
       FAM_CURRENT: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
       FAM_RU: "no_data",

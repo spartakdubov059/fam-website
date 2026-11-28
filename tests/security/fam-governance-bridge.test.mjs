@@ -9,11 +9,13 @@ import {
   fetchAgentMetrics,
   validateDevelopmentAdvisorResponse,
   fetchDevelopmentAdvisorSnapshots,
+  validateModerationSummaryResponse,
+  fetchModerationSummary,
   enqueueInspectorTask,
   mapInspectorWarning,
   validateInspectorEnqueueResponse,
 } from "../../scripts/fam-governance-bridge.mjs";
-import { makeReport, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
+import { makeReport, renderModerationStatus, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
 
 const values = Object.freeze({
   queued: 2,
@@ -116,6 +118,66 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings_band: "1_4" }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
   assert.match(workflow, /fam-development-advisor\.test\.mjs/);
+});
+
+test("moderation bridge exposes only thresholded category buckets, never raw incident data", async () => {
+  let request;
+  const summary = {
+    generated_at: "2026-11-27T06:00:00Z",
+    total_bucket: "5_9",
+    categories: [{ category: "targeted_harassment", severity: "medium", count_bucket: "5_9" }],
+  };
+  const result = await fetchModerationSummary({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token",
+    now: Date.parse("2026-11-27T06:10:00Z"),
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ ok: true, summary }) };
+    },
+  });
+  assert.deepEqual(result, summary);
+  assert.deepEqual(JSON.parse(request.body), { action: "moderation_metrics" });
+  assert.equal(request.headers["x-fam-agent-token"], "test-governance-token");
+  for (const unsafe of [
+    { ...summary, user_id: "private" },
+    { ...summary, categories: [{ ...summary.categories[0], evidence_excerpt: "private" }] },
+    { ...summary, categories: [{ category: "unknown", severity: "high", count_bucket: "5_9" }] },
+    { ...summary, categories: [{ ...summary.categories[0], count_bucket: "1_4" }] },
+    { ...summary, categories: [summary.categories[0], summary.categories[0]] },
+    { ...summary, total_bucket: "suppressed" },
+  ]) assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: unsafe }, {
+    now: Date.parse("2026-11-27T06:10:00Z"),
+  }));
+  assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: {
+    ...summary, generated_at: "2026-11-24T06:00:00Z",
+  } }, { now: Date.parse("2026-11-27T06:10:00Z") }), /Invalid protected moderation aggregate/);
+  assert.throws(() => validateModerationSummaryResponse({ ok: true, summary: {
+    ...summary, generated_at: "2026-11-27T06:20:00Z",
+  } }, { now: Date.parse("2026-11-27T06:10:00Z") }), /Invalid protected moderation aggregate/);
+  assert.equal(validateModerationSummaryResponse({ ok: true, summary }, {
+    now: Date.parse("2026-11-27T06:10:00Z"),
+  }).total_bucket, "5_9");
+  assert.match(edge, /get_fam_moderation_aggregate_summary/);
+  assert.match(edge, /body\.action === "moderation_metrics"/);
+  assert.match(workflow, /fam-governance-bridge\.test\.mjs/);
+});
+
+test("moderator report distinguishes no signal, suppressed data and unavailable source", () => {
+  const none = renderModerationStatus({
+    generated_at: "2026-11-27T06:00:00Z", total_bucket: "none", categories: [],
+  }, "connected");
+  assert.match(none, /школ с сигналами за последние 7 дней не обнаружено/);
+  assert.match(none, /FAM_RU не оценён/);
+
+  const suppressed = renderModerationStatus({
+    generated_at: "2026-11-27T06:00:00Z", total_bucket: "suppressed", categories: [],
+  }, "connected");
+  assert.match(suppressed, /меньше пяти; данные скрыты/);
+
+  const unavailable = renderModerationStatus(null, "unavailable");
+  assert.match(unavailable, /результат неизвестен/);
+  assert.doesNotMatch(makeReport(), /школ с сигналами за последние 7 дней не обнаружено/);
 });
 
 test("INSPECTOR maps only high-confidence technical warnings to a fixed task allowlist", () => {
