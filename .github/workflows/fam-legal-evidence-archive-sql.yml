@@ -1,0 +1,46 @@
+name: FAM legal evidence archive SQL contract
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/*fam_legal_evidence_observation_archive.sql"
+      - "tests/fixtures/fam-legal-evidence-archive/**"
+      - ".github/workflows/fam-legal-evidence-archive-sql.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-contract:
+    name: Isolated PostgreSQL archive contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fam_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fam_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout v4
+        with:
+          persist-credentials: false
+      - name: Prepare disposable roles
+        run: psql "${{ env.TEST_DATABASE_URL }}" -v ON_ERROR_STOP=1 -f tests/fixtures/fam-legal-evidence-archive/setup.sql
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fam_test
+      - name: Apply archive migration in disposable database
+        run: psql "${{ env.TEST_DATABASE_URL }}" -v ON_ERROR_STOP=1 -f supabase/migrations/20261127070343_fam_legal_evidence_observation_archive.sql
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fam_test
+      - name: Assert access, append-only and idempotency contracts
+        run: psql "${{ env.TEST_DATABASE_URL }}" -v ON_ERROR_STOP=1 -f tests/fixtures/fam-legal-evidence-archive/assertions.sql
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fam_test
