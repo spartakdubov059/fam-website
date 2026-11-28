@@ -17,6 +17,7 @@ import {
   inspectLegalEvidenceWarnings,
   summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
+  renderBossBrief,
 } from "../../scripts/fam-agent-governance.mjs";
 import { mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
@@ -153,6 +154,92 @@ test("Report escapes untrusted GitHub metadata and clarifies human authority", (
   assert.ok(report.includes("отчёт неполный"));
   assert.ok(report.includes("одобрения владельца"));
   assert.ok(report.includes("#1 ↔ #2"));
+});
+
+test("Boss brief keeps unknown sources explicit and does not report an unverified healthy state", () => {
+  const brief = renderBossBrief({ count: 7, limited: true, warnings: [], disputes: [], proposals: [] });
+  assert.match(brief, /данные неполные; готовность не подтверждена/);
+  assert.match(brief, /Очередь Supabase: не подтверждена/);
+  assert.match(brief, /LEGAL: данные не подтверждены; MODERATOR: данные не подтверждены/);
+  assert.match(brief, /Повторить обзор после восстановления полной выборки/);
+  assert.doesNotMatch(brief, /система работает нормально|всё исправлено/i);
+});
+
+test("Boss brief prioritizes high-risk warnings without exposing their free text", () => {
+  const brief = renderBossBrief({
+    warnings: [{ severity: "high", message: "student@example.test: private detail" }],
+    disputes: [{ highRisk: true }],
+    proposals: [{}],
+  });
+  assert.match(brief, /Состояние: требует внимания/);
+  assert.match(brief, /высокая важность — 1/);
+  assert.match(brief, /защищённых — 1/);
+  assert.match(brief, /Разобрать подтверждённые предупреждения высокой важности/);
+  assert.doesNotMatch(brief, /student@example\.test|private detail/);
+});
+
+test("Boss brief reports queue failures and separates Qwen analysis, QA and PR outcomes", () => {
+  const brief = renderBossBrief({
+    queueLink: "connected",
+    queueHealth: { queued: 1, in_progress: 0, failed_last_24h: 1, expired_leases: 1 },
+    legalEvidenceLink: "connected",
+    legalEvidenceSummary: [
+      { scope: "FAM_CURRENT", latest_status: "source_checked" },
+      { scope: "FAM_RU", latest_status: "source_checked" },
+    ],
+    moderationLink: "connected",
+    moderationSummary: { total_bucket: "none" },
+    qwenMetrics: { runs: 4, model_no_patch: 2, model_generated: 2, model_result_unconfirmed: 0, qa_passed: 1, pr_created: 1 },
+  });
+  assert.match(brief, /Состояние: требует внимания/);
+  assert.match(brief, /ошибки за сутки 1, просроченные аренды 1/);
+  assert.match(brief, /анализ без patch 2, patch 2, результат не подтверждён 0, QA пройдена 1, PR 1/);
+  assert.match(brief, /решения остаются на проверке человека/);
+});
+
+test("Boss brief highlights unconfirmed Qwen results and treats a missing metric as unknown", () => {
+  const validSources = {
+    queueLink: "connected",
+    queueHealth: { queued: 0, in_progress: 0, failed_last_24h: 0, expired_leases: 0 },
+    legalEvidenceLink: "connected",
+    legalEvidenceSummary: [
+      { scope: "FAM_CURRENT", latest_status: "source_checked" },
+      { scope: "FAM_RU", latest_status: "source_checked" },
+    ],
+    moderationLink: "connected",
+    moderationSummary: { total_bucket: "none" },
+  };
+  const unconfirmed = renderBossBrief({
+    ...validSources,
+    qwenMetrics: { runs: 3, model_no_patch: 0, model_generated: 0, model_result_unconfirmed: 2, qa_passed: 0, pr_created: 0 },
+  });
+  assert.match(unconfirmed, /Состояние: требует внимания/);
+  assert.match(unconfirmed, /результат не подтверждён 2/);
+  assert.match(unconfirmed, /Разобрать запуски Qwen, для которых этапы результата не подтверждены/);
+
+  const missingMetric = renderBossBrief({
+    ...validSources,
+    qwenMetrics: { runs: 3, model_no_patch: 1, model_generated: 2, qa_passed: 1, pr_created: 1 },
+  });
+  assert.match(missingMetric, /данные неполные; готовность не подтверждена/);
+  assert.match(missingMetric, /результат не подтверждён метрика отсутствует/);
+});
+
+test("Boss brief treats a detected legal-source change as pending human review", () => {
+  const brief = renderBossBrief({
+    queueLink: "connected",
+    queueHealth: { queued: 0, in_progress: 0, failed_last_24h: 0, expired_leases: 0 },
+    legalEvidenceLink: "connected",
+    legalEvidenceSummary: [
+      { scope: "FAM_CURRENT", latest_status: "change_detected" },
+      { scope: "FAM_RU", latest_status: "source_checked" },
+    ],
+    moderationLink: "connected",
+    moderationSummary: { total_bucket: "none" },
+    qwenMetrics: { runs: 0, model_no_patch: 0, model_generated: 0, qa_passed: 0, pr_created: 0 },
+  });
+  assert.match(brief, /Состояние: требует внимания/);
+  assert.match(brief, /LEGAL: обнаружено изменение; требуется проверка человека/);
 });
 
 test("Boss report uses Moscow time and updates even when the scheduled day has no warnings", () => {

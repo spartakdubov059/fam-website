@@ -104,6 +104,61 @@ function clean(value, maxLength = 150) {
     .slice(0, maxLength);
 }
 
+export function renderBossBrief({ disputes = [], warnings = [], proposals = [], queueHealth = null,
+  queueLink = "not_configured", legalEvidenceSummary = null, legalEvidenceLink = "not_configured",
+  moderationSummary = null, moderationLink = "not_configured", qwenMetrics = null,
+  count = 0, limited = false } = {}) {
+  const highWarnings = warnings.filter((item) => item?.severity === "high").length;
+  const mediumWarnings = warnings.filter((item) => item?.severity === "medium").length;
+  const highRiskDisputes = disputes.filter((item) => item?.highRisk === true).length;
+  const queueAvailable = queueLink === "connected" && queueHealth !== null;
+  const legalRowsValid = Array.isArray(legalEvidenceSummary) && legalEvidenceSummary.length === 2;
+  const legalAvailable = legalEvidenceLink === "connected" && legalRowsValid && legalEvidenceSummary.every((row) =>
+    row && ["source_checked", "change_detected"].includes(row.latest_status)
+  );
+  const legalChangeDetected = legalAvailable && legalEvidenceSummary.some((row) => row.latest_status === "change_detected");
+  const moderationAvailable = moderationLink === "connected" && moderationSummary !== null;
+  const moderationSuppressed = moderationAvailable && moderationSummary.total_bucket === "suppressed";
+  const qwenUnconfirmed = Number.isSafeInteger(qwenMetrics?.model_result_unconfirmed) &&
+    qwenMetrics.model_result_unconfirmed >= 0 ? qwenMetrics.model_result_unconfirmed : null;
+  const sourcesUnknown = !queueAvailable || !legalAvailable || !moderationAvailable || !qwenMetrics ||
+    qwenUnconfirmed === null || moderationSuppressed;
+  const queueIssues = queueAvailable && (queueHealth.failed_last_24h > 0 || queueHealth.expired_leases > 0);
+  const status = highWarnings || highRiskDisputes || queueIssues || legalChangeDetected || qwenUnconfirmed > 0
+    ? "требует внимания"
+    : limited || sourcesUnknown
+      ? "данные неполные; готовность не подтверждена"
+      : "проверенные источники без критического сигнала";
+  const queue = queueAvailable
+    ? "ожидают " + queueHealth.queued + ", выполняются " + queueHealth.in_progress +
+      ", ошибки за сутки " + queueHealth.failed_last_24h + ", просроченные аренды " + queueHealth.expired_leases
+    : "не подтверждена";
+  let nextStep = "Продолжить наблюдение; отсутствие новых сигналов не означает, что исправления внедрены.";
+  if (highWarnings) nextStep = "Разобрать подтверждённые предупреждения высокой важности.";
+  else if (highRiskDisputes) nextStep = "Сверить PR, затрагивающие защищённые файлы.";
+  else if (queueIssues) nextStep = "Разобрать сбои и просроченные аренды очереди.";
+  else if (qwenUnconfirmed > 0) nextStep = "Разобрать запуски Qwen, для которых этапы результата не подтверждены.";
+  else if (limited) nextStep = "Повторить обзор после восстановления полной выборки.";
+  else if (sourcesUnknown) nextStep = "Восстановить недоступные источники; их отсутствие не считать нулевой статистикой.";
+  else if (proposals.length) nextStep = "Рассмотреть предложения штаба; они не применяются автоматически.";
+  return [
+    "## Кратко для Босса",
+    "- Состояние: " + status + (count ? "; проверено PR: " + count : "" ) + ".",
+    "- Сигналы: высокая важность — " + highWarnings + ", средняя — " + mediumWarnings + "; пересечения PR — " + disputes.length + " (защищённых — " + highRiskDisputes + ").",
+    "- Очередь Supabase: " + queue + ".",
+    "- Qwen: " + (qwenMetrics
+      ? "запусков " + qwenMetrics.runs + ", анализ без patch " + qwenMetrics.model_no_patch +
+        ", patch " + qwenMetrics.model_generated + ", результат не подтверждён " +
+        (qwenUnconfirmed === null ? "метрика отсутствует" : qwenUnconfirmed) +
+        ", QA пройдена " + qwenMetrics.qa_passed + ", PR " + qwenMetrics.pr_created
+      : "метрики не подтверждены") + ".",
+    "- LEGAL: " + (legalChangeDetected ? "обнаружено изменение; требуется проверка человека" : legalAvailable ? "техническая сводка доступна; решения остаются на проверке человека" : "данные не подтверждены") +
+      "; MODERATOR: " + (moderationSuppressed ? "агрегат подавлен порогом приватности" : moderationAvailable ? "агрегат доступен" : "данные не подтверждены") + ".",
+    "- Предложения к рассмотрению: " + proposals.length + "; автоматически не утверждаются.",
+    "- Следующий шаг: " + nextStep,
+  ].join("\n");
+}
+
 function sortedNumbers(numbers) {
   return [...new Set(numbers)].sort((a, b) => a - b);
 }
@@ -276,6 +331,9 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
     "",
     "Ежедневный доклад на " + formatMoscowTimestamp(now) + ".",
     "Проверено открытых PR: " + count + (limited ? " (достигнут лимит выборки; отчёт неполный)" : "") + ".",
+    "",
+    renderBossBrief({ disputes, warnings, proposals, queueHealth, queueLink,
+      legalEvidenceSummary, legalEvidenceLink, moderationSummary, moderationLink, qwenMetrics, count, limited }),
     "",
     "## ARBITER — конфликты изменений",
   ];
