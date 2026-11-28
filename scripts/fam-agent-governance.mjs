@@ -45,6 +45,8 @@ export function summarizeQwenRuns(runs = []) {
         verifyJob?.status === "completed" && verifyJob.conclusion === "skipped",
       qa_passed: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
         verifyJob?.status === "completed" && verifyJob.conclusion === "success",
+      qa_not_passed: modelOutcome === "success" && verifyJob?.status === "completed" &&
+        verifyJob.conclusion === "failure",
       pr_created: job.status === "completed" && job.conclusion === "success" && modelOutcome === "success" &&
         verifyJob?.status === "completed" && verifyJob.conclusion === "success" &&
         (run.jobs || []).some((item) => item.name === "Подготовить PR и проверить исправление без публикации" &&
@@ -69,6 +71,7 @@ export function summarizeQwenRuns(runs = []) {
     model_no_patch: count((row) => row.no_patch),
     model_result_unconfirmed: count((row) => row.model_outcome === "success" && !row.generated && !row.no_patch && !row.no_task),
     qa_passed: count((row) => row.qa_passed),
+    qa_not_passed: count((row) => row.qa_not_passed),
     pr_created: count((row) => row.pr_created),
     estimated_runner_minutes: rows.reduce((sum, row) => sum + row.estimated_runner_minutes, 0),
     p95_duration_minutes: sorted.length ? Math.ceil(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] / 60_000) : 0,
@@ -268,7 +271,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
   for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
   if (qwenMetrics) {
-    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", ошибки " + qwenMetrics.failed + ", тайм-ауты " + qwenMetrics.timed_out + ", отменены " + qwenMetrics.cancelled + ", не завершены или не подтверждены " + qwenMetrics.unconfirmed + ", без задачи " + qwenMetrics.no_task + ", no_patch " + qwenMetrics.model_no_patch + ", результат не подтверждён " + qwenMetrics.model_result_unconfirmed + ", patch сгенерирован " + qwenMetrics.model_generated + ", независимая QA прошла " + qwenMetrics.qa_passed + ", PR создан " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", ошибки " + qwenMetrics.failed + ", тайм-ауты " + qwenMetrics.timed_out + ", отменены " + qwenMetrics.cancelled + ", не завершены или не подтверждены " + qwenMetrics.unconfirmed + ", без задачи " + qwenMetrics.no_task + ", no_patch " + qwenMetrics.model_no_patch + ", результат не подтверждён " + qwenMetrics.model_result_unconfirmed + ", patch сгенерирован " + qwenMetrics.model_generated + ", независимая QA прошла " + qwenMetrics.qa_passed + ", QA-job завершился ошибкой " + qwenMetrics.qa_not_passed + ", PR создан " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
     lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");

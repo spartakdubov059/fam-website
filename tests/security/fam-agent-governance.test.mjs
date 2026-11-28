@@ -194,6 +194,7 @@ test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR s
   assert.equal(result.model_result_unconfirmed, 6);
   assert.equal(result.model_generated, 2);
   assert.equal(result.qa_passed, 1);
+  assert.equal(result.qa_not_passed, 1);
   assert.equal(result.pr_created, 1);
   assert.equal(result.successful, 3);
   assert.equal(result.failed, 4);
