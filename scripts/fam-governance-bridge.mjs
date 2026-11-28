@@ -254,7 +254,9 @@ export function validateLegalEvidenceSummaryResponse(body) {
         !LEGAL_OBSERVATION_STATUSES.has(row.latest_status) ||
         (row.latest_checked_at !== null &&
           (typeof row.latest_checked_at !== "string" || !Number.isFinite(Date.parse(row.latest_checked_at)))) ||
-        !Number.isSafeInteger(row.observations_30d) || row.observations_30d < 0 || row.observations_30d > 100_000) {
+        !Number.isSafeInteger(row.observations_30d) || row.observations_30d < 0 || row.observations_30d > 100_000 ||
+        (row.latest_status === "not_assessed" && (row.latest_checked_at !== null || row.observations_30d !== 0)) ||
+        (row.latest_status !== "not_assessed" && (row.latest_checked_at === null || row.observations_30d < 1))) {
       throw new Error("Invalid legal evidence scope row");
     }
     seen.add(row.scope);

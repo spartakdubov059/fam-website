@@ -183,6 +183,10 @@ test("LEGAL summary accepts only two fixed scopes and metadata-only source obser
     [scopes[0], { ...scopes[1], latest_status: "approved" }],
     [scopes[0], { ...scopes[1], observations_30d: "0" }],
     [scopes[0], { ...scopes[1], observations_30d: 100_001 }],
+    [scopes[0], { ...scopes[1], latest_checked_at: "2026-11-28T04:00:00Z" }],
+    [scopes[0], { ...scopes[1], observations_30d: 1 }],
+    [{ ...scopes[0], latest_checked_at: null }, scopes[1]],
+    [{ ...scopes[0], observations_30d: 0 }, scopes[1]],
   ]) assert.throws(() => validateLegalEvidenceSummaryResponse({ ok: true, scopes: unsafe }));
 });
 

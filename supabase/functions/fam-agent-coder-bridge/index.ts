@@ -241,7 +241,9 @@ Deno.serve(async (req: Request) => {
         !row || Object.keys(row).length !== 4 || !scopes.has(row.scope) || !statuses.has(row.latest_status) ||
         (row.latest_checked_at !== null &&
           (typeof row.latest_checked_at !== "string" || !Number.isFinite(Date.parse(row.latest_checked_at)))) ||
-        !Number.isSafeInteger(row.observations_30d) || row.observations_30d < 0 || row.observations_30d > 100_000
+        !Number.isSafeInteger(row.observations_30d) || row.observations_30d < 0 || row.observations_30d > 100_000 ||
+        (row.latest_status === "not_assessed" && (row.latest_checked_at !== null || row.observations_30d !== 0)) ||
+        (row.latest_status !== "not_assessed" && (row.latest_checked_at === null || row.observations_30d < 1))
       ) || new Set(observations.map((row) => row.scope)).size !== 2) {
         return json({ ok: false, error_code: "invalid_legal_evidence_summary", stage: "rpc_validation", diagnostic_id: diagnosticId }, 502, diagnosticId);
       }
