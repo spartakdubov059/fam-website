@@ -27,6 +27,7 @@ on:
         options: [none, synthetic_ci_workflow_failure, synthetic_qwen_runtime_smoke]
         default: none
   schedule:
+    # 04:00 UTC = 07:00 Europe/Moscow.
     - cron: "0 4 * * *"
 
 permissions:
