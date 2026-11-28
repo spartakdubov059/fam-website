@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12140)
-Total output lines: 785
-
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
@@ -368,7 +365,10 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   }
   lines.push("В штаб поступают только счётчики задач; тексты, ID и данные учеников не передаются.");
   lines.push("", "## Метрики работы агентов");
-  if (!agent…140 tokens truncated…wenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
+  if (!agentMetrics.length) lines.push("Агрегаты заданий недоступны; статистика не считается нулевой.");
+  for (const item of agentMetrics) lines.push("- " + clean(item.agent, 50) + ": всего " + item.total + ", успешно " + item.completed + ", ошибка " + item.failed + ", активны " + item.active + ".");
+  if (qwenMetrics) {
+    lines.push("Qwen за последние запуски: всего " + qwenMetrics.runs + ", успешны " + qwenMetrics.successful + ", с ошибкой " + qwenMetrics.failed + ", без задачи " + qwenMetrics.no_task + ", анализ без patch " + qwenMetrics.model_no_patch + ", patch сгенерирован " + qwenMetrics.model_generated + ", QA прошла " + qwenMetrics.qa_passed + ", PR открыт " + qwenMetrics.pr_created + ", примерные runner-минуты " + qwenMetrics.estimated_runner_minutes + ", p95 длительности " + qwenMetrics.p95_duration_minutes + " мин.");
     lines.push("Runner-минуты оценены по длительности шагов последних 20 запусков; это не счёт и не стоимость. Анализ без patch не считается исправлением сайта.");
   } else lines.push("Метрики Actions пока недоступны.");
   lines.push("", "## RECRUITER — предложения по найму");
