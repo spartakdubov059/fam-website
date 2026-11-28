@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchLegalEvidenceSummary, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchLegalEvidenceSummary, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning, validateLegalEvidenceSummaryResponse } from "./fam-governance-bridge.mjs";
 import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
@@ -269,7 +269,7 @@ export function renderModerationStatus(summary = null, link = "not_configured") 
   ].join("\n");
 }
 
-export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, moderationSummary = null, moderationLink = "not_configured", staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
+export function makeReport({ disputes = [], warnings = [], proposals = [], integrationPlan = null, queueHealth = null, queueLink = "not_configured", agentMetrics = [], qwenMetrics = null, developmentAdvisor = null, developmentScopes = {}, legalScopes = {}, legalEvidenceSummary = null, legalEvidenceLink = "not_configured", moderationSummary = null, moderationLink = "not_configured", staffSignals = {}, count = 0, limited = false, now = Date.now() } = {}) {
   const lines = [
     REPORT_MARKER,
     "# FAM — штаб контроля агентов",
@@ -328,6 +328,7 @@ export function makeReport({ disputes = [], warnings = [], proposals = [], integ
   lines.push("", renderDevelopmentAdvisor(developmentAdvisor || buildDevelopmentAdvisor([])));
   lines.push("", renderDevelopmentScopeStatus(developmentScopes));
   lines.push("", renderLegalScopeStatus(legalScopes));
+  lines.push("", renderLegalObservationStatus(legalEvidenceSummary, legalEvidenceLink));
   lines.push("", renderModerationStatus(moderationSummary, moderationLink));
   lines.push("", renderStaffSnapshot(staffSignals));
   lines.push("", "## Полномочия и ограничения",
@@ -373,17 +374,60 @@ export function renderLegalScopeStatus(statuses = {}) {
   ].join("\n");
 }
 
-export function mapLegalEvidenceScopes(summary) {
-  if (!summary || typeof summary !== "object") return Object.freeze({ FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
-  const mapStatus = (row) => {
-    if (!row || !["source_checked", "change_detected", "source_unavailable", "not_assessed"].includes(row.latest_status)) return "not_assessed";
-    if (row.latest_status === "source_unavailable") return "source_unavailable";
-    if (row.latest_status === "source_checked" || row.latest_status === "change_detected") return "evidence_pending_human_review";
-    return "not_assessed";
+export function renderLegalObservationStatus(rows = null, link = "not_configured") {
+  const labels = {
+    not_assessed: "наблюдений в архиве нет",
+    source_checked: "официальный источник проверен, новых изменений не отмечено",
+    change_detected: "зафиксировано изменение источника, требуется проверка человеком",
+    source_unavailable: "источник был недоступен при последней проверке",
   };
+  const heading = "## LEGAL — наблюдения официальных источников";
+  if (link !== "connected" || !Array.isArray(rows)) {
+    return [heading, link === "not_configured"
+      ? "Защищённый источник архива не подключён; мониторинг не подтверждён."
+      : "Архив недоступен или его ответ отклонён; статус неизвестен."].join("\n");
+  }
+  let validatedRows;
+  try { validatedRows = validateLegalEvidenceSummaryResponse({ ok: true, scopes: rows }); }
+  catch { return [heading, "Архив вернул неожиданные поля или статусы; результат неизвестен."].join("\n"); }
+  const indexed = new Map(validatedRows.map((row) => [row.scope, row]));
+  return [
+    heading,
+    ...["FAM_CURRENT", "FAM_RU"].map((scope) => {
+      const row = indexed.get(scope);
+      if (!row) return "- **" + scope + ":** запись отсутствует; результат неизвестен.";
+      const checked = row.latest_checked_at ? "; последняя запись " + formatMoscowTimestamp(row.latest_checked_at) : "";
+      return "- **" + scope + ":** " + (labels[row.latest_status] || labels.not_assessed) +
+        "; наблюдений за 30 дней: " + row.observations_30d + checked + ".";
+    }),
+    "Это только техническая фиксация состояния публичного источника. Она не устанавливает применимость закона, юридическую готовность или разрешение на выпуск; решения ожидают человека.",
+  ].join("\n");
+}
+
+export function summarizeLegalStaffSignal(rows = null, link = "not_configured") {
+  if (link !== "connected" || !Array.isArray(rows) || rows.length !== 2) {
+    return Object.freeze({
+      state: "no_data",
+      evidence_count: 0,
+      detail: "защищённая сводка юридических наблюдений не подключена или недоступна; правовые выводы не подтверждены",
+    });
+  }
+  let validatedRows;
+  try { validatedRows = validateLegalEvidenceSummaryResponse({ ok: true, scopes: rows }); }
+  catch {
+    return Object.freeze({
+      state: "no_data",
+      evidence_count: 0,
+      detail: "сводка LEGAL содержит неподтверждённые поля; статус неизвестен",
+    });
+  }
+  const evidenceCount = validatedRows.reduce((sum, row) => sum + row.observations_30d, 0);
   return Object.freeze({
-    FAM_CURRENT: mapStatus(summary.FAM_CURRENT),
-    FAM_RU: mapStatus(summary.FAM_RU),
+    state: evidenceCount > 0 ? "confirmed" : "no_data",
+    evidence_count: evidenceCount,
+    detail: evidenceCount > 0
+      ? "получена только агрегированная история технических проверок публичных источников; юридическая применимость и решения остаются на проверке человека"
+      : "за последние 30 дней в защищённой сводке нет наблюдений; мониторинг и правовая готовность не подтверждены",
   });
 }
 
@@ -481,7 +525,7 @@ export async function main() {
   let developmentAdvisorLink = "not_configured";
   let moderationSummary = null;
   let moderationLink = "not_configured";
-  let legalEvidence = null;
+  let legalEvidenceSummary = null;
   let legalEvidenceLink = "not_configured";
   if (bridgeUrl && bridgeToken) {
     try {
@@ -525,15 +569,15 @@ export async function main() {
       });
     }
     try {
-      legalEvidence = await fetchLegalEvidenceSummary({ url: bridgeUrl, token: bridgeToken });
+      legalEvidenceSummary = await fetchLegalEvidenceSummary({ url: bridgeUrl, token: bridgeToken });
       legalEvidenceLink = "connected";
     } catch {
       legalEvidenceLink = "unavailable";
       warnings.push({
-        code: "legal_evidence_unavailable",
+        code: "legal_evidence_summary_unavailable",
         severity: "medium",
         count: 1,
-        message: "Не удалось получить безопасную сводку проверок источников LEGAL",
+        message: "Не удалось получить безопасную сводку наблюдений LEGAL; правовой статус неизвестен",
       });
     }
   } else if (bridgeUrl || bridgeToken) {
@@ -619,15 +663,7 @@ export async function main() {
       evidence_count: proposals.length,
       detail: proposals.length ? "подготовлены обоснованные предложения" : "порог для новых ролей не достигнут",
     },
-    legal: {
-      state: legalEvidenceLink === "connected" && Object.values(legalEvidence).some((row) => row.observations_30d > 0)
-        ? "confirmed" : "no_data",
-      evidence_count: legalEvidenceLink === "connected"
-        ? Object.values(legalEvidence).reduce((sum, row) => sum + row.observations_30d, 0) : 0,
-      detail: legalEvidenceLink === "connected"
-        ? "получена только сводка проверок источников; юридические решения остаются на проверке человеком, выпуск не одобрен"
-        : "сводка проверок официальных источников недоступна; готовность не оценена",
-    },
+    legal: summarizeLegalStaffSignal(legalEvidenceSummary, legalEvidenceLink),
     development_advisor: {
       state: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
       evidence_count: developmentAdvisorLink === "connected" ? developmentAdvisor.proposals.length : 0,
@@ -651,12 +687,11 @@ export async function main() {
   };
   const report = makeReport({
     disputes, warnings, proposals, integrationPlan, queueHealth, queueLink, agentMetrics,
-    qwenMetrics, developmentAdvisor, moderationSummary, moderationLink,
+    qwenMetrics, developmentAdvisor, legalEvidenceSummary, legalEvidenceLink, moderationSummary, moderationLink,
     developmentScopes: {
       FAM_CURRENT: developmentAdvisorLink === "connected" ? developmentAdvisor.state : "no_data",
       FAM_RU: "no_data",
     },
-    legalScopes: legalEvidenceLink === "connected" ? mapLegalEvidenceScopes(legalEvidence) : {},
     staffSignals, count: selected.length,
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   }) + "\n## INSPECTOR → Qwen\n" + inspectorOutcome + "\n";
