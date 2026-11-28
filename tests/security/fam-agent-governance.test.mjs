@@ -175,6 +175,9 @@ test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR s
   const successfulRun = (...jobs) => ({ status: "completed", conclusion: "success", jobs });
   const result = summarizeQwenRuns([
     successfulRun(noTask),
+    { status: "in_progress", conclusion: null, jobs: [noTask] },
+    { status: "completed", conclusion: "failure", jobs: [noTask] },
+    { status: "completed", conclusion: "cancelled", jobs: [noTask] },
     { status: "completed", conclusion: "failure", jobs: [{ ...noTask, conclusion: "failure" }] },
     successfulRun(generated, { ...qa, conclusion: "skipped" }),
     { status: "in_progress", conclusion: null, jobs: [{ ...generated, status: "in_progress", conclusion: null }] },
@@ -193,10 +196,10 @@ test("Qwen metrics require completed evidence for no-task, no-patch, QA and PR s
   assert.equal(result.qa_passed, 1);
   assert.equal(result.pr_created, 1);
   assert.equal(result.successful, 3);
-  assert.equal(result.failed, 3);
+  assert.equal(result.failed, 4);
   assert.equal(result.timed_out, 1);
-  assert.equal(result.cancelled, 2);
-  assert.equal(result.unconfirmed, 2);
+  assert.equal(result.cancelled, 3);
+  assert.equal(result.unconfirmed, 3);
 });
 
 test("Lifecycle approval and CI require exact commits and owner evidence", () => {

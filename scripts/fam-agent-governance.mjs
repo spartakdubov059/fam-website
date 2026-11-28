@@ -25,7 +25,8 @@ export function summarizeQwenRuns(runs = []) {
     const modelOutcome = (job.steps || []).find((step) => step.name === "Запустить локальную модель и подготовить patch")?.conclusion;
     const preflight = (job.steps || []).find((step) => step.name === "Проверить настройки затрат до сборки модели");
     const modelDownload = (job.steps || []).find((step) => step.name === "Скачать бесплатную модель с лицензией Apache 2.0");
-    const noTask = job.status === "completed" && job.conclusion === "success" &&
+    const noTask = run.status === "completed" && run.conclusion === "success" &&
+      job.status === "completed" && job.conclusion === "success" &&
       preflight?.conclusion === "success" && modelDownload?.conclusion === "skipped" && modelOutcome !== "success";
     const verifyJob = (run.jobs || []).find((item) => item.name === "Независимая проверка без модели и секретов");
     const runStatus = run.status === "completed"
