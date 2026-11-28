@@ -17,10 +17,11 @@ begin
      has_table_privilege('authenticated', 'private.fam_legal_evidence_archive', 'INSERT') then
     raise exception 'authenticated must not access legal archive';
   end if;
-  if has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'UPDATE') or
+  if has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'INSERT') or
+     has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'UPDATE') or
      has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'DELETE') or
      has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'TRUNCATE') then
-    raise exception 'service_role must not mutate or truncate the archive directly';
+    raise exception 'service_role must write through the validated RPC and cannot mutate or truncate directly';
   end if;
   if not has_function_privilege('service_role', 'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)', 'EXECUTE') or
      has_function_privilege('authenticated', 'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)', 'EXECUTE') then
@@ -30,10 +31,19 @@ begin
      has_function_privilege('anon', 'public.get_fam_legal_evidence_summary()', 'EXECUTE') then
     raise exception 'summary RPC grants are incorrect';
   end if;
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = 'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)'::regprocedure
+      and p.prosecdef
+      and pg_catalog.pg_get_userbyid(p.proowner) = 'postgres'
+  ) then
+    raise exception 'append RPC must be owned by postgres and use SECURITY DEFINER';
+  end if;
 end $$;
 
 begin;
 set role service_role;
+select set_config('request.jwt.claim.role', 'service_role', true);
 do $$
 declare
   v_first record;
@@ -134,6 +144,44 @@ begin
 
 end $$;
 reset role;
+
+begin;
+set role service_role;
+do $$
+declare
+  v_failed boolean := false;
+begin
+  begin
+    insert into private.fam_legal_evidence_archive (
+      scope, revision, criterion_id, source_id, source_url, status,
+      document_id, document_sha256, record_sha256
+    ) values (
+      'FAM_CURRENT', repeat('e', 40), 'official_source_review', 'official_portal_government',
+      'https://publication.pravo.gov.ru', 'source_unavailable', '', '', repeat('f', 64)
+    );
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'service_role direct archive insert was accepted'; end if;
+end $$;
+rollback;
+
+begin;
+set role service_role;
+do $$
+declare
+  v_failed boolean := false;
+begin
+  begin
+    perform * from public.append_fam_legal_evidence_observation(
+      'FAM_CURRENT', repeat('a', 40), 'official_source_review', 'official_portal_government',
+      'https://publication.pravo.gov.ru', 'source_unavailable', null, null);
+  exception when insufficient_privilege then
+    v_failed := true;
+  end;
+  if not v_failed then raise exception 'append RPC accepted a call without a service_role JWT claim'; end if;
+end $$;
+rollback;
 
 do $$
 declare
