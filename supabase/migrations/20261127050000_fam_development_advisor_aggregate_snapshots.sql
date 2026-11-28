@@ -17,17 +17,19 @@ as $function$
     r.report_date,
     r.generated_at,
     case
-      when coalesce(nullif(r.metrics #>> '{listings,active}', '')::integer, 0) = 0 then 'none'
-      when coalesce(nullif(r.metrics #>> '{listings,active}', '')::integer, 0) < 5 then 'suppressed'
-      when coalesce(nullif(r.metrics #>> '{listings,active}', '')::integer, 0) < 10 then '5_9'
-      when coalesce(nullif(r.metrics #>> '{listings,active}', '')::integer, 0) < 25 then '10_24'
+      when nullif(r.metrics #>> '{listings,active}', '') is null then 'unknown'
+      when (r.metrics #>> '{listings,active}')::integer = 0 then 'none'
+      when (r.metrics #>> '{listings,active}')::integer < 5 then 'suppressed'
+      when (r.metrics #>> '{listings,active}')::integer < 10 then '5_9'
+      when (r.metrics #>> '{listings,active}')::integer < 25 then '10_24'
       else '25_plus'
     end,
     case
-      when coalesce(nullif(r.metrics #>> '{listings,new_24h}', '')::integer, 0) = 0 then 'none'
-      when coalesce(nullif(r.metrics #>> '{listings,new_24h}', '')::integer, 0) < 5 then 'suppressed'
-      when coalesce(nullif(r.metrics #>> '{listings,new_24h}', '')::integer, 0) < 10 then '5_9'
-      when coalesce(nullif(r.metrics #>> '{listings,new_24h}', '')::integer, 0) < 25 then '10_24'
+      when nullif(r.metrics #>> '{listings,new_24h}', '') is null then 'unknown'
+      when (r.metrics #>> '{listings,new_24h}')::integer = 0 then 'none'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 5 then 'suppressed'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 10 then '5_9'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 25 then '10_24'
       else '25_plus'
     end
   from private.fam_agent_daily_reports as r

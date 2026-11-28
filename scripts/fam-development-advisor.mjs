@@ -1,7 +1,7 @@
 const MAX_ROWS = 14;
 const REQUIRED_DAYS = 6;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
-const LISTING_BANDS = new Set(["none", "suppressed", "5_9", "10_24", "25_plus"]);
+const LISTING_BANDS = new Set(["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"]);
 const LISTING_BAND_RANK = Object.freeze({ none: 0, suppressed: 1, "5_9": 2, "10_24": 3, "25_plus": 4 });
 
 function validDate(value) {
@@ -47,6 +47,10 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
     const expectedPrevious = new Date(Date.parse(snapshots[index - 1].report_date + "T00:00:00Z") - 86_400_000)
       .toISOString().slice(0, 10);
     if (snapshots[index].report_date !== expectedPrevious) return empty("gapped_history");
+  }
+  if (snapshots.slice(0, REQUIRED_DAYS).some((row) =>
+    row.active_listings_band === "unknown" || row.new_listings_24h_band === "unknown")) {
+    return empty("incomplete_aggregate");
   }
 
   const recent = snapshots.slice(0, 3);
