@@ -96,6 +96,23 @@ export function shouldPublishGovernanceReport({ eventName = "", disputes = [], w
   return eventName === "schedule" || disputes.length > 0 || warnings.length > 0 || proposals.length > 0;
 }
 
+export function classifyPullEvidence({ complete = false, disputes = [], pulls = [] } = {}) {
+  if (!complete) {
+    return {
+      arbiter: { state: "no_data", evidence_count: 0, detail: "список PR или перечень их файлов загружен не полностью" },
+      integrator: { state: "no_data", evidence_count: 0, detail: "список PR или перечень их файлов загружен не полностью" },
+    };
+  }
+  return {
+    arbiter: disputes.length
+      ? { state: "confirmed", evidence_count: disputes.length, detail: "обнаружены пересечения файлов между PR" }
+      : { state: "checked_no_signal", evidence_count: 0, detail: "в полной выборке PR пересечений файлов не обнаружено" },
+    integrator: pulls.length
+      ? { state: "confirmed", evidence_count: pulls.length, detail: "план проверки построен по " + pulls.length + " PR; сам по себе он не подтверждает merge" }
+      : { state: "checked_no_signal", evidence_count: 0, detail: "полная выборка не содержит открытых PR для плана внедрения" },
+  };
+}
+
 function clean(value, maxLength = 150) {
   return String(value ?? "")
     .replace(/[\r\n\t\u0000-\u001f]/g, " ")
@@ -571,6 +588,8 @@ export async function main() {
     }
   }));
   const disputes = findDisputes(pulls);
+  const pullEvidenceComplete = prs.length <= selected.length && pulls.every((pr) => Array.isArray(pr.files));
+  const pullStaffSignals = classifyPullEvidence({ complete: pullEvidenceComplete, disputes, pulls });
   const warnings = inspectAgents({ pulls, coderRuns: workflows.workflow_runs });
   const deploymentAuditResults = await Promise.allSettled([
     api("/actions/workflows/fam-domain-sync.yml/runs?branch=main&per_page=20", token),
@@ -708,7 +727,7 @@ export async function main() {
     limited: prs.length > selected.length || pulls.some((p) => p.files === null),
   });
   const staffSignals = {
-    arbiter: { state: "confirmed", evidence_count: disputes.length, detail: "сводка по конфликтам и открытым PR сформирована" },
+    arbiter: pullStaffSignals.arbiter,
     inspector: {
       state: warnings.length ? "confirmed" : "checked_no_signal",
       evidence_count: warnings.length,
@@ -726,10 +745,7 @@ export async function main() {
       evidence_count: qwenMetrics.qa_passed,
       detail: qwenMetrics.qa_passed ? "независимые проверки patch завершились успешно" : "успешных независимых проверок patch в выборке нет",
     },
-    integrator: {
-      state: "confirmed", evidence_count: pulls.length,
-      detail: "план проверки построен по " + pulls.length + " PR; сам по себе он не подтверждает merge",
-    },
+    integrator: pullStaffSignals.integrator,
     recruiter: {
       state: proposals.length ? "confirmed" : "checked_no_signal",
       evidence_count: proposals.length,
