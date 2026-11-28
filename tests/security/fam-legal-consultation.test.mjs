@@ -93,3 +93,87 @@ test("branch and exact revision must be supplied as a safe pair of scope metadat
   assert.equal(result.branch, BRANCH);
   assert.equal(result.revision, REVISION);
 });
+
+test("planned feature assessment uses fixed synthetic risk flags and stays non-authoritative", () => {
+  const plannedFeature = {
+    featureKey: "media_upload",
+    riskFlags: {
+      handles_student_data: true,
+      uses_private_media: true,
+      adds_external_provider: false,
+      changes_access_control: true,
+      changes_moderation: false,
+      adds_persistent_storage: true,
+    },
+  };
+  const result = consult({
+    scope: "FAM_CURRENT",
+    revision: REVISION,
+    plannedFeature,
+  });
+  const assessment = result.planned_feature_assessment;
+  assert.equal(assessment.status, "preliminary_technical_risk_screen_only");
+  assert.deepEqual(assessment.risk_categories, [
+    "access_control",
+    "database_change",
+    "file_and_media_handling",
+    "student_data_handling",
+  ]);
+  assert.deepEqual(assessment.scope_assessments.map((item) => item.scope), ["FAM_CURRENT"]);
+  assert.equal(assessment.scope_assessments[0].status, "human_review_pending");
+  assert.equal(assessment.legal_opinion, false);
+  assert.equal(assessment.release_authority, false);
+  assert.equal(assessment.independent_human_review, "pending_human_review");
+  assert.equal(assessment.source_verification, "not_performed");
+  assert.equal(assessment.qa_acceptance_checks.length, 4);
+  assert.equal(result.qwen_guidance.planned_feature_assessment, assessment);
+});
+
+test("shared planned-feature review keeps FAM_CURRENT and FAM_RU separate", () => {
+  const result = consult({
+    scope: "SHARED",
+    revision: REVISION,
+    plannedFeature: {
+      featureKey: "custom_feature",
+      riskFlags: {
+        handles_student_data: false,
+        uses_private_media: false,
+        adds_external_provider: false,
+        changes_access_control: false,
+        changes_moderation: false,
+        adds_persistent_storage: false,
+      },
+    },
+  });
+  assert.deepEqual(result.planned_feature_assessment.scope_assessments.map((item) => item.scope), [
+    "FAM_CURRENT",
+    "FAM_RU",
+  ]);
+  assert.deepEqual(result.planned_feature_assessment.risk_categories, []);
+  assert.equal(result.planned_feature_assessment.release_authority, false);
+  assert.equal(result.qwen_guidance.human_decision_required_before_release, true);
+});
+
+test("planned-feature assessment rejects free text, unknown flags, and missing risk declarations", () => {
+  const riskFlags = {
+    handles_student_data: false,
+    uses_private_media: false,
+    adds_external_provider: false,
+    changes_access_control: false,
+    changes_moderation: false,
+    adds_persistent_storage: false,
+  };
+  for (const plannedFeature of [
+    { featureKey: "untrusted", riskFlags },
+    { featureKey: "custom_feature", riskFlags, description: "free text is not accepted" },
+    { featureKey: "custom_feature", riskFlags: { ...riskFlags, unknown: true } },
+    { featureKey: "custom_feature", riskFlags: { ...riskFlags, handles_student_data: "unknown" } },
+    { featureKey: "custom_feature", riskFlags: { handles_student_data: false } },
+  ]) {
+    assert.throws(() => consult({
+      scope: "FAM_CURRENT",
+      revision: REVISION,
+      plannedFeature,
+    }), /Planned feature/);
+  }
+});
