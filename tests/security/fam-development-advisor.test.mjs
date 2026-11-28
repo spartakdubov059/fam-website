@@ -10,8 +10,8 @@ test("advisor asks for a proposal only after six consecutive aggregate snapshots
   const rows = Array.from({ length: 6 }, (_, i) => ({
     report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
     generated_at: `2026-11-${String(27 - i).padStart(2, "0")}T06:00:00Z`,
-    active_listings: i < 3 ? 6 : 20,
-    new_listings_24h: i < 3 ? 0 : 5,
+    active_listings_band: i < 3 ? "5_9" : "10_24",
+    new_listings_24h_band: i < 3 ? "none" : "5_9",
     pending_council_ideas_band: i < 3 ? "10_24" : "5_9",
   }));
   const result = buildDevelopmentAdvisor(rows, { now: Date.parse("2026-11-27T07:00:00Z") });
@@ -36,8 +36,8 @@ test("advisor suppresses idea signals for small samples and emits no idea propos
   const rows = Array.from({ length: 6 }, (_, i) => ({
     report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
     generated_at: `2026-11-${String(27 - i).padStart(2, "0")}T06:00:00Z`,
-    active_listings: 10,
-    new_listings_24h: 2,
+    active_listings_band: "10_24",
+    new_listings_24h_band: "suppressed",
     pending_council_ideas_band: i < 3 ? "suppressed" : "5_9",
   }));
   const result = buildDevelopmentAdvisor(rows, { now: Date.parse("2026-11-27T07:00:00Z") });
@@ -49,21 +49,35 @@ test("advisor emits no product hypothesis for missing, stale, gapped or malforme
   assert.equal(buildDevelopmentAdvisor([]).state, "no_data");
   const stale = Array.from({ length: 6 }, (_, i) => ({
     report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
-    generated_at: "2026-11-20T06:00:00Z", active_listings: 10, new_listings_24h: 2,
+    generated_at: "2026-11-20T06:00:00Z", active_listings_band: "10_24", new_listings_24h_band: "suppressed",
     pending_council_ideas_band: "none",
   }));
   assert.equal(buildDevelopmentAdvisor(stale, { now: Date.parse("2026-11-27T07:00:00Z") }).proposals.length, 0);
-  assert.equal(buildDevelopmentAdvisor([{ report_date: "bad", active_listings: -1 }]).state, "no_data");
+  assert.equal(buildDevelopmentAdvisor([{ report_date: "bad", active_listings_band: "forbidden" }]).state, "no_data");
+  const incomplete = Array.from({ length: 6 }, (_, i) => ({
+    report_date: `2026-11-${String(27 - i).padStart(2, "0")}`,
+    generated_at: `2026-11-${String(27 - i).padStart(2, "0")}T06:00:00Z`,
+    active_listings_band: i === 0 ? "unknown" : "none",
+    new_listings_24h_band: "none",
+    pending_council_ideas_band: "none",
+  }));
+  const result = buildDevelopmentAdvisor(incomplete, { now: Date.parse("2026-11-27T07:00:00Z") });
+  assert.equal(result.state, "no_data");
+  assert.equal(result.reason, "incomplete_aggregate");
 });
 
 test("advisor SQL is limited to predefined aggregates and service-role execution", () => {
   const body = migration.slice(migration.indexOf("$function$"), migration.lastIndexOf("$function$"));
   assert.match(migration, /security invoker/i);
   assert.match(migration, /private\.fam_agent_daily_reports/);
-  assert.match(migration, /metrics #>> '\{listings,active\}'/);
-  assert.match(migration, /metrics #>> '\{listings,new_24h\}'/);
-  assert.match(migration, /new_listings_24h integer\s*\n\)/);
+  assert.match(migration, /active_listings_band text/);
+  assert.match(migration, /new_listings_24h_band text/);
+  assert.match(migration, /then 'suppressed'/);
+  assert.match(migration, /then 'unknown'/);
+  assert.match(migration, /else '25_plus'/);
   assert.match(upgradeMigration, /drop function public\.get_fam_development_advisor_snapshots\(integer\)/i);
+  assert.match(upgradeMigration, /active_listings_band text/);
+  assert.match(upgradeMigration, /new_listings_24h_band text/);
   assert.match(upgradeMigration, /pending_council_ideas_band text/);
   assert.match(upgradeMigration, /security invoker/i);
   assert.match(upgradeMigration, /grant execute[\s\S]*to service_role/i);

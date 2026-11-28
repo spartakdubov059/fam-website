@@ -58,6 +58,7 @@ jobs:
         run: |
           docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/rollback-idea-backlog-band.sql
           docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions-before-upgrade.sql
+          docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < tests/fixtures/fam-development-advisor/assertions-after-rollback.sql
       - name: Повторно применить forward migration
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}

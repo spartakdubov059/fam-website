@@ -101,7 +101,7 @@ test("agent metrics client sends a fixed authenticated read-only action", async 
 
 test("development advisor bridge exposes only bounded listing aggregates", async () => {
   let request;
-  const snapshots = [{ report_date: "2026-11-27", generated_at: "2026-11-27T06:00:00Z", active_listings: 12, new_listings_24h: 2, pending_council_ideas_band: "5_9" }];
+  const snapshots = [{ report_date: "2026-11-27", generated_at: "2026-11-27T06:00:00Z", active_listings_band: "10_24", new_listings_24h_band: "suppressed", pending_council_ideas_band: "5_9" }];
   const result = await fetchDevelopmentAdvisorSnapshots({
     url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
     token: "test-governance-token",
@@ -113,12 +113,14 @@ test("development advisor bridge exposes only bounded listing aggregates", async
   assert.deepEqual(result, snapshots);
   assert.deepEqual(JSON.parse(request.body), { action: "development_advisor_metrics" });
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], user_id: "private" }] }));
-  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings: -1 }] }));
+  assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], active_listings_band: "1_4" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas_band: "17" }] }));
   assert.throws(() => validateDevelopmentAdvisorResponse({ ok: true, snapshots: [{ ...snapshots[0], pending_council_ideas: 17 }] }));
   assert.match(edge, /get_fam_development_advisor_snapshots/);
   assert.match(edge, /pending_council_ideas_band/);
   assert.match(edge, /\["none", "suppressed", "5_9", "10_24", "25_plus"\]/);
+  assert.match(edge, /active_listings_band/);
+  assert.match(edge, /active_listings_band: row\.active_listings_band/);
   assert.match(edge, /pending_council_ideas_band: row\.pending_council_ideas_band/);
   assert.match(workflow, /fam-development-advisor\.test\.mjs/);
 });

@@ -1,8 +1,8 @@
 do $assertions$
 begin
   if pg_catalog.pg_get_function_result('public.get_fam_development_advisor_snapshots(integer)'::regprocedure)
-      <> 'TABLE(report_date date, generated_at timestamp with time zone, active_listings integer, new_listings_24h integer)' then
-    raise exception 'Expected the installed four-column Advisor RPC before forward migration';
+      <> 'TABLE(report_date date, generated_at timestamp with time zone, active_listings_band text, new_listings_24h_band text)' then
+    raise exception 'Expected the installed privacy-banded Advisor RPC before forward migration';
   end if;
   if has_function_privilege('anon','public.get_fam_development_advisor_snapshots(integer)','execute')
      or has_function_privilege('authenticated','public.get_fam_development_advisor_snapshots(integer)','execute')

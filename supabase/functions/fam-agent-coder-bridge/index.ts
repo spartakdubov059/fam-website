@@ -180,15 +180,15 @@ Deno.serve(async (req: Request) => {
       if (!Array.isArray(snapshots) || snapshots.length > 7 || snapshots.some((row) =>
         !row || typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
-        !Number.isSafeInteger(row.active_listings) || row.active_listings < 0 || row.active_listings > 10_000_000 ||
-        !Number.isSafeInteger(row.new_listings_24h) || row.new_listings_24h < 0 || row.new_listings_24h > 10_000_000 ||
+        !["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.active_listings_band) ||
+        !["unknown", "none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.new_listings_24h_band) ||
         !["none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.pending_council_ideas_band)
       )) return json({ ok: false, error: "invalid_development_advisor_metrics" }, 502);
       const safe = snapshots.map((row) => ({
         report_date: row.report_date,
         generated_at: row.generated_at,
-        active_listings: row.active_listings,
-        new_listings_24h: row.new_listings_24h,
+        active_listings_band: row.active_listings_band,
+        new_listings_24h_band: row.new_listings_24h_band,
         pending_council_ideas_band: row.pending_council_ideas_band,
       }));
       return json({ ok: true, snapshots: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);

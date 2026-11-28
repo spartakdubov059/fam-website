@@ -1,4 +1,4 @@
--- Upgrade the already-installed Advisor RPC without rewriting its historical migration.
+-- Add a privacy-banded idea-backlog signal to the already-installed Advisor RPC.
 -- DROP (without CASCADE) fails closed if an unexpected database object depends on it.
 drop function public.get_fam_development_advisor_snapshots(integer);
 
@@ -6,8 +6,8 @@ create function public.get_fam_development_advisor_snapshots(p_days integer defa
 returns table(
   report_date date,
   generated_at timestamptz,
-  active_listings integer,
-  new_listings_24h integer,
+  active_listings_band text,
+  new_listings_24h_band text,
   pending_council_ideas_band text
 )
 language sql
@@ -18,8 +18,22 @@ as $function$
   select
     r.report_date,
     r.generated_at,
-    coalesce(nullif(r.metrics #>> '{listings,active}', '')::integer, 0),
-    coalesce(nullif(r.metrics #>> '{listings,new_24h}', '')::integer, 0),
+    case
+      when nullif(r.metrics #>> '{listings,active}', '') is null then 'unknown'
+      when (r.metrics #>> '{listings,active}')::integer = 0 then 'none'
+      when (r.metrics #>> '{listings,active}')::integer < 5 then 'suppressed'
+      when (r.metrics #>> '{listings,active}')::integer < 10 then '5_9'
+      when (r.metrics #>> '{listings,active}')::integer < 25 then '10_24'
+      else '25_plus'
+    end,
+    case
+      when nullif(r.metrics #>> '{listings,new_24h}', '') is null then 'unknown'
+      when (r.metrics #>> '{listings,new_24h}')::integer = 0 then 'none'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 5 then 'suppressed'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 10 then '5_9'
+      when (r.metrics #>> '{listings,new_24h}')::integer < 25 then '10_24'
+      else '25_plus'
+    end,
     school_ideas.pending_band
   from private.fam_agent_daily_reports as r
   cross join lateral (
@@ -57,4 +71,4 @@ grant execute on function public.get_fam_development_advisor_snapshots(integer)
   to service_role;
 
 comment on function public.get_fam_development_advisor_snapshots(integer) is
-  'Returns systemwide listing aggregates and only banded idea-backlog counts when at least five schools report and at least five schools contribute; no content or identifiers.';
+  'Returns only privacy-banded listing aggregates and banded idea-backlog counts when at least five schools report and contribute; no content or identifiers.';
