@@ -36,7 +36,7 @@ export const STAFF_AUTHORITY_CONTRACT = Object.freeze(Object.fromEntries(
 
 const deny = (reason) => Object.freeze({ allowed: false, reason, effect: "none" });
 
-export function authorizeStaffAction({ role, action, scope, evidence, now = Date.now() } = {}) {
+export function authorizeStaffAction({ role, action, scope, evidence, verifyEvidence, now = Date.now() } = {}) {
   const capabilities = ROLES[role];
   if (!capabilities || typeof action !== "string") return deny("unknown_role_or_action");
   if (ALWAYS_DENIED.has(action) || !capabilities.includes(action)) return deny("outside_role_authority");
@@ -53,10 +53,28 @@ export function authorizeStaffAction({ role, action, scope, evidence, now = Date
       : evidence?.source === "cron"
         ? evidence.kind === "cron_failure" && Number.isSafeInteger(evidence.run_id) && evidence.run_id > 0
         : false;
-  if (!evidence || evidence.confirmed !== true || evidence.source_verified !== true ||
-      !FAILURE_SOURCES.has(evidence.source) || !FAILURE_KINDS.has(evidence.kind) || !sourceEvidenceValid) {
+  if (!evidence || !FAILURE_SOURCES.has(evidence.source) || !FAILURE_KINDS.has(evidence.kind) || !sourceEvidenceValid) {
     return deny("confirmed_failure_evidence_required");
   }
+  // Boolean claims in the evidence payload are caller-controlled. The caller
+  // must supply a trusted source verifier; never treat `confirmed: true` or
+  // `source_verified: true` as proof by themselves. Pass only the bounded
+  // evidence fields that the verifier needs, never arbitrary caller fields.
+  if (typeof verifyEvidence !== "function") return deny("trusted_evidence_verifier_required");
+  const verificationInput = Object.freeze({
+    source: evidence.source,
+    kind: evidence.kind,
+    run_id: evidence.run_id ?? null,
+    event_id: evidence.event_id ?? null,
+    task_key: evidence.task_key,
+    lease_expires_at: evidence.lease_expires_at,
+    attempt_count: evidence.attempt_count,
+    max_attempts: evidence.max_attempts,
+    duplicate_active: evidence.duplicate_active,
+  });
+  let evidenceVerified = false;
+  try { evidenceVerified = verifyEvidence(verificationInput) === true; } catch { /* fail closed */ }
+  if (!evidenceVerified) return deny("source_evidence_not_verified");
   if (scope !== "FAM_CURRENT") return deny("task_scope_not_enabled_for_reassignment");
   if (!TASK_KEYS.has(evidence.task_key)) return deny("task_type_not_allowlisted");
   if (!Number.isFinite(now) || !Number.isFinite(Date.parse(evidence.lease_expires_at || "")) ||
