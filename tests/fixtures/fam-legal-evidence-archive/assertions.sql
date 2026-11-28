@@ -41,7 +41,7 @@ end $$;
 
 begin;
 set role service_role;
-set local request.jwt.claim.role = 'service_role';
+set local request.jwt.claims = '{"role":"service_role"}';
 do $$
 declare v_denied boolean := false;
 begin
@@ -59,7 +59,7 @@ begin
   end;
   if not v_denied then raise exception 'Direct archive insert unexpectedly succeeded'; end if;
 end $$;
-set local request.jwt.claim.role = '';
+set local request.jwt.claims = '{}';
 do $$
 declare v_denied boolean := false;
 begin
@@ -73,7 +73,7 @@ begin
   end;
   if not v_denied then raise exception 'RPC accepted service_role without a service-role JWT claim'; end if;
 end $$;
-set local request.jwt.claim.role = 'service_role';
+set local request.jwt.claims = '{"role":"service_role"}';
 do $$
 declare
   v_first record;

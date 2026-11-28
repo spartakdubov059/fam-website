@@ -104,7 +104,11 @@ declare
   v_previous_record_sha256 text := '';
   v_record_sha256 text;
 begin
-  if coalesce(nullif(pg_catalog.current_setting('request.jwt.claim.role', true), ''), '') <> 'service_role' then
+  if coalesce(
+       nullif(pg_catalog.current_setting('request.jwt.claims', true)::jsonb ->> 'role', ''),
+       nullif(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+       ''
+     ) <> 'service_role' then
     raise exception 'LEGAL archive requires the protected service role' using errcode = '42501';
   end if;
   if p_scope not in ('FAM_CURRENT', 'FAM_RU')
