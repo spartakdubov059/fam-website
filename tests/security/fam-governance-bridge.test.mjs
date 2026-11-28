@@ -15,7 +15,7 @@ import {
   mapInspectorWarning,
   validateInspectorEnqueueResponse,
 } from "../../scripts/fam-governance-bridge.mjs";
-import { makeReport, renderModerationStatus, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
+import { buildModeratorRecommendations, makeReport, renderModerationStatus, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
 
 const values = Object.freeze({
   queued: 2,
@@ -166,6 +166,31 @@ test("moderator report distinguishes no signal, suppressed data and unavailable 
   const unavailable = renderModerationStatus(null, "unavailable");
   assert.match(unavailable, /результат неизвестен/);
   assert.doesNotMatch(makeReport(), /школ с сигналами за последние 7 дней не обнаружено/);
+});
+
+test("moderator recommendations are fixed QA-only guidance from thresholded categories", () => {
+  const summary = {
+    generated_at: "2026-11-27T06:00:00Z",
+    total_bucket: "5_9",
+    categories: [
+      { category: "targeted_harassment", severity: "medium", count_bucket: "5_9" },
+      { category: "threat_or_intimidation", severity: "high", count_bucket: "10_24" },
+      { category: "unknown", severity: "high", count_bucket: "25_plus" },
+      { category: "unsafe_image", severity: "critical", count_bucket: "5_9" },
+    ],
+  };
+  const recommendations = buildModeratorRecommendations(summary);
+  assert.equal(recommendations.length, 2);
+  assert.ok(recommendations.every((item) => item.includes("синтетическ")));
+  assert.ok(recommendations.every((item) => !/ученик|наказать|санкц|заблокировать/i.test(item)));
+
+  for (const total_bucket of ["none", "suppressed"]) {
+    assert.deepEqual(buildModeratorRecommendations({ ...summary, total_bucket }), []);
+  }
+  const report = renderModerationStatus(summary, "connected");
+  assert.match(report, /Рекомендации для Испытателя \(QA\)/);
+  assert.match(report, /без санкций, автоматических задач и изменений production/);
+  assert.match(renderModerationStatus({ ...summary, total_bucket: "suppressed", categories: [] }, "connected"), /Рекомендаций по агрегату нет/);
 });
 
 test("INSPECTOR maps only high-confidence technical warnings to a fixed task allowlist", () => {
