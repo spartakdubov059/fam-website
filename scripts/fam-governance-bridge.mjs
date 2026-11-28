@@ -148,3 +148,38 @@ export async function fetchAgentMetrics({ url, token, fetchImpl = fetch }) {
   if (!response?.ok) throw new Error("FAM aggregate metrics request failed");
   return validateAgentMetricsResponse(await response.json());
 }
+
+export function validateDevelopmentAdvisorResponse(body) {
+  if (!body || typeof body !== "object" || body.ok !== true || !Array.isArray(body.snapshots) || body.snapshots.length > 14) {
+    throw new Error("Invalid development advisor aggregate response");
+  }
+  return Object.freeze(body.snapshots.map((row) => {
+    if (!row || Object.keys(row).length !== 4 ||
+        typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
+        typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
+        !Number.isSafeInteger(row.active_listings) || row.active_listings < 0 || row.active_listings > 10_000_000 ||
+        !Number.isSafeInteger(row.new_listings_24h) || row.new_listings_24h < 0 || row.new_listings_24h > 10_000_000) {
+      throw new Error("Invalid development advisor aggregate row");
+    }
+    return Object.freeze({
+      report_date: row.report_date,
+      generated_at: row.generated_at,
+      active_listings: row.active_listings,
+      new_listings_24h: row.new_listings_24h,
+    });
+  }));
+}
+
+export async function fetchDevelopmentAdvisorSnapshots({ url, token, fetchImpl = fetch }) {
+  if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
+    throw new Error("FAM governance bridge credentials unavailable");
+  }
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-fam-agent-token": token },
+    body: JSON.stringify({ action: "development_advisor_metrics" }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response?.ok) throw new Error("FAM development advisor aggregate request failed");
+  return validateDevelopmentAdvisorResponse(await response.json());
+}

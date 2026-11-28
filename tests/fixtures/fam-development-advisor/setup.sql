@@ -29,4 +29,4 @@ select
     'listings',
     pg_catalog.jsonb_build_object('active',40-offset_days,'new_24h',offset_days)
   )
-from pg_catalog.generate_series(0,6) as offset_days;
+from pg_catalog.generate_series(0,6) as generated(offset_days);

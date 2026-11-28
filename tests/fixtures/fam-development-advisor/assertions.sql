@@ -42,4 +42,53 @@ end
 $service_role_assertions$;
 reset role;
 
+
+set role anon;
+do $anon_access$
+declare
+  v_denied boolean;
+begin
+  v_denied := false;
+  begin
+    perform * from public.get_fam_development_advisor_snapshots(7);
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'anon unexpectedly executed the Advisor RPC'; end if;
+
+  v_denied := false;
+  begin
+    perform count(*) from private.fam_agent_daily_reports;
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'anon unexpectedly read the private aggregate source'; end if;
+end
+$anon_access$;
+reset role;
+
+set role authenticated;
+do $authenticated_access$
+declare
+  v_denied boolean;
+begin
+  v_denied := false;
+  begin
+    perform * from public.get_fam_development_advisor_snapshots(7);
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'authenticated unexpectedly executed the Advisor RPC'; end if;
+
+  v_denied := false;
+  begin
+    perform count(*) from private.fam_agent_daily_reports;
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'authenticated unexpectedly read the private aggregate source'; end if;
+end
+$authenticated_access$;
+reset role;
+
 select 'PASS: Advisor RPC returns only bounded synthetic aggregates to service_role' as result;
