@@ -36,7 +36,7 @@ export const STAFF_AUTHORITY_CONTRACT = Object.freeze(Object.fromEntries(
 
 const deny = (reason) => Object.freeze({ allowed: false, reason, effect: "none" });
 
-export function authorizeStaffAction({ role, action, scope, evidence, now = Date.now() } = {}) {
+export function authorizeStaffAction({ role, action, scope, evidence, verifyEvidence, now = Date.now() } = {}) {
   const capabilities = ROLES[role];
   if (!capabilities || typeof action !== "string") return deny("unknown_role_or_action");
   if (ALWAYS_DENIED.has(action) || !capabilities.includes(action)) return deny("outside_role_authority");
@@ -53,8 +53,7 @@ export function authorizeStaffAction({ role, action, scope, evidence, now = Date
       : evidence?.source === "cron"
         ? evidence.kind === "cron_failure" && Number.isSafeInteger(evidence.run_id) && evidence.run_id > 0
         : false;
-  if (!evidence || evidence.confirmed !== true || evidence.source_verified !== true ||
-      !FAILURE_SOURCES.has(evidence.source) || !FAILURE_KINDS.has(evidence.kind) || !sourceEvidenceValid) {
+  if (!evidence || !FAILURE_SOURCES.has(evidence.source) || !FAILURE_KINDS.has(evidence.kind) || !sourceEvidenceValid) {
     return deny("confirmed_failure_evidence_required");
   }
   if (scope !== "FAM_CURRENT") return deny("task_scope_not_enabled_for_reassignment");
@@ -65,6 +64,27 @@ export function authorizeStaffAction({ role, action, scope, evidence, now = Date
       evidence.attempt_count < 0 || evidence.max_attempts < 1 || evidence.max_attempts > 2 ||
       evidence.attempt_count >= evidence.max_attempts) return deny("retry_budget_exhausted_or_invalid");
   if (evidence.duplicate_active !== false) return deny("duplicate_status_not_proven_clear");
+
+  // Boolean claims in the evidence payload are caller-controlled. The caller
+  // must supply a trusted source verifier; never treat `confirmed: true` or
+  // `source_verified: true` as proof by themselves. Run it only after cheap
+  // allowlist/lease/budget gates, and pass bounded fields instead of arbitrary
+  // caller content.
+  if (typeof verifyEvidence !== "function") return deny("trusted_evidence_verifier_required");
+  const verificationInput = Object.freeze({
+    source: evidence.source,
+    kind: evidence.kind,
+    run_id: evidence.run_id ?? null,
+    event_id: evidence.event_id ?? null,
+    task_key: evidence.task_key,
+    lease_expires_at: evidence.lease_expires_at,
+    attempt_count: evidence.attempt_count,
+    max_attempts: evidence.max_attempts,
+    duplicate_active: evidence.duplicate_active,
+  });
+  let evidenceVerified = false;
+  try { evidenceVerified = verifyEvidence(verificationInput) === true; } catch { /* fail closed */ }
+  if (!evidenceVerified) return deny("source_evidence_not_verified");
 
   return Object.freeze({
     allowed: true,
