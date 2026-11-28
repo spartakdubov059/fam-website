@@ -11,11 +11,13 @@ import {
   fetchDevelopmentAdvisorSnapshots,
   validateModerationSummaryResponse,
   fetchModerationSummary,
+  validateLegalEvidenceSummaryResponse,
+  fetchLegalEvidenceSummary,
   enqueueInspectorTask,
   mapInspectorWarning,
   validateInspectorEnqueueResponse,
 } from "../../scripts/fam-governance-bridge.mjs";
-import { buildModeratorRecommendations, makeReport, renderModerationStatus, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
+import { buildModeratorRecommendations, makeReport, renderLegalObservationStatus, renderModerationStatus, REPORT_MARKER } from "../../scripts/fam-agent-governance.mjs";
 
 const values = Object.freeze({
   queued: 2,
@@ -166,6 +168,54 @@ test("moderator report distinguishes no signal, suppressed data and unavailable 
   const unavailable = renderModerationStatus(null, "unavailable");
   assert.match(unavailable, /результат неизвестен/);
   assert.doesNotMatch(makeReport(), /школ с сигналами за последние 7 дней не обнаружено/);
+});
+
+test("LEGAL summary accepts only two fixed scopes and metadata-only source observations", () => {
+  const scopes = [
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-28T04:00:00Z", latest_status: "source_checked", observations_30d: 2 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ];
+  assert.deepEqual(validateLegalEvidenceSummaryResponse({ ok: true, scopes }), scopes);
+  for (const unsafe of [
+    [scopes[0]],
+    [scopes[0], scopes[0]],
+    [scopes[0], { ...scopes[1], source_url: "https://publication.pravo.gov.ru/secret" }],
+    [scopes[0], { ...scopes[1], latest_status: "approved" }],
+    [scopes[0], { ...scopes[1], observations_30d: "0" }],
+    [scopes[0], { ...scopes[1], observations_30d: 100_001 }],
+  ]) assert.throws(() => validateLegalEvidenceSummaryResponse({ ok: true, scopes: unsafe }));
+});
+
+test("LEGAL report distinguishes observations from readiness and keeps FAM scopes separate", () => {
+  const report = renderLegalObservationStatus([
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-28T04:00:00Z", latest_status: "change_detected", observations_30d: 2 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ], "connected");
+  assert.match(report, /FAM_CURRENT.*изменение источника, требуется проверка человеком/);
+  assert.match(report, /FAM_RU.*наблюдений в архиве нет/);
+  assert.match(report, /не устанавливает применимость закона, юридическую готовность или разрешение на выпуск/);
+  assert.match(renderLegalObservationStatus(null, "unavailable"), /статус неизвестен/);
+});
+
+test("LEGAL summary bridge sends one fixed read-only action and rejects extra fields", async () => {
+  const scopes = [
+    { scope: "FAM_CURRENT", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ];
+  let request;
+  const result = await fetchLegalEvidenceSummary({
+    url: "https://example.invalid/functions/v1/fam-agent-coder-bridge",
+    token: "test-governance-token",
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ ok: true, scopes }) };
+    },
+  });
+  assert.deepEqual(result, scopes);
+  assert.deepEqual(JSON.parse(request.body), { action: "legal_evidence_summary" });
+  assert.match(edge, /get_fam_legal_evidence_summary/);
+  assert.match(edge, /body\.action === "legal_evidence_summary"/);
+  assert.throws(() => validateLegalEvidenceSummaryResponse({ ok: true, scopes: scopes.map((row) => ({ ...row, user_id: "private" })) }));
 });
 
 test("moderator recommendations are fixed QA-only guidance from thresholded categories", () => {

@@ -13,6 +13,7 @@ import {
   formatMoscowTimestamp,
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
+  summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
 
@@ -171,6 +172,23 @@ test("Boss report shows separate unassessed LEGAL scopes and never implies relea
   const unknown = renderLegalScopeStatus({ FAM_CURRENT: "owner_approved", FAM_RU: "merged" });
   assert.match(unknown, /FAM_CURRENT:[^\n]*не оценено/);
   assert.match(unknown, /FAM_RU:[^\n]*не оценено/);
+});
+
+test("LEGAL staff metric counts only archive observations and never labels them as legal approval", () => {
+  const rows = [
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 3 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ];
+  const signal = summarizeLegalStaffSignal(rows, "connected");
+  assert.equal(signal.state, "confirmed");
+  assert.equal(signal.evidence_count, 3);
+  assert.match(signal.detail, /технических проверок публичных источников/);
+  assert.match(signal.detail, /решения остаются на проверке человека/);
+  assert.equal(summarizeLegalStaffSignal(rows, "unavailable").state, "no_data");
+  assert.equal(summarizeLegalStaffSignal([
+    { ...rows[0], observations_30d: 0 }, rows[1],
+  ], "connected").state, "no_data");
+  assert.doesNotMatch(makeReport({ legalEvidenceSummary: rows, legalEvidenceLink: "connected" }), /Юрист \(LEGAL\).*решение о выпуске принято/);
 });
 
 test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {
