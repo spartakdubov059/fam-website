@@ -184,49 +184,6 @@ export async function fetchDevelopmentAdvisorSnapshots({ url, token, fetchImpl =
   return validateDevelopmentAdvisorResponse(await response.json());
 }
 
-const LEGAL_SCOPES = new Set(["FAM_CURRENT", "FAM_RU"]);
-const LEGAL_SOURCE_STATUSES = new Set(["source_checked", "change_detected", "source_unavailable", "not_assessed"]);
-
-export function validateLegalEvidenceResponse(body) {
-  if (!body || typeof body !== "object" || body.ok !== true ||
-      !Array.isArray(body.legal_evidence) || body.legal_evidence.length !== 2) {
-    throw new Error("Invalid LEGAL evidence summary response");
-  }
-  const result = Object.create(null);
-  for (const row of body.legal_evidence) {
-    if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).length !== 4 ||
-        !LEGAL_SCOPES.has(row.scope) || Object.hasOwn(result, row.scope) ||
-        !(row.latest_checked_at === null || (typeof row.latest_checked_at === "string" && Number.isFinite(Date.parse(row.latest_checked_at)))) ||
-        !LEGAL_SOURCE_STATUSES.has(row.latest_status) || !Number.isSafeInteger(row.observations_30d) ||
-        row.observations_30d < 0 || row.observations_30d > 10_000_000) {
-      throw new Error("Invalid LEGAL evidence summary row");
-    }
-    result[row.scope] = Object.freeze({
-      latest_checked_at: row.latest_checked_at,
-      latest_status: row.latest_status,
-      observations_30d: row.observations_30d,
-    });
-  }
-  if (!Object.hasOwn(result, "FAM_CURRENT") || !Object.hasOwn(result, "FAM_RU")) {
-    throw new Error("LEGAL evidence summary must contain both isolated scopes");
-  }
-  return Object.freeze(result);
-}
-
-export async function fetchLegalEvidenceSummary({ url, token, fetchImpl = fetch }) {
-  if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
-    throw new Error("FAM governance bridge credentials unavailable");
-  }
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-fam-agent-token": token },
-    body: JSON.stringify({ action: "legal_evidence_summary" }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response?.ok) throw new Error("FAM LEGAL evidence summary request failed");
-  return validateLegalEvidenceResponse(await response.json());
-}
-
 const MODERATION_CATEGORIES = new Set([
   "targeted_harassment", "hate_or_discrimination", "threat_or_intimidation",
   "negative_personal_call", "spam_or_repeated_abuse", "unsafe_image",
@@ -278,4 +235,52 @@ export async function fetchModerationSummary({ url, token, fetchImpl = fetch }) 
   });
   if (!response?.ok) throw new Error("FAM moderation aggregate request failed");
   return validateModerationSummaryResponse(await response.json());
+}
+
+const LEGAL_SCOPES = Object.freeze(["FAM_CURRENT", "FAM_RU"]);
+const LEGAL_OBSERVATION_STATUSES = new Set([
+  "not_assessed", "source_checked", "change_detected", "source_unavailable",
+]);
+
+export function validateLegalEvidenceSummaryResponse(body) {
+  if (!body || typeof body !== "object" || body.ok !== true ||
+      !Array.isArray(body.scopes) || body.scopes.length !== LEGAL_SCOPES.length) {
+    throw new Error("Invalid legal evidence summary response");
+  }
+  const seen = new Set();
+  const rows = body.scopes.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).length !== 4 ||
+        !LEGAL_SCOPES.includes(row.scope) || seen.has(row.scope) ||
+        !LEGAL_OBSERVATION_STATUSES.has(row.latest_status) ||
+        (row.latest_checked_at !== null &&
+          (typeof row.latest_checked_at !== "string" || !Number.isFinite(Date.parse(row.latest_checked_at)))) ||
+        !Number.isSafeInteger(row.observations_30d) || row.observations_30d < 0 || row.observations_30d > 100_000 ||
+        (row.latest_status === "not_assessed" && (row.latest_checked_at !== null || row.observations_30d !== 0)) ||
+        (row.latest_status !== "not_assessed" && (row.latest_checked_at === null || row.observations_30d < 1))) {
+      throw new Error("Invalid legal evidence scope row");
+    }
+    seen.add(row.scope);
+    return Object.freeze({
+      scope: row.scope,
+      latest_checked_at: row.latest_checked_at,
+      latest_status: row.latest_status,
+      observations_30d: row.observations_30d,
+    });
+  });
+  if (LEGAL_SCOPES.some((scope) => !seen.has(scope))) throw new Error("Legal evidence scope is missing");
+  return Object.freeze(LEGAL_SCOPES.map((scope) => rows.find((row) => row.scope === scope)));
+}
+
+export async function fetchLegalEvidenceSummary({ url, token, fetchImpl = fetch }) {
+  if (typeof url !== "string" || !/^https:\/\//.test(url) || typeof token !== "string" || token.length < 12) {
+    throw new Error("FAM governance bridge credentials unavailable");
+  }
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-fam-agent-token": token },
+    body: JSON.stringify({ action: "legal_evidence_summary" }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response?.ok) throw new Error("FAM legal evidence summary request failed");
+  return validateLegalEvidenceSummaryResponse(await response.json());
 }

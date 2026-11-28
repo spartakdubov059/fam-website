@@ -13,9 +13,12 @@ import {
   formatMoscowTimestamp,
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
-  mapLegalEvidenceScopes,
+  renderLegalObservationStatus,
+  inspectLegalEvidenceWarnings,
+  summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
+import { mapInspectorWarning } from "../../scripts/fam-governance-bridge.mjs";
 
 const NOW = Date.parse("2026-11-13T19:00:00Z");
 const earlier = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -206,21 +209,49 @@ test("Boss report shows separate unassessed LEGAL scopes and never implies relea
   assert.match(unknown, /FAM_RU:[^\n]*не оценено/);
 });
 
-test("LEGAL archive maps source observations only to pending human review and keeps scopes independent", () => {
-  const mapped = mapLegalEvidenceScopes({
-    FAM_CURRENT: { latest_status: "change_detected", observations_30d: 1 },
-    FAM_RU: { latest_status: "source_unavailable", observations_30d: 0 },
-  });
-  assert.deepEqual(mapped, {
-    FAM_CURRENT: "evidence_pending_human_review",
-    FAM_RU: "source_unavailable",
-  });
-  const output = renderLegalScopeStatus(mapped);
-  assert.match(output, /\*\*FAM_CURRENT:\*\* свидетельства ожидают независимой проверки человека/);
-  assert.match(output, /\*\*FAM_RU:\*\* источник недоступен/);
-  assert.doesNotMatch(output, /FAM_CURRENT:[^\n]*(?:одобрен|разрешён)/i);
-  assert.match(output, /не являются юридическим заключением или разрешением на выпуск/);
-  assert.deepEqual(mapLegalEvidenceScopes(null), { FAM_CURRENT: "not_assessed", FAM_RU: "not_assessed" });
+test("LEGAL staff metric counts only archive observations and never labels them as legal approval", () => {
+  const rows = [
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 3 },
+    { scope: "FAM_RU", latest_checked_at: null, latest_status: "not_assessed", observations_30d: 0 },
+  ];
+  const signal = summarizeLegalStaffSignal(rows, "connected");
+  assert.equal(signal.state, "confirmed");
+  assert.equal(signal.evidence_count, 3);
+  assert.match(signal.detail, /технических проверок публичных источников/);
+  assert.match(signal.detail, /решения остаются на проверке человека/);
+  assert.equal(summarizeLegalStaffSignal(rows, "unavailable").state, "no_data");
+  assert.equal(summarizeLegalStaffSignal([
+    rows[0], { ...rows[1], scope: "FAM_CURRENT" },
+  ], "connected").state, "no_data");
+  assert.equal(summarizeLegalStaffSignal([
+    { ...rows[0], observations_30d: 0 }, rows[1],
+  ], "connected").state, "no_data");
+  assert.match(renderLegalObservationStatus([
+    rows[0], { ...rows[1], observations_30d: "<unsafe>" },
+  ], "connected"), /неожиданные поля или статусы; результат неизвестен/);
+  assert.doesNotMatch(makeReport({ legalEvidenceSummary: rows, legalEvidenceLink: "connected" }), /Юрист \(LEGAL\).*решение о выпуске принято/);
+});
+
+test("INSPECTOR reports unavailable LEGAL sources but never auto-enqueues Qwen work", () => {
+  const warnings = inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_unavailable", observations_30d: 1 },
+  ]);
+  assert.deepEqual(warnings, [{
+    code: "legal_source_unavailable",
+    severity: "medium",
+    count: 1,
+    message: "LEGAL: официальный источник недоступен для FAM_RU; правовая готовность не подтверждена",
+  }]);
+  assert.equal(mapInspectorWarning(warnings[0]), null, "source outages are not coder tasks");
+  assert.deepEqual(inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "change_detected", observations_30d: 1 },
+  ]), []);
+  assert.deepEqual(inspectLegalEvidenceWarnings([
+    { scope: "FAM_CURRENT", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_unavailable", observations_30d: "unsafe" },
+    { scope: "FAM_RU", latest_checked_at: "2026-11-27T04:00:00Z", latest_status: "source_checked", observations_30d: 1 },
+  ]), []);
 });
 
 test("Development Advisor report distinguishes current-site aggregates from unassessed FAM RU", () => {
