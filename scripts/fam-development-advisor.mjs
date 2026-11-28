@@ -1,6 +1,8 @@
 const MAX_ROWS = 14;
 const REQUIRED_DAYS = 6;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
+const IDEA_BANDS = new Set(["none", "suppressed", "5_9", "10_24", "25_plus"]);
+const IDEA_BAND_RANK = Object.freeze({ none: 0, "5_9": 1, "10_24": 2, "25_plus": 3 });
 const LISTING_BANDS = new Set(["unknown", "suppressed", "5_9", "10_24", "25_plus"]);
 const LISTING_BAND_RANK = Object.freeze({ suppressed: 1, "5_9": 2, "10_24": 3, "25_plus": 4 });
 
@@ -18,6 +20,7 @@ function validateRows(rows) {
     if (!row || !validDate(row.report_date) || seen.has(row.report_date) ||
         !LISTING_BANDS.has(row.active_listings_band) ||
         !LISTING_BANDS.has(row.new_listings_24h_band) ||
+        !IDEA_BANDS.has(row.pending_council_ideas_band) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at))) continue;
     seen.add(row.report_date);
     safe.push({
@@ -25,11 +28,13 @@ function validateRows(rows) {
       generated_at: new Date(row.generated_at).toISOString(),
       active_listings_band: row.active_listings_band,
       new_listings_24h_band: row.new_listings_24h_band,
+      pending_council_ideas_band: row.pending_council_ideas_band,
     });
   }
   return safe.sort((a, b) => b.report_date.localeCompare(a.report_date)).slice(0, MAX_ROWS);
 }
 
+const averageNumbers = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
 const averageRank = (rows, key) => rows.reduce((sum, row) => sum + LISTING_BAND_RANK[row[key]], 0) / rows.length;
 
 export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
@@ -61,7 +66,8 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
   const recentNew = averageRank(recent, "new_listings_24h_band");
   const activeDrop = previousActive >= 3 && recentActive <= previousActive - 0.75;
   const newListingDrop = previousNew >= 2 && recentNew <= 1;
-  const proposals = activeDrop || newListingDrop ? [Object.freeze({
+  const proposals = [];
+  if (activeDrop || newListingDrop) proposals.push(Object.freeze({
     key: "review_listing_discovery",
     scope: "FAM_CURRENT",
     title: "Проверить, насколько заметен и понятен раздел объявлений",
@@ -97,7 +103,48 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
       priority: "advisory",
     }),
     authority: "recommendation_only",
-  })] : [];
+  }));
+
+  const priorIdeaRanks = previous.map((row) => IDEA_BAND_RANK[row.pending_council_ideas_band]);
+  const recentIdeaRanks = recent.map((row) => IDEA_BAND_RANK[row.pending_council_ideas_band]);
+  const hasCompleteIdeaBands = [...priorIdeaRanks, ...recentIdeaRanks].every(Number.isFinite);
+  const ideaBacklogRising = hasCompleteIdeaBands &&
+    averageNumbers(priorIdeaRanks) < 2 && averageNumbers(recentIdeaRanks) >= 2;
+  if (ideaBacklogRising) proposals.push(Object.freeze({
+    key: "review_idea_feedback_loop",
+    scope: "FAM_CURRENT",
+    title: "Проверить очередь идей и обратную связь Совета",
+    evidence: Object.freeze({
+      snapshots: REQUIRED_DAYS,
+      previous_pending_ideas_bands: [...new Set(previous.map((row) => row.pending_council_ideas_band))],
+      recent_pending_ideas_bands: [...new Set(recent.map((row) => row.pending_council_ideas_band))],
+      privacy_threshold: "не менее пяти школ с сигналом; вклад каждой школы ограничен пятью",
+    }),
+    hypothesis: "Рост диапазона ожидающих идей может означать, что участники дольше ждут решения; агрегаты не устанавливают причину.",
+    next_step: "Предложить владельцу проверить понятность статусов идеи и порядок обратной связи; не читать тексты идей и не менять продукт автоматически.",
+    design_brief: Object.freeze({
+      status: "proposal_only",
+      user_scenario: "Участник школы предлагает идею и хочет понимать, что происходит после отправки.",
+      options: Object.freeze([
+        "Проверить, виден ли понятный текущий статус и безопасный следующий шаг.",
+        "Проверить на синтетических сценариях состояния ожидания, принятия и отклонения.",
+        "Сравнить один вариант краткого объяснения процесса до разработки; не читать пользовательские предложения.",
+      ]),
+      acceptance_checks: Object.freeze([
+        "Синтетический пользователь понимает статус и ожидаемый следующий шаг.",
+        "Пустое состояние отличается от ожидания решения.",
+        "Доступность клавиатуры и мобильный сценарий проверены независимо.",
+        "Любое изменение проходит независимую QA и отдельное решение владельца.",
+      ]),
+      risks: Object.freeze([
+        "Диапазоны не раскрывают точные значения и подавляют сигнал при малом числе школ.",
+        "Рост очереди не доказывает проблему интерфейса или задержку конкретного сотрудника.",
+      ]),
+      cost: "Проверка гипотезы и макета без нового сервиса; трудоёмкость реализации не оценивалась.",
+      priority: "advisory",
+    }),
+    authority: "recommendation_only",
+  }));
 
   return Object.freeze({
     state: proposals.length ? "confirmed" : "checked_no_signal",
@@ -120,22 +167,27 @@ export function renderDevelopmentAdvisor(result) {
   ];
   if (result?.latest_report_date) lines.push("Последняя сводка: " + result.latest_report_date + "; дней в проверке: " + result.snapshot_count + ".");
   if (!result?.proposals?.length) {
-    lines.push("Регистрации и использование отдельных функций не анализировались: подтверждённый источник этих агрегатов не подключён.");
+    lines.push("Регистрации и просмотры отдельных функций не анализируются; диапазон очереди идей подавлен при недостаточной агрегированной выборке.");
   }
   for (const proposal of result?.proposals || []) {
-    lines.push(
-      "- **" + proposal.title + "** (гипотеза, не установленная причина). " + proposal.hypothesis,
-      "  Диапазоны объявлений: активные — " + proposal.evidence.previous_active_listings_bands.join(", ") +
+    const evidenceLine = proposal.key === "review_listing_discovery"
+      ? "  Диапазоны объявлений: активные — " + proposal.evidence.previous_active_listings_bands.join(", ") +
         " → " + proposal.evidence.recent_active_listings_bands.join(", ") +
         "; новые за сутки — " + proposal.evidence.previous_new_listings_24h_bands.join(", ") +
         " → " + proposal.evidence.recent_new_listings_24h_bands.join(", ") +
-        "; " + proposal.evidence.privacy_threshold + ".",
+        "; " + proposal.evidence.privacy_threshold + "."
+      : "  Агрегированные диапазоны ожидающих идей: " + proposal.evidence.previous_pending_ideas_bands.join(", ") +
+        " → " + proposal.evidence.recent_pending_ideas_bands.join(", ") +
+        "; применён порог: " + proposal.evidence.privacy_threshold + ".";
+    lines.push(
+      "- **" + proposal.title + "** (гипотеза, не установленная причина). " + proposal.hypothesis,
+      evidenceLine,
       "  Следующий шаг: " + proposal.next_step,
       "  UX-задание: " + proposal.design_brief.options.join(" "),
       "  Критерии: " + proposal.design_brief.acceptance_checks.join(" "),
       "  Риски: " + proposal.design_brief.risks.join(" "),
     );
   }
-  lines.push("Используются только дневные счётчики объявлений. Нет доступа к профилям, регистрациям, перепискам или содержимому учеников; Советник только рекомендует и не создаёт задачи автоматически.");
+  lines.push("Используются только дневные счётчики объявлений и диапазоны очереди идей с порогом пяти школ. Нет доступа к профилям, регистрациям, перепискам или текстам идей; Советник только рекомендует и не создаёт задачи автоматически.");
   return lines.join("\n");
 }

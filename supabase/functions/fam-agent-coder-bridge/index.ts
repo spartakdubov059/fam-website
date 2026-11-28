@@ -177,17 +177,21 @@ Deno.serve(async (req: Request) => {
 
     if (body.action === "development_advisor_metrics" && Object.keys(body).length === 1) {
       const snapshots = await rpc("get_fam_development_advisor_snapshots", { p_days: 7 });
+      const listingBands = new Set(["unknown", "suppressed", "5_9", "10_24", "25_plus"]);
+      const ideaBands = new Set(["none", "suppressed", "5_9", "10_24", "25_plus"]);
       if (!Array.isArray(snapshots) || snapshots.length > 7 || snapshots.some((row) =>
         !row || typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
-        !Number.isSafeInteger(row.active_listings) || row.active_listings < 0 || row.active_listings > 10_000_000 ||
-        !Number.isSafeInteger(row.new_listings_24h) || row.new_listings_24h < 0 || row.new_listings_24h > 10_000_000
+        !listingBands.has(row.active_listings_band) ||
+        !listingBands.has(row.new_listings_24h_band) ||
+        !ideaBands.has(row.pending_council_ideas_band)
       )) return json({ ok: false, error: "invalid_development_advisor_metrics" }, 502);
       const safe = snapshots.map((row) => ({
         report_date: row.report_date,
         generated_at: row.generated_at,
-        active_listings: row.active_listings,
-        new_listings_24h: row.new_listings_24h,
+        active_listings_band: row.active_listings_band,
+        new_listings_24h_band: row.new_listings_24h_band,
+        pending_council_ideas_band: row.pending_council_ideas_band,
       }));
       return json({ ok: true, snapshots: safe, diagnostic_id: diagnosticId }, 200, diagnosticId);
     }

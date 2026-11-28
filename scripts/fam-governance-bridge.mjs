@@ -154,11 +154,12 @@ export function validateDevelopmentAdvisorResponse(body) {
     throw new Error("Invalid development advisor aggregate response");
   }
   return Object.freeze(body.snapshots.map((row) => {
-    if (!row || Object.keys(row).length !== 4 ||
+    if (!row || Object.keys(row).length !== 5 ||
         typeof row.report_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at)) ||
         !["unknown", "suppressed", "5_9", "10_24", "25_plus"].includes(row.active_listings_band) ||
-        !["unknown", "suppressed", "5_9", "10_24", "25_plus"].includes(row.new_listings_24h_band)) {
+        !["unknown", "suppressed", "5_9", "10_24", "25_plus"].includes(row.new_listings_24h_band) ||
+        !["none", "suppressed", "5_9", "10_24", "25_plus"].includes(row.pending_council_ideas_band)) {
       throw new Error("Invalid development advisor aggregate row");
     }
     return Object.freeze({
@@ -166,6 +167,7 @@ export function validateDevelopmentAdvisorResponse(body) {
       generated_at: row.generated_at,
       active_listings_band: row.active_listings_band,
       new_listings_24h_band: row.new_listings_24h_band,
+      pending_council_ideas_band: row.pending_council_ideas_band,
     });
   }));
 }
