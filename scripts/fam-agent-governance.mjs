@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildIntegrationPlan, formatIntegrationPlan } from "./fam-integration-coordinator.mjs";
-import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchLegalEvidenceSummary, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning } from "./fam-governance-bridge.mjs";
+import { enqueueInspectorTask, fetchAgentMetrics, fetchDevelopmentAdvisorSnapshots, fetchLegalEvidenceSummary, fetchModerationSummary, fetchQueueHealth, inspectQueueHealth, mapInspectorWarning, validateLegalEvidenceSummaryResponse } from "./fam-governance-bridge.mjs";
 import { buildDevelopmentAdvisor, renderDevelopmentAdvisor } from "./fam-development-advisor.mjs";
 import { renderStaffSnapshot } from "./fam-agent-staff-snapshot.mjs";
 
@@ -387,7 +387,10 @@ export function renderLegalObservationStatus(rows = null, link = "not_configured
       ? "Защищённый источник архива не подключён; мониторинг не подтверждён."
       : "Архив недоступен или его ответ отклонён; статус неизвестен."].join("\n");
   }
-  const indexed = new Map(rows.map((row) => [row.scope, row]));
+  let validatedRows;
+  try { validatedRows = validateLegalEvidenceSummaryResponse({ ok: true, scopes: rows }); }
+  catch { return [heading, "Архив вернул неожиданные поля или статусы; результат неизвестен."].join("\n"); }
+  const indexed = new Map(validatedRows.map((row) => [row.scope, row]));
   return [
     heading,
     ...["FAM_CURRENT", "FAM_RU"].map((scope) => {
@@ -409,8 +412,16 @@ export function summarizeLegalStaffSignal(rows = null, link = "not_configured") 
       detail: "защищённая сводка юридических наблюдений не подключена или недоступна; правовые выводы не подтверждены",
     });
   }
-  const evidenceCount = rows.reduce((sum, row) =>
-    sum + (Number.isSafeInteger(row?.observations_30d) && row.observations_30d > 0 ? row.observations_30d : 0), 0);
+  let validatedRows;
+  try { validatedRows = validateLegalEvidenceSummaryResponse({ ok: true, scopes: rows }); }
+  catch {
+    return Object.freeze({
+      state: "no_data",
+      evidence_count: 0,
+      detail: "сводка LEGAL содержит неподтверждённые поля; статус неизвестен",
+    });
+  }
+  const evidenceCount = validatedRows.reduce((sum, row) => sum + row.observations_30d, 0);
   return Object.freeze({
     state: evidenceCount > 0 ? "confirmed" : "no_data",
     evidence_count: evidenceCount,

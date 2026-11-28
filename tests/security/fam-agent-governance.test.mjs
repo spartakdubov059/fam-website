@@ -13,6 +13,7 @@ import {
   formatMoscowTimestamp,
   shouldPublishGovernanceReport,
   renderLegalScopeStatus,
+  renderLegalObservationStatus,
   summarizeLegalStaffSignal,
   renderDevelopmentScopeStatus,
 } from "../../scripts/fam-agent-governance.mjs";
@@ -186,8 +187,14 @@ test("LEGAL staff metric counts only archive observations and never labels them 
   assert.match(signal.detail, /решения остаются на проверке человека/);
   assert.equal(summarizeLegalStaffSignal(rows, "unavailable").state, "no_data");
   assert.equal(summarizeLegalStaffSignal([
+    rows[0], { ...rows[1], scope: "FAM_CURRENT" },
+  ], "connected").state, "no_data");
+  assert.equal(summarizeLegalStaffSignal([
     { ...rows[0], observations_30d: 0 }, rows[1],
   ], "connected").state, "no_data");
+  assert.match(renderLegalObservationStatus([
+    rows[0], { ...rows[1], observations_30d: "<unsafe>" },
+  ], "connected"), /неожиданные поля или статусы; результат неизвестен/);
   assert.doesNotMatch(makeReport({ legalEvidenceSummary: rows, legalEvidenceLink: "connected" }), /Юрист \(LEGAL\).*решение о выпуске принято/);
 });
 
