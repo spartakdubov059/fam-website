@@ -1,7 +1,8 @@
 const MAX_ROWS = 14;
-const MAX_COUNT = 10_000_000;
 const REQUIRED_DAYS = 6;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
+const LISTING_BANDS = new Set(["none", "suppressed", "5_9", "10_24", "25_plus"]);
+const LISTING_BAND_RANK = Object.freeze({ none: 0, suppressed: 1, "5_9": 2, "10_24": 3, "25_plus": 4 });
 
 function validDate(value) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -15,21 +16,21 @@ function validateRows(rows) {
   const seen = new Set();
   for (const row of rows) {
     if (!row || !validDate(row.report_date) || seen.has(row.report_date) ||
-        !Number.isSafeInteger(row.active_listings) || row.active_listings < 0 || row.active_listings > MAX_COUNT ||
-        !Number.isSafeInteger(row.new_listings_24h) || row.new_listings_24h < 0 || row.new_listings_24h > MAX_COUNT ||
+        !LISTING_BANDS.has(row.active_listings_band) ||
+        !LISTING_BANDS.has(row.new_listings_24h_band) ||
         typeof row.generated_at !== "string" || !Number.isFinite(Date.parse(row.generated_at))) continue;
     seen.add(row.report_date);
     safe.push({
       report_date: row.report_date,
       generated_at: new Date(row.generated_at).toISOString(),
-      active_listings: row.active_listings,
-      new_listings_24h: row.new_listings_24h,
+      active_listings_band: row.active_listings_band,
+      new_listings_24h_band: row.new_listings_24h_band,
     });
   }
   return safe.sort((a, b) => b.report_date.localeCompare(a.report_date)).slice(0, MAX_ROWS);
 }
 
-const average = (rows, key) => rows.reduce((sum, row) => sum + row[key], 0) / rows.length;
+const averageRank = (rows, key) => rows.reduce((sum, row) => sum + LISTING_BAND_RANK[row[key]], 0) / rows.length;
 
 export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
   const snapshots = validateRows(rows);
@@ -50,22 +51,23 @@ export function buildDevelopmentAdvisor(rows = [], { now = Date.now() } = {}) {
 
   const recent = snapshots.slice(0, 3);
   const previous = snapshots.slice(3, 6);
-  const previousActive = average(previous, "active_listings");
-  const recentActive = average(recent, "active_listings");
-  const previousNew = average(previous, "new_listings_24h");
-  const recentNew = average(recent, "new_listings_24h");
-  const activeDrop = previousActive >= 10 && recentActive <= previousActive * 0.75;
-  const newListingDrop = previousNew >= 3 && recentNew === 0;
+  const previousActive = averageRank(previous, "active_listings_band");
+  const recentActive = averageRank(recent, "active_listings_band");
+  const previousNew = averageRank(previous, "new_listings_24h_band");
+  const recentNew = averageRank(recent, "new_listings_24h_band");
+  const activeDrop = previousActive >= 3 && recentActive <= previousActive - 0.75;
+  const newListingDrop = previousNew >= 2 && recentNew === 0;
   const proposals = activeDrop || newListingDrop ? [Object.freeze({
     key: "review_listing_discovery",
     scope: "FAM_CURRENT",
     title: "Проверить, насколько заметен и понятен раздел объявлений",
     evidence: Object.freeze({
       snapshots: REQUIRED_DAYS,
-      previous_active_listings_avg: Math.round(previousActive * 10) / 10,
-      recent_active_listings_avg: Math.round(recentActive * 10) / 10,
-      previous_new_listings_24h_avg: Math.round(previousNew * 10) / 10,
-      recent_new_listings_24h_avg: Math.round(recentNew * 10) / 10,
+      previous_active_listings_bands: [...new Set(previous.map((row) => row.active_listings_band))],
+      recent_active_listings_bands: [...new Set(recent.map((row) => row.active_listings_band))],
+      previous_new_listings_24h_bands: [...new Set(previous.map((row) => row.new_listings_24h_band))],
+      recent_new_listings_24h_bands: [...new Set(recent.map((row) => row.new_listings_24h_band))],
+      privacy_threshold: "точные показатели меньше пяти скрываются; остальные передаются диапазонами",
     }),
     hypothesis: "Снижение агрегатов может быть связано с заметностью или понятностью раздела; причина этими счётчиками не устанавливается.",
     next_step: "Предложить владельцу проверку сценария просмотра и добавления объявления; не менять продукт автоматически.",
@@ -119,10 +121,11 @@ export function renderDevelopmentAdvisor(result) {
   for (const proposal of result?.proposals || []) {
     lines.push(
       "- **" + proposal.title + "** (гипотеза, не установленная причина). " + proposal.hypothesis,
-      "  Агрегаты: активные объявления — " + proposal.evidence.previous_active_listings_avg +
-        " → " + proposal.evidence.recent_active_listings_avg +
-        "; новые за сутки — " + proposal.evidence.previous_new_listings_24h_avg +
-        " → " + proposal.evidence.recent_new_listings_24h_avg + ".",
+      "  Диапазоны объявлений: активные — " + proposal.evidence.previous_active_listings_bands.join(", ") +
+        " → " + proposal.evidence.recent_active_listings_bands.join(", ") +
+        "; новые за сутки — " + proposal.evidence.previous_new_listings_24h_bands.join(", ") +
+        " → " + proposal.evidence.recent_new_listings_24h_bands.join(", ") +
+        "; " + proposal.evidence.privacy_threshold + ".",
       "  Следующий шаг: " + proposal.next_step,
       "  UX-задание: " + proposal.design_brief.options.join(" "),
       "  Критерии: " + proposal.design_brief.acceptance_checks.join(" "),
