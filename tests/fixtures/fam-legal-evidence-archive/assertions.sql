@@ -19,8 +19,15 @@ begin
   end if;
   if has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'UPDATE') or
      has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'DELETE') or
-     has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'TRUNCATE') then
+     has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'TRUNCATE') or
+     has_table_privilege('service_role', 'private.fam_legal_evidence_archive', 'INSERT') then
     raise exception 'service_role must not mutate or truncate the archive directly';
+  end if;
+  if not (select prosecdef from pg_catalog.pg_proc where oid =
+      'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)'::regprocedure) or
+     (select pg_catalog.pg_get_userbyid(proowner) from pg_catalog.pg_proc where oid =
+      'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)'::regprocedure) <> 'postgres' then
+    raise exception 'append RPC must execute as its fixed protected owner';
   end if;
   if not has_function_privilege('service_role', 'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)', 'EXECUTE') or
      has_function_privilege('authenticated', 'public.append_fam_legal_evidence_observation(text,text,text,text,text,text,text,text)', 'EXECUTE') then
@@ -34,6 +41,39 @@ end $$;
 
 begin;
 set role service_role;
+set local request.jwt.claim.role = 'service_role';
+do $$
+declare v_denied boolean := false;
+begin
+  begin
+    insert into private.fam_legal_evidence_archive (
+      scope, revision, criterion_id, source_id, source_url, status,
+      document_id, document_sha256, record_sha256
+    ) values (
+      'FAM_CURRENT', repeat('a', 40), 'official_source_review', 'official_portal_all',
+      'https://publication.pravo.gov.ru/', 'source_checked', repeat('1', 12),
+      repeat('a', 64), repeat('0', 64)
+    );
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'Direct archive insert unexpectedly succeeded'; end if;
+end $$;
+set local request.jwt.claim.role = '';
+do $$
+declare v_denied boolean := false;
+begin
+  begin
+    perform * from public.append_fam_legal_evidence_observation(
+      'FAM_CURRENT', repeat('a', 40), 'official_source_review', 'official_portal_all',
+      'https://publication.pravo.gov.ru/', 'source_unavailable', null, null
+    );
+  exception when insufficient_privilege then
+    v_denied := true;
+  end;
+  if not v_denied then raise exception 'RPC accepted service_role without a service-role JWT claim'; end if;
+end $$;
+set local request.jwt.claim.role = 'service_role';
 do $$
 declare
   v_first record;
